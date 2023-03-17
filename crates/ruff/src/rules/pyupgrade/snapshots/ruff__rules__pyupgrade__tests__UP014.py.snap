@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ConvertNamedTupleFunctionalToClass:
-      name: MyType
-      fixable: true
+    name: ConvertNamedTupleFunctionalToClass
+    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
+    fixable: true
   location:
     row: 5
     column: 0
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 67
   parent: ~
 - kind:
-    ConvertNamedTupleFunctionalToClass:
-      name: MyType
-      fixable: true
+    name: ConvertNamedTupleFunctionalToClass
+    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
+    fixable: true
   location:
     row: 8
     column: 0
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    ConvertNamedTupleFunctionalToClass:
-      name: MyType
-      fixable: true
+    name: ConvertNamedTupleFunctionalToClass
+    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
+    fixable: true
   location:
     row: 15
     column: 0
@@ -58,5 +61,45 @@ expression: diagnostics
     end_location:
       row: 15
       column: 62
+  parent: ~
+- kind:
+    name: ConvertNamedTupleFunctionalToClass
+    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
+    fixable: true
+  location:
+    row: 28
+    column: 0
+  end_location:
+    row: 28
+    column: 36
+  fix:
+    content: "class MyType(typing.NamedTuple):\n    pass"
+    location:
+      row: 28
+      column: 0
+    end_location:
+      row: 28
+      column: 36
+  parent: ~
+- kind:
+    name: ConvertNamedTupleFunctionalToClass
+    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
+    suggestion: "Convert `MyType` to class syntax"
+    fixable: true
+  location:
+    row: 31
+    column: 0
+  end_location:
+    row: 31
+    column: 40
+  fix:
+    content: "class MyType(typing.NamedTuple):\n    pass"
+    location:
+      row: 31
+      column: 0
+    end_location:
+      row: 31
+      column: 40
   parent: ~
 

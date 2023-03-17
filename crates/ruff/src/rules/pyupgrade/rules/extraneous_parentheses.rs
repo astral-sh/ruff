@@ -1,17 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use crate::ast::types::Range;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::settings::{flags, Settings};
-use crate::source_code::Locator;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct ExtraneousParentheses;
-);
+use crate::registry::Rule;
+use crate::settings::{flags, Settings};
+
+#[violation]
+pub struct ExtraneousParentheses;
+
 impl AlwaysAutofixableViolation for ExtraneousParentheses {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -137,8 +137,8 @@ pub fn extraneous_parentheses(
                 };
                 let mut diagnostic =
                     Diagnostic::new(ExtraneousParentheses, Range::new(*start, *end));
-                if autofix.into() && settings.rules.should_fix(&Rule::ExtraneousParentheses) {
-                    let contents = locator.slice(&Range::new(*start, *end));
+                if autofix.into() && settings.rules.should_fix(Rule::ExtraneousParentheses) {
+                    let contents = locator.slice(Range::new(*start, *end));
                     diagnostic.amend(Fix::replacement(
                         contents[1..contents.len() - 1].to_string(),
                         *start,

@@ -4,7 +4,7 @@ use anyhow::Result;
 use serde::Serialize;
 
 use ruff::registry::{Linter, Rule, RuleNamespace};
-use ruff::AutofixAvailability;
+use ruff_diagnostics::Availability;
 
 use crate::args::HelpFormat;
 
@@ -16,7 +16,7 @@ struct Explanation<'a> {
 }
 
 /// Explain a `Rule` to the user.
-pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
+pub fn rule(rule: Rule, format: HelpFormat) -> Result<()> {
     let (linter, _) = Linter::parse_code(&rule.noqa_code().to_string()).unwrap();
     let mut stdout = BufWriter::new(io::stdout().lock());
     let mut output = String::new();
@@ -34,8 +34,8 @@ pub fn rule(rule: &Rule, format: HelpFormat) -> Result<()> {
 
             if let Some(autofix) = rule.autofixable() {
                 output.push_str(match autofix.available {
-                    AutofixAvailability::Sometimes => "Autofix is sometimes available.",
-                    AutofixAvailability::Always => "Autofix is always available.",
+                    Availability::Sometimes => "Autofix is sometimes available.",
+                    Availability::Always => "Autofix is always available.",
                 });
                 output.push('\n');
                 output.push('\n');

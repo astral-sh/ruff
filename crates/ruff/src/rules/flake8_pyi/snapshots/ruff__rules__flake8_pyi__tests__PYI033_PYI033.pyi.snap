@@ -1,0 +1,148 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 6
+    column: 21
+  end_location:
+    row: 6
+    column: 127
+  fix: ~
+  parent: ~
+- kind:
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 7
+    column: 21
+  end_location:
+    row: 7
+    column: 183
+  fix: ~
+  parent: ~
+- kind:
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 8
+    column: 21
+  end_location:
+    row: 8
+    column: 126
+  fix: ~
+  parent: ~
+- kind:
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 9
+    column: 21
+  end_location:
+    row: 9
+    column: 132
+  fix: ~
+  parent: ~
+- kind:
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 10
+    column: 19
+  end_location:
+    row: 10
+    column: 128
+  fix: ~
+  parent: ~
+- kind:
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 11
+    column: 19
+  end_location:
+    row: 11
+    column: 123
+  fix: ~
+  parent: ~
+- kind:
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 14
+    column: 11
+  end_location:
+    row: 14
+    column: 128
+  fix: ~
+  parent: ~
+- kind:
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 15
+    column: 10
+  end_location:
+    row: 15
+    column: 172
+  fix: ~
+  parent: ~
+- kind:
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 19
+    column: 28
+  end_location:
+    row: 19
+    column: 139
+  fix: ~
+  parent: ~
+- kind:
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 29
+    column: 21
+  end_location:
+    row: 29
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    name: TypeCommentInStub
+    body: "Don't use type comments in stub file"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 32
+    column: 25
+  end_location:
+    row: 32
+    column: 55
+  fix: ~
+  parent: ~
+

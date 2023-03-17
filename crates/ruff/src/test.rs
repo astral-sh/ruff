@@ -6,13 +6,14 @@ use std::path::Path;
 use anyhow::Result;
 use rustpython_parser::lexer::LexResult;
 
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+
 use crate::autofix::fix_file;
 use crate::directives;
 use crate::linter::{check_path, LinterResult};
 use crate::packaging::detect_package_root;
-use crate::registry::Diagnostic;
 use crate::settings::{flags, Settings};
-use crate::source_code::{Indexer, Locator, Stylist};
 
 pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
     Path::new("./resources/test/").join(path)
@@ -20,7 +21,7 @@ pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that autofixes converge after 10 iterations.
-pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
+pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diagnostic>> {
     let path = test_resource_path("fixtures").join(path);
     let contents = std::fs::read_to_string(&path)?;
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
@@ -43,8 +44,8 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
         &indexer,
         &directives,
         settings,
-        flags::Autofix::Enabled,
         flags::Noqa::Enabled,
+        flags::Autofix::Enabled,
     );
 
     // Detect autofixes that don't converge after multiple iterations.
@@ -76,8 +77,8 @@ pub fn test_path(path: &Path, settings: &Settings) -> Result<Vec<Diagnostic>> {
                 &indexer,
                 &directives,
                 settings,
-                flags::Autofix::Enabled,
                 flags::Noqa::Enabled,
+                flags::Autofix::Enabled,
             );
             if let Some((fixed_contents, _)) = fix_file(&diagnostics, &locator) {
                 if iterations < max_iterations {

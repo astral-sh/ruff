@@ -2,13 +2,12 @@ use rustpython_parser::{Mode, Tok};
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{write, Format};
+use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_python_ast::types::Range;
 use ruff_text_size::TextSize;
 
 use crate::context::ASTFormatContext;
-use crate::core::helpers::{leading_quote, trailing_quote};
-use crate::core::types::Range;
 use crate::cst::Expr;
-use crate::trivia::Parenthesize;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct StringLiteralPart {
@@ -17,13 +16,16 @@ pub struct StringLiteralPart {
 
 impl Format<ASTFormatContext<'_>> for StringLiteralPart {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let (source, start, end) = f.context().locator().slice(self.range);
+        let locator = f.context().locator();
+        let contents = f.context().contents();
+        let start_index = locator.offset(self.range.location);
+        let end_index = locator.offset(self.range.end_location);
 
         // Extract leading and trailing quotes.
-        let content = &source[start..end];
-        let leading_quote = leading_quote(content).unwrap();
-        let trailing_quote = trailing_quote(content).unwrap();
-        let body = &content[leading_quote.len()..content.len() - trailing_quote.len()];
+        let contents = &contents[start_index..end_index];
+        let leading_quote = leading_quote(contents).unwrap();
+        let trailing_quote = trailing_quote(contents).unwrap();
+        let body = &contents[leading_quote.len()..contents.len() - trailing_quote.len()];
 
         // Determine the correct quote style.
         // TODO(charlie): Make this parameterizable.
@@ -127,22 +129,21 @@ impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
 
         // TODO(charlie): This tokenization needs to happen earlier, so that we can attach
         // comments to individual string literals.
-        let (source, start, end) = f.context().locator().slice(Range::from_located(expr));
-        let elts =
-            rustpython_parser::lexer::lex_located(&source[start..end], Mode::Module, expr.location)
-                .flatten()
-                .filter_map(|(start, tok, end)| {
-                    if matches!(tok, Tok::String { .. }) {
-                        Some(Range::new(start, end))
-                    } else {
-                        None
-                    }
-                })
-                .collect::<Vec<_>>();
+        let contents = f.context().locator().slice(expr);
+        let elts = rustpython_parser::lexer::lex_located(contents, Mode::Module, expr.location)
+            .flatten()
+            .filter_map(|(start, tok, end)| {
+                if matches!(tok, Tok::String { .. }) {
+                    Some(Range::new(start, end))
+                } else {
+                    None
+                }
+            })
+            .collect::<Vec<_>>();
         write!(
             f,
             [group(&format_with(|f| {
-                if matches!(expr.parentheses, Parenthesize::IfExpanded) {
+                if expr.parentheses.is_if_expanded() {
                     write!(f, [if_group_breaks(&text("("))])?;
                 }
                 for (i, elt) in elts.iter().enumerate() {
@@ -151,7 +152,7 @@ impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
                         write!(f, [soft_line_break_or_space()])?;
                     }
                 }
-                if matches!(expr.parentheses, Parenthesize::IfExpanded) {
+                if expr.parentheses.is_if_expanded() {
                     write!(f, [if_group_breaks(&text(")"))])?;
                 }
                 Ok(())

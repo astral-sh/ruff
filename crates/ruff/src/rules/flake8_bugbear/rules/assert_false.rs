@@ -1,16 +1,16 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
-use crate::ast::helpers::unparse_stmt;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::unparse_stmt;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct AssertFalse;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct AssertFalse;
+
 impl AlwaysAutofixableViolation for AssertFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -61,7 +61,7 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(AssertFalse, Range::from_located(test));
+    let mut diagnostic = Diagnostic::new(AssertFalse, Range::from(test));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             unparse_stmt(&assertion_error(msg), checker.stylist),

@@ -1,14 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Expr;
 
-use crate::ast::types::{FunctionDef, Range, ScopeKind};
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::scope::{FunctionDef, ScopeKind};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct AwaitOutsideAsync;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct AwaitOutsideAsync;
+
 impl Violation for AwaitOutsideAsync {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -19,7 +20,8 @@ impl Violation for AwaitOutsideAsync {
 /// PLE1142
 pub fn await_outside_async(checker: &mut Checker, expr: &Expr) {
     if !checker
-        .current_scopes()
+        .ctx
+        .scopes()
         .find_map(|scope| {
             if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {
                 Some(*async_)
@@ -29,9 +31,8 @@ pub fn await_outside_async(checker: &mut Checker, expr: &Expr) {
         })
         .unwrap_or(true)
     {
-        checker.diagnostics.push(Diagnostic::new(
-            AwaitOutsideAsync,
-            Range::from_located(expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(AwaitOutsideAsync, Range::from(expr)));
     }
 }

@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnrecognizedPlatformCheck: ~
+    name: UnrecognizedPlatformCheck
+    body: "Unrecognized `sys.platform` check"
+    suggestion: ~
+    fixable: false
   location:
     row: 7
     column: 3
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnrecognizedPlatformCheck: ~
+    name: UnrecognizedPlatformCheck
+    body: "Unrecognized `sys.platform` check"
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 3
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnrecognizedPlatformCheck: ~
+    name: UnrecognizedPlatformCheck
+    body: "Unrecognized `sys.platform` check"
+    suggestion: ~
+    fixable: false
   location:
     row: 11
     column: 3

@@ -10,6 +10,7 @@ use ignore::{DirEntry, WalkBuilder, WalkState};
 use itertools::Itertools;
 use log::debug;
 use path_absolutize::path_dedot;
+use ruff_python_stdlib::path::is_python_file;
 use rustc_hash::FxHashSet;
 
 use crate::fs;
@@ -126,7 +127,8 @@ pub fn resolve_configuration(
         }
 
         // Resolve the current path.
-        let options = pyproject::load_options(&path)?;
+        let options = pyproject::load_options(&path)
+            .map_err(|err| anyhow!("Failed to parse `{}`: {}", path.display(), err))?;
         let project_root = relativity.resolve(&path);
         let configuration = Configuration::from_options(options, &project_root)?;
 
@@ -191,20 +193,9 @@ fn match_exclusion(file_path: &str, file_basename: &str, exclusion: &globset::Gl
     exclusion.is_match(file_path) || exclusion.is_match(file_basename)
 }
 
-/// Return `true` if the [`Path`] appears to be that of a Python file.
-fn is_python_path(path: &Path) -> bool {
-    path.extension()
-        .map_or(false, |ext| ext == "py" || ext == "pyi")
-}
-
-/// Return `true` if the [`Path`] appears to be that of a Python interface definition file (`.pyi`).
-pub fn is_interface_definition_path(path: &Path) -> bool {
-    path.extension().map_or(false, |ext| ext == "pyi")
-}
-
 /// Return `true` if the [`DirEntry`] appears to be that of a Python file.
 pub fn is_python_entry(entry: &DirEntry) -> bool {
-    is_python_path(entry.path())
+    is_python_file(entry.path())
         && !entry
             .file_type()
             .map_or(false, |file_type| file_type.is_dir())
@@ -430,27 +421,12 @@ mod tests {
 
     use crate::fs;
     use crate::resolver::{
-        is_file_excluded, is_python_path, match_exclusion, resolve_settings_with_processor,
-        NoOpProcessor, PyprojectDiscovery, Relativity, Resolver,
+        is_file_excluded, match_exclusion, resolve_settings_with_processor, NoOpProcessor,
+        PyprojectDiscovery, Relativity, Resolver,
     };
     use crate::settings::pyproject::find_settings_toml;
     use crate::settings::types::FilePattern;
     use crate::test::test_resource_path;
-
-    #[test]
-    fn inclusions() {
-        let path = Path::new("foo/bar/baz.py").absolutize().unwrap();
-        assert!(is_python_path(&path));
-
-        let path = Path::new("foo/bar/baz.pyi").absolutize().unwrap();
-        assert!(is_python_path(&path));
-
-        let path = Path::new("foo/bar/baz.js").absolutize().unwrap();
-        assert!(!is_python_path(&path));
-
-        let path = Path::new("foo/bar/baz").absolutize().unwrap();
-        assert!(!is_python_path(&path));
-    }
 
     fn make_exclusion(file_pattern: FilePattern) -> GlobSet {
         let mut builder = globset::GlobSetBuilder::new();

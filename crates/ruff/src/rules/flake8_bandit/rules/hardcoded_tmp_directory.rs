@@ -1,15 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Expr;
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct HardcodedTempFile {
-        pub string: String,
-    }
-);
+#[violation]
+pub struct HardcodedTempFile {
+    pub string: String,
+}
+
 impl Violation for HardcodedTempFile {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -32,7 +31,7 @@ pub fn hardcoded_tmp_directory(
             HardcodedTempFile {
                 string: value.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ))
     } else {
         None

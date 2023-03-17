@@ -4,20 +4,21 @@ use rustpython_parser::ast::Constant;
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{format_args, write};
+use ruff_python_ast::types::Range;
 use ruff_text_size::TextSize;
 
-use crate::builders::literal;
 use crate::context::ASTFormatContext;
-use crate::core::types::Range;
 use crate::cst::{
-    Arguments, Boolop, Cmpop, Comprehension, Expr, ExprKind, Keyword, Operator, SliceIndex,
-    SliceIndexKind, Unaryop,
+    Arguments, BoolOp, CmpOp, Comprehension, Expr, ExprKind, Keyword, Operator, OperatorKind,
+    SliceIndex, SliceIndexKind, UnaryOp, UnaryOpKind,
 };
+use crate::format::builders::literal;
+use crate::format::comments::{dangling_comments, end_of_line_comments, leading_comments};
 use crate::format::helpers::{is_self_closing, is_simple_power, is_simple_slice};
 use crate::format::numbers::{complex_literal, float_literal, int_literal};
 use crate::format::strings::string_literal;
 use crate::shared_traits::AsFormat;
-use crate::trivia::{Parenthesize, Relationship, TriviaKind};
+use crate::trivia::{Parenthesize, TriviaKind};
 
 pub struct FormatExpr<'a> {
     item: &'a Expr,
@@ -29,26 +30,7 @@ fn format_starred(
     value: &Expr,
 ) -> FormatResult<()> {
     write!(f, [text("*"), value.format()])?;
-
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
-
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -57,27 +39,8 @@ fn format_name(
     expr: &Expr,
     _id: &str,
 ) -> FormatResult<()> {
-    write!(f, [literal(Range::from_located(expr))])?;
-
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
-
+    write!(f, [literal(Range::from(expr))])?;
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -96,7 +59,7 @@ fn format_subscript(
 
             // Apply any dangling comments.
             for trivia in &expr.trivia {
-                if matches!(trivia.relationship, Relationship::Dangling) {
+                if trivia.relationship.is_dangling() {
                     if let TriviaKind::OwnLineComment(range) = trivia.kind {
                         write!(f, [expand_parent()])?;
                         write!(f, [hard_line_break()])?;
@@ -108,9 +71,8 @@ fn format_subscript(
             Ok(())
         }))])]
     )?;
-
     write!(f, [text("]")])?;
-
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -136,7 +98,7 @@ fn format_tuple(
         write!(
             f,
             [group(&format_with(|f| {
-                if matches!(expr.parentheses, Parenthesize::IfExpanded) {
+                if expr.parentheses.is_if_expanded() {
                     write!(f, [if_group_breaks(&text("("))])?;
                 }
                 if matches!(
@@ -146,10 +108,8 @@ fn format_tuple(
                     write!(
                         f,
                         [soft_block_indent(&format_with(|f| {
-                            let magic_trailing_comma = expr
-                                .trivia
-                                .iter()
-                                .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+                            let magic_trailing_comma =
+                                expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
                             let is_unbroken =
                                 expr.location.row() == expr.end_location.unwrap().row();
                             if magic_trailing_comma {
@@ -170,10 +130,8 @@ fn format_tuple(
                         }))]
                     )?;
                 } else {
-                    let magic_trailing_comma = expr
-                        .trivia
-                        .iter()
-                        .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+                    let magic_trailing_comma =
+                        expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
                     let is_unbroken = expr.location.row() == expr.end_location.unwrap().row();
                     if magic_trailing_comma {
                         write!(f, [expand_parent()])?;
@@ -190,7 +148,7 @@ fn format_tuple(
                         }
                     }
                 }
-                if matches!(expr.parentheses, Parenthesize::IfExpanded) {
+                if expr.parentheses.is_if_expanded() {
                     write!(f, [if_group_breaks(&text(")"))])?;
                 }
                 Ok(())
@@ -207,7 +165,7 @@ fn format_slice(
     upper: &SliceIndex,
     step: Option<&SliceIndex>,
 ) -> FormatResult<()> {
-    // // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices
+    // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#slices
     let lower_is_simple = if let SliceIndexKind::Index { value } = &lower.node {
         is_simple_slice(value)
     } else {
@@ -234,17 +192,7 @@ fn format_slice(
                 write!(f, [value.format()])?;
             }
 
-            // Apply any dangling comments.
-            for trivia in &lower.trivia {
-                if matches!(trivia.relationship, Relationship::Dangling) {
-                    if let TriviaKind::OwnLineComment(range) = trivia.kind {
-                        write!(f, [expand_parent()])?;
-                        write!(f, [hard_line_break()])?;
-                        write!(f, [literal(range)])?;
-                        write!(f, [hard_line_break()])?;
-                    }
-                }
-            }
+            write!(f, [dangling_comments(lower)])?;
 
             if matches!(lower.node, SliceIndexKind::Index { .. }) {
                 if !is_simple {
@@ -252,25 +200,7 @@ fn format_slice(
                 }
             }
             write!(f, [text(":")])?;
-
-            // Format any end-of-line comments.
-            let mut first = true;
-            for range in lower.trivia.iter().filter_map(|trivia| {
-                if matches!(trivia.relationship, Relationship::Trailing) {
-                    if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                        Some(range)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }) {
-                if std::mem::take(&mut first) {
-                    write!(f, [line_suffix(&text("  "))])?;
-                }
-                write!(f, [line_suffix(&literal(range))])?;
-            }
+            write!(f, [end_of_line_comments(lower)])?;
 
             if let SliceIndexKind::Index { value } = &upper.node {
                 if !is_simple {
@@ -280,36 +210,8 @@ fn format_slice(
                 write!(f, [value.format()])?;
             }
 
-            // Apply any dangling comments.
-            for trivia in &upper.trivia {
-                if matches!(trivia.relationship, Relationship::Dangling) {
-                    if let TriviaKind::OwnLineComment(range) = trivia.kind {
-                        write!(f, [expand_parent()])?;
-                        write!(f, [hard_line_break()])?;
-                        write!(f, [literal(range)])?;
-                        write!(f, [hard_line_break()])?;
-                    }
-                }
-            }
-
-            // Format any end-of-line comments.
-            let mut first = true;
-            for range in upper.trivia.iter().filter_map(|trivia| {
-                if matches!(trivia.relationship, Relationship::Trailing) {
-                    if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                        Some(range)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            }) {
-                if std::mem::take(&mut first) {
-                    write!(f, [line_suffix(&text("  "))])?;
-                }
-                write!(f, [line_suffix(&literal(range))])?;
-            }
+            write!(f, [dangling_comments(upper)])?;
+            write!(f, [end_of_line_comments(upper)])?;
 
             if let Some(step) = step {
                 if matches!(upper.node, SliceIndexKind::Index { .. }) {
@@ -327,60 +229,31 @@ fn format_slice(
                     write!(f, [value.format()])?;
                 }
 
-                // Apply any dangling comments.
-                for trivia in &step.trivia {
-                    if matches!(trivia.relationship, Relationship::Dangling) {
-                        if let TriviaKind::OwnLineComment(range) = trivia.kind {
-                            write!(f, [expand_parent()])?;
-                            write!(f, [hard_line_break()])?;
-                            write!(f, [literal(range)])?;
-                            write!(f, [hard_line_break()])?;
-                        }
-                    }
-                }
-
-                // Format any end-of-line comments.
-                let mut first = true;
-                for range in step.trivia.iter().filter_map(|trivia| {
-                    if matches!(trivia.relationship, Relationship::Trailing) {
-                        if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                            Some(range)
-                        } else {
-                            None
-                        }
-                    } else {
-                        None
-                    }
-                }) {
-                    if std::mem::take(&mut first) {
-                        write!(f, [line_suffix(&text("  "))])?;
-                    }
-                    write!(f, [line_suffix(&literal(range))])?;
-                }
+                write!(f, [dangling_comments(step)])?;
+                write!(f, [end_of_line_comments(step)])?;
             }
             Ok(())
         }))]
     )?;
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(expr)])?;
 
+    Ok(())
+}
+
+fn format_formatted_value(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    expr: &Expr,
+    value: &Expr,
+    _conversion: usize,
+    format_spec: Option<&Expr>,
+) -> FormatResult<()> {
+    write!(f, [text("!")])?;
+    write!(f, [value.format()])?;
+    if let Some(format_spec) = format_spec {
+        write!(f, [text(":")])?;
+        write!(f, [format_spec.format()])?;
+    }
     Ok(())
 }
 
@@ -391,10 +264,7 @@ fn format_list(
 ) -> FormatResult<()> {
     write!(f, [text("[")])?;
     if !elts.is_empty() {
-        let magic_trailing_comma = expr
-            .trivia
-            .iter()
-            .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+        let magic_trailing_comma = expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
         write!(
             f,
             [group(&format_args![soft_block_indent(&format_with(|f| {
@@ -415,6 +285,7 @@ fn format_list(
         )?;
     }
     write!(f, [text("]")])?;
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -429,10 +300,7 @@ fn format_set(
     } else {
         write!(f, [text("{")])?;
         if !elts.is_empty() {
-            let magic_trailing_comma = expr
-                .trivia
-                .iter()
-                .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+            let magic_trailing_comma = expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
             write!(
                 f,
                 [group(&format_args![soft_block_indent(&format_with(|f| {
@@ -470,51 +338,12 @@ fn format_call(
     if args.is_empty() && keywords.is_empty() {
         write!(f, [text("(")])?;
         write!(f, [text(")")])?;
-
-        // Format any end-of-line comments.
-        let mut first = true;
-        for range in expr.trivia.iter().filter_map(|trivia| {
-            if matches!(trivia.relationship, Relationship::Trailing) {
-                if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                    Some(range)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }) {
-            if std::mem::take(&mut first) {
-                write!(f, [line_suffix(&text("  "))])?;
-            }
-            write!(f, [line_suffix(&literal(range))])?;
-        }
+        write!(f, [end_of_line_comments(expr)])?;
     } else {
         write!(f, [text("(")])?;
+        write!(f, [end_of_line_comments(expr)])?;
 
-        // Format any end-of-line comments.
-        let mut first = true;
-        for range in expr.trivia.iter().filter_map(|trivia| {
-            if matches!(trivia.relationship, Relationship::Trailing) {
-                if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                    Some(range)
-                } else {
-                    None
-                }
-            } else {
-                None
-            }
-        }) {
-            if std::mem::take(&mut first) {
-                write!(f, [line_suffix(&text("  "))])?;
-            }
-            write!(f, [line_suffix(&literal(range))])?;
-        }
-
-        let magic_trailing_comma = expr
-            .trivia
-            .iter()
-            .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+        let magic_trailing_comma = expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
         write!(
             f,
             [group(&format_args![soft_block_indent(&format_with(|f| {
@@ -537,14 +366,7 @@ fn format_call(
                     write!(
                         f,
                         [group(&format_args![&format_with(|f| {
-                            if let Some(arg) = &keyword.node.arg {
-                                write!(f, [dynamic_text(arg, TextSize::default())])?;
-                                write!(f, [text("=")])?;
-                                write!(f, [keyword.node.value.format()])?;
-                            } else {
-                                write!(f, [text("**")])?;
-                                write!(f, [keyword.node.value.format()])?;
-                            }
+                            write!(f, [keyword.format()])?;
                             Ok(())
                         })])]
                     )?;
@@ -558,16 +380,7 @@ fn format_call(
                     }
                 }
 
-                // Apply any dangling trailing comments.
-                for trivia in &expr.trivia {
-                    if matches!(trivia.relationship, Relationship::Dangling) {
-                        if let TriviaKind::OwnLineComment(range) = trivia.kind {
-                            write!(f, [expand_parent()])?;
-                            write!(f, [hard_line_break()])?;
-                            write!(f, [literal(range)])?;
-                        }
-                    }
-                }
+                write!(f, [dangling_comments(expr)])?;
 
                 Ok(())
             }))])]
@@ -743,7 +556,7 @@ fn format_compare(
     f: &mut Formatter<ASTFormatContext<'_>>,
     expr: &Expr,
     left: &Expr,
-    ops: &[Cmpop],
+    ops: &[CmpOp],
     comparators: &[Expr],
 ) -> FormatResult<()> {
     write!(f, [group(&format_args![left.format()])])?;
@@ -754,24 +567,7 @@ fn format_compare(
         write!(f, [group(&format_args![comparators[i].format()])])?;
     }
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
+    write!(f, [end_of_line_comments(expr)])?;
 
     Ok(())
 }
@@ -781,7 +577,8 @@ fn format_joined_str(
     expr: &Expr,
     _values: &[Expr],
 ) -> FormatResult<()> {
-    write!(f, [literal(Range::from_located(expr))])?;
+    write!(f, [literal(Range::from(expr))])?;
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -801,13 +598,14 @@ fn format_constant(
                 write!(f, [text("False")])?;
             }
         }
-        Constant::Int(_) => write!(f, [int_literal(Range::from_located(expr))])?,
-        Constant::Float(_) => write!(f, [float_literal(Range::from_located(expr))])?,
+        Constant::Int(_) => write!(f, [int_literal(Range::from(expr))])?,
+        Constant::Float(_) => write!(f, [float_literal(Range::from(expr))])?,
         Constant::Str(_) => write!(f, [string_literal(expr)])?,
         Constant::Bytes(_) => write!(f, [string_literal(expr)])?,
-        Constant::Complex { .. } => write!(f, [complex_literal(Range::from_located(expr))])?,
+        Constant::Complex { .. } => write!(f, [complex_literal(Range::from(expr))])?,
         Constant::Tuple(_) => unreachable!("Constant::Tuple should be handled by format_tuple"),
     }
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -819,10 +617,7 @@ fn format_dict(
 ) -> FormatResult<()> {
     write!(f, [text("{")])?;
     if !keys.is_empty() {
-        let magic_trailing_comma = expr
-            .trivia
-            .iter()
-            .any(|c| matches!(c.kind, TriviaKind::MagicTrailingComma));
+        let magic_trailing_comma = expr.trivia.iter().any(|c| c.kind.is_magic_trailing_comma());
         write!(
             f,
             [soft_block_indent(&format_with(|f| {
@@ -885,66 +680,38 @@ fn format_attribute(
     write!(f, [value.format()])?;
     write!(f, [text(".")])?;
     write!(f, [dynamic_text(attr, TextSize::default())])?;
+    write!(f, [end_of_line_comments(expr)])?;
+    Ok(())
+}
 
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
-
+fn format_named_expr(
+    f: &mut Formatter<ASTFormatContext<'_>>,
+    expr: &Expr,
+    target: &Expr,
+    value: &Expr,
+) -> FormatResult<()> {
+    write!(f, [target.format()])?;
+    write!(f, [text(":=")])?;
+    write!(f, [space()])?;
+    write!(f, [group(&format_args![value.format()])])?;
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
 fn format_bool_op(
     f: &mut Formatter<ASTFormatContext<'_>>,
     expr: &Expr,
-    op: &Boolop,
+    ops: &[BoolOp],
     values: &[Expr],
 ) -> FormatResult<()> {
-    let mut first = true;
-    for value in values {
-        if std::mem::take(&mut first) {
-            write!(f, [group(&format_args![value.format()])])?;
-        } else {
-            write!(f, [soft_line_break_or_space()])?;
-            write!(f, [op.format()])?;
-            write!(f, [space()])?;
-            write!(f, [group(&format_args![value.format()])])?;
-        }
+    write!(f, [group(&format_args![values[0].format()])])?;
+    for (op, value) in ops.iter().zip(&values[1..]) {
+        write!(f, [soft_line_break_or_space()])?;
+        write!(f, [op.format()])?;
+        write!(f, [space()])?;
+        write!(f, [group(&format_args![value.format()])])?;
     }
-
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
-
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -956,8 +723,8 @@ fn format_bin_op(
     right: &Expr,
 ) -> FormatResult<()> {
     // https://black.readthedocs.io/en/stable/the_black_code_style/current_style.html#line-breaks-binary-operators
-    let is_simple = matches!(op, Operator::Pow) && is_simple_power(left) && is_simple_power(right);
-
+    let is_simple =
+        matches!(op.node, OperatorKind::Pow) && is_simple_power(left) && is_simple_power(right);
     write!(f, [left.format()])?;
     if !is_simple {
         write!(f, [soft_line_break_or_space()])?;
@@ -966,45 +733,26 @@ fn format_bin_op(
     if !is_simple {
         write!(f, [space()])?;
     }
-    write!(f, [group(&format_args![right.format()])])?;
-
-    // Format any end-of-line comments.
-    let mut first = true;
-    for range in expr.trivia.iter().filter_map(|trivia| {
-        if matches!(trivia.relationship, Relationship::Trailing) {
-            if let TriviaKind::EndOfLineComment(range) = trivia.kind {
-                Some(range)
-            } else {
-                None
-            }
-        } else {
-            None
-        }
-    }) {
-        if std::mem::take(&mut first) {
-            write!(f, [line_suffix(&text("  "))])?;
-        }
-        write!(f, [line_suffix(&literal(range))])?;
-    }
-
+    write!(f, [group(&right.format())])?;
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
 fn format_unary_op(
     f: &mut Formatter<ASTFormatContext<'_>>,
     expr: &Expr,
-    op: &Unaryop,
+    op: &UnaryOp,
     operand: &Expr,
 ) -> FormatResult<()> {
     write!(f, [op.format()])?;
     // TODO(charlie): Do this in the normalization pass.
-    if !matches!(op, Unaryop::Not)
+    if !matches!(op.node, UnaryOpKind::Not)
         && matches!(
             operand.node,
             ExprKind::BoolOp { .. } | ExprKind::Compare { .. } | ExprKind::BinOp { .. }
         )
     {
-        let parenthesized = matches!(operand.parentheses, Parenthesize::Always);
+        let parenthesized = operand.parentheses.is_always();
         if !parenthesized {
             write!(f, [text("(")])?;
         }
@@ -1015,6 +763,7 @@ fn format_unary_op(
     } else {
         write!(f, [operand.format()])?;
     }
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -1032,6 +781,7 @@ fn format_lambda(
     write!(f, [text(":")])?;
     write!(f, [space()])?;
     write!(f, [body.format()])?;
+    write!(f, [end_of_line_comments(expr)])?;
     Ok(())
 }
 
@@ -1056,24 +806,15 @@ fn format_if_exp(
 
 impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        if matches!(self.item.parentheses, Parenthesize::Always) {
+        if self.item.parentheses.is_always() {
             write!(f, [text("(")])?;
         }
 
-        // Any leading comments come on the line before.
-        for trivia in &self.item.trivia {
-            if matches!(trivia.relationship, Relationship::Leading) {
-                if let TriviaKind::OwnLineComment(range) = trivia.kind {
-                    write!(f, [expand_parent()])?;
-                    write!(f, [literal(range)])?;
-                    write!(f, [hard_line_break()])?;
-                }
-            }
-        }
+        write!(f, [leading_comments(self.item)])?;
 
         match &self.item.node {
-            ExprKind::BoolOp { op, values } => format_bool_op(f, self.item, op, values),
-            // ExprKind::NamedExpr { .. } => {}
+            ExprKind::BoolOp { ops, values } => format_bool_op(f, self.item, ops, values),
+            ExprKind::NamedExpr { target, value } => format_named_expr(f, self.item, target, value),
             ExprKind::BinOp { left, op, right } => format_bin_op(f, self.item, left, op, right),
             ExprKind::UnaryOp { op, operand } => format_unary_op(f, self.item, op, operand),
             ExprKind::Lambda { args, body } => format_lambda(f, self.item, args, body),
@@ -1107,7 +848,6 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
                 args,
                 keywords,
             } => format_call(f, self.item, func, args, keywords),
-            // ExprKind::FormattedValue { .. } => {}
             ExprKind::JoinedStr { values } => format_joined_str(f, self.item, values),
             ExprKind::Constant { value, kind } => {
                 format_constant(f, self.item, value, kind.as_deref())
@@ -1123,14 +863,16 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
             ExprKind::Slice { lower, upper, step } => {
                 format_slice(f, self.item, lower, upper, step.as_ref())
             }
-            _ => {
-                unimplemented!("Implement ExprKind: {:?}", self.item.node)
-            }
+            ExprKind::FormattedValue {
+                value,
+                conversion,
+                format_spec,
+            } => format_formatted_value(f, self.item, value, *conversion, format_spec.as_deref()),
         }?;
 
         // Any trailing comments come on the lines after.
         for trivia in &self.item.trivia {
-            if matches!(trivia.relationship, Relationship::Trailing) {
+            if trivia.relationship.is_trailing() {
                 if let TriviaKind::OwnLineComment(range) = trivia.kind {
                     write!(f, [expand_parent()])?;
                     write!(f, [literal(range)])?;
@@ -1139,7 +881,7 @@ impl Format<ASTFormatContext<'_>> for FormatExpr<'_> {
             }
         }
 
-        if matches!(self.item.parentheses, Parenthesize::Always) {
+        if self.item.parentheses.is_always() {
             write!(f, [text(")")])?;
         }
 

@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ParametrizeNamesWrongType:
-      expected: csv
+    name: ParametrizeNamesWrongType
+    body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
+    suggestion: "Use a `csv` for parameter names"
+    fixable: true
   location:
     row: 24
     column: 25
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    ParametrizeNamesWrongType:
-      expected: csv
+    name: ParametrizeNamesWrongType
+    body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
+    suggestion: "Use a `csv` for parameter names"
+    fixable: true
   location:
     row: 29
     column: 25
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 36
   parent: ~
 - kind:
-    ParametrizeNamesWrongType:
-      expected: csv
+    name: ParametrizeNamesWrongType
+    body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
+    suggestion: "Use a `csv` for parameter names"
+    fixable: true
   location:
     row: 34
     column: 25
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    ParametrizeNamesWrongType:
-      expected: csv
+    name: ParametrizeNamesWrongType
+    body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
+    suggestion: "Use a `csv` for parameter names"
+    fixable: true
   location:
     row: 39
     column: 25
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
-    ParametrizeNamesWrongType:
-      expected: csv
+    name: ParametrizeNamesWrongType
+    body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
+    suggestion: "Use a `csv` for parameter names"
+    fixable: true
   location:
     row: 44
     column: 25
@@ -86,8 +96,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ParametrizeNamesWrongType:
-      expected: csv
+    name: ParametrizeNamesWrongType
+    body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
+    suggestion: "Use a `csv` for parameter names"
+    fixable: true
   location:
     row: 49
     column: 25

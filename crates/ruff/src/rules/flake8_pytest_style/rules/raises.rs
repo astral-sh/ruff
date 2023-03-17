@@ -1,16 +1,18 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt, StmtKind, Withitem};
 
-use super::helpers::is_empty_or_null_string;
-use crate::ast::helpers::{format_call_path, to_call_path};
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{format_call_path, to_call_path};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct RaisesWithMultipleStatements;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::Rule;
+
+use super::helpers::is_empty_or_null_string;
+
+#[violation]
+pub struct RaisesWithMultipleStatements;
+
 impl Violation for RaisesWithMultipleStatements {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,11 +20,11 @@ impl Violation for RaisesWithMultipleStatements {
     }
 }
 
-define_violation!(
-    pub struct RaisesTooBroad {
-        pub exception: String,
-    }
-);
+#[violation]
+pub struct RaisesTooBroad {
+    pub exception: String,
+}
+
 impl Violation for RaisesTooBroad {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -34,9 +36,9 @@ impl Violation for RaisesTooBroad {
     }
 }
 
-define_violation!(
-    pub struct RaisesWithoutException;
-);
+#[violation]
+pub struct RaisesWithoutException;
+
 impl Violation for RaisesWithoutException {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -45,9 +47,12 @@ impl Violation for RaisesWithoutException {
 }
 
 fn is_pytest_raises(checker: &Checker, func: &Expr) -> bool {
-    checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["pytest", "raises"]
-    })
+    checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["pytest", "raises"]
+        })
 }
 
 const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
@@ -62,20 +67,15 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 
 pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_raises(checker, func) {
-        if checker
-            .settings
-            .rules
-            .enabled(&Rule::RaisesWithoutException)
-        {
+        if checker.settings.rules.enabled(Rule::RaisesWithoutException) {
             if args.is_empty() && keywords.is_empty() {
-                checker.diagnostics.push(Diagnostic::new(
-                    RaisesWithoutException,
-                    Range::from_located(func),
-                ));
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(RaisesWithoutException, Range::from(func)));
             }
         }
 
-        if checker.settings.rules.enabled(&Rule::RaisesTooBroad) {
+        if checker.settings.rules.enabled(Rule::RaisesTooBroad) {
             let match_keyword = keywords
                 .iter()
                 .find(|kw| kw.node.arg == Some("match".to_string()));
@@ -128,7 +128,7 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
         if is_too_complex {
             checker.diagnostics.push(Diagnostic::new(
                 RaisesWithMultipleStatements,
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
     }
@@ -136,30 +136,34 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
 
 /// PT011
 fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
-    if let Some(call_path) = checker.resolve_call_path(exception).and_then(|call_path| {
-        let is_broad_exception = checker
-            .settings
-            .flake8_pytest_style
-            .raises_require_match_for
-            .iter()
-            .chain(
-                &checker
-                    .settings
-                    .flake8_pytest_style
-                    .raises_extend_require_match_for,
-            )
-            .any(|target| call_path == to_call_path(target));
-        if is_broad_exception {
-            Some(format_call_path(&call_path))
-        } else {
-            None
-        }
-    }) {
+    if let Some(call_path) = checker
+        .ctx
+        .resolve_call_path(exception)
+        .and_then(|call_path| {
+            let is_broad_exception = checker
+                .settings
+                .flake8_pytest_style
+                .raises_require_match_for
+                .iter()
+                .chain(
+                    &checker
+                        .settings
+                        .flake8_pytest_style
+                        .raises_extend_require_match_for,
+                )
+                .any(|target| call_path == to_call_path(target));
+            if is_broad_exception {
+                Some(format_call_path(&call_path))
+            } else {
+                None
+            }
+        })
+    {
         checker.diagnostics.push(Diagnostic::new(
             RaisesTooBroad {
                 exception: call_path,
             },
-            Range::from_located(exception),
+            Range::from(exception),
         ));
     }
 }

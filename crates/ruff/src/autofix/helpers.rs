@@ -6,14 +6,14 @@ use libcst_native::{
 use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Location, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::helpers;
-use crate::ast::helpers::to_absolute;
-use crate::ast::types::Range;
-use crate::ast::whitespace::LinesWithTrailingNewline;
+use ruff_diagnostics::Fix;
+use ruff_python_ast::helpers;
+use ruff_python_ast::helpers::to_absolute;
+use ruff_python_ast::newlines::NewlineWithTrailingNewline;
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_module;
-use crate::fix::Fix;
-use crate::source_code::{Indexer, Locator, Stylist};
 
 /// Determine if a body contains only a single statement, taking into account
 /// deleted.
@@ -100,7 +100,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
 /// of a multi-statement line.
 fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
     let contents = locator.skip(stmt.end_location.unwrap());
-    for (row, line) in LinesWithTrailingNewline::from(contents).enumerate() {
+    for (row, line) in NewlineWithTrailingNewline::from(contents).enumerate() {
         let trimmed = line.trim();
         if trimmed.starts_with(';') {
             let column = line
@@ -123,7 +123,7 @@ fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
 fn next_stmt_break(semicolon: Location, locator: &Locator) -> Location {
     let start_location = Location::new(semicolon.row(), semicolon.column() + 1);
     let contents = locator.skip(start_location);
-    for (row, line) in LinesWithTrailingNewline::from(contents).enumerate() {
+    for (row, line) in NewlineWithTrailingNewline::from(contents).enumerate() {
         let trimmed = line.trim();
         // Skip past any continuations.
         if trimmed.starts_with('\\') {
@@ -227,7 +227,7 @@ pub fn remove_unused_imports<'a>(
     indexer: &Indexer,
     stylist: &Stylist,
 ) -> Result<Fix> {
-    let module_text = locator.slice(&Range::from_located(stmt));
+    let module_text = locator.slice(stmt);
     let mut tree = match_module(module_text)?;
 
     let Some(Statement::Simple(body)) = tree.body.first_mut() else {
@@ -450,8 +450,9 @@ mod tests {
     use rustpython_parser as parser;
     use rustpython_parser::ast::Location;
 
+    use ruff_python_ast::source_code::Locator;
+
     use crate::autofix::helpers::{next_stmt_break, trailing_semicolon};
-    use crate::source_code::Locator;
 
     #[test]
     fn find_semicolon() -> Result<()> {

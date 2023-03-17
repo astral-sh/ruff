@@ -1,15 +1,30 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::source_code::Stylist;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::newlines::StrExt;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct NoNewLineAtEndOfFile;
-);
+/// ## What it does
+/// Checks for files missing a new line at the end of the file.
+///
+/// ## Why is this bad?
+/// Trailing blank lines are superfluous.
+/// However the last line should end with a new line.
+///
+/// ## Example
+/// ```python
+/// spam(1)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// spam(1)\n
+/// ```
+#[violation]
+pub struct NoNewLineAtEndOfFile;
+
 impl AlwaysAutofixableViolation for NoNewLineAtEndOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -23,16 +38,16 @@ impl AlwaysAutofixableViolation for NoNewLineAtEndOfFile {
 
 /// W292
 pub fn no_newline_at_end_of_file(
+    locator: &Locator,
     stylist: &Stylist,
-    contents: &str,
     autofix: bool,
 ) -> Option<Diagnostic> {
-    if !contents.ends_with('\n') {
+    if !locator.contents().ends_with(['\n', '\r']) {
         // Note: if `lines.last()` is `None`, then `contents` is empty (and so we don't
         // want to raise W292 anyway).
-        if let Some(line) = contents.lines().last() {
+        if let Some(line) = locator.contents().universal_newlines().last() {
             // Both locations are at the end of the file (and thus the same).
-            let location = Location::new(contents.lines().count(), line.len());
+            let location = Location::new(locator.count_lines(), line.len());
             let mut diagnostic =
                 Diagnostic::new(NoNewLineAtEndOfFile, Range::new(location, location));
             if autofix {

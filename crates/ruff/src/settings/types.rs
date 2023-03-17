@@ -1,23 +1,40 @@
-use std::hash::Hash;
+use std::hash::{Hash, Hasher};
 use std::ops::Deref;
 use std::path::{Path, PathBuf};
 use std::str::FromStr;
+use std::string::ToString;
 
-use anyhow::{anyhow, bail, Result};
-use clap::ValueEnum;
-use globset::{Glob, GlobSetBuilder};
+use anyhow::{bail, Result};
+use globset::{Glob, GlobSet, GlobSetBuilder};
+use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
 use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 
-use super::hashable::HashableHashSet;
+use ruff_cache::{CacheKey, CacheKeyHasher};
+use ruff_macros::CacheKey;
+
+use crate::fs;
 use crate::registry::Rule;
 use crate::rule_selector::RuleSelector;
-use crate::{fs, warn_user_once};
 
 #[derive(
-    Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema,
+    Clone,
+    Copy,
+    Debug,
+    PartialOrd,
+    Ord,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    JsonSchema,
+    CacheKey,
+    EnumIter,
 )]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "lowercase")]
 pub enum PythonVersion {
     Py37,
@@ -27,25 +44,10 @@ pub enum PythonVersion {
     Py311,
 }
 
-impl FromStr for PythonVersion {
-    type Err = anyhow::Error;
-
-    fn from_str(string: &str) -> Result<Self, Self::Err> {
-        match string {
-            "py33" | "py34" | "py35" | "py36" => {
-                warn_user_once!(
-                    "Specified a version below the minimum supported Python version. Defaulting \
-                     to Python 3.7."
-                );
-                Ok(Self::Py37)
-            }
-            "py37" => Ok(Self::Py37),
-            "py38" => Ok(Self::Py38),
-            "py39" => Ok(Self::Py39),
-            "py310" => Ok(Self::Py310),
-            "py311" => Ok(Self::Py311),
-            _ => Err(anyhow!("Unknown version: {string} (try: \"py37\")")),
-        }
+impl From<PythonVersion> for Pep440Version {
+    fn from(version: PythonVersion) -> Self {
+        let (major, minor) = version.as_tuple();
+        Self::from_str(&format!("{major}.{minor}.100")).unwrap()
     }
 }
 
@@ -59,9 +61,23 @@ impl PythonVersion {
             Self::Py311 => (3, 11),
         }
     }
+
+    pub fn get_minimum_supported_version(requires_version: &VersionSpecifiers) -> Option<Self> {
+        let mut minimum_version = None;
+        for python_version in PythonVersion::iter() {
+            if requires_version
+                .iter()
+                .all(|specifier| specifier.contains(&python_version.into()))
+            {
+                minimum_version = Some(python_version);
+                break;
+            }
+        }
+        minimum_version
+    }
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(Debug, Clone, CacheKey, PartialEq, PartialOrd, Eq, Ord)]
 pub enum FilePattern {
     Builtin(&'static str),
     User(String, PathBuf),
@@ -92,8 +108,48 @@ impl FromStr for FilePattern {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         let pattern = s.to_string();
-        let absolute = fs::normalize_path(Path::new(&pattern));
+        let absolute = fs::normalize_path(&pattern);
         Ok(Self::User(pattern, absolute))
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub struct FilePatternSet {
+    set: GlobSet,
+    cache_key: u64,
+}
+
+impl FilePatternSet {
+    pub fn try_from_vec(patterns: Vec<FilePattern>) -> Result<Self, anyhow::Error> {
+        let mut builder = GlobSetBuilder::new();
+        let mut hasher = CacheKeyHasher::new();
+
+        for pattern in patterns {
+            pattern.cache_key(&mut hasher);
+            pattern.add_to(&mut builder)?;
+        }
+
+        let set = builder.build()?;
+
+        Ok(FilePatternSet {
+            set,
+            cache_key: hasher.finish(),
+        })
+    }
+}
+
+impl Deref for FilePatternSet {
+    type Target = GlobSet;
+
+    fn deref(&self) -> &Self::Target {
+        &self.set
+    }
+}
+
+impl CacheKey for FilePatternSet {
+    fn cache_key(&self, state: &mut CacheKeyHasher) {
+        state.write_usize(self.set.len());
+        state.write_u64(self.cache_key);
     }
 }
 
@@ -101,7 +157,7 @@ impl FromStr for FilePattern {
 pub struct PerFileIgnore {
     pub(crate) basename: String,
     pub(crate) absolute: PathBuf,
-    pub(crate) rules: HashableHashSet<Rule>,
+    pub(crate) rules: FxHashSet<Rule>,
 }
 
 impl PerFileIgnore {
@@ -116,7 +172,7 @@ impl PerFileIgnore {
         Self {
             basename: pattern,
             absolute,
-            rules: rules.into(),
+            rules,
         }
     }
 }
@@ -163,9 +219,8 @@ impl FromStr for PatternPrefixPair {
     }
 }
 
-#[derive(
-    Clone, Copy, ValueEnum, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema, Hash,
-)]
+#[derive(Clone, Copy, PartialEq, Eq, Serialize, Deserialize, Debug, JsonSchema, Hash)]
+#[cfg_attr(feature = "clap", derive(clap::ValueEnum))]
 #[serde(rename_all = "kebab-case")]
 pub enum SerializationFormat {
     Text,
@@ -175,6 +230,7 @@ pub enum SerializationFormat {
     Github,
     Gitlab,
     Pylint,
+    Azure,
 }
 
 impl Default for SerializationFormat {

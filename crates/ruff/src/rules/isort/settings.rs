@@ -2,13 +2,14 @@
 
 use std::collections::BTreeSet;
 
-use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use ruff_macros::{CacheKey, ConfigurationOptions};
+
 use super::categorize::ImportType;
 
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum RelativeImportsOrder {
     /// Place "closer" imports (fewer `.` characters, most local) before
@@ -180,8 +181,8 @@ pub struct Options {
     ///
     /// The default ("furthest-to-closest") is equivalent to isort's
     /// `reverse-relative` default (`reverse-relative = false`); setting
-    /// this to "closest-to-furthest" is equivalent to isort's `reverse-relative
-    /// = true`.
+    /// this to "closest-to-furthest" is equivalent to isort's
+    /// `reverse-relative = true`.
     pub relative_imports_order: Option<RelativeImportsOrder>,
     #[option(
         default = r#"[]"#,
@@ -255,7 +256,7 @@ pub struct Options {
     pub lines_between_types: Option<usize>,
     #[option(
         default = r#"[]"#,
-        value_type = "Vec<String>",
+        value_type = "list[str]",
         example = r#"
             forced-separate = ["tests"]
         "#
@@ -265,7 +266,7 @@ pub struct Options {
     pub forced_separate: Option<Vec<String>>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub required_imports: BTreeSet<String>,

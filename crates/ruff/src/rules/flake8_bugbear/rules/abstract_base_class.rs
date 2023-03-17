@@ -1,17 +1,18 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::Violation;
-use crate::visibility::{is_abstract, is_overload};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visibility::{is_abstract, is_overload};
 
-define_violation!(
-    pub struct AbstractBaseClassWithoutAbstractMethod {
-        pub name: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::Rule;
+
+#[violation]
+pub struct AbstractBaseClassWithoutAbstractMethod {
+    pub name: String,
+}
+
 impl Violation for AbstractBaseClassWithoutAbstractMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -19,11 +20,11 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
         format!("`{name}` is an abstract base class, but it has no abstract methods")
     }
 }
-define_violation!(
-    pub struct EmptyMethodWithoutAbstractDecorator {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct EmptyMethodWithoutAbstractDecorator {
+    pub name: String,
+}
+
 impl Violation for EmptyMethodWithoutAbstractDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -42,12 +43,14 @@ fn is_abc_class(checker: &Checker, bases: &[Expr], keywords: &[Keyword]) -> bool
             .as_ref()
             .map_or(false, |arg| arg == "metaclass")
             && checker
+                .ctx
                 .resolve_call_path(&keyword.node.value)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["abc", "ABCMeta"]
                 })
     }) || bases.iter().any(|base| {
         checker
+            .ctx
             .resolve_call_path(base)
             .map_or(false, |call_path| call_path.as_slice() == ["abc", "ABC"])
     })
@@ -106,37 +109,40 @@ pub fn abstract_base_class(
             continue;
         };
 
-        let has_abstract_decorator = is_abstract(checker, decorator_list);
+        let has_abstract_decorator = is_abstract(&checker.ctx, decorator_list);
         has_abstract_method |= has_abstract_decorator;
 
         if !checker
             .settings
             .rules
-            .enabled(&Rule::EmptyMethodWithoutAbstractDecorator)
+            .enabled(Rule::EmptyMethodWithoutAbstractDecorator)
         {
             continue;
         }
 
-        if !has_abstract_decorator && is_empty_body(body) && !is_overload(checker, decorator_list) {
+        if !has_abstract_decorator
+            && is_empty_body(body)
+            && !is_overload(&checker.ctx, decorator_list)
+        {
             checker.diagnostics.push(Diagnostic::new(
                 EmptyMethodWithoutAbstractDecorator {
                     name: format!("{name}.{method_name}"),
                 },
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
     }
     if checker
         .settings
         .rules
-        .enabled(&Rule::AbstractBaseClassWithoutAbstractMethod)
+        .enabled(Rule::AbstractBaseClassWithoutAbstractMethod)
     {
         if !has_abstract_method {
             checker.diagnostics.push(Diagnostic::new(
                 AbstractBaseClassWithoutAbstractMethod {
                     name: name.to_string(),
                 },
-                Range::from_located(stmt),
+                Range::from(stmt),
             ));
         }
     }

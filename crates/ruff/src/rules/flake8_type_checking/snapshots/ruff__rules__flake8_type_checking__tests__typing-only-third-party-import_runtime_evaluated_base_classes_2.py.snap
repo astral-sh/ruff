@@ -1,0 +1,31 @@
+---
+source: crates/ruff/src/rules/flake8_type_checking/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: TypingOnlyThirdPartyImport
+    body: "Move third-party import `geopandas` into a type-checking block"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 3
+    column: 7
+  end_location:
+    row: 3
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    name: TypingOnlyThirdPartyImport
+    body: "Move third-party import `pyproj` into a type-checking block"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 5
+    column: 7
+  end_location:
+    row: 5
+    column: 13
+  fix: ~
+  parent: ~
+

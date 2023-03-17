@@ -1,4 +1,4 @@
-use std::io::{self};
+use std::io;
 use std::path::PathBuf;
 use std::time::Instant;
 
@@ -10,15 +10,15 @@ use log::{debug, error};
 use rayon::prelude::*;
 
 use ruff::message::{Location, Message};
-use ruff::registry::{Diagnostic, Rule};
+use ruff::registry::Rule;
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
 use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError, Range};
+use ruff_diagnostics::Diagnostic;
 
 use crate::args::Overrides;
 use crate::cache;
 use crate::diagnostics::{lint_path, Diagnostics};
-use crate::iterators::par_iter;
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -26,6 +26,7 @@ pub fn run(
     pyproject_strategy: &PyprojectDiscovery,
     overrides: &Overrides,
     cache: flags::Cache,
+    noqa: flags::Noqa,
     autofix: fix::FixMode,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
@@ -43,10 +44,7 @@ pub fn run(
     if cache.into() {
         fn init_cache(path: &std::path::Path) {
             if let Err(e) = cache::init(path) {
-                error!(
-                    "Failed to initialize cache at {}: {e:?}",
-                    path.to_string_lossy()
-                );
+                error!("Failed to initialize cache at {}: {e:?}", path.display());
             }
         }
 
@@ -74,7 +72,8 @@ pub fn run(
     );
 
     let start = Instant::now();
-    let mut diagnostics: Diagnostics = par_iter(&paths)
+    let mut diagnostics: Diagnostics = paths
+        .par_iter()
         .map(|entry| {
             match entry {
                 Ok(entry) => {
@@ -84,7 +83,7 @@ pub fn run(
                         .and_then(|parent| package_roots.get(parent))
                         .and_then(|package| *package);
                     let settings = resolver.resolve_all(path, pyproject_strategy);
-                    lint_path(path, package, settings, cache, autofix)
+                    lint_path(path, package, settings, cache, noqa, autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
                 Err(e) => Err((
@@ -106,7 +105,7 @@ pub fn run(
                         ":".bold()
                     );
                     let settings = resolver.resolve(path, pyproject_strategy);
-                    if settings.rules.enabled(&Rule::IOError) {
+                    if settings.rules.enabled(Rule::IOError) {
                         Diagnostics::new(vec![Message::from_diagnostic(
                             Diagnostic::new(
                                 IOError { message },
@@ -114,6 +113,7 @@ pub fn run(
                             ),
                             format!("{}", path.display()),
                             None,
+                            1,
                         )])
                     } else {
                         Diagnostics::default()

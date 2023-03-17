@@ -8,6 +8,10 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::ParseError;
 
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_stdlib::path::is_python_stub_file;
+
 use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
@@ -20,10 +24,9 @@ use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
 use crate::noqa::{add_noqa, rule_is_ignored};
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
-use crate::source_code::{Indexer, Locator, Stylist};
 use crate::{directives, fs};
 
 const CARGO_PKG_NAME: &str = env!("CARGO_PKG_NAME");
@@ -47,7 +50,7 @@ impl<T> LinterResult<T> {
     }
 }
 
-pub type FixTable = FxHashMap<&'static Rule, usize>;
+pub type FixTable = FxHashMap<Rule, usize>;
 
 /// Generate `Diagnostic`s from the source code contents at the
 /// given `Path`.
@@ -62,8 +65,8 @@ pub fn check_path(
     indexer: &Indexer,
     directives: &Directives,
     settings: &Settings,
-    autofix: flags::Autofix,
     noqa: flags::Noqa,
+    autofix: flags::Autofix,
 ) -> LinterResult<Vec<Diagnostic>> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -71,7 +74,7 @@ pub fn check_path(
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
-    let use_doc_lines = settings.rules.enabled(&Rule::DocLineTooLong);
+    let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
         doc_lines.extend(doc_lines_from_tokens(&tokens));
@@ -83,7 +86,8 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
-        diagnostics.extend(check_tokens(locator, &tokens, settings, autofix));
+        let is_stub = is_python_stub_file(path);
+        diagnostics.extend(check_tokens(locator, &tokens, settings, autofix, is_stub));
     }
 
     // Run the filesystem-based rules.
@@ -101,7 +105,13 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
-        diagnostics.extend(check_logical_lines(&tokens, locator, stylist, settings));
+        diagnostics.extend(check_logical_lines(
+            &tokens,
+            locator,
+            stylist,
+            settings,
+            flags::Autofix::Enabled,
+        ));
     }
 
     // Run the AST-based rules.
@@ -149,14 +159,14 @@ pub fn check_path(
                 }
             }
             Err(parse_error) => {
-                if settings.rules.enabled(&Rule::SyntaxError) {
+                if settings.rules.enabled(Rule::SyntaxError) {
                     pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error);
                 }
 
                 // If the syntax error is ignored, suppress it (regardless of whether
                 // `Rule::SyntaxError` is enabled).
                 if !rule_is_ignored(
-                    &Rule::SyntaxError,
+                    Rule::SyntaxError,
                     parse_error.location.row(),
                     &directives.noqa_line_for,
                     locator,
@@ -181,8 +191,8 @@ pub fn check_path(
     {
         diagnostics.extend(check_physical_lines(
             path,
+            locator,
             stylist,
-            contents,
             indexer.commented_lines(),
             &doc_lines,
             settings,
@@ -205,7 +215,7 @@ pub fn check_path(
             .iter_enabled()
             .any(|rule_code| rule_code.lint_source().is_noqa())
     {
-        check_noqa(
+        let ignored = check_noqa(
             &mut diagnostics,
             contents,
             indexer.commented_lines(),
@@ -213,6 +223,11 @@ pub fn check_path(
             settings,
             error.as_ref().map_or(autofix, |_| flags::Autofix::Disabled),
         );
+        if noqa.into() {
+            for index in ignored.iter().rev() {
+                diagnostics.swap_remove(*index);
+            }
+        }
     }
 
     LinterResult::new(diagnostics, error)
@@ -255,8 +270,8 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
         &indexer,
         &directives,
         settings,
-        flags::Autofix::Disabled,
         flags::Noqa::Disabled,
+        flags::Autofix::Disabled,
     );
 
     // Log any parse errors.
@@ -287,6 +302,7 @@ pub fn lint_only(
     path: &Path,
     package: Option<&Path>,
     settings: &Settings,
+    noqa: flags::Noqa,
     autofix: flags::Autofix,
 ) -> LinterResult<Vec<Message>> {
     // Tokenize once.
@@ -316,8 +332,8 @@ pub fn lint_only(
         &indexer,
         &directives,
         settings,
+        noqa,
         autofix,
-        flags::Noqa::Enabled,
     );
 
     // Convert from diagnostics to messages.
@@ -331,7 +347,9 @@ pub fn lint_only(
                 } else {
                     None
                 };
-                Message::from_diagnostic(diagnostic, path_lossy.to_string(), source)
+                let lineno = diagnostic.location.row();
+                let noqa_row = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
+                Message::from_diagnostic(diagnostic, path_lossy.to_string(), source, noqa_row)
             })
             .collect()
     })
@@ -343,6 +361,7 @@ pub fn lint_fix<'a>(
     contents: &'a str,
     path: &Path,
     package: Option<&Path>,
+    noqa: flags::Noqa,
     settings: &Settings,
 ) -> Result<(LinterResult<Vec<Message>>, Cow<'a, str>, FixTable)> {
     let mut transformed = Cow::Borrowed(contents);
@@ -385,8 +404,8 @@ pub fn lint_fix<'a>(
             &indexer,
             &directives,
             settings,
+            noqa,
             flags::Autofix::Enabled,
-            flags::Noqa::Enabled,
         );
 
         if iterations == 0 {
@@ -469,7 +488,14 @@ This indicates a bug in `{}`. If you could open an issue at:
                         } else {
                             None
                         };
-                        Message::from_diagnostic(diagnostic, path_lossy.to_string(), source)
+                        let lineno = diagnostic.location.row();
+                        let noqa_row = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
+                        Message::from_diagnostic(
+                            diagnostic,
+                            path_lossy.to_string(),
+                            source,
+                            noqa_row,
+                        )
                     })
                     .collect()
             }),

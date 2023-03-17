@@ -15,10 +15,11 @@ mod tests {
     use test_case::test_case;
     use textwrap::dedent;
 
+    use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+
     use crate::linter::{check_path, LinterResult};
-    use crate::registry::{Linter, Rule};
+    use crate::registry::{AsRule, Linter, Rule};
     use crate::settings::flags;
-    use crate::source_code::{Indexer, Locator, Stylist};
     use crate::test::test_path;
     use crate::{directives, settings};
 
@@ -32,6 +33,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_7.py"); "F401_7")]
     #[test_case(Rule::UnusedImport, Path::new("F401_8.py"); "F401_8")]
     #[test_case(Rule::UnusedImport, Path::new("F401_9.py"); "F401_9")]
+    #[test_case(Rule::UnusedImport, Path::new("F401_10.py"); "F401_10")]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"); "F402")]
     #[test_case(Rule::ImportStar, Path::new("F403.py"); "F403")]
     #[test_case(Rule::LateFutureImport, Path::new("F404.py"); "F404")]
@@ -103,6 +105,8 @@ mod tests {
     #[test_case(Rule::UndefinedName, Path::new("F821_8.pyi"); "F821_8")]
     #[test_case(Rule::UndefinedName, Path::new("F821_9.py"); "F821_9")]
     #[test_case(Rule::UndefinedName, Path::new("F821_10.py"); "F821_10")]
+    #[test_case(Rule::UndefinedName, Path::new("F821_11.py"); "F821_11")]
+    #[test_case(Rule::UndefinedName, Path::new("F821_12.py"); "F821_12")]
     #[test_case(Rule::UndefinedExport, Path::new("F822_0.py"); "F822_0")]
     #[test_case(Rule::UndefinedExport, Path::new("F822_1.py"); "F822_1")]
     #[test_case(Rule::UndefinedExport, Path::new("F822_2.py"); "F822_2")]
@@ -128,7 +132,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("pyflakes/F841_0.py"),
             &settings::Settings {
-                dummy_variable_rgx: Regex::new(r"^z$").unwrap().into(),
+                dummy_variable_rgx: Regex::new(r"^z$").unwrap(),
                 ..settings::Settings::for_rule(Rule::UnusedVariable)
             },
         )?;
@@ -262,13 +266,13 @@ mod tests {
             &indexer,
             &directives,
             &settings,
-            flags::Autofix::Enabled,
             flags::Noqa::Enabled,
+            flags::Autofix::Enabled,
         );
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         let actual = diagnostics
             .iter()
-            .map(|diagnostic| diagnostic.kind.rule().clone())
+            .map(|diagnostic| diagnostic.kind.rule())
             .collect::<Vec<_>>();
         assert_eq!(actual, expected);
     }

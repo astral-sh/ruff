@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SnmpWeakCryptography: ~
+    name: SnmpWeakCryptography
+    body: "You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure."
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 11
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SnmpWeakCryptography: ~
+    name: SnmpWeakCryptography
+    body: "You should not use SNMPv3 without encryption. `noAuthNoPriv` & `authNoPriv` is insecure."
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 15

@@ -6,11 +6,14 @@
 "yoda" <= compare  # SIM300
 "yoda" < compare  # SIM300
 42 > age  # SIM300
+-42 > age  # SIM300
++42 > age  # SIM300
 YODA == age  # SIM300
 YODA > age  # SIM300
 YODA >= age  # SIM300
 JediOrder.YODA == age  # SIM300
 0 < (number - 100)  # SIM300
+SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
 
 # OK
 compare == "yoda"

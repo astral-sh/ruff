@@ -1,21 +1,21 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{Boolop, Expr, ExprKind};
 
-use crate::ast::hashable::HashableExpr;
-use crate::ast::helpers::unparse_expr;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::hashable::HashableExpr;
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct ConsiderMergingIsinstance {
-        pub obj: String,
-        pub types: Vec<String>,
-    }
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct ConsiderMergingIsinstance {
+    pub obj: String,
+    pub types: Vec<String>,
+}
+
 impl Violation for ConsiderMergingIsinstance {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -27,7 +27,7 @@ impl Violation for ConsiderMergingIsinstance {
 
 /// PLR1701
 pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values: &[Expr]) {
-    if !matches!(op, Boolop::Or) || !checker.is_builtin("isinstance") {
+    if !matches!(op, Boolop::Or) || !checker.ctx.is_builtin("isinstance") {
         return;
     }
 
@@ -68,7 +68,7 @@ pub fn merge_isinstance(checker: &mut Checker, expr: &Expr, op: &Boolop, values:
                         .sorted()
                         .collect(),
                 },
-                Range::from_located(expr),
+                Range::from(expr),
             ));
         }
     }

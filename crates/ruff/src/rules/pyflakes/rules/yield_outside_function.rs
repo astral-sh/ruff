@@ -1,15 +1,15 @@
 use std::fmt;
 
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
-use serde::{Deserialize, Serialize};
 
-use crate::ast::types::{Range, ScopeKind};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::scope::ScopeKind;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum DeferralKeyword {
     Yield,
     YieldFrom,
@@ -26,11 +26,11 @@ impl fmt::Display for DeferralKeyword {
     }
 }
 
-define_violation!(
-    pub struct YieldOutsideFunction {
-        pub keyword: DeferralKeyword,
-    }
-);
+#[violation]
+pub struct YieldOutsideFunction {
+    pub keyword: DeferralKeyword,
+}
+
 impl Violation for YieldOutsideFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -41,7 +41,7 @@ impl Violation for YieldOutsideFunction {
 
 pub fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
     if matches!(
-        checker.current_scope().kind,
+        checker.ctx.scope().kind,
         ScopeKind::Class(_) | ScopeKind::Module
     ) {
         let keyword = match expr.node {
@@ -52,7 +52,7 @@ pub fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
         };
         checker.diagnostics.push(Diagnostic::new(
             YieldOutsideFunction { keyword },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 }

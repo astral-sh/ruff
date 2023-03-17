@@ -1,18 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Stmt;
 
-use crate::ast::helpers::{identifier_range, ReturnStatementVisitor};
-use crate::ast::visitor::Visitor;
-use crate::registry::Diagnostic;
-use crate::source_code::Locator;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{identifier_range, ReturnStatementVisitor};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::visitor::Visitor;
 
-define_violation!(
-    pub struct TooManyReturnStatements {
-        pub returns: usize,
-        pub max_returns: usize,
-    }
-);
+#[violation]
+pub struct TooManyReturnStatements {
+    pub returns: usize,
+    pub max_returns: usize,
+}
+
 impl Violation for TooManyReturnStatements {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -20,7 +19,7 @@ impl Violation for TooManyReturnStatements {
             returns,
             max_returns,
         } = self;
-        format!("Too many return statements ({returns}/{max_returns})")
+        format!("Too many return statements ({returns} > {max_returns})")
     }
 }
 

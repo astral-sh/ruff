@@ -1,0 +1,148 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 2
+    column: 11
+  end_location:
+    row: 2
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 2
+    column: 13
+  end_location:
+    row: 2
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 6
+    column: 8
+  end_location:
+    row: 6
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 8
+    column: 7
+  end_location:
+    row: 8
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 10
+    column: 7
+  end_location:
+    row: 10
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 10
+    column: 9
+  end_location:
+    row: 10
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 12
+    column: 13
+  end_location:
+    row: 12
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 15
+    column: 28
+  end_location:
+    row: 15
+    column: 28
+  fix: ~
+  parent: ~
+- kind:
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 18
+    column: 44
+  end_location:
+    row: 18
+    column: 44
+  fix: ~
+  parent: ~
+- kind:
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 23
+    column: 7
+  end_location:
+    row: 23
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: UnexpectedSpacesAroundKeywordParameterEquals
+    body: Unexpected spaces around keyword / parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 23
+    column: 9
+  end_location:
+    row: 23
+    column: 9
+  fix: ~
+  parent: ~
+

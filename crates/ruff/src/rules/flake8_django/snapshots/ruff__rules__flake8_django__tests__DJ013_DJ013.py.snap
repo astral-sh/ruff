@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NonLeadingReceiverDecorator: ~
+    name: NonLeadingReceiverDecorator
+    body: "`@receiver` decorator must be on top of all the other decorators"
+    suggestion: ~
+    fixable: false
   location:
     row: 15
     column: 1
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NonLeadingReceiverDecorator: ~
+    name: NonLeadingReceiverDecorator
+    body: "`@receiver` decorator must be on top of all the other decorators"
+    suggestion: ~
+    fixable: false
   location:
     row: 35
     column: 1

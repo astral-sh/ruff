@@ -4,31 +4,30 @@ use libcst_native::{
     ImportAlias, ImportFrom, ImportNames, Name, NameOrAttribute, ParenthesizableWhitespace,
 };
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
-use serde::{Deserialize, Serialize};
 
-use crate::ast::helpers::collect_call_path;
-use crate::ast::types::Range;
-use crate::ast::whitespace::indentation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::collect_call_path;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::indentation;
+
 use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::source_code::{Locator, Stylist};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::{AsRule, Rule};
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum MockReference {
     Import,
     Attribute,
 }
 
-define_violation!(
-    pub struct RewriteMockImport {
-        pub reference_type: MockReference,
-    }
-);
+#[violation]
+pub struct RewriteMockImport {
+    pub reference_type: MockReference,
+}
+
 impl AlwaysAutofixableViolation for RewriteMockImport {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -94,22 +93,6 @@ fn clean_import_aliases(aliases: Vec<ImportAlias>) -> (Vec<ImportAlias>, Vec<Opt
     (clean_aliases, mock_aliases)
 }
 
-/// Return `true` if the aliases contain `mock`.
-fn includes_mock_member(aliases: &[ImportAlias]) -> bool {
-    for alias in aliases {
-        let ImportAlias { name, .. } = &alias;
-        // Ex) `import mock.mock`
-        if let NameOrAttribute::A(attribute_struct) = name {
-            if let Expression::Name(name_struct) = &*attribute_struct.value {
-                if name_struct.value == "mock" && attribute_struct.attr.value == "mock" {
-                    return true;
-                }
-            }
-        }
-    }
-    false
-}
-
 fn format_mocks(aliases: Vec<Option<AsName>>, indent: &str, stylist: &Stylist) -> String {
     let mut content = String::new();
     for alias in aliases {
@@ -143,7 +126,7 @@ fn format_import(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(&Range::from_located(stmt));
+    let module_text = locator.slice(stmt);
     let mut tree = match_module(module_text)?;
     let mut import = match_import(&mut tree)?;
 
@@ -177,24 +160,16 @@ fn format_import_from(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(&Range::from_located(stmt));
+    let module_text = locator.slice(stmt);
     let mut tree = match_module(module_text).unwrap();
     let mut import = match_import_from(&mut tree)?;
 
-    let ImportFrom {
-        names: ImportNames::Aliases(aliases),
+    if let ImportFrom {
+        names: ImportNames::Star(..),
         ..
-    } = import.clone() else {
-        unreachable!("Expected ImportNames::Aliases");
-    };
-
-    let has_mock_member = includes_mock_member(&aliases);
-    let (clean_aliases, mock_aliases) = clean_import_aliases(aliases);
-
-    Ok(if clean_aliases.is_empty() {
-        format_mocks(mock_aliases, indent, stylist)
-    } else {
-        import.names = ImportNames::Aliases(clean_aliases);
+    } = import
+    {
+        // Ex) `from mock import *`
         import.module = Some(NameOrAttribute::A(Box::new(Attribute {
             value: Box::new(Expression::Name(Box::new(Name {
                 value: "unittest",
@@ -213,22 +188,61 @@ fn format_import_from(
             lpar: vec![],
             rpar: vec![],
         })));
-
         let mut state = CodegenState {
             default_newline: stylist.line_ending(),
             default_indent: stylist.indentation(),
             ..CodegenState::default()
         };
         tree.codegen(&mut state);
+        Ok(state.to_string())
+    } else if let ImportFrom {
+        names: ImportNames::Aliases(aliases),
+        ..
+    } = import
+    {
+        // Ex) `from mock import mock`
+        let (clean_aliases, mock_aliases) = clean_import_aliases(aliases.clone());
+        Ok(if clean_aliases.is_empty() {
+            format_mocks(mock_aliases, indent, stylist)
+        } else {
+            import.names = ImportNames::Aliases(clean_aliases);
+            import.module = Some(NameOrAttribute::A(Box::new(Attribute {
+                value: Box::new(Expression::Name(Box::new(Name {
+                    value: "unittest",
+                    lpar: vec![],
+                    rpar: vec![],
+                }))),
+                attr: Name {
+                    value: "mock",
+                    lpar: vec![],
+                    rpar: vec![],
+                },
+                dot: Dot {
+                    whitespace_before: ParenthesizableWhitespace::default(),
+                    whitespace_after: ParenthesizableWhitespace::default(),
+                },
+                lpar: vec![],
+                rpar: vec![],
+            })));
 
-        let mut content = state.to_string();
-        if has_mock_member {
-            content.push_str(stylist.line_ending());
-            content.push_str(indent);
-            content.push_str(&format_mocks(mock_aliases, indent, stylist));
-        }
-        content
-    })
+            let mut state = CodegenState {
+                default_newline: stylist.line_ending(),
+                default_indent: stylist.indentation(),
+                ..CodegenState::default()
+            };
+            tree.codegen(&mut state);
+
+            let mut content = state.to_string();
+            if !mock_aliases.is_empty() {
+                content.push_str(stylist.line_ending());
+                content.push_str(indent);
+                content.push_str(&format_mocks(mock_aliases, indent, stylist));
+            }
+            content
+        })
+    } else {
+        unreachable!("Expected ImportNames::Aliases | ImportNames::Star");
+    }
 }
 
 /// UP026
@@ -239,7 +253,7 @@ pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 RewriteMockImport {
                     reference_type: MockReference::Attribute,
                 },
-                Range::from_located(value),
+                Range::from(value),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
@@ -263,7 +277,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| name.node.name == "mock" || name.node.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if checker.patch(&Rule::RewriteMockImport) {
+                let content = if checker.patch(Rule::RewriteMockImport) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         match format_import(stmt, indent, checker.locator, checker.stylist) {
                             Ok(content) => Some(content),
@@ -286,7 +300,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             RewriteMockImport {
                                 reference_type: MockReference::Import,
                             },
-                            Range::from_located(name),
+                            Range::from(name),
                         );
                         if let Some(content) = content.as_ref() {
                             diagnostic.amend(Fix::replacement(
@@ -314,7 +328,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     RewriteMockImport {
                         reference_type: MockReference::Import,
                     },
-                    Range::from_located(stmt),
+                    Range::from(stmt),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {

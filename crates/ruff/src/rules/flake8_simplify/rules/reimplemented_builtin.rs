@@ -1,21 +1,21 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{
     Cmpop, Comprehension, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Unaryop,
 };
 
-use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::source_code::Stylist;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
+use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct ReimplementedBuiltin {
-        pub repl: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::{AsRule, Rule};
+
+#[violation]
+pub struct ReimplementedBuiltin {
+    pub repl: String,
+}
+
 impl AlwaysAutofixableViolation for ReimplementedBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -201,7 +201,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
         .or_else(|| sibling.and_then(|sibling| return_values_for_siblings(stmt, sibling)))
     {
         if loop_info.return_value && !loop_info.next_return_value {
-            if checker.settings.rules.enabled(&Rule::ReimplementedBuiltin) {
+            if checker.settings.rules.enabled(Rule::ReimplementedBuiltin) {
                 let contents = return_stmt(
                     "any",
                     loop_info.test,
@@ -219,9 +219,9 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     ReimplementedBuiltin {
                         repl: contents.clone(),
                     },
-                    Range::from_located(stmt),
+                    Range::from(stmt),
                 );
-                if checker.patch(diagnostic.kind.rule()) && checker.is_builtin("any") {
+                if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("any") {
                     diagnostic.amend(Fix::replacement(
                         contents,
                         stmt.location,
@@ -233,7 +233,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
         }
 
         if !loop_info.return_value && loop_info.next_return_value {
-            if checker.settings.rules.enabled(&Rule::ReimplementedBuiltin) {
+            if checker.settings.rules.enabled(Rule::ReimplementedBuiltin) {
                 // Invert the condition.
                 let test = {
                     if let ExprKind::UnaryOp {
@@ -296,9 +296,9 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     ReimplementedBuiltin {
                         repl: contents.clone(),
                     },
-                    Range::from_located(stmt),
+                    Range::from(stmt),
                 );
-                if checker.patch(diagnostic.kind.rule()) && checker.is_builtin("all") {
+                if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("all") {
                     diagnostic.amend(Fix::replacement(
                         contents,
                         stmt.location,

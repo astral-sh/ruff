@@ -1,14 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct MutableArgumentDefault;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct MutableArgumentDefault;
+
 impl Violation for MutableArgumentDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -67,11 +67,14 @@ const IMMUTABLE_GENERIC_TYPES: &[&[&str]] = &[
 ];
 
 pub fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
-    checker.resolve_call_path(func).map_or(false, |call_path| {
-        MUTABLE_FUNCS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
-    })
+    checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            MUTABLE_FUNCS
+                .iter()
+                .any(|target| call_path.as_slice() == *target)
+        })
 }
 
 fn is_mutable_expr(checker: &Checker, expr: &Expr) -> bool {
@@ -89,40 +92,44 @@ fn is_mutable_expr(checker: &Checker, expr: &Expr) -> bool {
 
 fn is_immutable_annotation(checker: &Checker, expr: &Expr) -> bool {
     match &expr.node {
-        ExprKind::Name { .. } | ExprKind::Attribute { .. } => {
-            checker.resolve_call_path(expr).map_or(false, |call_path| {
+        ExprKind::Name { .. } | ExprKind::Attribute { .. } => checker
+            .ctx
+            .resolve_call_path(expr)
+            .map_or(false, |call_path| {
                 IMMUTABLE_TYPES
                     .iter()
                     .chain(IMMUTABLE_GENERIC_TYPES)
                     .any(|target| call_path.as_slice() == *target)
-            })
-        }
+            }),
         ExprKind::Subscript { value, slice, .. } => {
-            checker.resolve_call_path(value).map_or(false, |call_path| {
-                if IMMUTABLE_GENERIC_TYPES
-                    .iter()
-                    .any(|target| call_path.as_slice() == *target)
-                {
-                    true
-                } else if call_path.as_slice() == ["typing", "Union"] {
-                    if let ExprKind::Tuple { elts, .. } = &slice.node {
-                        elts.iter().all(|elt| is_immutable_annotation(checker, elt))
+            checker
+                .ctx
+                .resolve_call_path(value)
+                .map_or(false, |call_path| {
+                    if IMMUTABLE_GENERIC_TYPES
+                        .iter()
+                        .any(|target| call_path.as_slice() == *target)
+                    {
+                        true
+                    } else if call_path.as_slice() == ["typing", "Union"] {
+                        if let ExprKind::Tuple { elts, .. } = &slice.node {
+                            elts.iter().all(|elt| is_immutable_annotation(checker, elt))
+                        } else {
+                            false
+                        }
+                    } else if call_path.as_slice() == ["typing", "Optional"] {
+                        is_immutable_annotation(checker, slice)
+                    } else if call_path.as_slice() == ["typing", "Annotated"] {
+                        if let ExprKind::Tuple { elts, .. } = &slice.node {
+                            elts.first()
+                                .map_or(false, |elt| is_immutable_annotation(checker, elt))
+                        } else {
+                            false
+                        }
                     } else {
                         false
                     }
-                } else if call_path.as_slice() == ["typing", "Optional"] {
-                    is_immutable_annotation(checker, slice)
-                } else if call_path.as_slice() == ["typing", "Annotated"] {
-                    if let ExprKind::Tuple { elts, .. } = &slice.node {
-                        elts.first()
-                            .map_or(false, |elt| is_immutable_annotation(checker, elt))
-                    } else {
-                        false
-                    }
-                } else {
-                    false
-                }
-            })
+                })
         }
         ExprKind::BinOp {
             left,
@@ -163,7 +170,7 @@ pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
         {
             checker.diagnostics.push(Diagnostic::new(
                 MutableArgumentDefault,
-                Range::from_located(default),
+                Range::from(default),
             ));
         }
     }

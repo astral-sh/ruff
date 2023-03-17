@@ -1,16 +1,16 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::helpers::unparse_expr;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct LRUCacheWithoutParameters;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct LRUCacheWithoutParameters;
+
 impl AlwaysAutofixableViolation for LRUCacheWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -36,9 +36,12 @@ pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Exp
         // Look for, e.g., `import functools; @functools.lru_cache()`.
         if args.is_empty()
             && keywords.is_empty()
-            && checker.resolve_call_path(func).map_or(false, |call_path| {
-                call_path.as_slice() == ["functools", "lru_cache"]
-            })
+            && checker
+                .ctx
+                .resolve_call_path(func)
+                .map_or(false, |call_path| {
+                    call_path.as_slice() == ["functools", "lru_cache"]
+                })
         {
             let mut diagnostic = Diagnostic::new(
                 LRUCacheWithoutParameters,

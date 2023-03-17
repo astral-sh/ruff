@@ -1,9 +1,12 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PublicPackage: ~
+    name: PublicPackage
+    body: Missing docstring in public package
+    suggestion: ~
+    fixable: false
   location:
     row: 1
     column: 0

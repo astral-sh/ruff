@@ -32,6 +32,7 @@ mod tests {
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_11.py"); "TCH004_11")]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_12.py"); "TCH004_12")]
     #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_13.py"); "TCH004_13")]
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("TCH004_14.pyi"); "TCH004_14")]
     #[test_case(Rule::EmptyTypeCheckingBlock, Path::new("TCH005.py"); "TCH005")]
     #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("strict.py"); "strict")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -73,6 +74,47 @@ mod tests {
             },
         )?;
         assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("runtime_evaluated_base_classes_1.py"); "runtime_evaluated_base_classes_1")]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("runtime_evaluated_base_classes_2.py"); "runtime_evaluated_base_classes_2")]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("runtime_evaluated_base_classes_3.py"); "runtime_evaluated_base_classes_3")]
+    fn runtime_evaluated_base_classes(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::Settings {
+                flake8_type_checking: super::settings::Settings {
+                    runtime_evaluated_base_classes: vec!["pydantic.BaseModel".to_string()],
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rule(rule_code)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Rule::RuntimeImportInTypeCheckingBlock, Path::new("runtime_evaluated_decorators_1.py"); "runtime_evaluated_decorators_1")]
+    #[test_case(Rule::TypingOnlyThirdPartyImport, Path::new("runtime_evaluated_decorators_2.py"); "runtime_evaluated_decorators_2")]
+    #[test_case(Rule::TypingOnlyStandardLibraryImport, Path::new("runtime_evaluated_decorators_3.py"); "runtime_evaluated_decorators_3")]
+    fn runtime_evaluated_decorators(rule_code: Rule, path: &Path) -> Result<()> {
+        let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("flake8_type_checking").join(path).as_path(),
+            &settings::Settings {
+                flake8_type_checking: super::settings::Settings {
+                    runtime_evaluated_decorators: vec![
+                        "attrs.define".to_string(),
+                        "attrs.frozen".to_string(),
+                    ],
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rule(rule_code)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 }

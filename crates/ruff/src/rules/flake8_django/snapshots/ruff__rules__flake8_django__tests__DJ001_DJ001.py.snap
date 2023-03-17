@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NullableModelStringField:
-      field_name: CharField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as CharField"
+    suggestion: ~
+    fixable: false
   location:
     row: 7
     column: 16
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: TextField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as TextField"
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 16
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: SlugField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as SlugField"
+    suggestion: ~
+    fixable: false
   location:
     row: 9
     column: 16
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: EmailField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as EmailField"
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 17
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: FilePathField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as FilePathField"
+    suggestion: ~
+    fixable: false
   location:
     row: 11
     column: 20
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: URLField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as URLField"
+    suggestion: ~
+    fixable: false
   location:
     row: 12
     column: 15
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: CharField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as CharField"
+    suggestion: ~
+    fixable: false
   location:
     row: 16
     column: 16
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: CharField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as CharField"
+    suggestion: ~
+    fixable: false
   location:
     row: 17
     column: 16
@@ -91,8 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: SlugField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as SlugField"
+    suggestion: ~
+    fixable: false
   location:
     row: 18
     column: 16
@@ -102,8 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: EmailField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as EmailField"
+    suggestion: ~
+    fixable: false
   location:
     row: 19
     column: 17
@@ -113,8 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: FilePathField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as FilePathField"
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 20
@@ -124,8 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: URLField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as URLField"
+    suggestion: ~
+    fixable: false
   location:
     row: 21
     column: 15
@@ -135,8 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: CharField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as CharField"
+    suggestion: ~
+    fixable: false
   location:
     row: 25
     column: 16
@@ -146,8 +172,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: CharField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as CharField"
+    suggestion: ~
+    fixable: false
   location:
     row: 26
     column: 16
@@ -157,8 +185,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: SlugField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as SlugField"
+    suggestion: ~
+    fixable: false
   location:
     row: 27
     column: 16
@@ -168,8 +198,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: EmailField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as EmailField"
+    suggestion: ~
+    fixable: false
   location:
     row: 28
     column: 17
@@ -179,8 +211,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: FilePathField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as FilePathField"
+    suggestion: ~
+    fixable: false
   location:
     row: 29
     column: 20
@@ -190,8 +224,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    NullableModelStringField:
-      field_name: URLField
+    name: NullableModelStringField
+    body: "Avoid using `null=True` on string-based fields such as URLField"
+    suggestion: ~
+    fixable: false
   location:
     row: 30
     column: 15

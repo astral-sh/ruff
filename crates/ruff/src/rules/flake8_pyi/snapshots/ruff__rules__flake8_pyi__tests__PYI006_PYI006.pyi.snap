@@ -1,0 +1,83 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: BadVersionInfoComparison
+    body: "Use `<` or `>=` for version info comparisons"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 8
+    column: 3
+  end_location:
+    row: 8
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    name: BadVersionInfoComparison
+    body: "Use `<` or `>=` for version info comparisons"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 10
+    column: 3
+  end_location:
+    row: 10
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    name: BadVersionInfoComparison
+    body: "Use `<` or `>=` for version info comparisons"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 12
+    column: 3
+  end_location:
+    row: 12
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    name: BadVersionInfoComparison
+    body: "Use `<` or `>=` for version info comparisons"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 14
+    column: 3
+  end_location:
+    row: 14
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    name: BadVersionInfoComparison
+    body: "Use `<` or `>=` for version info comparisons"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 16
+    column: 3
+  end_location:
+    row: 16
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    name: BadVersionInfoComparison
+    body: "Use `<` or `>=` for version info comparisons"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 18
+    column: 3
+  end_location:
+    row: 18
+    column: 27
+  fix: ~
+  parent: ~
+

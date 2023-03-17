@@ -1,0 +1,25 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: InvalidCharacterNul
+    body: "Invalid unescaped character NUL, use \"\\0\" instead"
+    suggestion: Replace with escape sequence
+    fixable: true
+  location:
+    row: 30
+    column: 4
+  end_location:
+    row: 30
+    column: 5
+  fix:
+    content: "\\0"
+    location:
+      row: 30
+      column: 4
+    end_location:
+      row: 30
+      column: 5
+  parent: ~
+

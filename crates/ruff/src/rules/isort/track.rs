@@ -6,11 +6,13 @@ use rustpython_parser::ast::{
     Unaryop, Withitem,
 };
 
-use super::helpers;
-use crate::ast::visitor::Visitor;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_stdlib::path::is_python_stub_file;
+
 use crate::directives::IsortDirectives;
-use crate::resolver::is_interface_definition_path;
-use crate::source_code::Locator;
+
+use super::helpers;
 
 #[derive(Debug)]
 pub enum Trailer {
@@ -29,7 +31,7 @@ pub struct Block<'a> {
 pub struct ImportTracker<'a> {
     locator: &'a Locator<'a>,
     directives: &'a IsortDirectives,
-    pyi: bool,
+    is_stub: bool,
     blocks: Vec<Block<'a>>,
     split_index: usize,
     nested: bool,
@@ -40,7 +42,7 @@ impl<'a> ImportTracker<'a> {
         Self {
             locator,
             directives,
-            pyi: is_interface_definition_path(path),
+            is_stub: is_python_stub_file(path),
             blocks: vec![Block::default()],
             split_index: 0,
             nested: false,
@@ -65,7 +67,7 @@ impl<'a> ImportTracker<'a> {
             return None;
         }
 
-        Some(if self.pyi {
+        Some(if self.is_stub {
             // Black treats interface files differently, limiting to one newline
             // (`Trailing::Sibling`).
             Trailer::Sibling

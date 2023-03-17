@@ -1,20 +1,21 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::future::ALL_FEATURE_NAMES;
 use rustpython_parser::ast::Alias;
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::{AutofixKind, Availability, Violation};
+use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{AutofixKind, Availability, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+use ruff_python_stdlib::future::ALL_FEATURE_NAMES;
 
-define_violation!(
-    pub struct UnusedImport {
-        pub name: String,
-        pub ignore_init: bool,
-        pub multiple: bool,
-    }
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct UnusedImport {
+    pub name: String,
+    pub ignore_init: bool,
+    pub multiple: bool,
+}
+
 fn fmt_unused_import_autofix_msg(unused_import: &UnusedImport) -> String {
     let UnusedImport { name, multiple, .. } = unused_import;
     if *multiple {
@@ -50,12 +51,12 @@ impl Violation for UnusedImport {
         }
     }
 }
-define_violation!(
-    pub struct ImportShadowedByLoopVar {
-        pub name: String,
-        pub line: usize,
-    }
-);
+#[violation]
+pub struct ImportShadowedByLoopVar {
+    pub name: String,
+    pub line: usize,
+}
+
 impl Violation for ImportShadowedByLoopVar {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -64,11 +65,11 @@ impl Violation for ImportShadowedByLoopVar {
     }
 }
 
-define_violation!(
-    pub struct ImportStar {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct ImportStar {
+    pub name: String,
+}
+
 impl Violation for ImportStar {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -77,9 +78,9 @@ impl Violation for ImportStar {
     }
 }
 
-define_violation!(
-    pub struct LateFutureImport;
-);
+#[violation]
+pub struct LateFutureImport;
+
 impl Violation for LateFutureImport {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -87,12 +88,12 @@ impl Violation for LateFutureImport {
     }
 }
 
-define_violation!(
-    pub struct ImportStarUsage {
-        pub name: String,
-        pub sources: Vec<String>,
-    }
-);
+#[violation]
+pub struct ImportStarUsage {
+    pub name: String,
+    pub sources: Vec<String>,
+}
+
 impl Violation for ImportStarUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -105,11 +106,11 @@ impl Violation for ImportStarUsage {
     }
 }
 
-define_violation!(
-    pub struct ImportStarNotPermitted {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct ImportStarNotPermitted {
+    pub name: String,
+}
+
 impl Violation for ImportStarNotPermitted {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -118,11 +119,11 @@ impl Violation for ImportStarNotPermitted {
     }
 }
 
-define_violation!(
-    pub struct FutureFeatureNotDefined {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct FutureFeatureNotDefined {
+    pub name: String,
+}
+
 impl Violation for FutureFeatureNotDefined {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -137,7 +138,7 @@ pub fn future_feature_not_defined(checker: &mut Checker, alias: &Alias) {
             FutureFeatureNotDefined {
                 name: alias.node.name.to_string(),
             },
-            Range::from_located(alias),
+            Range::from(alias),
         ));
     }
 }

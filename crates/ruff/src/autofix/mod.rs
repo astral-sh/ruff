@@ -4,11 +4,12 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
-use crate::fix::Fix;
+use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
+
 use crate::linter::FixTable;
-use crate::registry::Diagnostic;
-use crate::source_code::Locator;
+use crate::registry::{AsRule, Rule};
 
 pub mod helpers;
 
@@ -38,7 +39,7 @@ fn apply_fixes<'a>(
                 .as_ref()
                 .map(|fix| (diagnostic.kind.rule(), fix))
         })
-        .sorted_by_key(|(.., fix)| fix.location)
+        .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
         // If we already applied an identical fix as part of another correction, skip
         // any re-application.
@@ -54,7 +55,7 @@ fn apply_fixes<'a>(
         }
 
         // Add all contents from `last_pos` to `fix.location`.
-        let slice = locator.slice(&Range::new(last_pos, fix.location));
+        let slice = locator.slice(Range::new(last_pos, fix.location));
         output.push_str(slice);
 
         // Add the patch itself.
@@ -78,7 +79,7 @@ pub(crate) fn apply_fix(fix: &Fix, locator: &Locator) -> String {
     let mut output = String::with_capacity(locator.len());
 
     // Add all contents from `last_pos` to `fix.location`.
-    let slice = locator.slice(&Range::new(Location::new(1, 0), fix.location));
+    let slice = locator.slice(Range::new(Location::new(1, 0), fix.location));
     output.push_str(slice);
 
     // Add the patch itself.
@@ -91,47 +92,54 @@ pub(crate) fn apply_fix(fix: &Fix, locator: &Locator) -> String {
     output
 }
 
+/// Compare two fixes.
+fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
+    fix1.location
+        .cmp(&fix2.location)
+        .then_with(|| match (&rule1, &rule2) {
+            // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
+            (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
+            (Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod) => std::cmp::Ordering::Greater,
+            _ => std::cmp::Ordering::Equal,
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use rustpython_parser::ast::Location;
 
+    use ruff_diagnostics::Diagnostic;
+    use ruff_diagnostics::Fix;
+    use ruff_python_ast::source_code::Locator;
+
     use crate::autofix::{apply_fix, apply_fixes};
-    use crate::fix::Fix;
-    use crate::registry::Diagnostic;
     use crate::rules::pycodestyle::rules::NoNewLineAtEndOfFile;
 
-    use crate::source_code::Locator;
-
-    #[test]
-    fn empty_file() {
-        let fixes: Vec<Diagnostic> = vec![];
-        let locator = Locator::new(r#""#);
-        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
-        assert_eq!(contents, "");
-        assert_eq!(fixed.values().sum::<usize>(), 0);
-    }
-
-    impl From<Fix> for Diagnostic {
-        fn from(fix: Fix) -> Self {
-            Diagnostic {
+    fn create_diagnostics(fixes: impl IntoIterator<Item = Fix>) -> Vec<Diagnostic> {
+        fixes
+            .into_iter()
+            .map(|fix| Diagnostic {
                 // The choice of rule here is arbitrary.
                 kind: NoNewLineAtEndOfFile.into(),
                 location: fix.location,
                 end_location: fix.end_location,
                 fix: Some(fix),
                 parent: None,
-            }
-        }
+            })
+            .collect()
+    }
+
+    #[test]
+    fn empty_file() {
+        let locator = Locator::new(r#""#);
+        let diagnostics = create_diagnostics([]);
+        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
+        assert_eq!(contents, "");
+        assert_eq!(fixed.values().sum::<usize>(), 0);
     }
 
     #[test]
     fn apply_one_replacement() {
-        let fixes: Vec<Diagnostic> = vec![Fix {
-            content: "Bar".to_string(),
-            location: Location::new(1, 8),
-            end_location: Location::new(1, 14),
-        }
-        .into()];
         let locator = Locator::new(
             r#"
 class A(object):
@@ -139,7 +147,12 @@ class A(object):
 "#
             .trim(),
         );
-        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
+        let diagnostics = create_diagnostics([Fix {
+            content: "Bar".to_string(),
+            location: Location::new(1, 8),
+            end_location: Location::new(1, 14),
+        }]);
+        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             contents,
             r#"
@@ -153,12 +166,6 @@ class A(Bar):
 
     #[test]
     fn apply_one_removal() {
-        let fixes: Vec<Diagnostic> = vec![Fix {
-            content: String::new(),
-            location: Location::new(1, 7),
-            end_location: Location::new(1, 15),
-        }
-        .into()];
         let locator = Locator::new(
             r#"
 class A(object):
@@ -166,7 +173,12 @@ class A(object):
 "#
             .trim(),
         );
-        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
+        let diagnostics = create_diagnostics([Fix {
+            content: String::new(),
+            location: Location::new(1, 7),
+            end_location: Location::new(1, 15),
+        }]);
+        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             contents,
             r#"
@@ -180,20 +192,6 @@ class A:
 
     #[test]
     fn apply_two_removals() {
-        let fixes: Vec<Diagnostic> = vec![
-            Fix {
-                content: String::new(),
-                location: Location::new(1, 7),
-                end_location: Location::new(1, 16),
-            }
-            .into(),
-            Fix {
-                content: String::new(),
-                location: Location::new(1, 16),
-                end_location: Location::new(1, 23),
-            }
-            .into(),
-        ];
         let locator = Locator::new(
             r#"
 class A(object, object):
@@ -201,7 +199,19 @@ class A(object, object):
 "#
             .trim(),
         );
-        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
+        let diagnostics = create_diagnostics([
+            Fix {
+                content: String::new(),
+                location: Location::new(1, 7),
+                end_location: Location::new(1, 16),
+            },
+            Fix {
+                content: String::new(),
+                location: Location::new(1, 16),
+                end_location: Location::new(1, 23),
+            },
+        ]);
+        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
 
         assert_eq!(
             contents,
@@ -216,20 +226,6 @@ class A:
 
     #[test]
     fn ignore_overlapping_fixes() {
-        let fixes: Vec<Diagnostic> = vec![
-            Fix {
-                content: String::new(),
-                location: Location::new(1, 7),
-                end_location: Location::new(1, 15),
-            }
-            .into(),
-            Fix {
-                content: "ignored".to_string(),
-                location: Location::new(1, 9),
-                end_location: Location::new(1, 11),
-            }
-            .into(),
-        ];
         let locator = Locator::new(
             r#"
 class A(object):
@@ -237,7 +233,19 @@ class A(object):
 "#
             .trim(),
         );
-        let (contents, fixed) = apply_fixes(fixes.iter(), &locator);
+        let diagnostics = create_diagnostics([
+            Fix {
+                content: String::new(),
+                location: Location::new(1, 7),
+                end_location: Location::new(1, 15),
+            },
+            Fix {
+                content: "ignored".to_string(),
+                location: Location::new(1, 9),
+                end_location: Location::new(1, 11),
+            },
+        ]);
+        let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             contents,
             r#"

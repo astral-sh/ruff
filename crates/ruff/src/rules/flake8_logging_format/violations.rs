@@ -1,10 +1,9 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_macros::{derive_message_formats, violation};
 
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+#[violation]
+pub struct LoggingStringFormat;
 
-define_violation!(
-    pub struct LoggingStringFormat;
-);
 impl Violation for LoggingStringFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -12,9 +11,9 @@ impl Violation for LoggingStringFormat {
     }
 }
 
-define_violation!(
-    pub struct LoggingPercentFormat;
-);
+#[violation]
+pub struct LoggingPercentFormat;
+
 impl Violation for LoggingPercentFormat {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -22,9 +21,9 @@ impl Violation for LoggingPercentFormat {
     }
 }
 
-define_violation!(
-    pub struct LoggingStringConcat;
-);
+#[violation]
+pub struct LoggingStringConcat;
+
 impl Violation for LoggingStringConcat {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -32,9 +31,9 @@ impl Violation for LoggingStringConcat {
     }
 }
 
-define_violation!(
-    pub struct LoggingFString;
-);
+#[violation]
+pub struct LoggingFString;
+
 impl Violation for LoggingFString {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -42,9 +41,9 @@ impl Violation for LoggingFString {
     }
 }
 
-define_violation!(
-    pub struct LoggingWarn;
-);
+#[violation]
+pub struct LoggingWarn;
+
 impl AlwaysAutofixableViolation for LoggingWarn {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -56,9 +55,9 @@ impl AlwaysAutofixableViolation for LoggingWarn {
     }
 }
 
-define_violation!(
-    pub struct LoggingExtraAttrClash(pub String);
-);
+#[violation]
+pub struct LoggingExtraAttrClash(pub String);
+
 impl Violation for LoggingExtraAttrClash {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -69,9 +68,9 @@ impl Violation for LoggingExtraAttrClash {
     }
 }
 
-define_violation!(
-    pub struct LoggingExcInfo;
-);
+#[violation]
+pub struct LoggingExcInfo;
+
 impl Violation for LoggingExcInfo {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -79,9 +78,9 @@ impl Violation for LoggingExcInfo {
     }
 }
 
-define_violation!(
-    pub struct LoggingRedundantExcInfo;
-);
+#[violation]
+pub struct LoggingRedundantExcInfo;
+
 impl Violation for LoggingRedundantExcInfo {
     #[derive_message_formats]
     fn message(&self) -> String {

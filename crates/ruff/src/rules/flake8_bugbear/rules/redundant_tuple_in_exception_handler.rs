@@ -1,18 +1,18 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
-use crate::ast::helpers::unparse_expr;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct RedundantTupleInExceptionHandler {
-        pub name: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct RedundantTupleInExceptionHandler {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for RedundantTupleInExceptionHandler {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -45,7 +45,7 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
             RedundantTupleInExceptionHandler {
                 name: unparse_expr(elt, checker.stylist),
             },
-            Range::from_located(type_),
+            Range::from(type_),
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(

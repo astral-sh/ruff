@@ -1,29 +1,28 @@
-use crate::ast::function_type;
-use crate::ast::function_type::FunctionType;
-use crate::{
-    ast::types::{FunctionDef, ScopeKind},
-    checkers::ast::Checker,
-};
+use ruff_python_ast::function_type;
+use ruff_python_ast::function_type::FunctionType;
+use ruff_python_ast::scope::{FunctionDef, ScopeKind};
 
-pub fn in_dunder_init(checker: &mut Checker) -> bool {
-    let scope = checker.current_scope();
+use crate::checkers::ast::Checker;
+
+pub fn in_dunder_init(checker: &Checker) -> bool {
+    let scope = checker.ctx.scope();
     let ScopeKind::Function(FunctionDef {
         name,
         decorator_list,
         ..
-    }) = &scope.kind else {
+    }): ScopeKind = scope.kind else {
         return false;
     };
-    if *name != "__init__" {
+    if name != "__init__" {
         return false;
     }
-    let Some(parent) = checker.current_scope_parent() else {
+    let Some(parent) = checker.ctx.parent_scope() else {
         return false;
     };
 
     if !matches!(
         function_type::classify(
-            checker,
+            &checker.ctx,
             parent,
             name,
             decorator_list,

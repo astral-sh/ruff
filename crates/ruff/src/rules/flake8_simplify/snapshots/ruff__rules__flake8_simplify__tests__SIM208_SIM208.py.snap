@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DoubleNegation:
-      expr: a
+    name: DoubleNegation
+    body: "Use `a` instead of `not (not a)`"
+    suggestion: "Replace with `a`"
+    fixable: true
   location:
     row: 1
     column: 3
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    DoubleNegation:
-      expr: a == b
+    name: DoubleNegation
+    body: "Use `a == b` instead of `not (not a == b)`"
+    suggestion: "Replace with `a == b`"
+    fixable: true
   location:
     row: 4
     column: 3

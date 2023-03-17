@@ -1,8 +1,8 @@
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{Expr, ExprKind, Location, Stmt, StmtKind};
 
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 
 #[derive(Default)]
 pub struct Stack<'a> {
@@ -66,8 +66,26 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                     .non_locals
                     .extend(names.iter().map(String::as_str));
             }
-            StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. } => {
-                // Don't recurse.
+            StmtKind::FunctionDef {
+                decorator_list,
+                args,
+                returns,
+                ..
+            }
+            | StmtKind::AsyncFunctionDef {
+                decorator_list,
+                args,
+                returns,
+                ..
+            } => {
+                // Don't recurse into the body, but visit the decorators, etc.
+                for expr in decorator_list {
+                    visitor::walk_expr(self, expr);
+                }
+                if let Some(returns) = returns {
+                    visitor::walk_expr(self, returns);
+                }
+                visitor::walk_arguments(self, args);
             }
             StmtKind::Return { value } => {
                 self.stack

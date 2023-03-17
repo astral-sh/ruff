@@ -1,28 +1,29 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Location;
 
-use super::detection::comment_contains_code;
-use crate::ast::types::Range;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::settings::{flags, Settings};
-use crate::source_code::Locator;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for commented-out Python code.
-    ///
-    /// ## Why is this bad?
-    /// Commented-out code is dead code, and is often included inadvertently.
-    /// It should be removed.
-    ///
-    /// ## Example
-    /// ```python
-    /// # print('foo')
-    /// ```
-    pub struct CommentedOutCode;
-);
+use crate::registry::Rule;
+use crate::settings::{flags, Settings};
+
+use super::detection::comment_contains_code;
+
+/// ## What it does
+/// Checks for commented-out Python code.
+///
+/// ## Why is this bad?
+/// Commented-out code is dead code, and is often included inadvertently.
+/// It should be removed.
+///
+/// ## Example
+/// ```python
+/// # print('foo')
+/// ```
+#[violation]
+pub struct CommentedOutCode;
+
 impl AlwaysAutofixableViolation for CommentedOutCode {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -55,12 +56,12 @@ pub fn commented_out_code(
 ) -> Option<Diagnostic> {
     let location = Location::new(start.row(), 0);
     let end_location = Location::new(end.row() + 1, 0);
-    let line = locator.slice(&Range::new(location, end_location));
+    let line = locator.slice(Range::new(location, end_location));
 
     // Verify that the comment is on its own line, and that it contains code.
     if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
         let mut diagnostic = Diagnostic::new(CommentedOutCode, Range::new(start, end));
-        if autofix.into() && settings.rules.should_fix(&Rule::CommentedOutCode) {
+        if autofix.into() && settings.rules.should_fix(Rule::CommentedOutCode) {
             diagnostic.amend(Fix::deletion(location, end_location));
         }
         Some(diagnostic)

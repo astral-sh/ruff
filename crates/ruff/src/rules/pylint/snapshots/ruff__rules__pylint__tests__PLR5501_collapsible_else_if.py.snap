@@ -1,0 +1,31 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: CollapsibleElseIf
+    body: "Consider using `elif` instead of `else` then `if` to remove one indentation level"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 38
+    column: 8
+  end_location:
+    row: 39
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: CollapsibleElseIf
+    body: "Consider using `elif` instead of `else` then `if` to remove one indentation level"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 46
+    column: 8
+  end_location:
+    row: 49
+    column: 16
+  fix: ~
+  parent: ~
+

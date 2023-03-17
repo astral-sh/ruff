@@ -1,8 +1,9 @@
 //! Settings for the `flake8-bandit` plugin.
 
-use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 fn default_tmp_dirs() -> Vec<String> {
     ["/tmp", "/var/tmp", "/dev/shm"]
@@ -45,7 +46,7 @@ pub struct Options {
     pub check_typed_exception: Option<bool>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 pub struct Settings {
     pub hardcoded_tmp_directory: Vec<String>,
     pub check_typed_exception: bool,

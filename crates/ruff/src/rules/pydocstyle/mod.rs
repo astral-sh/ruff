@@ -5,16 +5,18 @@ pub mod settings;
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
     use std::path::Path;
 
     use anyhow::Result;
     use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
-    use super::settings::{Convention, Settings};
     use crate::registry::Rule;
     use crate::settings;
     use crate::test::test_path;
+
+    use super::settings::{Convention, Settings};
 
     #[test_case(Rule::BlankLineAfterLastSection, Path::new("sections.py"); "D413")]
     #[test_case(Rule::BlankLineAfterSection, Path::new("sections.py"); "D410")]
@@ -58,7 +60,7 @@ mod tests {
     #[test_case(Rule::PublicMethod, Path::new("setter.py"); "D102_1")]
     #[test_case(Rule::PublicModule, Path::new("D.py"); "D100")]
     #[test_case(Rule::PublicNestedClass, Path::new("D.py"); "D106")]
-    #[test_case(Rule::PublicPackage, Path::new("D.py"); "D104")]
+    #[test_case(Rule::PublicPackage, Path::new("D.py"); "D104_0")]
     #[test_case(Rule::PublicPackage, Path::new("D104/__init__.py"); "D104_1")]
     #[test_case(Rule::SectionNameEndsInColon, Path::new("D.py"); "D416")]
     #[test_case(Rule::SectionNotOverIndented, Path::new("sections.py"); "D214")]
@@ -72,9 +74,28 @@ mod tests {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
             Path::new("pydocstyle").join(path).as_path(),
-            &settings::Settings::for_rule(rule_code),
+            &settings::Settings {
+                pydocstyle: Settings {
+                    convention: None,
+                    ignore_decorators: BTreeSet::from_iter(["functools.wraps".to_string()]),
+                    property_decorators: BTreeSet::from_iter([
+                        "gi.repository.GObject.Property".to_string()
+                    ]),
+                },
+                ..settings::Settings::for_rule(rule_code)
+            },
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn bom() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/bom.py"),
+            &settings::Settings::for_rule(Rule::TripleSingleQuotes),
+        )?;
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 
@@ -85,7 +106,11 @@ mod tests {
             &settings::Settings {
                 // When inferring the convention, we'll see a few false negatives.
                 // See: https://github.com/PyCQA/pydocstyle/issues/459.
-                pydocstyle: Settings { convention: None },
+                pydocstyle: Settings {
+                    convention: None,
+                    ignore_decorators: BTreeSet::new(),
+                    property_decorators: BTreeSet::new(),
+                },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
         )?;
@@ -101,6 +126,8 @@ mod tests {
                 // With explicit Google convention, we should flag every function.
                 pydocstyle: Settings {
                     convention: Some(Convention::Google),
+                    ignore_decorators: BTreeSet::new(),
+                    property_decorators: BTreeSet::new(),
                 },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
@@ -117,9 +144,21 @@ mod tests {
                 // With explicit Google convention, we shouldn't flag anything.
                 pydocstyle: Settings {
                     convention: Some(Convention::Numpy),
+                    ignore_decorators: BTreeSet::new(),
+                    property_decorators: BTreeSet::new(),
                 },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn d209_d400() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D209_D400.py"),
+            &settings::Settings::for_rules([Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod]),
         )?;
         assert_yaml_snapshot!(diagnostics);
         Ok(())

@@ -1,19 +1,19 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-use crate::ast::helpers::{create_expr, unparse_expr};
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{create_expr, unparse_expr};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct UseCapitalEnvironmentVariables {
-        pub expected: String,
-        pub original: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct UseCapitalEnvironmentVariables {
+    pub expected: String,
+    pub original: String,
+}
+
 impl AlwaysAutofixableViolation for UseCapitalEnvironmentVariables {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -45,9 +45,14 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Constant { value: Constant::Str(env_var), kind } = &arg.node else {
         return;
     };
-    if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["os", "environ", "get"] || call_path.as_slice() == ["os", "getenv"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["os", "environ", "get"]
+                || call_path.as_slice() == ["os", "getenv"]
+        })
+    {
         return;
     }
 
@@ -61,7 +66,7 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
             expected: capital_env_var.clone(),
             original: env_var.clone(),
         },
-        Range::from_located(arg),
+        Range::from(arg),
     );
     if checker.patch(diagnostic.kind.rule()) {
         let new_env_var = create_expr(ExprKind::Constant {
@@ -103,7 +108,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
             expected: capital_env_var.clone(),
             original: env_var.clone(),
         },
-        Range::from_located(slice),
+        Range::from(slice),
     );
     if checker.patch(diagnostic.kind.rule()) {
         let new_env_var = create_expr(ExprKind::Constant {

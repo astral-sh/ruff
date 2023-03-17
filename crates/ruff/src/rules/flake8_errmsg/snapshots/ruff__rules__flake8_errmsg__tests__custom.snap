@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_errmsg/mod.rs
+source: crates/ruff/src/rules/flake8_errmsg/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RawStringInException: ~
+    name: RawStringInException
+    body: "Exception must not use a string literal, assign to variable first"
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 23
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FStringInException: ~
+    name: FStringInException
+    body: "Exception must not use an f-string literal, assign to variable first"
+    suggestion: ~
+    fixable: false
   location:
     row: 14
     column: 23
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DotFormatInException: ~
+    name: DotFormatInException
+    body: "Exception must not use a `.format()` string directly, assign to variable first"
+    suggestion: ~
+    fixable: false
   location:
     row: 18
     column: 23

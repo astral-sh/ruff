@@ -3,23 +3,24 @@
 use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
+use itertools::Either::{Left, Right};
+use strum::IntoEnumIterator;
+
 use annotate::annotate_imports;
 use categorize::categorize_imports;
 pub use categorize::{categorize, ImportType};
 use comments::Comment;
-use itertools::Either::{Left, Right};
 use normalize::normalize_imports;
 use order::order_imports;
+use ruff_python_ast::source_code::{Locator, Stylist};
 use settings::RelativeImportsOrder;
 use sorting::cmp_either_import;
-use strum::IntoEnumIterator;
 use track::{Block, Trailer};
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, CommentSet, EitherImport, OrderedImportBlock, TrailingComma};
 
 use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
-use crate::source_code::{Locator, Stylist};
 
 mod annotate;
 mod categorize;
@@ -93,7 +94,7 @@ fn force_single_line_imports<'a>(
                                     } else {
                                         CommentSet {
                                             atop: vec![],
-                                            inline: vec![],
+                                            inline: comment_set.inline.clone(),
                                         }
                                     },
                                     TrailingComma::Absent,
@@ -142,7 +143,7 @@ pub fn format_imports(
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
-    let block = normalize_imports(block, combine_as_imports);
+    let block = normalize_imports(block, combine_as_imports, force_single_line);
 
     let mut output = String::new();
 
@@ -350,12 +351,12 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
-    use super::categorize::ImportType;
-    use super::settings::RelativeImportsOrder;
-
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::{test_path, test_resource_path};
+
+    use super::categorize::ImportType;
+    use super::settings::RelativeImportsOrder;
 
     #[test_case(Path::new("add_newline_before_comments.py"))]
     #[test_case(Path::new("as_imports_comments.py"))]
@@ -372,6 +373,7 @@ mod tests {
     #[test_case(Path::new("inline_comments.py"))]
     #[test_case(Path::new("insert_empty_lines.py"))]
     #[test_case(Path::new("insert_empty_lines.pyi"))]
+    #[test_case(Path::new("isort_skip_file.py"))]
     #[test_case(Path::new("leading_prefix.py"))]
     #[test_case(Path::new("magic_trailing_comma.py"))]
     #[test_case(Path::new("natural_order.py"))]
@@ -390,12 +392,12 @@ mod tests {
     #[test_case(Path::new("preserve_tabs_2.py"))]
     #[test_case(Path::new("relative_imports_order.py"))]
     #[test_case(Path::new("reorder_within_section.py"))]
+    #[test_case(Path::new("ruff_skip_file.py"))]
     #[test_case(Path::new("separate_first_party_imports.py"))]
     #[test_case(Path::new("separate_future_imports.py"))]
     #[test_case(Path::new("separate_local_folder_imports.py"))]
     #[test_case(Path::new("separate_third_party_imports.py"))]
     #[test_case(Path::new("skip.py"))]
-    #[test_case(Path::new("skip_file.py"))]
     #[test_case(Path::new("sort_similar_imports.py"))]
     #[test_case(Path::new("split.py"))]
     #[test_case(Path::new("star_before_others.py"))]

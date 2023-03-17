@@ -15,9 +15,17 @@ use crate::rule_redirects::get_redirect;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum RuleSelector {
-    /// All rules
+    /// Select all rules.
     All,
+    /// Legacy category to select both the `mccabe` and `flake8-comprehensions` linters
+    /// via a single selector.
+    C,
+    /// Legacy category to select both the `flake8-debugger` and `flake8-print` linters
+    /// via a single selector.
+    T,
+    /// Select all rules for a given linter.
     Linter(Linter),
+    /// Select all rules for a given linter with a given prefix.
     Prefix {
         prefix: RuleCodePrefix,
         redirected_from: Option<&'static str>,
@@ -36,6 +44,10 @@ impl FromStr for RuleSelector {
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         if s == "ALL" {
             Ok(Self::All)
+        } else if s == "C" {
+            Ok(Self::C)
+        } else if s == "T" {
+            Ok(Self::T)
         } else {
             let (s, redirected_from) = match get_redirect(s) {
                 Some((from, target)) => (target, Some(from)),
@@ -51,7 +63,7 @@ impl FromStr for RuleSelector {
 
             Ok(Self::Prefix {
                 prefix: RuleCodePrefix::parse(&linter, code)
-                    .map_err(|_| ParseError::Unknown(code.to_string()))?,
+                    .map_err(|_| ParseError::Unknown(s.to_string()))?,
                 redirected_from,
             })
         }
@@ -60,7 +72,7 @@ impl FromStr for RuleSelector {
 
 #[derive(Debug, thiserror::Error)]
 pub enum ParseError {
-    #[error("Unknown rule selector `{0}`")]
+    #[error("Unknown rule selector: `{0}`")]
     // TODO(martin): tell the user how to discover rule codes via the CLI once such a command is
     // implemented (but that should of course be done only in ruff_cli and not here)
     Unknown(String),
@@ -70,6 +82,8 @@ impl RuleSelector {
     pub fn prefix_and_code(&self) -> (&'static str, &'static str) {
         match self {
             RuleSelector::All => ("", "ALL"),
+            RuleSelector::C => ("", "C"),
+            RuleSelector::T => ("", "T"),
             RuleSelector::Prefix { prefix, .. } => {
                 (prefix.linter().common_prefix(), prefix.short_code())
             }
@@ -138,6 +152,16 @@ impl IntoIterator for &RuleSelector {
     fn into_iter(self) -> Self::IntoIter {
         match self {
             RuleSelector::All => RuleSelectorIter::All(Rule::iter()),
+            RuleSelector::C => RuleSelectorIter::Chain(
+                Linter::Flake8Comprehensions
+                    .into_iter()
+                    .chain(Linter::McCabe.into_iter()),
+            ),
+            RuleSelector::T => RuleSelectorIter::Chain(
+                Linter::Flake8Debugger
+                    .into_iter()
+                    .chain(Linter::Flake8Print.into_iter()),
+            ),
             RuleSelector::Linter(linter) => RuleSelectorIter::Vec(linter.into_iter()),
             RuleSelector::Prefix { prefix, .. } => RuleSelectorIter::Vec(prefix.into_iter()),
         }
@@ -146,6 +170,7 @@ impl IntoIterator for &RuleSelector {
 
 pub enum RuleSelectorIter {
     All(RuleIter),
+    Chain(std::iter::Chain<std::vec::IntoIter<Rule>, std::vec::IntoIter<Rule>>),
     Vec(std::vec::IntoIter<Rule>),
 }
 
@@ -155,13 +180,14 @@ impl Iterator for RuleSelectorIter {
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             RuleSelectorIter::All(iter) => iter.next(),
+            RuleSelectorIter::Chain(iter) => iter.next(),
             RuleSelectorIter::Vec(iter) => iter.next(),
         }
     }
 }
 
 /// A const alternative to the `impl From<RuleCodePrefix> for RuleSelector`
-// to let us keep the fields of RuleSelector private.
+/// to let us keep the fields of [`RuleSelector`] private.
 // Note that Rust doesn't yet support `impl const From<RuleCodePrefix> for
 // RuleSelector` (see https://github.com/rust-lang/rust/issues/67792).
 // TODO(martin): Remove once RuleSelector is an enum with Linter & Rule variants
@@ -177,13 +203,27 @@ impl JsonSchema for RuleSelector {
         "RuleSelector".to_string()
     }
 
-    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> schemars::schema::Schema {
+    fn json_schema(_gen: &mut schemars::gen::SchemaGenerator) -> Schema {
         Schema::Object(SchemaObject {
             instance_type: Some(InstanceType::String.into()),
             enum_values: Some(
                 std::iter::once("ALL".to_string())
                     .chain(
                         RuleCodePrefix::iter()
+                            .filter(|p| {
+                                // Once logical lines are active by default, please remove this.
+                                // This is here because generate-all output otherwise depends on
+                                // the feature sets which makes the test running with
+                                // `--all-features` fail
+                                !Rule::from_code(&format!(
+                                    "{}{}",
+                                    p.linter().common_prefix(),
+                                    p.short_code()
+                                ))
+                                .unwrap()
+                                .lint_source()
+                                .is_logical_lines()
+                            })
                             .map(|p| {
                                 let prefix = p.linter().common_prefix();
                                 let code = p.short_code();
@@ -207,6 +247,8 @@ impl RuleSelector {
     pub(crate) fn specificity(&self) -> Specificity {
         match self {
             RuleSelector::All => Specificity::All,
+            RuleSelector::T => Specificity::LinterGroup,
+            RuleSelector::C => Specificity::LinterGroup,
             RuleSelector::Linter(..) => Specificity::Linter,
             RuleSelector::Prefix { prefix, .. } => {
                 let prefix: &'static str = prefix.short_code();
@@ -226,6 +268,7 @@ impl RuleSelector {
 #[derive(EnumIter, PartialEq, Eq, PartialOrd, Ord)]
 pub(crate) enum Specificity {
     All,
+    LinterGroup,
     Linter,
     Code1Char,
     Code2Chars,
@@ -234,6 +277,7 @@ pub(crate) enum Specificity {
     Code5Chars,
 }
 
+#[cfg(feature = "clap")]
 mod clap_completion {
     use clap::builder::{PossibleValue, TypedValueParser, ValueParserFactory};
     use strum::IntoEnumIterator;
@@ -273,9 +317,7 @@ mod clap_completion {
                 .map_err(|e| clap::Error::raw(clap::error::ErrorKind::InvalidValue, e))
         }
 
-        fn possible_values(
-            &self,
-        ) -> Option<Box<dyn Iterator<Item = clap::builder::PossibleValue> + '_>> {
+        fn possible_values(&self) -> Option<Box<dyn Iterator<Item = PossibleValue> + '_>> {
             Some(Box::new(
                 std::iter::once(PossibleValue::new("ALL").help("all rules")).chain(
                     Linter::iter()

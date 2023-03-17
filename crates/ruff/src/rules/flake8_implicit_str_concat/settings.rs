@@ -1,8 +1,9 @@
 //! Settings for the `flake8-implicit-str-concat` plugin.
 
-use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
@@ -32,7 +33,7 @@ pub struct Options {
     pub allow_multiline: Option<bool>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 pub struct Settings {
     pub allow_multiline: bool,
 }

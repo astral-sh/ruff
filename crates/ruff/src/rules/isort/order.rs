@@ -1,8 +1,9 @@
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
-use crate::rules::isort::types::ImportFromStatement;
 use itertools::Itertools;
+
+use crate::rules::isort::types::ImportFromStatement;
 
 use super::settings::RelativeImportsOrder;
 use super::sorting::{cmp_import_from, cmp_members, cmp_modules};

@@ -1,13 +1,12 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct DfIsABadVariableName;
-);
+#[violation]
+pub struct DfIsABadVariableName;
+
 impl Violation for DfIsABadVariableName {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -27,8 +26,5 @@ pub fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
     if id != "df" {
         return None;
     }
-    Some(Diagnostic::new(
-        DfIsABadVariableName,
-        Range::from_located(target),
-    ))
+    Some(Diagnostic::new(DfIsABadVariableName, Range::from(target)))
 }

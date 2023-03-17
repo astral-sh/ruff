@@ -1,19 +1,19 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Operator};
 
-use crate::ast::helpers::{create_expr, has_comments, unparse_expr};
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::{AutofixKind, Availability, Violation};
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{create_expr, has_comments, unparse_expr};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct UnpackInsteadOfConcatenatingToCollectionLiteral {
-        pub expr: String,
-        pub fixable: bool,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct UnpackInsteadOfConcatenatingToCollectionLiteral {
+    pub expr: String,
+    pub fixable: bool,
+}
+
 impl Violation for UnpackInsteadOfConcatenatingToCollectionLiteral {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -109,7 +109,7 @@ pub fn unpack_instead_of_concatenating_to_collection_literal(checker: &mut Check
             expr: contents.clone(),
             fixable,
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         if fixable {

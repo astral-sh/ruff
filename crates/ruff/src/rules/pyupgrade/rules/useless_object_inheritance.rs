@@ -1,17 +1,20 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt};
 
-use super::super::fixes;
-use crate::ast::types::{Binding, BindingKind, Range, Scope};
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::scope::{Binding, BindingKind, Bindings, Scope};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct UselessObjectInheritance {
-        pub name: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+use super::super::fixes;
+
+#[violation]
+pub struct UselessObjectInheritance {
+    pub name: String,
+}
+
 impl AlwaysAutofixableViolation for UselessObjectInheritance {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -24,7 +27,7 @@ impl AlwaysAutofixableViolation for UselessObjectInheritance {
     }
 }
 
-fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Option<Diagnostic> {
+fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Option<Diagnostic> {
     for expr in bases {
         let ExprKind::Name { id, .. } = &expr.node else {
             continue;
@@ -33,10 +36,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Opti
             continue;
         }
         if !matches!(
-            scope
-                .bindings
-                .get(&id.as_str())
-                .map(|index| &bindings[*index]),
+            scope.get(id.as_str()).map(|index| &bindings[*index]),
             None | Some(Binding {
                 kind: BindingKind::Builtin,
                 ..
@@ -48,7 +48,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Opti
             UselessObjectInheritance {
                 name: name.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 
@@ -63,7 +63,7 @@ pub fn useless_object_inheritance(
     bases: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(mut diagnostic) = rule(name, bases, checker.current_scope(), &checker.bindings) else {
+    let Some(mut diagnostic) = rule(name, bases, checker.ctx.scope(), &checker.ctx.bindings) else {
         return;
     };
     if checker.patch(diagnostic.kind.rule()) {

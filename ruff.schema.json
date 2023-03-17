@@ -40,7 +40,7 @@
       ]
     },
     "exclude": {
-      "description": "A list of file patterns to exclude from linting.\n\nExclusions are based on globs, and can be either:\n\n* Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). * Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
+      "description": "A list of file patterns to exclude from linting.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).\n\nNote that you'll typically want to use [`extend-exclude`](#extend-exclude) to modify the excluded paths.",
       "type": [
         "array",
         "null"
@@ -57,7 +57,7 @@
       ]
     },
     "extend-exclude": {
-      "description": "A list of file patterns to omit from linting, in addition to those specified by `exclude`.\n\nExclusions are based on globs, and can be either:\n\n* Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). * Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+      "description": "A list of file patterns to omit from linting, in addition to those specified by `exclude`.\n\nExclusions are based on globs, and can be either:\n\n- Single-path patterns, like `.mypy_cache` (to exclude any directory named `.mypy_cache` in the tree), `foo.py` (to exclude any file named `foo.py`), or `foo_*.py` (to exclude any file matching `foo_*.py` ). - Relative patterns, like `directory/foo.py` (to exclude that specific file) or `directory/*.py` (to exclude any Python files in `directory`). Note that these paths are relative to the project root (e.g., the directory containing your `pyproject.toml`).\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
       "type": [
         "array",
         "null"
@@ -272,7 +272,7 @@
       ]
     },
     "format": {
-      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), or `\"pylint\"` (Pylint text format).",
+      "description": "The style in which violation messages should be formatted: `\"text\"` (default), `\"grouped\"` (group messages by file), `\"json\"` (machine-readable), `\"junit\"` (machine-readable XML), `\"github\"` (GitHub Actions annotations), `\"gitlab\"` (GitLab CI code quality report), `\"pylint\"` (Pylint text format) or `\"azure\"` (Azure Pipeline logging commands).",
       "anyOf": [
         {
           "$ref": "#/definitions/SerializationFormat"
@@ -461,7 +461,7 @@
       }
     },
     "target-version": {
-      "description": "The Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations. Note that the target version will _not_ be inferred from the _current_ Python version, and instead must be specified explicitly (as seen below).",
+      "description": "The Python version to target, e.g., when considering automatic code upgrades, like rewriting type annotations.\n\nIf omitted, the target version will be inferred from the `project.requires-python` field in the relevant `pyproject.toml` (e.g., `requires-python = \">=3.8\"`), if present.",
       "anyOf": [
         {
           "$ref": "#/definitions/PythonVersion"
@@ -592,7 +592,7 @@
           ]
         },
         "suppress-none-returning": {
-          "description": "Whether to suppress `ANN200`-level violations for functions that meet either of the following criteria:\n\n* Contain no `return` statement. * Explicit `return` statement(s) all return `None` (explicitly or implicitly).",
+          "description": "Whether to suppress `ANN200`-level violations for functions that meet either of the following criteria:\n\n- Contain no `return` statement. - Explicit `return` statement(s) all return `None` (explicitly or implicitly).",
           "type": [
             "boolean",
             "null"
@@ -751,7 +751,7 @@
           ]
         },
         "parametrize-names-type": {
-          "description": "Expected type for multiple argument names in `@pytest.mark.parametrize`. The following values are supported:\n\n* `csv` — a comma-separated list, e.g. `@pytest.mark.parametrize('name1,name2', ...)` * `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), ...)` * `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`",
+          "description": "Expected type for multiple argument names in `@pytest.mark.parametrize`. The following values are supported:\n\n- `csv` — a comma-separated list, e.g. `@pytest.mark.parametrize('name1,name2', ...)` - `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), ...)` - `list` — e.g. `@pytest.mark.parametrize(['name1', 'name2'], ...)`",
           "anyOf": [
             {
               "$ref": "#/definitions/ParametrizeNameType"
@@ -762,7 +762,7 @@
           ]
         },
         "parametrize-values-row-type": {
-          "description": "Expected type for each row of values in `@pytest.mark.parametrize` in case of multiple parameters. The following values are supported:\n\n* `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])` * `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`",
+          "description": "Expected type for each row of values in `@pytest.mark.parametrize` in case of multiple parameters. The following values are supported:\n\n- `tuple` (default) — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [(1, 2), (3, 4)])` - `list` — e.g. `@pytest.mark.parametrize(('name1', 'name2'), [[1, 2], [3, 4]])`",
           "anyOf": [
             {
               "$ref": "#/definitions/ParametrizeValuesRowType"
@@ -773,7 +773,7 @@
           ]
         },
         "parametrize-values-type": {
-          "description": "Expected type for the list of values rows in `@pytest.mark.parametrize`. The following values are supported:\n\n* `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))` * `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`",
+          "description": "Expected type for the list of values rows in `@pytest.mark.parametrize`. The following values are supported:\n\n- `tuple` — e.g. `@pytest.mark.parametrize('name', (1, 2, 3))` - `list` (default) — e.g. `@pytest.mark.parametrize('name', [1, 2, 3])`",
           "anyOf": [
             {
               "$ref": "#/definitions/ParametrizeValuesType"
@@ -900,6 +900,26 @@
       "properties": {
         "exempt-modules": {
           "description": "Exempt certain modules from needing to be moved into type-checking blocks.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "runtime-evaluated-base-classes": {
+          "description": "Exempt classes that list any of the enumerated classes as a base class from needing to be moved into type-checking blocks.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "runtime-evaluated-decorators": {
+          "description": "Exempt classes decorated with any of the enumerated decorators from needing to be moved into type-checking blocks.",
           "type": [
             "array",
             "null"
@@ -1178,7 +1198,7 @@
       "type": "object",
       "properties": {
         "classmethod-decorators": {
-          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method. For example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.",
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a class method (in addition to the builtin `@classmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list takes a `cls` argument as its first argument.",
           "type": [
             "array",
             "null"
@@ -1198,7 +1218,7 @@
           }
         },
         "staticmethod-decorators": {
-          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method. For example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.",
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a static method (in addition to the builtin `@staticmethod`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list has no `self` or `cls` argument.",
           "type": [
             "array",
             "null"
@@ -1227,7 +1247,7 @@
       "type": "object",
       "properties": {
         "ignore-overlong-task-comments": {
-          "description": "Whether line-length violations (`E501`) should be triggered for comments starting with `task-tags` (by default: [\"TODO\", \"FIXME\", and \"XXX\"]).",
+          "description": "Whether line-length violations (`E501`) should be triggered for comments starting with `task-tags` (by default: \\[\"TODO\", \"FIXME\", and \"XXX\"\\]).",
           "type": [
             "boolean",
             "null"
@@ -1258,6 +1278,26 @@
               "type": "null"
             }
           ]
+        },
+        "ignore-decorators": {
+          "description": "Ignore docstrings for functions or methods decorated with the specified fully-qualified decorators.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
+        },
+        "property-decorators": {
+          "description": "A list of decorators that, when applied to a method, indicate that the method should be treated as a property (in addition to the builtin `@property` and standard-library `@functools.cached_property`).\n\nFor example, Ruff will expect that any method decorated by a decorator in this list can use a non-imperative summary line.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -1429,8 +1469,10 @@
         "B025",
         "B026",
         "B027",
+        "B028",
         "B029",
         "B03",
+        "B030",
         "B032",
         "B9",
         "B90",
@@ -1528,6 +1570,9 @@
         "DJ0",
         "DJ00",
         "DJ001",
+        "DJ003",
+        "DJ006",
+        "DJ007",
         "DJ008",
         "DJ01",
         "DJ013",
@@ -1773,6 +1818,10 @@
         "PLC04",
         "PLC041",
         "PLC0414",
+        "PLC1",
+        "PLC19",
+        "PLC190",
+        "PLC1901",
         "PLC3",
         "PLC30",
         "PLC300",
@@ -1784,6 +1833,7 @@
         "PLE0100",
         "PLE0101",
         "PLE011",
+        "PLE0116",
         "PLE0117",
         "PLE0118",
         "PLE06",
@@ -1803,10 +1853,19 @@
         "PLE1307",
         "PLE131",
         "PLE1310",
+        "PLE15",
+        "PLE150",
+        "PLE1507",
         "PLE2",
         "PLE25",
         "PLE250",
         "PLE2502",
+        "PLE251",
+        "PLE2510",
+        "PLE2512",
+        "PLE2513",
+        "PLE2514",
+        "PLE2515",
         "PLR",
         "PLR0",
         "PLR01",
@@ -1836,6 +1895,10 @@
         "PLR20",
         "PLR200",
         "PLR2004",
+        "PLR5",
+        "PLR55",
+        "PLR550",
+        "PLR5501",
         "PLW",
         "PLW0",
         "PLW01",
@@ -1844,6 +1907,11 @@
         "PLW06",
         "PLW060",
         "PLW0602",
+        "PLW0603",
+        "PLW1",
+        "PLW15",
+        "PLW150",
+        "PLW1508",
         "PLW2",
         "PLW29",
         "PLW290",
@@ -1912,8 +1980,18 @@
         "PYI0",
         "PYI00",
         "PYI001",
+        "PYI006",
         "PYI007",
         "PYI008",
+        "PYI009",
+        "PYI01",
+        "PYI010",
+        "PYI011",
+        "PYI014",
+        "PYI02",
+        "PYI021",
+        "PYI03",
+        "PYI033",
         "Q",
         "Q0",
         "Q00",
@@ -1942,9 +2020,9 @@
         "RUF001",
         "RUF002",
         "RUF003",
-        "RUF004",
         "RUF005",
         "RUF006",
+        "RUF007",
         "RUF1",
         "RUF10",
         "RUF100",
@@ -2099,7 +2177,11 @@
         "UP035",
         "UP036",
         "UP037",
+        "UP038",
         "W",
+        "W1",
+        "W19",
+        "W191",
         "W2",
         "W29",
         "W291",
@@ -2139,7 +2221,8 @@
         "grouped",
         "github",
         "gitlab",
-        "pylint"
+        "pylint",
+        "azure"
       ]
     },
     "Strictness": {

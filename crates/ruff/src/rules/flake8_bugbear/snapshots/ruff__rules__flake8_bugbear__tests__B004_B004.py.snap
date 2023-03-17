@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnreliableCallableCheck: ~
+    name: UnreliableCallableCheck
+    body: "Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results."
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 7
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnreliableCallableCheck: ~
+    name: UnreliableCallableCheck
+    body: "Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results."
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 7

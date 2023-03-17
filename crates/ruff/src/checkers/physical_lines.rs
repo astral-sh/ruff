@@ -2,25 +2,28 @@
 
 use std::path::Path;
 
-use crate::registry::{Diagnostic, Rule};
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::newlines::StrExt;
+use ruff_python_ast::source_code::{Locator, Stylist};
+
+use crate::registry::Rule;
 use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
 use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
 };
 use crate::rules::pycodestyle::rules::{
-    doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
-    trailing_whitespace,
+    doc_line_too_long, indentation_contains_tabs, line_too_long, mixed_spaces_and_tabs,
+    no_newline_at_end_of_file, trailing_whitespace,
 };
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pylint;
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
 use crate::settings::{flags, Settings};
-use crate::source_code::Stylist;
 
 pub fn check_physical_lines(
     path: &Path,
+    locator: &Locator,
     stylist: &Stylist,
-    contents: &str,
     commented_lines: &[usize],
     doc_lines: &[usize],
     settings: &Settings,
@@ -29,31 +32,32 @@ pub fn check_physical_lines(
     let mut diagnostics: Vec<Diagnostic> = vec![];
     let mut has_any_shebang = false;
 
-    let enforce_blanket_noqa = settings.rules.enabled(&Rule::BlanketNOQA);
-    let enforce_shebang_not_executable = settings.rules.enabled(&Rule::ShebangNotExecutable);
-    let enforce_shebang_missing = settings.rules.enabled(&Rule::ShebangMissingExecutableFile);
-    let enforce_shebang_whitespace = settings.rules.enabled(&Rule::ShebangWhitespace);
-    let enforce_shebang_newline = settings.rules.enabled(&Rule::ShebangNewline);
-    let enforce_shebang_python = settings.rules.enabled(&Rule::ShebangPython);
-    let enforce_blanket_type_ignore = settings.rules.enabled(&Rule::BlanketTypeIgnore);
-    let enforce_doc_line_too_long = settings.rules.enabled(&Rule::DocLineTooLong);
-    let enforce_line_too_long = settings.rules.enabled(&Rule::LineTooLong);
-    let enforce_no_newline_at_end_of_file = settings.rules.enabled(&Rule::NoNewLineAtEndOfFile);
-    let enforce_unnecessary_coding_comment = settings.rules.enabled(&Rule::UTF8EncodingDeclaration);
-    let enforce_mixed_spaces_and_tabs = settings.rules.enabled(&Rule::MixedSpacesAndTabs);
-    let enforce_bidirectional_unicode = settings.rules.enabled(&Rule::BidirectionalUnicode);
-    let enforce_trailing_whitespace = settings.rules.enabled(&Rule::TrailingWhitespace);
+    let enforce_blanket_noqa = settings.rules.enabled(Rule::BlanketNOQA);
+    let enforce_shebang_not_executable = settings.rules.enabled(Rule::ShebangNotExecutable);
+    let enforce_shebang_missing = settings.rules.enabled(Rule::ShebangMissingExecutableFile);
+    let enforce_shebang_whitespace = settings.rules.enabled(Rule::ShebangWhitespace);
+    let enforce_shebang_newline = settings.rules.enabled(Rule::ShebangNewline);
+    let enforce_shebang_python = settings.rules.enabled(Rule::ShebangPython);
+    let enforce_blanket_type_ignore = settings.rules.enabled(Rule::BlanketTypeIgnore);
+    let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
+    let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);
+    let enforce_no_newline_at_end_of_file = settings.rules.enabled(Rule::NoNewLineAtEndOfFile);
+    let enforce_unnecessary_coding_comment = settings.rules.enabled(Rule::UTF8EncodingDeclaration);
+    let enforce_mixed_spaces_and_tabs = settings.rules.enabled(Rule::MixedSpacesAndTabs);
+    let enforce_bidirectional_unicode = settings.rules.enabled(Rule::BidirectionalUnicode);
+    let enforce_trailing_whitespace = settings.rules.enabled(Rule::TrailingWhitespace);
     let enforce_blank_line_contains_whitespace =
-        settings.rules.enabled(&Rule::BlankLineContainsWhitespace);
+        settings.rules.enabled(Rule::BlankLineContainsWhitespace);
+    let enforce_indentation_contains_tabs = settings.rules.enabled(Rule::IndentationContainsTabs);
 
     let fix_unnecessary_coding_comment =
-        autofix.into() && settings.rules.should_fix(&Rule::UTF8EncodingDeclaration);
+        autofix.into() && settings.rules.should_fix(Rule::UTF8EncodingDeclaration);
     let fix_shebang_whitespace =
-        autofix.into() && settings.rules.should_fix(&Rule::ShebangWhitespace);
+        autofix.into() && settings.rules.should_fix(Rule::ShebangWhitespace);
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
-    for (index, line) in contents.lines().enumerate() {
+    for (index, line) in locator.contents().universal_newlines().enumerate() {
         while commented_lines_iter
             .next_if(|lineno| &(index + 1) == *lineno)
             .is_some()
@@ -149,13 +153,19 @@ pub fn check_physical_lines(
                 diagnostics.push(diagnostic);
             }
         }
+
+        if enforce_indentation_contains_tabs {
+            if let Some(diagnostic) = indentation_contains_tabs(index, line) {
+                diagnostics.push(diagnostic);
+            }
+        }
     }
 
     if enforce_no_newline_at_end_of_file {
         if let Some(diagnostic) = no_newline_at_end_of_file(
+            locator,
             stylist,
-            contents,
-            autofix.into() && settings.rules.should_fix(&Rule::NoNewLineAtEndOfFile),
+            autofix.into() && settings.rules.should_fix(Rule::NoNewLineAtEndOfFile),
         ) {
             diagnostics.push(diagnostic);
         }
@@ -172,13 +182,14 @@ pub fn check_physical_lines(
 
 #[cfg(test)]
 mod tests {
-
     use std::path::Path;
 
-    use super::check_physical_lines;
+    use ruff_python_ast::source_code::{Locator, Stylist};
+
     use crate::registry::Rule;
     use crate::settings::{flags, Settings};
-    use crate::source_code::{Locator, Stylist};
+
+    use super::check_physical_lines;
 
     #[test]
     fn e501_non_ascii_char() {
@@ -189,8 +200,8 @@ mod tests {
         let check_with_max_line_length = |line_length: usize| {
             check_physical_lines(
                 Path::new("foo.py"),
+                &locator,
                 &stylist,
-                line,
                 &[],
                 &[],
                 &Settings {

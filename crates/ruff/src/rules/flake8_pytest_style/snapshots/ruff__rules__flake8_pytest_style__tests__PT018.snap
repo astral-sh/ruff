@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    CompositeAssertion:
-      fixable: true
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
   location:
     row: 14
     column: 4
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: true
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
   location:
     row: 15
     column: 4
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: true
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
   location:
     row: 16
     column: 4
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: true
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
   location:
     row: 17
     column: 4
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: true
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
   location:
     row: 18
     column: 4
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: true
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
   location:
     row: 19
     column: 4
@@ -111,8 +123,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: true
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
   location:
     row: 20
     column: 4
@@ -129,8 +143,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: true
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
   location:
     row: 21
     column: 4
@@ -147,8 +163,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: true
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
   location:
     row: 26
     column: 4
@@ -165,8 +183,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: true
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
   location:
     row: 27
     column: 4
@@ -183,8 +203,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: false
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: ~
+    fixable: false
   location:
     row: 30
     column: 4
@@ -194,8 +216,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: false
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: ~
+    fixable: false
   location:
     row: 31
     column: 4
@@ -205,8 +229,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: false
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: ~
+    fixable: false
   location:
     row: 33
     column: 4
@@ -216,8 +242,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    CompositeAssertion:
-      fixable: true
+    name: CompositeAssertion
+    body: Assertion should be broken down into multiple parts
+    suggestion: Break down assertion into multiple parts
+    fixable: true
   location:
     row: 35
     column: 4

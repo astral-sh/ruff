@@ -1,17 +1,16 @@
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 
-use crate::ast::types::Range;
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct PreferTypeError;
-);
+#[violation]
+pub struct PreferTypeError;
+
 impl Violation for PreferTypeError {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -66,11 +65,14 @@ fn has_control_flow(stmt: &Stmt) -> bool {
 
 /// Returns `true` if an [`Expr`] is a call to check types.
 fn check_type_check_call(checker: &mut Checker, call: &Expr) -> bool {
-    checker.resolve_call_path(call).map_or(false, |call_path| {
-        call_path.as_slice() == ["", "isinstance"]
-            || call_path.as_slice() == ["", "issubclass"]
-            || call_path.as_slice() == ["", "callable"]
-    })
+    checker
+        .ctx
+        .resolve_call_path(call)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["", "isinstance"]
+                || call_path.as_slice() == ["", "issubclass"]
+                || call_path.as_slice() == ["", "callable"]
+        })
 }
 
 /// Returns `true` if an [`Expr`] is a test to check types (e.g. via isinstance)
@@ -87,27 +89,30 @@ fn check_type_check_test(checker: &mut Checker, test: &Expr) -> bool {
 
 /// Returns `true` if `exc` is a reference to a builtin exception.
 fn is_builtin_exception(checker: &mut Checker, exc: &Expr) -> bool {
-    return checker.resolve_call_path(exc).map_or(false, |call_path| {
-        [
-            "ArithmeticError",
-            "AssertionError",
-            "AttributeError",
-            "BufferError",
-            "EOFError",
-            "Exception",
-            "ImportError",
-            "LookupError",
-            "MemoryError",
-            "NameError",
-            "ReferenceError",
-            "RuntimeError",
-            "SyntaxError",
-            "SystemError",
-            "ValueError",
-        ]
-        .iter()
-        .any(|target| call_path.as_slice() == ["", target])
-    });
+    return checker
+        .ctx
+        .resolve_call_path(exc)
+        .map_or(false, |call_path| {
+            [
+                "ArithmeticError",
+                "AssertionError",
+                "AttributeError",
+                "BufferError",
+                "EOFError",
+                "Exception",
+                "ImportError",
+                "LookupError",
+                "MemoryError",
+                "NameError",
+                "ReferenceError",
+                "RuntimeError",
+                "SyntaxError",
+                "SystemError",
+                "ValueError",
+            ]
+            .iter()
+            .any(|target| call_path.as_slice() == ["", target])
+        });
 }
 
 /// Returns `true` if an [`Expr`] is a reference to a builtin exception.
@@ -129,7 +134,7 @@ fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
     if check_raise_type(checker, exc) {
         checker
             .diagnostics
-            .push(Diagnostic::new(PreferTypeError, Range::from_located(item)));
+            .push(Diagnostic::new(PreferTypeError, Range::from(item)));
     }
 }
 

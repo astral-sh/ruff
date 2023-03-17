@@ -13,11 +13,13 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
-    use super::settings::Settings;
+    use ruff_python_ast::source_code::LineEnding;
+
     use crate::registry::Rule;
     use crate::settings;
-    use crate::source_code::LineEnding;
     use crate::test::test_path;
+
+    use super::settings::Settings;
 
     #[test_case(Rule::AmbiguousClassName, Path::new("E742.py"))]
     #[test_case(Rule::AmbiguousFunctionName, Path::new("E743.py"))]
@@ -42,6 +44,7 @@ mod tests {
     #[test_case(Rule::NotInTest, Path::new("E713.py"))]
     #[test_case(Rule::NotIsTest, Path::new("E714.py"))]
     #[test_case(Rule::SyntaxError, Path::new("E999.py"))]
+    #[test_case(Rule::IndentationContainsTabs, Path::new("W19.py"))]
     #[test_case(Rule::TrailingWhitespace, Path::new("W29.py"))]
     #[test_case(Rule::TrueFalseComparison, Path::new("E712.py"))]
     #[test_case(Rule::TypeComparison, Path::new("E721.py"))]
@@ -83,6 +86,7 @@ mod tests {
     #[test_case(Rule::MultipleSpacesAfterKeyword, Path::new("E27.py"))]
     #[test_case(Rule::MultipleSpacesAfterOperator, Path::new("E22.py"))]
     #[test_case(Rule::MultipleSpacesBeforeKeyword, Path::new("E27.py"))]
+    #[test_case(Rule::MissingWhitespaceAfterKeyword, Path::new("E27.py"))]
     #[test_case(Rule::MultipleSpacesBeforeOperator, Path::new("E22.py"))]
     #[test_case(Rule::NoIndentedBlock, Path::new("E11.py"))]
     #[test_case(Rule::NoIndentedBlockComment, Path::new("E11.py"))]
@@ -93,12 +97,26 @@ mod tests {
     #[test_case(Rule::TabAfterOperator, Path::new("E22.py"))]
     #[test_case(Rule::TabBeforeKeyword, Path::new("E27.py"))]
     #[test_case(Rule::TabBeforeOperator, Path::new("E22.py"))]
+    #[test_case(Rule::MissingWhitespaceAroundOperator, Path::new("E22.py"))]
+    #[test_case(Rule::MissingWhitespaceAroundArithmeticOperator, Path::new("E22.py"))]
+    #[test_case(
+        Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
+        Path::new("E22.py")
+    )]
+    #[test_case(Rule::MissingWhitespaceAroundModuloOperator, Path::new("E22.py"))]
+    #[test_case(Rule::MissingWhitespace, Path::new("E23.py"))]
     #[test_case(Rule::TooFewSpacesBeforeInlineComment, Path::new("E26.py"))]
     #[test_case(Rule::UnexpectedIndentation, Path::new("E11.py"))]
     #[test_case(Rule::UnexpectedIndentationComment, Path::new("E11.py"))]
     #[test_case(Rule::WhitespaceAfterOpenBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforeCloseBracket, Path::new("E20.py"))]
     #[test_case(Rule::WhitespaceBeforePunctuation, Path::new("E20.py"))]
+    #[test_case(Rule::WhitespaceBeforeParameters, Path::new("E21.py"))]
+    #[test_case(
+        Rule::UnexpectedSpacesAroundKeywordParameterEquals,
+        Path::new("E25.py")
+    )]
+    #[test_case(Rule::MissingWhitespaceAroundParameterEquals, Path::new("E25.py"))]
     fn logical(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

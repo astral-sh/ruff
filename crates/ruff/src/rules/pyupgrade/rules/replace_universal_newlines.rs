@@ -1,16 +1,16 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, Keyword, Location};
 
-use crate::ast::helpers::find_keyword;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct ReplaceUniversalNewlines;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct ReplaceUniversalNewlines;
+
 impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -24,9 +24,13 @@ impl AlwaysAutofixableViolation for ReplaceUniversalNewlines {
 
 /// UP021
 pub fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[Keyword]) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["subprocess", "run"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["subprocess", "run"]
+        })
+    {
         let Some(kwarg) = find_keyword(kwargs, "universal_newlines") else { return; };
         let range = Range::new(
             kwarg.location,

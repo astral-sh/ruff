@@ -1,9 +1,10 @@
 //! Settings for the `flake8-tidy-imports` plugin.
 
-use ruff_macros::ConfigurationOptions;
 use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::ConfigurationOptions;
 
 use super::banned_api::ApiBan;
 use super::relative_imports::Strictness;
@@ -48,7 +49,7 @@ impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
             ban_relative_imports: options.ban_relative_imports.unwrap_or(Strictness::Parents),
-            banned_api: options.banned_api.unwrap_or_default().into(),
+            banned_api: options.banned_api.unwrap_or_default(),
         }
     }
 }
@@ -57,7 +58,7 @@ impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
             ban_relative_imports: Some(settings.ban_relative_imports),
-            banned_api: Some(settings.banned_api.into()),
+            banned_api: Some(settings.banned_api),
         }
     }
 }

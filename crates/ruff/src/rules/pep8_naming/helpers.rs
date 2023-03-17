@@ -1,6 +1,7 @@
 use itertools::Itertools;
-use ruff_python::str::{is_lower, is_upper};
 use rustpython_parser::ast::{ExprKind, Stmt, StmtKind};
+
+use ruff_python_stdlib::str::{is_lower, is_upper};
 
 use crate::checkers::ast::Checker;
 
@@ -29,10 +30,13 @@ pub fn is_namedtuple_assignment(checker: &Checker, stmt: &Stmt) -> bool {
     let ExprKind::Call {func, ..} = &value.node else {
         return false;
     };
-    checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["collections", "namedtuple"]
-            || call_path.as_slice() == ["typing", "NamedTuple"]
-    })
+    checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["collections", "namedtuple"]
+                || call_path.as_slice() == ["typing", "NamedTuple"]
+        })
 }
 
 pub fn is_typeddict_assignment(checker: &Checker, stmt: &Stmt) -> bool {
@@ -42,9 +46,12 @@ pub fn is_typeddict_assignment(checker: &Checker, stmt: &Stmt) -> bool {
     let ExprKind::Call {func, ..} = &value.node else {
         return false;
     };
-    checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "TypedDict"]
-    })
+    checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["typing", "TypedDict"]
+        })
 }
 
 pub fn is_type_var_assignment(checker: &Checker, stmt: &Stmt) -> bool {
@@ -54,10 +61,13 @@ pub fn is_type_var_assignment(checker: &Checker, stmt: &Stmt) -> bool {
     let ExprKind::Call {func, ..} = &value.node else {
         return false;
     };
-    checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "TypeVar"]
-            || call_path.as_slice() == ["typing", "NewType"]
-    })
+    checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["typing", "TypeVar"]
+                || call_path.as_slice() == ["typing", "NewType"]
+        })
 }
 
 #[cfg(test)]

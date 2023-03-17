@@ -1,63 +1,67 @@
-use ruff_macros::{define_violation, derive_message_formats};
-use rustpython_parser::ast::{ExcepthandlerKind, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{ExcepthandlerKind, Stmt, StmtKind};
 
-use crate::ast::helpers::identifier_range;
-use crate::registry::Diagnostic;
-use crate::source_code::Locator;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::identifier_range;
+use ruff_python_ast::source_code::Locator;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for functions with a high `McCabe` complexity.
-    ///
-    /// The `McCabe` complexity of a function is a measure of the complexity of
-    /// the control flow graph of the function. It is calculated by adding
-    /// one to the number of decision points in the function. A decision
-    /// point is a place in the code where the program has a choice of two
-    /// or more paths to follow.
-    ///
-    /// ## Why is this bad?
-    /// Functions with a high complexity are hard to understand and maintain.
-    ///
-    /// ## Options
-    /// * `mccabe.max-complexity`
-    ///
-    /// ## Example
-    /// ```python
-    /// def foo(a, b, c):
-    ///     if a:
-    ///         if b:
-    ///             if c:
-    ///                 return 1
-    ///             else:
-    ///                 return 2
-    ///         else:
-    ///             return 3
-    ///     else:
-    ///         return 4
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// def foo(a, b, c):
-    ///     if not a:
-    ///         return 4
-    ///     if not b:
-    ///         return 3
-    ///     if not c:
-    ///         return 2
-    ///     return 1
-    /// ```
-    pub struct ComplexStructure {
-        pub name: String,
-        pub complexity: usize,
-    }
-);
+/// ## What it does
+/// Checks for functions with a high `McCabe` complexity.
+///
+/// The `McCabe` complexity of a function is a measure of the complexity of
+/// the control flow graph of the function. It is calculated by adding
+/// one to the number of decision points in the function. A decision
+/// point is a place in the code where the program has a choice of two
+/// or more paths to follow.
+///
+/// ## Why is this bad?
+/// Functions with a high complexity are hard to understand and maintain.
+///
+/// ## Options
+/// - `mccabe.max-complexity`
+///
+/// ## Example
+/// ```python
+/// def foo(a, b, c):
+///     if a:
+///         if b:
+///             if c:
+///                 return 1
+///             else:
+///                 return 2
+///         else:
+///             return 3
+///     else:
+///         return 4
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(a, b, c):
+///     if not a:
+///         return 4
+///     if not b:
+///         return 3
+///     if not c:
+///         return 2
+///     return 1
+/// ```
+#[violation]
+pub struct ComplexStructure {
+    pub name: String,
+    pub complexity: usize,
+    pub max_complexity: usize,
+}
+
 impl Violation for ComplexStructure {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ComplexStructure { name, complexity } = self;
-        format!("`{name}` is too complex ({complexity})")
+        let ComplexStructure {
+            name,
+            complexity,
+            max_complexity,
+        } = self;
+        format!("`{name}` is too complex ({complexity} > {max_complexity})")
     }
 }
 
@@ -75,13 +79,10 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 complexity += get_complexity_number(body);
                 complexity += get_complexity_number(orelse);
             }
-            StmtKind::While { test, body, orelse } => {
+            StmtKind::While { body, orelse, .. } => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
                 complexity += get_complexity_number(orelse);
-                if let ExprKind::BoolOp { .. } = &test.node {
-                    complexity += 1;
-                }
             }
             StmtKind::Match { cases, .. } => {
                 complexity += 1;
@@ -101,8 +102,10 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 orelse,
                 finalbody,
             } => {
-                complexity += 1;
                 complexity += get_complexity_number(body);
+                if !orelse.is_empty() {
+                    complexity += 1;
+                }
                 complexity += get_complexity_number(orelse);
                 complexity += get_complexity_number(finalbody);
                 for handler in handlers {
@@ -137,6 +140,7 @@ pub fn function_is_too_complex(
             ComplexStructure {
                 name: name.to_string(),
                 complexity,
+                max_complexity,
             },
             identifier_range(stmt, locator),
         ))
@@ -308,7 +312,7 @@ def nested_try_finally():
         print(3)
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
-        assert_eq!(get_complexity_number(&stmts), 3);
+        assert_eq!(get_complexity_number(&stmts), 1);
         Ok(())
     }
 
@@ -373,6 +377,35 @@ class Class:
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 9);
+        Ok(())
+    }
+
+    #[test]
+    fn finally() -> Result<()> {
+        let source = r#"
+def process_detect_lines():
+    try:
+        pass
+    finally:
+        pass
+"#;
+        let stmts = parser::parse_program(source, "<filename>")?;
+        assert_eq!(get_complexity_number(&stmts), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn if_in_finally() -> Result<()> {
+        let source = r#"
+def process_detect_lines():
+    try:
+        pass
+    finally:
+        if res:
+            errors.append(f"Non-zero exit code {res}")
+"#;
+        let stmts = parser::parse_program(source, "<filename>")?;
+        assert_eq!(get_complexity_number(&stmts), 2);
         Ok(())
     }
 }

@@ -1,16 +1,35 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::rules::pycodestyle::helpers::compare;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct NotInTest;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+use crate::rules::pycodestyle::helpers::compare;
+
+/// ## What it does
+/// Checks for negative comparison using `not {foo} in {bar}`.
+///
+/// ## Why is this bad?
+/// Negative comparison should be done using `not in`.
+///
+/// ## Example
+/// ```python
+/// Z = not X in Y
+/// if not X.B in Y:\n    pass
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if x not in y:\n    pass
+/// assert (X in Y or X is Z)
+///
+/// ```
+#[violation]
+pub struct NotInTest;
+
 impl AlwaysAutofixableViolation for NotInTest {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -22,9 +41,28 @@ impl AlwaysAutofixableViolation for NotInTest {
     }
 }
 
-define_violation!(
-    pub struct NotIsTest;
-);
+/// ## What it does
+/// Checks for negative comparison using `not {foo} is {bar}`.
+///
+/// ## Why is this bad?
+/// Negative comparison should be done using `is not`.
+///
+/// ## Example
+/// ```python
+/// if not X is Y:
+///     pass
+/// Z = not X.B is Y
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if not (X in Y):
+///     pass
+/// zz = x is not y
+/// ```
+#[violation]
+pub struct NotIsTest;
+
 impl AlwaysAutofixableViolation for NotIsTest {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -58,8 +96,7 @@ pub fn not_tests(
                 match op {
                     Cmpop::In => {
                         if check_not_in {
-                            let mut diagnostic =
-                                Diagnostic::new(NotInTest, Range::from_located(operand));
+                            let mut diagnostic = Diagnostic::new(NotInTest, Range::from(operand));
                             if checker.patch(diagnostic.kind.rule()) && should_fix {
                                 diagnostic.amend(Fix::replacement(
                                     compare(left, &[Cmpop::NotIn], comparators, checker.stylist),
@@ -72,8 +109,7 @@ pub fn not_tests(
                     }
                     Cmpop::Is => {
                         if check_not_is {
-                            let mut diagnostic =
-                                Diagnostic::new(NotIsTest, Range::from_located(operand));
+                            let mut diagnostic = Diagnostic::new(NotIsTest, Range::from(operand));
                             if checker.patch(diagnostic.kind.rule()) && should_fix {
                                 diagnostic.amend(Fix::replacement(
                                     compare(left, &[Cmpop::IsNot], comparators, checker.stylist),

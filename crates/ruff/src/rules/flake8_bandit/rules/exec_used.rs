@@ -1,13 +1,12 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct ExecBuiltin;
-);
+#[violation]
+pub struct ExecBuiltin;
+
 impl Violation for ExecBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -23,5 +22,5 @@ pub fn exec_used(expr: &Expr, func: &Expr) -> Option<Diagnostic> {
     if id != "exec" {
         return None;
     }
-    Some(Diagnostic::new(ExecBuiltin, Range::from_located(expr)))
+    Some(Diagnostic::new(ExecBuiltin, Range::from(expr)))
 }

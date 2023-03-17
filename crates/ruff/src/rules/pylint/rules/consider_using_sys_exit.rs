@@ -1,17 +1,18 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::types::{BindingKind, Range};
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::{AutofixKind, Availability, Violation};
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::scope::BindingKind;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct ConsiderUsingSysExit {
-        pub name: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct ConsiderUsingSysExit {
+    pub name: String,
+}
+
 impl Violation for ConsiderUsingSysExit {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -28,9 +29,9 @@ impl Violation for ConsiderUsingSysExit {
 /// Return `true` if the `module` was imported using a star import (e.g., `from
 /// sys import *`).
 fn is_module_star_imported(checker: &Checker, module: &str) -> bool {
-    checker.current_scopes().any(|scope| {
-        scope.bindings.values().any(|index| {
-            if let BindingKind::StarImportation(_, name) = &checker.bindings[*index].kind {
+    checker.ctx.scopes().any(|scope| {
+        scope.binding_ids().any(|index| {
+            if let BindingKind::StarImportation(_, name) = &checker.ctx.bindings[*index].kind {
                 name.as_ref().map(|name| name == module).unwrap_or_default()
             } else {
                 false
@@ -42,11 +43,10 @@ fn is_module_star_imported(checker: &Checker, module: &str) -> bool {
 /// Return the appropriate `sys.exit` reference based on the current set of
 /// imports, or `None` is `sys.exit` hasn't been imported.
 fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -> Option<String> {
-    checker.current_scopes().find_map(|scope| {
+    checker.ctx.scopes().find_map(|scope| {
         scope
-            .bindings
-            .values()
-            .find_map(|index| match &checker.bindings[*index].kind {
+            .binding_ids()
+            .find_map(|index| match &checker.ctx.bindings[*index].kind {
                 // e.g. module=sys object=exit
                 // `import sys`         -> `sys.exit`
                 // `import sys as sys2` -> `sys2.exit`
@@ -95,7 +95,7 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
     })
 }
 
-/// RUF004
+/// PLR1722
 pub fn consider_using_sys_exit(checker: &mut Checker, func: &Expr) {
     let ExprKind::Name { id, .. } = &func.node else {
         return;
@@ -107,14 +107,14 @@ pub fn consider_using_sys_exit(checker: &mut Checker, func: &Expr) {
         if name == "exit" && is_module_star_imported(checker, "sys") {
             continue;
         }
-        if !checker.is_builtin(name) {
+        if !checker.ctx.is_builtin(name) {
             continue;
         }
         let mut diagnostic = Diagnostic::new(
             ConsiderUsingSysExit {
                 name: name.to_string(),
             },
-            Range::from_located(func),
+            Range::from(func),
         );
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(content) = get_member_import_name_alias(checker, "sys", "exit") {

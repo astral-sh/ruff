@@ -1,16 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, Keyword};
 
-use super::helpers::{is_empty_or_null_string, is_pytest_fail};
-use crate::ast::helpers::SimpleCallArgs;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct FailWithoutMessage;
-);
+use crate::checkers::ast::Checker;
+
+use super::helpers::{is_empty_or_null_string, is_pytest_fail};
+
+#[violation]
+pub struct FailWithoutMessage;
+
 impl Violation for FailWithoutMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -21,20 +22,18 @@ impl Violation for FailWithoutMessage {
 pub fn fail_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_fail(func, checker) {
         let call_args = SimpleCallArgs::new(args, keywords);
-        let msg = call_args.get_argument("msg", Some(0));
+        let msg = call_args.argument("msg", 0);
 
         if let Some(msg) = msg {
             if is_empty_or_null_string(msg) {
-                checker.diagnostics.push(Diagnostic::new(
-                    FailWithoutMessage,
-                    Range::from_located(func),
-                ));
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(FailWithoutMessage, Range::from(func)));
             }
         } else {
-            checker.diagnostics.push(Diagnostic::new(
-                FailWithoutMessage,
-                Range::from_located(func),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(FailWithoutMessage, Range::from(func)));
         }
     }
 }

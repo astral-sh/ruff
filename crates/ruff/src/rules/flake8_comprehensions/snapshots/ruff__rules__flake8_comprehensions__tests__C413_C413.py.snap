@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryCallAroundSorted:
-      func: list
+    name: UnnecessaryCallAroundSorted
+    body: "Unnecessary `list` call around `sorted()`"
+    suggestion: "Remove unnecessary `list` call"
+    fixable: true
   location:
     row: 3
     column: 0
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    UnnecessaryCallAroundSorted:
-      func: reversed
+    name: UnnecessaryCallAroundSorted
+    body: "Unnecessary `reversed` call around `sorted()`"
+    suggestion: "Remove unnecessary `reversed` call"
+    fixable: true
   location:
     row: 4
     column: 0
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    UnnecessaryCallAroundSorted:
-      func: reversed
+    name: UnnecessaryCallAroundSorted
+    body: "Unnecessary `reversed` call around `sorted()`"
+    suggestion: "Remove unnecessary `reversed` call"
+    fixable: true
   location:
     row: 5
     column: 0
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 36
   parent: ~
 - kind:
-    UnnecessaryCallAroundSorted:
-      func: reversed
+    name: UnnecessaryCallAroundSorted
+    body: "Unnecessary `reversed` call around `sorted()`"
+    suggestion: "Remove unnecessary `reversed` call"
+    fixable: true
   location:
     row: 6
     column: 0
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 33
   parent: ~
 - kind:
-    UnnecessaryCallAroundSorted:
-      func: reversed
+    name: UnnecessaryCallAroundSorted
+    body: "Unnecessary `reversed` call around `sorted()`"
+    suggestion: "Remove unnecessary `reversed` call"
+    fixable: true
   location:
     row: 7
     column: 0
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 50
   parent: ~
 - kind:
-    UnnecessaryCallAroundSorted:
-      func: reversed
+    name: UnnecessaryCallAroundSorted
+    body: "Unnecessary `reversed` call around `sorted()`"
+    suggestion: "Remove unnecessary `reversed` call"
+    fixable: true
   location:
     row: 8
     column: 0
@@ -111,8 +123,10 @@ expression: diagnostics
       column: 50
   parent: ~
 - kind:
-    UnnecessaryCallAroundSorted:
-      func: reversed
+    name: UnnecessaryCallAroundSorted
+    body: "Unnecessary `reversed` call around `sorted()`"
+    suggestion: "Remove unnecessary `reversed` call"
+    fixable: true
   location:
     row: 9
     column: 0

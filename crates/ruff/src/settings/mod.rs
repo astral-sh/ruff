@@ -5,13 +5,14 @@
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
-use globset::Glob;
+use globset::{Glob, GlobMatcher};
+use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use strum::IntoEnumIterator;
 
-use self::hashable::{HashableGlobMatcher, HashableGlobSet, HashableHashSet, HashableRegex};
-use self::rule_table::RuleTable;
-use crate::cache::cache_dir;
+use ruff_cache::cache_dir;
+use ruff_macros::CacheKey;
+
 use crate::registry::{Rule, RuleNamespace, INCOMPATIBLE_CODES};
 use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
@@ -21,13 +22,14 @@ use crate::rules::{
     isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
-use crate::settings::types::{PerFileIgnore, PythonVersion, SerializationFormat};
-use crate::warn_user_once;
+use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
+use crate::warn_user_once_by_id;
+
+use self::rule_table::RuleTable;
 
 pub mod configuration;
 pub mod defaults;
 pub mod flags;
-pub mod hashable;
 pub mod options;
 pub mod options_base;
 pub mod pyproject;
@@ -74,31 +76,27 @@ pub struct CliSettings {
     pub update_check: bool,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub rules: RuleTable,
-    pub per_file_ignores: Vec<(
-        HashableGlobMatcher,
-        HashableGlobMatcher,
-        HashableHashSet<Rule>,
-    )>,
+    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<Rule>)>,
 
     pub show_source: bool,
     pub target_version: PythonVersion,
 
     // Resolver settings
-    pub exclude: HashableGlobSet,
-    pub extend_exclude: HashableGlobSet,
+    pub exclude: FilePatternSet,
+    pub extend_exclude: FilePatternSet,
     pub force_exclude: bool,
     pub respect_gitignore: bool,
     pub project_root: PathBuf,
 
     // Rule-specific settings
-    pub allowed_confusables: HashableHashSet<char>,
+    pub allowed_confusables: FxHashSet<char>,
     pub builtins: Vec<String>,
-    pub dummy_variable_rgx: HashableRegex,
-    pub external: HashableHashSet<String>,
+    pub dummy_variable_rgx: Regex,
+    pub external: FxHashSet<String>,
     pub ignore_init_module_imports: bool,
     pub line_length: usize,
     pub namespace_packages: Vec<PathBuf>,
@@ -146,18 +144,16 @@ impl Settings {
             allowed_confusables: config
                 .allowed_confusables
                 .map(FxHashSet::from_iter)
-                .unwrap_or_default()
-                .into(),
+                .unwrap_or_default(),
             builtins: config.builtins.unwrap_or_default(),
             dummy_variable_rgx: config
                 .dummy_variable_rgx
-                .unwrap_or_else(|| defaults::DUMMY_VARIABLE_RGX.clone())
-                .into(),
-            exclude: HashableGlobSet::new(
+                .unwrap_or_else(|| defaults::DUMMY_VARIABLE_RGX.clone()),
+            exclude: FilePatternSet::try_from_vec(
                 config.exclude.unwrap_or_else(|| defaults::EXCLUDE.clone()),
             )?,
-            extend_exclude: HashableGlobSet::new(config.extend_exclude)?,
-            external: FxHashSet::from_iter(config.external.unwrap_or_default()).into(),
+            extend_exclude: FilePatternSet::try_from_vec(config.extend_exclude)?,
+            external: FxHashSet::from_iter(config.external.unwrap_or_default()),
 
             force_exclude: config.force_exclude.unwrap_or(false),
 
@@ -367,7 +363,8 @@ impl From<&Configuration> for RuleTable {
 
         for (from, target) in redirects {
             // TODO(martin): This belongs into the ruff_cli crate.
-            crate::warn_user!(
+            warn_user_once_by_id!(
+                from,
                 "`{from}` has been remapped to `{}{}`.",
                 target.linter().common_prefix(),
                 target.short_code()
@@ -378,7 +375,7 @@ impl From<&Configuration> for RuleTable {
 
         for rule in select_set {
             let fix = fixable_set.contains(&rule);
-            rules.enable(rule.clone(), fix);
+            rules.enable(rule, fix);
         }
 
         // If a docstring convention is specified, force-disable any incompatible error
@@ -389,22 +386,17 @@ impl From<&Configuration> for RuleTable {
             .and_then(|pydocstyle| pydocstyle.convention)
         {
             for rule in convention.rules_to_be_ignored() {
-                rules.disable(rule);
+                rules.disable(*rule);
             }
         }
 
         // Validate that we didn't enable any incompatible rules. Use this awkward
         // approach to give each pair it's own `warn_user_once`.
-        let [pair1, pair2] = INCOMPATIBLE_CODES;
-        let (preferred, expendable, message) = pair1;
-        if rules.enabled(preferred) && rules.enabled(expendable) {
-            warn_user_once!("{}", message);
-            rules.disable(expendable);
-        }
-        let (preferred, expendable, message) = pair2;
-        if rules.enabled(preferred) && rules.enabled(expendable) {
-            warn_user_once!("{}", message);
-            rules.disable(expendable);
+        for (preferred, expendable, message) in INCOMPATIBLE_CODES {
+            if rules.enabled(*preferred) && rules.enabled(*expendable) {
+                warn_user_once_by_id!(expendable.as_ref(), "{}", message);
+                rules.disable(*expendable);
+            }
         }
 
         rules
@@ -414,13 +406,7 @@ impl From<&Configuration> for RuleTable {
 /// Given a list of patterns, create a `GlobSet`.
 pub fn resolve_per_file_ignores(
     per_file_ignores: Vec<PerFileIgnore>,
-) -> Result<
-    Vec<(
-        HashableGlobMatcher,
-        HashableGlobMatcher,
-        HashableHashSet<Rule>,
-    )>,
-> {
+) -> Result<Vec<(GlobMatcher, GlobMatcher, FxHashSet<Rule>)>> {
     per_file_ignores
         .into_iter()
         .map(|per_file_ignore| {
@@ -431,7 +417,7 @@ pub fn resolve_per_file_ignores(
             // Construct basename matcher.
             let basename = Glob::new(&per_file_ignore.basename)?.compile_matcher();
 
-            Ok((absolute.into(), basename.into(), per_file_ignore.rules))
+            Ok((absolute, basename, per_file_ignore.rules))
         })
         .collect()
 }
@@ -440,11 +426,12 @@ pub fn resolve_per_file_ignores(
 mod tests {
     use rustc_hash::FxHashSet;
 
-    use super::configuration::RuleSelection;
     use crate::codes::{self, Pycodestyle};
     use crate::registry::Rule;
     use crate::settings::configuration::Configuration;
     use crate::settings::rule_table::RuleTable;
+
+    use super::configuration::RuleSelection;
 
     #[allow(clippy::needless_pass_by_value)]
     fn resolve_rules(selections: impl IntoIterator<Item = RuleSelection>) -> FxHashSet<Rule> {
@@ -453,7 +440,7 @@ mod tests {
             ..Configuration::default()
         })
         .iter_enabled()
-        .cloned()
+        .copied()
         .collect()
     }
 
@@ -470,6 +457,7 @@ mod tests {
             Rule::BlankLineContainsWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
+            Rule::IndentationContainsTabs,
         ]);
         assert_eq!(actual, expected);
 
@@ -482,7 +470,7 @@ mod tests {
 
         let actual = resolve_rules([RuleSelection {
             select: Some(vec![Pycodestyle::W.into()]),
-            ignore: vec![codes::Pycodestyle::W292.into()],
+            ignore: vec![Pycodestyle::W292.into()],
             ..RuleSelection::default()
         }]);
         let expected = FxHashSet::from_iter([
@@ -490,6 +478,7 @@ mod tests {
             Rule::BlankLineContainsWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
+            Rule::IndentationContainsTabs,
         ]);
         assert_eq!(actual, expected);
 
@@ -526,6 +515,7 @@ mod tests {
             Rule::BlankLineContainsWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
+            Rule::IndentationContainsTabs,
         ]);
         assert_eq!(actual, expected);
 
@@ -563,6 +553,7 @@ mod tests {
             Rule::BlankLineContainsWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
+            Rule::IndentationContainsTabs,
         ]);
         assert_eq!(actual, expected);
 
@@ -582,6 +573,7 @@ mod tests {
             Rule::TrailingWhitespace,
             Rule::BlankLineContainsWhitespace,
             Rule::InvalidEscapeSequence,
+            Rule::IndentationContainsTabs,
         ]);
         assert_eq!(actual, expected);
     }

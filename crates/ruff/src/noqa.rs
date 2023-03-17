@@ -11,15 +11,18 @@ use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::newlines::StrExt;
+use ruff_python_ast::source_code::{LineEnding, Locator};
+use ruff_python_ast::types::Range;
+
 use crate::codes::NoqaCode;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Rule};
 use crate::rule_redirects::get_redirect_target;
-use crate::source_code::{LineEnding, Locator};
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(
-        r"(?P<spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>([A-Z]+[0-9]+(?:[,\s]+)?)+))?)",
+        r"(?P<leading_spaces>\s*)(?P<noqa>(?i:# noqa)(?::\s?(?P<codes>(?:[A-Z]+[0-9]+)(?:[,\s]+[A-Z]+[0-9]+)*))?)(?P<trailing_spaces>\s*)",
     )
     .unwrap()
 });
@@ -71,35 +74,42 @@ pub fn extract_file_exemption(line: &str) -> Exemption {
 #[derive(Debug)]
 pub enum Directive<'a> {
     None,
-    All(usize, usize, usize),
-    Codes(usize, usize, usize, Vec<&'a str>),
+    All(usize, usize, usize, usize),
+    Codes(usize, usize, usize, Vec<&'a str>, usize),
 }
 
 /// Extract the noqa `Directive` from a line of Python source code.
 pub fn extract_noqa_directive(line: &str) -> Directive {
     match NOQA_LINE_REGEX.captures(line) {
-        Some(caps) => match caps.name("spaces") {
-            Some(spaces) => match caps.name("noqa") {
-                Some(noqa) => match caps.name("codes") {
-                    Some(codes) => {
-                        let codes: Vec<&str> = SPLIT_COMMA_REGEX
-                            .split(codes.as_str().trim())
-                            .map(str::trim)
-                            .filter(|code| !code.is_empty())
-                            .collect();
-                        if codes.is_empty() {
-                            warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+        Some(caps) => match caps.name("leading_spaces") {
+            Some(leading_spaces) => match caps.name("trailing_spaces") {
+                Some(trailing_spaces) => match caps.name("noqa") {
+                    Some(noqa) => match caps.name("codes") {
+                        Some(codes) => {
+                            let codes: Vec<&str> = SPLIT_COMMA_REGEX
+                                .split(codes.as_str().trim())
+                                .map(str::trim)
+                                .filter(|code| !code.is_empty())
+                                .collect();
+                            if codes.is_empty() {
+                                warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+                            }
+                            Directive::Codes(
+                                leading_spaces.as_str().chars().count(),
+                                noqa.start(),
+                                noqa.end(),
+                                codes,
+                                trailing_spaces.as_str().chars().count(),
+                            )
                         }
-                        Directive::Codes(
-                            spaces.as_str().chars().count(),
+                        None => Directive::All(
+                            leading_spaces.as_str().chars().count(),
                             noqa.start(),
                             noqa.end(),
-                            codes,
-                        )
-                    }
-                    None => {
-                        Directive::All(spaces.as_str().chars().count(), noqa.start(), noqa.end())
-                    }
+                            trailing_spaces.as_str().chars().count(),
+                        ),
+                    },
+                    None => Directive::None,
                 },
                 None => Directive::None,
             },
@@ -111,7 +121,7 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
-pub fn includes(needle: &Rule, haystack: &[&str]) -> bool {
+pub fn includes(needle: Rule, haystack: &[&str]) -> bool {
     let needle = needle.noqa_code();
     haystack
         .iter()
@@ -120,20 +130,20 @@ pub fn includes(needle: &Rule, haystack: &[&str]) -> bool {
 
 /// Returns `true` if the given [`Rule`] is ignored at the specified `lineno`.
 pub fn rule_is_ignored(
-    code: &Rule,
+    code: Rule,
     lineno: usize,
     noqa_line_for: &IntMap<usize, usize>,
     locator: &Locator,
 ) -> bool {
     let noqa_lineno = noqa_line_for.get(&lineno).unwrap_or(&lineno);
-    let line = locator.slice(&Range::new(
+    let line = locator.slice(Range::new(
         Location::new(*noqa_lineno, 0),
         Location::new(noqa_lineno + 1, 0),
     ));
     match extract_noqa_directive(line) {
         Directive::None => false,
         Directive::All(..) => true,
-        Directive::Codes(.., codes) => includes(code, &codes),
+        Directive::Codes(.., codes, _) => includes(code, &codes),
     }
 }
 
@@ -164,7 +174,7 @@ fn add_noqa_inner(
     line_ending: &LineEnding,
 ) -> (usize, String) {
     // Map of line number to set of (non-ignored) diagnostic codes that are triggered on that line.
-    let mut matches_by_line: FxHashMap<usize, FxHashSet<&Rule>> = FxHashMap::default();
+    let mut matches_by_line: FxHashMap<usize, FxHashSet<Rule>> = FxHashMap::default();
 
     // Whether the file is exempted from all checks.
     let mut file_exempted = false;
@@ -172,7 +182,7 @@ fn add_noqa_inner(
     // Codes that are globally exempted (within the current file).
     let mut file_exemptions: Vec<NoqaCode> = vec![];
 
-    let lines: Vec<&str> = contents.lines().collect();
+    let lines: Vec<&str> = contents.universal_newlines().collect();
     for lineno in commented_lines {
         match extract_file_exemption(lines[lineno - 1]) {
             Exemption::All => {
@@ -214,7 +224,7 @@ fn add_noqa_inner(
                     Directive::All(..) => {
                         continue;
                     }
-                    Directive::Codes(.., codes) => {
+                    Directive::Codes(.., codes, _) => {
                         if includes(diagnostic.kind.rule(), &codes) {
                             continue;
                         }
@@ -234,7 +244,7 @@ fn add_noqa_inner(
                 Directive::All(..) => {
                     continue;
                 }
-                Directive::Codes(.., codes) => {
+                Directive::Codes(.., codes, _) => {
                     if includes(diagnostic.kind.rule(), &codes) {
                         continue;
                     }
@@ -254,7 +264,7 @@ fn add_noqa_inner(
 
     let mut count: usize = 0;
     let mut output = String::new();
-    for (lineno, line) in contents.lines().enumerate() {
+    for (lineno, line) in lines.into_iter().enumerate() {
         match matches_by_line.get(&lineno) {
             None => {
                 output.push_str(line);
@@ -270,7 +280,7 @@ fn add_noqa_inner(
                         output.push_str("  # noqa: ");
 
                         // Add codes.
-                        push_codes(&mut output, rules.iter().map(|r| r.noqa_code()));
+                        push_codes(&mut output, rules.iter().map(Rule::noqa_code));
                         output.push_str(line_ending);
                         count += 1;
                     }
@@ -279,7 +289,7 @@ fn add_noqa_inner(
                         output.push_str(line);
                         output.push_str(line_ending);
                     }
-                    Directive::Codes(_, start_byte, _, existing) => {
+                    Directive::Codes(_, start_byte, _, existing, _) => {
                         // Reconstruct the line based on the preserved rule codes.
                         // This enables us to tally the number of edits.
                         let mut formatted = String::with_capacity(line.len());
@@ -332,12 +342,13 @@ mod tests {
     use nohash_hasher::IntMap;
     use rustpython_parser::ast::Location;
 
-    use crate::ast::types::Range;
+    use ruff_diagnostics::Diagnostic;
+    use ruff_python_ast::source_code::LineEnding;
+    use ruff_python_ast::types::Range;
+
     use crate::noqa::{add_noqa_inner, NOQA_LINE_REGEX};
-    use crate::registry::Diagnostic;
     use crate::rules::pycodestyle::rules::AmbiguousVariableName;
     use crate::rules::pyflakes;
-    use crate::source_code::LineEnding;
 
     #[test]
     fn regex() {

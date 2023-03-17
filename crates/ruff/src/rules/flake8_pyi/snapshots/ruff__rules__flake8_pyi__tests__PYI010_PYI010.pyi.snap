@@ -1,0 +1,44 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: NonEmptyStubBody
+    body: "Function body must contain only `...`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 17
+  fix: ~
+  parent: ~
+- kind:
+    name: NonEmptyStubBody
+    body: "Function body must contain only `...`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 9
+    column: 4
+  end_location:
+    row: 9
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: NonEmptyStubBody
+    body: "Function body must contain only `...`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 12
+    column: 4
+  end_location:
+    row: 12
+    column: 11
+  fix: ~
+  parent: ~
+

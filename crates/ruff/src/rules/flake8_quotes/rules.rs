@@ -1,42 +1,43 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use super::settings::Quote;
-use crate::ast::types::Range;
-use crate::fix::Fix;
-use crate::lex::docstring_detection::StateMachine;
-use crate::registry::{Diagnostic, Rule};
-use crate::settings::{flags, Settings};
-use crate::source_code::Locator;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    /// ## What it does
-    /// Checks for inline strings that use single quotes or double quotes,
-    /// depending on the value of the [`flake8-quotes.inline-quotes`] option.
-    ///
-    /// ## Why is this bad?
-    /// Consistency is good. Use either single or double quotes for inline
-    /// strings, but be consistent.
-    ///
-    /// ## Options
-    /// * `flake8-quotes.inline-quotes`
-    ///
-    /// ## Example
-    /// ```python
-    /// foo = 'bar'
-    /// ```
-    ///
-    /// Assuming `inline-quotes` is set to `double`, use instead:
-    /// ```python
-    /// foo = "bar"
-    /// ```
-    pub struct BadQuotesInlineString {
-        pub quote: Quote,
-    }
-);
+use crate::lex::docstring_detection::StateMachine;
+use crate::registry::Rule;
+use crate::settings::{flags, Settings};
+
+use super::settings::Quote;
+
+/// ## What it does
+/// Checks for inline strings that use single quotes or double quotes,
+/// depending on the value of the [`flake8-quotes.inline-quotes`] option.
+///
+/// ## Why is this bad?
+/// Consistency is good. Use either single or double quotes for inline
+/// strings, but be consistent.
+///
+/// ## Options
+/// - `flake8-quotes.inline-quotes`
+///
+/// ## Example
+/// ```python
+/// foo = 'bar'
+/// ```
+///
+/// Assuming `inline-quotes` is set to `double`, use instead:
+/// ```python
+/// foo = "bar"
+/// ```
+#[violation]
+pub struct BadQuotesInlineString {
+    pub quote: Quote,
+}
+
 impl AlwaysAutofixableViolation for BadQuotesInlineString {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -56,36 +57,36 @@ impl AlwaysAutofixableViolation for BadQuotesInlineString {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for multiline strings that use single quotes or double quotes,
-    /// depending on the value of the [`flake8-quotes.multiline-quotes`]
-    /// setting.
-    ///
-    /// ## Why is this bad?
-    /// Consistency is good. Use either single or double quotes for multiline
-    /// strings, but be consistent.
-    ///
-    /// ## Options
-    /// * `flake8-quotes.multiline-quotes`
-    ///
-    /// ## Example
-    /// ```python
-    /// foo = '''
-    /// bar
-    /// '''
-    /// ```
-    ///
-    /// Assuming `multiline-quotes` is set to `double`, use instead:
-    /// ```python
-    /// foo = """
-    /// bar
-    /// """
-    /// ```
-    pub struct BadQuotesMultilineString {
-        pub quote: Quote,
-    }
-);
+/// ## What it does
+/// Checks for multiline strings that use single quotes or double quotes,
+/// depending on the value of the [`flake8-quotes.multiline-quotes`]
+/// setting.
+///
+/// ## Why is this bad?
+/// Consistency is good. Use either single or double quotes for multiline
+/// strings, but be consistent.
+///
+/// ## Options
+/// - `flake8-quotes.multiline-quotes`
+///
+/// ## Example
+/// ```python
+/// foo = '''
+/// bar
+/// '''
+/// ```
+///
+/// Assuming `multiline-quotes` is set to `double`, use instead:
+/// ```python
+/// foo = """
+/// bar
+/// """
+/// ```
+#[violation]
+pub struct BadQuotesMultilineString {
+    pub quote: Quote,
+}
+
 impl AlwaysAutofixableViolation for BadQuotesMultilineString {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -105,35 +106,35 @@ impl AlwaysAutofixableViolation for BadQuotesMultilineString {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for docstrings that use single quotes or double quotes, depending
-    /// on the value of the [`flake8-quotes.docstring-quotes`] setting.
-    ///
-    /// ## Why is this bad?
-    /// Consistency is good. Use either single or double quotes for docstring
-    /// strings, but be consistent.
-    ///
-    /// ## Options
-    /// * `flake8-quotes.docstring-quotes`
-    ///
-    /// ## Example
-    /// ```python
-    /// '''
-    /// bar
-    /// '''
-    /// ```
-    ///
-    /// Assuming `docstring-quotes` is set to `double`, use instead:
-    /// ```python
-    /// """
-    /// bar
-    /// """
-    /// ```
-    pub struct BadQuotesDocstring {
-        pub quote: Quote,
-    }
-);
+/// ## What it does
+/// Checks for docstrings that use single quotes or double quotes, depending
+/// on the value of the [`flake8-quotes.docstring-quotes`] setting.
+///
+/// ## Why is this bad?
+/// Consistency is good. Use either single or double quotes for docstring
+/// strings, but be consistent.
+///
+/// ## Options
+/// - `flake8-quotes.docstring-quotes`
+///
+/// ## Example
+/// ```python
+/// '''
+/// bar
+/// '''
+/// ```
+///
+/// Assuming `docstring-quotes` is set to `double`, use instead:
+/// ```python
+/// """
+/// bar
+/// """
+/// ```
+#[violation]
+pub struct BadQuotesDocstring {
+    pub quote: Quote,
+}
+
 impl AlwaysAutofixableViolation for BadQuotesDocstring {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -153,26 +154,26 @@ impl AlwaysAutofixableViolation for BadQuotesDocstring {
     }
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for strings that include escaped quotes, and suggests changing
-    /// the quote style to avoid the need to escape them.
-    ///
-    /// ## Why is this bad?
-    /// It's preferable to avoid escaped quotes in strings. By changing the
-    /// outer quote style, you can avoid escaping inner quotes.
-    ///
-    /// ## Example
-    /// ```python
-    /// foo = 'bar\'s'
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// foo = "bar's"
-    /// ```
-    pub struct AvoidableEscapedQuote;
-);
+/// ## What it does
+/// Checks for strings that include escaped quotes, and suggests changing
+/// the quote style to avoid the need to escape them.
+///
+/// ## Why is this bad?
+/// It's preferable to avoid escaped quotes in strings. By changing the
+/// outer quote style, you can avoid escaping inner quotes.
+///
+/// ## Example
+/// ```python
+/// foo = 'bar\'s'
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = "bar's"
+/// ```
+#[violation]
+pub struct AvoidableEscapedQuote;
+
 impl AlwaysAutofixableViolation for AvoidableEscapedQuote {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -264,7 +265,7 @@ fn docstring(
 ) -> Option<Diagnostic> {
     let quotes_settings = &settings.flake8_quotes;
 
-    let text = locator.slice(&Range::new(start, end));
+    let text = locator.slice(Range::new(start, end));
     let trivia: Trivia = text.into();
 
     if trivia
@@ -280,7 +281,7 @@ fn docstring(
         },
         Range::new(start, end),
     );
-    if autofix.into() && settings.rules.should_fix(&Rule::BadQuotesDocstring) {
+    if autofix.into() && settings.rules.should_fix(Rule::BadQuotesDocstring) {
         let quote_count = if trivia.is_multiline { 3 } else { 1 };
         let string_contents = &trivia.raw_text[quote_count..trivia.raw_text.len() - quote_count];
         let quote = good_docstring(&quotes_settings.docstring_quotes).repeat(quote_count);
@@ -309,7 +310,7 @@ fn strings(
     let trivia = sequence
         .iter()
         .map(|(start, end)| {
-            let text = locator.slice(&Range::new(*start, *end));
+            let text = locator.slice(Range::new(*start, *end));
             let trivia: Trivia = text.into();
             trivia
         })
@@ -355,7 +356,7 @@ fn strings(
                 Range::new(*start, *end),
             );
 
-            if autofix.into() && settings.rules.should_fix(&Rule::BadQuotesMultilineString) {
+            if autofix.into() && settings.rules.should_fix(Rule::BadQuotesMultilineString) {
                 let string_contents = &trivia.raw_text[3..trivia.raw_text.len() - 3];
                 let quote = good_multiline(&quotes_settings.multiline_quotes);
                 let mut fixed_contents = String::with_capacity(
@@ -385,7 +386,7 @@ fn strings(
                 {
                     let mut diagnostic =
                         Diagnostic::new(AvoidableEscapedQuote, Range::new(*start, *end));
-                    if autofix.into() && settings.rules.should_fix(&Rule::AvoidableEscapedQuote) {
+                    if autofix.into() && settings.rules.should_fix(Rule::AvoidableEscapedQuote) {
                         let quote = bad_single(&quotes_settings.inline_quotes);
 
                         let mut fixed_contents =
@@ -444,7 +445,7 @@ fn strings(
                     },
                     Range::new(*start, *end),
                 );
-                if autofix.into() && settings.rules.should_fix(&Rule::BadQuotesInlineString) {
+                if autofix.into() && settings.rules.should_fix(Rule::BadQuotesInlineString) {
                     let quote = good_single(&quotes_settings.inline_quotes);
                     let mut fixed_contents =
                         String::with_capacity(trivia.prefix.len() + string_contents.len() + 2);

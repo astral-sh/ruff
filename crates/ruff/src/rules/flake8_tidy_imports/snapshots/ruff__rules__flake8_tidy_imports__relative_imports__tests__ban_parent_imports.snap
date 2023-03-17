@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
 expression: diagnostics
 ---
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 9
     column: 0
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 10
     column: 0
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 11
     column: 0
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 12
     column: 0
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 17
     column: 0
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 21
     column: 0
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 22
     column: 0
@@ -80,8 +94,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 23
     column: 0
@@ -91,8 +107,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 24
     column: 0
@@ -102,8 +120,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 25
     column: 0
@@ -113,8 +133,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 26
     column: 0
@@ -124,8 +146,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 27
     column: 0
@@ -135,8 +159,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RelativeImports:
-      strictness: parents
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
   location:
     row: 28
     column: 0

@@ -1,13 +1,15 @@
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::lexer::{LexResult, Spanned};
 use rustpython_parser::Tok;
 
-use crate::ast::types::Range;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
+
+use crate::registry::Rule;
 use crate::settings::{flags, Settings};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
 
 /// Simplified token type.
 #[derive(Copy, Clone, PartialEq, Eq)]
@@ -108,9 +110,9 @@ impl Context {
     }
 }
 
-define_violation!(
-    pub struct TrailingCommaMissing;
-);
+#[violation]
+pub struct TrailingCommaMissing;
+
 impl AlwaysAutofixableViolation for TrailingCommaMissing {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -122,9 +124,9 @@ impl AlwaysAutofixableViolation for TrailingCommaMissing {
     }
 }
 
-define_violation!(
-    pub struct TrailingCommaOnBareTupleProhibited;
-);
+#[violation]
+pub struct TrailingCommaOnBareTupleProhibited;
+
 impl Violation for TrailingCommaOnBareTupleProhibited {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -132,9 +134,9 @@ impl Violation for TrailingCommaOnBareTupleProhibited {
     }
 }
 
-define_violation!(
-    pub struct TrailingCommaProhibited;
-);
+#[violation]
+pub struct TrailingCommaProhibited;
+
 impl AlwaysAutofixableViolation for TrailingCommaProhibited {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -149,6 +151,7 @@ impl AlwaysAutofixableViolation for TrailingCommaProhibited {
 /// COM812, COM818, COM819
 pub fn trailing_commas(
     tokens: &[LexResult],
+    locator: &Locator,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
@@ -257,7 +260,7 @@ pub fn trailing_commas(
                     end_location: comma.2,
                 },
             );
-            if autofix.into() && settings.rules.should_fix(&Rule::TrailingCommaProhibited) {
+            if autofix.into() && settings.rules.should_fix(Rule::TrailingCommaProhibited) {
                 diagnostic.amend(Fix::deletion(comma.0, comma.2));
             }
             diagnostics.push(diagnostic);
@@ -301,8 +304,17 @@ pub fn trailing_commas(
                     end_location: missing_comma.2,
                 },
             );
-            if autofix.into() && settings.rules.should_fix(&Rule::TrailingCommaMissing) {
-                diagnostic.amend(Fix::insertion(",".to_owned(), missing_comma.2));
+            if autofix.into() && settings.rules.should_fix(Rule::TrailingCommaMissing) {
+                // Create a replacement that includes the final bracket (or other token),
+                // rather than just inserting a comma at the end. This prevents the UP034 autofix
+                // removing any brackets in the same linter pass - doing both at the same time could
+                // lead to a syntax error.
+                let contents = locator.slice(Range::new(missing_comma.0, missing_comma.2));
+                diagnostic.amend(Fix::replacement(
+                    format!("{contents},"),
+                    missing_comma.0,
+                    missing_comma.2,
+                ));
             }
             diagnostics.push(diagnostic);
         }

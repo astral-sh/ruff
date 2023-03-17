@@ -17,7 +17,6 @@ mod tests {
     use crate::settings::types::PerFileIgnore;
     use crate::test::test_path;
 
-    #[test_case(Rule::KeywordArgumentBeforeStarArgument, Path::new("RUF004.py"); "RUF004")]
     #[test_case(Rule::UnpackInsteadOfConcatenatingToCollectionLiteral, Path::new("RUF005.py"); "RUF005")]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"); "RUF006")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -35,7 +34,7 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/confusables.py"),
             &settings::Settings {
-                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']).into(),
+                allowed_confusables: FxHashSet::from_iter(['−', 'ρ', '∗']),
                 ..settings::Settings::for_rules(vec![
                     Rule::AmbiguousUnicodeCharacterString,
                     Rule::AmbiguousUnicodeCharacterDocstring,
@@ -56,6 +55,7 @@ mod tests {
                 Rule::LineTooLong,
                 Rule::UnusedImport,
                 Rule::UnusedVariable,
+                Rule::IndentationContainsTabs,
             ]),
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -85,6 +85,20 @@ mod tests {
         .unwrap();
 
         let diagnostics = test_path(Path::new("ruff/RUF100_2.py"), &settings)?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruf100_3() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF100_3.py"),
+            &settings::Settings::for_rules(vec![
+                Rule::UnusedNOQA,
+                Rule::LineTooLong,
+                Rule::UndefinedName,
+            ]),
+        )?;
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
@@ -124,6 +138,16 @@ mod tests {
         let diagnostics = test_path(
             Path::new("ruff/redirects.py"),
             &settings::Settings::for_rules(vec![Rule::TypingUnion]),
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruff_pairwise_over_zipped() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF007.py"),
+            &settings::Settings::for_rules(vec![Rule::PairwiseOverZipped]),
         )?;
         assert_yaml_snapshot!(diagnostics);
         Ok(())

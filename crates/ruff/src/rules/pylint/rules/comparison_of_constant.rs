@@ -1,17 +1,16 @@
 use std::fmt;
 
 use itertools::Itertools;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Located};
-use serde::{Deserialize, Serialize};
 
-use crate::ast::helpers::unparse_constant;
-use crate::ast::types::Range;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::unparse_constant;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ViolationsCmpop {
     Eq,
     NotEq,
@@ -60,13 +59,13 @@ impl fmt::Display for ViolationsCmpop {
     }
 }
 
-define_violation!(
-    pub struct ComparisonOfConstant {
-        pub left_constant: String,
-        pub op: ViolationsCmpop,
-        pub right_constant: String,
-    }
-);
+#[violation]
+pub struct ComparisonOfConstant {
+    pub left_constant: String,
+    pub op: ViolationsCmpop,
+    pub right_constant: String,
+}
+
 impl Violation for ComparisonOfConstant {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -112,7 +111,7 @@ pub fn comparison_of_constant(
                     op: op.into(),
                     right_constant: unparse_constant(right_constant, checker.stylist),
                 },
-                Range::from_located(left),
+                Range::from(left),
             );
 
             checker.diagnostics.push(diagnostic);

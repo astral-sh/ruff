@@ -1,12 +1,11 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::Violation;
+use ruff_macros::{derive_message_formats, violation};
 
-use crate::violation::Violation;
+#[violation]
+pub struct UndefinedName {
+    pub name: String,
+}
 
-define_violation!(
-    pub struct UndefinedName {
-        pub name: String,
-    }
-);
 impl Violation for UndefinedName {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,13 +1,12 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Stmt;
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct IncorrectPytestImport;
-);
+#[violation]
+pub struct IncorrectPytestImport;
+
 impl Violation for IncorrectPytestImport {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -26,7 +25,7 @@ pub fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Di
             if alias != name {
                 return Some(Diagnostic::new(
                     IncorrectPytestImport,
-                    Range::from_located(import_from),
+                    Range::from(import_from),
                 ));
             }
         }
@@ -51,7 +50,7 @@ pub fn import_from(
         if is_pytest_or_subpackage(module) {
             return Some(Diagnostic::new(
                 IncorrectPytestImport,
-                Range::from_located(import_from),
+                Range::from(import_from),
             ));
         }
     };

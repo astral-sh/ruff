@@ -1,16 +1,16 @@
 use num_traits::{One, Zero};
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
-use crate::ast::helpers::SimpleCallArgs;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct SnmpInsecureVersion;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct SnmpInsecureVersion;
+
 impl Violation for SnmpInsecureVersion {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -25,11 +25,15 @@ pub fn snmp_insecure_version(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["pysnmp", "hlapi", "CommunityData"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["pysnmp", "hlapi", "CommunityData"]
+        })
+    {
         let call_args = SimpleCallArgs::new(args, keywords);
-        if let Some(mp_model_arg) = call_args.get_argument("mpModel", None) {
+        if let Some(mp_model_arg) = call_args.keyword_argument("mpModel") {
             if let ExprKind::Constant {
                 value: Constant::Int(value),
                 ..
@@ -38,7 +42,7 @@ pub fn snmp_insecure_version(
                 if value.is_zero() || value.is_one() {
                     checker.diagnostics.push(Diagnostic::new(
                         SnmpInsecureVersion,
-                        Range::from_located(mp_model_arg),
+                        Range::from(mp_model_arg),
                     ));
                 }
             }

@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_bugbear/mod.rs
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UselessComparison: ~
+    name: UselessComparison
+    body: "Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it."
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessComparison: ~
+    name: UselessComparison
+    body: "Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it."
+    suggestion: ~
+    fixable: false
   location:
     row: 7
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessComparison: ~
+    name: UselessComparison
+    body: "Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it."
+    suggestion: ~
+    fixable: false
   location:
     row: 17
     column: 4
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UselessComparison: ~
+    name: UselessComparison
+    body: "Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it."
+    suggestion: ~
+    fixable: false
   location:
     row: 24
     column: 4

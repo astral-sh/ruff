@@ -1,0 +1,31 @@
+---
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: NoExplicitStacklevel
+    body: "No explicit `stacklevel` keyword argument found"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    name: NoExplicitStacklevel
+    body: "No explicit `stacklevel` keyword argument found"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 13
+  fix: ~
+  parent: ~
+

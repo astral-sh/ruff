@@ -1,0 +1,18 @@
+---
+source: crates/ruff/src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: TripleSingleQuotes
+    body: "Use triple double quotes `\"\"\"`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 29
+  fix: ~
+  parent: ~
+

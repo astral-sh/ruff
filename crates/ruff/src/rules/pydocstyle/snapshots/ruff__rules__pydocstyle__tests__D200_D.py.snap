@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    FitsOnOneLine: ~
+    name: FitsOnOneLine
+    body: One-line docstring should fit on one line
+    suggestion: Reformat to one line
+    fixable: true
   location:
     row: 129
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    FitsOnOneLine: ~
+    name: FitsOnOneLine
+    body: One-line docstring should fit on one line
+    suggestion: Reformat to one line
+    fixable: true
   location:
     row: 597
     column: 4
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    FitsOnOneLine: ~
+    name: FitsOnOneLine
+    body: One-line docstring should fit on one line
+    suggestion: Reformat to one line
+    fixable: true
   location:
     row: 606
     column: 4
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    FitsOnOneLine: ~
+    name: FitsOnOneLine
+    body: One-line docstring should fit on one line
+    suggestion: Reformat to one line
+    fixable: true
   location:
     row: 615
     column: 4
@@ -64,7 +76,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    FitsOnOneLine: ~
+    name: FitsOnOneLine
+    body: One-line docstring should fit on one line
+    suggestion: Reformat to one line
+    fixable: true
   location:
     row: 624
     column: 4

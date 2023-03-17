@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryGeneratorSet: ~
+    name: UnnecessaryGeneratorSet
+    body: "Unnecessary generator (rewrite as a `set` comprehension)"
+    suggestion: "Rewrite as a `set` comprehension"
+    fixable: true
   location:
     row: 1
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    UnnecessaryGeneratorSet: ~
+    name: UnnecessaryGeneratorSet
+    body: "Unnecessary generator (rewrite as a `set` comprehension)"
+    suggestion: "Rewrite as a `set` comprehension"
+    fixable: true
   location:
     row: 2
     column: 4
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    UnnecessaryGeneratorSet: ~
+    name: UnnecessaryGeneratorSet
+    body: "Unnecessary generator (rewrite as a `set` comprehension)"
+    suggestion: "Rewrite as a `set` comprehension"
+    fixable: true
   location:
     row: 5
     column: 7
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 48
   parent: ~
 - kind:
-    UnnecessaryGeneratorSet: ~
+    name: UnnecessaryGeneratorSet
+    body: "Unnecessary generator (rewrite as a `set` comprehension)"
+    suggestion: "Rewrite as a `set` comprehension"
+    fixable: true
   location:
     row: 6
     column: 16
@@ -71,7 +83,10 @@ expression: diagnostics
       column: 57
   parent: ~
 - kind:
-    UnnecessaryGeneratorSet: ~
+    name: UnnecessaryGeneratorSet
+    body: "Unnecessary generator (rewrite as a `set` comprehension)"
+    suggestion: "Rewrite as a `set` comprehension"
+    fixable: true
   location:
     row: 7
     column: 15

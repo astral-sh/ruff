@@ -15,7 +15,7 @@ jobs:
       - uses: actions/setup-python@v4
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - name: "Install dependencies"
         run: |
           pip install -r docs/requirements.txt

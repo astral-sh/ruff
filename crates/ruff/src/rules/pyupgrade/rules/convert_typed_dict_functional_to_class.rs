@@ -2,25 +2,23 @@ use anyhow::{bail, Result};
 use log::debug;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::identifiers::is_identifier;
-use ruff_python::keyword::KWLIST;
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
+use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::types::Range;
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_stdlib::keyword::KWLIST;
 
-use crate::ast::helpers::{create_expr, create_stmt, unparse_stmt};
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::source_code::Stylist;
-use crate::violation::{Availability, Violation};
-use crate::AutofixKind;
+use crate::registry::AsRule;
 
-define_violation!(
-    pub struct ConvertTypedDictFunctionalToClass {
-        pub name: String,
-        pub fixable: bool,
-    }
-);
+#[violation]
+pub struct ConvertTypedDictFunctionalToClass {
+    pub name: String,
+    pub fixable: bool,
+}
+
 impl Violation for ConvertTypedDictFunctionalToClass {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -56,9 +54,13 @@ fn match_typed_dict_assign<'a>(
     } = &value.node else {
         return None;
     };
-    if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "TypedDict"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["typing", "TypedDict"]
+        })
+    {
         return None;
     }
     Some((class_name, args, keywords, func))
@@ -76,11 +78,6 @@ fn create_property_assignment_stmt(property: &str, annotation: &ExprKind) -> Stm
         value: None,
         simple: 1,
     })
-}
-
-/// Generate a `StmtKind::Pass` statement.
-fn create_pass_stmt() -> Stmt {
-    create_stmt(StmtKind::Pass)
 }
 
 /// Generate a `StmtKind:ClassDef` statement based on the provided body,
@@ -105,6 +102,10 @@ fn create_class_def_stmt(
 }
 
 fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Result<Vec<Stmt>> {
+    if keys.is_empty() {
+        return Ok(vec![create_stmt(StmtKind::Pass)]);
+    }
+
     keys.iter()
         .zip(values.iter())
         .map(|(key, value)| match key {
@@ -134,11 +135,19 @@ fn properties_from_dict_call(func: &Expr, keywords: &[Keyword]) -> Result<Vec<St
     if id != "dict" {
         bail!("Expected `id` to be `\"dict\"`")
     }
+    if keywords.is_empty() {
+        return Ok(vec![create_stmt(StmtKind::Pass)]);
+    }
+
     properties_from_keywords(keywords)
 }
 
 // Deprecated in Python 3.11, removed in Python 3.13.
 fn properties_from_keywords(keywords: &[Keyword]) -> Result<Vec<Stmt>> {
+    if keywords.is_empty() {
+        return Ok(vec![create_stmt(StmtKind::Pass)]);
+    }
+
     keywords
         .iter()
         .map(|keyword| {
@@ -185,12 +194,12 @@ fn match_properties_and_total<'a>(
             ExprKind::Call { func, keywords, .. } => {
                 Ok((properties_from_dict_call(func, keywords)?, total))
             }
-            _ => Ok((vec![create_pass_stmt()], total)),
+            _ => bail!("Expected `arg` to be `ExprKind::Dict` or `ExprKind::Call`"),
         }
     } else if !keywords.is_empty() {
         Ok((properties_from_keywords(keywords)?, None))
     } else {
-        Ok((vec![create_pass_stmt()], None))
+        Ok((vec![create_stmt(StmtKind::Pass)], None))
     }
 }
 
@@ -240,7 +249,7 @@ pub fn convert_typed_dict_functional_to_class(
             name: class_name.to_string(),
             fixable,
         },
-        Range::from_located(stmt),
+        Range::from(stmt),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(convert_to_class(

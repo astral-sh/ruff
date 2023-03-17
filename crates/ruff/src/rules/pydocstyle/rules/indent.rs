@@ -1,18 +1,18 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::newlines::NewlineWithTrailingNewline;
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace;
 
-use crate::ast::types::Range;
-use crate::ast::whitespace;
-use crate::ast::whitespace::LinesWithTrailingNewline;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::registry::{AsRule, Rule};
 
-define_violation!(
-    pub struct IndentWithSpaces;
-);
+#[violation]
+pub struct IndentWithSpaces;
+
 impl Violation for IndentWithSpaces {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -20,9 +20,9 @@ impl Violation for IndentWithSpaces {
     }
 }
 
-define_violation!(
-    pub struct NoUnderIndentation;
-);
+#[violation]
+pub struct NoUnderIndentation;
+
 impl AlwaysAutofixableViolation for NoUnderIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -34,9 +34,9 @@ impl AlwaysAutofixableViolation for NoUnderIndentation {
     }
 }
 
-define_violation!(
-    pub struct NoOverIndentation;
-);
+#[violation]
+pub struct NoOverIndentation;
+
 impl AlwaysAutofixableViolation for NoOverIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -53,7 +53,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
     let body = docstring.body;
 
     // Split the docstring into lines.
-    let lines: Vec<&str> = LinesWithTrailingNewline::from(body).collect();
+    let lines: Vec<&str> = NewlineWithTrailingNewline::from(body).collect();
     if lines.len() <= 1 {
         return;
     }
@@ -80,7 +80,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
         // yet.
         has_seen_tab = has_seen_tab || line_indent.contains('\t');
 
-        if checker.settings.rules.enabled(&Rule::NoUnderIndentation) {
+        if checker.settings.rules.enabled(Rule::NoUnderIndentation) {
             // We report under-indentation on every line. This isn't great, but enables
             // autofix.
             if (i == lines.len() - 1 || !is_blank)
@@ -119,16 +119,16 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
         }
     }
 
-    if checker.settings.rules.enabled(&Rule::IndentWithSpaces) {
+    if checker.settings.rules.enabled(Rule::IndentWithSpaces) {
         if has_seen_tab {
             checker.diagnostics.push(Diagnostic::new(
                 IndentWithSpaces,
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             ));
         }
     }
 
-    if checker.settings.rules.enabled(&Rule::NoOverIndentation) {
+    if checker.settings.rules.enabled(Rule::NoOverIndentation) {
         // If every line (except the last) is over-indented...
         if is_over_indented {
             for i in over_indented_lines {

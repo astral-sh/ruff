@@ -1,17 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
-use crate::ast::helpers::{unparse_constant, SimpleCallArgs};
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{unparse_constant, SimpleCallArgs};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct RequestWithoutTimeout {
-        pub timeout: Option<String>,
-    }
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct RequestWithoutTimeout {
+    pub timeout: Option<String>,
+}
+
 impl Violation for RequestWithoutTimeout {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -34,13 +34,17 @@ pub fn request_without_timeout(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        HTTP_VERBS
-            .iter()
-            .any(|func_name| call_path.as_slice() == ["requests", func_name])
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            HTTP_VERBS
+                .iter()
+                .any(|func_name| call_path.as_slice() == ["requests", func_name])
+        })
+    {
         let call_args = SimpleCallArgs::new(args, keywords);
-        if let Some(timeout_arg) = call_args.get_argument("timeout", None) {
+        if let Some(timeout_arg) = call_args.keyword_argument("timeout") {
             if let Some(timeout) = match &timeout_arg.node {
                 ExprKind::Constant {
                     value: value @ Constant::None,
@@ -52,13 +56,13 @@ pub fn request_without_timeout(
                     RequestWithoutTimeout {
                         timeout: Some(timeout),
                     },
-                    Range::from_located(timeout_arg),
+                    Range::from(timeout_arg),
                 ));
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
                 RequestWithoutTimeout { timeout: None },
-                Range::from_located(func),
+                Range::from(func),
             ));
         }
     }

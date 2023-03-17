@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NewLineAfterSectionName:
-      name: Returns
+    name: NewLineAfterSectionName
+    body: "Section name should end with a newline (\"Returns\")"
+    suggestion: "Add newline after \"Returns\""
+    fixable: true
   location:
     row: 30
     column: 4
@@ -21,57 +23,23 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    NewLineAfterSectionName:
-      name: Raises
+    name: NewLineAfterSectionName
+    body: "Section name should end with a newline (\"Raises\")"
+    suggestion: "Add newline after \"Raises\""
+    fixable: true
   location:
-    row: 207
+    row: 216
     column: 4
   end_location:
-    row: 221
+    row: 230
     column: 7
   fix:
     content: ""
     location:
-      row: 218
+      row: 227
       column: 10
     end_location:
-      row: 218
-      column: 11
-  parent: ~
-- kind:
-    NewLineAfterSectionName:
-      name: Returns
-  location:
-    row: 252
-    column: 4
-  end_location:
-    row: 262
-    column: 7
-  fix:
-    content: ""
-    location:
-      row: 257
-      column: 11
-    end_location:
-      row: 257
-      column: 12
-  parent: ~
-- kind:
-    NewLineAfterSectionName:
-      name: Raises
-  location:
-    row: 252
-    column: 4
-  end_location:
-    row: 262
-    column: 7
-  fix:
-    content: ""
-    location:
-      row: 259
-      column: 10
-    end_location:
-      row: 259
+      row: 227
       column: 11
   parent: ~
 

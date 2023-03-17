@@ -1,8 +1,11 @@
 use rustpython_parser::ast::Constant;
 
-use crate::core::visitor;
-use crate::core::visitor::Visitor;
-use crate::cst::{ExcepthandlerKind, Expr, ExprKind, Stmt, StmtKind};
+use crate::cst::visitor;
+use crate::cst::visitor::Visitor;
+use crate::cst::{
+    Alias, Arg, BoolOp, CmpOp, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Operator,
+    Pattern, SliceIndex, Stmt, StmtKind, UnaryOp,
+};
 use crate::trivia::{Relationship, Trivia, TriviaKind};
 
 #[derive(Debug, Copy, Clone)]
@@ -38,21 +41,18 @@ enum Trailer {
     CompoundStatement,
 }
 
-struct NewlineNormalizer {
+struct StmtNormalizer {
     depth: Depth,
     trailer: Trailer,
     scope: Scope,
 }
 
-impl<'a> Visitor<'a> for NewlineNormalizer {
+impl<'a> Visitor<'a> for StmtNormalizer {
     fn visit_stmt(&mut self, stmt: &'a mut Stmt) {
         // Remove any runs of empty lines greater than two in a row.
         let mut count = 0;
         stmt.trivia.retain(|c| {
-            if matches!(
-                (c.kind, c.relationship),
-                (TriviaKind::EmptyLine, Relationship::Leading)
-            ) {
+            if c.kind.is_empty_line() && c.relationship.is_leading() {
                 count += 1;
                 count <= self.depth.max_newlines()
             } else {
@@ -78,10 +78,7 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
                 if seen_non_empty {
                     true
                 } else {
-                    if matches!(
-                        (c.kind, c.relationship),
-                        (TriviaKind::EmptyLine, Relationship::Leading)
-                    ) {
+                    if c.kind.is_empty_line() && c.relationship.is_leading() {
                         false
                     } else {
                         seen_non_empty = true;
@@ -104,12 +101,7 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
             let present_newlines = stmt
                 .trivia
                 .iter()
-                .take_while(|c| {
-                    matches!(
-                        (c.kind, c.relationship),
-                        (TriviaKind::EmptyLine, Relationship::Leading)
-                    )
-                })
+                .take_while(|c| c.kind.is_empty_line() && c.relationship.is_leading())
                 .count();
             if present_newlines < required_newlines {
                 for _ in 0..(required_newlines - present_newlines) {
@@ -135,12 +127,7 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
                     - stmt
                         .trivia
                         .iter()
-                        .take_while(|c| {
-                            matches!(
-                                (c.kind, c.relationship),
-                                (TriviaKind::EmptyLine, Relationship::Leading)
-                            )
-                        })
+                        .take_while(|c| c.kind.is_empty_line() && c.relationship.is_leading())
                         .count();
                 for _ in 0..num_to_insert {
                     stmt.trivia.insert(
@@ -179,15 +166,14 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
                 self.trailer = Trailer::CompoundStatement;
                 self.visit_body(body);
 
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     // If the previous body ended with a function or class definition, we need to
                     // insert an empty line before the else block. Since the `else` itself isn't
                     // a statement, we need to insert it into the last statement of the body.
                     if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
-                        let stmt = body.last_mut().unwrap();
-                        stmt.trivia.push(Trivia {
+                        body.trivia.push(Trivia {
                             kind: TriviaKind::EmptyLine,
-                            relationship: Relationship::Trailing,
+                            relationship: Relationship::Dangling,
                         });
                     }
 
@@ -201,12 +187,11 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
                 self.trailer = Trailer::CompoundStatement;
                 self.visit_body(body);
 
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
-                        let stmt = body.last_mut().unwrap();
-                        stmt.trivia.push(Trivia {
+                        body.trivia.push(Trivia {
                             kind: TriviaKind::EmptyLine,
-                            relationship: Relationship::Trailing,
+                            relationship: Relationship::Dangling,
                         });
                     }
 
@@ -236,49 +221,44 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
                 self.depth = Depth::Nested;
                 self.trailer = Trailer::CompoundStatement;
                 self.visit_body(body);
-                let mut last = body.last_mut();
+
+                let mut prev = &mut body.trivia;
 
                 for handler in handlers {
                     if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
-                        if let Some(stmt) = last.as_mut() {
-                            stmt.trivia.push(Trivia {
-                                kind: TriviaKind::EmptyLine,
-                                relationship: Relationship::Trailing,
-                            });
-                        }
+                        prev.push(Trivia {
+                            kind: TriviaKind::EmptyLine,
+                            relationship: Relationship::Dangling,
+                        });
                     }
 
                     self.depth = Depth::Nested;
                     self.trailer = Trailer::CompoundStatement;
                     let ExcepthandlerKind::ExceptHandler { body, .. } = &mut handler.node;
                     self.visit_body(body);
-                    last = body.last_mut();
+                    prev = &mut body.trivia;
                 }
 
-                if !orelse.is_empty() {
+                if let Some(orelse) = orelse {
                     if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
-                        if let Some(stmt) = last.as_mut() {
-                            stmt.trivia.push(Trivia {
-                                kind: TriviaKind::EmptyLine,
-                                relationship: Relationship::Trailing,
-                            });
-                        }
+                        prev.push(Trivia {
+                            kind: TriviaKind::EmptyLine,
+                            relationship: Relationship::Dangling,
+                        });
                     }
 
                     self.depth = Depth::Nested;
                     self.trailer = Trailer::CompoundStatement;
                     self.visit_body(orelse);
-                    last = body.last_mut();
+                    prev = &mut body.trivia;
                 }
 
-                if !finalbody.is_empty() {
+                if let Some(finalbody) = finalbody {
                     if matches!(self.trailer, Trailer::ClassDef | Trailer::FunctionDef) {
-                        if let Some(stmt) = last.as_mut() {
-                            stmt.trivia.push(Trivia {
-                                kind: TriviaKind::EmptyLine,
-                                relationship: Relationship::Trailing,
-                            });
-                        }
+                        prev.push(Trivia {
+                            kind: TriviaKind::EmptyLine,
+                            relationship: Relationship::Dangling,
+                        });
                     }
 
                     self.depth = Depth::Nested;
@@ -312,16 +292,78 @@ impl<'a> Visitor<'a> for NewlineNormalizer {
         self.depth = prev_depth;
         self.scope = prev_scope;
     }
+}
 
-    fn visit_expr(&mut self, _expr: &'a mut Expr) {}
+struct ExprNormalizer;
+
+impl<'a> Visitor<'a> for ExprNormalizer {
+    fn visit_expr(&mut self, expr: &'a mut Expr) {
+        expr.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_expr(self, expr);
+    }
+
+    fn visit_alias(&mut self, alias: &'a mut Alias) {
+        alias.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_alias(self, alias);
+    }
+
+    fn visit_arg(&mut self, arg: &'a mut Arg) {
+        arg.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_arg(self, arg);
+    }
+
+    fn visit_excepthandler(&mut self, excepthandler: &'a mut Excepthandler) {
+        excepthandler.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_excepthandler(self, excepthandler);
+    }
+
+    fn visit_keyword(&mut self, keyword: &'a mut Keyword) {
+        keyword.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_keyword(self, keyword);
+    }
+
+    fn visit_bool_op(&mut self, bool_op: &'a mut BoolOp) {
+        bool_op.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_bool_op(self, bool_op);
+    }
+
+    fn visit_unary_op(&mut self, unary_op: &'a mut UnaryOp) {
+        unary_op.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_unary_op(self, unary_op);
+    }
+
+    fn visit_cmp_op(&mut self, cmp_op: &'a mut CmpOp) {
+        cmp_op.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_cmp_op(self, cmp_op);
+    }
+
+    fn visit_operator(&mut self, operator: &'a mut Operator) {
+        operator.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_operator(self, operator);
+    }
+
+    fn visit_slice_index(&mut self, slice_index: &'a mut SliceIndex) {
+        slice_index.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_slice_index(self, slice_index);
+    }
+
+    fn visit_pattern(&mut self, pattern: &'a mut Pattern) {
+        pattern.trivia.retain(|c| !c.kind.is_empty_line());
+        visitor::walk_pattern(self, pattern);
+    }
 }
 
 pub fn normalize_newlines(python_cst: &mut [Stmt]) {
-    let mut normalizer = NewlineNormalizer {
+    let mut normalizer = StmtNormalizer {
         depth: Depth::TopLevel,
         trailer: Trailer::None,
         scope: Scope::Module,
     };
+    for stmt in python_cst.iter_mut() {
+        normalizer.visit_stmt(stmt);
+    }
+
+    let mut normalizer = ExprNormalizer;
     for stmt in python_cst.iter_mut() {
         normalizer.visit_stmt(stmt);
     }

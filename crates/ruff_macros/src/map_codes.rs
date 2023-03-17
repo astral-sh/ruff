@@ -156,29 +156,18 @@ pub fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
 
     out.extend(quote! {
         impl RuleCodePrefix {
-            pub fn parse(linter: &Linter, code: &str) -> Result<Self, FromCodeError> {
+            pub fn parse(linter: &Linter, code: &str) -> Result<Self, crate::registry::FromCodeError> {
                 use std::str::FromStr;
 
                 Ok(match linter {
-                    #(Linter::#linter_idents => RuleCodePrefix::#linter_idents(#linter_idents::from_str(code).map_err(|_| FromCodeError::Unknown)?),)*
+                    #(Linter::#linter_idents => RuleCodePrefix::#linter_idents(#linter_idents::from_str(code).map_err(|_| crate::registry::FromCodeError::Unknown)?),)*
                 })
             }
         }
     });
 
-    out.extend(quote! {
-        impl crate::registry::Rule {
-            pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
-                use crate::registry::RuleNamespace;
-                let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
-                let prefix: RuleCodePrefix = RuleCodePrefix::parse(&linter, code)?;
-                Ok(prefix.into_iter().next().unwrap())
-            }
-        }
-    });
-
     #[allow(clippy::type_complexity)]
-    let mut rule_to_codes: HashMap<&Path, Vec<(&Ident, &String, &Vec<Attribute>)>> = HashMap::new();
+    let mut rule_to_codes: HashMap<&Path, Vec<(&Ident, &str, &Vec<Attribute>)>> = HashMap::new();
     let mut linter_code_for_rule_match_arms = quote!();
 
     for (linter, map) in &linters {
@@ -238,29 +227,10 @@ pub fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
         }
 
         impl crate::registry::Linter {
-            pub fn code_for_rule(&self, rule: &Rule) -> Option<&'static str> {
+            pub fn code_for_rule(&self, rule: Rule) -> Option<&'static str> {
                 match (self, rule) {
                     #linter_code_for_rule_match_arms
                     _ => None,
-                }
-            }
-        }
-
-        #[derive(PartialEq, Eq, PartialOrd, Ord)]
-        pub struct NoqaCode(&'static str, &'static str);
-
-        impl std::fmt::Display for NoqaCode {
-            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
-                use std::fmt::Write;
-                write!(f, "{}{}", self.0, self.1)
-            }
-        }
-
-        impl PartialEq<&str> for NoqaCode {
-            fn eq(&self, other: &&str) -> bool {
-                match other.strip_prefix(self.0) {
-                    Some(suffix) => suffix == self.1,
-                    None => false
                 }
             }
         }
@@ -294,12 +264,6 @@ pub fn map_codes(func: &ItemFn) -> syn::Result<TokenStream> {
             pub fn iter() -> ::std::vec::IntoIter<RuleCodePrefix> {
                 vec![ #(#all_codes,)* ].into_iter()
             }
-        }
-
-        #[derive(thiserror::Error, Debug)]
-        pub enum FromCodeError {
-            #[error("unknown rule code")]
-            Unknown,
         }
     });
 

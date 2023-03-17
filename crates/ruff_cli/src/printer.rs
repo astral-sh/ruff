@@ -1,13 +1,16 @@
 use std::cmp::Reverse;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::BTreeMap;
 use std::fmt::Display;
-use std::io;
+use std::hash::{Hash, Hasher};
 use std::io::{BufWriter, Write};
 use std::path::Path;
+use std::{env, io};
 
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use anyhow::Result;
+use bitflags::bitflags;
 use colored::control::SHOULD_COLORIZE;
 use colored::Colorize;
 use itertools::{iterate, Itertools};
@@ -15,12 +18,11 @@ use rustc_hash::FxHashMap;
 use serde::Serialize;
 use serde_json::json;
 
-use bitflags::bitflags;
-use ruff::fs::relativize_path;
+use ruff::fs::{relativize_path, relativize_path_to};
 use ruff::linter::FixTable;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
-use ruff::registry::Rule;
+use ruff::registry::{AsRule, Rule};
 use ruff::settings::types::SerializationFormat;
 use ruff::{fix, notify_user};
 
@@ -37,19 +39,20 @@ bitflags! {
 #[derive(Serialize)]
 struct ExpandedFix<'a> {
     content: &'a str,
-    message: Option<String>,
+    message: Option<&'a str>,
     location: &'a Location,
     end_location: &'a Location,
 }
 
 #[derive(Serialize)]
 struct ExpandedMessage<'a> {
-    code: SerializeRuleAsCode<'a>,
+    code: SerializeRuleAsCode,
     message: String,
     fix: Option<ExpandedFix<'a>>,
     location: Location,
     end_location: Location,
     filename: &'a str,
+    noqa_row: usize,
 }
 
 #[derive(Serialize)]
@@ -60,9 +63,9 @@ struct ExpandedStatistics {
     fixable: bool,
 }
 
-struct SerializeRuleAsCode<'a>(&'a Rule);
+struct SerializeRuleAsCode(Rule);
 
-impl Serialize for SerializeRuleAsCode<'_> {
+impl Serialize for SerializeRuleAsCode {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -71,8 +74,8 @@ impl Serialize for SerializeRuleAsCode<'_> {
     }
 }
 
-impl<'a> From<&'a Rule> for SerializeRuleAsCode<'a> {
-    fn from(rule: &'a Rule) -> Self {
+impl From<Rule> for SerializeRuleAsCode {
+    fn from(rule: Rule) -> Self {
         Self(rule)
     }
 }
@@ -130,7 +133,7 @@ impl Printer {
                     let num_fixable = diagnostics
                         .messages
                         .iter()
-                        .filter(|message| message.kind.fixable())
+                        .filter(|message| message.kind.fixable)
                         .count();
                     if num_fixable > 0 {
                         writeln!(
@@ -170,6 +173,13 @@ impl Printer {
                 self.format,
                 SerializationFormat::Text | SerializationFormat::Grouped
             ) {
+                if self.flags.contains(Flags::SHOW_FIXES) {
+                    if !diagnostics.fixed.is_empty() {
+                        writeln!(stdout)?;
+                        print_fixed(&mut stdout, &diagnostics.fixed)?;
+                        writeln!(stdout)?;
+                    }
+                }
                 self.post_text(&mut stdout, diagnostics)?;
             }
             return Ok(());
@@ -187,16 +197,17 @@ impl Printer {
                             .iter()
                             .map(|message| ExpandedMessage {
                                 code: message.kind.rule().into(),
-                                message: message.kind.body(),
+                                message: message.kind.body.clone(),
                                 fix: message.fix.as_ref().map(|fix| ExpandedFix {
                                     content: &fix.content,
                                     location: &fix.location,
                                     end_location: &fix.end_location,
-                                    message: message.kind.commit(),
+                                    message: message.kind.suggestion.as_deref(),
                                 }),
                                 location: message.location,
                                 end_location: message.end_location,
                                 filename: &message.filename,
+                                noqa_row: message.noqa_row,
                             })
                             .collect::<Vec<_>>()
                     )?
@@ -213,12 +224,12 @@ impl Printer {
                         .insert("package".to_string(), "org.ruff".to_string());
                     for message in messages {
                         let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
-                        status.set_message(message.kind.body());
+                        status.set_message(message.kind.body.clone());
                         status.set_description(format!(
                             "line {}, col {}, {}",
                             message.location.row(),
                             message.location.column(),
-                            message.kind.body()
+                            message.kind.body
                         ));
                         let mut case = TestCase::new(
                             format!("org.ruff.{}", message.kind.rule().noqa_code()),
@@ -272,11 +283,7 @@ impl Printer {
                     );
 
                     // Print the filename.
-                    writeln!(
-                        stdout,
-                        "{}:",
-                        relativize_path(Path::new(&filename)).underline()
-                    )?;
+                    writeln!(stdout, "{}:", relativize_path(filename).underline())?;
 
                     // Print each message.
                     for message in messages {
@@ -290,7 +297,6 @@ impl Printer {
                     }
                     writeln!(stdout)?;
                 }
-
                 if self.flags.contains(Flags::SHOW_FIXES) {
                     if !diagnostics.fixed.is_empty() {
                         writeln!(stdout)?;
@@ -298,7 +304,6 @@ impl Printer {
                         writeln!(stdout)?;
                     }
                 }
-
                 self.post_text(&mut stdout, diagnostics)?;
             }
             SerializationFormat::Github => {
@@ -307,14 +312,14 @@ impl Printer {
                 for message in &diagnostics.messages {
                     let label = format!(
                         "{}{}{}{}{}{} {} {}",
-                        relativize_path(Path::new(&message.filename)),
+                        relativize_path(&message.filename),
                         ":",
                         message.location.row(),
                         ":",
                         message.location.column(),
                         ":",
                         message.kind.rule().noqa_code(),
-                        message.kind.body(),
+                        message.kind.body,
                     );
                     writeln!(
                         stdout,
@@ -332,7 +337,8 @@ impl Printer {
             }
             SerializationFormat::Gitlab => {
                 // Generate JSON with violations in GitLab CI format
-                // https://docs.gitlab.com/ee/ci/testing/code_quality.html#implementing-a-custom-tool
+                // https://docs.gitlab.com/ee/ci/testing/code_quality.html#implement-a-custom-tool
+                let project_dir = env::var("CI_PROJECT_DIR").ok();
                 writeln!(stdout,
                     "{}",
                     serde_json::to_string_pretty(
@@ -341,11 +347,14 @@ impl Printer {
                             .iter()
                             .map(|message| {
                                 json!({
-                                    "description": format!("({}) {}", message.kind.rule().noqa_code(), message.kind.body()),
+                                    "description": format!("({}) {}", message.kind.rule().noqa_code(), message.kind.body),
                                     "severity": "major",
-                                    "fingerprint": message.kind.rule().noqa_code().to_string(),
+                                    "fingerprint": fingerprint(message),
                                     "location": {
-                                        "path": message.filename,
+                                        "path": project_dir.as_ref().map_or_else(
+                                            || relativize_path(&message.filename),
+                                            |project_dir| relativize_path_to(&message.filename, project_dir),
+                                        ),
                                         "lines": {
                                             "begin": message.location.row(),
                                             "end": message.end_location.row()
@@ -364,12 +373,28 @@ impl Printer {
                 for message in &diagnostics.messages {
                     let label = format!(
                         "{}:{}: [{}] {}",
-                        relativize_path(Path::new(&message.filename)),
+                        relativize_path(&message.filename),
                         message.location.row(),
                         message.kind.rule().noqa_code(),
-                        message.kind.body(),
+                        message.kind.body,
                     );
                     writeln!(stdout, "{label}")?;
+                }
+            }
+            SerializationFormat::Azure => {
+                // Generate error logging commands for Azure Pipelines format.
+                // See https://learn.microsoft.com/en-us/azure/devops/pipelines/scripts/logging-commands?view=azure-devops&tabs=bash#logissue-log-an-error-or-warning
+                for message in &diagnostics.messages {
+                    writeln!(
+                        stdout,
+                        "##vso[task.logissue type=error\
+                        ;sourcepath={};linenumber={};columnnumber={};code={};]{}",
+                        message.filename,
+                        message.location.row(),
+                        message.location.column(),
+                        message.kind.rule().noqa_code(),
+                        message.kind.body,
+                    )?;
                 }
             }
         }
@@ -380,13 +405,13 @@ impl Printer {
     }
 
     pub fn write_statistics(&self, diagnostics: &Diagnostics) -> Result<()> {
-        let violations = diagnostics
+        let violations: Vec<Rule> = diagnostics
             .messages
             .iter()
             .map(|message| message.kind.rule())
             .sorted()
             .dedup()
-            .collect::<Vec<_>>();
+            .collect();
         if violations.is_empty() {
             return Ok(());
         }
@@ -404,14 +429,14 @@ impl Printer {
                     .messages
                     .iter()
                     .find(|message| message.kind.rule() == *rule)
-                    .map(|message| message.kind.body())
+                    .map(|message| message.kind.body.clone())
                     .unwrap(),
                 fixable: diagnostics
                     .messages
                     .iter()
                     .find(|message| message.kind.rule() == *rule)
                     .iter()
-                    .any(|message| message.kind.fixable()),
+                    .any(|message| message.kind.fixable),
             })
             .collect::<Vec<_>>();
 
@@ -512,11 +537,11 @@ impl Printer {
     }
 }
 
-fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<&String, Vec<&Message>> {
+fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<&str, Vec<&Message>> {
     let mut grouped_messages = BTreeMap::default();
     for message in messages {
         grouped_messages
-            .entry(&message.filename)
+            .entry(message.filename.as_str())
             .or_insert_with(Vec::new)
             .push(message);
     }
@@ -530,24 +555,36 @@ fn num_digits(n: usize) -> usize {
         .max(1)
 }
 
+/// Generate a unique fingerprint to identify a violation.
+fn fingerprint(message: &Message) -> String {
+    let mut hasher = DefaultHasher::new();
+    message.kind.rule().hash(&mut hasher);
+    message.location.row().hash(&mut hasher);
+    message.location.column().hash(&mut hasher);
+    message.end_location.row().hash(&mut hasher);
+    message.end_location.column().hash(&mut hasher);
+    message.filename.hash(&mut hasher);
+    format!("{:x}", hasher.finish())
+}
+
 struct CodeAndBody<'a>(&'a Message, fix::FixMode);
 
 impl Display for CodeAndBody<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if show_fix_status(self.1) && self.0.kind.fixable() {
+        if show_fix_status(self.1) && self.0.kind.fixable {
             write!(
                 f,
                 "{code} {autofix}{body}",
                 code = self.0.kind.rule().noqa_code().to_string().red().bold(),
                 autofix = format_args!("[{}] ", "*".cyan()),
-                body = self.0.kind.body(),
+                body = self.0.kind.body,
             )
         } else {
             write!(
                 f,
                 "{code} {body}",
                 code = self.0.kind.rule().noqa_code().to_string().red().bold(),
-                body = self.0.kind.body(),
+                body = self.0.kind.body,
             )
         }
     }
@@ -571,7 +608,7 @@ fn print_message<T: Write>(
 ) -> Result<()> {
     let label = format!(
         "{path}{sep}{row}{sep}{col}{sep} {code_and_body}",
-        path = relativize_path(Path::new(&message.filename)).bold(),
+        path = relativize_path(&message.filename).bold(),
         sep = ":".cyan(),
         row = message.location.row(),
         col = message.location.column(),
@@ -579,11 +616,11 @@ fn print_message<T: Write>(
     );
     writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
-        let commit = message.kind.commit();
-        let footer = if commit.is_some() {
+        let suggestion = message.kind.suggestion.clone();
+        let footer = if suggestion.is_some() {
             vec![Annotation {
                 id: None,
-                label: commit.as_deref(),
+                label: suggestion.as_deref(),
                 annotation_type: AnnotationType::Help,
             }]
         } else {
@@ -650,7 +687,7 @@ fn print_fixed<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTable>) ->
             stdout,
             "{} {}{}",
             "-".cyan(),
-            relativize_path(Path::new(filename)).bold(),
+            relativize_path(filename).bold(),
             ":".cyan()
         )?;
         for (rule, count) in table.iter().sorted_by_key(|(.., count)| Reverse(*count)) {
@@ -685,11 +722,11 @@ fn print_grouped_message<T: Write>(
     );
     writeln!(stdout, "{label}")?;
     if let Some(source) = &message.source {
-        let commit = message.kind.commit();
-        let footer = if commit.is_some() {
+        let suggestion = message.kind.suggestion.clone();
+        let footer = if suggestion.is_some() {
             vec![Annotation {
                 id: None,
-                label: commit.as_deref(),
+                label: suggestion.as_deref(),
                 annotation_type: AnnotationType::Help,
             }]
         } else {

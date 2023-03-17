@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ReplaceUniversalNewlines: ~
+    name: ReplaceUniversalNewlines
+    body: "`universal_newlines` is deprecated, use `text`"
+    suggestion: "Replace with `text` keyword argument"
+    fixable: true
   location:
     row: 6
     column: 24
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 42
   parent: ~
 - kind:
-    ReplaceUniversalNewlines: ~
+    name: ReplaceUniversalNewlines
+    body: "`universal_newlines` is deprecated, use `text`"
+    suggestion: "Replace with `text` keyword argument"
+    fixable: true
   location:
     row: 7
     column: 22
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    ReplaceUniversalNewlines: ~
+    name: ReplaceUniversalNewlines
+    body: "`universal_newlines` is deprecated, use `text`"
+    suggestion: "Replace with `text` keyword argument"
+    fixable: true
   location:
     row: 9
     column: 13
@@ -54,7 +63,10 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    ReplaceUniversalNewlines: ~
+    name: ReplaceUniversalNewlines
+    body: "`universal_newlines` is deprecated, use `text`"
+    suggestion: "Replace with `text` keyword argument"
+    fixable: true
   location:
     row: 10
     column: 21

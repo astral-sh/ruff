@@ -1,9 +1,12 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MagicMethod: ~
+    name: MagicMethod
+    body: Missing docstring in magic method
+    suggestion: ~
+    fixable: false
   location:
     row: 64
     column: 8

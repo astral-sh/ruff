@@ -1,20 +1,20 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Alias, AliasData, Located, Stmt, StmtKind};
 
-use crate::ast::helpers::{create_stmt, unparse_stmt};
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::{AutofixKind, Availability, Violation};
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{create_stmt, unparse_stmt};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct ConsiderUsingFromImport {
-        pub module: String,
-        pub name: String,
-        pub fixable: bool,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct ConsiderUsingFromImport {
+    pub module: String,
+    pub name: String,
+    pub fixable: bool,
+}
+
 impl Violation for ConsiderUsingFromImport {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -51,7 +51,7 @@ pub fn use_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, names:
             name: name.to_string(),
             fixable,
         },
-        Range::from_located(alias),
+        Range::from(alias),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(

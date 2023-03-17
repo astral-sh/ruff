@@ -2,8 +2,9 @@
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
 
+use ruff_python_stdlib::str;
+
 use crate::rules::isort::types::Importable;
-use ruff_python::str;
 
 use super::settings::RelativeImportsOrder;
 use super::types::EitherImport::{Import, ImportFrom};

@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 3
     column: 11
@@ -21,435 +23,503 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 6
+    row: 7
     column: 11
   end_location:
-    row: 6
+    row: 7
     column: 15
   fix:
     content: "import sys\n    from unittest import mock"
     location:
-      row: 6
+      row: 7
       column: 4
     end_location:
-      row: 6
+      row: 7
       column: 20
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 9
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 22
+  fix:
+    content: from unittest.mock import *
+    location:
+      row: 11
+      column: 4
+    end_location:
+      row: 11
+      column: 22
+  parent: ~
+- kind:
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
+  location:
+    row: 14
     column: 7
   end_location:
-    row: 9
+    row: 14
     column: 16
   fix:
     content: from unittest import mock
     location:
-      row: 9
+      row: 14
       column: 0
     end_location:
-      row: 9
+      row: 14
       column: 16
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 12
+    row: 17
     column: 19
   end_location:
-    row: 12
+    row: 17
     column: 23
   fix:
     content: "import contextlib, sys\nfrom unittest import mock"
     location:
-      row: 12
+      row: 17
       column: 0
     end_location:
-      row: 12
+      row: 17
       column: 28
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 15
+    row: 20
     column: 7
   end_location:
-    row: 15
+    row: 20
     column: 11
   fix:
     content: "import sys\nfrom unittest import mock"
     location:
-      row: 15
+      row: 20
       column: 0
     end_location:
-      row: 15
+      row: 20
       column: 16
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 19
+    row: 24
     column: 0
   end_location:
-    row: 19
+    row: 24
     column: 21
   fix:
     content: from unittest import mock
     location:
-      row: 19
+      row: 24
       column: 0
     end_location:
-      row: 19
+      row: 24
       column: 21
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 22
-    column: 0
-  end_location:
     row: 27
+    column: 0
+  end_location:
+    row: 32
     column: 1
   fix:
-    content: "from unittest.mock import (\n    a,\n    b,\n    c,\n)"
+    content: "from unittest.mock import (\n    a,\n    b,\n    c,\n)\nfrom unittest import mock"
     location:
-      row: 22
-      column: 0
-    end_location:
       row: 27
+      column: 0
+    end_location:
+      row: 32
       column: 1
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 28
-    column: 0
-  end_location:
     row: 33
+    column: 0
+  end_location:
+    row: 38
     column: 1
   fix:
-    content: "from unittest.mock import (\n    a,\n    b,\n    c,\n)"
+    content: "from unittest.mock import (\n    a,\n    b,\n    c,\n)\nfrom unittest import mock"
     location:
-      row: 28
-      column: 0
-    end_location:
       row: 33
+      column: 0
+    end_location:
+      row: 38
       column: 1
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 36
-    column: 0
-  end_location:
     row: 41
+    column: 0
+  end_location:
+    row: 46
     column: 1
   fix:
-    content: "from unittest.mock import (\n    a,\n    b,\n    c\n)"
+    content: "from unittest.mock import (\n    a,\n    b,\n    c\n)\nfrom unittest import mock"
     location:
-      row: 36
-      column: 0
-    end_location:
       row: 41
+      column: 0
+    end_location:
+      row: 46
       column: 1
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 42
+    row: 47
     column: 0
   end_location:
-    row: 47
+    row: 52
     column: 1
   fix:
-    content: "from unittest.mock import (\n    a,\n    b,\n    c\n)"
+    content: "from unittest.mock import (\n    a,\n    b,\n    c\n)\nfrom unittest import mock"
     location:
-      row: 42
+      row: 47
       column: 0
     end_location:
-      row: 47
+      row: 52
       column: 1
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
-  location:
-    row: 48
-    column: 0
-  end_location:
-    row: 48
-    column: 30
-  fix:
-    content: "from unittest.mock import a, b, c"
-    location:
-      row: 48
-      column: 0
-    end_location:
-      row: 48
-      column: 30
-  parent: ~
-- kind:
-    RewriteMockImport:
-      reference_type: Import
-  location:
-    row: 49
-    column: 0
-  end_location:
-    row: 49
-    column: 30
-  fix:
-    content: "from unittest.mock import a, b, c"
-    location:
-      row: 49
-      column: 0
-    end_location:
-      row: 49
-      column: 30
-  parent: ~
-- kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
     row: 53
-    column: 8
+    column: 0
   end_location:
-    row: 58
-    column: 9
+    row: 53
+    column: 30
   fix:
-    content: "from unittest.mock import (\n            a,\n            b,\n            c\n        )"
+    content: "from unittest.mock import a, b, c\nfrom unittest import mock"
     location:
       row: 53
+      column: 0
+    end_location:
+      row: 53
+      column: 30
+  parent: ~
+- kind:
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
+  location:
+    row: 54
+    column: 0
+  end_location:
+    row: 54
+    column: 30
+  fix:
+    content: "from unittest.mock import a, b, c\nfrom unittest import mock"
+    location:
+      row: 54
+      column: 0
+    end_location:
+      row: 54
+      column: 30
+  parent: ~
+- kind:
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
+  location:
+    row: 58
+    column: 8
+  end_location:
+    row: 63
+    column: 9
+  fix:
+    content: "from unittest.mock import (\n            a,\n            b,\n            c\n        )\n        from unittest import mock"
+    location:
+      row: 58
       column: 8
     end_location:
-      row: 58
+      row: 63
       column: 9
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 64
+    row: 69
     column: 7
   end_location:
-    row: 64
+    row: 69
     column: 11
   fix:
     content: "from unittest import mock\nfrom unittest import mock"
     location:
-      row: 64
+      row: 69
       column: 0
     end_location:
-      row: 64
+      row: 69
       column: 17
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 64
+    row: 69
     column: 13
   end_location:
-    row: 64
+    row: 69
     column: 17
   fix:
     content: "from unittest import mock\nfrom unittest import mock"
     location:
-      row: 64
+      row: 69
       column: 0
     end_location:
-      row: 64
+      row: 69
       column: 17
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 67
+    row: 72
     column: 7
   end_location:
-    row: 67
+    row: 72
     column: 18
   fix:
     content: from unittest import mock as foo
     location:
-      row: 67
+      row: 72
       column: 0
     end_location:
-      row: 67
+      row: 72
       column: 18
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 70
+    row: 75
     column: 0
   end_location:
-    row: 70
+    row: 75
     column: 28
   fix:
     content: from unittest import mock as foo
     location:
-      row: 70
+      row: 75
       column: 0
     end_location:
-      row: 70
+      row: 75
       column: 28
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 74
+    row: 79
     column: 11
   end_location:
-    row: 74
+    row: 79
     column: 22
   fix:
     content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
     location:
-      row: 74
+      row: 79
       column: 4
     end_location:
-      row: 74
+      row: 79
       column: 41
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 74
+    row: 79
     column: 24
   end_location:
-    row: 74
+    row: 79
     column: 35
   fix:
     content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
     location:
-      row: 74
+      row: 79
       column: 4
     end_location:
-      row: 74
+      row: 79
       column: 41
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 74
+    row: 79
     column: 37
   end_location:
-    row: 74
+    row: 79
     column: 41
   fix:
     content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
     location:
-      row: 74
+      row: 79
       column: 4
     end_location:
-      row: 74
+      row: 79
       column: 41
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 77
+    row: 82
     column: 11
   end_location:
-    row: 77
+    row: 82
     column: 22
   fix:
     content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
     location:
-      row: 77
+      row: 82
       column: 4
     end_location:
-      row: 77
+      row: 82
       column: 45
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 77
+    row: 82
     column: 24
   end_location:
-    row: 77
+    row: 82
     column: 35
   fix:
     content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
     location:
-      row: 77
+      row: 82
       column: 4
     end_location:
-      row: 77
+      row: 82
       column: 45
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 77
+    row: 82
     column: 37
   end_location:
-    row: 77
+    row: 82
     column: 41
   fix:
     content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
     location:
-      row: 77
+      row: 82
       column: 4
     end_location:
-      row: 77
+      row: 82
       column: 45
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Import
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Import from `unittest.mock` instead"
+    fixable: true
   location:
-    row: 81
+    row: 86
     column: 4
   end_location:
-    row: 81
+    row: 86
     column: 51
   fix:
     content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
     location:
-      row: 81
+      row: 86
       column: 4
     end_location:
-      row: 81
+      row: 86
       column: 51
   parent: ~
 - kind:
-    RewriteMockImport:
-      reference_type: Attribute
+    name: RewriteMockImport
+    body: "`mock` is deprecated, use `unittest.mock`"
+    suggestion: "Replace `mock.mock` with `mock`"
+    fixable: true
   location:
-    row: 88
+    row: 93
     column: 4
   end_location:
-    row: 88
+    row: 93
     column: 13
   fix:
     content: mock
     location:
-      row: 88
+      row: 93
       column: 4
     end_location:
-      row: 88
+      row: 93
       column: 13
   parent: ~
 

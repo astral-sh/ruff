@@ -1,15 +1,12 @@
-//! Registry of [`Rule`] to [`DiagnosticKind`] mappings.
+//! Registry of all [`Rule`] implementations.
 
-use ruff_macros::RuleNamespace;
-use rustpython_parser::ast::Location;
-use serde::{Deserialize, Serialize};
 use strum_macros::{AsRefStr, EnumIter};
 
-use crate::ast::types::Range;
+use ruff_diagnostics::Violation;
+use ruff_macros::RuleNamespace;
+
 use crate::codes::{self, RuleCodePrefix};
-use crate::fix::Fix;
 use crate::rules;
-use crate::violation::Violation;
 
 ruff_macros::register_rules!(
     // pycodestyle errors
@@ -53,9 +50,27 @@ ruff_macros::register_rules!(
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespace,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAfterKeyword,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
     #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundArithmeticOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundBitwiseOrShiftOperator,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundModuloOperator,
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabAfterKeyword,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::UnexpectedSpacesAroundKeywordParameterEquals,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::MissingWhitespaceAroundParameterEquals,
+    #[cfg(feature = "logical_lines")]
+    rules::pycodestyle::rules::WhitespaceBeforeParameters,
     #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabBeforeKeyword,
     rules::pycodestyle::rules::MultipleImportsOnOneLine,
@@ -77,6 +92,7 @@ ruff_macros::register_rules!(
     rules::pycodestyle::rules::IOError,
     rules::pycodestyle::rules::SyntaxError,
     // pycodestyle warnings
+    rules::pycodestyle::rules::IndentationContainsTabs,
     rules::pycodestyle::rules::TrailingWhitespace,
     rules::pycodestyle::rules::NoNewLineAtEndOfFile,
     rules::pycodestyle::rules::BlankLineContainsWhitespace,
@@ -131,9 +147,18 @@ ruff_macros::register_rules!(
     rules::pylint::rules::YieldInInit,
     rules::pylint::rules::InvalidAllObject,
     rules::pylint::rules::InvalidAllFormat,
+    rules::pylint::rules::InvalidEnvvarDefault,
+    rules::pylint::rules::InvalidEnvvarValue,
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
+    rules::pylint::rules::InvalidCharacterBackspace,
+    rules::pylint::rules::InvalidCharacterSub,
+    rules::pylint::rules::InvalidCharacterEsc,
+    rules::pylint::rules::InvalidCharacterNul,
+    rules::pylint::rules::InvalidCharacterZeroWidthSpace,
     rules::pylint::rules::BadStrStripCall,
+    rules::pylint::rules::CollapsibleElseIf,
+    rules::pylint::rules::ContinueInFinally,
     rules::pylint::rules::UselessImportAlias,
     rules::pylint::rules::UnnecessaryDirectLambdaCall,
     rules::pylint::rules::NonlocalWithoutBinding,
@@ -142,11 +167,13 @@ ruff_macros::register_rules!(
     rules::pylint::rules::PropertyWithParameters,
     rules::pylint::rules::ReturnInInit,
     rules::pylint::rules::ConsiderUsingFromImport,
+    rules::pylint::rules::CompareToEmptyString,
     rules::pylint::rules::ComparisonOfConstant,
     rules::pylint::rules::ConsiderMergingIsinstance,
     rules::pylint::rules::ConsiderUsingSysExit,
     rules::pylint::rules::MagicValueComparison,
     rules::pylint::rules::UselessElseOnLoop,
+    rules::pylint::rules::GlobalStatement,
     rules::pylint::rules::GlobalVariableNotAssigned,
     rules::pylint::rules::TooManyReturnStatements,
     rules::pylint::rules::TooManyArguments,
@@ -165,6 +192,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::UnreliableCallableCheck,
     rules::flake8_bugbear::rules::StripWithMultiCharacters,
     rules::flake8_bugbear::rules::MutableArgumentDefault,
+    rules::flake8_bugbear::rules::NoExplicitStacklevel,
     rules::flake8_bugbear::rules::UnusedLoopControlVariable,
     rules::flake8_bugbear::rules::FunctionCallArgumentDefault,
     rules::flake8_bugbear::rules::GetAttrWithConstant,
@@ -189,6 +217,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::RaiseWithoutFromInsideExcept,
     rules::flake8_bugbear::rules::ZipWithoutExplicitStrict,
     rules::flake8_bugbear::rules::ExceptWithEmptyTuple,
+    rules::flake8_bugbear::rules::ExceptWithNonExceptionClasses,
     rules::flake8_bugbear::rules::UnintentionalTypeAnnotation,
     // flake8-blind-except
     rules::flake8_blind_except::rules::BlindExcept,
@@ -281,10 +310,10 @@ ruff_macros::register_rules!(
     rules::flake8_simplify::rules::IfExprWithTrueFalse,
     rules::flake8_simplify::rules::IfExprWithFalseTrue,
     rules::flake8_simplify::rules::IfExprWithTwistedArms,
-    rules::flake8_simplify::rules::AAndNotA,
-    rules::flake8_simplify::rules::AOrNotA,
-    rules::flake8_simplify::rules::OrTrue,
-    rules::flake8_simplify::rules::AndFalse,
+    rules::flake8_simplify::rules::ExprAndNotExpr,
+    rules::flake8_simplify::rules::ExprOrNotExpr,
+    rules::flake8_simplify::rules::ExprOrTrue,
+    rules::flake8_simplify::rules::ExprAndFalse,
     rules::flake8_simplify::rules::YodaConditions,
     rules::flake8_simplify::rules::DictGetWithDefault,
     // pyupgrade
@@ -320,9 +349,10 @@ ruff_macros::register_rules!(
     rules::pyupgrade::rules::FString,
     rules::pyupgrade::rules::FunctoolsCache,
     rules::pyupgrade::rules::ExtraneousParentheses,
-    rules::pyupgrade::rules::ImportReplacements,
+    rules::pyupgrade::rules::DeprecatedImport,
     rules::pyupgrade::rules::OutdatedVersionBlock,
     rules::pyupgrade::rules::QuotedAnnotation,
+    rules::pyupgrade::rules::IsinstanceWithTuple,
     // pydocstyle
     rules::pydocstyle::rules::PublicModule,
     rules::pydocstyle::rules::PublicClass,
@@ -458,8 +488,15 @@ ruff_macros::register_rules!(
     rules::flake8_errmsg::rules::DotFormatInException,
     // flake8-pyi
     rules::flake8_pyi::rules::PrefixTypeParams,
+    rules::flake8_pyi::rules::BadVersionInfoComparison,
     rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
     rules::flake8_pyi::rules::UnrecognizedPlatformName,
+    rules::flake8_pyi::rules::PassStatementStubBody,
+    rules::flake8_pyi::rules::NonEmptyStubBody,
+    rules::flake8_pyi::rules::DocstringInStub,
+    rules::flake8_pyi::rules::TypedArgumentSimpleDefaults,
+    rules::flake8_pyi::rules::ArgumentSimpleDefaults,
+    rules::flake8_pyi::rules::TypeCommentInStub,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::IncorrectFixtureParenthesesStyle,
     rules::flake8_pytest_style::rules::FixturePositionalArgs,
@@ -569,15 +606,36 @@ ruff_macros::register_rules!(
     rules::ruff::rules::AmbiguousUnicodeCharacterString,
     rules::ruff::rules::AmbiguousUnicodeCharacterDocstring,
     rules::ruff::rules::AmbiguousUnicodeCharacterComment,
-    rules::ruff::rules::KeywordArgumentBeforeStarArgument,
     rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
     rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,
+    rules::ruff::rules::PairwiseOverZipped,
     // flake8-django
     rules::flake8_django::rules::NullableModelStringField,
+    rules::flake8_django::rules::LocalsInRenderFunction,
+    rules::flake8_django::rules::ExcludeWithModelForm,
+    rules::flake8_django::rules::AllWithModelForm,
     rules::flake8_django::rules::ModelWithoutDunderStr,
     rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );
+
+pub trait AsRule {
+    fn rule(&self) -> Rule;
+}
+
+impl Rule {
+    pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
+        let (linter, code) = Linter::parse_code(code).ok_or(FromCodeError::Unknown)?;
+        let prefix: RuleCodePrefix = RuleCodePrefix::parse(&linter, code)?;
+        Ok(prefix.into_iter().next().unwrap())
+    }
+}
+
+#[derive(thiserror::Error, Debug)]
+pub enum FromCodeError {
+    #[error("unknown rule code")]
+    Unknown,
+}
 
 #[derive(EnumIter, Debug, PartialEq, Eq, Clone, Hash, RuleNamespace)]
 pub enum Linter {
@@ -760,7 +818,7 @@ impl Linter {
     }
 }
 
-#[derive(is_macro::Is)]
+#[derive(is_macro::Is, Copy, Clone)]
 pub enum LintSource {
     Ast,
     Io,
@@ -775,9 +833,9 @@ pub enum LintSource {
 impl Rule {
     /// The source for the diagnostic (either the AST, the filesystem, or the
     /// physical lines).
-    pub const fn lint_source(&self) -> &'static LintSource {
+    pub const fn lint_source(&self) -> LintSource {
         match self {
-            Rule::UnusedNOQA => &LintSource::Noqa,
+            Rule::UnusedNOQA => LintSource::Noqa,
             Rule::BlanketNOQA
             | Rule::BlanketTypeIgnore
             | Rule::DocLineTooLong
@@ -792,7 +850,8 @@ impl Rule {
             | Rule::ShebangPython
             | Rule::ShebangWhitespace
             | Rule::TrailingWhitespace
-            | Rule::BlankLineContainsWhitespace => &LintSource::PhysicalLines,
+            | Rule::IndentationContainsTabs
+            | Rule::BlankLineContainsWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring
             | Rule::AmbiguousUnicodeCharacterString
@@ -802,6 +861,11 @@ impl Rule {
             | Rule::BadQuotesMultilineString
             | Rule::CommentedOutCode
             | Rule::MultiLineImplicitStringConcatenation
+            | Rule::InvalidCharacterBackspace
+            | Rule::InvalidCharacterSub
+            | Rule::InvalidCharacterEsc
+            | Rule::InvalidCharacterNul
+            | Rule::InvalidCharacterZeroWidthSpace
             | Rule::ExtraneousParentheses
             | Rule::InvalidEscapeSequence
             | Rule::SingleLineImplicitStringConcatenation
@@ -810,13 +874,21 @@ impl Rule {
             | Rule::MultipleStatementsOnOneLineColon
             | Rule::UselessSemicolon
             | Rule::MultipleStatementsOnOneLineSemicolon
-            | Rule::TrailingCommaProhibited => &LintSource::Tokens,
-            Rule::IOError => &LintSource::Io,
-            Rule::UnsortedImports | Rule::MissingRequiredImport => &LintSource::Imports,
-            Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => &LintSource::Filesystem,
+            | Rule::TrailingCommaProhibited
+            | Rule::TypeCommentInStub => LintSource::Tokens,
+            Rule::IOError => LintSource::Io,
+            Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
+            Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
+            | Rule::MissingWhitespace
+            | Rule::MissingWhitespaceAfterKeyword
+            | Rule::MissingWhitespaceAroundArithmeticOperator
+            | Rule::MissingWhitespaceAroundBitwiseOrShiftOperator
+            | Rule::MissingWhitespaceAroundModuloOperator
+            | Rule::MissingWhitespaceAroundOperator
+            | Rule::MissingWhitespaceAroundParameterEquals
             | Rule::MultipleLeadingHashesForBlockComment
             | Rule::MultipleSpacesAfterKeyword
             | Rule::MultipleSpacesAfterOperator
@@ -834,42 +906,13 @@ impl Rule {
             | Rule::TooFewSpacesBeforeInlineComment
             | Rule::UnexpectedIndentation
             | Rule::UnexpectedIndentationComment
+            | Rule::UnexpectedSpacesAroundKeywordParameterEquals
             | Rule::WhitespaceAfterOpenBracket
             | Rule::WhitespaceBeforeCloseBracket
-            | Rule::WhitespaceBeforePunctuation => &LintSource::LogicalLines,
-            _ => &LintSource::Ast,
+            | Rule::WhitespaceBeforeParameters
+            | Rule::WhitespaceBeforePunctuation => LintSource::LogicalLines,
+            _ => LintSource::Ast,
         }
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Diagnostic {
-    pub kind: DiagnosticKind,
-    pub location: Location,
-    pub end_location: Location,
-    pub fix: Option<Fix>,
-    pub parent: Option<Location>,
-}
-
-impl Diagnostic {
-    pub fn new<K: Into<DiagnosticKind>>(kind: K, range: Range) -> Self {
-        Self {
-            kind: kind.into(),
-            location: range.location,
-            end_location: range.end_location,
-            fix: None,
-            parent: None,
-        }
-    }
-
-    pub fn amend(&mut self, fix: Fix) -> &mut Self {
-        self.fix = Some(fix);
-        self
-    }
-
-    pub fn parent(&mut self, parent: Location) -> &mut Self {
-        self.parent = Some(parent);
-        self
     }
 }
 
@@ -891,6 +934,7 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
 
 #[cfg(test)]
 mod tests {
+    use std::mem::size_of;
     use strum::IntoEnumIterator;
 
     use super::{Linter, Rule, RuleNamespace};
@@ -935,5 +979,10 @@ mod tests {
                 Linter::parse_code(&code).unwrap_or_else(|| panic!("couldn't parse {code:?}"));
             assert_eq!(code, format!("{}{rest}", linter.common_prefix()));
         }
+    }
+
+    #[test]
+    fn rule_size() {
+        assert_eq!(2, size_of::<Rule>());
     }
 }

@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BadQuotesDocstring:
-      quote: single
+    name: BadQuotesDocstring
+    body: Double quote docstring found but single quotes preferred
+    suggestion: Replace double quotes docstring with single quotes
+    fixable: true
   location:
     row: 1
     column: 0

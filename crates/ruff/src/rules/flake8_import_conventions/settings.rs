@@ -1,13 +1,10 @@
 //! Settings for import conventions.
 
-use std::hash::Hash;
-
-use ruff_macros::ConfigurationOptions;
 use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::settings::hashable::HashableHashMap;
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 const CONVENTIONAL_ALIASES: &[(&str, &str)] = &[
     ("altair", "alt"),
@@ -64,9 +61,9 @@ pub struct Options {
     pub extend_aliases: Option<FxHashMap<String, String>>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 pub struct Settings {
-    pub aliases: HashableHashMap<String, String>,
+    pub aliases: FxHashMap<String, String>,
 }
 
 fn default_aliases() -> FxHashMap<String, String> {
@@ -90,7 +87,7 @@ fn resolve_aliases(options: Options) -> FxHashMap<String, String> {
 impl Default for Settings {
     fn default() -> Self {
         Self {
-            aliases: default_aliases().into(),
+            aliases: default_aliases(),
         }
     }
 }
@@ -98,7 +95,7 @@ impl Default for Settings {
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
-            aliases: resolve_aliases(options).into(),
+            aliases: resolve_aliases(options),
         }
     }
 }
@@ -106,7 +103,7 @@ impl From<Options> for Settings {
 impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
-            aliases: Some(settings.aliases.into()),
+            aliases: Some(settings.aliases),
             extend_aliases: None,
         }
     }

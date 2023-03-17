@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    WhitespaceAfterOpenBracket: ~
+    name: WhitespaceAfterOpenBracket
+    body: "Whitespace after '('"
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 5
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceAfterOpenBracket: ~
+    name: WhitespaceAfterOpenBracket
+    body: "Whitespace after '('"
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 9
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceAfterOpenBracket: ~
+    name: WhitespaceAfterOpenBracket
+    body: "Whitespace after '('"
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 14
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceAfterOpenBracket: ~
+    name: WhitespaceAfterOpenBracket
+    body: "Whitespace after '('"
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 5
@@ -43,7 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceAfterOpenBracket: ~
+    name: WhitespaceAfterOpenBracket
+    body: "Whitespace after '('"
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 9
@@ -53,7 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    WhitespaceAfterOpenBracket: ~
+    name: WhitespaceAfterOpenBracket
+    body: "Whitespace after '('"
+    suggestion: ~
+    fixable: false
   location:
     row: 12
     column: 14

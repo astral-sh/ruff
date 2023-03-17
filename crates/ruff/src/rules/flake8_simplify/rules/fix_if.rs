@@ -6,11 +6,12 @@ use libcst_native::{
 };
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
-use crate::ast::whitespace;
+use ruff_diagnostics::Fix;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace;
+
 use crate::cst::matchers::match_module;
-use crate::fix::Fix;
-use crate::source_code::{Locator, Stylist};
 
 fn parenthesize_and_operand(expr: Expression) -> Expression {
     match &expr {
@@ -39,7 +40,7 @@ pub(crate) fn fix_nested_if_statements(
     };
 
     // Extract the module text.
-    let contents = locator.slice(&Range::new(
+    let contents = locator.slice(Range::new(
         Location::new(stmt.location.row(), 0),
         Location::new(stmt.end_location.unwrap().row() + 1, 0),
     ));

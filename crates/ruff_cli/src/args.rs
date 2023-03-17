@@ -1,6 +1,5 @@
-#![allow(dead_code)]
-
 use std::path::PathBuf;
+use std::str::FromStr;
 
 use clap::{command, Parser};
 use regex::Regex;
@@ -93,11 +92,14 @@ pub struct CheckArgs {
     fix_only: bool,
     #[clap(long, overrides_with("fix_only"), hide = true)]
     no_fix_only: bool,
+    /// Ignore any `# noqa` comments.
+    #[arg(long)]
+    ignore_noqa: bool,
     /// Output serialization format for violations.
     #[arg(long, value_enum, env = "RUFF_FORMAT")]
     pub format: Option<SerializationFormat>,
     /// The minimum Python version that should be supported.
-    #[arg(long)]
+    #[arg(long, value_enum)]
     pub target_version: Option<PythonVersion>,
     /// Path to the `pyproject.toml` or `ruff.toml` file to use for
     /// configuration.
@@ -109,6 +111,7 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -118,6 +121,7 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -128,6 +132,7 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -137,6 +142,7 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
         help_heading = "Rule selection",
         hide = true
     )]
@@ -167,6 +173,7 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -177,6 +184,7 @@ pub struct CheckArgs {
         long,
         value_delimiter = ',',
         value_name = "RULE_CODE",
+        value_parser = parse_rule_selector,
         help_heading = "Rule selection",
         hide_possible_values = true
     )]
@@ -258,6 +266,7 @@ pub struct CheckArgs {
         conflicts_with = "show_files",
         conflicts_with = "show_settings",
         // Unsupported default-command arguments.
+        conflicts_with = "ignore_noqa",
         conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
@@ -272,6 +281,7 @@ pub struct CheckArgs {
         // conflicts_with = "show_files",
         conflicts_with = "show_settings",
         // Unsupported default-command arguments.
+        conflicts_with = "ignore_noqa",
         conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
@@ -285,6 +295,7 @@ pub struct CheckArgs {
         conflicts_with = "show_files",
         // conflicts_with = "show_settings",
         // Unsupported default-command arguments.
+        conflicts_with = "ignore_noqa",
         conflicts_with = "statistics",
         conflicts_with = "stdin_filename",
         conflicts_with = "watch",
@@ -357,6 +368,7 @@ impl CheckArgs {
                 exit_zero: self.exit_zero,
                 exit_non_zero_on_fix: self.exit_non_zero_on_fix,
                 files: self.files,
+                ignore_noqa: self.ignore_noqa,
                 isolated: self.isolated,
                 no_cache: self.no_cache,
                 show_files: self.show_files,
@@ -396,6 +408,11 @@ impl CheckArgs {
     }
 }
 
+fn parse_rule_selector(env: &str) -> Result<RuleSelector, std::io::Error> {
+    RuleSelector::from_str(env)
+        .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidInput, e))
+}
+
 fn resolve_bool_arg(yes: bool, no: bool) -> Option<bool> {
     match (yes, no) {
         (true, false) => Some(true),
@@ -415,6 +432,7 @@ pub struct Arguments {
     pub exit_zero: bool,
     pub exit_non_zero_on_fix: bool,
     pub files: Vec<PathBuf>,
+    pub ignore_noqa: bool,
     pub isolated: bool,
     pub no_cache: bool,
     pub show_files: bool,

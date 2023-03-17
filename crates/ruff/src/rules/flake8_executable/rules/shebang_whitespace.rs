@@ -1,15 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Location;
 
-use crate::ast::types::Range;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::rules::flake8_executable::helpers::ShebangDirective;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct ShebangWhitespace;
-);
+use crate::rules::flake8_executable::helpers::ShebangDirective;
+
+#[violation]
+pub struct ShebangWhitespace;
+
 impl AlwaysAutofixableViolation for ShebangWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {

@@ -1,0 +1,278 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 54
+    column: 12
+  end_location:
+    row: 54
+    column: 12
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 58
+    column: 3
+  end_location:
+    row: 58
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 60
+    column: 7
+  end_location:
+    row: 60
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 62
+    column: 11
+  end_location:
+    row: 62
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 64
+    column: 9
+  end_location:
+    row: 64
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 66
+    column: 8
+  end_location:
+    row: 66
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 68
+    column: 14
+  end_location:
+    row: 68
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 70
+    column: 11
+  end_location:
+    row: 70
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 72
+    column: 14
+  end_location:
+    row: 72
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 74
+    column: 11
+  end_location:
+    row: 74
+    column: 11
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 76
+    column: 2
+  end_location:
+    row: 76
+    column: 2
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 76
+    column: 3
+  end_location:
+    row: 76
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 78
+    column: 2
+  end_location:
+    row: 78
+    column: 2
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 78
+    column: 5
+  end_location:
+    row: 78
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 88
+    column: 7
+  end_location:
+    row: 88
+    column: 7
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 90
+    column: 5
+  end_location:
+    row: 90
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 92
+    column: 2
+  end_location:
+    row: 92
+    column: 2
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 94
+    column: 3
+  end_location:
+    row: 94
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 98
+    column: 8
+  end_location:
+    row: 98
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 100
+    column: 6
+  end_location:
+    row: 100
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundOperator
+    body: Missing whitespace around operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 154
+    column: 12
+  end_location:
+    row: 154
+    column: 12
+  fix: ~
+  parent: ~
+

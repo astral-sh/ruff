@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    AvoidableEscapedQuote: ~
+    name: AvoidableEscapedQuote
+    body: Change outer quotes to avoid escaping inner quotes
+    suggestion: Change outer quotes to avoid escaping inner quotes
+    fixable: true
   location:
     row: 1
     column: 25
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 47
   parent: ~
 - kind:
-    AvoidableEscapedQuote: ~
+    name: AvoidableEscapedQuote
+    body: Change outer quotes to avoid escaping inner quotes
+    suggestion: Change outer quotes to avoid escaping inner quotes
+    fixable: true
   location:
     row: 2
     column: 25
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 52
   parent: ~
 - kind:
-    AvoidableEscapedQuote: ~
+    name: AvoidableEscapedQuote
+    body: Change outer quotes to avoid escaping inner quotes
+    suggestion: Change outer quotes to avoid escaping inner quotes
+    fixable: true
   location:
     row: 10
     column: 4

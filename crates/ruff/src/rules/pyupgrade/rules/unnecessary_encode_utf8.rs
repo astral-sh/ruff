@@ -1,16 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::types::Range;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::source_code::Locator;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::Rule;
 
-define_violation!(
-    pub struct UnnecessaryEncodeUTF8;
-);
+#[violation]
+pub struct UnnecessaryEncodeUTF8;
+
 impl AlwaysAutofixableViolation for UnnecessaryEncodeUTF8 {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -58,7 +59,7 @@ fn is_default_encode(args: &[Expr], kwargs: &[Keyword]) -> bool {
         (1, 0) => is_utf8_encoding_arg(&args[0]),
         // .encode(kwarg=kwarg)
         (0, 1) => {
-            kwargs[0].node.arg == Some("encoding".to_string())
+            kwargs[0].node.arg.as_ref().unwrap() == "encoding"
                 && is_utf8_encoding_arg(&kwargs[0].node.value)
         }
         // .encode(*args, **kwargs)
@@ -66,8 +67,8 @@ fn is_default_encode(args: &[Expr], kwargs: &[Keyword]) -> bool {
     }
 }
 
-// Return a Fix for a default `encode` call removing the encoding argument,
-// keyword, or positional.
+/// Return a [`Fix`] for a default `encode` call removing the encoding argument,
+/// keyword, or positional.
 fn delete_default_encode_arg_or_kwarg(
     expr: &Expr,
     args: &[Expr],
@@ -75,13 +76,13 @@ fn delete_default_encode_arg_or_kwarg(
     patch: bool,
 ) -> Option<Diagnostic> {
     if let Some(arg) = args.get(0) {
-        let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from_located(expr));
+        let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from(expr));
         if patch {
             diagnostic.amend(Fix::deletion(arg.location, arg.end_location.unwrap()));
         }
         Some(diagnostic)
     } else if let Some(kwarg) = kwargs.get(0) {
-        let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from_located(expr));
+        let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from(expr));
         if patch {
             diagnostic.amend(Fix::deletion(kwarg.location, kwarg.end_location.unwrap()));
         }
@@ -91,25 +92,43 @@ fn delete_default_encode_arg_or_kwarg(
     }
 }
 
-// Return a Fix replacing the call to encode by a `"b"` prefix on the string.
+/// Return a [`Fix`] replacing the call to encode by a `"b"` prefix on the string.
 fn replace_with_bytes_literal(
     expr: &Expr,
     constant: &Expr,
     locator: &Locator,
     patch: bool,
 ) -> Diagnostic {
-    let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from(expr));
     if patch {
-        let content = locator.slice(&Range::new(
+        // Build up a replacement string by prefixing all string tokens with `b`.
+        let contents = locator.slice(Range::new(
             constant.location,
             constant.end_location.unwrap(),
         ));
-        let content = format!(
-            "b{}",
-            content.trim_start_matches('u').trim_start_matches('U')
-        );
+        let mut replacement = String::with_capacity(contents.len() + 1);
+        let mut prev = None;
+        for (start, tok, end) in
+            lexer::lex_located(contents, Mode::Module, constant.location).flatten()
+        {
+            if matches!(tok, Tok::String { .. }) {
+                if let Some(prev) = prev {
+                    replacement.push_str(locator.slice(Range::new(prev, start)));
+                }
+                let string = locator.slice(Range::new(start, end));
+                replacement.push_str(&format!(
+                    "b{}",
+                    &string.trim_start_matches('u').trim_start_matches('U')
+                ));
+            } else {
+                if let Some(prev) = prev {
+                    replacement.push_str(locator.slice(Range::new(prev, end)));
+                }
+            }
+            prev = Some(end);
+        }
         diagnostic.amend(Fix::replacement(
-            content,
+            replacement,
             expr.location,
             expr.end_location.unwrap(),
         ));
@@ -142,7 +161,7 @@ pub fn unnecessary_encode_utf8(
                         expr,
                         variable,
                         checker.locator,
-                        checker.patch(&Rule::UnnecessaryEncodeUTF8),
+                        checker.patch(Rule::UnnecessaryEncodeUTF8),
                     ));
                 } else {
                     // "unicode text©".encode("utf-8")
@@ -150,7 +169,7 @@ pub fn unnecessary_encode_utf8(
                         expr,
                         args,
                         kwargs,
-                        checker.patch(&Rule::UnnecessaryEncodeUTF8),
+                        checker.patch(Rule::UnnecessaryEncodeUTF8),
                     ) {
                         checker.diagnostics.push(diagnostic);
                     }
@@ -164,7 +183,7 @@ pub fn unnecessary_encode_utf8(
                     expr,
                     args,
                     kwargs,
-                    checker.patch(&Rule::UnnecessaryEncodeUTF8),
+                    checker.patch(Rule::UnnecessaryEncodeUTF8),
                 ) {
                     checker.diagnostics.push(diagnostic);
                 }

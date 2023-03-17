@@ -1,9 +1,10 @@
 use rustpython_parser::ast::{Arguments, Expr, Stmt, StmtKind};
 
-use crate::ast::cast;
+use ruff_python_ast::cast;
+use ruff_python_ast::visibility;
+
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
-use crate::visibility;
 
 pub(super) fn match_function_def(
     stmt: &Stmt,
@@ -33,7 +34,7 @@ pub fn overloaded_name(checker: &Checker, definition: &Definition) -> Option<Str
     | DefinitionKind::NestedFunction(stmt)
     | DefinitionKind::Method(stmt) = definition.kind
     {
-        if visibility::is_overload(checker, cast::decorator_list(stmt)) {
+        if visibility::is_overload(&checker.ctx, cast::decorator_list(stmt)) {
             let (name, ..) = match_function_def(stmt);
             Some(name.to_string())
         } else {
@@ -51,7 +52,7 @@ pub fn is_overload_impl(checker: &Checker, definition: &Definition, overloaded_n
     | DefinitionKind::NestedFunction(stmt)
     | DefinitionKind::Method(stmt) = definition.kind
     {
-        if visibility::is_overload(checker, cast::decorator_list(stmt)) {
+        if visibility::is_overload(&checker.ctx, cast::decorator_list(stmt)) {
             false
         } else {
             let (name, ..) = match_function_def(stmt);

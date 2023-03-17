@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UseCapitalEnvironmentVariables:
-      expected: FOO
-      original: foo
+    name: UseCapitalEnvironmentVariables
+    body: "Use capitalized environment variable `FOO` instead of `foo`"
+    suggestion: "Replace `foo` with `FOO`"
+    fixable: true
   location:
     row: 4
     column: 11
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    UseCapitalEnvironmentVariables:
-      expected: FOO
-      original: foo
+    name: UseCapitalEnvironmentVariables
+    body: "Use capitalized environment variable `FOO` instead of `foo`"
+    suggestion: "Replace `foo` with `FOO`"
+    fixable: true
   location:
     row: 6
     column: 15
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    UseCapitalEnvironmentVariables:
-      expected: FOO
-      original: foo
+    name: UseCapitalEnvironmentVariables
+    body: "Use capitalized environment variable `FOO` instead of `foo`"
+    suggestion: "Replace `foo` with `FOO`"
+    fixable: true
   location:
     row: 8
     column: 15
@@ -60,9 +63,10 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    UseCapitalEnvironmentVariables:
-      expected: FOO
-      original: foo
+    name: UseCapitalEnvironmentVariables
+    body: "Use capitalized environment variable `FOO` instead of `foo`"
+    suggestion: "Replace `foo` with `FOO`"
+    fixable: true
   location:
     row: 10
     column: 10

@@ -1,24 +1,24 @@
 use itertools::Itertools;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
+use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{elif_else_range, end_of_statement};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::whitespace::indentation;
 
-use crate::ast::helpers::elif_else_range;
-use crate::ast::types::Range;
-use crate::ast::visitor::Visitor;
-use crate::ast::whitespace::indentation;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::{AlwaysAutofixableViolation, Violation};
+use crate::registry::{AsRule, Rule};
 
 use super::branch::Branch;
 use super::helpers::result_exists;
 use super::visitor::{ReturnVisitor, Stack};
 
-define_violation!(
-    pub struct UnnecessaryReturnNone;
-);
+#[violation]
+pub struct UnnecessaryReturnNone;
+
 impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -32,9 +32,9 @@ impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
     }
 }
 
-define_violation!(
-    pub struct ImplicitReturnValue;
-);
+#[violation]
+pub struct ImplicitReturnValue;
+
 impl AlwaysAutofixableViolation for ImplicitReturnValue {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -46,9 +46,9 @@ impl AlwaysAutofixableViolation for ImplicitReturnValue {
     }
 }
 
-define_violation!(
-    pub struct ImplicitReturn;
-);
+#[violation]
+pub struct ImplicitReturn;
+
 impl AlwaysAutofixableViolation for ImplicitReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -60,9 +60,9 @@ impl AlwaysAutofixableViolation for ImplicitReturn {
     }
 }
 
-define_violation!(
-    pub struct UnnecessaryAssign;
-);
+#[violation]
+pub struct UnnecessaryAssign;
+
 impl Violation for UnnecessaryAssign {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -70,11 +70,11 @@ impl Violation for UnnecessaryAssign {
     }
 }
 
-define_violation!(
-    pub struct SuperfluousElseReturn {
-        pub branch: Branch,
-    }
-);
+#[violation]
+pub struct SuperfluousElseReturn {
+    pub branch: Branch,
+}
+
 impl Violation for SuperfluousElseReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -83,11 +83,11 @@ impl Violation for SuperfluousElseReturn {
     }
 }
 
-define_violation!(
-    pub struct SuperfluousElseRaise {
-        pub branch: Branch,
-    }
-);
+#[violation]
+pub struct SuperfluousElseRaise {
+    pub branch: Branch,
+}
+
 impl Violation for SuperfluousElseRaise {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -96,11 +96,11 @@ impl Violation for SuperfluousElseRaise {
     }
 }
 
-define_violation!(
-    pub struct SuperfluousElseContinue {
-        pub branch: Branch,
-    }
-);
+#[violation]
+pub struct SuperfluousElseContinue {
+    pub branch: Branch,
+}
+
 impl Violation for SuperfluousElseContinue {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -109,11 +109,11 @@ impl Violation for SuperfluousElseContinue {
     }
 }
 
-define_violation!(
-    pub struct SuperfluousElseBreak {
-        pub branch: Branch,
-    }
-);
+#[violation]
+pub struct SuperfluousElseBreak {
+    pub branch: Branch,
+}
+
 impl Violation for SuperfluousElseBreak {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -137,7 +137,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         ) {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, Range::from_located(stmt));
+        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, Range::from(*stmt));
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "return".to_string(),
@@ -155,7 +155,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         if expr.is_some() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, Range::from_located(stmt));
+        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, Range::from(*stmt));
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "return None".to_string(),
@@ -192,11 +192,14 @@ const NORETURN_FUNCS: &[&[&str]] = &[
 
 /// Return `true` if the `func` is a known function that never returns.
 fn is_noreturn_func(checker: &Checker, func: &Expr) -> bool {
-    checker.resolve_call_path(func).map_or(false, |call_path| {
-        NORETURN_FUNCS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
-    })
+    checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            NORETURN_FUNCS
+                .iter()
+                .any(|target| call_path.as_slice() == *target)
+        })
 }
 
 /// RET503
@@ -209,14 +212,19 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
             } else {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(stmt));
+                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         let mut content = String::new();
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.amend(Fix::insertion(content, stmt.end_location.unwrap()));
+                        // This is the last statement in the function. So it has to be followed by
+                        // a newline, or comments, or nothing.
+                        diagnostic.amend(Fix::insertion(
+                            content,
+                            end_of_statement(stmt, checker.locator),
+                        ));
                     }
                 }
                 checker.diagnostics.push(diagnostic);
@@ -244,14 +252,17 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
             } else {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(stmt));
+                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         let mut content = String::new();
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.amend(Fix::insertion(content, stmt.end_location.unwrap()));
+                        diagnostic.amend(Fix::insertion(
+                            content,
+                            end_of_statement(stmt, checker.locator),
+                        ));
                     }
                 }
                 checker.diagnostics.push(diagnostic);
@@ -280,19 +291,31 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                     if is_noreturn_func(checker, func)
             ) => {}
         _ => {
-            let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from_located(stmt));
+            let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
             if checker.patch(diagnostic.kind.rule()) {
                 if let Some(indent) = indentation(checker.locator, stmt) {
                     let mut content = String::new();
                     content.push_str(checker.stylist.line_ending().as_str());
                     content.push_str(indent);
                     content.push_str("return None");
-                    diagnostic.amend(Fix::insertion(content, stmt.end_location.unwrap()));
+                    diagnostic.amend(Fix::insertion(
+                        content,
+                        end_of_statement(stmt, checker.locator),
+                    ));
                 }
             }
             checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+fn has_multiple_assigns(id: &str, stack: &Stack) -> bool {
+    if let Some(assigns) = stack.assigns.get(&id) {
+        if assigns.len() > 1 {
+            return true;
+        }
+    }
+    false
 }
 
 fn has_refs_before_next_assign(id: &str, return_location: Location, stack: &Stack) -> bool {
@@ -369,14 +392,14 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
         }
 
         if !stack.refs.contains_key(id.as_str()) {
-            checker.diagnostics.push(Diagnostic::new(
-                UnnecessaryAssign,
-                Range::from_located(expr),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(UnnecessaryAssign, Range::from(expr)));
             return;
         }
 
-        if has_refs_before_next_assign(id, expr.location, stack)
+        if has_multiple_assigns(id, stack)
+            || has_refs_before_next_assign(id, expr.location, stack)
             || has_refs_or_assigns_within_try_or_loop(id, stack)
         {
             return;
@@ -386,10 +409,9 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
             return;
         }
 
-        checker.diagnostics.push(Diagnostic::new(
-            UnnecessaryAssign,
-            Range::from_located(expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(UnnecessaryAssign, Range::from(expr)));
     }
 }
 
@@ -402,7 +424,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Return { .. }) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseReturn { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -412,7 +434,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Break) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseBreak { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -422,7 +444,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Raise { .. }) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseRaise { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -432,7 +454,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Continue) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseContinue { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from_located(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -492,13 +514,13 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
         return;
     }
 
-    if checker.settings.rules.enabled(&Rule::SuperfluousElseReturn)
-        || checker.settings.rules.enabled(&Rule::SuperfluousElseRaise)
+    if checker.settings.rules.enabled(Rule::SuperfluousElseReturn)
+        || checker.settings.rules.enabled(Rule::SuperfluousElseRaise)
         || checker
             .settings
             .rules
-            .enabled(&Rule::SuperfluousElseContinue)
-        || checker.settings.rules.enabled(&Rule::SuperfluousElseBreak)
+            .enabled(Rule::SuperfluousElseContinue)
+        || checker.settings.rules.enabled(Rule::SuperfluousElseBreak)
     {
         if superfluous_elif(checker, &stack) {
             return;
@@ -514,20 +536,20 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
     }
 
     if !result_exists(&stack.returns) {
-        if checker.settings.rules.enabled(&Rule::UnnecessaryReturnNone) {
+        if checker.settings.rules.enabled(Rule::UnnecessaryReturnNone) {
             unnecessary_return_none(checker, &stack);
         }
         return;
     }
 
-    if checker.settings.rules.enabled(&Rule::ImplicitReturnValue) {
+    if checker.settings.rules.enabled(Rule::ImplicitReturnValue) {
         implicit_return_value(checker, &stack);
     }
-    if checker.settings.rules.enabled(&Rule::ImplicitReturn) {
+    if checker.settings.rules.enabled(Rule::ImplicitReturn) {
         implicit_return(checker, last_stmt);
     }
 
-    if checker.settings.rules.enabled(&Rule::UnnecessaryAssign) {
+    if checker.settings.rules.enabled(Rule::UnnecessaryAssign) {
         for (_, expr) in &stack.returns {
             if let Some(expr) = expr {
                 unnecessary_assign(checker, &stack, expr);

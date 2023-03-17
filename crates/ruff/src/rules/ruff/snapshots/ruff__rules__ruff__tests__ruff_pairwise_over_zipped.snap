@@ -1,0 +1,96 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 13
+    column: 0
+  end_location:
+    row: 13
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 14
+    column: 0
+  end_location:
+    row: 14
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 16
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 18
+    column: 5
+  end_location:
+    row: 18
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 19
+    column: 5
+  end_location:
+    row: 19
+    column: 8
+  fix: ~
+  parent: ~
+

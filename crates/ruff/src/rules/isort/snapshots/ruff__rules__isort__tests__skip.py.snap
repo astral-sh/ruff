@@ -3,37 +3,43 @@ source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnsortedImports: ~
+    name: UnsortedImports
+    body: Import block is un-sorted or un-formatted
+    suggestion: Organize imports
+    fixable: true
   location:
-    row: 12
+    row: 20
     column: 0
   end_location:
-    row: 14
+    row: 22
     column: 0
   fix:
     content: "    import abc\n    import collections\n"
     location:
-      row: 12
+      row: 20
       column: 0
     end_location:
-      row: 14
+      row: 22
       column: 0
   parent: ~
 - kind:
-    UnsortedImports: ~
+    name: UnsortedImports
+    body: Import block is un-sorted or un-formatted
+    suggestion: Organize imports
+    fixable: true
   location:
-    row: 19
+    row: 27
     column: 0
   end_location:
-    row: 21
+    row: 29
     column: 0
   fix:
     content: "    import abc\n    import collections\n"
     location:
-      row: 19
+      row: 27
       column: 0
     end_location:
-      row: 21
+      row: 29
       column: 0
   parent: ~
 

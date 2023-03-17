@@ -1,9 +1,12 @@
 ---
-source: src/rules/tryceratops/mod.rs
+source: crates/ruff/src/rules/tryceratops/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ReraiseNoCause: ~
+    name: ReraiseNoCause
+    body: "Use `raise from` to specify exception cause"
+    suggestion: ~
+    fixable: false
   location:
     row: 15
     column: 8
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ReraiseNoCause: ~
+    name: ReraiseNoCause
+    body: "Use `raise from` to specify exception cause"
+    suggestion: ~
+    fixable: false
   location:
     row: 23
     column: 12

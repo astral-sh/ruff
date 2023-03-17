@@ -1,5 +1,6 @@
 [alias]
 dev = "run --package ruff_dev --bin ruff_dev"
+benchmark = "bench -p ruff_benchmark --"
 
 [target.'cfg(all())']
 rustflags = [

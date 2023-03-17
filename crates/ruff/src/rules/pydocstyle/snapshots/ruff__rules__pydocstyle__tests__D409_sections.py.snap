@@ -3,39 +3,43 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SectionUnderlineMatchesSectionLength:
-      name: Returns
+    name: SectionUnderlineMatchesSectionLength
+    body: "Section underline should match the length of its name (\"Returns\")"
+    suggestion: "Adjust underline length to match \"Returns\""
+    fixable: true
   location:
-    row: 99
+    row: 108
     column: 4
   end_location:
-    row: 105
+    row: 114
     column: 7
   fix:
     content: "    -------\n"
     location:
-      row: 102
+      row: 111
       column: 0
     end_location:
-      row: 103
+      row: 112
       column: 0
   parent: ~
 - kind:
-    SectionUnderlineMatchesSectionLength:
-      name: Returns
+    name: SectionUnderlineMatchesSectionLength
+    body: "Section underline should match the length of its name (\"Returns\")"
+    suggestion: "Adjust underline length to match \"Returns\""
+    fixable: true
   location:
-    row: 207
+    row: 216
     column: 4
   end_location:
-    row: 221
+    row: 230
     column: 7
   fix:
     content: "    -------\n"
     location:
-      row: 216
+      row: 225
       column: 0
     end_location:
-      row: 217
+      row: 226
       column: 0
   parent: ~
 

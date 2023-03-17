@@ -1,0 +1,70 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: MissingWhitespaceAfterKeyword
+    body: Missing whitespace after keyword
+    suggestion: ~
+    fixable: false
+  location:
+    row: 37
+    column: 13
+  end_location:
+    row: 37
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAfterKeyword
+    body: Missing whitespace after keyword
+    suggestion: ~
+    fixable: false
+  location:
+    row: 39
+    column: 29
+  end_location:
+    row: 39
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAfterKeyword
+    body: Missing whitespace after keyword
+    suggestion: ~
+    fixable: false
+  location:
+    row: 42
+    column: 33
+  end_location:
+    row: 42
+    column: 33
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAfterKeyword
+    body: Missing whitespace after keyword
+    suggestion: ~
+    fixable: false
+  location:
+    row: 46
+    column: 2
+  end_location:
+    row: 46
+    column: 2
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAfterKeyword
+    body: Missing whitespace after keyword
+    suggestion: ~
+    fixable: false
+  location:
+    row: 54
+    column: 10
+  end_location:
+    row: 54
+    column: 10
+  fix: ~
+  parent: ~
+

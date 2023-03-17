@@ -1,15 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Expr;
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct TypingTextStrAlias;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct TypingTextStrAlias;
+
 impl AlwaysAutofixableViolation for TypingTextStrAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -23,10 +23,14 @@ impl AlwaysAutofixableViolation for TypingTextStrAlias {
 
 /// UP019
 pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
-    if checker.resolve_call_path(expr).map_or(false, |call_path| {
-        call_path.as_slice() == ["typing", "Text"]
-    }) {
-        let mut diagnostic = Diagnostic::new(TypingTextStrAlias, Range::from_located(expr));
+    if checker
+        .ctx
+        .resolve_call_path(expr)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["typing", "Text"]
+        })
+    {
+        let mut diagnostic = Diagnostic::new(TypingTextStrAlias, Range::from(expr));
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "str".to_string(),

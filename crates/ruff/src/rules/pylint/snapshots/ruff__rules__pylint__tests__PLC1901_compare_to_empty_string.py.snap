@@ -1,0 +1,70 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: CompareToEmptyString
+    body: "`x is \"\"` can be simplified to `not x` as an empty string is falsey"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 7
+    column: 12
+  end_location:
+    row: 7
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    name: CompareToEmptyString
+    body: "`x == \"\"` can be simplified to `not x` as an empty string is falsey"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 7
+    column: 23
+  end_location:
+    row: 7
+    column: 25
+  fix: ~
+  parent: ~
+- kind:
+    name: CompareToEmptyString
+    body: "`y is not \"\"` can be simplified to `y` as an empty string is falsey"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 10
+    column: 16
+  end_location:
+    row: 10
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    name: CompareToEmptyString
+    body: "`y != \"\"` can be simplified to `y` as an empty string is falsey"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 10
+    column: 27
+  end_location:
+    row: 10
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    name: CompareToEmptyString
+    body: "`\"\" != z` can be simplified to `z` as an empty string is falsey"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 13
+    column: 7
+  end_location:
+    row: 13
+    column: 9
+  fix: ~
+  parent: ~
+

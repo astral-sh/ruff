@@ -1,0 +1,57 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: MissingWhitespaceAroundParameterEquals
+    body: Missing whitespace around parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 46
+    column: 14
+  end_location:
+    row: 46
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundParameterEquals
+    body: Missing whitespace around parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 46
+    column: 15
+  end_location:
+    row: 46
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundParameterEquals
+    body: Missing whitespace around parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 46
+    column: 26
+  end_location:
+    row: 46
+    column: 26
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundParameterEquals
+    body: Missing whitespace around parameter equals
+    suggestion: ~
+    fixable: false
+  location:
+    row: 46
+    column: 35
+  end_location:
+    row: 46
+    column: 35
+  fix: ~
+  parent: ~
+

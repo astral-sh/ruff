@@ -1,20 +1,22 @@
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, Keyword};
 
-use super::helpers;
-use crate::ast::types::Range;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
+use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
 use crate::rules::flake8_comprehensions::settings::Settings;
-use crate::violation::AlwaysAutofixableViolation;
 
-define_violation!(
-    pub struct UnnecessaryCollectionCall {
-        pub obj_type: String,
-    }
-);
+use super::helpers;
+
+#[violation]
+pub struct UnnecessaryCollectionCall {
+    pub obj_type: String,
+}
+
 impl AlwaysAutofixableViolation for UnnecessaryCollectionCall {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -55,14 +57,14 @@ pub fn unnecessary_collection_call(
         }
         _ => return,
     };
-    if !checker.is_builtin(id) {
+    if !checker.ctx.is_builtin(id) {
         return;
     }
     let mut diagnostic = Diagnostic::new(
         UnnecessaryCollectionCall {
             obj_type: id.to_string(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         match fixes::fix_unnecessary_collection_call(checker.locator, checker.stylist, expr) {

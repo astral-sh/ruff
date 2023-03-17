@@ -6,11 +6,12 @@ use libcst_native::{
 use rustpython_parser::ast::{Expr, Keyword, Location};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::types::Range;
+use ruff_diagnostics::Fix;
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::types::Range;
+
 use crate::autofix::helpers::remove_argument;
 use crate::cst::matchers::match_module;
-use crate::fix::Fix;
-use crate::source_code::{Locator, Stylist};
 
 /// Safely adjust the indentation of the indented block at [`Range`].
 pub fn adjust_indentation(
@@ -19,7 +20,7 @@ pub fn adjust_indentation(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let contents = locator.slice(&range);
+    let contents = locator.slice(range);
 
     let module_text = format!("def f():{}{contents}", stylist.line_ending().as_str());
 
@@ -67,8 +68,8 @@ pub fn remove_class_def_base(
 
 /// Generate a fix to remove arguments from a `super` call.
 pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr) -> Option<Fix> {
-    let range = Range::from_located(expr);
-    let contents = locator.slice(&range);
+    let range = Range::from(expr);
+    let contents = locator.slice(range);
 
     let mut tree = libcst_native::parse_module(contents, None).ok()?;
 
@@ -150,7 +151,7 @@ pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
         // It's possible that `last_pos` is after `fix.location`, if we're removing the
         // first _two_ members.
         if start_location > last_pos {
-            let slice = locator.slice(&Range::new(last_pos, start_location));
+            let slice = locator.slice(Range::new(last_pos, start_location));
             output.push_str(slice);
         }
 

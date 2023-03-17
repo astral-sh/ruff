@@ -1,25 +1,25 @@
 use std::iter;
 
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
-use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arg, Arguments};
+
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::function_type;
+use ruff_python_ast::function_type::FunctionType;
+use ruff_python_ast::scope::{Bindings, FunctionDef, Lambda, Scope, ScopeKind};
+use ruff_python_ast::visibility;
+
+use crate::checkers::ast::Checker;
 
 use super::helpers;
 use super::types::Argumentable;
-use crate::ast::function_type;
-use crate::ast::function_type::FunctionType;
-use crate::ast::types::{Binding, FunctionDef, Lambda, Scope, ScopeKind};
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
-use crate::visibility;
 
-define_violation!(
-    pub struct UnusedFunctionArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedFunctionArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedFunctionArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,11 +28,11 @@ impl Violation for UnusedFunctionArgument {
     }
 }
 
-define_violation!(
-    pub struct UnusedMethodArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedMethodArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -41,11 +41,11 @@ impl Violation for UnusedMethodArgument {
     }
 }
 
-define_violation!(
-    pub struct UnusedClassMethodArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedClassMethodArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedClassMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -54,11 +54,11 @@ impl Violation for UnusedClassMethodArgument {
     }
 }
 
-define_violation!(
-    pub struct UnusedStaticMethodArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedStaticMethodArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedStaticMethodArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -67,11 +67,11 @@ impl Violation for UnusedStaticMethodArgument {
     }
 }
 
-define_violation!(
-    pub struct UnusedLambdaArgument {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UnusedLambdaArgument {
+    pub name: String,
+}
+
 impl Violation for UnusedLambdaArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -84,8 +84,8 @@ impl Violation for UnusedLambdaArgument {
 fn function(
     argumentable: &Argumentable,
     args: &Arguments,
-    values: &FxHashMap<&str, usize>,
-    bindings: &[Binding],
+    values: &Scope,
+    bindings: &Bindings,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
 ) -> Vec<Diagnostic> {
@@ -111,8 +111,8 @@ fn function(
 fn method(
     argumentable: &Argumentable,
     args: &Arguments,
-    values: &FxHashMap<&str, usize>,
-    bindings: &[Binding],
+    values: &Scope,
+    bindings: &Bindings,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
 ) -> Vec<Diagnostic> {
@@ -138,14 +138,14 @@ fn method(
 fn call<'a>(
     argumentable: &Argumentable,
     args: impl Iterator<Item = &'a Arg>,
-    values: &FxHashMap<&str, usize>,
-    bindings: &[Binding],
+    values: &Scope,
+    bindings: &Bindings,
     dummy_variable_rgx: &Regex,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     for arg in args {
         if let Some(binding) = values
-            .get(&arg.node.arg.as_str())
+            .get(arg.node.arg.as_str())
             .map(|index| &bindings[*index])
         {
             if !binding.used()
@@ -167,7 +167,7 @@ pub fn unused_arguments(
     checker: &Checker,
     parent: &Scope,
     scope: &Scope,
-    bindings: &[Binding],
+    bindings: &Bindings,
 ) -> Vec<Diagnostic> {
     match &scope.kind {
         ScopeKind::Function(FunctionDef {
@@ -178,7 +178,7 @@ pub fn unused_arguments(
             ..
         }) => {
             match function_type::classify(
-                checker,
+                &checker.ctx,
                 parent,
                 name,
                 decorator_list,
@@ -190,12 +190,12 @@ pub fn unused_arguments(
                         .settings
                         .rules
                         .enabled(Argumentable::Function.rule_code())
-                        && !visibility::is_overload(checker, decorator_list)
+                        && !visibility::is_overload(&checker.ctx, decorator_list)
                     {
                         function(
                             &Argumentable::Function,
                             args,
-                            &scope.bindings,
+                            scope,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -217,14 +217,14 @@ pub fn unused_arguments(
                             || visibility::is_init(name)
                             || visibility::is_new(name)
                             || visibility::is_call(name))
-                        && !visibility::is_abstract(checker, decorator_list)
-                        && !visibility::is_override(checker, decorator_list)
-                        && !visibility::is_overload(checker, decorator_list)
+                        && !visibility::is_abstract(&checker.ctx, decorator_list)
+                        && !visibility::is_override(&checker.ctx, decorator_list)
+                        && !visibility::is_overload(&checker.ctx, decorator_list)
                     {
                         method(
                             &Argumentable::Method,
                             args,
-                            &scope.bindings,
+                            scope,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -246,14 +246,14 @@ pub fn unused_arguments(
                             || visibility::is_init(name)
                             || visibility::is_new(name)
                             || visibility::is_call(name))
-                        && !visibility::is_abstract(checker, decorator_list)
-                        && !visibility::is_override(checker, decorator_list)
-                        && !visibility::is_overload(checker, decorator_list)
+                        && !visibility::is_abstract(&checker.ctx, decorator_list)
+                        && !visibility::is_override(&checker.ctx, decorator_list)
+                        && !visibility::is_overload(&checker.ctx, decorator_list)
                     {
                         method(
                             &Argumentable::ClassMethod,
                             args,
-                            &scope.bindings,
+                            scope,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -275,14 +275,14 @@ pub fn unused_arguments(
                             || visibility::is_init(name)
                             || visibility::is_new(name)
                             || visibility::is_call(name))
-                        && !visibility::is_abstract(checker, decorator_list)
-                        && !visibility::is_override(checker, decorator_list)
-                        && !visibility::is_overload(checker, decorator_list)
+                        && !visibility::is_abstract(&checker.ctx, decorator_list)
+                        && !visibility::is_override(&checker.ctx, decorator_list)
+                        && !visibility::is_overload(&checker.ctx, decorator_list)
                     {
                         function(
                             &Argumentable::StaticMethod,
                             args,
-                            &scope.bindings,
+                            scope,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -305,7 +305,7 @@ pub fn unused_arguments(
                 function(
                     &Argumentable::Lambda,
                     args,
-                    &scope.bindings,
+                    scope,
                     bindings,
                     &checker.settings.dummy_variable_rgx,
                     checker

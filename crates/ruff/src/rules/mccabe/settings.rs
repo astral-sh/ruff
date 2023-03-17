@@ -1,8 +1,9 @@
 //! Settings for the `mccabe` plugin.
 
-use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
@@ -25,7 +26,7 @@ pub struct Options {
     pub max_complexity: Option<usize>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 pub struct Settings {
     pub max_complexity: usize,
 }

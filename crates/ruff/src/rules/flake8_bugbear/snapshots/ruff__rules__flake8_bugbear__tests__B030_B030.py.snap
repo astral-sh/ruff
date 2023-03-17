@@ -1,0 +1,57 @@
+---
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: ExceptWithNonExceptionClasses
+    body: "`except` handlers should only be exception classes or tuples of exception classes"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 12
+    column: 7
+  end_location:
+    row: 12
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    name: ExceptWithNonExceptionClasses
+    body: "`except` handlers should only be exception classes or tuples of exception classes"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 17
+    column: 8
+  end_location:
+    row: 17
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    name: ExceptWithNonExceptionClasses
+    body: "`except` handlers should only be exception classes or tuples of exception classes"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 22
+    column: 20
+  end_location:
+    row: 22
+    column: 57
+  fix: ~
+  parent: ~
+- kind:
+    name: ExceptWithNonExceptionClasses
+    body: "`except` handlers should only be exception classes or tuples of exception classes"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 27
+    column: 36
+  end_location:
+    row: 27
+    column: 57
+  fix: ~
+  parent: ~
+

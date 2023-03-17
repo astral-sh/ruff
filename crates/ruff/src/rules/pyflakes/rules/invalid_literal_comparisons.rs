@@ -1,19 +1,18 @@
 use itertools::izip;
 use log::error;
 use once_cell::unsync::Lazy;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Expr};
-use serde::{Deserialize, Serialize};
 
-use crate::ast::helpers;
-use crate::ast::operations::locate_cmpops;
-use crate::ast::types::Range;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers;
+use ruff_python_ast::operations::locate_cmpops;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::AsRule;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum IsCmpop {
     Is,
     IsNot,
@@ -29,11 +28,11 @@ impl From<&Cmpop> for IsCmpop {
     }
 }
 
-define_violation!(
-    pub struct IsLiteral {
-        pub cmpop: IsCmpop,
-    }
-);
+#[violation]
+pub struct IsLiteral {
+    pub cmpop: IsCmpop,
+}
+
 impl AlwaysAutofixableViolation for IsLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -61,7 +60,7 @@ pub fn invalid_literal_comparison(
     comparators: &[Expr],
     location: Range,
 ) {
-    let located = Lazy::new(|| locate_cmpops(checker.locator.slice(&location)));
+    let located = Lazy::new(|| locate_cmpops(checker.locator.slice(location)));
     let mut left = left;
     for (index, (op, right)) in izip!(ops, comparators).enumerate() {
         if matches!(op, Cmpop::Is | Cmpop::IsNot)

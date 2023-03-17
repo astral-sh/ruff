@@ -1,22 +1,21 @@
 use std::fmt;
 
-use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
-use serde::{Deserialize, Serialize};
 
-use crate::ast::types::Range;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
 use crate::settings::types::PythonVersion;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct BadStrStripCall {
-        strip: StripKind,
-        removal: Option<RemovalKind>,
-    }
-);
+#[violation]
+pub struct BadStrStripCall {
+    strip: StripKind,
+    removal: Option<RemovalKind>,
+}
+
 impl Violation for BadStrStripCall {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -31,7 +30,7 @@ impl Violation for BadStrStripCall {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum StripKind {
     Strip,
     LStrip,
@@ -60,7 +59,7 @@ impl fmt::Display for StripKind {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum RemovalKind {
     RemovePrefix,
     RemoveSuffix,
@@ -133,7 +132,7 @@ pub fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
                             };
                             checker.diagnostics.push(Diagnostic::new(
                                 BadStrStripCall { strip, removal },
-                                Range::from_located(arg),
+                                Range::from(arg),
                             ));
                         }
                     }

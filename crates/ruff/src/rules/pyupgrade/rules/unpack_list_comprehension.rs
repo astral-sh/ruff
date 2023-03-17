@@ -1,15 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct RewriteListComprehension;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct RewriteListComprehension;
+
 impl AlwaysAutofixableViolation for RewriteListComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -94,10 +94,9 @@ pub fn unpack_list_comprehension(checker: &mut Checker, targets: &[Expr], value:
                 return;
             }
 
-            let mut diagnostic =
-                Diagnostic::new(RewriteListComprehension, Range::from_located(value));
+            let mut diagnostic = Diagnostic::new(RewriteListComprehension, Range::from(value));
             if checker.patch(diagnostic.kind.rule()) {
-                let existing = checker.locator.slice(&Range::from_located(value));
+                let existing = checker.locator.slice(value);
 
                 let mut content = String::with_capacity(existing.len());
                 content.push('(');

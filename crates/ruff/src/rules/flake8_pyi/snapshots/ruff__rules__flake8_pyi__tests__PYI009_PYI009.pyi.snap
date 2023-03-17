@@ -1,0 +1,31 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: PassStatementStubBody
+    body: "Empty body should contain `...`, not `pass`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 3
+    column: 4
+  end_location:
+    row: 3
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    name: PassStatementStubBody
+    body: "Empty body should contain `...`, not `pass`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 8
+  fix: ~
+  parent: ~
+

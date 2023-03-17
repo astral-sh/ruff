@@ -1,9 +1,12 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    PublicMethod: ~
+    name: PublicMethod
+    body: Missing docstring in public method
+    suggestion: ~
+    fixable: false
   location:
     row: 23
     column: 8
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PublicMethod: ~
+    name: PublicMethod
+    body: Missing docstring in public method
+    suggestion: ~
+    fixable: false
   location:
     row: 56
     column: 8
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    PublicMethod: ~
+    name: PublicMethod
+    body: Missing docstring in public method
+    suggestion: ~
+    fixable: false
   location:
     row: 68
     column: 8

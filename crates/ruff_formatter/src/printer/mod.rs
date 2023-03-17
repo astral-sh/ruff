@@ -435,15 +435,15 @@ impl<'a> Printer<'a> {
     ///
     /// The implementation handles the following 5 cases:
     ///
-    /// * The *item*, *separator*, and the *next item* fit on the same line.
+    /// - The *item*, *separator*, and the *next item* fit on the same line.
     ///   Print the *item* and *separator* in flat mode.
-    /// * The *item* and *separator* fit on the line but there's not enough space for the *next item*.
+    /// - The *item* and *separator* fit on the line but there's not enough space for the *next item*.
     ///   Print the *item* in flat mode and the *separator* in expanded mode.
-    /// * The *item* fits on the line but the *separator* does not in flat mode.
+    /// - The *item* fits on the line but the *separator* does not in flat mode.
     ///   Print the *item* in flat mode and the *separator* in expanded mode.
-    /// * The *item* fits on the line but the *separator* does not in flat **NOR** expanded mode.
+    /// - The *item* fits on the line but the *separator* does not in flat **NOR** expanded mode.
     ///   Print the *item* and *separator* in expanded mode.
-    /// * The *item* does not fit on the line.
+    /// - The *item* does not fit on the line.
     ///   Print the *item* and *separator* in expanded mode.
     fn print_fill_entries(
         &mut self,
@@ -777,8 +777,8 @@ impl Indention {
     /// Increments the level by one.
     ///
     /// The behaviour depends on the [`indent_style`][IndentStyle] if this is an [Indent::Align]:
-    /// * **Tabs**: `align` is converted into an indent. This results in `level` increasing by two: once for the align, once for the level increment
-    /// * **Spaces**: Increments the `level` by one and keeps the `align` unchanged.
+    /// - **Tabs**: `align` is converted into an indent. This results in `level` increasing by two: once for the align, once for the level increment
+    /// - **Spaces**: Increments the `level` by one and keeps the `align` unchanged.
     /// Keeps any  the current value is [Indent::Align] and increments the level by one.
     fn increment_level(self, indent_style: IndentStyle) -> Self {
         match self {
@@ -796,8 +796,8 @@ impl Indention {
     }
 
     /// Decrements the indent by one by:
-    /// * Reducing the level by one if this is [Indent::Level]
-    /// * Removing the `align` if this is [Indent::Align]
+    /// - Reducing the level by one if this is [Indent::Level]
+    /// - Removing the `align` if this is [Indent::Align]
     ///
     /// No-op if the level is already zero.
     fn decrement(self) -> Self {

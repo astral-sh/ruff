@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
 - kind:
-    InvalidModuleName:
-      name: mod with spaces
+    name: InvalidModuleName
+    body: "Invalid module name: 'mod with spaces'"
+    suggestion: ~
+    fixable: false
   location:
     row: 1
     column: 0

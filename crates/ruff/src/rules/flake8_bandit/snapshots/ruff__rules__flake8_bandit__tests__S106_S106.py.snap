@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    HardcodedPasswordFuncArg:
-      string: s3cr3t
+    name: HardcodedPasswordFuncArg
+    body: "Possible hardcoded password: \"s3cr3t\""
+    suggestion: ~
+    fixable: false
   location:
     row: 14
     column: 8

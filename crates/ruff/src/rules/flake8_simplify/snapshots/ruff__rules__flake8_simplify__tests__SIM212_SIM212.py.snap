@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    IfExprWithTwistedArms:
-      expr_body: b
-      expr_else: a
+    name: IfExprWithTwistedArms
+    body: "Use `a if a else b` instead of `b if not a else a`"
+    suggestion: "Replace with `a if a else b`"
+    fixable: true
   location:
     row: 1
     column: 4
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    IfExprWithTwistedArms:
-      expr_body: b + c
-      expr_else: a
+    name: IfExprWithTwistedArms
+    body: "Use `a if a else b + c` instead of `b + c if not a else a`"
+    suggestion: "Replace with `a if a else b + c`"
+    fixable: true
   location:
     row: 3
     column: 4

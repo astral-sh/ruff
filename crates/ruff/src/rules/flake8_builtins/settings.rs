@@ -1,8 +1,9 @@
 //! Settings for the `flake8-builtins` plugin.
 
-use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, JsonSchema,
@@ -22,7 +23,7 @@ pub struct Options {
     pub builtins_ignorelist: Option<Vec<String>>,
 }
 
-#[derive(Debug, Default, Hash)]
+#[derive(Debug, Default, CacheKey)]
 pub struct Settings {
     pub builtins_ignorelist: Vec<String>,
 }

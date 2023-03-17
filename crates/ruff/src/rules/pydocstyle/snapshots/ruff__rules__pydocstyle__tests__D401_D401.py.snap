@@ -1,74 +1,95 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    NonImperativeMood: Returns foo.
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"Returns foo.\""
+    suggestion: ~
+    fixable: false
   location:
-    row: 8
+    row: 10
     column: 4
   end_location:
-    row: 8
+    row: 10
     column: 22
   fix: ~
   parent: ~
 - kind:
-    NonImperativeMood: Constructor for a foo.
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"Constructor for a foo.\""
+    suggestion: ~
+    fixable: false
   location:
-    row: 12
+    row: 14
     column: 4
   end_location:
-    row: 12
+    row: 14
     column: 32
   fix: ~
   parent: ~
 - kind:
-    NonImperativeMood: Constructor for a boa.
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"Constructor for a boa.\""
+    suggestion: ~
+    fixable: false
   location:
-    row: 16
+    row: 18
     column: 4
   end_location:
-    row: 20
+    row: 22
     column: 7
   fix: ~
   parent: ~
 - kind:
-    NonImperativeMood: Runs something
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"Runs something\""
+    suggestion: ~
+    fixable: false
   location:
-    row: 24
+    row: 26
     column: 4
   end_location:
-    row: 24
+    row: 26
     column: 24
   fix: ~
   parent: ~
 - kind:
-    NonImperativeMood: "Runs other things, nested"
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"Runs other things, nested\""
+    suggestion: ~
+    fixable: false
   location:
-    row: 27
+    row: 29
     column: 8
   end_location:
-    row: 27
+    row: 29
     column: 39
   fix: ~
   parent: ~
 - kind:
-    NonImperativeMood: Writes a logical line that
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"Writes a logical line that\""
+    suggestion: ~
+    fixable: false
   location:
-    row: 33
+    row: 35
     column: 4
   end_location:
-    row: 35
+    row: 37
     column: 7
   fix: ~
   parent: ~
 - kind:
-    NonImperativeMood: This method docstring should be written in imperative mood.
+    name: NonImperativeMood
+    body: "First line of docstring should be in imperative mood: \"This method docstring should be written in imperative mood.\""
+    suggestion: ~
+    fixable: false
   location:
-    row: 72
+    row: 74
     column: 8
   end_location:
-    row: 72
+    row: 74
     column: 73
   fix: ~
   parent: ~

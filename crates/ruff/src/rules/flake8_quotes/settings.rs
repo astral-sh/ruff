@@ -1,10 +1,11 @@
 //! Settings for the `flake8-quotes` plugin.
 
-use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
+use ruff_macros::{CacheKey, ConfigurationOptions};
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Quote {
     /// Use single quotes.
@@ -71,7 +72,7 @@ pub struct Options {
     pub avoid_escape: Option<bool>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 pub struct Settings {
     pub inline_quotes: Quote,
     pub multiline_quotes: Quote,

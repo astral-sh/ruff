@@ -1,18 +1,18 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Unaryop};
 
-use crate::ast::helpers::{create_expr, unparse_expr};
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{create_expr, unparse_expr};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct IfExprWithTrueFalse {
-        pub expr: String,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct IfExprWithTrueFalse {
+    pub expr: String,
+}
+
 impl AlwaysAutofixableViolation for IfExprWithTrueFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -26,11 +26,11 @@ impl AlwaysAutofixableViolation for IfExprWithTrueFalse {
     }
 }
 
-define_violation!(
-    pub struct IfExprWithFalseTrue {
-        pub expr: String,
-    }
-);
+#[violation]
+pub struct IfExprWithFalseTrue {
+    pub expr: String,
+}
+
 impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -44,12 +44,12 @@ impl AlwaysAutofixableViolation for IfExprWithFalseTrue {
     }
 }
 
-define_violation!(
-    pub struct IfExprWithTwistedArms {
-        pub expr_body: String,
-        pub expr_else: String,
-    }
-);
+#[violation]
+pub struct IfExprWithTwistedArms {
+    pub expr_body: String,
+    pub expr_else: String,
+}
+
 impl AlwaysAutofixableViolation for IfExprWithTwistedArms {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -97,7 +97,7 @@ pub fn explicit_true_false_in_ifexpr(
         IfExprWithTrueFalse {
             expr: unparse_expr(test, checker.stylist),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
@@ -106,7 +106,7 @@ pub fn explicit_true_false_in_ifexpr(
                 expr.location,
                 expr.end_location.unwrap(),
             ));
-        } else if checker.is_builtin("bool") {
+        } else if checker.ctx.is_builtin("bool") {
             diagnostic.amend(Fix::replacement(
                 unparse_expr(
                     &create_expr(ExprKind::Call {
@@ -152,7 +152,7 @@ pub fn explicit_false_true_in_ifexpr(
         IfExprWithFalseTrue {
             expr: unparse_expr(test, checker.stylist),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
@@ -201,7 +201,7 @@ pub fn twisted_arms_in_ifexpr(
             expr_body: unparse_expr(body, checker.stylist),
             expr_else: unparse_expr(orelse, checker.stylist),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(

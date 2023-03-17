@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    DocstringStartsWithThis: ~
+    name: DocstringStartsWithThis
+    body: "First word of the docstring should not be \"This\""
+    suggestion: ~
+    fixable: false
   location:
     row: 631
     column: 4
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    DocstringStartsWithThis: ~
+    name: DocstringStartsWithThis
+    body: "First word of the docstring should not be \"This\""
+    suggestion: ~
+    fixable: false
   location:
     row: 636
     column: 4

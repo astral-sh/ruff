@@ -23,3 +23,9 @@ MyType = NamedTuple(
 
 # invalid identifiers (OK)
 MyType = NamedTuple("MyType", [("x-y", int), ("b", tuple[str, ...])])
+
+# no fields
+MyType = typing.NamedTuple("MyType")
+
+# empty fields
+MyType = typing.NamedTuple("MyType", [])

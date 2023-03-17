@@ -1,11 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    StringDotFormatMissingArguments:
-      missing:
-        - "1"
+    name: StringDotFormatMissingArguments
+    body: "`.format` call is missing argument(s) for placeholder(s): 1"
+    suggestion: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -15,9 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatMissingArguments:
-      missing:
-        - "2"
+    name: StringDotFormatMissingArguments
+    body: "`.format` call is missing argument(s) for placeholder(s): 2"
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 0
@@ -27,9 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatMissingArguments:
-      missing:
-        - bar
+    name: StringDotFormatMissingArguments
+    body: "`.format` call is missing argument(s) for placeholder(s): bar"
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 0
@@ -39,9 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatMissingArguments:
-      missing:
-        - bar
+    name: StringDotFormatMissingArguments
+    body: "`.format` call is missing argument(s) for placeholder(s): bar"
+    suggestion: ~
+    fixable: false
   location:
     row: 4
     column: 0
@@ -51,10 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatMissingArguments:
-      missing:
-        - "0"
-        - bar
+    name: StringDotFormatMissingArguments
+    body: "`.format` call is missing argument(s) for placeholder(s): 0, bar"
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 0
@@ -64,10 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    StringDotFormatMissingArguments:
-      missing:
-        - "0"
-        - bar
+    name: StringDotFormatMissingArguments
+    body: "`.format` call is missing argument(s) for placeholder(s): 0, bar"
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 0

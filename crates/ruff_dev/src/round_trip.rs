@@ -5,7 +5,8 @@ use std::fs;
 use std::path::PathBuf;
 
 use anyhow::Result;
-use ruff::source_code::round_trip;
+
+use ruff::round_trip;
 
 #[derive(clap::Args)]
 pub struct Args {

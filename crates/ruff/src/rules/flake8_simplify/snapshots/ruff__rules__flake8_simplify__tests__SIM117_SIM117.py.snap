@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    MultipleWithStatements:
-      fixable: true
+    name: MultipleWithStatements
+    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
+    suggestion: "Combine `with` statements"
+    fixable: true
   location:
     row: 2
     column: 0
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    MultipleWithStatements:
-      fixable: true
+    name: MultipleWithStatements
+    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
+    suggestion: "Combine `with` statements"
+    fixable: true
   location:
     row: 7
     column: 0
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    MultipleWithStatements:
-      fixable: false
+    name: MultipleWithStatements
+    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
+    suggestion: ~
+    fixable: false
   location:
     row: 13
     column: 0
@@ -50,8 +56,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    MultipleWithStatements:
-      fixable: true
+    name: MultipleWithStatements
+    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
+    suggestion: "Combine `with` statements"
+    fixable: true
   location:
     row: 19
     column: 0
@@ -68,8 +76,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    MultipleWithStatements:
-      fixable: true
+    name: MultipleWithStatements
+    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
+    suggestion: "Combine `with` statements"
+    fixable: true
   location:
     row: 53
     column: 4
@@ -86,8 +96,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    MultipleWithStatements:
-      fixable: true
+    name: MultipleWithStatements
+    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
+    suggestion: "Combine `with` statements"
+    fixable: true
   location:
     row: 68
     column: 0
@@ -104,8 +116,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    MultipleWithStatements:
-      fixable: true
+    name: MultipleWithStatements
+    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
+    suggestion: "Combine `with` statements"
+    fixable: true
   location:
     row: 76
     column: 0
@@ -122,8 +136,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    MultipleWithStatements:
-      fixable: true
+    name: MultipleWithStatements
+    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
+    suggestion: "Combine `with` statements"
+    fixable: true
   location:
     row: 84
     column: 0

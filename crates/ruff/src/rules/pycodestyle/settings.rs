@@ -1,8 +1,9 @@
 //! Settings for the `pycodestyle` plugin.
 
-use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
@@ -27,12 +28,12 @@ pub struct Options {
         "#
     )]
     /// Whether line-length violations (`E501`) should be triggered for
-    /// comments starting with `task-tags` (by default: ["TODO", "FIXME",
-    /// and "XXX"]).
+    /// comments starting with `task-tags` (by default: \["TODO", "FIXME",
+    /// and "XXX"\]).
     pub ignore_overlong_task_comments: Option<bool>,
 }
 
-#[derive(Debug, Default, Hash)]
+#[derive(Debug, Default, CacheKey)]
 pub struct Settings {
     pub max_doc_length: Option<usize>,
     pub ignore_overlong_task_comments: bool,

@@ -2,20 +2,19 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::identifiers::is_module_name;
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation, CacheKey};
+use ruff_python_ast::helpers::{create_stmt, from_relative_import, unparse_stmt};
+use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::types::Range;
+use ruff_python_stdlib::identifiers::is_module_name;
 
-use crate::ast::helpers::{create_stmt, from_relative_import, unparse_stmt};
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::source_code::Stylist;
-use crate::violation::{AutofixKind, Availability, Violation};
+use crate::registry::AsRule;
 
 pub type Settings = Strictness;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema, Default)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Strictness {
     /// Ban imports that extend into the parent module or beyond.
@@ -25,45 +24,45 @@ pub enum Strictness {
     All,
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for relative imports.
-    ///
-    /// ## Why is this bad?
-    /// Absolute imports, or relative imports from siblings, are recommended by [PEP 8]:
-    ///
-    /// > Absolute imports are recommended, as they are usually more readable and tend to be better behaved...
-    /// > ```python
-    /// > import mypkg.sibling
-    /// > from mypkg import sibling
-    /// > from mypkg.sibling import example
-    /// > ```
-    /// > However, explicit relative imports are an acceptable alternative to absolute imports,
-    /// > especially when dealing with complex package layouts where using absolute imports would be
-    /// > unnecessarily verbose:
-    /// > ```python
-    /// > from . import sibling
-    /// > from .sibling import example
-    /// > ```
-    ///
-    /// ## Options
-    /// * `flake8-tidy-imports.ban-relative-imports`
-    ///
-    /// ## Example
-    /// ```python
-    /// from .. import foo
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// from mypkg import foo
-    /// ```
-    ///
-    /// [PEP 8]: https://peps.python.org/pep-0008/#imports
-    pub struct RelativeImports {
-        pub strictness: Strictness,
-    }
-);
+/// ## What it does
+/// Checks for relative imports.
+///
+/// ## Why is this bad?
+/// Absolute imports, or relative imports from siblings, are recommended by [PEP 8]:
+///
+/// > Absolute imports are recommended, as they are usually more readable and tend to be better behaved...
+/// > ```python
+/// > import mypkg.sibling
+/// > from mypkg import sibling
+/// > from mypkg.sibling import example
+/// > ```
+/// > However, explicit relative imports are an acceptable alternative to absolute imports,
+/// > especially when dealing with complex package layouts where using absolute imports would be
+/// > unnecessarily verbose:
+/// > ```python
+/// > from . import sibling
+/// > from .sibling import example
+/// > ```
+///
+/// ## Options
+/// - `flake8-tidy-imports.ban-relative-imports`
+///
+/// ## Example
+/// ```python
+/// from .. import foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from mypkg import foo
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#imports
+#[violation]
+pub struct RelativeImports {
+    pub strictness: Strictness,
+}
+
 impl Violation for RelativeImports {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -94,6 +93,10 @@ fn fix_banned_relative_import(
 ) -> Option<Fix> {
     // Only fix is the module path is known.
     if let Some(mut parts) = module_path.cloned() {
+        if *level? >= parts.len() {
+            return None;
+        }
+
         // Remove relative level from module path.
         for _ in 0..*level? {
             parts.pop();
@@ -165,7 +168,7 @@ pub fn banned_relative_import(
             RelativeImports {
                 strictness: strictness.clone(),
             },
-            Range::from_located(stmt),
+            Range::from(stmt),
         );
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(fix) =

@@ -1,47 +1,46 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Alias, Expr, Located};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use crate::ast::types::{CallPath, Range};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation, CacheKey};
+use ruff_python_ast::types::{CallPath, Range};
+
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::settings::hashable::HashableHashMap;
-use crate::violation::Violation;
 
-pub type Settings = HashableHashMap<String, ApiBan>;
+pub type Settings = FxHashMap<String, ApiBan>;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub struct ApiBan {
     /// The message to display when the API is used.
     pub msg: String,
 }
 
-define_violation!(
-    /// ## What it does
-    /// Checks for banned imports.
-    ///
-    /// ## Why is this bad?
-    /// Projects may want to ensure that specific modules or module members are
-    /// not be imported or accessed.
-    ///
-    /// Security or other company policies may be a reason to impose
-    /// restrictions on importing external Python libraries. In some cases,
-    /// projects may adopt conventions around the use of certain modules or
-    /// module members that are not enforceable by the language itself.
-    ///
-    /// This rule enforces certain import conventions project-wide in an
-    /// automatic way.
-    ///
-    /// ## Options
-    /// * `flake8-tidy-imports.banned-api`
-    pub struct BannedApi {
-        pub name: String,
-        pub message: String,
-    }
-);
+/// ## What it does
+/// Checks for banned imports.
+///
+/// ## Why is this bad?
+/// Projects may want to ensure that specific modules or module members are
+/// not be imported or accessed.
+///
+/// Security or other company policies may be a reason to impose
+/// restrictions on importing external Python libraries. In some cases,
+/// projects may adopt conventions around the use of certain modules or
+/// module members that are not enforceable by the language itself.
+///
+/// This rule enforces certain import conventions project-wide in an
+/// automatic way.
+///
+/// ## Options
+/// - `flake8-tidy-imports.banned-api`
+#[violation]
+pub struct BannedApi {
+    pub name: String,
+    pub message: String,
+}
+
 impl Violation for BannedApi {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -63,7 +62,7 @@ pub fn name_is_banned(
                 name: full_name,
                 message: ban.msg.to_string(),
             },
-            Range::from_located(name),
+            Range::from(name),
         ));
     }
     None
@@ -83,7 +82,7 @@ pub fn name_or_parent_is_banned<T>(
                     name: name.to_string(),
                     message: ban.msg.to_string(),
                 },
-                Range::from_located(located),
+                Range::from(located),
             ));
         }
         match name.rfind('.') {
@@ -97,7 +96,7 @@ pub fn name_or_parent_is_banned<T>(
 
 /// TID251
 pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
-    if let Some((banned_path, ban)) = checker.resolve_call_path(expr).and_then(|call_path| {
+    if let Some((banned_path, ban)) = checker.ctx.resolve_call_path(expr).and_then(|call_path| {
         checker
             .settings
             .flake8_tidy_imports
@@ -110,7 +109,7 @@ pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
                 name: banned_path.to_string(),
                 message: ban.msg.to_string(),
             },
-            Range::from_located(expr),
+            Range::from(expr),
         ));
     }
 }
@@ -123,10 +122,11 @@ mod tests {
     use insta::assert_yaml_snapshot;
     use rustc_hash::FxHashMap;
 
-    use super::ApiBan;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;
+
+    use super::ApiBan;
 
     #[test]
     fn banned_api_true_positives() -> Result<()> {
@@ -147,8 +147,7 @@ mod tests {
                                 msg: "Use typing_extensions.TypedDict instead.".to_string(),
                             },
                         ),
-                    ])
-                    .into(),
+                    ]),
                     ..Default::default()
                 },
                 ..Settings::for_rules(vec![Rule::BannedApi])

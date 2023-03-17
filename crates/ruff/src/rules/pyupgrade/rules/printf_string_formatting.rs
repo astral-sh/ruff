@@ -1,26 +1,26 @@
 use std::str::FromStr;
 
-use ruff_macros::{define_violation, derive_message_formats};
-use ruff_python::identifiers::is_identifier;
-use ruff_python::keyword::KWLIST;
 use rustpython_common::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::types::Range;
-use crate::ast::whitespace::indentation;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::rules::pydocstyle::helpers::{leading_quote, trailing_quote};
-use crate::rules::pyupgrade::helpers::curly_escape;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_python_ast::types::Range;
+use ruff_python_ast::whitespace::indentation;
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_stdlib::keyword::KWLIST;
 
-define_violation!(
-    pub struct PrintfStringFormatting;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+use crate::rules::pyupgrade::helpers::curly_escape;
+
+#[violation]
+pub struct PrintfStringFormatting;
+
 impl AlwaysAutofixableViolation for PrintfStringFormatting {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -139,10 +139,7 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
 fn clean_params_tuple(checker: &mut Checker, right: &Expr) -> String {
-    let mut contents = checker
-        .locator
-        .slice(&Range::from_located(right))
-        .to_string();
+    let mut contents = checker.locator.slice(right).to_string();
     if let ExprKind::Tuple { elts, .. } = &right.node {
         if elts.len() == 1 {
             if right.location.row() == right.end_location.unwrap().row() {
@@ -195,7 +192,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                             }
                         }
 
-                        let value_string = checker.locator.slice(&Range::from_located(value));
+                        let value_string = checker.locator.slice(value);
                         arguments.push(format!("{key_string}={value_string}"));
                     } else {
                         // If there are any non-string keys, abort.
@@ -203,7 +200,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                     }
                 }
                 None => {
-                    let value_string = checker.locator.slice(&Range::from_located(value));
+                    let value_string = checker.locator.slice(value);
                     arguments.push(format!("**{value_string}"));
                 }
             }
@@ -318,12 +315,8 @@ pub(crate) fn printf_string_formatting(
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<(Location, Location)> = vec![];
     let mut extension = None;
-    for (start, tok, end) in lexer::lex_located(
-        checker.locator.slice(&Range::from_located(expr)),
-        Mode::Module,
-        expr.location,
-    )
-    .flatten()
+    for (start, tok, end) in
+        lexer::lex_located(checker.locator.slice(expr), Mode::Module, expr.location).flatten()
     {
         if matches!(tok, Tok::String { .. }) {
             strings.push((start, end));
@@ -344,7 +337,7 @@ pub(crate) fn printf_string_formatting(
     // Parse each string segment.
     let mut format_strings = vec![];
     for (start, end) in &strings {
-        let string = checker.locator.slice(&Range::new(*start, *end));
+        let string = checker.locator.slice(Range::new(*start, *end));
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };
@@ -382,10 +375,10 @@ pub(crate) fn printf_string_formatting(
         // Add the content before the string segment.
         match prev {
             None => {
-                contents.push_str(checker.locator.slice(&Range::new(expr.location, *start)));
+                contents.push_str(checker.locator.slice(Range::new(expr.location, *start)));
             }
             Some(prev) => {
-                contents.push_str(checker.locator.slice(&Range::new(prev, *start)));
+                contents.push_str(checker.locator.slice(Range::new(prev, *start)));
             }
         }
         // Add the string itself.
@@ -394,13 +387,13 @@ pub(crate) fn printf_string_formatting(
     }
 
     if let Some((.., end)) = extension {
-        contents.push_str(checker.locator.slice(&Range::new(prev.unwrap(), end)));
+        contents.push_str(checker.locator.slice(Range::new(prev.unwrap(), end)));
     }
 
     // Add the `.format` call.
     contents.push_str(&format!(".format{params_string}"));
 
-    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, Range::from(expr));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,

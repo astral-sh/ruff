@@ -1,8 +1,9 @@
 *
 !assets
-!requirements.txt
 !configuration.md
 !editor-integrations.md
 !faq.md
 !installation.md
+!requirements.txt
+!tutorial.md
 !usage.md

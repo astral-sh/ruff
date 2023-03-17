@@ -1,8 +1,10 @@
 //! Settings for the `flake-annotations` plugin.
 
-use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::CacheKey;
+use ruff_macros::ConfigurationOptions;
 
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, JsonSchema,
@@ -37,8 +39,8 @@ pub struct Options {
     /// Whether to suppress `ANN200`-level violations for functions that meet
     /// either of the following criteria:
     ///
-    /// * Contain no `return` statement.
-    /// * Explicit `return` statement(s) all return `None` (explicitly or
+    /// - Contain no `return` statement.
+    /// - Explicit `return` statement(s) all return `None` (explicitly or
     ///   implicitly).
     pub suppress_none_returning: Option<bool>,
     #[option(
@@ -60,7 +62,7 @@ pub struct Options {
     pub ignore_fully_untyped: Option<bool>,
 }
 
-#[derive(Debug, Default, Hash)]
+#[derive(Debug, Default, CacheKey)]
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub mypy_init_return: bool,

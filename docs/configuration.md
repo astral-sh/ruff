@@ -106,13 +106,13 @@ formats. Ruff will automatically disable any conflicting rules when `ALL` is ena
 
 If you're wondering how to configure Ruff, here are some **recommended guidelines**:
 
-* Prefer `select` and `ignore` over `extend-select` and `extend-ignore`, to make your rule set
+- Prefer `select` and `ignore` over `extend-select` and `extend-ignore`, to make your rule set
   explicit.
-* Use `ALL` with discretion. Enabling `ALL` will implicitly enable new rules whenever you upgrade.
-* Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
+- Use `ALL` with discretion. Enabling `ALL` will implicitly enable new rules whenever you upgrade.
+- Start with a small set of rules (`select = ["E", "F"]`) and add a category at-a-time. For example,
   you might consider expanding to `select = ["E", "F", "B"]` to enable the popular flake8-bugbear
   extension.
-* By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
+- By default, Ruff's autofix is aggressive. If you find that it's too aggressive for your liking,
   consider turning off autofix for specific rules or categories (see [_FAQ_](faq.md#ruff-tried-to-fix-something--but-it-broke-my-code)).
 
 ## Using `ruff.toml`
@@ -206,10 +206,12 @@ Options:
           Run in watch mode by re-running whenever files change
       --fix-only
           Fix any fixable lint violations, but don't report on leftover violations. Implies `--fix`
+      --ignore-noqa
+          Ignore any `# noqa` comments
       --format <FORMAT>
-          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint]
+          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint, azure]
       --target-version <TARGET_VERSION>
-          The minimum Python version that should be supported
+          The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311]
       --config <CONFIG>
           Path to the `pyproject.toml` or `ruff.toml` file to use for configuration
       --statistics
@@ -277,15 +279,15 @@ There are a few exceptions to these rules:
 
 1. In locating the "closest" `pyproject.toml` file for a given path, Ruff ignores any
    `pyproject.toml` files that lack a `[tool.ruff]` section.
-2. If a configuration file is passed directly via `--config`, those settings are used for across
+1. If a configuration file is passed directly via `--config`, those settings are used for across
    files. Any relative paths in that configuration file (like `exclude` globs or `src` paths) are
    resolved relative to the _current working directory_.
-3. If no `pyproject.toml` file is found in the filesystem hierarchy, Ruff will fall back to using
+1. If no `pyproject.toml` file is found in the filesystem hierarchy, Ruff will fall back to using
    a default configuration. If a user-specific configuration file exists
    at `${config_dir}/ruff/pyproject.toml`, that file will be used instead of the default
    configuration, with `${config_dir}` being determined via the [`dirs`](https://docs.rs/dirs/4.0.0/dirs/fn.config_dir.html)
    crate, and all relative paths being again resolved relative to the _current working directory_.
-4. Any `pyproject.toml`-supported settings that are provided on the command-line (e.g., via
+1. Any `pyproject.toml`-supported settings that are provided on the command-line (e.g., via
    `--select`) will override the settings in _every_ resolved configuration file.
 
 Unlike [ESLint](https://eslint.org/docs/latest/user-guide/configuring/configuration-files#cascading-and-hierarchy),
@@ -416,29 +418,34 @@ automatically add `noqa` directives to all failing lines, with the appropriate r
 
 ### Action comments
 
-Ruff respects `isort`'s [action comments](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
+Ruff respects isort's [action comments](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 (`# isort: skip_file`, `# isort: on`, `# isort: off`, `# isort: skip`, and `# isort: split`), which
 enable selectively enabling and disabling import sorting for blocks of code and other inline
 configuration.
 
-See the [`isort` documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
+Ruff will also respect variants of these action comments with a `# ruff:` prefix
+(e.g., `# ruff: isort: skip_file`, `# ruff: isort: on`, and so on). These variants more clearly
+convey that the action comment is intended for Ruff, but are functionally equivalent to the
+isort variants.
+
+See the [isort documentation](https://pycqa.github.io/isort/docs/configuration/action_comments.html)
 for more.
 
 ## Exit codes
 
 By default, Ruff exits with the following status codes:
 
-* `0` if no violations were found, or if all present violations were fixed automatically.
-* `1` if violations were found.
-* `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an internal error.
+- `0` if no violations were found, or if all present violations were fixed automatically.
+- `1` if violations were found.
+- `2` if Ruff terminates abnormally due to invalid configuration, invalid CLI options, or an internal error.
 
 This convention mirrors that of tools like ESLint, Prettier, and RuboCop.
 
 Ruff supports two command-line flags that alter its exit code behavior:
 
-* `--exit-zero` will cause Ruff to exit with a status code of `0` even if violations were found.
+- `--exit-zero` will cause Ruff to exit with a status code of `0` even if violations were found.
   Note that Ruff will still exit with a status code of `2` if it terminates abnormally.
-* `--exit-non-zero-on-fix` will cause Ruff to exit with a status code of `1` if violations were
+- `--exit-non-zero-on-fix` will cause Ruff to exit with a status code of `1` if violations were
   found, _even if_ all such violations were fixed automatically. Note that the use of
   `--exit-non-zero-on-fix` can result in a non-zero exit code even if no violations remain after
   autofixing.

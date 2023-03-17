@@ -1,17 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
-use crate::ast::helpers::SimpleCallArgs;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::SimpleCallArgs;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct RequestWithNoCertValidation {
-        pub string: String,
-    }
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct RequestWithNoCertValidation {
+    pub string: String,
+}
+
 impl Violation for RequestWithNoCertValidation {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -44,7 +44,7 @@ pub fn request_with_no_cert_validation(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if let Some(target) = checker.resolve_call_path(func).and_then(|call_path| {
+    if let Some(target) = checker.ctx.resolve_call_path(func).and_then(|call_path| {
         if call_path.len() == 2 {
             if call_path[0] == "requests" && REQUESTS_HTTP_VERBS.contains(&call_path[1]) {
                 return Some("requests");
@@ -56,7 +56,7 @@ pub fn request_with_no_cert_validation(
         None
     }) {
         let call_args = SimpleCallArgs::new(args, keywords);
-        if let Some(verify_arg) = call_args.get_argument("verify", None) {
+        if let Some(verify_arg) = call_args.keyword_argument("verify") {
             if let ExprKind::Constant {
                 value: Constant::Bool(false),
                 ..
@@ -66,7 +66,7 @@ pub fn request_with_no_cert_validation(
                     RequestWithNoCertValidation {
                         string: target.to_string(),
                     },
-                    Range::from_located(verify_arg),
+                    Range::from(verify_arg),
                 ));
             }
         }

@@ -1,0 +1,18 @@
+---
+source: crates/ruff/src/rules/flake8_django/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: ExcludeWithModelForm
+    body: "Do not use `exclude` with `ModelForm`, use `fields` instead"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 6
+    column: 8
+  end_location:
+    row: 6
+    column: 15
+  fix: ~
+  parent: ~
+

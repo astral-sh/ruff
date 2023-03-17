@@ -1,15 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct RaiseNotImplemented;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct RaiseNotImplemented;
+
 impl AlwaysAutofixableViolation for RaiseNotImplemented {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -45,7 +45,7 @@ pub fn raise_not_implemented(checker: &mut Checker, expr: &Expr) {
     let Some(expr) = match_not_implemented(expr) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(RaiseNotImplemented, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(RaiseNotImplemented, Range::from(expr));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             "NotImplementedError".to_string(),

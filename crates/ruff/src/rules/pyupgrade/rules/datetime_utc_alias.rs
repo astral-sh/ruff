@@ -1,18 +1,18 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::Expr;
 
-use crate::ast::helpers::collect_call_path;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::{AutofixKind, Availability, Violation};
+use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::collect_call_path;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct DatetimeTimezoneUTC {
-        pub straight_import: bool,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct DatetimeTimezoneUTC {
+    pub straight_import: bool,
+}
+
 impl Violation for DatetimeTimezoneUTC {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
@@ -32,14 +32,16 @@ impl Violation for DatetimeTimezoneUTC {
 
 /// UP017
 pub fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
-    if checker.resolve_call_path(expr).map_or(false, |call_path| {
-        call_path.as_slice() == ["datetime", "timezone", "utc"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(expr)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["datetime", "timezone", "utc"]
+        })
+    {
         let straight_import = collect_call_path(expr).as_slice() == ["datetime", "timezone", "utc"];
-        let mut diagnostic = Diagnostic::new(
-            DatetimeTimezoneUTC { straight_import },
-            Range::from_located(expr),
-        );
+        let mut diagnostic =
+            Diagnostic::new(DatetimeTimezoneUTC { straight_import }, Range::from(expr));
         if checker.patch(diagnostic.kind.rule()) {
             if straight_import {
                 diagnostic.amend(Fix::replacement(

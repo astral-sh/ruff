@@ -17,20 +17,6 @@ env:
   RUSTUP_MAX_RETRIES: 10
 
 jobs:
-  cargo-build:
-    name: "cargo build"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - uses: Swatinem/rust-cache@v1
-      - run: cargo build --all
-      - run: ./target/debug/ruff_dev generate-all
-      - run: git diff --quiet README.md || echo "::error file=README.md::This file is outdated. Run 'cargo dev generate-all'."
-      - run: git diff --quiet ruff.schema.json || echo "::error file=ruff.schema.json::This file is outdated. Run 'cargo dev generate-all'."
-      - run: git diff --exit-code -- README.md ruff.schema.json
-
   cargo-fmt:
     name: "cargo fmt"
     runs-on: ubuntu-latest
@@ -48,7 +34,7 @@ jobs:
       - name: "Install Rust toolchain"
         run: |
           rustup component add clippy
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 
   cargo-clippy-wasm:
@@ -60,8 +46,8 @@ jobs:
         run: |
           rustup component add clippy
           rustup target add wasm32-unknown-unknown
-      - uses: Swatinem/rust-cache@v1
-      - run: cargo clippy -p ruff --target wasm32-unknown-unknown --all-features -- -D warnings
+      - uses: Swatinem/rust-cache@v2
+      - run: cargo clippy -p ruff_wasm --target wasm32-unknown-unknown --all-features -- -D warnings
 
   cargo-test:
     strategy:
@@ -73,9 +59,9 @@ jobs:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - run: cargo install cargo-insta
-      - run: pip install black[d]==22.12.0
+      - run: pip install black[d]==23.1.0
       - name: "Run tests (Ubuntu)"
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
@@ -93,6 +79,31 @@ jobs:
         env:
           # Setting RUSTDOCFLAGS because `cargo doc --check` isn't yet implemented (https://github.com/rust-lang/cargo/issues/10025).
           RUSTDOCFLAGS: "-D warnings"
+      - uses: actions/upload-artifact@v3
+        if: ${{ matrix.os == 'ubuntu-latest' }}
+        with:
+          name: ruff
+          path: target/debug/ruff
+
+
+  cargo-test-wasm:
+    runs-on: ubuntu-latest
+    name: "cargo test (wasm)"
+    steps:
+      - uses: actions/checkout@v3
+      - name: "Install Rust toolchain"
+        run: rustup target add wasm32-unknown-unknown
+      - uses: actions/setup-node@v3
+        with:
+          node-version: 18
+          cache: "npm"
+          cache-dependency-path: playground/package-lock.json
+      - uses: jetli/wasm-pack-action@v0.4.0
+      - uses: Swatinem/rust-cache@v2
+      - name: "Run wasm-pack"
+        run: |
+          cd crates/ruff_wasm
+          wasm-pack test --node
 
   scripts:
     name: "test scripts"
@@ -101,28 +112,13 @@ jobs:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
         run: rustup show
-      - uses: Swatinem/rust-cache@v1
+      - uses: Swatinem/rust-cache@v2
       - run: ./scripts/add_rule.py --name DoTheThing --code PLC999 --linter pylint
       - run: cargo check
       - run: |
           ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
           ./scripts/add_rule.py --name FirstRule --code TST001 --linter test
       - run: cargo check
-
-  maturin-build:
-    name: "maturin build"
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v3
-      - name: "Install Rust toolchain"
-        run: rustup show
-      - uses: Swatinem/rust-cache@v1
-      - uses: actions/setup-python@v4
-        with:
-          python-version: "3.11"
-      - run: pip install maturin
-      - run: maturin build -b bin
-      - run: python scripts/transform_readme.py --target pypi
 
   typos:
     name: "spell check"
@@ -132,3 +128,51 @@ jobs:
       - uses: crate-ci/typos@master
         with:
           files: .
+
+  ecosystem:
+    name: "ecosystem"
+    runs-on: ubuntu-latest
+    needs: cargo-test
+    # Only runs on pull requests, since that is the only we way we can find the base version for comparison.
+    if: github.event_name == 'pull_request'
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+
+      - uses: actions/download-artifact@v3
+        name: Download Ruff binary
+        id: ruff-target
+        with:
+          name: ruff
+          path: target/debug
+
+      - uses: dawidd6/action-download-artifact@v2
+        name: Download base results
+        with:
+          name: ruff
+          branch: ${{ github.event.pull_request.base.ref }}
+          check_artifacts: true
+
+      - name: Run ecosystem check
+        run: |
+          # Make executable, since artifact download doesn't preserve this
+          chmod +x ruff ${{ steps.ruff-target.outputs.download-path }}/ruff
+
+          scripts/check_ecosystem.py ruff ${{ steps.ruff-target.outputs.download-path }}/ruff | tee ecosystem-result
+          cat ecosystem-result > $GITHUB_STEP_SUMMARY
+
+          echo ${{ github.event.number }} > pr-number
+
+      - uses: actions/upload-artifact@v3
+        name: Upload PR Number
+        with:
+          name: pr-number
+          path: pr-number
+
+      - uses: actions/upload-artifact@v3
+        name: Upload Results
+        with:
+          name: ecosystem-result
+          path: ecosystem-result

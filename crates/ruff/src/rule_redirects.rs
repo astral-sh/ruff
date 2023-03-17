@@ -18,9 +18,7 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         // The following are here because we don't yet have the many-to-one mapping enabled.
         ("SIM111", "SIM110"),
         // The following are deprecated.
-        ("C", "C4"),
         ("C9", "C90"),
-        ("T", "T10"),
         ("T1", "T10"),
         ("T2", "T20"),
         // TODO(charlie): Remove by 2023-02-01.
@@ -92,5 +90,7 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         // TODO(charlie): Remove by 2023-04-01.
         ("TYP", "TCH"),
         ("TYP001", "TCH001"),
+        // TODO(charlie): Remove by 2023-06-01.
+        ("RUF004", "B026"),
     ])
 });

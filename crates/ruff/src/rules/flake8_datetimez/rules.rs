@@ -1,15 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
-use crate::ast::helpers::{has_non_none_keyword, is_const_none};
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{has_non_none_keyword, is_const_none};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct CallDatetimeWithoutTzinfo;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct CallDatetimeWithoutTzinfo;
+
 impl Violation for CallDatetimeWithoutTzinfo {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -17,9 +17,9 @@ impl Violation for CallDatetimeWithoutTzinfo {
     }
 }
 
-define_violation!(
-    pub struct CallDatetimeToday;
-);
+#[violation]
+pub struct CallDatetimeToday;
+
 impl Violation for CallDatetimeToday {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -30,9 +30,9 @@ impl Violation for CallDatetimeToday {
     }
 }
 
-define_violation!(
-    pub struct CallDatetimeUtcnow;
-);
+#[violation]
+pub struct CallDatetimeUtcnow;
+
 impl Violation for CallDatetimeUtcnow {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -43,9 +43,9 @@ impl Violation for CallDatetimeUtcnow {
     }
 }
 
-define_violation!(
-    pub struct CallDatetimeUtcfromtimestamp;
-);
+#[violation]
+pub struct CallDatetimeUtcfromtimestamp;
+
 impl Violation for CallDatetimeUtcfromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -56,9 +56,9 @@ impl Violation for CallDatetimeUtcfromtimestamp {
     }
 }
 
-define_violation!(
-    pub struct CallDatetimeNowWithoutTzinfo;
-);
+#[violation]
+pub struct CallDatetimeNowWithoutTzinfo;
+
 impl Violation for CallDatetimeNowWithoutTzinfo {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -66,9 +66,9 @@ impl Violation for CallDatetimeNowWithoutTzinfo {
     }
 }
 
-define_violation!(
-    pub struct CallDatetimeFromtimestamp;
-);
+#[violation]
+pub struct CallDatetimeFromtimestamp;
+
 impl Violation for CallDatetimeFromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -78,9 +78,9 @@ impl Violation for CallDatetimeFromtimestamp {
     }
 }
 
-define_violation!(
-    pub struct CallDatetimeStrptimeWithoutZone;
-);
+#[violation]
+pub struct CallDatetimeStrptimeWithoutZone;
+
 impl Violation for CallDatetimeStrptimeWithoutZone {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -91,9 +91,9 @@ impl Violation for CallDatetimeStrptimeWithoutZone {
     }
 }
 
-define_violation!(
-    pub struct CallDateToday;
-);
+#[violation]
+pub struct CallDateToday;
+
 impl Violation for CallDateToday {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -104,9 +104,9 @@ impl Violation for CallDateToday {
     }
 }
 
-define_violation!(
-    pub struct CallDateFromtimestamp;
-);
+#[violation]
+pub struct CallDateFromtimestamp;
+
 impl Violation for CallDateFromtimestamp {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -124,9 +124,13 @@ pub fn call_datetime_without_tzinfo(
     keywords: &[Keyword],
     location: Range,
 ) {
-    if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["datetime", "datetime"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["datetime", "datetime"]
+        })
+    {
         return;
     }
 
@@ -153,9 +157,13 @@ pub fn call_datetime_without_tzinfo(
 /// It uses the system local timezone.
 /// Use `datetime.datetime.now(tz=)` instead.
 pub fn call_datetime_today(checker: &mut Checker, func: &Expr, location: Range) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["datetime", "datetime", "today"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["datetime", "datetime", "today"]
+        })
+    {
         checker
             .diagnostics
             .push(Diagnostic::new(CallDatetimeToday, location));
@@ -171,9 +179,13 @@ pub fn call_datetime_today(checker: &mut Checker, func: &Expr, location: Range) 
 /// UTC. As such, the recommended way to create an object representing the
 /// current time in UTC is by calling `datetime.now(timezone.utc)`.
 pub fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: Range) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["datetime", "datetime", "utcnow"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["datetime", "datetime", "utcnow"]
+        })
+    {
         checker
             .diagnostics
             .push(Diagnostic::new(CallDatetimeUtcnow, location));
@@ -190,9 +202,13 @@ pub fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: Range)
 /// specific timestamp in UTC is by calling `datetime.fromtimestamp(timestamp,
 /// tz=timezone.utc)`.
 pub fn call_datetime_utcfromtimestamp(checker: &mut Checker, func: &Expr, location: Range) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["datetime", "datetime", "utcfromtimestamp"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["datetime", "datetime", "utcfromtimestamp"]
+        })
+    {
         checker
             .diagnostics
             .push(Diagnostic::new(CallDatetimeUtcfromtimestamp, location));
@@ -207,9 +223,13 @@ pub fn call_datetime_now_without_tzinfo(
     keywords: &[Keyword],
     location: Range,
 ) {
-    if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["datetime", "datetime", "now"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["datetime", "datetime", "now"]
+        })
+    {
         return;
     }
 
@@ -245,9 +265,13 @@ pub fn call_datetime_fromtimestamp(
     keywords: &[Keyword],
     location: Range,
 ) {
-    if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["datetime", "datetime", "fromtimestamp"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["datetime", "datetime", "fromtimestamp"]
+        })
+    {
         return;
     }
 
@@ -282,9 +306,13 @@ pub fn call_datetime_strptime_without_zone(
     args: &[Expr],
     location: Range,
 ) {
-    if !checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["datetime", "datetime", "strptime"]
-    }) {
+    if !checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["datetime", "datetime", "strptime"]
+        })
+    {
         return;
     }
 
@@ -299,7 +327,7 @@ pub fn call_datetime_strptime_without_zone(
         }
     };
 
-    let (Some(grandparent), Some(parent)) = (checker.current_expr_grandparent(), checker.current_expr_parent()) else {
+    let (Some(grandparent), Some(parent)) = (checker.ctx.current_expr_grandparent(), checker.ctx.current_expr_parent()) else {
         checker.diagnostics.push(Diagnostic::new(
             CallDatetimeStrptimeWithoutZone,
             location,
@@ -335,9 +363,13 @@ pub fn call_datetime_strptime_without_zone(
 /// It uses the system local timezone.
 /// Use `datetime.datetime.now(tz=).date()` instead.
 pub fn call_date_today(checker: &mut Checker, func: &Expr, location: Range) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["datetime", "date", "today"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["datetime", "date", "today"]
+        })
+    {
         checker
             .diagnostics
             .push(Diagnostic::new(CallDateToday, location));
@@ -351,9 +383,13 @@ pub fn call_date_today(checker: &mut Checker, func: &Expr, location: Range) {
 /// It uses the system local timezone.
 /// Use `datetime.datetime.fromtimestamp(, tz=).date()` instead.
 pub fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, location: Range) {
-    if checker.resolve_call_path(func).map_or(false, |call_path| {
-        call_path.as_slice() == ["datetime", "date", "fromtimestamp"]
-    }) {
+    if checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["datetime", "date", "fromtimestamp"]
+        })
+    {
         checker
             .diagnostics
             .push(Diagnostic::new(CallDateFromtimestamp, location));

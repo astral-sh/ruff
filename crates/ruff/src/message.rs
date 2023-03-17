@@ -3,10 +3,9 @@ use std::cmp::Ordering;
 pub use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-use crate::ast::types::Range;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, DiagnosticKind};
-use crate::source_code::Locator;
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Message {
@@ -16,6 +15,7 @@ pub struct Message {
     pub fix: Option<Fix>,
     pub filename: String,
     pub source: Option<Source>,
+    pub noqa_row: usize,
 }
 
 impl Message {
@@ -23,6 +23,7 @@ impl Message {
         diagnostic: Diagnostic,
         filename: String,
         source: Option<Source>,
+        noqa_row: usize,
     ) -> Self {
         Self {
             kind: diagnostic.kind,
@@ -34,6 +35,7 @@ impl Message {
             fix: diagnostic.fix,
             filename,
             source,
+            noqa_row,
         }
     }
 }
@@ -71,9 +73,9 @@ impl Source {
         } else {
             Location::new(diagnostic.end_location.row() + 1, 0)
         };
-        let source = locator.slice(&Range::new(location, end_location));
+        let source = locator.slice(Range::new(location, end_location));
         let num_chars_in_range = locator
-            .slice(&Range::new(diagnostic.location, diagnostic.end_location))
+            .slice(Range::new(diagnostic.location, diagnostic.end_location))
             .chars()
             .count();
         Source {

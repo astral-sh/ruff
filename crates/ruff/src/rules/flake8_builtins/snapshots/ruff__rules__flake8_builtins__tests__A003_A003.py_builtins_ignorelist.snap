@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_builtins/mod.rs
+source: crates/ruff/src/rules/flake8_builtins/mod.rs
 expression: diagnostics
 ---
 - kind:
-    BuiltinAttributeShadowing:
-      name: ImportError
+    name: BuiltinAttributeShadowing
+    body: "Class attribute `ImportError` is shadowing a python builtin"
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 4
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    BuiltinAttributeShadowing:
-      name: str
+    name: BuiltinAttributeShadowing
+    body: "Class attribute `str` is shadowing a python builtin"
+    suggestion: ~
+    fixable: false
   location:
     row: 11
     column: 4

@@ -147,8 +147,8 @@ macro_rules! format {
 /// Provides multiple different alternatives and the printer picks the first one that fits.
 /// Use this as last resort because it requires that the printer must try all variants in the worst case.
 /// The passed variants must be in the following order:
-/// * First: The variant that takes up most space horizontally
-/// * Last: The variant that takes up the least space horizontally by splitting the content over multiple lines.
+/// - First: The variant that takes up most space horizontally
+/// - Last: The variant that takes up the least space horizontally by splitting the content over multiple lines.
 ///
 /// ## Examples
 ///
@@ -306,9 +306,9 @@ macro_rules! format {
 ///
 /// ## Complexity
 /// Be mindful of using this IR element as it has a considerable performance penalty:
-/// * There are multiple representation for the same content. This results in increased memory usage
+/// - There are multiple representation for the same content. This results in increased memory usage
 ///   and traversal time in the printer.
-/// * The worst case complexity is that the printer tires each variant. This can result in quadratic
+/// - The worst case complexity is that the printer tires each variant. This can result in quadratic
 ///   complexity if used in nested structures.
 ///
 /// ## Behavior

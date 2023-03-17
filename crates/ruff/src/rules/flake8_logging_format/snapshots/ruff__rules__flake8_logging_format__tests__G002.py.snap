@@ -1,9 +1,12 @@
 ---
-source: src/rules/flake8_logging_format/mod.rs
+source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 expression: diagnostics
 ---
 - kind:
-    LoggingPercentFormat: ~
+    name: LoggingPercentFormat
+    body: "Logging statement uses `%`"
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 13

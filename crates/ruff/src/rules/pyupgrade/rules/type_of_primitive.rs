@@ -1,18 +1,19 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use super::super::types::Primitive;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct TypeOfPrimitive {
-        pub primitive: Primitive,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+use super::super::types::Primitive;
+
+#[violation]
+pub struct TypeOfPrimitive {
+    pub primitive: Primitive,
+}
+
 impl AlwaysAutofixableViolation for TypeOfPrimitive {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -32,6 +33,7 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
         return;
     }
     if !checker
+        .ctx
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["", "type"])
     {
@@ -43,7 +45,7 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
     let Some(primitive) = Primitive::from_constant(value) else {
         return;
     };
-    let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, Range::from(expr));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             primitive.builtin(),

@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ImportStar:
-      name: F634
+    name: ImportStar
+    body: "`from F634 import *` used; unable to detect undefined names"
+    suggestion: ~
+    fixable: false
   location:
     row: 1
     column: 0
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ImportStar:
-      name: F634
+    name: ImportStar
+    body: "`from F634 import *` used; unable to detect undefined names"
+    suggestion: ~
+    fixable: false
   location:
     row: 2
     column: 0

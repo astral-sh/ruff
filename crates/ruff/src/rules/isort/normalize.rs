@@ -1,8 +1,13 @@
-use super::types::{AliasData, ImportBlock, ImportFromData};
-use super::AnnotatedImport;
 use crate::rules::isort::types::TrailingComma;
 
-pub fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool) -> ImportBlock {
+use super::types::{AliasData, ImportBlock, ImportFromData};
+use super::AnnotatedImport;
+
+pub fn normalize_imports(
+    imports: Vec<AnnotatedImport>,
+    combine_as_imports: bool,
+    force_single_line: bool,
+) -> ImportBlock {
     let mut block = ImportBlock::default();
     for import in imports {
         match import {
@@ -54,7 +59,7 @@ pub fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool
                             .import_from_star
                             .entry(ImportFromData { module, level })
                             .or_default()
-                    } else if alias.asname.is_none() || combine_as_imports {
+                    } else if alias.asname.is_none() || combine_as_imports || force_single_line {
                         block
                             .import_from
                             .entry(ImportFromData { module, level })
@@ -88,7 +93,7 @@ pub fn normalize_imports(imports: Vec<AnnotatedImport>, combine_as_imports: bool
                             .import_from_star
                             .entry(ImportFromData { module, level })
                             .or_default()
-                    } else if alias.asname.is_none() || combine_as_imports {
+                    } else if alias.asname.is_none() || combine_as_imports || force_single_line {
                         block
                             .import_from
                             .entry(ImportFromData { module, level })

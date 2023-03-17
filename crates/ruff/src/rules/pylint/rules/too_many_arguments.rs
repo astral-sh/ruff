@@ -1,23 +1,22 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Arguments, Stmt};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::identifier_range;
 
-define_violation!(
-    pub struct TooManyArguments {
-        pub c_args: usize,
-        pub max_args: usize,
-    }
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct TooManyArguments {
+    pub c_args: usize,
+    pub max_args: usize,
+}
 
 impl Violation for TooManyArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
         let TooManyArguments { c_args, max_args } = self;
-        format!("Too many arguments to function call ({c_args}/{max_args})")
+        format!("Too many arguments to function call ({c_args} > {max_args})")
     }
 }
 
@@ -34,7 +33,7 @@ pub fn too_many_arguments(checker: &mut Checker, args: &Arguments, stmt: &Stmt) 
                 c_args: num_args,
                 max_args: checker.settings.pylint.max_args,
             },
-            Range::from_located(stmt),
+            identifier_range(stmt, checker.locator),
         ));
     }
 }

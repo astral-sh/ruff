@@ -1,15 +1,15 @@
-use crate::ast::types::{Range, Scope};
-use crate::registry::Diagnostic;
-use ruff_macros::{define_violation, derive_message_formats};
 use std::path::Path;
 
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::scope::Scope;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct UndefinedExport {
-        pub name: String,
-    }
-);
+#[violation]
+pub struct UndefinedExport {
+    pub name: String,
+}
+
 impl Violation for UndefinedExport {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -28,7 +28,7 @@ pub fn undefined_export(
     let mut diagnostics = Vec::new();
     if !scope.import_starred && !path.ends_with("__init__.py") {
         for name in names {
-            if !scope.bindings.contains_key(name) {
+            if !scope.defines(name) {
                 diagnostics.push(Diagnostic::new(
                     UndefinedExport {
                         name: (*name).to_string(),

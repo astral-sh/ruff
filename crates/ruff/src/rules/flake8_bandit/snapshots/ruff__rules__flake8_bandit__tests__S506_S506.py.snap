@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_bandit/mod.rs
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnsafeYAMLLoad:
-      loader: ~
+    name: UnsafeYAMLLoad
+    body: "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`."
+    suggestion: ~
+    fixable: false
   location:
     row: 10
     column: 8
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnsafeYAMLLoad:
-      loader: Loader
+    name: UnsafeYAMLLoad
+    body: "Probable use of unsafe loader `Loader` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`."
+    suggestion: ~
+    fixable: false
   location:
     row: 24
     column: 23

@@ -2,19 +2,17 @@ use anyhow::Result;
 use rustpython_parser::lexer::LexResult;
 
 use ruff_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
+use ruff_python_ast::source_code::Locator;
 
 use crate::attachment::attach;
 use crate::context::ASTFormatContext;
-use crate::core::locator::Locator;
 use crate::cst::Stmt;
 use crate::newlines::normalize_newlines;
 use crate::parentheses::normalize_parentheses;
 
 mod attachment;
-pub mod builders;
 pub mod cli;
 pub mod context;
-mod core;
 mod cst;
 mod format;
 mod newlines;
@@ -54,7 +52,7 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
             },
             locator,
         ),
-        [format::builders::block(&python_cst)]
+        [format::builders::statements(&python_cst)]
     )
     .map_err(Into::into)
 }
@@ -76,13 +74,7 @@ mod tests {
         pattern = "resources/test/fixtures/black/**/*.py",
         // Excluded tests because they reach unreachable when attaching tokens
         exclude = [
-            "*comments.py",
-            "*comments[3,5,8].py",
-            "*comments_non_breaking_space.py",
-            "*docstring_preview.py",
-            "*docstring.py",
-            "*fmtonoff.py",
-            "*fmtskip8.py",
+            "*comments8.py",
         ])
     ]
     #[test]

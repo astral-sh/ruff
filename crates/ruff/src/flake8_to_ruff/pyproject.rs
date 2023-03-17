@@ -5,6 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use super::black::Black;
 use super::isort::Isort;
+use super::pep621::Project;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tools {
@@ -15,6 +16,7 @@ pub struct Tools {
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Pyproject {
     pub tool: Option<Tools>,
+    pub project: Option<Project>,
 }
 
 pub fn parse<P: AsRef<Path>>(path: P) -> Result<Pyproject> {

@@ -1,13 +1,12 @@
-use std::ops::Deref;
 use std::path::{Path, PathBuf};
 
 use anyhow::{anyhow, Result};
+use globset::GlobMatcher;
 use log::debug;
 use path_absolutize::{path_dedot, Absolutize};
 use rustc_hash::FxHashSet;
 
 use crate::registry::Rule;
-use crate::settings::hashable::{HashableGlobMatcher, HashableHashSet};
 
 /// Extract the absolute path and basename (as strings) from a Path.
 pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
@@ -23,15 +22,12 @@ pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
 }
 
 /// Create a set with codes matching the pattern/code pairs.
-pub(crate) fn ignores_from_path<'a>(
+pub(crate) fn ignores_from_path(
     path: &Path,
-    pattern_code_pairs: &'a [(
-        HashableGlobMatcher,
-        HashableGlobMatcher,
-        HashableHashSet<Rule>,
-    )],
-) -> FxHashSet<&'a Rule> {
+    pattern_code_pairs: &[(GlobMatcher, GlobMatcher, FxHashSet<Rule>)],
+) -> FxHashSet<Rule> {
     let (file_path, file_basename) = extract_path_names(path).expect("Unable to parse filename");
+
     pattern_code_pairs
         .iter()
         .filter_map(|(absolute, basename, codes)| {
@@ -39,23 +35,24 @@ pub(crate) fn ignores_from_path<'a>(
                 debug!(
                     "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
                     path,
-                    basename.deref().glob().regex(),
-                    &**codes
+                    basename.glob().regex(),
+                    codes
                 );
-                return Some(codes.iter());
-            }
-            if absolute.is_match(file_path) {
+                Some(codes)
+            } else if absolute.is_match(file_path) {
                 debug!(
                     "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
                     path,
-                    absolute.deref().glob().regex(),
-                    &**codes
+                    absolute.glob().regex(),
+                    codes
                 );
-                return Some(codes.iter());
+                Some(codes)
+            } else {
+                None
             }
-            None
         })
         .flatten()
+        .copied()
         .collect()
 }
 
@@ -79,10 +76,20 @@ pub fn normalize_path_to<P: AsRef<Path>, R: AsRef<Path>>(path: P, project_root: 
 }
 
 /// Convert an absolute path to be relative to the current working directory.
-pub fn relativize_path(path: impl AsRef<Path>) -> String {
+pub fn relativize_path<P: AsRef<Path>>(path: P) -> String {
     let path = path.as_ref();
     if let Ok(path) = path.strip_prefix(&*path_dedot::CWD) {
         return format!("{}", path.display());
     }
     format!("{}", path.display())
+}
+
+/// Convert an absolute path to be relative to the specified project root.
+pub fn relativize_path_to<P: AsRef<Path>, R: AsRef<Path>>(path: P, project_root: R) -> String {
+    format!(
+        "{}",
+        pathdiff::diff_paths(&path, project_root)
+            .expect("Could not diff paths")
+            .display()
+    )
 }

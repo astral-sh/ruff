@@ -1,0 +1,161 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: MissingWhitespaceAroundArithmeticOperator
+    body: Missing whitespace around arithmetic operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 92
+    column: 3
+  end_location:
+    row: 92
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundArithmeticOperator
+    body: Missing whitespace around arithmetic operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 94
+    column: 4
+  end_location:
+    row: 94
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundArithmeticOperator
+    body: Missing whitespace around arithmetic operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 96
+    column: 4
+  end_location:
+    row: 96
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundArithmeticOperator
+    body: Missing whitespace around arithmetic operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 98
+    column: 10
+  end_location:
+    row: 98
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundArithmeticOperator
+    body: Missing whitespace around arithmetic operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 100
+    column: 10
+  end_location:
+    row: 100
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundArithmeticOperator
+    body: Missing whitespace around arithmetic operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 106
+    column: 6
+  end_location:
+    row: 106
+    column: 6
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundArithmeticOperator
+    body: Missing whitespace around arithmetic operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 106
+    column: 14
+  end_location:
+    row: 106
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundArithmeticOperator
+    body: Missing whitespace around arithmetic operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 110
+    column: 5
+  end_location:
+    row: 110
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundArithmeticOperator
+    body: Missing whitespace around arithmetic operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 112
+    column: 5
+  end_location:
+    row: 112
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundArithmeticOperator
+    body: Missing whitespace around arithmetic operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 114
+    column: 10
+  end_location:
+    row: 114
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundArithmeticOperator
+    body: Missing whitespace around arithmetic operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 114
+    column: 16
+  end_location:
+    row: 114
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: MissingWhitespaceAroundArithmeticOperator
+    body: Missing whitespace around arithmetic operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 116
+    column: 11
+  end_location:
+    row: 116
+    column: 11
+  fix: ~
+  parent: ~
+

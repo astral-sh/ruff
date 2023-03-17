@@ -1,0 +1,57 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: InvalidEnvvarDefault
+    body: "Invalid type for environment variable default; expected `str` or `None`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 3
+    column: 28
+  end_location:
+    row: 3
+    column: 30
+  fix: ~
+  parent: ~
+- kind:
+    name: InvalidEnvvarDefault
+    body: "Invalid type for environment variable default; expected `str` or `None`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 5
+    column: 30
+  end_location:
+    row: 5
+    column: 38
+  fix: ~
+  parent: ~
+- kind:
+    name: InvalidEnvvarDefault
+    body: "Invalid type for environment variable default; expected `str` or `None`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 6
+    column: 24
+  end_location:
+    row: 6
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    name: InvalidEnvvarDefault
+    body: "Invalid type for environment variable default; expected `str` or `None`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 10
+    column: 16
+  end_location:
+    row: 10
+    column: 26
+  fix: ~
+  parent: ~
+

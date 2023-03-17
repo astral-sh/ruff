@@ -2,23 +2,23 @@ use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
 use log::error;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use crate::ast::helpers::find_keyword;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
-use crate::source_code::Locator;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::find_keyword;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct RedundantOpenModes {
-        pub replacement: Option<String>,
-    }
-);
+use crate::checkers::ast::Checker;
+use crate::registry::Rule;
+
+#[violation]
+pub struct RedundantOpenModes {
+    pub replacement: Option<String>,
+}
+
 impl AlwaysAutofixableViolation for RedundantOpenModes {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -112,7 +112,7 @@ fn create_check(
         RedundantOpenModes {
             replacement: replacement_value.clone(),
         },
-        Range::from_located(expr),
+        Range::from(expr),
     );
     if patch {
         if let Some(content) = replacement_value {
@@ -134,7 +134,7 @@ fn create_check(
 }
 
 fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) -> Result<Fix> {
-    let content = locator.slice(&Range::new(expr.location, expr.end_location.unwrap()));
+    let content = locator.slice(Range::new(expr.location, expr.end_location.unwrap()));
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
     let mut fix_start: Option<Location> = None;
@@ -176,7 +176,7 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
 /// UP015
 pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
     // If `open` has been rebound, skip this check entirely.
-    if !checker.is_builtin(OPEN_FUNC_NAME) {
+    if !checker.ctx.is_builtin(OPEN_FUNC_NAME) {
         return;
     }
     let (mode_param, keywords): (Option<&Expr>, Vec<Keyword>) = match_open(expr);
@@ -193,7 +193,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                         &keyword.node.value,
                         mode.replacement_value(),
                         checker.locator,
-                        checker.patch(&Rule::RedundantOpenModes),
+                        checker.patch(Rule::RedundantOpenModes),
                     ));
                 }
             }
@@ -210,7 +210,7 @@ pub fn redundant_open_modes(checker: &mut Checker, expr: &Expr) {
                     mode_param,
                     mode.replacement_value(),
                     checker.locator,
-                    checker.patch(&Rule::RedundantOpenModes),
+                    checker.patch(Rule::RedundantOpenModes),
                 ));
             }
         }

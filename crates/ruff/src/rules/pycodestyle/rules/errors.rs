@@ -1,15 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ParseError;
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct IOError {
-        pub message: String,
-    }
-);
+#[violation]
+pub struct IOError {
+    pub message: String,
+}
+
+/// E902
 impl Violation for IOError {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -18,11 +18,11 @@ impl Violation for IOError {
     }
 }
 
-define_violation!(
-    pub struct SyntaxError {
-        pub message: String,
-    }
-);
+#[violation]
+pub struct SyntaxError {
+    pub message: String,
+}
+
 impl Violation for SyntaxError {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -31,6 +31,7 @@ impl Violation for SyntaxError {
     }
 }
 
+/// E901
 pub fn syntax_error(diagnostics: &mut Vec<Diagnostic>, parse_error: &ParseError) {
     diagnostics.push(Diagnostic::new(
         SyntaxError {

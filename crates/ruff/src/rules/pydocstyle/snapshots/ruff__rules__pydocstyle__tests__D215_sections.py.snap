@@ -3,39 +3,43 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SectionUnderlineNotOverIndented:
-      name: Returns
+    name: SectionUnderlineNotOverIndented
+    body: "Section underline is over-indented (\"Returns\")"
+    suggestion: "Remove over-indentation from \"Returns\" underline"
+    fixable: true
   location:
-    row: 147
+    row: 156
     column: 4
   end_location:
-    row: 153
+    row: 162
     column: 7
   fix:
     content: "    "
     location:
-      row: 150
+      row: 159
       column: 0
     end_location:
-      row: 150
+      row: 159
       column: 9
   parent: ~
 - kind:
-    SectionUnderlineNotOverIndented:
-      name: Returns
+    name: SectionUnderlineNotOverIndented
+    body: "Section underline is over-indented (\"Returns\")"
+    suggestion: "Remove over-indentation from \"Returns\" underline"
+    fixable: true
   location:
-    row: 161
+    row: 170
     column: 4
   end_location:
-    row: 165
+    row: 174
     column: 7
   fix:
     content: "    "
     location:
-      row: 164
+      row: 173
       column: 0
     end_location:
-      row: 164
+      row: 173
       column: 9
   parent: ~
 

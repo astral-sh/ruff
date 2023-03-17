@@ -1,20 +1,22 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
-use super::mutable_argument_default::is_mutable_func;
-use crate::ast::helpers::{compose_call_path, to_call_path};
-use crate::ast::types::{CallPath, Range};
-use crate::ast::visitor;
-use crate::ast::visitor::Visitor;
-use crate::checkers::ast::Checker;
-use crate::registry::{Diagnostic, DiagnosticKind};
-use crate::violation::Violation;
+use ruff_diagnostics::Violation;
+use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{compose_call_path, to_call_path};
+use ruff_python_ast::types::{CallPath, Range};
+use ruff_python_ast::visitor;
+use ruff_python_ast::visitor::Visitor;
 
-define_violation!(
-    pub struct FunctionCallArgumentDefault {
-        pub name: Option<String>,
-    }
-);
+use crate::checkers::ast::Checker;
+
+use super::mutable_argument_default::is_mutable_func;
+
+#[violation]
+pub struct FunctionCallArgumentDefault {
+    pub name: Option<String>,
+}
+
 impl Violation for FunctionCallArgumentDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -38,14 +40,17 @@ const IMMUTABLE_FUNCS: &[&[&str]] = &[
 ];
 
 fn is_immutable_func(checker: &Checker, func: &Expr, extend_immutable_calls: &[CallPath]) -> bool {
-    checker.resolve_call_path(func).map_or(false, |call_path| {
-        IMMUTABLE_FUNCS
-            .iter()
-            .any(|target| call_path.as_slice() == *target)
-            || extend_immutable_calls
+    checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            IMMUTABLE_FUNCS
                 .iter()
-                .any(|target| call_path == *target)
-    })
+                .any(|target| call_path.as_slice() == *target)
+                || extend_immutable_calls
+                    .iter()
+                    .any(|target| call_path == *target)
+        })
 }
 
 struct ArgumentDefaultVisitor<'a> {
@@ -70,7 +75,7 @@ where
                             name: compose_call_path(func),
                         }
                         .into(),
-                        Range::from_located(expr),
+                        Range::from(expr),
                     ));
                 }
                 visitor::walk_expr(self, expr);

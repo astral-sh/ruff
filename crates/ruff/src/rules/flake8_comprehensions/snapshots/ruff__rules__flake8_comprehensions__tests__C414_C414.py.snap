@@ -3,9 +3,10 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: list
-      outer: list
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `list` call within `list()`"
+    suggestion: "Remove the inner `list` call"
+    fixable: true
   location:
     row: 2
     column: 0
@@ -22,9 +23,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: tuple
-      outer: list
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `tuple` call within `list()`"
+    suggestion: "Remove the inner `tuple` call"
+    fixable: true
   location:
     row: 3
     column: 0
@@ -41,9 +43,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: list
-      outer: tuple
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `list` call within `tuple()`"
+    suggestion: "Remove the inner `list` call"
+    fixable: true
   location:
     row: 4
     column: 0
@@ -60,9 +63,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: tuple
-      outer: tuple
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `tuple` call within `tuple()`"
+    suggestion: "Remove the inner `tuple` call"
+    fixable: true
   location:
     row: 5
     column: 0
@@ -79,9 +83,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: set
-      outer: set
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `set` call within `set()`"
+    suggestion: "Remove the inner `set` call"
+    fixable: true
   location:
     row: 6
     column: 0
@@ -98,9 +103,10 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: list
-      outer: set
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `list` call within `set()`"
+    suggestion: "Remove the inner `list` call"
+    fixable: true
   location:
     row: 7
     column: 0
@@ -117,9 +123,10 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: tuple
-      outer: set
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `tuple` call within `set()`"
+    suggestion: "Remove the inner `tuple` call"
+    fixable: true
   location:
     row: 8
     column: 0
@@ -136,9 +143,10 @@ expression: diagnostics
       column: 13
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: sorted
-      outer: set
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `sorted` call within `set()`"
+    suggestion: "Remove the inner `sorted` call"
+    fixable: true
   location:
     row: 9
     column: 0
@@ -155,9 +163,10 @@ expression: diagnostics
       column: 14
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: reversed
-      outer: set
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `reversed` call within `set()`"
+    suggestion: "Remove the inner `reversed` call"
+    fixable: true
   location:
     row: 10
     column: 0
@@ -174,9 +183,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: list
-      outer: sorted
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `list` call within `sorted()`"
+    suggestion: "Remove the inner `list` call"
+    fixable: true
   location:
     row: 11
     column: 0
@@ -193,9 +203,10 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: tuple
-      outer: sorted
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `tuple` call within `sorted()`"
+    suggestion: "Remove the inner `tuple` call"
+    fixable: true
   location:
     row: 12
     column: 0
@@ -212,9 +223,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: sorted
-      outer: sorted
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `sorted` call within `sorted()`"
+    suggestion: "Remove the inner `sorted` call"
+    fixable: true
   location:
     row: 13
     column: 0
@@ -231,9 +243,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: reversed
-      outer: sorted
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `reversed` call within `sorted()`"
+    suggestion: "Remove the inner `reversed` call"
+    fixable: true
   location:
     row: 14
     column: 0
@@ -250,9 +263,10 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    UnnecessaryDoubleCastOrProcess:
-      inner: list
-      outer: tuple
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `list` call within `tuple()`"
+    suggestion: "Remove the inner `list` call"
+    fixable: true
   location:
     row: 15
     column: 0

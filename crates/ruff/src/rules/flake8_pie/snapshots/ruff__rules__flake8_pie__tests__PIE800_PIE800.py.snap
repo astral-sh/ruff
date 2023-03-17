@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessarySpread: ~
+    name: UnnecessarySpread
+    body: "Unnecessary spread `**`"
+    suggestion: ~
+    fixable: false
   location:
     row: 1
     column: 13
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessarySpread: ~
+    name: UnnecessarySpread
+    body: "Unnecessary spread `**`"
+    suggestion: ~
+    fixable: false
   location:
     row: 3
     column: 14
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessarySpread: ~
+    name: UnnecessarySpread
+    body: "Unnecessary spread `**`"
+    suggestion: ~
+    fixable: false
   location:
     row: 5
     column: 10
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnnecessarySpread: ~
+    name: UnnecessarySpread
+    body: "Unnecessary spread `**`"
+    suggestion: ~
+    fixable: false
   location:
     row: 7
     column: 18

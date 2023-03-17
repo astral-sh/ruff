@@ -1,16 +1,36 @@
-#![allow(dead_code)]
+#![allow(dead_code, unused_imports, unused_variables)]
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::DiagnosticKind;
+use ruff_diagnostics::Violation;
+use ruff_macros::{derive_message_formats, violation};
 
-use crate::registry::DiagnosticKind;
 use crate::rules::pycodestyle::logical_lines::LogicalLine;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct IndentationWithInvalidMultiple {
-        pub indent_size: usize,
-    }
-);
+/// ## What it does
+/// Checks for indentation with a non-multiple of 4 spaces.
+///
+/// ## Why is this bad?
+/// Per PEP 8, 4 spaces per indentation level should be preferred.
+///
+/// ## Example
+/// ```python
+/// if True:
+///    a = 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if True:
+///     a = 1
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+#[violation]
+pub struct IndentationWithInvalidMultiple {
+    pub indent_size: usize,
+}
+
 impl Violation for IndentationWithInvalidMultiple {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -19,11 +39,31 @@ impl Violation for IndentationWithInvalidMultiple {
     }
 }
 
-define_violation!(
-    pub struct IndentationWithInvalidMultipleComment {
-        pub indent_size: usize,
-    }
-);
+/// ## What it does
+/// Checks for indentation of comments with a non-multiple of 4 spaces.
+///
+/// ## Why is this bad?
+/// Per PEP 8, 4 spaces per indentation level should be preferred.
+///
+/// ## Example
+/// ```python
+/// if True:
+///    # a = 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if True:
+///     # a = 1
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+#[violation]
+pub struct IndentationWithInvalidMultipleComment {
+    pub indent_size: usize,
+}
+
 impl Violation for IndentationWithInvalidMultipleComment {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -32,9 +72,31 @@ impl Violation for IndentationWithInvalidMultipleComment {
     }
 }
 
-define_violation!(
-    pub struct NoIndentedBlock;
-);
+/// ## What it does
+/// Checks for indented blocks that are lacking indentation.
+///
+/// ## Why is this bad?
+/// All indented blocks should be indented; otherwise, they are not valid
+/// Python syntax.
+///
+/// ## Example
+/// ```python
+/// for item in items:
+/// pass
+///
+/// ```
+///
+/// Use instead:
+/// ```python
+/// for item in items:
+///     pass
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+#[violation]
+pub struct NoIndentedBlock;
+
 impl Violation for NoIndentedBlock {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -42,9 +104,32 @@ impl Violation for NoIndentedBlock {
     }
 }
 
-define_violation!(
-    pub struct NoIndentedBlockComment;
-);
+/// ## What it does
+/// Checks for comments in a code blocks that are lacking indentation.
+///
+/// ## Why is this bad?
+/// Comments within an indented block should themselves be indented, to
+/// indicate that they are part of the block.
+///
+/// ## Example
+/// ```python
+/// for item in items:
+/// # Hi
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// for item in items:
+///     # Hi
+///     pass
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+#[violation]
+pub struct NoIndentedBlockComment;
+
 impl Violation for NoIndentedBlockComment {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -52,9 +137,29 @@ impl Violation for NoIndentedBlockComment {
     }
 }
 
-define_violation!(
-    pub struct UnexpectedIndentation;
-);
+/// ## What it does
+/// Checks for unexpected indentation.
+///
+/// ## Why is this bad?
+/// Indentation outside of a code block is not valid Python syntax.
+///
+/// ## Example
+/// ```python
+/// a = 1
+///     b = 2
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 1
+/// b = 2
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+#[violation]
+pub struct UnexpectedIndentation;
+
 impl Violation for UnexpectedIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -62,9 +167,29 @@ impl Violation for UnexpectedIndentation {
     }
 }
 
-define_violation!(
-    pub struct UnexpectedIndentationComment;
-);
+/// ## What it does
+/// Checks for unexpected indentation of comment.
+///
+/// ## Why is this bad?
+/// Comments should match the indentation of the containing code block.
+///
+/// ## Example
+/// ```python
+/// a = 1
+///     # b = 2
+/// ```
+///
+/// Use instead:
+/// ```python
+/// a = 1
+/// # b = 2
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+#[violation]
+pub struct UnexpectedIndentationComment;
+
 impl Violation for UnexpectedIndentationComment {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -72,9 +197,31 @@ impl Violation for UnexpectedIndentationComment {
     }
 }
 
-define_violation!(
-    pub struct OverIndented;
-);
+/// ## What it does
+/// Checks for over-indented code.
+///
+/// ## Why is this bad?
+/// Per PEP 8, 4 spaces per indentation level should be preferred. Increased
+/// indentation can lead to inconsistent formatting, which can hurt
+/// readability.
+///
+/// ## Example
+/// ```python
+/// for item in items:
+///       pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// for item in items:
+///     pass
+/// ```
+///
+/// ## References
+/// - [PEP 8](https://peps.python.org/pep-0008/#indentation)
+#[violation]
+pub struct OverIndented;
+
 impl Violation for OverIndented {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -82,7 +229,7 @@ impl Violation for OverIndented {
     }
 }
 
-/// E111
+/// E111, E114, E112, E113, E115, E116, E117
 #[cfg(feature = "logical_lines")]
 pub fn indentation(
     logical_line: &LogicalLine,

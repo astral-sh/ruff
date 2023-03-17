@@ -1,14 +1,14 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct InvalidPrintSyntax;
-);
+use crate::checkers::ast::Checker;
+
+#[violation]
+pub struct InvalidPrintSyntax;
+
 impl Violation for InvalidPrintSyntax {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -24,11 +24,10 @@ pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
     if id != "print" {
         return;
     }
-    if !checker.is_builtin("print") {
+    if !checker.ctx.is_builtin("print") {
         return;
     };
-    checker.diagnostics.push(Diagnostic::new(
-        InvalidPrintSyntax,
-        Range::from_located(left),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(InvalidPrintSyntax, Range::from(left)));
 }

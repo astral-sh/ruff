@@ -1,18 +1,17 @@
 use std::path::Path;
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::scope::{Binding, BindingKind, ExecutionContext};
 
-use crate::ast::types::{Binding, BindingKind, ExecutionContext};
-use crate::registry::Diagnostic;
 use crate::rules::isort::{categorize, ImportType};
 use crate::settings::Settings;
-use crate::violation::Violation;
 
-define_violation!(
-    pub struct TypingOnlyFirstPartyImport {
-        pub full_name: String,
-    }
-);
+#[violation]
+pub struct TypingOnlyFirstPartyImport {
+    pub full_name: String,
+}
+
 impl Violation for TypingOnlyFirstPartyImport {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -23,11 +22,11 @@ impl Violation for TypingOnlyFirstPartyImport {
     }
 }
 
-define_violation!(
-    pub struct TypingOnlyThirdPartyImport {
-        pub full_name: String,
-    }
-);
+#[violation]
+pub struct TypingOnlyThirdPartyImport {
+    pub full_name: String,
+}
+
 impl Violation for TypingOnlyThirdPartyImport {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -38,11 +37,11 @@ impl Violation for TypingOnlyThirdPartyImport {
     }
 }
 
-define_violation!(
-    pub struct TypingOnlyStandardLibraryImport {
-        pub full_name: String,
-    }
-);
+#[violation]
+pub struct TypingOnlyStandardLibraryImport {
+    pub full_name: String,
+}
+
 impl Violation for TypingOnlyStandardLibraryImport {
     #[derive_message_formats]
     fn message(&self) -> String {

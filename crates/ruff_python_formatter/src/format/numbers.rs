@@ -1,11 +1,12 @@
-use ruff_formatter::prelude::*;
-use ruff_formatter::{write, Format};
-use ruff_text_size::TextSize;
 use rustpython_parser::ast::Location;
 
-use crate::builders::literal;
+use ruff_formatter::prelude::*;
+use ruff_formatter::{write, Format};
+use ruff_python_ast::types::Range;
+use ruff_text_size::TextSize;
+
 use crate::context::ASTFormatContext;
-use crate::core::types::Range;
+use crate::format::builders::literal;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 struct FloatAtom {
@@ -14,11 +15,14 @@ struct FloatAtom {
 
 impl Format<ASTFormatContext<'_>> for FloatAtom {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let (source, start, end) = f.context().locator().slice(self.range);
+        let locator = f.context().locator();
+        let contents = f.context().contents();
+        let start_index = locator.offset(self.range.location);
+        let end_index = locator.offset(self.range.end_location);
 
-        if let Some(dot_index) = source[start..end].find('.') {
-            let integer = &source[start..start + dot_index];
-            let fractional = &source[start + dot_index + 1..end];
+        if let Some(dot_index) = contents[start_index..end_index].find('.') {
+            let integer = &contents[start_index..start_index + dot_index];
+            let fractional = &contents[start_index + dot_index + 1..end_index];
 
             if integer.is_empty() {
                 write!(f, [text("0")])?;
@@ -71,12 +75,15 @@ pub struct FloatLiteral {
 
 impl Format<ASTFormatContext<'_>> for FloatLiteral {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let (source, start, end) = f.context().locator().slice(self.range);
+        let locator = f.context().locator();
+        let contents = f.context().contents();
+        let start_index = locator.offset(self.range.location);
+        let end_index = locator.offset(self.range.end_location);
 
         // Scientific notation
-        if let Some(exponent_index) = source[start..end]
+        if let Some(exponent_index) = contents[start_index..end_index]
             .find('e')
-            .or_else(|| source[start..end].find('E'))
+            .or_else(|| contents[start_index..end_index].find('E'))
         {
             // Write the base.
             write!(
@@ -93,7 +100,7 @@ impl Format<ASTFormatContext<'_>> for FloatLiteral {
             write!(f, [text("e")])?;
 
             // Write the exponent, omitting the sign if it's positive.
-            let plus = source[start + exponent_index + 1..end].starts_with('+');
+            let plus = contents[start_index + exponent_index + 1..end_index].starts_with('+');
             write!(
                 f,
                 [literal(Range::new(
@@ -124,13 +131,16 @@ pub struct IntLiteral {
 
 impl Format<ASTFormatContext<'_>> for IntLiteral {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let (source, start, end) = f.context().locator().slice(self.range);
+        let locator = f.context().locator();
+        let contents = f.context().contents();
+        let start_index = locator.offset(self.range.location);
+        let end_index = locator.offset(self.range.end_location);
 
         for prefix in ["0b", "0B", "0o", "0O", "0x", "0X"] {
-            if source[start..end].starts_with(prefix) {
+            if contents[start_index..end_index].starts_with(prefix) {
                 // In each case, the prefix must be lowercase, while the suffix must be uppercase.
-                let prefix = &source[start..start + prefix.len()];
-                let suffix = &source[start + prefix.len()..end];
+                let prefix = &contents[start_index..start_index + prefix.len()];
+                let suffix = &contents[start_index + prefix.len()..end_index];
 
                 if prefix.bytes().any(|b| b.is_ascii_uppercase())
                     || suffix.bytes().any(|b| b.is_ascii_lowercase())
@@ -170,11 +180,14 @@ pub struct ComplexLiteral {
 
 impl Format<ASTFormatContext<'_>> for ComplexLiteral {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let (source, start, end) = f.context().locator().slice(self.range);
+        let locator = f.context().locator();
+        let contents = f.context().contents();
+        let start_index = locator.offset(self.range.location);
+        let end_index = locator.offset(self.range.end_location);
 
-        if source[start..end].ends_with('j') {
+        if contents[start_index..end_index].ends_with('j') {
             write!(f, [literal(self.range)])?;
-        } else if source[start..end].ends_with('J') {
+        } else if contents[start_index..end_index].ends_with('J') {
             write!(
                 f,
                 [literal(Range::new(

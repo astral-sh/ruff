@@ -1,17 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Operator};
 
-use crate::ast::helpers::unparse_expr;
-use crate::ast::types::Range;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    // TODO: document referencing [PEP 604]: https://peps.python.org/pep-0604/
-    pub struct TypingUnion;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+// TODO: document referencing [PEP 604]: https://peps.python.org/pep-0604/
+#[violation]
+pub struct TypingUnion;
+
 impl AlwaysAutofixableViolation for TypingUnion {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -82,10 +82,10 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         return;
     }
 
-    let Some(typing_member) = checker.resolve_call_path(value).as_ref().and_then(|call_path| {
-        if checker.match_typing_call_path(call_path, "Optional") {
+    let Some(typing_member) = checker.ctx.resolve_call_path(value).as_ref().and_then(|call_path| {
+        if checker.ctx.match_typing_call_path(call_path, "Optional") {
             Some(TypingMember::Optional)
-        } else if checker.match_typing_call_path(call_path, "Union") {
+        } else if checker.ctx.match_typing_call_path(call_path, "Union") {
             Some(TypingMember::Union)
         } else {
             None
@@ -96,7 +96,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
 
     match typing_member {
         TypingMember::Optional => {
-            let mut diagnostic = Diagnostic::new(TypingUnion, Range::from_located(expr));
+            let mut diagnostic = Diagnostic::new(TypingUnion, Range::from(expr));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     unparse_expr(&optional(slice), checker.stylist),
@@ -107,7 +107,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             checker.diagnostics.push(diagnostic);
         }
         TypingMember::Union => {
-            let mut diagnostic = Diagnostic::new(TypingUnion, Range::from_located(expr));
+            let mut diagnostic = Diagnostic::new(TypingUnion, Range::from(expr));
             if checker.patch(diagnostic.kind.rule()) {
                 match &slice.node {
                     ExprKind::Slice { .. } => {

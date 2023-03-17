@@ -1,14 +1,32 @@
 use itertools::izip;
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use crate::checkers::ast::Checker;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct TypeComparison;
-);
+/// ## What it does
+/// Checks for object type comparisons without using isinstance().
+///
+/// ## Why is this bad?
+/// Do not compare types directly.
+/// When checking if an object is a instance of a certain type, keep in mind that it might
+/// be subclassed. E.g. `bool` inherits from `int` or `Exception` inherits from `BaseException`.
+///
+/// ## Example
+/// ```python
+/// if type(obj) is type(1):
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if isinstance(obj, int):
+/// if type(a1) is type(b1):
+/// ```
+#[violation]
+pub struct TypeComparison;
+
 impl Violation for TypeComparison {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -17,9 +35,7 @@ impl Violation for TypeComparison {
 }
 
 /// E721
-pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = vec![];
-
+pub fn type_comparison(checker: &mut Checker, expr: &Expr, ops: &[Cmpop], comparators: &[Expr]) {
     for (op, right) in izip!(ops, comparators) {
         if !matches!(op, Cmpop::Is | Cmpop::IsNot | Cmpop::Eq | Cmpop::NotEq) {
             continue;
@@ -27,8 +43,8 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
         match &right.node {
             ExprKind::Call { func, args, .. } => {
                 if let ExprKind::Name { id, .. } = &func.node {
-                    // Ex) type(False)
-                    if id == "type" {
+                    // Ex) `type(False)`
+                    if id == "type" && checker.ctx.is_builtin("type") {
                         if let Some(arg) = args.first() {
                             // Allow comparison for types which are not obvious.
                             if !matches!(
@@ -39,7 +55,9 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
                                         kind: None
                                     }
                             ) {
-                                diagnostics.push(Diagnostic::new(TypeComparison, location));
+                                checker
+                                    .diagnostics
+                                    .push(Diagnostic::new(TypeComparison, Range::from(expr)));
                             }
                         }
                     }
@@ -47,15 +65,22 @@ pub fn type_comparison(ops: &[Cmpop], comparators: &[Expr], location: Range) -> 
             }
             ExprKind::Attribute { value, .. } => {
                 if let ExprKind::Name { id, .. } = &value.node {
-                    // Ex) types.IntType
-                    if id == "types" {
-                        diagnostics.push(Diagnostic::new(TypeComparison, location));
+                    // Ex) `types.NoneType`
+                    if id == "types"
+                        && checker
+                            .ctx
+                            .resolve_call_path(value)
+                            .map_or(false, |call_path| {
+                                call_path.first().map_or(false, |module| *module == "types")
+                            })
+                    {
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(TypeComparison, Range::from(expr)));
                     }
                 }
             }
             _ => {}
         }
     }
-
-    diagnostics
 }

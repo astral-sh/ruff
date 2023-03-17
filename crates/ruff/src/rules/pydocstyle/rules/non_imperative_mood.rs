@@ -1,20 +1,28 @@
+use std::collections::BTreeSet;
+
 use imperative::Mood;
 use once_cell::sync::Lazy;
-use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::ast::cast;
-use crate::ast::types::Range;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::cast;
+use ruff_python_ast::helpers::to_call_path;
+use ruff_python_ast::newlines::StrExt;
+use ruff_python_ast::types::{CallPath, Range};
+use ruff_python_ast::visibility::{is_property, is_test};
+
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
-use crate::registry::Diagnostic;
 use crate::rules::pydocstyle::helpers::normalize_word;
-use crate::violation::Violation;
-use crate::visibility::{is_property, is_test};
 
 static MOOD: Lazy<Mood> = Lazy::new(Mood::new);
 
 /// D401
-pub fn non_imperative_mood(checker: &mut Checker, docstring: &Docstring) {
+pub fn non_imperative_mood(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    property_decorators: &BTreeSet<String>,
+) {
     let (
         DefinitionKind::Function(parent)
         | DefinitionKind::NestedFunction(parent)
@@ -22,14 +30,26 @@ pub fn non_imperative_mood(checker: &mut Checker, docstring: &Docstring) {
     ) = &docstring.kind else {
         return;
     };
-    if is_test(cast::name(parent)) || is_property(checker, cast::decorator_list(parent)) {
+
+    let property_decorators = property_decorators
+        .iter()
+        .map(|decorator| to_call_path(decorator))
+        .collect::<Vec<CallPath>>();
+
+    if is_test(cast::name(parent))
+        || is_property(
+            &checker.ctx,
+            cast::decorator_list(parent),
+            &property_decorators,
+        )
+    {
         return;
     }
 
     let body = docstring.body;
 
     // Find first line, disregarding whitespace.
-    let line = match body.trim().lines().next() {
+    let line = match body.trim().universal_newlines().next() {
         Some(line) => line.trim(),
         None => return,
     };
@@ -44,15 +64,15 @@ pub fn non_imperative_mood(checker: &mut Checker, docstring: &Docstring) {
     if let Some(false) = MOOD.is_imperative(&first_word_norm) {
         let diagnostic = Diagnostic::new(
             NonImperativeMood(line.to_string()),
-            Range::from_located(docstring.expr),
+            Range::from(docstring.expr),
         );
         checker.diagnostics.push(diagnostic);
     }
 }
 
-define_violation!(
-    pub struct NonImperativeMood(pub String);
-);
+#[violation]
+pub struct NonImperativeMood(pub String);
+
 impl Violation for NonImperativeMood {
     #[derive_message_formats]
     fn message(&self) -> String {

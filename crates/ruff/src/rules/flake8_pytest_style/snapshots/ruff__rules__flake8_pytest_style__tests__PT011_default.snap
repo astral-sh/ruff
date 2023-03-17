@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_pytest_style/mod.rs
+source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RaisesTooBroad:
-      exception: ValueError
+    name: RaisesTooBroad
+    body: "`pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception"
+    suggestion: ~
+    fixable: false
   location:
     row: 17
     column: 23
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesTooBroad:
-      exception: socket.error
+    name: RaisesTooBroad
+    body: "`pytest.raises(socket.error)` is too broad, set the `match` parameter or use a more specific exception"
+    suggestion: ~
+    fixable: false
   location:
     row: 20
     column: 23
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesTooBroad:
-      exception: ValueError
+    name: RaisesTooBroad
+    body: "`pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception"
+    suggestion: ~
+    fixable: false
   location:
     row: 25
     column: 23
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesTooBroad:
-      exception: ValueError
+    name: RaisesTooBroad
+    body: "`pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception"
+    suggestion: ~
+    fixable: false
   location:
     row: 28
     column: 23
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    RaisesTooBroad:
-      exception: ValueError
+    name: RaisesTooBroad
+    body: "`pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception"
+    suggestion: ~
+    fixable: false
   location:
     row: 31
     column: 23

@@ -1,47 +1,48 @@
 use rustpython_parser::ast::{Constant, Expr, StmtKind};
 use rustpython_parser::ast::{ExprKind, Stmt};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
 
 use super::helpers;
 
-define_violation!(
-    /// ## What it does
-    /// Checks that `__str__` method is defined in Django models.
-    ///
-    /// ## Why is this bad?
-    /// Django models should define `__str__` method to return a string representation
-    /// of the model instance, as Django calls this method to display the object in
-    /// the Django Admin and elsewhere.
-    ///
-    /// Models without `__str__` method will display a non-meaningful representation
-    /// of the object in the Django Admin.
-    ///
-    /// ## Example
-    /// ```python
-    /// from django.db import models
-    ///
-    /// class MyModel(models.Model):
-    ///    field = models.CharField(max_length=255)
-    /// ```
-    ///
-    /// Use instead:
-    /// ```python
-    /// from django.db import models
-    ///
-    /// class MyModel(models.Model):
-    ///    field = models.CharField(max_length=255)
-    ///
-    ///   def __str__(self):
-    ///      return f"{self.field}"
-    /// ```
-    pub struct ModelWithoutDunderStr;
-);
+/// ## What it does
+/// Checks that `__str__` method is defined in Django models.
+///
+/// ## Why is this bad?
+/// Django models should define `__str__` method to return a string representation
+/// of the model instance, as Django calls this method to display the object in
+/// the Django Admin and elsewhere.
+///
+/// Models without `__str__` method will display a non-meaningful representation
+/// of the object in the Django Admin.
+///
+/// ## Example
+/// ```python
+/// from django.db import models
+///
+///
+/// class MyModel(models.Model):
+///     field = models.CharField(max_length=255)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from django.db import models
+///
+///
+/// class MyModel(models.Model):
+///     field = models.CharField(max_length=255)
+///
+///     def __str__(self):
+///         return f"{self.field}"
+/// ```
+#[violation]
+pub struct ModelWithoutDunderStr;
+
 impl Violation for ModelWithoutDunderStr {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -62,7 +63,7 @@ pub fn model_without_dunder_str(
     if !has_dunder_method(body) {
         return Some(Diagnostic::new(
             ModelWithoutDunderStr,
-            Range::from_located(class_location),
+            Range::from(class_location),
         ));
     }
     None

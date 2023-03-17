@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnnecessaryListComprehensionSet: ~
+    name: UnnecessaryListComprehensionSet
+    body: "Unnecessary `list` comprehension (rewrite as a `set` comprehension)"
+    suggestion: "Rewrite as a `set` comprehension"
+    fixable: true
   location:
     row: 1
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    UnnecessaryListComprehensionSet: ~
+    name: UnnecessaryListComprehensionSet
+    body: "Unnecessary `list` comprehension (rewrite as a `set` comprehension)"
+    suggestion: "Rewrite as a `set` comprehension"
+    fixable: true
   location:
     row: 2
     column: 4

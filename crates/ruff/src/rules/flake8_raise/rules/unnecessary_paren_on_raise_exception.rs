@@ -1,15 +1,15 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::ast::helpers::match_parens;
-use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::Diagnostic;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::match_parens;
 
-define_violation!(
-    pub struct UnnecessaryParenOnRaiseException;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+
+#[violation]
+pub struct UnnecessaryParenOnRaiseException;
+
 impl AlwaysAutofixableViolation for UnnecessaryParenOnRaiseException {
     #[derive_message_formats]
     fn message(&self) -> String {

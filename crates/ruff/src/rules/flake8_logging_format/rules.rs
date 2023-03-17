@@ -1,11 +1,12 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location, Operator};
 
-use crate::ast::helpers::{find_keyword, is_logger_candidate, SimpleCallArgs};
-use crate::ast::logging::LoggingLevel;
-use crate::ast::types::Range;
+use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_python_ast::helpers::{find_keyword, is_logger_candidate, SimpleCallArgs};
+use ruff_python_ast::logging::LoggingLevel;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
-use crate::fix::Fix;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::{AsRule, Rule};
 use crate::rules::flake8_logging_format::violations::{
     LoggingExcInfo, LoggingExtraAttrClash, LoggingFString, LoggingPercentFormat,
     LoggingRedundantExcInfo, LoggingStringConcat, LoggingStringFormat, LoggingWarn,
@@ -42,40 +43,37 @@ fn check_msg(checker: &mut Checker, msg: &Expr) {
         // Check for string concatenation and percent format.
         ExprKind::BinOp { op, .. } => match op {
             Operator::Add => {
-                if checker.settings.rules.enabled(&Rule::LoggingStringConcat) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        LoggingStringConcat,
-                        Range::from_located(msg),
-                    ));
+                if checker.settings.rules.enabled(Rule::LoggingStringConcat) {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(LoggingStringConcat, Range::from(msg)));
                 }
             }
             Operator::Mod => {
-                if checker.settings.rules.enabled(&Rule::LoggingPercentFormat) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        LoggingPercentFormat,
-                        Range::from_located(msg),
-                    ));
+                if checker.settings.rules.enabled(Rule::LoggingPercentFormat) {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(LoggingPercentFormat, Range::from(msg)));
                 }
             }
             _ => {}
         },
         // Check for f-strings.
         ExprKind::JoinedStr { .. } => {
-            if checker.settings.rules.enabled(&Rule::LoggingFString) {
+            if checker.settings.rules.enabled(Rule::LoggingFString) {
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(LoggingFString, Range::from_located(msg)));
+                    .push(Diagnostic::new(LoggingFString, Range::from(msg)));
             }
         }
         // Check for .format() calls.
         ExprKind::Call { func, .. } => {
-            if checker.settings.rules.enabled(&Rule::LoggingStringFormat) {
+            if checker.settings.rules.enabled(Rule::LoggingStringFormat) {
                 if let ExprKind::Attribute { value, attr, .. } = &func.node {
                     if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            LoggingStringFormat,
-                            Range::from_located(msg),
-                        ));
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(LoggingStringFormat, Range::from(msg)));
                     }
                 }
             }
@@ -98,7 +96,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
                         if RESERVED_ATTRS.contains(&string.as_str()) {
                             checker.diagnostics.push(Diagnostic::new(
                                 LoggingExtraAttrClash(string.to_string()),
-                                Range::from_located(key),
+                                Range::from(key),
                             ));
                         }
                     }
@@ -107,6 +105,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
         }
         ExprKind::Call { func, keywords, .. } => {
             if checker
+                .ctx
                 .resolve_call_path(func)
                 .map_or(false, |call_path| call_path.as_slice() == ["", "dict"])
             {
@@ -115,7 +114,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
                         if RESERVED_ATTRS.contains(&key.as_str()) {
                             checker.diagnostics.push(Diagnostic::new(
                                 LoggingExtraAttrClash(key.to_string()),
-                                Range::from_located(keyword),
+                                Range::from(keyword),
                             ));
                         }
                     }
@@ -133,7 +132,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
     }
 
     if let ExprKind::Attribute { value, attr, .. } = &func.node {
-        if let Some(logging_level) = LoggingLevel::from_str(attr.as_str()) {
+        if let Some(logging_level) = LoggingLevel::from_attribute(attr.as_str()) {
             let call_args = SimpleCallArgs::new(args, keywords);
             let level_call_range = Range::new(
                 Location::new(
@@ -147,12 +146,12 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             );
 
             // G001 - G004
-            if let Some(format_arg) = call_args.get_argument("msg", Some(0)) {
+            if let Some(format_arg) = call_args.argument("msg", 0) {
                 check_msg(checker, format_arg);
             }
 
             // G010
-            if checker.settings.rules.enabled(&Rule::LoggingWarn)
+            if checker.settings.rules.enabled(Rule::LoggingWarn)
                 && matches!(logging_level, LoggingLevel::Warn)
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
@@ -167,20 +166,20 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             }
 
             // G101
-            if checker.settings.rules.enabled(&Rule::LoggingExtraAttrClash) {
+            if checker.settings.rules.enabled(Rule::LoggingExtraAttrClash) {
                 if let Some(extra) = find_keyword(keywords, "extra") {
                     check_log_record_attr_clash(checker, extra);
                 }
             }
 
             // G201, G202
-            if checker.settings.rules.enabled(&Rule::LoggingExcInfo)
+            if checker.settings.rules.enabled(Rule::LoggingExcInfo)
                 || checker
                     .settings
                     .rules
-                    .enabled(&Rule::LoggingRedundantExcInfo)
+                    .enabled(Rule::LoggingRedundantExcInfo)
             {
-                if !checker.in_exception_handler() {
+                if !checker.ctx.in_exception_handler() {
                     return;
                 }
                 if let Some(exc_info) = find_keyword(keywords, "exc_info") {
@@ -193,9 +192,12 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                             ..
                         }
                     ) || if let ExprKind::Call { func, .. } = &exc_info.node.value.node {
-                        checker.resolve_call_path(func).map_or(false, |call_path| {
-                            call_path.as_slice() == ["sys", "exc_info"]
-                        })
+                        checker
+                            .ctx
+                            .resolve_call_path(func)
+                            .map_or(false, |call_path| {
+                                call_path.as_slice() == ["sys", "exc_info"]
+                            })
                     } else {
                         false
                     }) {
@@ -204,7 +206,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
 
                     match logging_level {
                         LoggingLevel::Error => {
-                            if checker.settings.rules.enabled(&Rule::LoggingExcInfo) {
+                            if checker.settings.rules.enabled(Rule::LoggingExcInfo) {
                                 checker
                                     .diagnostics
                                     .push(Diagnostic::new(LoggingExcInfo, level_call_range));
@@ -214,11 +216,11 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                             if checker
                                 .settings
                                 .rules
-                                .enabled(&Rule::LoggingRedundantExcInfo)
+                                .enabled(Rule::LoggingRedundantExcInfo)
                             {
                                 checker.diagnostics.push(Diagnostic::new(
                                     LoggingRedundantExcInfo,
-                                    Range::from_located(exc_info),
+                                    Range::from(exc_info),
                                 ));
                             }
                         }

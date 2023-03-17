@@ -1,16 +1,16 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-use super::super::helpers::{matches_password_name, string_literal};
-use crate::ast::types::Range;
-use crate::registry::Diagnostic;
-use crate::violation::Violation;
+use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct HardcodedPasswordString {
-        pub string: String,
-    }
-);
+use super::super::helpers::{matches_password_name, string_literal};
+
+#[violation]
+pub struct HardcodedPasswordString {
+    pub string: String,
+}
+
 impl Violation for HardcodedPasswordString {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -52,7 +52,7 @@ pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -
                 HardcodedPasswordString {
                     string: string.to_string(),
                 },
-                Range::from_located(comp),
+                Range::from(comp),
             ))
         })
         .collect()
@@ -67,7 +67,7 @@ pub fn assign_hardcoded_password_string(value: &Expr, targets: &[Expr]) -> Optio
                     HardcodedPasswordString {
                         string: string.to_string(),
                     },
-                    Range::from_located(value),
+                    Range::from(value),
                 ));
             }
         }

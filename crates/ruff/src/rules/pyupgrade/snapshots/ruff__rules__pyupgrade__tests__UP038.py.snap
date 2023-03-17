@@ -1,0 +1,45 @@
+---
+source: crates/ruff/src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: IsinstanceWithTuple
+    body: "Use `X | Y` in `isinstance` call instead of `(X, Y)`"
+    suggestion: "Convert to `X | Y`"
+    fixable: true
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 27
+  fix:
+    content: int | float
+    location:
+      row: 1
+      column: 14
+    end_location:
+      row: 1
+      column: 26
+  parent: ~
+- kind:
+    name: IsinstanceWithTuple
+    body: "Use `X | Y` in `issubclass` call instead of `(X, Y)`"
+    suggestion: "Convert to `X | Y`"
+    fixable: true
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 36
+  fix:
+    content: int | float | str
+    location:
+      row: 2
+      column: 18
+    end_location:
+      row: 2
+      column: 35
+  parent: ~
+

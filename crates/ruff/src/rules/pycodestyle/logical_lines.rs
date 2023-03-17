@@ -3,8 +3,10 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use crate::ast::types::Range;
-use crate::source_code::Locator;
+use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
+
+use crate::rules::pycodestyle::helpers::{is_keyword_token, is_op_token};
 
 bitflags! {
     #[derive(Default)]
@@ -62,36 +64,7 @@ fn build_line<'a>(
             continue;
         }
 
-        if matches!(
-            tok,
-            Tok::Amper
-                | Tok::AmperEqual
-                | Tok::CircumFlex
-                | Tok::CircumflexEqual
-                | Tok::Colon
-                | Tok::ColonEqual
-                | Tok::DoubleSlash
-                | Tok::DoubleSlashEqual
-                | Tok::DoubleStar
-                | Tok::Equal
-                | Tok::Greater
-                | Tok::GreaterEqual
-                | Tok::Less
-                | Tok::LessEqual
-                | Tok::Minus
-                | Tok::MinusEqual
-                | Tok::NotEqual
-                | Tok::Percent
-                | Tok::PercentEqual
-                | Tok::Plus
-                | Tok::PlusEqual
-                | Tok::Slash
-                | Tok::SlashEqual
-                | Tok::Star
-                | Tok::StarEqual
-                | Tok::Vbar
-                | Tok::VbarEqual
-        ) {
+        if is_op_token(tok) {
             flags.insert(TokenFlags::OPERATOR);
         }
 
@@ -106,52 +79,17 @@ fn build_line<'a>(
             flags.insert(TokenFlags::PUNCTUATION);
         }
 
-        if matches!(
-            tok,
-            Tok::False
-                | Tok::None
-                | Tok::True
-                | Tok::And
-                | Tok::As
-                | Tok::Assert
-                | Tok::Async
-                | Tok::Await
-                | Tok::Break
-                | Tok::Class
-                | Tok::Continue
-                | Tok::Def
-                | Tok::Del
-                | Tok::Elif
-                | Tok::Else
-                | Tok::Except
-                | Tok::Finally
-                | Tok::For
-                | Tok::From
-                | Tok::Global
-                | Tok::If
-                | Tok::Import
-                | Tok::In
-                | Tok::Is
-                | Tok::Lambda
-                | Tok::Nonlocal
-                | Tok::Not
-                | Tok::Or
-                | Tok::Pass
-                | Tok::Raise
-                | Tok::Return
-                | Tok::Try
-                | Tok::While
-                | Tok::With
-                | Tok::Yield
-        ) {
+        if is_keyword_token(tok) {
             flags.insert(TokenFlags::KEYWORD);
         }
 
         // TODO(charlie): "Mute" strings.
-        let text = if let Tok::String { .. } = tok {
-            "\"xxx\""
+        let s;
+        let text = if let Tok::String { value, .. } = tok {
+            s = format!("\"{}\"", "x".repeat(value.len()).clone());
+            &s
         } else {
-            locator.slice(&Range {
+            locator.slice(Range {
                 location: *start,
                 end_location: *end,
             })
@@ -159,7 +97,7 @@ fn build_line<'a>(
 
         if let Some(prev) = prev {
             if prev.row() != start.row() {
-                let prev_text = locator.slice(&Range {
+                let prev_text = locator.slice(Range {
                     location: Location::new(prev.row(), prev.column() - 1),
                     end_location: Location::new(prev.row(), prev.column()),
                 });
@@ -171,7 +109,7 @@ fn build_line<'a>(
                     length += 1;
                 }
             } else if prev.column() != start.column() {
-                let prev_text = locator.slice(&Range {
+                let prev_text = locator.slice(Range {
                     location: *prev,
                     end_location: *start,
                 });

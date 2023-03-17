@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UnexpectedIndentationComment: ~
+    name: UnexpectedIndentationComment
+    body: Unexpected indentation (comment)
+    suggestion: ~
+    fixable: false
   location:
     row: 15
     column: 5
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedIndentationComment: ~
+    name: UnexpectedIndentationComment
+    body: Unexpected indentation (comment)
+    suggestion: ~
+    fixable: false
   location:
     row: 22
     column: 12
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedIndentationComment: ~
+    name: UnexpectedIndentationComment
+    body: Unexpected indentation (comment)
+    suggestion: ~
+    fixable: false
   location:
     row: 24
     column: 12
@@ -33,7 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    UnexpectedIndentationComment: ~
+    name: UnexpectedIndentationComment
+    body: Unexpected indentation (comment)
+    suggestion: ~
+    fixable: false
   location:
     row: 26
     column: 12

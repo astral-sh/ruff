@@ -20,6 +20,7 @@ use crate::rules::{
 };
 use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
+use crate::settings::types::PythonVersion;
 use crate::warn_user;
 
 const DEFAULT_SELECTORS: &[RuleSelector] = &[
@@ -424,6 +425,15 @@ pub fn convert(
         }
     }
 
+    if let Some(project) = &external_config.project {
+        if let Some(requires_python) = &project.requires_python {
+            if options.target_version.is_none() {
+                options.target_version =
+                    PythonVersion::get_minimum_supported_version(requires_python);
+            }
+        }
+    }
+
     // Create the pyproject.toml.
     Ok(Pyproject::new(options))
 }
@@ -439,13 +449,17 @@ fn resolve_select(plugins: &[Plugin]) -> HashSet<RuleSelector> {
 #[cfg(test)]
 mod tests {
     use std::collections::HashMap;
+    use std::str::FromStr;
 
     use anyhow::Result;
     use itertools::Itertools;
+    use pep440_rs::VersionSpecifiers;
+    use pretty_assertions::assert_eq;
 
     use super::super::plugin::Plugin;
     use super::convert;
     use crate::flake8_to_ruff::converter::DEFAULT_SELECTORS;
+    use crate::flake8_to_ruff::pep621::Project;
     use crate::flake8_to_ruff::ExternalConfig;
     use crate::registry::Linter;
     use crate::rule_selector::RuleSelector;
@@ -453,6 +467,7 @@ mod tests {
     use crate::rules::{flake8_quotes, pydocstyle};
     use crate::settings::options::Options;
     use crate::settings::pyproject::Pyproject;
+    use crate::settings::types::PythonVersion;
 
     fn default_options(plugins: impl IntoIterator<Item = RuleSelector>) -> Options {
         Options {
@@ -576,6 +591,8 @@ mod tests {
         let expected = Pyproject::new(Options {
             pydocstyle: Some(pydocstyle::settings::Options {
                 convention: Some(Convention::Numpy),
+                ignore_decorators: None,
+                property_decorators: None,
             }),
             ..default_options([Linter::Pydocstyle.into()])
         });
@@ -602,6 +619,27 @@ mod tests {
                 avoid_escape: None,
             }),
             ..default_options([Linter::Flake8Quotes.into()])
+        });
+        assert_eq!(actual, expected);
+
+        Ok(())
+    }
+
+    #[test]
+    fn it_converts_project_requires_python() -> Result<()> {
+        let actual = convert(
+            &HashMap::from([("flake8".to_string(), HashMap::default())]),
+            &ExternalConfig {
+                project: Some(&Project {
+                    requires_python: Some(VersionSpecifiers::from_str(">=3.8.16, <3.11")?),
+                }),
+                ..ExternalConfig::default()
+            },
+            Some(vec![]),
+        )?;
+        let expected = Pyproject::new(Options {
+            target_version: Some(PythonVersion::Py38),
+            ..default_options([])
         });
         assert_eq!(actual, expected);
 

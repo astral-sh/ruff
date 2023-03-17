@@ -1,8 +1,9 @@
 //! Settings for the `flake8-comprehensions` plugin.
 
-use ruff_macros::ConfigurationOptions;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 #[derive(
     Debug, PartialEq, Eq, Default, Serialize, Deserialize, ConfigurationOptions, JsonSchema,
@@ -22,7 +23,7 @@ pub struct Options {
     pub allow_dict_calls_with_keyword_arguments: Option<bool>,
 }
 
-#[derive(Debug, Default, Hash)]
+#[derive(Debug, Default, CacheKey)]
 pub struct Settings {
     pub allow_dict_calls_with_keyword_arguments: bool,
 }

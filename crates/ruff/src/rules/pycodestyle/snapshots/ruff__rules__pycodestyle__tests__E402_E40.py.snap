@@ -1,9 +1,12 @@
 ---
-source: src/rules/pycodestyle/mod.rs
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ModuleImportNotAtTopOfFile: ~
+    name: ModuleImportNotAtTopOfFile
+    body: Module level import not at top of file
+    suggestion: ~
+    fixable: false
   location:
     row: 55
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModuleImportNotAtTopOfFile: ~
+    name: ModuleImportNotAtTopOfFile
+    body: Module level import not at top of file
+    suggestion: ~
+    fixable: false
   location:
     row: 57
     column: 0
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ModuleImportNotAtTopOfFile: ~
+    name: ModuleImportNotAtTopOfFile
+    body: Module level import not at top of file
+    suggestion: ~
+    fixable: false
   location:
     row: 61
     column: 0

@@ -1,0 +1,83 @@
+name: PR Check Comment
+
+on:
+  workflow_run:
+    workflows: [CI, Benchmark]
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      workflow_run_id:
+        description: The ecosystem workflow that triggers the workflow run
+        required: true
+
+permissions:
+  pull-requests: write
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: dawidd6/action-download-artifact@v2
+        name: Download PR Number
+        with:
+          name: pr-number
+          run_id: ${{ github.event.workflow_run.id ||  github.event.inputs.workflow_run_id }}
+          if_no_artifact_found: ignore
+
+      - name: Extract PR Number
+        id: pr-number
+        run: |
+          if [[ -f pr-number ]]
+          then
+            echo "pr-number=$(<pr-number)" >> $GITHUB_OUTPUT
+          fi
+
+      - uses: dawidd6/action-download-artifact@v2
+        name: "Download Ecosystem Result"
+        id: download-ecosystem-result
+        if: steps.pr-number.outputs.pr-number
+        with:
+          name: ecosystem-result
+          workflow: ci.yaml
+          pr: ${{ steps.pr-number.outputs.pr-number }}
+          path: pr/ecosystem
+          if_no_artifact_found: ignore
+
+      - uses: dawidd6/action-download-artifact@v2
+        name: "Download Benchmark Result"
+        id: download-benchmark-result
+        if: steps.pr-number.outputs.pr-number
+        with:
+          name: summary
+          workflow: benchmark.yaml
+          pr: ${{ steps.pr-number.outputs.pr-number }}
+          path: pr/benchmark
+          if_no_artifact_found: ignore
+
+      - name: Generate Comment
+        id: generate-comment
+        if: steps.download-ecosystem-result.outputs.found_artifact == 'true' || steps.download-benchmark-result.outputs.found_artifact == 'true'
+        run: |
+          echo 'comment<<EOF' >> $GITHUB_OUTPUT
+          echo '## PR Check Results' >> $GITHUB_OUTPUT
+
+          if [[ -f pr/ecosystem/ecosystem-result ]]
+          then
+            echo "### Ecosystem" >> $GITHUB_OUTPUT
+            cat pr/ecosystem/ecosystem-result >> $GITHUB_OUTPUT
+          fi
+
+          if [[ -f pr/benchmark/summary.md ]]
+          then
+            cat pr/benchmark/summary.md >> $GITHUB_OUTPUT
+          fi
+
+          echo 'EOF' >> $GITHUB_OUTPUT
+
+      - name: Create or update comment
+        if: steps.generate-comment.outputs.comment
+        uses: thollander/actions-comment-pull-request@v2
+        with:
+          pr_number: ${{ steps.pr-number.outputs.pr-number }}
+          message: ${{ steps.generate-comment.outputs.comment }}
+          comment_tag: PR Check Results

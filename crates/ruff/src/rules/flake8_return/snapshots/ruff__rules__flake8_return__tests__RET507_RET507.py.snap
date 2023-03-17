@@ -1,10 +1,12 @@
 ---
-source: src/rules/flake8_return/mod.rs
+source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
 - kind:
-    SuperfluousElseContinue:
-      branch: Elif
+    name: SuperfluousElseContinue
+    body: "Unnecessary `elif` after `continue` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 8
@@ -14,8 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseContinue:
-      branch: Elif
+    name: SuperfluousElseContinue
+    body: "Unnecessary `elif` after `continue` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 22
     column: 8
@@ -25,8 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseContinue:
-      branch: Else
+    name: SuperfluousElseContinue
+    body: "Unnecessary `else` after `continue` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 36
     column: 8
@@ -36,8 +42,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseContinue:
-      branch: Else
+    name: SuperfluousElseContinue
+    body: "Unnecessary `else` after `continue` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 47
     column: 12
@@ -47,8 +55,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseContinue:
-      branch: Else
+    name: SuperfluousElseContinue
+    body: "Unnecessary `else` after `continue` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 63
     column: 8
@@ -58,8 +68,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseContinue:
-      branch: Else
+    name: SuperfluousElseContinue
+    body: "Unnecessary `else` after `continue` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 74
     column: 12
@@ -69,8 +81,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    SuperfluousElseContinue:
-      branch: Else
+    name: SuperfluousElseContinue
+    body: "Unnecessary `else` after `continue` statement"
+    suggestion: ~
+    fixable: false
   location:
     row: 85
     column: 8

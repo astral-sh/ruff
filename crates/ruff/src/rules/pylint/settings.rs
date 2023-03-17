@@ -1,13 +1,13 @@
 //! Settings for the `pylint` plugin.
 
-use std::hash::Hash;
-
 use anyhow::anyhow;
-use ruff_macros::ConfigurationOptions;
 use rustpython_parser::ast::Constant;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
-#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, Hash, JsonSchema)]
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
+
+#[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum ConstantType {
     Bytes,
@@ -72,7 +72,7 @@ pub struct Options {
     pub max_statements: Option<usize>,
 }
 
-#[derive(Debug, Hash)]
+#[derive(Debug, CacheKey)]
 pub struct Settings {
     pub allow_magic_value_types: Vec<ConstantType>,
     pub max_args: usize,

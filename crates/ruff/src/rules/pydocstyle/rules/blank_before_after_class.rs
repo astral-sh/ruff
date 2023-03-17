@@ -1,18 +1,18 @@
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::newlines::StrExt;
+use ruff_python_ast::types::Range;
 
-use crate::ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::{AsRule, Rule};
 
-define_violation!(
-    pub struct OneBlankLineBeforeClass {
-        pub lines: usize,
-    }
-);
+#[violation]
+pub struct OneBlankLineBeforeClass {
+    pub lines: usize,
+}
+
 impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -24,11 +24,11 @@ impl AlwaysAutofixableViolation for OneBlankLineBeforeClass {
     }
 }
 
-define_violation!(
-    pub struct OneBlankLineAfterClass {
-        pub lines: usize,
-    }
-);
+#[violation]
+pub struct OneBlankLineAfterClass {
+    pub lines: usize,
+}
+
 impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -40,11 +40,11 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
     }
 }
 
-define_violation!(
-    pub struct NoBlankLineBeforeClass {
-        pub lines: usize,
-    }
-);
+#[violation]
+pub struct NoBlankLineBeforeClass {
+    pub lines: usize,
+}
+
 impl AlwaysAutofixableViolation for NoBlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -65,33 +65,26 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
     if checker
         .settings
         .rules
-        .enabled(&Rule::OneBlankLineBeforeClass)
-        || checker
-            .settings
-            .rules
-            .enabled(&Rule::NoBlankLineBeforeClass)
+        .enabled(Rule::OneBlankLineBeforeClass)
+        || checker.settings.rules.enabled(Rule::NoBlankLineBeforeClass)
     {
         let before = checker
             .locator
-            .slice(&Range::new(parent.location, docstring.expr.location));
+            .slice(Range::new(parent.location, docstring.expr.location));
 
         let blank_lines_before = before
-            .lines()
+            .universal_newlines()
             .rev()
             .skip(1)
             .take_while(|line| line.trim().is_empty())
             .count();
-        if checker
-            .settings
-            .rules
-            .enabled(&Rule::NoBlankLineBeforeClass)
-        {
+        if checker.settings.rules.enabled(Rule::NoBlankLineBeforeClass) {
             if blank_lines_before != 0 {
                 let mut diagnostic = Diagnostic::new(
                     NoBlankLineBeforeClass {
                         lines: blank_lines_before,
                     },
-                    Range::from_located(docstring.expr),
+                    Range::from(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Delete the blank line before the class.
@@ -106,14 +99,14 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         if checker
             .settings
             .rules
-            .enabled(&Rule::OneBlankLineBeforeClass)
+            .enabled(Rule::OneBlankLineBeforeClass)
         {
             if blank_lines_before != 1 {
                 let mut diagnostic = Diagnostic::new(
                     OneBlankLineBeforeClass {
                         lines: blank_lines_before,
                     },
-                    Range::from_located(docstring.expr),
+                    Range::from(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Insert one blank line before the class.
@@ -128,18 +121,14 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         }
     }
 
-    if checker
-        .settings
-        .rules
-        .enabled(&Rule::OneBlankLineAfterClass)
-    {
-        let after = checker.locator.slice(&Range::new(
+    if checker.settings.rules.enabled(Rule::OneBlankLineAfterClass) {
+        let after = checker.locator.slice(Range::new(
             docstring.expr.end_location.unwrap(),
             parent.end_location.unwrap(),
         ));
 
         let all_blank_after = after
-            .lines()
+            .universal_newlines()
             .skip(1)
             .all(|line| line.trim().is_empty() || line.trim_start().starts_with('#'));
         if all_blank_after {
@@ -147,7 +136,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         }
 
         let blank_lines_after = after
-            .lines()
+            .universal_newlines()
             .skip(1)
             .take_while(|line| line.trim().is_empty())
             .count();
@@ -156,7 +145,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                 OneBlankLineAfterClass {
                     lines: blank_lines_after,
                 },
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Insert a blank line before the class (replacing any existing lines).

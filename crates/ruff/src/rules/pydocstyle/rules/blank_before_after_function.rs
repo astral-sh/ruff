@@ -1,20 +1,21 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_macros::{define_violation, derive_message_formats};
 
-use crate::ast::types::Range;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::newlines::StrExt;
+use ruff_python_ast::types::Range;
+
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
-use crate::fix::Fix;
 use crate::message::Location;
-use crate::registry::{Diagnostic, Rule};
-use crate::violation::AlwaysAutofixableViolation;
+use crate::registry::{AsRule, Rule};
 
-define_violation!(
-    pub struct NoBlankLineBeforeFunction {
-        pub num_lines: usize,
-    }
-);
+#[violation]
+pub struct NoBlankLineBeforeFunction {
+    pub num_lines: usize,
+}
+
 impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -27,11 +28,11 @@ impl AlwaysAutofixableViolation for NoBlankLineBeforeFunction {
     }
 }
 
-define_violation!(
-    pub struct NoBlankLineAfterFunction {
-        pub num_lines: usize,
-    }
-);
+#[violation]
+pub struct NoBlankLineAfterFunction {
+    pub num_lines: usize,
+}
+
 impl AlwaysAutofixableViolation for NoBlankLineAfterFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -60,14 +61,14 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
     if checker
         .settings
         .rules
-        .enabled(&Rule::NoBlankLineBeforeFunction)
+        .enabled(Rule::NoBlankLineBeforeFunction)
     {
         let before = checker
             .locator
-            .slice(&Range::new(parent.location, docstring.expr.location));
+            .slice(Range::new(parent.location, docstring.expr.location));
 
         let blank_lines_before = before
-            .lines()
+            .universal_newlines()
             .rev()
             .skip(1)
             .take_while(|line| line.trim().is_empty())
@@ -77,7 +78,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
                 NoBlankLineBeforeFunction {
                     num_lines: blank_lines_before,
                 },
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Delete the blank line before the docstring.
@@ -93,16 +94,16 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
     if checker
         .settings
         .rules
-        .enabled(&Rule::NoBlankLineAfterFunction)
+        .enabled(Rule::NoBlankLineAfterFunction)
     {
-        let after = checker.locator.slice(&Range::new(
+        let after = checker.locator.slice(Range::new(
             docstring.expr.end_location.unwrap(),
             parent.end_location.unwrap(),
         ));
 
         // If the docstring is only followed by blank and commented lines, abort.
         let all_blank_after = after
-            .lines()
+            .universal_newlines()
             .skip(1)
             .all(|line| line.trim().is_empty() || line.trim_start().starts_with('#'));
         if all_blank_after {
@@ -111,7 +112,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
 
         // Count the number of blank lines after the docstring.
         let blank_lines_after = after
-            .lines()
+            .universal_newlines()
             .skip(1)
             .take_while(|line| line.trim().is_empty())
             .count();
@@ -119,7 +120,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
         // Avoid violations for blank lines followed by inner functions or classes.
         if blank_lines_after == 1
             && after
-                .lines()
+                .universal_newlines()
                 .skip(1 + blank_lines_after)
                 .find(|line| !line.trim_start().starts_with('#'))
                 .map_or(false, |line| INNER_FUNCTION_OR_CLASS_REGEX.is_match(line))
@@ -132,7 +133,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
                 NoBlankLineAfterFunction {
                     num_lines: blank_lines_after,
                 },
-                Range::from_located(docstring.expr),
+                Range::from(docstring.expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Delete the blank line after the docstring.

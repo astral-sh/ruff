@@ -117,12 +117,13 @@ def __await__(): return (yield)
  
  
  def func_no_args():
-@@ -64,19 +64,14 @@
+@@ -64,19 +64,15 @@
  
  
  def spaces2(result=_core.Value(None)):
 -    assert fut is self._read_fut, (fut, self._read_fut)
 +    assert fut is self._read_fut, fut, self._read_fut
++
  
  
  def example(session):
@@ -142,7 +143,7 @@ def __await__(): return (yield)
  
  
  def long_lines():
-@@ -135,14 +130,13 @@
+@@ -135,14 +131,13 @@
      a,
      **kwargs,
  ) -> A:
@@ -231,6 +232,7 @@ def spaces_types(
 
 def spaces2(result=_core.Value(None)):
     assert fut is self._read_fut, fut, self._read_fut
+
 
 
 def example(session):

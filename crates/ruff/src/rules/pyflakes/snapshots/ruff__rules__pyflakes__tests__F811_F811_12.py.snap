@@ -1,11 +1,12 @@
 ---
-source: src/rules/pyflakes/mod.rs
+source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    RedefinedWhileUnused:
-      name: mixer
-      line: 2
+    name: RedefinedWhileUnused
+    body: "Redefinition of unused `mixer` from line 2"
+    suggestion: ~
+    fixable: false
   location:
     row: 6
     column: 19

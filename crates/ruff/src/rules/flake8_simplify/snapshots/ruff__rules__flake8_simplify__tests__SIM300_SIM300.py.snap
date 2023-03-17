@@ -3,8 +3,10 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    YodaConditions:
-      suggestion: "compare == \"yoda\""
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `compare == \"yoda\"` instead"
+    suggestion: "Replace Yoda condition with `compare == \"yoda\"`"
+    fixable: true
   location:
     row: 2
     column: 0
@@ -21,8 +23,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    YodaConditions:
-      suggestion: "compare == \"yoda\""
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `compare == \"yoda\"` instead"
+    suggestion: "Replace Yoda condition with `compare == \"yoda\"`"
+    fixable: true
   location:
     row: 3
     column: 0
@@ -39,8 +43,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    YodaConditions:
-      suggestion: age == 42
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `age == 42` instead"
+    suggestion: "Replace Yoda condition with `age == 42`"
+    fixable: true
   location:
     row: 4
     column: 0
@@ -57,8 +63,10 @@ expression: diagnostics
       column: 9
   parent: ~
 - kind:
-    YodaConditions:
-      suggestion: "compare == (\"a\", \"b\")"
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `compare == (\"a\", \"b\")` instead"
+    suggestion: "Replace Yoda condition with `compare == (\"a\", \"b\")`"
+    fixable: true
   location:
     row: 5
     column: 0
@@ -75,8 +83,10 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    YodaConditions:
-      suggestion: "compare >= \"yoda\""
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `compare >= \"yoda\"` instead"
+    suggestion: "Replace Yoda condition with `compare >= \"yoda\"`"
+    fixable: true
   location:
     row: 6
     column: 0
@@ -93,8 +103,10 @@ expression: diagnostics
       column: 17
   parent: ~
 - kind:
-    YodaConditions:
-      suggestion: "compare > \"yoda\""
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `compare > \"yoda\"` instead"
+    suggestion: "Replace Yoda condition with `compare > \"yoda\"`"
+    fixable: true
   location:
     row: 7
     column: 0
@@ -111,8 +123,10 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    YodaConditions:
-      suggestion: age < 42
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `age < 42` instead"
+    suggestion: "Replace Yoda condition with `age < 42`"
+    fixable: true
   location:
     row: 8
     column: 0
@@ -129,93 +143,163 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    YodaConditions:
-      suggestion: age == YODA
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `age < -42` instead"
+    suggestion: "Replace Yoda condition with `age < -42`"
+    fixable: true
   location:
     row: 9
     column: 0
   end_location:
     row: 9
+    column: 9
+  fix:
+    content: age < -42
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 9
+  parent: ~
+- kind:
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `age < +42` instead"
+    suggestion: "Replace Yoda condition with `age < +42`"
+    fixable: true
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 9
+  fix:
+    content: age < +42
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 9
+  parent: ~
+- kind:
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `age == YODA` instead"
+    suggestion: "Replace Yoda condition with `age == YODA`"
+    fixable: true
+  location:
+    row: 11
+    column: 0
+  end_location:
+    row: 11
     column: 11
   fix:
     content: age == YODA
     location:
-      row: 9
+      row: 11
       column: 0
     end_location:
-      row: 9
+      row: 11
       column: 11
   parent: ~
 - kind:
-    YodaConditions:
-      suggestion: age < YODA
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `age < YODA` instead"
+    suggestion: "Replace Yoda condition with `age < YODA`"
+    fixable: true
   location:
-    row: 10
+    row: 12
     column: 0
   end_location:
-    row: 10
+    row: 12
     column: 10
   fix:
     content: age < YODA
     location:
-      row: 10
+      row: 12
       column: 0
     end_location:
-      row: 10
+      row: 12
       column: 10
   parent: ~
 - kind:
-    YodaConditions:
-      suggestion: age <= YODA
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `age <= YODA` instead"
+    suggestion: "Replace Yoda condition with `age <= YODA`"
+    fixable: true
   location:
-    row: 11
+    row: 13
     column: 0
   end_location:
-    row: 11
+    row: 13
     column: 11
   fix:
     content: age <= YODA
     location:
-      row: 11
+      row: 13
       column: 0
     end_location:
-      row: 11
+      row: 13
       column: 11
   parent: ~
 - kind:
-    YodaConditions:
-      suggestion: age == JediOrder.YODA
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `age == JediOrder.YODA` instead"
+    suggestion: "Replace Yoda condition with `age == JediOrder.YODA`"
+    fixable: true
   location:
-    row: 12
+    row: 14
     column: 0
   end_location:
-    row: 12
+    row: 14
     column: 21
   fix:
     content: age == JediOrder.YODA
     location:
-      row: 12
+      row: 14
       column: 0
     end_location:
-      row: 12
+      row: 14
       column: 21
   parent: ~
 - kind:
-    YodaConditions:
-      suggestion: (number - 100) > 0
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `(number - 100) > 0` instead"
+    suggestion: "Replace Yoda condition with `(number - 100) > 0`"
+    fixable: true
   location:
-    row: 13
+    row: 15
     column: 0
   end_location:
-    row: 13
+    row: 15
     column: 18
   fix:
     content: (number - 100) > 0
     location:
-      row: 13
+      row: 15
       column: 0
     end_location:
-      row: 13
-      column: 17
+      row: 15
+      column: 18
+  parent: ~
+- kind:
+    name: YodaConditions
+    body: "Yoda conditions are discouraged, use `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE` instead"
+    suggestion: "Replace Yoda condition with `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE`"
+    fixable: true
+  location:
+    row: 16
+    column: 0
+  end_location:
+    row: 16
+    column: 52
+  fix:
+    content: (60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 16
+      column: 52
   parent: ~
 

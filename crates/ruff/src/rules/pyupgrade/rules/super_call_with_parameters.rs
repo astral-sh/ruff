@@ -1,15 +1,17 @@
-use ruff_macros::{define_violation, derive_message_formats};
 use rustpython_parser::ast::{ArgData, Expr, ExprKind, Stmt, StmtKind};
 
-use crate::ast::types::{Range, ScopeKind};
-use crate::checkers::ast::Checker;
-use crate::registry::Diagnostic;
-use crate::rules::pyupgrade::fixes;
-use crate::violation::AlwaysAutofixableViolation;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::scope::ScopeKind;
+use ruff_python_ast::types::Range;
 
-define_violation!(
-    pub struct SuperCallWithParameters;
-);
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
+use crate::rules::pyupgrade::fixes;
+
+#[violation]
+pub struct SuperCallWithParameters;
+
 impl AlwaysAutofixableViolation for SuperCallWithParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -37,12 +39,8 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
     if !is_super_call_with_arguments(func, args) {
         return;
     }
-    let scope = checker.current_scope();
-    let parents: Vec<&Stmt> = checker
-        .parents
-        .iter()
-        .map(std::convert::Into::into)
-        .collect();
+    let scope = checker.ctx.scope();
+    let parents: Vec<&Stmt> = checker.ctx.parents.iter().map(Into::into).collect();
 
     // Check: are we in a Function scope?
     if !matches!(scope.kind, ScopeKind::Function { .. }) {
@@ -98,7 +96,7 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(SuperCallWithParameters, Range::from_located(expr));
+    let mut diagnostic = Diagnostic::new(SuperCallWithParameters, Range::from(expr));
     if checker.patch(diagnostic.kind.rule()) {
         if let Some(fix) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
             diagnostic.amend(fix);

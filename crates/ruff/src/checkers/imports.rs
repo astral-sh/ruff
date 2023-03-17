@@ -4,13 +4,15 @@ use std::path::Path;
 
 use rustpython_parser::ast::Suite;
 
-use crate::ast::visitor::Visitor;
+use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::visitor::Visitor;
+
 use crate::directives::IsortDirectives;
-use crate::registry::{Diagnostic, Rule};
+use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::track::{Block, ImportTracker};
 use crate::settings::{flags, Settings};
-use crate::source_code::{Indexer, Locator, Stylist};
 
 #[allow(clippy::too_many_arguments)]
 pub fn check_imports(
@@ -36,7 +38,7 @@ pub fn check_imports(
 
     // Enforce import rules.
     let mut diagnostics = vec![];
-    if settings.rules.enabled(&Rule::UnsortedImports) {
+    if settings.rules.enabled(Rule::UnsortedImports) {
         for block in &blocks {
             if !block.imports.is_empty() {
                 if let Some(diagnostic) = isort::rules::organize_imports(
@@ -47,7 +49,7 @@ pub fn check_imports(
             }
         }
     }
-    if settings.rules.enabled(&Rule::MissingRequiredImport) {
+    if settings.rules.enabled(Rule::MissingRequiredImport) {
         diagnostics.extend(isort::rules::add_required_imports(
             &blocks, python_ast, locator, stylist, settings, autofix,
         ));

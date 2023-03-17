@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    ExceptWithEmptyTuple: ~
+    name: ExceptWithEmptyTuple
+    body: "Using except (): with an empty tuple does not handle/catch anything. Add exceptions to handle."
+    suggestion: ~
+    fixable: false
   location:
     row: 8
     column: 0
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    ExceptWithEmptyTuple: ~
+    name: ExceptWithEmptyTuple
+    body: "Using except (): with an empty tuple does not handle/catch anything. Add exceptions to handle."
+    suggestion: ~
+    fixable: false
   location:
     row: 13
     column: 0

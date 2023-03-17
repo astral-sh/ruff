@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    OverloadWithDocstring: ~
+    name: OverloadWithDocstring
+    body: "Function decorated with `@overload` shouldn't contain a docstring"
+    suggestion: ~
+    fixable: false
   location:
     row: 34
     column: 8
@@ -13,7 +16,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    OverloadWithDocstring: ~
+    name: OverloadWithDocstring
+    body: "Function decorated with `@overload` shouldn't contain a docstring"
+    suggestion: ~
+    fixable: false
   location:
     row: 90
     column: 8
@@ -23,7 +29,10 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    OverloadWithDocstring: ~
+    name: OverloadWithDocstring
+    body: "Function decorated with `@overload` shouldn't contain a docstring"
+    suggestion: ~
+    fixable: false
   location:
     row: 110
     column: 4
