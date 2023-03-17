@@ -2,7 +2,7 @@ use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Binding, BindingKind, ExecutionContext};
+use ruff_python_ast::scope::{Binding, BindingKind, ExecutionContext};
 
 use crate::rules::isort::{categorize, ImportType};
 use crate::settings::Settings;

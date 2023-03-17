@@ -5,7 +5,7 @@ use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::context::Context;
 use crate::helpers::any_over_expr;
-use crate::types::{BindingKind, Scope};
+use crate::scope::{BindingKind, Scope};
 use crate::visitor;
 use crate::visitor::Visitor;
 

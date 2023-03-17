@@ -2,7 +2,8 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{BindingKind, Range};
+use ruff_python_ast::scope::BindingKind;
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

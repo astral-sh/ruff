@@ -14,17 +14,18 @@ use rustpython_parser::ast::{
 };
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::context::{Context, ScopeStack};
+use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers::{
     binding_range, extract_handled_exceptions, to_module_path, Exceptions,
 };
 use ruff_python_ast::operations::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::relocate::relocate_expr;
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::types::{
-    Binding, BindingId, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Node, Range,
-    RefEquality, Scope, ScopeId, ScopeKind,
+use ruff_python_ast::scope::{
+    Binding, BindingId, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Scope,
+    ScopeId, ScopeKind, ScopeStack,
 };
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::types::{Node, Range, RefEquality};
 use ruff_python_ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use ruff_python_ast::{

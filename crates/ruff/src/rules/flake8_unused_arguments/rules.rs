@@ -6,10 +6,9 @@ use rustpython_parser::ast::{Arg, Arguments};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::context::Bindings;
 use ruff_python_ast::function_type;
 use ruff_python_ast::function_type::FunctionType;
-use ruff_python_ast::types::{BindingId, FunctionDef, Lambda, Scope, ScopeKind};
+use ruff_python_ast::scope::{BindingId, Bindings, FunctionDef, Lambda, Scope, ScopeKind};
 use ruff_python_ast::visibility;
 
 use crate::checkers::ast::Checker;
