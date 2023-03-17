@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     name: TooManyStatements
-    body: Too many statements (52/50)
+    body: Too many statements (52 > 50)
     suggestion: ~
     fixable: false
   location:

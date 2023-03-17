@@ -46,7 +46,7 @@ struct ExpandedFix<'a> {
 
 #[derive(Serialize)]
 struct ExpandedMessage<'a> {
-    code: SerializeRuleAsCode<'a>,
+    code: SerializeRuleAsCode,
     message: String,
     fix: Option<ExpandedFix<'a>>,
     location: Location,
@@ -63,9 +63,9 @@ struct ExpandedStatistics {
     fixable: bool,
 }
 
-struct SerializeRuleAsCode<'a>(&'a Rule);
+struct SerializeRuleAsCode(Rule);
 
-impl Serialize for SerializeRuleAsCode<'_> {
+impl Serialize for SerializeRuleAsCode {
     fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -74,8 +74,8 @@ impl Serialize for SerializeRuleAsCode<'_> {
     }
 }
 
-impl<'a> From<&'a Rule> for SerializeRuleAsCode<'a> {
-    fn from(rule: &'a Rule) -> Self {
+impl From<Rule> for SerializeRuleAsCode {
+    fn from(rule: Rule) -> Self {
         Self(rule)
     }
 }
@@ -405,13 +405,13 @@ impl Printer {
     }
 
     pub fn write_statistics(&self, diagnostics: &Diagnostics) -> Result<()> {
-        let violations: Vec<&Rule> = diagnostics
+        let violations: Vec<Rule> = diagnostics
             .messages
             .iter()
             .map(|message| message.kind.rule())
             .sorted()
             .dedup()
-            .collect::<Vec<_>>();
+            .collect();
         if violations.is_empty() {
             return Ok(());
         }
@@ -537,11 +537,11 @@ impl Printer {
     }
 }
 
-fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<&String, Vec<&Message>> {
+fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<&str, Vec<&Message>> {
     let mut grouped_messages = BTreeMap::default();
     for message in messages {
         grouped_messages
-            .entry(&message.filename)
+            .entry(message.filename.as_str())
             .or_insert_with(Vec::new)
             .push(message);
     }

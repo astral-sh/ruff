@@ -20,11 +20,12 @@ use ruff_python_ast::helpers::{
 };
 use ruff_python_ast::operations::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::relocate::relocate_expr;
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::types::{
-    Binding, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Node, Range,
-    RefEquality, Scope, ScopeKind,
+use ruff_python_ast::scope::{
+    Binding, BindingId, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Scope,
+    ScopeId, ScopeKind, ScopeStack,
 };
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::types::{Node, Range, RefEquality};
 use ruff_python_ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use ruff_python_ast::{
@@ -52,8 +53,6 @@ use crate::settings::{flags, Settings};
 use crate::{autofix, docstrings, noqa};
 
 mod deferred;
-
-const GLOBAL_SCOPE_INDEX: usize = 0;
 
 type AnnotationContext = (bool, bool);
 
@@ -118,12 +117,12 @@ impl<'a> Checker<'a> {
 impl<'a> Checker<'a> {
     /// Return `true` if a patch should be generated under the given autofix
     /// `Mode`.
-    pub fn patch(&self, code: &Rule) -> bool {
+    pub fn patch(&self, code: Rule) -> bool {
         self.autofix.into() && self.settings.rules.should_fix(code)
     }
 
     /// Return `true` if a `Rule` is disabled by a `noqa` directive.
-    pub fn rule_is_ignored(&self, code: &Rule, lineno: usize) -> bool {
+    pub fn rule_is_ignored(&self, code: Rule, lineno: usize) -> bool {
         // TODO(charlie): `noqa` directives are mostly enforced in `check_lines.rs`.
         // However, in rare cases, we need to check them here. For example, when
         // removing unused imports, we create a single fix that's applied to all
@@ -193,16 +192,15 @@ where
         // Pre-visit.
         match &stmt.node {
             StmtKind::Global { names } => {
-                let scope_index = *self.ctx.scope_stack.last().expect("No current scope found");
+                let scope_index = self.ctx.scope_id();
                 let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
-                if scope_index != GLOBAL_SCOPE_INDEX {
+                if !scope_index.is_global() {
                     // Add the binding to the current scope.
                     let context = self.ctx.execution_context();
                     let scope = &mut self.ctx.scopes[scope_index];
                     let usage = Some((scope.id, Range::from(stmt)));
                     for (name, range) in names.iter().zip(ranges.iter()) {
-                        let index = self.ctx.bindings.len();
-                        self.ctx.bindings.push(Binding {
+                        let id = self.ctx.bindings.push(Binding {
                             kind: BindingKind::Global,
                             runtime_usage: None,
                             synthetic_usage: usage,
@@ -211,11 +209,11 @@ where
                             source: Some(RefEquality(stmt)),
                             context,
                         });
-                        scope.bindings.insert(name, index);
+                        scope.add(name, id);
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::AmbiguousVariableName) {
+                if self.settings.rules.enabled(Rule::AmbiguousVariableName) {
                     self.diagnostics
                         .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
                             pycodestyle::rules::ambiguous_variable_name(name, *range)
@@ -223,16 +221,15 @@ where
                 }
             }
             StmtKind::Nonlocal { names } => {
-                let scope_index = *self.ctx.scope_stack.last().expect("No current scope found");
+                let scope_index = self.ctx.scope_id();
                 let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
-                if scope_index != GLOBAL_SCOPE_INDEX {
+                if !scope_index.is_global() {
                     let context = self.ctx.execution_context();
                     let scope = &mut self.ctx.scopes[scope_index];
                     let usage = Some((scope.id, Range::from(stmt)));
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
-                        let index = self.ctx.bindings.len();
-                        self.ctx.bindings.push(Binding {
+                        let id = self.ctx.bindings.push(Binding {
                             kind: BindingKind::Nonlocal,
                             runtime_usage: None,
                             synthetic_usage: usage,
@@ -241,17 +238,19 @@ where
                             source: Some(RefEquality(stmt)),
                             context,
                         });
-                        scope.bindings.insert(name, index);
+                        scope.add(name, id);
                     }
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
                     // and the current scope.)
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let mut exists = false;
-                        for index in self.ctx.scope_stack.iter().skip(1).rev().skip(1) {
-                            if let Some(index) =
-                                self.ctx.scopes[*index].bindings.get(&name.as_str())
-                            {
+                        let mut scopes_iter = self.ctx.scope_stack.iter();
+                        // Skip the global scope
+                        scopes_iter.next_back();
+
+                        for index in scopes_iter.skip(1) {
+                            if let Some(index) = self.ctx.scopes[*index].get(name.as_str()) {
                                 exists = true;
                                 self.ctx.bindings[*index].runtime_usage = usage;
                             }
@@ -259,7 +258,7 @@ where
 
                         // Ensure that every nonlocal has an existing binding from a parent scope.
                         if !exists {
-                            if self.settings.rules.enabled(&Rule::NonlocalWithoutBinding) {
+                            if self.settings.rules.enabled(Rule::NonlocalWithoutBinding) {
                                 self.diagnostics.push(Diagnostic::new(
                                     pylint::rules::NonlocalWithoutBinding {
                                         name: name.to_string(),
@@ -271,7 +270,7 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::AmbiguousVariableName) {
+                if self.settings.rules.enabled(Rule::AmbiguousVariableName) {
                     self.diagnostics
                         .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
                             pycodestyle::rules::ambiguous_variable_name(name, *range)
@@ -279,7 +278,7 @@ where
                 }
             }
             StmtKind::Break => {
-                if self.settings.rules.enabled(&Rule::BreakOutsideLoop) {
+                if self.settings.rules.enabled(Rule::BreakOutsideLoop) {
                     if let Some(diagnostic) = pyflakes::rules::break_outside_loop(
                         stmt,
                         &mut self.ctx.parents.iter().rev().map(Into::into).skip(1),
@@ -289,7 +288,7 @@ where
                 }
             }
             StmtKind::Continue => {
-                if self.settings.rules.enabled(&Rule::ContinueOutsideLoop) {
+                if self.settings.rules.enabled(Rule::ContinueOutsideLoop) {
                     if let Some(diagnostic) = pyflakes::rules::continue_outside_loop(
                         stmt,
                         &mut self.ctx.parents.iter().rev().map(Into::into).skip(1),
@@ -317,7 +316,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::NonLeadingReceiverDecorator)
+                    .enabled(Rule::NonLeadingReceiverDecorator)
                 {
                     self.diagnostics
                         .extend(flake8_django::rules::non_leading_receiver_decorator(
@@ -325,7 +324,7 @@ where
                             |expr| self.ctx.resolve_call_path(expr),
                         ));
                 }
-                if self.settings.rules.enabled(&Rule::AmbiguousFunctionName) {
+                if self.settings.rules.enabled(Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
                         pycodestyle::rules::ambiguous_function_name(name, || {
                             helpers::identifier_range(stmt, self.locator)
@@ -335,7 +334,7 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::InvalidFunctionName) {
+                if self.settings.rules.enabled(Rule::InvalidFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::invalid_function_name(
                         stmt,
                         name,
@@ -349,12 +348,12 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::InvalidFirstArgumentNameForClassMethod)
+                    .enabled(Rule::InvalidFirstArgumentNameForClassMethod)
                 {
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_first_argument_name_for_class_method(
                             self,
-                            self.ctx.current_scope(),
+                            self.ctx.scope(),
                             name,
                             decorator_list,
                             args,
@@ -367,12 +366,12 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::InvalidFirstArgumentNameForMethod)
+                    .enabled(Rule::InvalidFirstArgumentNameForMethod)
                 {
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_first_argument_name_for_method(
                             self,
-                            self.ctx.current_scope(),
+                            self.ctx.scope(),
                             name,
                             decorator_list,
                             args,
@@ -383,17 +382,17 @@ where
                 }
 
                 if self.is_stub {
-                    if self.settings.rules.enabled(&Rule::PassStatementStubBody) {
+                    if self.settings.rules.enabled(Rule::PassStatementStubBody) {
                         flake8_pyi::rules::pass_statement_stub_body(self, body);
                     }
-                    if self.settings.rules.enabled(&Rule::NonEmptyStubBody) {
+                    if self.settings.rules.enabled(Rule::NonEmptyStubBody) {
                         flake8_pyi::rules::non_empty_stub_body(self, body);
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::DunderFunctionName) {
+                if self.settings.rules.enabled(Rule::DunderFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
-                        self.ctx.current_scope(),
+                        self.ctx.scope(),
                         stmt,
                         name,
                         self.locator,
@@ -402,45 +401,42 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                if self.settings.rules.enabled(Rule::GlobalStatement) {
                     pylint::rules::global_statement(self, name);
                 }
 
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::LRUCacheWithoutParameters)
+                if self.settings.rules.enabled(Rule::LRUCacheWithoutParameters)
                     && self.settings.target_version >= PythonVersion::Py38
                 {
                     pyupgrade::rules::lru_cache_without_parameters(self, decorator_list);
                 }
-                if self.settings.rules.enabled(&Rule::FunctoolsCache)
+                if self.settings.rules.enabled(Rule::FunctoolsCache)
                     && self.settings.target_version >= PythonVersion::Py39
                 {
                     pyupgrade::rules::functools_cache(self, decorator_list);
                 }
 
-                if self.settings.rules.enabled(&Rule::UselessExpression) {
+                if self.settings.rules.enabled(Rule::UselessExpression) {
                     flake8_bugbear::rules::useless_expression(self, body);
                 }
 
-                if self.settings.rules.enabled(&Rule::CachedInstanceMethod) {
+                if self.settings.rules.enabled(Rule::CachedInstanceMethod) {
                     flake8_bugbear::rules::cached_instance_method(self, decorator_list);
                 }
 
-                if self.settings.rules.enabled(&Rule::UnnecessaryReturnNone)
-                    || self.settings.rules.enabled(&Rule::ImplicitReturnValue)
-                    || self.settings.rules.enabled(&Rule::ImplicitReturn)
-                    || self.settings.rules.enabled(&Rule::UnnecessaryAssign)
-                    || self.settings.rules.enabled(&Rule::SuperfluousElseReturn)
-                    || self.settings.rules.enabled(&Rule::SuperfluousElseRaise)
-                    || self.settings.rules.enabled(&Rule::SuperfluousElseContinue)
-                    || self.settings.rules.enabled(&Rule::SuperfluousElseBreak)
+                if self.settings.rules.enabled(Rule::UnnecessaryReturnNone)
+                    || self.settings.rules.enabled(Rule::ImplicitReturnValue)
+                    || self.settings.rules.enabled(Rule::ImplicitReturn)
+                    || self.settings.rules.enabled(Rule::UnnecessaryAssign)
+                    || self.settings.rules.enabled(Rule::SuperfluousElseReturn)
+                    || self.settings.rules.enabled(Rule::SuperfluousElseRaise)
+                    || self.settings.rules.enabled(Rule::SuperfluousElseContinue)
+                    || self.settings.rules.enabled(Rule::SuperfluousElseBreak)
                 {
                     flake8_return::rules::function(self, body);
                 }
 
-                if self.settings.rules.enabled(&Rule::ComplexStructure) {
+                if self.settings.rules.enabled(Rule::ComplexStructure) {
                     if let Some(diagnostic) = mccabe::rules::function_is_too_complex(
                         stmt,
                         name,
@@ -452,20 +448,20 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::HardcodedPasswordDefault) {
+                if self.settings.rules.enabled(Rule::HardcodedPasswordDefault) {
                     self.diagnostics
                         .extend(flake8_bandit::rules::hardcoded_password_default(args));
                 }
 
-                if self.settings.rules.enabled(&Rule::PropertyWithParameters) {
+                if self.settings.rules.enabled(Rule::PropertyWithParameters) {
                     pylint::rules::property_with_parameters(self, stmt, decorator_list, args);
                 }
 
-                if self.settings.rules.enabled(&Rule::TooManyArguments) {
+                if self.settings.rules.enabled(Rule::TooManyArguments) {
                     pylint::rules::too_many_arguments(self, args, stmt);
                 }
 
-                if self.settings.rules.enabled(&Rule::TooManyReturnStatements) {
+                if self.settings.rules.enabled(Rule::TooManyReturnStatements) {
                     if let Some(diagnostic) = pylint::rules::too_many_return_statements(
                         stmt,
                         body,
@@ -476,7 +472,7 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::TooManyBranches) {
+                if self.settings.rules.enabled(Rule::TooManyBranches) {
                     if let Some(diagnostic) = pylint::rules::too_many_branches(
                         stmt,
                         body,
@@ -487,7 +483,7 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::TooManyStatements) {
+                if self.settings.rules.enabled(Rule::TooManyStatements) {
                     if let Some(diagnostic) = pylint::rules::too_many_statements(
                         stmt,
                         body,
@@ -501,29 +497,29 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::IncorrectFixtureParenthesesStyle)
-                    || self.settings.rules.enabled(&Rule::FixturePositionalArgs)
-                    || self.settings.rules.enabled(&Rule::ExtraneousScopeFunction)
+                    .enabled(Rule::IncorrectFixtureParenthesesStyle)
+                    || self.settings.rules.enabled(Rule::FixturePositionalArgs)
+                    || self.settings.rules.enabled(Rule::ExtraneousScopeFunction)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::MissingFixtureNameUnderscore)
+                        .enabled(Rule::MissingFixtureNameUnderscore)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::IncorrectFixtureNameUnderscore)
-                    || self.settings.rules.enabled(&Rule::FixtureParamWithoutValue)
-                    || self.settings.rules.enabled(&Rule::DeprecatedYieldFixture)
-                    || self.settings.rules.enabled(&Rule::FixtureFinalizerCallback)
-                    || self.settings.rules.enabled(&Rule::UselessYieldFixture)
+                        .enabled(Rule::IncorrectFixtureNameUnderscore)
+                    || self.settings.rules.enabled(Rule::FixtureParamWithoutValue)
+                    || self.settings.rules.enabled(Rule::DeprecatedYieldFixture)
+                    || self.settings.rules.enabled(Rule::FixtureFinalizerCallback)
+                    || self.settings.rules.enabled(Rule::UselessYieldFixture)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::UnnecessaryAsyncioMarkOnFixture)
+                        .enabled(Rule::UnnecessaryAsyncioMarkOnFixture)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::ErroneousUseFixturesOnFixture)
+                        .enabled(Rule::ErroneousUseFixturesOnFixture)
                 {
                     flake8_pytest_style::rules::fixture(
                         self,
@@ -535,14 +531,11 @@ where
                     );
                 }
 
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::ParametrizeNamesWrongType)
+                if self.settings.rules.enabled(Rule::ParametrizeNamesWrongType)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::ParametrizeValuesWrongType)
+                        .enabled(Rule::ParametrizeValuesWrongType)
                 {
                     flake8_pytest_style::rules::parametrize(self, decorator_list);
                 }
@@ -550,11 +543,11 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::IncorrectMarkParenthesesStyle)
+                    .enabled(Rule::IncorrectMarkParenthesesStyle)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::UseFixturesWithoutParameters)
+                        .enabled(Rule::UseFixturesWithoutParameters)
                 {
                     flake8_pytest_style::rules::marks(self, decorator_list);
                 }
@@ -562,7 +555,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::BooleanPositionalArgInFunctionDefinition)
+                    .enabled(Rule::BooleanPositionalArgInFunctionDefinition)
                 {
                     flake8_boolean_trap::rules::check_positional_boolean_in_def(
                         self,
@@ -575,7 +568,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::BooleanDefaultValueInFunctionDefinition)
+                    .enabled(Rule::BooleanDefaultValueInFunctionDefinition)
                 {
                     flake8_boolean_trap::rules::check_boolean_default_value_in_function_definition(
                         self,
@@ -598,7 +591,7 @@ where
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
                 let runtime_annotation = !self.ctx.annotations_future_enabled
                     && matches!(
-                        self.ctx.current_scope().kind,
+                        self.ctx.scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
                     );
 
@@ -676,10 +669,10 @@ where
                 );
             }
             StmtKind::Return { .. } => {
-                if self.settings.rules.enabled(&Rule::ReturnOutsideFunction) {
+                if self.settings.rules.enabled(Rule::ReturnOutsideFunction) {
                     pyflakes::rules::return_outside_function(self, stmt);
                 }
-                if self.settings.rules.enabled(&Rule::ReturnInInit) {
+                if self.settings.rules.enabled(Rule::ReturnInInit) {
                     pylint::rules::return_in_init(self, stmt);
                 }
             }
@@ -690,42 +683,42 @@ where
                 decorator_list,
                 body,
             } => {
-                if self.settings.rules.enabled(&Rule::NullableModelStringField) {
+                if self.settings.rules.enabled(Rule::NullableModelStringField) {
                     self.diagnostics
                         .extend(flake8_django::rules::nullable_model_string_field(
                             self, body,
                         ));
                 }
 
-                if self.settings.rules.enabled(&Rule::ExcludeWithModelForm) {
+                if self.settings.rules.enabled(Rule::ExcludeWithModelForm) {
                     if let Some(diagnostic) =
                         flake8_django::rules::exclude_with_model_form(self, bases, body)
                     {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::AllWithModelForm) {
+                if self.settings.rules.enabled(Rule::AllWithModelForm) {
                     if let Some(diagnostic) =
                         flake8_django::rules::all_with_model_form(self, bases, body)
                     {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::ModelWithoutDunderStr) {
+                if self.settings.rules.enabled(Rule::ModelWithoutDunderStr) {
                     if let Some(diagnostic) =
                         flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
                     {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                if self.settings.rules.enabled(Rule::GlobalStatement) {
                     pylint::rules::global_statement(self, name);
                 }
-                if self.settings.rules.enabled(&Rule::UselessObjectInheritance) {
+                if self.settings.rules.enabled(Rule::UselessObjectInheritance) {
                     pyupgrade::rules::useless_object_inheritance(self, stmt, name, bases, keywords);
                 }
 
-                if self.settings.rules.enabled(&Rule::AmbiguousClassName) {
+                if self.settings.rules.enabled(Rule::AmbiguousClassName) {
                     if let Some(diagnostic) = pycodestyle::rules::ambiguous_class_name(name, || {
                         helpers::identifier_range(stmt, self.locator)
                     }) {
@@ -733,7 +726,7 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::InvalidClassName) {
+                if self.settings.rules.enabled(Rule::InvalidClassName) {
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_class_name(stmt, name, self.locator)
                     {
@@ -744,7 +737,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::ErrorSuffixOnExceptionName)
+                    .enabled(Rule::ErrorSuffixOnExceptionName)
                 {
                     if let Some(diagnostic) = pep8_naming::rules::error_suffix_on_exception_name(
                         stmt,
@@ -756,7 +749,7 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::UselessExpression) {
+                if self.settings.rules.enabled(Rule::UselessExpression) {
                     flake8_bugbear::rules::useless_expression(self, body);
                 }
 
@@ -764,11 +757,11 @@ where
                     if self
                         .settings
                         .rules
-                        .enabled(&Rule::AbstractBaseClassWithoutAbstractMethod)
+                        .enabled(Rule::AbstractBaseClassWithoutAbstractMethod)
                         || self
                             .settings
                             .rules
-                            .enabled(&Rule::EmptyMethodWithoutAbstractDecorator)
+                            .enabled(Rule::EmptyMethodWithoutAbstractDecorator)
                     {
                         flake8_bugbear::rules::abstract_base_class(
                             self, stmt, name, bases, keywords, body,
@@ -776,7 +769,7 @@ where
                     }
                 }
                 if self.is_stub {
-                    if self.settings.rules.enabled(&Rule::PassStatementStubBody) {
+                    if self.settings.rules.enabled(Rule::PassStatementStubBody) {
                         flake8_pyi::rules::pass_statement_stub_body(self, body);
                     }
                 }
@@ -784,20 +777,16 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::IncorrectMarkParenthesesStyle)
+                    .enabled(Rule::IncorrectMarkParenthesesStyle)
                 {
                     flake8_pytest_style::rules::marks(self, decorator_list);
                 }
 
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::DupeClassFieldDefinitions)
-                {
+                if self.settings.rules.enabled(Rule::DupeClassFieldDefinitions) {
                     flake8_pie::rules::dupe_class_field_definitions(self, stmt, body);
                 }
 
-                if self.settings.rules.enabled(&Rule::PreferUniqueEnums) {
+                if self.settings.rules.enabled(Rule::PreferUniqueEnums) {
                     flake8_pie::rules::prefer_unique_enums(self, stmt, body);
                 }
 
@@ -814,18 +803,18 @@ where
                 }
             }
             StmtKind::Import { names } => {
-                if self.settings.rules.enabled(&Rule::MultipleImportsOnOneLine) {
+                if self.settings.rules.enabled(Rule::MultipleImportsOnOneLine) {
                     pycodestyle::rules::multiple_imports_on_one_line(self, stmt, names);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::ModuleImportNotAtTopOfFile)
+                    .enabled(Rule::ModuleImportNotAtTopOfFile)
                 {
                     pycodestyle::rules::module_import_not_at_top_of_file(self, stmt);
                 }
 
-                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                if self.settings.rules.enabled(Rule::GlobalStatement) {
                     for name in names.iter() {
                         if let Some(asname) = name.node.asname.as_ref() {
                             pylint::rules::global_statement(self, asname);
@@ -835,10 +824,10 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::RewriteCElementTree) {
+                if self.settings.rules.enabled(Rule::RewriteCElementTree) {
                     pyupgrade::rules::replace_c_element_tree(self, stmt);
                 }
-                if self.settings.rules.enabled(&Rule::RewriteMockImport) {
+                if self.settings.rules.enabled(Rule::RewriteMockImport) {
                     pyupgrade::rules::rewrite_mock_import(self, stmt);
                 }
 
@@ -859,15 +848,7 @@ where
                                 kind: BindingKind::FutureImportation,
                                 runtime_usage: None,
                                 // Always mark `__future__` imports as used.
-                                synthetic_usage: Some((
-                                    self.ctx.scopes[*(self
-                                        .ctx
-                                        .scope_stack
-                                        .last()
-                                        .expect("No current scope found"))]
-                                    .id,
-                                    Range::from(alias),
-                                )),
+                                synthetic_usage: Some((self.ctx.scope_id(), Range::from(alias))),
                                 typing_usage: None,
                                 range: Range::from(alias),
                                 source: Some(self.ctx.current_stmt().clone()),
@@ -875,7 +856,7 @@ where
                             },
                         );
 
-                        if self.settings.rules.enabled(&Rule::LateFutureImport)
+                        if self.settings.rules.enabled(Rule::LateFutureImport)
                             && !self.ctx.futures_allowed
                         {
                             self.diagnostics.push(Diagnostic::new(
@@ -894,15 +875,7 @@ where
                                 kind: BindingKind::SubmoduleImportation(name, full_name),
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled {
-                                    Some((
-                                        self.ctx.scopes[*(self
-                                            .ctx
-                                            .scope_stack
-                                            .last()
-                                            .expect("No current scope found"))]
-                                        .id,
-                                        Range::from(alias),
-                                    ))
+                                    Some((self.ctx.scope_id(), Range::from(alias)))
                                 } else {
                                     None
                                 },
@@ -932,15 +905,7 @@ where
                                 kind: BindingKind::Importation(name, full_name),
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled || is_explicit_reexport {
-                                    Some((
-                                        self.ctx.scopes[*(self
-                                            .ctx
-                                            .scope_stack
-                                            .last()
-                                            .expect("No current scope found"))]
-                                        .id,
-                                        Range::from(alias),
-                                    ))
+                                    Some((self.ctx.scope_id(), Range::from(alias)))
                                 } else {
                                     None
                                 },
@@ -957,7 +922,7 @@ where
                     }
 
                     // flake8-debugger
-                    if self.settings.rules.enabled(&Rule::Debugger) {
+                    if self.settings.rules.enabled(Rule::Debugger) {
                         if let Some(diagnostic) =
                             flake8_debugger::rules::debugger_import(stmt, None, &alias.node.name)
                         {
@@ -966,7 +931,7 @@ where
                     }
 
                     // flake8_tidy_imports
-                    if self.settings.rules.enabled(&Rule::BannedApi) {
+                    if self.settings.rules.enabled(Rule::BannedApi) {
                         if let Some(diagnostic) =
                             flake8_tidy_imports::banned_api::name_or_parent_is_banned(
                                 alias,
@@ -979,10 +944,10 @@ where
                     }
 
                     // pylint
-                    if self.settings.rules.enabled(&Rule::UselessImportAlias) {
+                    if self.settings.rules.enabled(Rule::UselessImportAlias) {
                         pylint::rules::useless_import_alias(self, alias);
                     }
-                    if self.settings.rules.enabled(&Rule::ConsiderUsingFromImport) {
+                    if self.settings.rules.enabled(Rule::ConsiderUsingFromImport) {
                         pylint::rules::use_from_import(self, stmt, alias, names);
                     }
 
@@ -991,7 +956,7 @@ where
                         if self
                             .settings
                             .rules
-                            .enabled(&Rule::ConstantImportedAsNonConstant)
+                            .enabled(Rule::ConstantImportedAsNonConstant)
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::constant_imported_as_non_constant(
@@ -1008,7 +973,7 @@ where
                         if self
                             .settings
                             .rules
-                            .enabled(&Rule::LowercaseImportedAsNonLowercase)
+                            .enabled(Rule::LowercaseImportedAsNonLowercase)
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
@@ -1025,7 +990,7 @@ where
                         if self
                             .settings
                             .rules
-                            .enabled(&Rule::CamelcaseImportedAsLowercase)
+                            .enabled(Rule::CamelcaseImportedAsLowercase)
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
@@ -1042,7 +1007,7 @@ where
                         if self
                             .settings
                             .rules
-                            .enabled(&Rule::CamelcaseImportedAsConstant)
+                            .enabled(Rule::CamelcaseImportedAsConstant)
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
@@ -1059,7 +1024,7 @@ where
                         if self
                             .settings
                             .rules
-                            .enabled(&Rule::CamelcaseImportedAsAcronym)
+                            .enabled(Rule::CamelcaseImportedAsAcronym)
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
@@ -1074,11 +1039,7 @@ where
                         }
                     }
 
-                    if self
-                        .settings
-                        .rules
-                        .enabled(&Rule::UnconventionalImportAlias)
-                    {
+                    if self.settings.rules.enabled(Rule::UnconventionalImportAlias) {
                         if let Some(diagnostic) =
                             flake8_import_conventions::rules::check_conventional_import(
                                 stmt,
@@ -1091,7 +1052,7 @@ where
                         }
                     }
 
-                    if self.settings.rules.enabled(&Rule::IncorrectPytestImport) {
+                    if self.settings.rules.enabled(Rule::IncorrectPytestImport) {
                         if let Some(diagnostic) = flake8_pytest_style::rules::import(
                             stmt,
                             &alias.node.name,
@@ -1110,12 +1071,12 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::ModuleImportNotAtTopOfFile)
+                    .enabled(Rule::ModuleImportNotAtTopOfFile)
                 {
                     pycodestyle::rules::module_import_not_at_top_of_file(self, stmt);
                 }
 
-                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                if self.settings.rules.enabled(Rule::GlobalStatement) {
                     for name in names.iter() {
                         if let Some(asname) = name.node.asname.as_ref() {
                             pylint::rules::global_statement(self, asname);
@@ -1125,20 +1086,20 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::UnnecessaryFutureImport)
+                if self.settings.rules.enabled(Rule::UnnecessaryFutureImport)
                     && self.settings.target_version >= PythonVersion::Py37
                 {
                     if let Some("__future__") = module.as_deref() {
                         pyupgrade::rules::unnecessary_future_import(self, stmt, names);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::RewriteMockImport) {
+                if self.settings.rules.enabled(Rule::RewriteMockImport) {
                     pyupgrade::rules::rewrite_mock_import(self, stmt);
                 }
-                if self.settings.rules.enabled(&Rule::RewriteCElementTree) {
+                if self.settings.rules.enabled(Rule::RewriteCElementTree) {
                     pyupgrade::rules::replace_c_element_tree(self, stmt);
                 }
-                if self.settings.rules.enabled(&Rule::DeprecatedImport) {
+                if self.settings.rules.enabled(Rule::DeprecatedImport) {
                     pyupgrade::rules::deprecated_import(
                         self,
                         stmt,
@@ -1147,13 +1108,13 @@ where
                         level.as_ref(),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::UnnecessaryBuiltinImport) {
+                if self.settings.rules.enabled(Rule::UnnecessaryBuiltinImport) {
                     if let Some(module) = module.as_deref() {
                         pyupgrade::rules::unnecessary_builtin_import(self, stmt, module, names);
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::BannedApi) {
+                if self.settings.rules.enabled(Rule::BannedApi) {
                     if let Some(module) = module {
                         for name in names {
                             if let Some(diagnostic) =
@@ -1178,7 +1139,7 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::IncorrectPytestImport) {
+                if self.settings.rules.enabled(Rule::IncorrectPytestImport) {
                     if let Some(diagnostic) = flake8_pytest_style::rules::import_from(
                         stmt,
                         module.as_deref(),
@@ -1205,15 +1166,7 @@ where
                                 kind: BindingKind::FutureImportation,
                                 runtime_usage: None,
                                 // Always mark `__future__` imports as used.
-                                synthetic_usage: Some((
-                                    self.ctx.scopes[*(self
-                                        .ctx
-                                        .scope_stack
-                                        .last()
-                                        .expect("No current scope found"))]
-                                    .id,
-                                    Range::from(alias),
-                                )),
+                                synthetic_usage: Some((self.ctx.scope_id(), Range::from(alias))),
                                 typing_usage: None,
                                 range: Range::from(alias),
                                 source: Some(self.ctx.current_stmt().clone()),
@@ -1225,11 +1178,11 @@ where
                             self.ctx.annotations_future_enabled = true;
                         }
 
-                        if self.settings.rules.enabled(&Rule::FutureFeatureNotDefined) {
+                        if self.settings.rules.enabled(Rule::FutureFeatureNotDefined) {
                             pyflakes::rules::future_feature_not_defined(self, alias);
                         }
 
-                        if self.settings.rules.enabled(&Rule::LateFutureImport)
+                        if self.settings.rules.enabled(Rule::LateFutureImport)
                             && !self.ctx.futures_allowed
                         {
                             self.diagnostics.push(Diagnostic::new(
@@ -1244,15 +1197,7 @@ where
                                 kind: BindingKind::StarImportation(*level, module.clone()),
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled {
-                                    Some((
-                                        self.ctx.scopes[*(self
-                                            .ctx
-                                            .scope_stack
-                                            .last()
-                                            .expect("No current scope found"))]
-                                        .id,
-                                        Range::from(alias),
-                                    ))
+                                    Some((self.ctx.scope_id(), Range::from(alias)))
                                 } else {
                                     None
                                 },
@@ -1263,9 +1208,8 @@ where
                             },
                         );
 
-                        if self.settings.rules.enabled(&Rule::ImportStarNotPermitted) {
-                            let scope = &self.ctx.scopes
-                                [*(self.ctx.scope_stack.last().expect("No current scope found"))];
+                        if self.settings.rules.enabled(Rule::ImportStarNotPermitted) {
+                            let scope = self.ctx.scope();
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::ImportStarNotPermitted {
@@ -1279,7 +1223,7 @@ where
                             }
                         }
 
-                        if self.settings.rules.enabled(&Rule::ImportStar) {
+                        if self.settings.rules.enabled(Rule::ImportStar) {
                             self.diagnostics.push(Diagnostic::new(
                                 pyflakes::rules::ImportStar {
                                     name: helpers::format_import_from(
@@ -1291,8 +1235,7 @@ where
                             ));
                         }
 
-                        let scope = &mut self.ctx.scopes
-                            [*(self.ctx.scope_stack.last().expect("No current scope found"))];
+                        let scope = self.ctx.scope_mut();
                         scope.import_starred = true;
                     } else {
                         if let Some(asname) = &alias.node.asname {
@@ -1322,15 +1265,7 @@ where
                                 kind: BindingKind::FromImportation(name, full_name),
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled || is_explicit_reexport {
-                                    Some((
-                                        self.ctx.scopes[*(self
-                                            .ctx
-                                            .scope_stack
-                                            .last()
-                                            .expect("No current scope found"))]
-                                        .id,
-                                        Range::from(alias),
-                                    ))
+                                    Some((self.ctx.scope_id(), Range::from(alias)))
                                 } else {
                                     None
                                 },
@@ -1343,7 +1278,7 @@ where
                         );
                     }
 
-                    if self.settings.rules.enabled(&Rule::RelativeImports) {
+                    if self.settings.rules.enabled(Rule::RelativeImports) {
                         if let Some(diagnostic) =
                             flake8_tidy_imports::relative_imports::banned_relative_import(
                                 self,
@@ -1359,7 +1294,7 @@ where
                     }
 
                     // flake8-debugger
-                    if self.settings.rules.enabled(&Rule::Debugger) {
+                    if self.settings.rules.enabled(Rule::Debugger) {
                         if let Some(diagnostic) = flake8_debugger::rules::debugger_import(
                             stmt,
                             module.as_deref(),
@@ -1369,11 +1304,7 @@ where
                         }
                     }
 
-                    if self
-                        .settings
-                        .rules
-                        .enabled(&Rule::UnconventionalImportAlias)
-                    {
+                    if self.settings.rules.enabled(Rule::UnconventionalImportAlias) {
                         let full_name = helpers::format_import_from_member(
                             level.as_ref(),
                             module.as_deref(),
@@ -1395,7 +1326,7 @@ where
                         if self
                             .settings
                             .rules
-                            .enabled(&Rule::ConstantImportedAsNonConstant)
+                            .enabled(Rule::ConstantImportedAsNonConstant)
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::constant_imported_as_non_constant(
@@ -1412,7 +1343,7 @@ where
                         if self
                             .settings
                             .rules
-                            .enabled(&Rule::LowercaseImportedAsNonLowercase)
+                            .enabled(Rule::LowercaseImportedAsNonLowercase)
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
@@ -1429,7 +1360,7 @@ where
                         if self
                             .settings
                             .rules
-                            .enabled(&Rule::CamelcaseImportedAsLowercase)
+                            .enabled(Rule::CamelcaseImportedAsLowercase)
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
@@ -1446,7 +1377,7 @@ where
                         if self
                             .settings
                             .rules
-                            .enabled(&Rule::CamelcaseImportedAsConstant)
+                            .enabled(Rule::CamelcaseImportedAsConstant)
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
@@ -1463,7 +1394,7 @@ where
                         if self
                             .settings
                             .rules
-                            .enabled(&Rule::CamelcaseImportedAsAcronym)
+                            .enabled(Rule::CamelcaseImportedAsAcronym)
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
@@ -1478,42 +1409,42 @@ where
                         }
 
                         // pylint
-                        if self.settings.rules.enabled(&Rule::UselessImportAlias) {
+                        if self.settings.rules.enabled(Rule::UselessImportAlias) {
                             pylint::rules::useless_import_alias(self, alias);
                         }
                     }
                 }
             }
             StmtKind::Raise { exc, .. } => {
-                if self.settings.rules.enabled(&Rule::RaiseNotImplemented) {
+                if self.settings.rules.enabled(Rule::RaiseNotImplemented) {
                     if let Some(expr) = exc {
                         pyflakes::rules::raise_not_implemented(self, expr);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::CannotRaiseLiteral) {
+                if self.settings.rules.enabled(Rule::CannotRaiseLiteral) {
                     if let Some(exc) = exc {
                         flake8_bugbear::rules::cannot_raise_literal(self, exc);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::RawStringInException)
-                    || self.settings.rules.enabled(&Rule::FStringInException)
-                    || self.settings.rules.enabled(&Rule::DotFormatInException)
+                if self.settings.rules.enabled(Rule::RawStringInException)
+                    || self.settings.rules.enabled(Rule::FStringInException)
+                    || self.settings.rules.enabled(Rule::DotFormatInException)
                 {
                     if let Some(exc) = exc {
                         flake8_errmsg::rules::string_in_exception(self, exc);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::OSErrorAlias) {
+                if self.settings.rules.enabled(Rule::OSErrorAlias) {
                     if let Some(item) = exc {
                         pyupgrade::rules::os_error_alias_raise(self, item);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::RaiseVanillaClass) {
+                if self.settings.rules.enabled(Rule::RaiseVanillaClass) {
                     if let Some(expr) = exc {
                         tryceratops::rules::raise_vanilla_class(self, expr);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::RaiseVanillaArgs) {
+                if self.settings.rules.enabled(Rule::RaiseVanillaArgs) {
                     if let Some(expr) = exc {
                         tryceratops::rules::raise_vanilla_args(self, expr);
                     }
@@ -1521,7 +1452,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UnnecessaryParenOnRaiseException)
+                    .enabled(Rule::UnnecessaryParenOnRaiseException)
                 {
                     if let Some(expr) = exc {
                         flake8_raise::rules::unnecessary_paren_on_raise_exception(self, expr);
@@ -1531,17 +1462,17 @@ where
             StmtKind::AugAssign { target, .. } => {
                 self.handle_node_load(target);
 
-                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                if self.settings.rules.enabled(Rule::GlobalStatement) {
                     if let ExprKind::Name { id, .. } = &target.node {
                         pylint::rules::global_statement(self, id);
                     }
                 }
             }
             StmtKind::If { test, body, orelse } => {
-                if self.settings.rules.enabled(&Rule::IfTuple) {
+                if self.settings.rules.enabled(Rule::IfTuple) {
                     pyflakes::rules::if_tuple(self, stmt, test);
                 }
-                if self.settings.rules.enabled(&Rule::CollapsibleIf) {
+                if self.settings.rules.enabled(Rule::CollapsibleIf) {
                     flake8_simplify::rules::nested_if_statements(
                         self,
                         stmt,
@@ -1551,17 +1482,17 @@ where
                         self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::IfWithSameArms) {
+                if self.settings.rules.enabled(Rule::IfWithSameArms) {
                     flake8_simplify::rules::if_with_same_arms(
                         self,
                         stmt,
                         self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::NeedlessBool) {
+                if self.settings.rules.enabled(Rule::NeedlessBool) {
                     flake8_simplify::rules::needless_bool(self, stmt);
                 }
-                if self.settings.rules.enabled(&Rule::ManualDictLookup) {
+                if self.settings.rules.enabled(Rule::ManualDictLookup) {
                     flake8_simplify::rules::manual_dict_lookup(
                         self,
                         stmt,
@@ -1571,14 +1502,14 @@ where
                         self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::UseTernaryOperator) {
+                if self.settings.rules.enabled(Rule::UseTernaryOperator) {
                     flake8_simplify::rules::use_ternary_operator(
                         self,
                         stmt,
                         self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::DictGetWithDefault) {
+                if self.settings.rules.enabled(Rule::DictGetWithDefault) {
                     flake8_simplify::rules::use_dict_get_with_default(
                         self,
                         stmt,
@@ -1588,7 +1519,7 @@ where
                         self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::PreferTypeError) {
+                if self.settings.rules.enabled(Rule::PreferTypeError) {
                     tryceratops::rules::prefer_type_error(
                         self,
                         body,
@@ -1597,10 +1528,10 @@ where
                         self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::OutdatedVersionBlock) {
+                if self.settings.rules.enabled(Rule::OutdatedVersionBlock) {
                     pyupgrade::rules::outdated_version_block(self, stmt, test, body, orelse);
                 }
-                if self.settings.rules.enabled(&Rule::CollapsibleElseIf) {
+                if self.settings.rules.enabled(Rule::CollapsibleElseIf) {
                     if let Some(diagnostic) =
                         pylint::rules::collapsible_else_if(orelse, self.locator)
                     {
@@ -1609,22 +1540,22 @@ where
                 }
             }
             StmtKind::Assert { test, msg } => {
-                if self.settings.rules.enabled(&Rule::AssertTuple) {
+                if self.settings.rules.enabled(Rule::AssertTuple) {
                     pyflakes::rules::assert_tuple(self, stmt, test);
                 }
-                if self.settings.rules.enabled(&Rule::AssertFalse) {
+                if self.settings.rules.enabled(Rule::AssertFalse) {
                     flake8_bugbear::rules::assert_false(self, stmt, test, msg.as_deref());
                 }
-                if self.settings.rules.enabled(&Rule::Assert) {
+                if self.settings.rules.enabled(Rule::Assert) {
                     self.diagnostics
                         .push(flake8_bandit::rules::assert_used(stmt));
                 }
-                if self.settings.rules.enabled(&Rule::AssertAlwaysFalse) {
+                if self.settings.rules.enabled(Rule::AssertAlwaysFalse) {
                     if let Some(diagnostic) = flake8_pytest_style::rules::assert_falsy(stmt, test) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::CompositeAssertion) {
+                if self.settings.rules.enabled(Rule::CompositeAssertion) {
                     flake8_pytest_style::rules::composite_condition(
                         self,
                         stmt,
@@ -1634,17 +1565,17 @@ where
                 }
             }
             StmtKind::With { items, body, .. } => {
-                if self.settings.rules.enabled(&Rule::AssertRaisesException) {
+                if self.settings.rules.enabled(Rule::AssertRaisesException) {
                     flake8_bugbear::rules::assert_raises_exception(self, stmt, items);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::RaisesWithMultipleStatements)
+                    .enabled(Rule::RaisesWithMultipleStatements)
                 {
                     flake8_pytest_style::rules::complex_raises(self, stmt, items, body);
                 }
-                if self.settings.rules.enabled(&Rule::MultipleWithStatements) {
+                if self.settings.rules.enabled(Rule::MultipleWithStatements) {
                     flake8_simplify::rules::multiple_with_statements(
                         self,
                         stmt,
@@ -1652,15 +1583,15 @@ where
                         self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::RedefinedLoopName) {
+                if self.settings.rules.enabled(Rule::RedefinedLoopName) {
                     pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
             }
             StmtKind::While { body, orelse, .. } => {
-                if self.settings.rules.enabled(&Rule::FunctionUsesLoopVariable) {
+                if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Stmt(stmt));
                 }
-                if self.settings.rules.enabled(&Rule::UselessElseOnLoop) {
+                if self.settings.rules.enabled(Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
             }
@@ -1678,11 +1609,7 @@ where
                 orelse,
                 ..
             } => {
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::UnusedLoopControlVariable)
-                {
+                if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
                     self.deferred.for_loops.push((
                         stmt,
                         (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
@@ -1691,28 +1618,28 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::LoopVariableOverridesIterator)
+                    .enabled(Rule::LoopVariableOverridesIterator)
                 {
                     flake8_bugbear::rules::loop_variable_overrides_iterator(self, target, iter);
                 }
-                if self.settings.rules.enabled(&Rule::FunctionUsesLoopVariable) {
+                if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Stmt(stmt));
                 }
-                if self.settings.rules.enabled(&Rule::UselessElseOnLoop) {
+                if self.settings.rules.enabled(Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
-                if self.settings.rules.enabled(&Rule::RedefinedLoopName) {
+                if self.settings.rules.enabled(Rule::RedefinedLoopName) {
                     pylint::rules::redefined_loop_name(self, &Node::Stmt(stmt));
                 }
                 if matches!(stmt.node, StmtKind::For { .. }) {
-                    if self.settings.rules.enabled(&Rule::ReimplementedBuiltin) {
+                    if self.settings.rules.enabled(Rule::ReimplementedBuiltin) {
                         flake8_simplify::rules::convert_for_loop_to_any_all(
                             self,
                             stmt,
                             self.ctx.current_sibling_stmt(),
                         );
                     }
-                    if self.settings.rules.enabled(&Rule::KeyInDict) {
+                    if self.settings.rules.enabled(Rule::KeyInDict) {
                         flake8_simplify::rules::key_in_dict_for(self, target, iter);
                     }
                 }
@@ -1731,77 +1658,74 @@ where
                 finalbody,
                 ..
             } => {
-                if self.settings.rules.enabled(&Rule::DefaultExceptNotLast) {
+                if self.settings.rules.enabled(Rule::DefaultExceptNotLast) {
                     if let Some(diagnostic) =
                         pyflakes::rules::default_except_not_last(handlers, self.locator)
                     {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::DuplicateHandlerException)
+                if self.settings.rules.enabled(Rule::DuplicateHandlerException)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::DuplicateTryBlockException)
+                        .enabled(Rule::DuplicateTryBlockException)
                 {
                     flake8_bugbear::rules::duplicate_exceptions(self, handlers);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::RedundantTupleInExceptionHandler)
+                    .enabled(Rule::RedundantTupleInExceptionHandler)
                 {
                     flake8_bugbear::rules::redundant_tuple_in_exception_handler(self, handlers);
                 }
-                if self.settings.rules.enabled(&Rule::OSErrorAlias) {
+                if self.settings.rules.enabled(Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias_handlers(self, handlers);
                 }
-                if self.settings.rules.enabled(&Rule::AssertInExcept) {
+                if self.settings.rules.enabled(Rule::AssertInExcept) {
                     self.diagnostics.extend(
                         flake8_pytest_style::rules::assert_in_exception_handler(handlers),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::UseContextlibSuppress) {
+                if self.settings.rules.enabled(Rule::UseContextlibSuppress) {
                     flake8_simplify::rules::use_contextlib_suppress(
                         self, stmt, body, handlers, orelse, finalbody,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::ReturnInTryExceptFinally) {
+                if self.settings.rules.enabled(Rule::ReturnInTryExceptFinally) {
                     flake8_simplify::rules::return_in_try_except_finally(
                         self, body, handlers, finalbody,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::TryConsiderElse) {
+                if self.settings.rules.enabled(Rule::TryConsiderElse) {
                     tryceratops::rules::try_consider_else(self, body, orelse);
                 }
-                if self.settings.rules.enabled(&Rule::VerboseRaise) {
+                if self.settings.rules.enabled(Rule::VerboseRaise) {
                     tryceratops::rules::verbose_raise(self, handlers);
                 }
-                if self.settings.rules.enabled(&Rule::VerboseLogMessage) {
+                if self.settings.rules.enabled(Rule::VerboseLogMessage) {
                     tryceratops::rules::verbose_log_message(self, handlers);
                 }
-                if self.settings.rules.enabled(&Rule::RaiseWithinTry) {
+                if self.settings.rules.enabled(Rule::RaiseWithinTry) {
                     tryceratops::rules::raise_within_try(self, body);
                 }
-                if self.settings.rules.enabled(&Rule::ErrorInsteadOfException) {
+                if self.settings.rules.enabled(Rule::ErrorInsteadOfException) {
                     tryceratops::rules::error_instead_of_exception(self, handlers);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
-                if self.settings.rules.enabled(&Rule::LambdaAssignment) {
+                if self.settings.rules.enabled(Rule::LambdaAssignment) {
                     if let [target] = &targets[..] {
                         pycodestyle::rules::lambda_assignment(self, target, value, stmt);
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::AssignmentToOsEnviron) {
+                if self.settings.rules.enabled(Rule::AssignmentToOsEnviron) {
                     flake8_bugbear::rules::assignment_to_os_environ(self, targets);
                 }
 
-                if self.settings.rules.enabled(&Rule::HardcodedPasswordString) {
+                if self.settings.rules.enabled(Rule::HardcodedPasswordString) {
                     if let Some(diagnostic) =
                         flake8_bandit::rules::assign_hardcoded_password_string(value, targets)
                     {
@@ -1810,12 +1734,12 @@ where
                 }
 
                 if self.is_stub {
-                    if self.settings.rules.enabled(&Rule::PrefixTypeParams) {
+                    if self.settings.rules.enabled(Rule::PrefixTypeParams) {
                         flake8_pyi::rules::prefix_type_params(self, value, targets);
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                if self.settings.rules.enabled(Rule::GlobalStatement) {
                     for target in targets.iter() {
                         if let ExprKind::Name { id, .. } = &target.node {
                             pylint::rules::global_statement(self, id);
@@ -1823,13 +1747,13 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::UselessMetaclassType) {
+                if self.settings.rules.enabled(Rule::UselessMetaclassType) {
                     pyupgrade::rules::useless_metaclass_type(self, stmt, value, targets);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::ConvertTypedDictFunctionalToClass)
+                    .enabled(Rule::ConvertTypedDictFunctionalToClass)
                 {
                     pyupgrade::rules::convert_typed_dict_functional_to_class(
                         self, stmt, targets, value,
@@ -1838,24 +1762,24 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::ConvertNamedTupleFunctionalToClass)
+                    .enabled(Rule::ConvertNamedTupleFunctionalToClass)
                 {
                     pyupgrade::rules::convert_named_tuple_functional_to_class(
                         self, stmt, targets, value,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::RewriteListComprehension) {
+                if self.settings.rules.enabled(Rule::RewriteListComprehension) {
                     pyupgrade::rules::unpack_list_comprehension(self, targets, value);
                 }
 
-                if self.settings.rules.enabled(&Rule::DfIsABadVariableName) {
+                if self.settings.rules.enabled(Rule::DfIsABadVariableName) {
                     if let Some(diagnostic) = pandas_vet::rules::assignment_to_df(targets) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
             }
             StmtKind::AnnAssign { target, value, .. } => {
-                if self.settings.rules.enabled(&Rule::LambdaAssignment) {
+                if self.settings.rules.enabled(Rule::LambdaAssignment) {
                     if let Some(value) = value {
                         pycodestyle::rules::lambda_assignment(self, target, value, stmt);
                     }
@@ -1863,7 +1787,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UnintentionalTypeAnnotation)
+                    .enabled(Rule::UnintentionalTypeAnnotation)
                 {
                     flake8_bugbear::rules::unintentional_type_annotation(
                         self,
@@ -1874,7 +1798,7 @@ where
                 }
             }
             StmtKind::Delete { targets } => {
-                if self.settings.rules.enabled(&Rule::GlobalStatement) {
+                if self.settings.rules.enabled(Rule::GlobalStatement) {
                     for target in targets.iter() {
                         if let ExprKind::Name { id, .. } = &target.node {
                             pylint::rules::global_statement(self, id);
@@ -1883,17 +1807,17 @@ where
                 }
             }
             StmtKind::Expr { value, .. } => {
-                if self.settings.rules.enabled(&Rule::UselessComparison) {
+                if self.settings.rules.enabled(Rule::UselessComparison) {
                     flake8_bugbear::rules::useless_comparison(self, value);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UseCapitalEnvironmentVariables)
+                    .enabled(Rule::UseCapitalEnvironmentVariables)
                 {
                     flake8_simplify::rules::use_capital_environment_variables(self, value);
                 }
-                if self.settings.rules.enabled(&Rule::AsyncioDanglingTask) {
+                if self.settings.rules.enabled(Rule::AsyncioDanglingTask) {
                     if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
                         self.ctx.resolve_call_path(expr)
                     }) {
@@ -1922,7 +1846,7 @@ where
                 decorator_list,
                 ..
             } => {
-                if self.settings.rules.enabled(&Rule::FStringDocstring) {
+                if self.settings.rules.enabled(Rule::FStringDocstring) {
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
                 let definition = docstrings::extraction::extract(
@@ -1931,7 +1855,7 @@ where
                     body,
                     &Documentable::Function,
                 );
-                if self.settings.rules.enabled(&Rule::RewriteYieldFrom) {
+                if self.settings.rules.enabled(Rule::RewriteYieldFrom) {
                     pyupgrade::rules::rewrite_yield_from(self, stmt);
                 }
                 let scope =
@@ -1946,13 +1870,13 @@ where
                 // If any global bindings don't already exist in the global scope, add it.
                 let globals = operations::extract_globals(body);
                 for (name, stmt) in operations::extract_globals(body) {
-                    if self.ctx.scopes[GLOBAL_SCOPE_INDEX]
-                        .bindings
+                    if self
+                        .ctx
+                        .global_scope()
                         .get(name)
                         .map_or(true, |index| self.ctx.bindings[*index].kind.is_annotation())
                     {
-                        let index = self.ctx.bindings.len();
-                        self.ctx.bindings.push(Binding {
+                        let id = self.ctx.bindings.push(Binding {
                             kind: BindingKind::Assignment,
                             runtime_usage: None,
                             synthetic_usage: None,
@@ -1961,21 +1885,18 @@ where
                             source: Some(RefEquality(stmt)),
                             context: self.ctx.execution_context(),
                         });
-                        self.ctx.scopes[GLOBAL_SCOPE_INDEX]
-                            .bindings
-                            .insert(name, index);
+                        self.ctx.global_scope_mut().add(name, id);
                     }
                 }
 
-                self.ctx
-                    .push_scope(Scope::new(ScopeKind::Function(FunctionDef {
-                        name,
-                        body,
-                        args,
-                        decorator_list,
-                        async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
-                        globals,
-                    })));
+                self.ctx.push_scope(ScopeKind::Function(FunctionDef {
+                    name,
+                    body,
+                    args,
+                    decorator_list,
+                    async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
+                    globals,
+                }));
 
                 self.deferred.functions.push((
                     stmt,
@@ -1991,7 +1912,7 @@ where
                 decorator_list,
                 ..
             } => {
-                if self.settings.rules.enabled(&Rule::FStringDocstring) {
+                if self.settings.rules.enabled(Rule::FStringDocstring) {
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
                 let definition = docstrings::extraction::extract(
@@ -2011,13 +1932,13 @@ where
                 // If any global bindings don't already exist in the global scope, add it.
                 let globals = operations::extract_globals(body);
                 for (name, stmt) in &globals {
-                    if self.ctx.scopes[GLOBAL_SCOPE_INDEX]
-                        .bindings
+                    if self
+                        .ctx
+                        .global_scope()
                         .get(name)
                         .map_or(true, |index| self.ctx.bindings[*index].kind.is_annotation())
                     {
-                        let index = self.ctx.bindings.len();
-                        self.ctx.bindings.push(Binding {
+                        let id = self.ctx.bindings.push(Binding {
                             kind: BindingKind::Assignment,
                             runtime_usage: None,
                             synthetic_usage: None,
@@ -2026,19 +1947,17 @@ where
                             source: Some(RefEquality(stmt)),
                             context: self.ctx.execution_context(),
                         });
-                        self.ctx.scopes[GLOBAL_SCOPE_INDEX]
-                            .bindings
-                            .insert(name, index);
+                        self.ctx.global_scope_mut().add(name, id);
                     }
                 }
 
-                self.ctx.push_scope(Scope::new(ScopeKind::Class(ClassDef {
+                self.ctx.push_scope(ScopeKind::Class(ClassDef {
                     name,
                     bases,
                     keywords,
                     decorator_list,
                     globals,
-                })));
+                }));
 
                 self.visit_body(body);
             }
@@ -2066,9 +1985,17 @@ where
                 }
 
                 self.ctx.handled_exceptions.push(handled_exceptions);
-                if self.settings.rules.enabled(&Rule::JumpStatementInFinally) {
+
+                if self.settings.rules.enabled(Rule::JumpStatementInFinally) {
                     flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
                 }
+
+                if self.settings.rules.enabled(Rule::ContinueInFinally) {
+                    if self.settings.target_version <= PythonVersion::Py38 {
+                        pylint::rules::continue_in_finally(self, finalbody);
+                    }
+                }
+
                 self.visit_body(body);
                 self.ctx.handled_exceptions.pop();
 
@@ -2091,7 +2018,7 @@ where
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
                 let runtime_annotation = if self.ctx.annotations_future_enabled {
-                    if matches!(self.ctx.current_scope().kind, ScopeKind::Class(..)) {
+                    if matches!(self.ctx.scope().kind, ScopeKind::Class(..)) {
                         let baseclasses = &self
                             .settings
                             .flake8_type_checking
@@ -2110,7 +2037,7 @@ where
                     }
                 } else {
                     matches!(
-                        self.ctx.current_scope().kind,
+                        self.ctx.scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
                     )
                 };
@@ -2133,7 +2060,7 @@ where
                 self.visit_expr(test);
 
                 if flake8_type_checking::helpers::is_type_checking_block(&self.ctx, test) {
-                    if self.settings.rules.enabled(&Rule::EmptyTypeCheckingBlock) {
+                    if self.settings.rules.enabled(Rule::EmptyTypeCheckingBlock) {
                         flake8_type_checking::rules::empty_type_checking_block(self, stmt, body);
                     }
 
@@ -2222,7 +2149,7 @@ where
                 if self.ctx.in_type_definition
                     && !self.ctx.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
-                    && self.settings.rules.enabled(&Rule::TypingUnion)
+                    && self.settings.rules.enabled(Rule::TypingUnion)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.ctx.annotations_future_enabled
@@ -2238,13 +2165,13 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::SysVersionSlice3Referenced)
-                    || self.settings.rules.enabled(&Rule::SysVersion2Referenced)
-                    || self.settings.rules.enabled(&Rule::SysVersion0Referenced)
+                    .enabled(Rule::SysVersionSlice3Referenced)
+                    || self.settings.rules.enabled(Rule::SysVersion2Referenced)
+                    || self.settings.rules.enabled(Rule::SysVersion0Referenced)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::SysVersionSlice1Referenced)
+                        .enabled(Rule::SysVersionSlice1Referenced)
                 {
                     flake8_2020::rules::subscript(self, value, slice);
                 }
@@ -2254,9 +2181,9 @@ where
                     let check_too_many_expressions = self
                         .settings
                         .rules
-                        .enabled(&Rule::ExpressionsInStarAssignment);
+                        .enabled(Rule::ExpressionsInStarAssignment);
                     let check_two_starred_expressions =
-                        self.settings.rules.enabled(&Rule::TwoStarredExpressions);
+                        self.settings.rules.enabled(Rule::TwoStarredExpressions);
                     if let Some(diagnostic) = pyflakes::rules::starred_expressions(
                         elts,
                         check_too_many_expressions,
@@ -2270,17 +2197,17 @@ where
             ExprKind::Name { id, ctx } => {
                 match ctx {
                     ExprContext::Load => {
-                        if self.settings.rules.enabled(&Rule::TypingTextStrAlias) {
+                        if self.settings.rules.enabled(Rule::TypingTextStrAlias) {
                             pyupgrade::rules::typing_text_str_alias(self, expr);
                         }
-                        if self.settings.rules.enabled(&Rule::NumpyDeprecatedTypeAlias) {
+                        if self.settings.rules.enabled(Rule::NumpyDeprecatedTypeAlias) {
                             numpy::rules::deprecated_type_alias(self, expr);
                         }
 
                         // Ex) List[...]
                         if !self.ctx.in_deferred_string_type_definition
                             && !self.settings.pyupgrade.keep_runtime_typing
-                            && self.settings.rules.enabled(&Rule::DeprecatedCollectionType)
+                            && self.settings.rules.enabled(Rule::DeprecatedCollectionType)
                             && (self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.ctx.annotations_future_enabled
@@ -2295,7 +2222,7 @@ where
                         self.handle_node_load(expr);
                     }
                     ExprContext::Store => {
-                        if self.settings.rules.enabled(&Rule::AmbiguousVariableName) {
+                        if self.settings.rules.enabled(Rule::AmbiguousVariableName) {
                             if let Some(diagnostic) =
                                 pycodestyle::rules::ambiguous_variable_name(id, Range::from(expr))
                             {
@@ -2310,14 +2237,14 @@ where
                     ExprContext::Del => self.handle_node_delete(expr),
                 }
 
-                if self.settings.rules.enabled(&Rule::SixPY3Referenced) {
+                if self.settings.rules.enabled(Rule::SixPY3Referenced) {
                     flake8_2020::rules::name_or_attribute(self, expr);
                 }
 
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UsedPriorGlobalDeclaration)
+                    .enabled(Rule::UsedPriorGlobalDeclaration)
                 {
                     pylint::rules::used_prior_global_declaration(self, id, expr);
                 }
@@ -2326,7 +2253,7 @@ where
                 // Ex) typing.List[...]
                 if !self.ctx.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
-                    && self.settings.rules.enabled(&Rule::DeprecatedCollectionType)
+                    && self.settings.rules.enabled(Rule::DeprecatedCollectionType)
                     && (self.settings.target_version >= PythonVersion::Py39
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.ctx.annotations_future_enabled
@@ -2335,27 +2262,27 @@ where
                 {
                     pyupgrade::rules::use_pep585_annotation(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::DatetimeTimezoneUTC)
+                if self.settings.rules.enabled(Rule::DatetimeTimezoneUTC)
                     && self.settings.target_version >= PythonVersion::Py311
                 {
                     pyupgrade::rules::datetime_utc_alias(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::TypingTextStrAlias) {
+                if self.settings.rules.enabled(Rule::TypingTextStrAlias) {
                     pyupgrade::rules::typing_text_str_alias(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::NumpyDeprecatedTypeAlias) {
+                if self.settings.rules.enabled(Rule::NumpyDeprecatedTypeAlias) {
                     numpy::rules::deprecated_type_alias(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::RewriteMockImport) {
+                if self.settings.rules.enabled(Rule::RewriteMockImport) {
                     pyupgrade::rules::rewrite_mock_attribute(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::SixPY3Referenced) {
+                if self.settings.rules.enabled(Rule::SixPY3Referenced) {
                     flake8_2020::rules::name_or_attribute(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::BannedApi) {
+                if self.settings.rules.enabled(Rule::BannedApi) {
                     flake8_tidy_imports::banned_api::banned_attribute_access(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::PrivateMemberAccess) {
+                if self.settings.rules.enabled(Rule::PrivateMemberAccess) {
                     flake8_self::rules::private_member_access(self, expr);
                 }
                 pandas_vet::rules::check_attr(self, attr, value, expr);
@@ -2366,14 +2293,14 @@ where
                 keywords,
             } => {
                 // pyflakes
-                if self.settings.rules.enabled(&Rule::StringDotFormatInvalidFormat)
-                    || self.settings.rules.enabled(&Rule::StringDotFormatExtraNamedArguments)
-                    || self.settings.rules.enabled(&Rule::StringDotFormatExtraPositionalArguments)
-                    || self.settings.rules.enabled(&Rule::StringDotFormatMissingArguments)
-                    || self.settings.rules.enabled(&Rule::StringDotFormatMixingAutomatic)
+                if self.settings.rules.enabled(Rule::StringDotFormatInvalidFormat)
+                    || self.settings.rules.enabled(Rule::StringDotFormatExtraNamedArguments)
+                    || self.settings.rules.enabled(Rule::StringDotFormatExtraPositionalArguments)
+                    || self.settings.rules.enabled(Rule::StringDotFormatMissingArguments)
+                    || self.settings.rules.enabled(Rule::StringDotFormatMixingAutomatic)
                     // pyupgrade
-                    || self.settings.rules.enabled(&Rule::FormatLiterals)
-                    || self.settings.rules.enabled(&Rule::FString)
+                    || self.settings.rules.enabled(Rule::FormatLiterals)
+                    || self.settings.rules.enabled(Rule::FString)
                 {
                     if let ExprKind::Attribute { value, attr, .. } = &func.node {
                         if let ExprKind::Constant {
@@ -2389,7 +2316,7 @@ where
                                         if self
                                             .settings
                                             .rules
-                                            .enabled(&Rule::StringDotFormatInvalidFormat)
+                                            .enabled(Rule::StringDotFormatInvalidFormat)
                                         {
                                             self.diagnostics.push(Diagnostic::new(
                                                 pyflakes::rules::StringDotFormatInvalidFormat {
@@ -2403,7 +2330,7 @@ where
                                         if self
                                             .settings
                                             .rules
-                                            .enabled(&Rule::StringDotFormatExtraNamedArguments)
+                                            .enabled(Rule::StringDotFormatExtraNamedArguments)
                                         {
                                             pyflakes::rules::string_dot_format_extra_named_arguments(
                                                 self, &summary, keywords, location,
@@ -2413,7 +2340,7 @@ where
                                         if self
                                             .settings
                                             .rules
-                                            .enabled(&Rule::StringDotFormatExtraPositionalArguments)
+                                            .enabled(Rule::StringDotFormatExtraPositionalArguments)
                                         {
                                             pyflakes::rules::string_dot_format_extra_positional_arguments(
                                                 self,
@@ -2424,7 +2351,7 @@ where
                                         if self
                                             .settings
                                             .rules
-                                            .enabled(&Rule::StringDotFormatMissingArguments)
+                                            .enabled(Rule::StringDotFormatMissingArguments)
                                         {
                                             pyflakes::rules::string_dot_format_missing_argument(
                                                 self, &summary, args, keywords, location,
@@ -2434,18 +2361,18 @@ where
                                         if self
                                             .settings
                                             .rules
-                                            .enabled(&Rule::StringDotFormatMixingAutomatic)
+                                            .enabled(Rule::StringDotFormatMixingAutomatic)
                                         {
                                             pyflakes::rules::string_dot_format_mixing_automatic(
                                                 self, &summary, location,
                                             );
                                         }
 
-                                        if self.settings.rules.enabled(&Rule::FormatLiterals) {
+                                        if self.settings.rules.enabled(Rule::FormatLiterals) {
                                             pyupgrade::rules::format_literals(self, &summary, expr);
                                         }
 
-                                        if self.settings.rules.enabled(&Rule::FString) {
+                                        if self.settings.rules.enabled(Rule::FString) {
                                             pyupgrade::rules::f_strings(self, &summary, expr);
                                         }
                                     }
@@ -2456,79 +2383,75 @@ where
                 }
 
                 // pyupgrade
-                if self.settings.rules.enabled(&Rule::TypeOfPrimitive) {
+                if self.settings.rules.enabled(Rule::TypeOfPrimitive) {
                     pyupgrade::rules::type_of_primitive(self, expr, func, args);
                 }
-                if self.settings.rules.enabled(&Rule::DeprecatedUnittestAlias) {
+                if self.settings.rules.enabled(Rule::DeprecatedUnittestAlias) {
                     pyupgrade::rules::deprecated_unittest_alias(self, func);
                 }
-                if self.settings.rules.enabled(&Rule::SuperCallWithParameters) {
+                if self.settings.rules.enabled(Rule::SuperCallWithParameters) {
                     pyupgrade::rules::super_call_with_parameters(self, expr, func, args);
                 }
-                if self.settings.rules.enabled(&Rule::UnnecessaryEncodeUTF8) {
+                if self.settings.rules.enabled(Rule::UnnecessaryEncodeUTF8) {
                     pyupgrade::rules::unnecessary_encode_utf8(self, expr, func, args, keywords);
                 }
-                if self.settings.rules.enabled(&Rule::RedundantOpenModes) {
+                if self.settings.rules.enabled(Rule::RedundantOpenModes) {
                     pyupgrade::rules::redundant_open_modes(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::NativeLiterals) {
+                if self.settings.rules.enabled(Rule::NativeLiterals) {
                     pyupgrade::rules::native_literals(self, expr, func, args, keywords);
                 }
-                if self.settings.rules.enabled(&Rule::OpenAlias) {
+                if self.settings.rules.enabled(Rule::OpenAlias) {
                     pyupgrade::rules::open_alias(self, expr, func);
                 }
-                if self.settings.rules.enabled(&Rule::ReplaceUniversalNewlines) {
+                if self.settings.rules.enabled(Rule::ReplaceUniversalNewlines) {
                     pyupgrade::rules::replace_universal_newlines(self, func, keywords);
                 }
-                if self.settings.rules.enabled(&Rule::ReplaceStdoutStderr) {
+                if self.settings.rules.enabled(Rule::ReplaceStdoutStderr) {
                     pyupgrade::rules::replace_stdout_stderr(self, expr, func, keywords);
                 }
-                if self.settings.rules.enabled(&Rule::OSErrorAlias) {
+                if self.settings.rules.enabled(Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias_call(self, func);
                 }
-                if self.settings.rules.enabled(&Rule::IsinstanceWithTuple)
+                if self.settings.rules.enabled(Rule::IsinstanceWithTuple)
                     && self.settings.target_version >= PythonVersion::Py310
                 {
                     pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
                 }
 
                 // flake8-print
-                if self.settings.rules.enabled(&Rule::PrintFound)
-                    || self.settings.rules.enabled(&Rule::PPrintFound)
+                if self.settings.rules.enabled(Rule::PrintFound)
+                    || self.settings.rules.enabled(Rule::PPrintFound)
                 {
                     flake8_print::rules::print_call(self, func, keywords);
                 }
 
                 // flake8-bugbear
-                if self.settings.rules.enabled(&Rule::UnreliableCallableCheck) {
+                if self.settings.rules.enabled(Rule::UnreliableCallableCheck) {
                     flake8_bugbear::rules::unreliable_callable_check(self, expr, func, args);
                 }
-                if self.settings.rules.enabled(&Rule::StripWithMultiCharacters) {
+                if self.settings.rules.enabled(Rule::StripWithMultiCharacters) {
                     flake8_bugbear::rules::strip_with_multi_characters(self, expr, func, args);
                 }
-                if self.settings.rules.enabled(&Rule::GetAttrWithConstant) {
+                if self.settings.rules.enabled(Rule::GetAttrWithConstant) {
                     flake8_bugbear::rules::getattr_with_constant(self, expr, func, args);
                 }
-                if self.settings.rules.enabled(&Rule::SetAttrWithConstant) {
+                if self.settings.rules.enabled(Rule::SetAttrWithConstant) {
                     flake8_bugbear::rules::setattr_with_constant(self, expr, func, args);
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::UselessContextlibSuppress)
-                {
+                if self.settings.rules.enabled(Rule::UselessContextlibSuppress) {
                     flake8_bugbear::rules::useless_contextlib_suppress(self, expr, func, args);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::StarArgUnpackingAfterKeywordArg)
+                    .enabled(Rule::StarArgUnpackingAfterKeywordArg)
                 {
                     flake8_bugbear::rules::star_arg_unpacking_after_keyword_arg(
                         self, args, keywords,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::ZipWithoutExplicitStrict)
+                if self.settings.rules.enabled(Rule::ZipWithoutExplicitStrict)
                     && self.settings.target_version >= PythonVersion::Py310
                 {
                     flake8_bugbear::rules::zip_without_explicit_strict(self, expr, func, keywords);
@@ -2538,70 +2461,70 @@ where
                 }
 
                 // flake8-pie
-                if self.settings.rules.enabled(&Rule::UnnecessaryDictKwargs) {
+                if self.settings.rules.enabled(Rule::UnnecessaryDictKwargs) {
                     flake8_pie::rules::no_unnecessary_dict_kwargs(self, expr, keywords);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UnnecessaryComprehensionAnyAll)
+                    .enabled(Rule::UnnecessaryComprehensionAnyAll)
                 {
                     flake8_pie::rules::unnecessary_comprehension_any_all(self, expr, func, args);
                 }
 
                 // flake8-bandit
-                if self.settings.rules.enabled(&Rule::ExecBuiltin) {
+                if self.settings.rules.enabled(Rule::ExecBuiltin) {
                     if let Some(diagnostic) = flake8_bandit::rules::exec_used(expr, func) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::BadFilePermissions) {
+                if self.settings.rules.enabled(Rule::BadFilePermissions) {
                     flake8_bandit::rules::bad_file_permissions(self, func, args, keywords);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::RequestWithNoCertValidation)
+                    .enabled(Rule::RequestWithNoCertValidation)
                 {
                     flake8_bandit::rules::request_with_no_cert_validation(
                         self, func, args, keywords,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::UnsafeYAMLLoad) {
+                if self.settings.rules.enabled(Rule::UnsafeYAMLLoad) {
                     flake8_bandit::rules::unsafe_yaml_load(self, func, args, keywords);
                 }
-                if self.settings.rules.enabled(&Rule::SnmpInsecureVersion) {
+                if self.settings.rules.enabled(Rule::SnmpInsecureVersion) {
                     flake8_bandit::rules::snmp_insecure_version(self, func, args, keywords);
                 }
-                if self.settings.rules.enabled(&Rule::SnmpWeakCryptography) {
+                if self.settings.rules.enabled(Rule::SnmpWeakCryptography) {
                     flake8_bandit::rules::snmp_weak_cryptography(self, func, args, keywords);
                 }
-                if self.settings.rules.enabled(&Rule::Jinja2AutoescapeFalse) {
+                if self.settings.rules.enabled(Rule::Jinja2AutoescapeFalse) {
                     flake8_bandit::rules::jinja2_autoescape_false(self, func, args, keywords);
                 }
-                if self.settings.rules.enabled(&Rule::HardcodedPasswordFuncArg) {
+                if self.settings.rules.enabled(Rule::HardcodedPasswordFuncArg) {
                     self.diagnostics
                         .extend(flake8_bandit::rules::hardcoded_password_func_arg(keywords));
                 }
-                if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
+                if self.settings.rules.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::HashlibInsecureHashFunction)
+                    .enabled(Rule::HashlibInsecureHashFunction)
                 {
                     flake8_bandit::rules::hashlib_insecure_hash_functions(
                         self, func, args, keywords,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::RequestWithoutTimeout) {
+                if self.settings.rules.enabled(Rule::RequestWithoutTimeout) {
                     flake8_bandit::rules::request_without_timeout(self, func, args, keywords);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::LoggingConfigInsecureListen)
+                    .enabled(Rule::LoggingConfigInsecureListen)
                 {
                     flake8_bandit::rules::logging_config_insecure_listen(
                         self, func, args, keywords,
@@ -2609,12 +2532,12 @@ where
                 }
 
                 // flake8-comprehensions
-                if self.settings.rules.enabled(&Rule::UnnecessaryGeneratorList) {
+                if self.settings.rules.enabled(Rule::UnnecessaryGeneratorList) {
                     flake8_comprehensions::rules::unnecessary_generator_list(
                         self, expr, func, args, keywords,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::UnnecessaryGeneratorSet) {
+                if self.settings.rules.enabled(Rule::UnnecessaryGeneratorSet) {
                     flake8_comprehensions::rules::unnecessary_generator_set(
                         self,
                         expr,
@@ -2624,7 +2547,7 @@ where
                         keywords,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::UnnecessaryGeneratorDict) {
+                if self.settings.rules.enabled(Rule::UnnecessaryGeneratorDict) {
                     flake8_comprehensions::rules::unnecessary_generator_dict(
                         self,
                         expr,
@@ -2637,7 +2560,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UnnecessaryListComprehensionSet)
+                    .enabled(Rule::UnnecessaryListComprehensionSet)
                 {
                     flake8_comprehensions::rules::unnecessary_list_comprehension_set(
                         self, expr, func, args, keywords,
@@ -2646,27 +2569,23 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UnnecessaryListComprehensionDict)
+                    .enabled(Rule::UnnecessaryListComprehensionDict)
                 {
                     flake8_comprehensions::rules::unnecessary_list_comprehension_dict(
                         self, expr, func, args, keywords,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::UnnecessaryLiteralSet) {
+                if self.settings.rules.enabled(Rule::UnnecessaryLiteralSet) {
                     flake8_comprehensions::rules::unnecessary_literal_set(
                         self, expr, func, args, keywords,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::UnnecessaryLiteralDict) {
+                if self.settings.rules.enabled(Rule::UnnecessaryLiteralDict) {
                     flake8_comprehensions::rules::unnecessary_literal_dict(
                         self, expr, func, args, keywords,
                     );
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::UnnecessaryCollectionCall)
-                {
+                if self.settings.rules.enabled(Rule::UnnecessaryCollectionCall) {
                     flake8_comprehensions::rules::unnecessary_collection_call(
                         self,
                         expr,
@@ -2679,7 +2598,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UnnecessaryLiteralWithinTupleCall)
+                    .enabled(Rule::UnnecessaryLiteralWithinTupleCall)
                 {
                     flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
                         self, expr, func, args,
@@ -2688,19 +2607,19 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UnnecessaryLiteralWithinListCall)
+                    .enabled(Rule::UnnecessaryLiteralWithinListCall)
                 {
                     flake8_comprehensions::rules::unnecessary_literal_within_list_call(
                         self, expr, func, args,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::UnnecessaryListCall) {
+                if self.settings.rules.enabled(Rule::UnnecessaryListCall) {
                     flake8_comprehensions::rules::unnecessary_list_call(self, expr, func, args);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UnnecessaryCallAroundSorted)
+                    .enabled(Rule::UnnecessaryCallAroundSorted)
                 {
                     flake8_comprehensions::rules::unnecessary_call_around_sorted(
                         self, expr, func, args,
@@ -2709,7 +2628,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UnnecessaryDoubleCastOrProcess)
+                    .enabled(Rule::UnnecessaryDoubleCastOrProcess)
                 {
                     flake8_comprehensions::rules::unnecessary_double_cast_or_process(
                         self, expr, func, args,
@@ -2718,13 +2637,13 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UnnecessarySubscriptReversal)
+                    .enabled(Rule::UnnecessarySubscriptReversal)
                 {
                     flake8_comprehensions::rules::unnecessary_subscript_reversal(
                         self, expr, func, args,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::UnnecessaryMap) {
+                if self.settings.rules.enabled(Rule::UnnecessaryMap) {
                     flake8_comprehensions::rules::unnecessary_map(
                         self,
                         expr,
@@ -2738,7 +2657,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::BooleanPositionalValueInFunctionCall)
+                    .enabled(Rule::BooleanPositionalValueInFunctionCall)
                 {
                     flake8_boolean_trap::rules::check_boolean_positional_value_in_function_call(
                         self, args, func,
@@ -2746,37 +2665,32 @@ where
                 }
                 if let ExprKind::Name { id, ctx } = &func.node {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
-                        let scope = &mut self.ctx.scopes
-                            [*(self.ctx.scope_stack.last().expect("No current scope found"))];
+                        let scope = self.ctx.scope_mut();
                         scope.uses_locals = true;
                     }
                 }
 
                 // flake8-debugger
-                if self.settings.rules.enabled(&Rule::Debugger) {
+                if self.settings.rules.enabled(Rule::Debugger) {
                     flake8_debugger::rules::debugger_call(self, expr, func);
                 }
 
                 // pandas-vet
-                if self.settings.rules.enabled(&Rule::UseOfInplaceArgument) {
+                if self.settings.rules.enabled(Rule::UseOfInplaceArgument) {
                     self.diagnostics.extend(
                         pandas_vet::rules::inplace_argument(self, expr, args, keywords).into_iter(),
                     );
                 }
                 pandas_vet::rules::check_call(self, func);
 
-                if self.settings.rules.enabled(&Rule::UseOfPdMerge) {
+                if self.settings.rules.enabled(Rule::UseOfPdMerge) {
                     if let Some(diagnostic) = pandas_vet::rules::use_of_pd_merge(func) {
                         self.diagnostics.push(diagnostic);
                     };
                 }
 
                 // flake8-datetimez
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::CallDatetimeWithoutTzinfo)
-                {
+                if self.settings.rules.enabled(Rule::CallDatetimeWithoutTzinfo) {
                     flake8_datetimez::rules::call_datetime_without_tzinfo(
                         self,
                         func,
@@ -2785,16 +2699,16 @@ where
                         Range::from(expr),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::CallDatetimeToday) {
+                if self.settings.rules.enabled(Rule::CallDatetimeToday) {
                     flake8_datetimez::rules::call_datetime_today(self, func, Range::from(expr));
                 }
-                if self.settings.rules.enabled(&Rule::CallDatetimeUtcnow) {
+                if self.settings.rules.enabled(Rule::CallDatetimeUtcnow) {
                     flake8_datetimez::rules::call_datetime_utcnow(self, func, Range::from(expr));
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::CallDatetimeUtcfromtimestamp)
+                    .enabled(Rule::CallDatetimeUtcfromtimestamp)
                 {
                     flake8_datetimez::rules::call_datetime_utcfromtimestamp(
                         self,
@@ -2805,7 +2719,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::CallDatetimeNowWithoutTzinfo)
+                    .enabled(Rule::CallDatetimeNowWithoutTzinfo)
                 {
                     flake8_datetimez::rules::call_datetime_now_without_tzinfo(
                         self,
@@ -2815,11 +2729,7 @@ where
                         Range::from(expr),
                     );
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::CallDatetimeFromtimestamp)
-                {
+                if self.settings.rules.enabled(Rule::CallDatetimeFromtimestamp) {
                     flake8_datetimez::rules::call_datetime_fromtimestamp(
                         self,
                         func,
@@ -2831,7 +2741,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::CallDatetimeStrptimeWithoutZone)
+                    .enabled(Rule::CallDatetimeStrptimeWithoutZone)
                 {
                     flake8_datetimez::rules::call_datetime_strptime_without_zone(
                         self,
@@ -2840,18 +2750,18 @@ where
                         Range::from(expr),
                     );
                 }
-                if self.settings.rules.enabled(&Rule::CallDateToday) {
+                if self.settings.rules.enabled(Rule::CallDateToday) {
                     flake8_datetimez::rules::call_date_today(self, func, Range::from(expr));
                 }
-                if self.settings.rules.enabled(&Rule::CallDateFromtimestamp) {
+                if self.settings.rules.enabled(Rule::CallDateFromtimestamp) {
                     flake8_datetimez::rules::call_date_fromtimestamp(self, func, Range::from(expr));
                 }
 
                 // pygrep-hooks
-                if self.settings.rules.enabled(&Rule::NoEval) {
+                if self.settings.rules.enabled(Rule::NoEval) {
                     pygrep_hooks::rules::no_eval(self, func);
                 }
-                if self.settings.rules.enabled(&Rule::DeprecatedLogWarn) {
+                if self.settings.rules.enabled(Rule::DeprecatedLogWarn) {
                     pygrep_hooks::rules::deprecated_log_warn(self, func);
                 }
 
@@ -2859,32 +2769,32 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UnnecessaryDirectLambdaCall)
+                    .enabled(Rule::UnnecessaryDirectLambdaCall)
                 {
                     pylint::rules::unnecessary_direct_lambda_call(self, expr, func);
                 }
-                if self.settings.rules.enabled(&Rule::ConsiderUsingSysExit) {
+                if self.settings.rules.enabled(Rule::ConsiderUsingSysExit) {
                     pylint::rules::consider_using_sys_exit(self, func);
                 }
-                if self.settings.rules.enabled(&Rule::BadStrStripCall) {
+                if self.settings.rules.enabled(Rule::BadStrStripCall) {
                     pylint::rules::bad_str_strip_call(self, func, args);
                 }
-                if self.settings.rules.enabled(&Rule::InvalidEnvvarDefault) {
+                if self.settings.rules.enabled(Rule::InvalidEnvvarDefault) {
                     pylint::rules::invalid_envvar_default(self, func, args, keywords);
                 }
-                if self.settings.rules.enabled(&Rule::InvalidEnvvarValue) {
+                if self.settings.rules.enabled(Rule::InvalidEnvvarValue) {
                     pylint::rules::invalid_envvar_value(self, func, args, keywords);
                 }
 
                 // flake8-pytest-style
-                if self.settings.rules.enabled(&Rule::PatchWithLambda) {
+                if self.settings.rules.enabled(Rule::PatchWithLambda) {
                     if let Some(diagnostic) =
                         flake8_pytest_style::rules::patch_with_lambda(func, args, keywords)
                     {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::UnittestAssertion) {
+                if self.settings.rules.enabled(Rule::UnittestAssertion) {
                     if let Some(diagnostic) = flake8_pytest_style::rules::unittest_assertion(
                         self, expr, func, args, keywords,
                     ) {
@@ -2892,81 +2802,87 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::RaisesWithoutException)
-                    || self.settings.rules.enabled(&Rule::RaisesTooBroad)
+                if self.settings.rules.enabled(Rule::RaisesWithoutException)
+                    || self.settings.rules.enabled(Rule::RaisesTooBroad)
                 {
                     flake8_pytest_style::rules::raises_call(self, func, args, keywords);
                 }
 
-                if self.settings.rules.enabled(&Rule::FailWithoutMessage) {
+                if self.settings.rules.enabled(Rule::FailWithoutMessage) {
                     flake8_pytest_style::rules::fail_call(self, func, args, keywords);
+                }
+
+                if self.settings.rules.enabled(Rule::PairwiseOverZipped) {
+                    if self.settings.target_version >= PythonVersion::Py310 {
+                        ruff::rules::pairwise_over_zipped(self, func, args);
+                    }
                 }
 
                 // flake8-simplify
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::OpenFileWithContextHandler)
+                    .enabled(Rule::OpenFileWithContextHandler)
                 {
                     flake8_simplify::rules::open_file_with_context_handler(self, func);
                 }
 
                 // flake8-use-pathlib
-                if self.settings.rules.enabled(&Rule::PathlibAbspath)
-                    || self.settings.rules.enabled(&Rule::PathlibChmod)
-                    || self.settings.rules.enabled(&Rule::PathlibMkdir)
-                    || self.settings.rules.enabled(&Rule::PathlibMakedirs)
-                    || self.settings.rules.enabled(&Rule::PathlibRename)
-                    || self.settings.rules.enabled(&Rule::PathlibReplace)
-                    || self.settings.rules.enabled(&Rule::PathlibRmdir)
-                    || self.settings.rules.enabled(&Rule::PathlibRemove)
-                    || self.settings.rules.enabled(&Rule::PathlibUnlink)
-                    || self.settings.rules.enabled(&Rule::PathlibGetcwd)
-                    || self.settings.rules.enabled(&Rule::PathlibExists)
-                    || self.settings.rules.enabled(&Rule::PathlibExpanduser)
-                    || self.settings.rules.enabled(&Rule::PathlibIsDir)
-                    || self.settings.rules.enabled(&Rule::PathlibIsFile)
-                    || self.settings.rules.enabled(&Rule::PathlibIsLink)
-                    || self.settings.rules.enabled(&Rule::PathlibReadlink)
-                    || self.settings.rules.enabled(&Rule::PathlibStat)
-                    || self.settings.rules.enabled(&Rule::PathlibIsAbs)
-                    || self.settings.rules.enabled(&Rule::PathlibJoin)
-                    || self.settings.rules.enabled(&Rule::PathlibBasename)
-                    || self.settings.rules.enabled(&Rule::PathlibSamefile)
-                    || self.settings.rules.enabled(&Rule::PathlibSplitext)
-                    || self.settings.rules.enabled(&Rule::PathlibOpen)
-                    || self.settings.rules.enabled(&Rule::PathlibPyPath)
+                if self.settings.rules.enabled(Rule::PathlibAbspath)
+                    || self.settings.rules.enabled(Rule::PathlibChmod)
+                    || self.settings.rules.enabled(Rule::PathlibMkdir)
+                    || self.settings.rules.enabled(Rule::PathlibMakedirs)
+                    || self.settings.rules.enabled(Rule::PathlibRename)
+                    || self.settings.rules.enabled(Rule::PathlibReplace)
+                    || self.settings.rules.enabled(Rule::PathlibRmdir)
+                    || self.settings.rules.enabled(Rule::PathlibRemove)
+                    || self.settings.rules.enabled(Rule::PathlibUnlink)
+                    || self.settings.rules.enabled(Rule::PathlibGetcwd)
+                    || self.settings.rules.enabled(Rule::PathlibExists)
+                    || self.settings.rules.enabled(Rule::PathlibExpanduser)
+                    || self.settings.rules.enabled(Rule::PathlibIsDir)
+                    || self.settings.rules.enabled(Rule::PathlibIsFile)
+                    || self.settings.rules.enabled(Rule::PathlibIsLink)
+                    || self.settings.rules.enabled(Rule::PathlibReadlink)
+                    || self.settings.rules.enabled(Rule::PathlibStat)
+                    || self.settings.rules.enabled(Rule::PathlibIsAbs)
+                    || self.settings.rules.enabled(Rule::PathlibJoin)
+                    || self.settings.rules.enabled(Rule::PathlibBasename)
+                    || self.settings.rules.enabled(Rule::PathlibSamefile)
+                    || self.settings.rules.enabled(Rule::PathlibSplitext)
+                    || self.settings.rules.enabled(Rule::PathlibOpen)
+                    || self.settings.rules.enabled(Rule::PathlibPyPath)
                 {
                     flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
                 }
 
                 // numpy
-                if self.settings.rules.enabled(&Rule::NumpyLegacyRandom) {
+                if self.settings.rules.enabled(Rule::NumpyLegacyRandom) {
                     numpy::rules::numpy_legacy_random(self, func);
                 }
 
                 // flake8-logging-format
-                if self.settings.rules.enabled(&Rule::LoggingStringFormat)
-                    || self.settings.rules.enabled(&Rule::LoggingPercentFormat)
-                    || self.settings.rules.enabled(&Rule::LoggingStringConcat)
-                    || self.settings.rules.enabled(&Rule::LoggingFString)
-                    || self.settings.rules.enabled(&Rule::LoggingWarn)
-                    || self.settings.rules.enabled(&Rule::LoggingExtraAttrClash)
-                    || self.settings.rules.enabled(&Rule::LoggingExcInfo)
-                    || self.settings.rules.enabled(&Rule::LoggingRedundantExcInfo)
+                if self.settings.rules.enabled(Rule::LoggingStringFormat)
+                    || self.settings.rules.enabled(Rule::LoggingPercentFormat)
+                    || self.settings.rules.enabled(Rule::LoggingStringConcat)
+                    || self.settings.rules.enabled(Rule::LoggingFString)
+                    || self.settings.rules.enabled(Rule::LoggingWarn)
+                    || self.settings.rules.enabled(Rule::LoggingExtraAttrClash)
+                    || self.settings.rules.enabled(Rule::LoggingExcInfo)
+                    || self.settings.rules.enabled(Rule::LoggingRedundantExcInfo)
                 {
                     flake8_logging_format::rules::logging_call(self, func, args, keywords);
                 }
 
                 // pylint logging checker
-                if self.settings.rules.enabled(&Rule::LoggingTooFewArgs)
-                    || self.settings.rules.enabled(&Rule::LoggingTooManyArgs)
+                if self.settings.rules.enabled(Rule::LoggingTooFewArgs)
+                    || self.settings.rules.enabled(Rule::LoggingTooManyArgs)
                 {
                     pylint::rules::logging_call(self, func, args, keywords);
                 }
 
                 // flake8-django
-                if self.settings.rules.enabled(&Rule::LocalsInRenderFunction) {
+                if self.settings.rules.enabled(Rule::LocalsInRenderFunction) {
                     flake8_django::rules::locals_in_render_function(self, func, args, keywords);
                 }
             }
@@ -2974,40 +2890,40 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::MultiValueRepeatedKeyLiteral)
+                    .enabled(Rule::MultiValueRepeatedKeyLiteral)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::MultiValueRepeatedKeyVariable)
+                        .enabled(Rule::MultiValueRepeatedKeyVariable)
                 {
                     pyflakes::rules::repeated_keys(self, keys, values);
                 }
 
-                if self.settings.rules.enabled(&Rule::UnnecessarySpread) {
+                if self.settings.rules.enabled(Rule::UnnecessarySpread) {
                     flake8_pie::rules::no_unnecessary_spread(self, keys, values);
                 }
             }
             ExprKind::Yield { .. } => {
-                if self.settings.rules.enabled(&Rule::YieldOutsideFunction) {
+                if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
                     pyflakes::rules::yield_outside_function(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::YieldInInit) {
+                if self.settings.rules.enabled(Rule::YieldInInit) {
                     pylint::rules::yield_in_init(self, expr);
                 }
             }
             ExprKind::YieldFrom { .. } => {
-                if self.settings.rules.enabled(&Rule::YieldOutsideFunction) {
+                if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
                     pyflakes::rules::yield_outside_function(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::YieldInInit) {
+                if self.settings.rules.enabled(Rule::YieldInInit) {
                     pylint::rules::yield_in_init(self, expr);
                 }
             }
             ExprKind::Await { .. } => {
-                if self.settings.rules.enabled(&Rule::YieldOutsideFunction) {
+                if self.settings.rules.enabled(Rule::YieldOutsideFunction) {
                     pyflakes::rules::yield_outside_function(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::AwaitOutsideAsync) {
+                if self.settings.rules.enabled(Rule::AwaitOutsideAsync) {
                     pylint::rules::await_outside_async(self, expr);
                 }
             }
@@ -3015,11 +2931,11 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::FStringMissingPlaceholders)
+                    .enabled(Rule::FStringMissingPlaceholders)
                 {
                     pyflakes::rules::f_string_missing_placeholders(expr, values, self);
                 }
-                if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
+                if self.settings.rules.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
             }
@@ -3028,7 +2944,7 @@ where
                 op: Operator::RShift,
                 ..
             } => {
-                if self.settings.rules.enabled(&Rule::InvalidPrintSyntax) {
+                if self.settings.rules.enabled(Rule::InvalidPrintSyntax) {
                     pyflakes::rules::invalid_print_syntax(self, left);
                 }
             }
@@ -3045,39 +2961,39 @@ where
                     if self
                         .settings
                         .rules
-                        .enabled(&Rule::PercentFormatInvalidFormat)
+                        .enabled(Rule::PercentFormatInvalidFormat)
                         || self
                             .settings
                             .rules
-                            .enabled(&Rule::PercentFormatExpectedMapping)
+                            .enabled(Rule::PercentFormatExpectedMapping)
                         || self
                             .settings
                             .rules
-                            .enabled(&Rule::PercentFormatExpectedSequence)
+                            .enabled(Rule::PercentFormatExpectedSequence)
                         || self
                             .settings
                             .rules
-                            .enabled(&Rule::PercentFormatExtraNamedArguments)
+                            .enabled(Rule::PercentFormatExtraNamedArguments)
                         || self
                             .settings
                             .rules
-                            .enabled(&Rule::PercentFormatMissingArgument)
+                            .enabled(Rule::PercentFormatMissingArgument)
                         || self
                             .settings
                             .rules
-                            .enabled(&Rule::PercentFormatMixedPositionalAndNamed)
+                            .enabled(Rule::PercentFormatMixedPositionalAndNamed)
                         || self
                             .settings
                             .rules
-                            .enabled(&Rule::PercentFormatPositionalCountMismatch)
+                            .enabled(Rule::PercentFormatPositionalCountMismatch)
                         || self
                             .settings
                             .rules
-                            .enabled(&Rule::PercentFormatStarRequiresSequence)
+                            .enabled(Rule::PercentFormatStarRequiresSequence)
                         || self
                             .settings
                             .rules
-                            .enabled(&Rule::PercentFormatUnsupportedFormatCharacter)
+                            .enabled(Rule::PercentFormatUnsupportedFormatCharacter)
                     {
                         let location = Range::from(expr);
                         match pyflakes::cformat::CFormatSummary::try_from(value.as_str()) {
@@ -3088,7 +3004,7 @@ where
                                 if self
                                     .settings
                                     .rules
-                                    .enabled(&Rule::PercentFormatUnsupportedFormatCharacter)
+                                    .enabled(Rule::PercentFormatUnsupportedFormatCharacter)
                                 {
                                     self.diagnostics.push(Diagnostic::new(
                                         pyflakes::rules::PercentFormatUnsupportedFormatCharacter {
@@ -3102,7 +3018,7 @@ where
                                 if self
                                     .settings
                                     .rules
-                                    .enabled(&Rule::PercentFormatInvalidFormat)
+                                    .enabled(Rule::PercentFormatInvalidFormat)
                                 {
                                     self.diagnostics.push(Diagnostic::new(
                                         pyflakes::rules::PercentFormatInvalidFormat {
@@ -3116,7 +3032,7 @@ where
                                 if self
                                     .settings
                                     .rules
-                                    .enabled(&Rule::PercentFormatExpectedMapping)
+                                    .enabled(Rule::PercentFormatExpectedMapping)
                                 {
                                     pyflakes::rules::percent_format_expected_mapping(
                                         self, &summary, right, location,
@@ -3125,7 +3041,7 @@ where
                                 if self
                                     .settings
                                     .rules
-                                    .enabled(&Rule::PercentFormatExpectedSequence)
+                                    .enabled(Rule::PercentFormatExpectedSequence)
                                 {
                                     pyflakes::rules::percent_format_expected_sequence(
                                         self, &summary, right, location,
@@ -3134,7 +3050,7 @@ where
                                 if self
                                     .settings
                                     .rules
-                                    .enabled(&Rule::PercentFormatExtraNamedArguments)
+                                    .enabled(Rule::PercentFormatExtraNamedArguments)
                                 {
                                     pyflakes::rules::percent_format_extra_named_arguments(
                                         self, &summary, right, location,
@@ -3143,7 +3059,7 @@ where
                                 if self
                                     .settings
                                     .rules
-                                    .enabled(&Rule::PercentFormatMissingArgument)
+                                    .enabled(Rule::PercentFormatMissingArgument)
                                 {
                                     pyflakes::rules::percent_format_missing_arguments(
                                         self, &summary, right, location,
@@ -3152,7 +3068,7 @@ where
                                 if self
                                     .settings
                                     .rules
-                                    .enabled(&Rule::PercentFormatMixedPositionalAndNamed)
+                                    .enabled(Rule::PercentFormatMixedPositionalAndNamed)
                                 {
                                     pyflakes::rules::percent_format_mixed_positional_and_named(
                                         self, &summary, location,
@@ -3161,7 +3077,7 @@ where
                                 if self
                                     .settings
                                     .rules
-                                    .enabled(&Rule::PercentFormatPositionalCountMismatch)
+                                    .enabled(Rule::PercentFormatPositionalCountMismatch)
                                 {
                                     pyflakes::rules::percent_format_positional_count_mismatch(
                                         self, &summary, right, location,
@@ -3170,7 +3086,7 @@ where
                                 if self
                                     .settings
                                     .rules
-                                    .enabled(&Rule::PercentFormatStarRequiresSequence)
+                                    .enabled(Rule::PercentFormatStarRequiresSequence)
                                 {
                                     pyflakes::rules::percent_format_star_requires_sequence(
                                         self, &summary, right, location,
@@ -3180,13 +3096,13 @@ where
                         }
                     }
 
-                    if self.settings.rules.enabled(&Rule::PrintfStringFormatting) {
+                    if self.settings.rules.enabled(Rule::PrintfStringFormatting) {
                         pyupgrade::rules::printf_string_formatting(self, expr, left, right);
                     }
-                    if self.settings.rules.enabled(&Rule::BadStringFormatType) {
+                    if self.settings.rules.enabled(Rule::BadStringFormatType) {
                         pylint::rules::bad_string_format_type(self, expr, right);
                     }
-                    if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
+                    if self.settings.rules.enabled(Rule::HardcodedSQLExpression) {
                         flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                     }
                 }
@@ -3197,7 +3113,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::ExplicitStringConcatenation)
+                    .enabled(Rule::ExplicitStringConcatenation)
                 {
                     if let Some(diagnostic) = flake8_implicit_str_concat::rules::explicit(expr) {
                         self.diagnostics.push(diagnostic);
@@ -3206,17 +3122,17 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::UnpackInsteadOfConcatenatingToCollectionLiteral)
+                    .enabled(Rule::UnpackInsteadOfConcatenatingToCollectionLiteral)
                 {
                     ruff::rules::unpack_instead_of_concatenating_to_collection_literal(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::HardcodedSQLExpression) {
+                if self.settings.rules.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
             }
             ExprKind::UnaryOp { op, operand } => {
-                let check_not_in = self.settings.rules.enabled(&Rule::NotInTest);
-                let check_not_is = self.settings.rules.enabled(&Rule::NotIsTest);
+                let check_not_in = self.settings.rules.enabled(Rule::NotInTest);
+                let check_not_is = self.settings.rules.enabled(Rule::NotIsTest);
                 if check_not_in || check_not_is {
                     pycodestyle::rules::not_tests(
                         self,
@@ -3228,17 +3144,17 @@ where
                     );
                 }
 
-                if self.settings.rules.enabled(&Rule::UnaryPrefixIncrement) {
+                if self.settings.rules.enabled(Rule::UnaryPrefixIncrement) {
                     flake8_bugbear::rules::unary_prefix_increment(self, expr, op, operand);
                 }
 
-                if self.settings.rules.enabled(&Rule::NegateEqualOp) {
+                if self.settings.rules.enabled(Rule::NegateEqualOp) {
                     flake8_simplify::rules::negation_with_equal_op(self, expr, op, operand);
                 }
-                if self.settings.rules.enabled(&Rule::NegateNotEqualOp) {
+                if self.settings.rules.enabled(Rule::NegateNotEqualOp) {
                     flake8_simplify::rules::negation_with_not_equal_op(self, expr, op, operand);
                 }
-                if self.settings.rules.enabled(&Rule::DoubleNegation) {
+                if self.settings.rules.enabled(Rule::DoubleNegation) {
                     flake8_simplify::rules::double_negation(self, expr, op, operand);
                 }
             }
@@ -3247,9 +3163,9 @@ where
                 ops,
                 comparators,
             } => {
-                let check_none_comparisons = self.settings.rules.enabled(&Rule::NoneComparison);
+                let check_none_comparisons = self.settings.rules.enabled(Rule::NoneComparison);
                 let check_true_false_comparisons =
-                    self.settings.rules.enabled(&Rule::TrueFalseComparison);
+                    self.settings.rules.enabled(Rule::TrueFalseComparison);
                 if check_none_comparisons || check_true_false_comparisons {
                     pycodestyle::rules::literal_comparisons(
                         self,
@@ -3262,7 +3178,7 @@ where
                     );
                 }
 
-                if self.settings.rules.enabled(&Rule::IsLiteral) {
+                if self.settings.rules.enabled(Rule::IsLiteral) {
                     pyflakes::rules::invalid_literal_comparison(
                         self,
                         left,
@@ -3272,30 +3188,23 @@ where
                     );
                 }
 
-                if self.settings.rules.enabled(&Rule::TypeComparison) {
-                    self.diagnostics.extend(pycodestyle::rules::type_comparison(
-                        ops,
-                        comparators,
-                        Range::from(expr),
-                    ));
+                if self.settings.rules.enabled(Rule::TypeComparison) {
+                    pycodestyle::rules::type_comparison(self, expr, ops, comparators);
                 }
 
-                if self.settings.rules.enabled(&Rule::SysVersionCmpStr3)
+                if self.settings.rules.enabled(Rule::SysVersionCmpStr3)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::SysVersionInfo0Eq3Referenced)
-                    || self.settings.rules.enabled(&Rule::SysVersionInfo1CmpInt)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(&Rule::SysVersionInfoMinorCmpInt)
-                    || self.settings.rules.enabled(&Rule::SysVersionCmpStr10)
+                        .enabled(Rule::SysVersionInfo0Eq3Referenced)
+                    || self.settings.rules.enabled(Rule::SysVersionInfo1CmpInt)
+                    || self.settings.rules.enabled(Rule::SysVersionInfoMinorCmpInt)
+                    || self.settings.rules.enabled(Rule::SysVersionCmpStr10)
                 {
                     flake8_2020::rules::compare(self, left, ops, comparators);
                 }
 
-                if self.settings.rules.enabled(&Rule::HardcodedPasswordString) {
+                if self.settings.rules.enabled(Rule::HardcodedPasswordString) {
                     self.diagnostics.extend(
                         flake8_bandit::rules::compare_to_hardcoded_password_string(
                             left,
@@ -3304,32 +3213,29 @@ where
                     );
                 }
 
-                if self.settings.rules.enabled(&Rule::ComparisonOfConstant) {
+                if self.settings.rules.enabled(Rule::ComparisonOfConstant) {
                     pylint::rules::comparison_of_constant(self, left, ops, comparators);
                 }
 
-                if self.settings.rules.enabled(&Rule::CompareToEmptyString) {
+                if self.settings.rules.enabled(Rule::CompareToEmptyString) {
                     pylint::rules::compare_to_empty_string(self, left, ops, comparators);
                 }
 
-                if self.settings.rules.enabled(&Rule::MagicValueComparison) {
+                if self.settings.rules.enabled(Rule::MagicValueComparison) {
                     pylint::rules::magic_value_comparison(self, left, comparators);
                 }
 
-                if self.settings.rules.enabled(&Rule::KeyInDict) {
+                if self.settings.rules.enabled(Rule::KeyInDict) {
                     flake8_simplify::rules::key_in_dict_compare(self, expr, left, ops, comparators);
                 }
 
-                if self.settings.rules.enabled(&Rule::YodaConditions) {
+                if self.settings.rules.enabled(Rule::YodaConditions) {
                     flake8_simplify::rules::yoda_conditions(self, expr, left, ops, comparators);
                 }
 
                 if self.is_stub {
-                    if self
-                        .settings
-                        .rules
-                        .enabled(&Rule::UnrecognizedPlatformCheck)
-                        || self.settings.rules.enabled(&Rule::UnrecognizedPlatformName)
+                    if self.settings.rules.enabled(Rule::UnrecognizedPlatformCheck)
+                        || self.settings.rules.enabled(Rule::UnrecognizedPlatformName)
                     {
                         flake8_pyi::rules::unrecognized_platform(
                             self,
@@ -3340,7 +3246,7 @@ where
                         );
                     }
 
-                    if self.settings.rules.enabled(&Rule::BadVersionInfoComparison) {
+                    if self.settings.rules.enabled(Rule::BadVersionInfoComparison) {
                         flake8_pyi::rules::bad_version_info_comparison(
                             self,
                             expr,
@@ -3366,7 +3272,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::HardcodedBindAllInterfaces)
+                    .enabled(Rule::HardcodedBindAllInterfaces)
                 {
                     if let Some(diagnostic) = flake8_bandit::rules::hardcoded_bind_all_interfaces(
                         value,
@@ -3375,7 +3281,7 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::HardcodedTempFile) {
+                if self.settings.rules.enabled(Rule::HardcodedTempFile) {
                     if let Some(diagnostic) = flake8_bandit::rules::hardcoded_tmp_directory(
                         expr,
                         value,
@@ -3384,12 +3290,12 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(&Rule::RewriteUnicodeLiteral) {
+                if self.settings.rules.enabled(Rule::RewriteUnicodeLiteral) {
                     pyupgrade::rules::rewrite_unicode_literal(self, expr, kind.as_deref());
                 }
             }
             ExprKind::Lambda { args, body, .. } => {
-                if self.settings.rules.enabled(&Rule::PreferListBuiltin) {
+                if self.settings.rules.enabled(Rule::PreferListBuiltin) {
                     flake8_pie::rules::prefer_list_builtin(self, expr);
                 }
 
@@ -3401,67 +3307,63 @@ where
                     self.visit_expr(expr);
                 }
                 self.ctx
-                    .push_scope(Scope::new(ScopeKind::Lambda(Lambda { args, body })));
+                    .push_scope(ScopeKind::Lambda(Lambda { args, body }));
             }
             ExprKind::IfExp { test, body, orelse } => {
-                if self.settings.rules.enabled(&Rule::IfExprWithTrueFalse) {
+                if self.settings.rules.enabled(Rule::IfExprWithTrueFalse) {
                     flake8_simplify::rules::explicit_true_false_in_ifexpr(
                         self, expr, test, body, orelse,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::IfExprWithFalseTrue) {
+                if self.settings.rules.enabled(Rule::IfExprWithFalseTrue) {
                     flake8_simplify::rules::explicit_false_true_in_ifexpr(
                         self, expr, test, body, orelse,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::IfExprWithTwistedArms) {
+                if self.settings.rules.enabled(Rule::IfExprWithTwistedArms) {
                     flake8_simplify::rules::twisted_arms_in_ifexpr(self, expr, test, body, orelse);
                 }
             }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
-                if self.settings.rules.enabled(&Rule::UnnecessaryComprehension) {
+                if self.settings.rules.enabled(Rule::UnnecessaryComprehension) {
                     flake8_comprehensions::rules::unnecessary_comprehension(
                         self, expr, elt, generators,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::FunctionUsesLoopVariable) {
+                if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(Scope::new(ScopeKind::Generator));
+                self.ctx.push_scope(ScopeKind::Generator);
             }
             ExprKind::GeneratorExp { .. } | ExprKind::DictComp { .. } => {
-                if self.settings.rules.enabled(&Rule::FunctionUsesLoopVariable) {
+                if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(Scope::new(ScopeKind::Generator));
+                self.ctx.push_scope(ScopeKind::Generator);
             }
             ExprKind::BoolOp { op, values } => {
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::ConsiderMergingIsinstance)
-                {
+                if self.settings.rules.enabled(Rule::ConsiderMergingIsinstance) {
                     pylint::rules::merge_isinstance(self, expr, op, values);
                 }
-                if self.settings.rules.enabled(&Rule::SingleStartsEndsWith) {
+                if self.settings.rules.enabled(Rule::SingleStartsEndsWith) {
                     flake8_pie::rules::single_starts_ends_with(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::DuplicateIsinstanceCall) {
+                if self.settings.rules.enabled(Rule::DuplicateIsinstanceCall) {
                     flake8_simplify::rules::duplicate_isinstance_call(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::CompareWithTuple) {
+                if self.settings.rules.enabled(Rule::CompareWithTuple) {
                     flake8_simplify::rules::compare_with_tuple(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::ExprAndNotExpr) {
+                if self.settings.rules.enabled(Rule::ExprAndNotExpr) {
                     flake8_simplify::rules::expr_and_not_expr(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::ExprOrNotExpr) {
+                if self.settings.rules.enabled(Rule::ExprOrNotExpr) {
                     flake8_simplify::rules::expr_or_not_expr(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::ExprOrTrue) {
+                if self.settings.rules.enabled(Rule::ExprOrTrue) {
                     flake8_simplify::rules::expr_or_true(self, expr);
                 }
-                if self.settings.rules.enabled(&Rule::ExprAndFalse) {
+                if self.settings.rules.enabled(Rule::ExprAndFalse) {
                     flake8_simplify::rules::expr_and_false(self, expr);
                 }
             }
@@ -3717,7 +3619,7 @@ where
     }
 
     fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
-        if self.settings.rules.enabled(&Rule::KeyInDict) {
+        if self.settings.rules.enabled(Rule::KeyInDict) {
             flake8_simplify::rules::key_in_dict_for(
                 self,
                 &comprehension.target,
@@ -3732,7 +3634,7 @@ where
             ExcepthandlerKind::ExceptHandler {
                 type_, name, body, ..
             } => {
-                if self.settings.rules.enabled(&Rule::BareExcept) {
+                if self.settings.rules.enabled(Rule::BareExcept) {
                     if let Some(diagnostic) = pycodestyle::rules::bare_except(
                         type_.as_deref(),
                         body,
@@ -3745,11 +3647,11 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::RaiseWithoutFromInsideExcept)
+                    .enabled(Rule::RaiseWithoutFromInsideExcept)
                 {
                     flake8_bugbear::rules::raise_without_from_inside_except(self, body);
                 }
-                if self.settings.rules.enabled(&Rule::BlindExcept) {
+                if self.settings.rules.enabled(Rule::BlindExcept) {
                     flake8_blind_except::rules::blind_except(
                         self,
                         type_.as_deref(),
@@ -3757,7 +3659,7 @@ where
                         body,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::TryExceptPass) {
+                if self.settings.rules.enabled(Rule::TryExceptPass) {
                     flake8_bandit::rules::try_except_pass(
                         self,
                         excepthandler,
@@ -3767,7 +3669,7 @@ where
                         self.settings.flake8_bandit.check_typed_exception,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::TryExceptContinue) {
+                if self.settings.rules.enabled(Rule::TryExceptContinue) {
                     flake8_bandit::rules::try_except_continue(
                         self,
                         excepthandler,
@@ -3777,22 +3679,22 @@ where
                         self.settings.flake8_bandit.check_typed_exception,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::ExceptWithEmptyTuple) {
+                if self.settings.rules.enabled(Rule::ExceptWithEmptyTuple) {
                     flake8_bugbear::rules::except_with_empty_tuple(self, excepthandler);
                 }
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::ExceptWithNonExceptionClasses)
+                    .enabled(Rule::ExceptWithNonExceptionClasses)
                 {
                     flake8_bugbear::rules::except_with_non_exception_classes(self, excepthandler);
                 }
-                if self.settings.rules.enabled(&Rule::ReraiseNoCause) {
+                if self.settings.rules.enabled(Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
                 }
                 match name {
                     Some(name) => {
-                        if self.settings.rules.enabled(&Rule::AmbiguousVariableName) {
+                        if self.settings.rules.enabled(Rule::AmbiguousVariableName) {
                             if let Some(diagnostic) = pycodestyle::rules::ambiguous_variable_name(
                                 name,
                                 helpers::excepthandler_name_range(excepthandler, self.locator)
@@ -3807,12 +3709,7 @@ where
                         let name_range =
                             helpers::excepthandler_name_range(excepthandler, self.locator).unwrap();
 
-                        if self
-                            .ctx
-                            .current_scope()
-                            .bindings
-                            .contains_key(&name.as_str())
-                        {
+                        if self.ctx.scope().defines(name.as_str()) {
                             self.handle_node_store(
                                 name,
                                 &Expr::new(
@@ -3826,12 +3723,7 @@ where
                             );
                         }
 
-                        let definition = self
-                            .ctx
-                            .current_scope()
-                            .bindings
-                            .get(&name.as_str())
-                            .copied();
+                        let definition = self.ctx.scope().get(name.as_str()).copied();
                         self.handle_node_store(
                             name,
                             &Expr::new(
@@ -3847,19 +3739,18 @@ where
                         walk_excepthandler(self, excepthandler);
 
                         if let Some(index) = {
-                            let scope = &mut self.ctx.scopes
-                                [*(self.ctx.scope_stack.last().expect("No current scope found"))];
-                            &scope.bindings.remove(&name.as_str())
+                            let scope = self.ctx.scope_mut();
+                            &scope.remove(name.as_str())
                         } {
                             if !self.ctx.bindings[*index].used() {
-                                if self.settings.rules.enabled(&Rule::UnusedVariable) {
+                                if self.settings.rules.enabled(Rule::UnusedVariable) {
                                     let mut diagnostic = Diagnostic::new(
                                         pyflakes::rules::UnusedVariable {
                                             name: name.to_string(),
                                         },
                                         name_range,
                                     );
-                                    if self.patch(&Rule::UnusedVariable) {
+                                    if self.patch(Rule::UnusedVariable) {
                                         match pyflakes::fixes::remove_exception_handler_assignment(
                                             excepthandler,
                                             self.locator,
@@ -3882,9 +3773,8 @@ where
                         }
 
                         if let Some(index) = definition {
-                            let scope = &mut self.ctx.scopes
-                                [*(self.ctx.scope_stack.last().expect("No current scope found"))];
-                            scope.bindings.insert(name, index);
+                            let scope = self.ctx.scope_mut();
+                            scope.add(name, index);
                         }
                     }
                     None => walk_excepthandler(self, excepthandler),
@@ -3905,13 +3795,13 @@ where
     }
 
     fn visit_arguments(&mut self, arguments: &'b Arguments) {
-        if self.settings.rules.enabled(&Rule::MutableArgumentDefault) {
+        if self.settings.rules.enabled(Rule::MutableArgumentDefault) {
             flake8_bugbear::rules::mutable_argument_default(self, arguments);
         }
         if self
             .settings
             .rules
-            .enabled(&Rule::FunctionCallArgumentDefault)
+            .enabled(Rule::FunctionCallArgumentDefault)
         {
             flake8_bugbear::rules::function_call_argument_default(self, arguments);
         }
@@ -3920,13 +3810,13 @@ where
             if self
                 .settings
                 .rules
-                .enabled(&Rule::TypedArgumentSimpleDefaults)
+                .enabled(Rule::TypedArgumentSimpleDefaults)
             {
                 flake8_pyi::rules::typed_argument_simple_defaults(self, arguments);
             }
         }
         if self.is_stub {
-            if self.settings.rules.enabled(&Rule::ArgumentSimpleDefaults) {
+            if self.settings.rules.enabled(Rule::ArgumentSimpleDefaults) {
                 flake8_pyi::rules::argument_simple_defaults(self, arguments);
             }
         }
@@ -3966,7 +3856,7 @@ where
             },
         );
 
-        if self.settings.rules.enabled(&Rule::AmbiguousVariableName) {
+        if self.settings.rules.enabled(Rule::AmbiguousVariableName) {
             if let Some(diagnostic) =
                 pycodestyle::rules::ambiguous_variable_name(&arg.node.arg, Range::from(arg))
             {
@@ -3974,7 +3864,7 @@ where
             }
         }
 
-        if self.settings.rules.enabled(&Rule::InvalidArgumentName) {
+        if self.settings.rules.enabled(Rule::InvalidArgumentName) {
             if let Some(diagnostic) = pep8_naming::rules::invalid_argument_name(
                 &arg.node.arg,
                 arg,
@@ -4014,7 +3904,7 @@ where
     }
 
     fn visit_body(&mut self, body: &'b [Stmt]) {
-        if self.settings.rules.enabled(&Rule::UnnecessaryPass) {
+        if self.settings.rules.enabled(Rule::UnnecessaryPass) {
             flake8_pie::rules::no_unnecessary_pass(self, body);
         }
 
@@ -4038,18 +3928,19 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        let binding_index = self.ctx.bindings.len();
-
-        if let Some((stack_index, scope_index)) = self
+        let binding_id = self.ctx.bindings.next_id();
+        if let Some((stack_index, existing_binding_index)) = self
             .ctx
             .scope_stack
             .iter()
-            .rev()
             .enumerate()
-            .find(|(_, scope_index)| self.ctx.scopes[**scope_index].bindings.contains_key(&name))
+            .find_map(|(stack_index, scope_index)| {
+                self.ctx.scopes[*scope_index]
+                    .get(name)
+                    .map(|binding_id| (stack_index, *binding_id))
+            })
         {
-            let existing_binding_index = self.ctx.scopes[*scope_index].bindings.get(&name).unwrap();
-            let existing = &self.ctx.bindings[*existing_binding_index];
+            let existing = &self.ctx.bindings[existing_binding_index];
             let in_current_scope = stack_index == 0;
             if !existing.kind.is_builtin()
                 && existing.source.as_ref().map_or(true, |left| {
@@ -4072,7 +3963,7 @@ impl<'a> Checker<'a> {
                         | BindingKind::FutureImportation
                 );
                 if binding.kind.is_loop_var() && existing_is_import {
-                    if self.settings.rules.enabled(&Rule::ImportShadowedByLoopVar) {
+                    if self.settings.rules.enabled(Rule::ImportShadowedByLoopVar) {
                         self.diagnostics.push(Diagnostic::new(
                             pyflakes::rules::ImportShadowedByLoopVar {
                                 name: name.to_string(),
@@ -4091,7 +3982,7 @@ impl<'a> Checker<'a> {
                                 cast::decorator_list(existing.source.as_ref().unwrap()),
                             ))
                     {
-                        if self.settings.rules.enabled(&Rule::RedefinedWhileUnused) {
+                        if self.settings.rules.enabled(Rule::RedefinedWhileUnused) {
                             let mut diagnostic = Diagnostic::new(
                                 pyflakes::rules::RedefinedWhileUnused {
                                     name: name.to_string(),
@@ -4112,15 +4003,15 @@ impl<'a> Checker<'a> {
                 } else if existing_is_import && binding.redefines(existing) {
                     self.ctx
                         .redefinitions
-                        .entry(*existing_binding_index)
+                        .entry(existing_binding_index)
                         .or_insert_with(Vec::new)
-                        .push(binding_index);
+                        .push(binding_id);
                 }
             }
         }
 
-        let scope = self.ctx.current_scope();
-        let binding = if let Some(index) = scope.bindings.get(&name) {
+        let scope = self.ctx.scope();
+        let binding = if let Some(index) = scope.get(name) {
             let existing = &self.ctx.bindings[*index];
             match &existing.kind {
                 BindingKind::Builtin => {
@@ -4151,10 +4042,9 @@ impl<'a> Checker<'a> {
 
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
-        let scope =
-            &mut self.ctx.scopes[*(self.ctx.scope_stack.last().expect("No current scope found"))];
-        if !(binding.kind.is_annotation() && scope.bindings.contains_key(name)) {
-            if let Some(rebound_index) = scope.bindings.insert(name, binding_index) {
+        let scope = self.ctx.scope_mut();
+        if !(binding.kind.is_annotation() && scope.defines(name)) {
+            if let Some(rebound_index) = scope.add(name, binding_id) {
                 scope
                     .rebounds
                     .entry(name)
@@ -4168,7 +4058,7 @@ impl<'a> Checker<'a> {
 
     fn bind_builtins(&mut self) {
         let scope =
-            &mut self.ctx.scopes[*(self.ctx.scope_stack.last().expect("No current scope found"))];
+            &mut self.ctx.scopes[self.ctx.scope_stack.top().expect("No current scope found")];
 
         for builtin in BUILTINS
             .iter()
@@ -4176,17 +4066,16 @@ impl<'a> Checker<'a> {
             .copied()
             .chain(self.settings.builtins.iter().map(String::as_str))
         {
-            let index = self.ctx.bindings.len();
-            self.ctx.bindings.push(Binding {
+            let id = self.ctx.bindings.push(Binding {
                 kind: BindingKind::Builtin,
                 range: Range::default(),
                 runtime_usage: None,
-                synthetic_usage: Some((0, Range::default())),
+                synthetic_usage: Some((ScopeId::global(), Range::default())),
                 typing_usage: None,
                 source: None,
                 context: ExecutionContext::Runtime,
             });
-            scope.bindings.insert(builtin, index);
+            scope.add(builtin, id);
         }
     }
 
@@ -4194,13 +4083,13 @@ impl<'a> Checker<'a> {
         let ExprKind::Name { id, .. } = &expr.node else {
             return;
         };
-        let scope_id = self.ctx.current_scope().id;
+        let scope_id = self.ctx.scope_id();
 
         let mut first_iter = true;
         let mut in_generator = false;
         let mut import_starred = false;
 
-        for scope_index in self.ctx.scope_stack.iter().rev() {
+        for scope_index in self.ctx.scope_stack.iter() {
             let scope = &self.ctx.scopes[*scope_index];
 
             if matches!(scope.kind, ScopeKind::Class(_)) {
@@ -4211,7 +4100,7 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if let Some(index) = scope.bindings.get(&id.as_str()) {
+            if let Some(index) = scope.get(id.as_str()) {
                 // Mark the binding as used.
                 let context = self.ctx.execution_context();
                 self.ctx.bindings[*index].mark_used(scope_id, Range::from(expr), context);
@@ -4241,7 +4130,7 @@ impl<'a> Checker<'a> {
                             .unwrap_or_default();
                         if has_alias {
                             // Mark the sub-importation as used.
-                            if let Some(index) = scope.bindings.get(full_name) {
+                            if let Some(index) = scope.get(full_name) {
                                 self.ctx.bindings[*index].mark_used(
                                     scope_id,
                                     Range::from(expr),
@@ -4258,7 +4147,7 @@ impl<'a> Checker<'a> {
                             .unwrap_or_default();
                         if has_alias {
                             // Mark the sub-importation as used.
-                            if let Some(index) = scope.bindings.get(full_name.as_str()) {
+                            if let Some(index) = scope.get(full_name.as_str()) {
                                 self.ctx.bindings[*index].mark_used(
                                     scope_id,
                                     Range::from(expr),
@@ -4279,15 +4168,11 @@ impl<'a> Checker<'a> {
         }
 
         if import_starred {
-            if self.settings.rules.enabled(&Rule::ImportStarUsage) {
+            if self.settings.rules.enabled(Rule::ImportStarUsage) {
                 let mut from_list = vec![];
-                for scope_index in self.ctx.scope_stack.iter().rev() {
+                for scope_index in self.ctx.scope_stack.iter() {
                     let scope = &self.ctx.scopes[*scope_index];
-                    for binding in scope
-                        .bindings
-                        .values()
-                        .map(|index| &self.ctx.bindings[*index])
-                    {
+                    for binding in scope.binding_ids().map(|index| &self.ctx.bindings[*index]) {
                         if let BindingKind::StarImportation(level, module) = &binding.kind {
                             from_list.push(helpers::format_import_from(
                                 level.as_ref(),
@@ -4309,7 +4194,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        if self.settings.rules.enabled(&Rule::UndefinedName) {
+        if self.settings.rules.enabled(Rule::UndefinedName) {
             // Allow __path__.
             if self.path.ends_with("__init__.py") && id == "__path__" {
                 return;
@@ -4317,7 +4202,7 @@ impl<'a> Checker<'a> {
 
             // Allow "__module__" and "__qualname__" in class scopes.
             if (id == "__module__" || id == "__qualname__")
-                && matches!(self.ctx.current_scope().kind, ScopeKind::Class(..))
+                && matches!(self.ctx.scope().kind, ScopeKind::Class(..))
             {
                 return;
             }
@@ -4345,11 +4230,12 @@ impl<'a> Checker<'a> {
     {
         let parent = self.ctx.current_stmt().0;
 
-        if self.settings.rules.enabled(&Rule::UndefinedLocal) {
+        if self.settings.rules.enabled(Rule::UndefinedLocal) {
             let scopes: Vec<&Scope> = self
                 .ctx
                 .scope_stack
                 .iter()
+                .rev()
                 .map(|index| &self.ctx.scopes[*index])
                 .collect();
             if let Some(diagnostic) =
@@ -4362,14 +4248,13 @@ impl<'a> Checker<'a> {
         if self
             .settings
             .rules
-            .enabled(&Rule::NonLowercaseVariableInFunction)
+            .enabled(Rule::NonLowercaseVariableInFunction)
         {
-            if matches!(self.ctx.current_scope().kind, ScopeKind::Function(..)) {
+            if matches!(self.ctx.scope().kind, ScopeKind::Function(..)) {
                 // Ignore globals.
                 if !self
                     .ctx
-                    .current_scope()
-                    .bindings
+                    .scope()
                     .get(id)
                     .map_or(false, |index| self.ctx.bindings[*index].kind.is_global())
                 {
@@ -4381,9 +4266,9 @@ impl<'a> Checker<'a> {
         if self
             .settings
             .rules
-            .enabled(&Rule::MixedCaseVariableInClassScope)
+            .enabled(Rule::MixedCaseVariableInClassScope)
         {
-            if matches!(self.ctx.current_scope().kind, ScopeKind::Class(..)) {
+            if matches!(self.ctx.scope().kind, ScopeKind::Class(..)) {
                 pep8_naming::rules::mixed_case_variable_in_class_scope(self, expr, parent, id);
             }
         }
@@ -4391,9 +4276,9 @@ impl<'a> Checker<'a> {
         if self
             .settings
             .rules
-            .enabled(&Rule::MixedCaseVariableInGlobalScope)
+            .enabled(Rule::MixedCaseVariableInGlobalScope)
         {
-            if matches!(self.ctx.current_scope().kind, ScopeKind::Module) {
+            if matches!(self.ctx.scope().kind, ScopeKind::Module) {
                 pep8_naming::rules::mixed_case_variable_in_global_scope(self, expr, parent, id);
             }
         }
@@ -4450,7 +4335,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let current = self.ctx.current_scope();
+        let current = self.ctx.scope();
         if id == "__all__"
             && matches!(current.kind, ScopeKind::Module)
             && matches!(
@@ -4486,14 +4371,14 @@ impl<'a> Checker<'a> {
             } {
                 let (all_names, all_names_flags) = extract_all_names(&self.ctx, parent, current);
 
-                if self.settings.rules.enabled(&Rule::InvalidAllFormat) {
+                if self.settings.rules.enabled(Rule::InvalidAllFormat) {
                     if matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT) {
                         self.diagnostics
                             .push(pylint::rules::invalid_all_format(expr));
                     }
                 }
 
-                if self.settings.rules.enabled(&Rule::InvalidAllObject) {
+                if self.settings.rules.enabled(Rule::InvalidAllObject) {
                     if matches!(all_names_flags, AllNamesFlags::INVALID_OBJECT) {
                         self.diagnostics
                             .push(pylint::rules::invalid_all_object(expr));
@@ -4541,12 +4426,11 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let scope =
-            &mut self.ctx.scopes[*(self.ctx.scope_stack.last().expect("No current scope found"))];
-        if scope.bindings.remove(&id.as_str()).is_some() {
+        let scope = self.ctx.scope_mut();
+        if scope.remove(id.as_str()).is_some() {
             return;
         }
-        if !self.settings.rules.enabled(&Rule::UndefinedName) {
+        if !self.settings.rules.enabled(Rule::UndefinedName) {
             return;
         }
 
@@ -4562,7 +4446,7 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        if self.settings.rules.enabled(&Rule::FStringDocstring) {
+        if self.settings.rules.enabled(Rule::FStringDocstring) {
             flake8_bugbear::rules::f_string_docstring(self, python_ast);
         }
         let docstring = docstrings::extraction::docstring_from(python_ast);
@@ -4609,7 +4493,7 @@ impl<'a> Checker<'a> {
         {
             if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
                 if in_annotation && self.ctx.annotations_future_enabled {
-                    if self.settings.rules.enabled(&Rule::QuotedAnnotation) {
+                    if self.settings.rules.enabled(Rule::QuotedAnnotation) {
                         pyupgrade::rules::quoted_annotation(self, expression, range);
                     }
                 }
@@ -4620,7 +4504,7 @@ impl<'a> Checker<'a> {
                 if self
                     .settings
                     .rules
-                    .enabled(&Rule::ForwardAnnotationSyntaxError)
+                    .enabled(Rule::ForwardAnnotationSyntaxError)
                 {
                     self.diagnostics.push(Diagnostic::new(
                         pyflakes::rules::ForwardAnnotationSyntaxError {
@@ -4686,30 +4570,28 @@ impl<'a> Checker<'a> {
     fn check_deferred_assignments(&mut self) {
         self.deferred.assignments.reverse();
         while let Some((scopes, ..)) = self.deferred.assignments.pop() {
-            let scope_index = scopes[scopes.len() - 1];
-            let parent_scope_index = scopes[scopes.len() - 2];
+            let mut scopes_iter = scopes.iter();
+            let scope_index = *scopes_iter.next().unwrap();
+            let parent_scope_index = *scopes_iter.next().unwrap();
 
             // pyflakes
-            if self.settings.rules.enabled(&Rule::UnusedVariable) {
+            if self.settings.rules.enabled(Rule::UnusedVariable) {
                 pyflakes::rules::unused_variable(self, scope_index);
             }
-            if self.settings.rules.enabled(&Rule::UnusedAnnotation) {
+            if self.settings.rules.enabled(Rule::UnusedAnnotation) {
                 pyflakes::rules::unused_annotation(self, scope_index);
             }
 
             if !self.is_stub {
                 // flake8-unused-arguments
-                if self.settings.rules.enabled(&Rule::UnusedFunctionArgument)
-                    || self.settings.rules.enabled(&Rule::UnusedMethodArgument)
+                if self.settings.rules.enabled(Rule::UnusedFunctionArgument)
+                    || self.settings.rules.enabled(Rule::UnusedMethodArgument)
+                    || self.settings.rules.enabled(Rule::UnusedClassMethodArgument)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::UnusedClassMethodArgument)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(&Rule::UnusedStaticMethodArgument)
-                    || self.settings.rules.enabled(&Rule::UnusedLambdaArgument)
+                        .enabled(Rule::UnusedStaticMethodArgument)
+                    || self.settings.rules.enabled(Rule::UnusedLambdaArgument)
                 {
                     self.diagnostics
                         .extend(flake8_unused_arguments::rules::unused_arguments(
@@ -4732,11 +4614,7 @@ impl<'a> Checker<'a> {
             if let StmtKind::For { target, body, .. } | StmtKind::AsyncFor { target, body, .. } =
                 &stmt.node
             {
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::UnusedLoopControlVariable)
-                {
+                if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
                     flake8_bugbear::rules::unused_loop_control_variable(self, stmt, target, body);
                 }
             } else {
@@ -4747,59 +4625,60 @@ impl<'a> Checker<'a> {
 
     fn check_dead_scopes(&mut self) {
         let enforce_typing_imports = !self.is_stub
-            && (self
-                .settings
-                .rules
-                .enabled(&Rule::GlobalVariableNotAssigned)
+            && (self.settings.rules.enabled(Rule::GlobalVariableNotAssigned)
                 || self
                     .settings
                     .rules
-                    .enabled(&Rule::RuntimeImportInTypeCheckingBlock)
+                    .enabled(Rule::RuntimeImportInTypeCheckingBlock)
                 || self
                     .settings
                     .rules
-                    .enabled(&Rule::TypingOnlyFirstPartyImport)
+                    .enabled(Rule::TypingOnlyFirstPartyImport)
                 || self
                     .settings
                     .rules
-                    .enabled(&Rule::TypingOnlyThirdPartyImport)
+                    .enabled(Rule::TypingOnlyThirdPartyImport)
                 || self
                     .settings
                     .rules
-                    .enabled(&Rule::TypingOnlyStandardLibraryImport));
+                    .enabled(Rule::TypingOnlyStandardLibraryImport));
 
-        if !(self.settings.rules.enabled(&Rule::UnusedImport)
-            || self.settings.rules.enabled(&Rule::ImportStarUsage)
-            || self.settings.rules.enabled(&Rule::RedefinedWhileUnused)
-            || self.settings.rules.enabled(&Rule::UndefinedExport)
+        if !(self.settings.rules.enabled(Rule::UnusedImport)
+            || self.settings.rules.enabled(Rule::ImportStarUsage)
+            || self.settings.rules.enabled(Rule::RedefinedWhileUnused)
+            || self.settings.rules.enabled(Rule::UndefinedExport)
             || enforce_typing_imports)
         {
             return;
         }
 
         // Mark anything referenced in `__all__` as used.
-        let global_scope = &self.ctx.scopes[GLOBAL_SCOPE_INDEX];
-        let all_names: Option<(&Vec<String>, Range)> = global_scope
-            .bindings
-            .get("__all__")
-            .map(|index| &self.ctx.bindings[*index])
-            .and_then(|binding| match &binding.kind {
-                BindingKind::Export(names) => Some((names, binding.range)),
-                _ => None,
-            });
-        let all_bindings: Option<(Vec<usize>, Range)> = all_names.map(|(names, range)| {
-            (
-                names
-                    .iter()
-                    .filter_map(|name| global_scope.bindings.get(name.as_str()).copied())
-                    .collect(),
-                range,
-            )
-        });
+
+        let all_bindings: Option<(Vec<BindingId>, Range)> = {
+            let global_scope = self.ctx.global_scope();
+            let all_names: Option<(&Vec<String>, Range)> = global_scope
+                .get("__all__")
+                .map(|index| &self.ctx.bindings[*index])
+                .and_then(|binding| match &binding.kind {
+                    BindingKind::Export(names) => Some((names, binding.range)),
+                    _ => None,
+                });
+
+            all_names.map(|(names, range)| {
+                (
+                    names
+                        .iter()
+                        .filter_map(|name| global_scope.get(name.as_str()).copied())
+                        .collect(),
+                    range,
+                )
+            })
+        };
+
         if let Some((bindings, range)) = all_bindings {
             for index in bindings {
                 self.ctx.bindings[index].mark_used(
-                    GLOBAL_SCOPE_INDEX,
+                    ScopeId::global(),
                     range,
                     ExecutionContext::Runtime,
                 );
@@ -4807,8 +4686,9 @@ impl<'a> Checker<'a> {
         }
 
         // Extract `__all__` names from the global scope.
-        let all_names: Option<(Vec<&str>, Range)> = global_scope
-            .bindings
+        let all_names: Option<(Vec<&str>, Range)> = self
+            .ctx
+            .global_scope()
             .get("__all__")
             .map(|index| &self.ctx.bindings[*index])
             .and_then(|binding| match &binding.kind {
@@ -4830,13 +4710,12 @@ impl<'a> Checker<'a> {
                     .iter()
                     .map(|scope| {
                         scope
-                            .bindings
-                            .values()
+                            .binding_ids()
                             .map(|index| &self.ctx.bindings[*index])
                             .filter(|binding| {
                                 flake8_type_checking::helpers::is_valid_runtime_import(binding)
                             })
-                            .collect::<Vec<_>>()
+                            .collect()
                     })
                     .collect::<Vec<_>>()
             }
@@ -4849,8 +4728,8 @@ impl<'a> Checker<'a> {
             let scope = &self.ctx.scopes[*index];
 
             // F822
-            if *index == GLOBAL_SCOPE_INDEX {
-                if self.settings.rules.enabled(&Rule::UndefinedExport) {
+            if index.is_global() {
+                if self.settings.rules.enabled(Rule::UndefinedExport) {
                     if let Some((names, range)) = &all_names {
                         diagnostics.extend(pyflakes::rules::undefined_export(
                             names, range, self.path, scope,
@@ -4860,12 +4739,8 @@ impl<'a> Checker<'a> {
             }
 
             // PLW0602
-            if self
-                .settings
-                .rules
-                .enabled(&Rule::GlobalVariableNotAssigned)
-            {
-                for (name, index) in &scope.bindings {
+            if self.settings.rules.enabled(Rule::GlobalVariableNotAssigned) {
+                for (name, index) in scope.bindings() {
                     let binding = &self.ctx.bindings[*index];
                     if binding.kind.is_global() {
                         if let Some(stmt) = &binding.source {
@@ -4890,8 +4765,8 @@ impl<'a> Checker<'a> {
             // Look for any bindings that were redefined in another scope, and remain
             // unused. Note that we only store references in `redefinitions` if
             // the bindings are in different scopes.
-            if self.settings.rules.enabled(&Rule::RedefinedWhileUnused) {
-                for (name, index) in &scope.bindings {
+            if self.settings.rules.enabled(Rule::RedefinedWhileUnused) {
+                for (name, index) in scope.bindings() {
                     let binding = &self.ctx.bindings[*index];
 
                     if matches!(
@@ -4930,15 +4805,11 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if self.settings.rules.enabled(&Rule::ImportStarUsage) {
+            if self.settings.rules.enabled(Rule::ImportStarUsage) {
                 if scope.import_starred {
                     if let Some((names, range)) = &all_names {
                         let mut from_list = vec![];
-                        for binding in scope
-                            .bindings
-                            .values()
-                            .map(|index| &self.ctx.bindings[*index])
-                        {
+                        for binding in scope.binding_ids().map(|index| &self.ctx.bindings[*index]) {
                             if let BindingKind::StarImportation(level, module) = &binding.kind {
                                 from_list.push(helpers::format_import_from(
                                     level.as_ref(),
@@ -4949,7 +4820,7 @@ impl<'a> Checker<'a> {
                         from_list.sort();
 
                         for &name in names {
-                            if !scope.bindings.contains_key(name) {
+                            if !scope.defines(name) {
                                 diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::ImportStarUsage {
                                         name: name.to_string(),
@@ -4969,12 +4840,13 @@ impl<'a> Checker<'a> {
                 } else {
                     stack
                         .iter()
+                        .rev()
                         .chain(iter::once(index))
-                        .flat_map(|index| runtime_imports[*index].iter())
+                        .flat_map(|index| runtime_imports[usize::from(*index)].iter())
                         .copied()
                         .collect()
                 };
-                for (.., index) in &scope.bindings {
+                for index in scope.binding_ids() {
                     let binding = &self.ctx.bindings[*index];
 
                     if let Some(diagnostic) =
@@ -4999,7 +4871,7 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if self.settings.rules.enabled(&Rule::UnusedImport) {
+            if self.settings.rules.enabled(Rule::UnusedImport) {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
                 type UnusedImport<'a> = (&'a str, &'a Range);
@@ -5010,7 +4882,7 @@ impl<'a> Checker<'a> {
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
                     FxHashMap::default();
 
-                for index in scope.bindings.values() {
+                for index in scope.binding_ids() {
                     let binding = &self.ctx.bindings[*index];
 
                     let full_name = match &binding.kind {
@@ -5037,9 +4909,9 @@ impl<'a> Checker<'a> {
                         None
                     };
 
-                    if self.rule_is_ignored(&Rule::UnusedImport, diagnostic_lineno)
+                    if self.rule_is_ignored(Rule::UnusedImport, diagnostic_lineno)
                         || parent_lineno.map_or(false, |parent_lineno| {
-                            self.rule_is_ignored(&Rule::UnusedImport, parent_lineno)
+                            self.rule_is_ignored(Rule::UnusedImport, parent_lineno)
                         })
                     {
                         ignored
@@ -5063,7 +4935,7 @@ impl<'a> Checker<'a> {
                     let child: &Stmt = defined_by.into();
                     let parent: Option<&Stmt> = defined_in.map(Into::into);
 
-                    let fix = if !ignore_init && self.patch(&Rule::UnusedImport) {
+                    let fix = if !ignore_init && self.patch(Rule::UnusedImport) {
                         let deleted: Vec<&Stmt> = self.deletions.iter().map(Into::into).collect();
                         match autofix::helpers::remove_unused_imports(
                             unused_imports.iter().map(|(full_name, _)| *full_name),
@@ -5142,111 +5014,93 @@ impl<'a> Checker<'a> {
         let enforce_annotations = self
             .settings
             .rules
-            .enabled(&Rule::MissingTypeFunctionArgument)
-            || self.settings.rules.enabled(&Rule::MissingTypeArgs)
-            || self.settings.rules.enabled(&Rule::MissingTypeKwargs)
-            || self.settings.rules.enabled(&Rule::MissingTypeSelf)
-            || self.settings.rules.enabled(&Rule::MissingTypeCls)
+            .enabled(Rule::MissingTypeFunctionArgument)
+            || self.settings.rules.enabled(Rule::MissingTypeArgs)
+            || self.settings.rules.enabled(Rule::MissingTypeKwargs)
+            || self.settings.rules.enabled(Rule::MissingTypeSelf)
+            || self.settings.rules.enabled(Rule::MissingTypeCls)
             || self
                 .settings
                 .rules
-                .enabled(&Rule::MissingReturnTypePublicFunction)
+                .enabled(Rule::MissingReturnTypePublicFunction)
             || self
                 .settings
                 .rules
-                .enabled(&Rule::MissingReturnTypePrivateFunction)
+                .enabled(Rule::MissingReturnTypePrivateFunction)
             || self
                 .settings
                 .rules
-                .enabled(&Rule::MissingReturnTypeSpecialMethod)
+                .enabled(Rule::MissingReturnTypeSpecialMethod)
             || self
                 .settings
                 .rules
-                .enabled(&Rule::MissingReturnTypeStaticMethod)
+                .enabled(Rule::MissingReturnTypeStaticMethod)
             || self
                 .settings
                 .rules
-                .enabled(&Rule::MissingReturnTypeClassMethod)
-            || self.settings.rules.enabled(&Rule::AnyType);
-        let enforce_docstrings = self.settings.rules.enabled(&Rule::PublicModule)
-            || self.settings.rules.enabled(&Rule::PublicClass)
-            || self.settings.rules.enabled(&Rule::PublicMethod)
-            || self.settings.rules.enabled(&Rule::PublicFunction)
-            || self.settings.rules.enabled(&Rule::PublicPackage)
-            || self.settings.rules.enabled(&Rule::MagicMethod)
-            || self.settings.rules.enabled(&Rule::PublicNestedClass)
-            || self.settings.rules.enabled(&Rule::PublicInit)
-            || self.settings.rules.enabled(&Rule::FitsOnOneLine)
+                .enabled(Rule::MissingReturnTypeClassMethod)
+            || self.settings.rules.enabled(Rule::AnyType);
+        let enforce_docstrings = self.settings.rules.enabled(Rule::PublicModule)
+            || self.settings.rules.enabled(Rule::PublicClass)
+            || self.settings.rules.enabled(Rule::PublicMethod)
+            || self.settings.rules.enabled(Rule::PublicFunction)
+            || self.settings.rules.enabled(Rule::PublicPackage)
+            || self.settings.rules.enabled(Rule::MagicMethod)
+            || self.settings.rules.enabled(Rule::PublicNestedClass)
+            || self.settings.rules.enabled(Rule::PublicInit)
+            || self.settings.rules.enabled(Rule::FitsOnOneLine)
+            || self.settings.rules.enabled(Rule::NoBlankLineBeforeFunction)
+            || self.settings.rules.enabled(Rule::NoBlankLineAfterFunction)
+            || self.settings.rules.enabled(Rule::OneBlankLineBeforeClass)
+            || self.settings.rules.enabled(Rule::OneBlankLineAfterClass)
+            || self.settings.rules.enabled(Rule::BlankLineAfterSummary)
+            || self.settings.rules.enabled(Rule::IndentWithSpaces)
+            || self.settings.rules.enabled(Rule::NoUnderIndentation)
+            || self.settings.rules.enabled(Rule::NoOverIndentation)
+            || self.settings.rules.enabled(Rule::NewLineAfterLastParagraph)
+            || self.settings.rules.enabled(Rule::NoSurroundingWhitespace)
+            || self.settings.rules.enabled(Rule::NoBlankLineBeforeClass)
+            || self.settings.rules.enabled(Rule::MultiLineSummaryFirstLine)
             || self
                 .settings
                 .rules
-                .enabled(&Rule::NoBlankLineBeforeFunction)
-            || self.settings.rules.enabled(&Rule::NoBlankLineAfterFunction)
-            || self.settings.rules.enabled(&Rule::OneBlankLineBeforeClass)
-            || self.settings.rules.enabled(&Rule::OneBlankLineAfterClass)
-            || self.settings.rules.enabled(&Rule::BlankLineAfterSummary)
-            || self.settings.rules.enabled(&Rule::IndentWithSpaces)
-            || self.settings.rules.enabled(&Rule::NoUnderIndentation)
-            || self.settings.rules.enabled(&Rule::NoOverIndentation)
+                .enabled(Rule::MultiLineSummarySecondLine)
+            || self.settings.rules.enabled(Rule::SectionNotOverIndented)
             || self
                 .settings
                 .rules
-                .enabled(&Rule::NewLineAfterLastParagraph)
-            || self.settings.rules.enabled(&Rule::NoSurroundingWhitespace)
-            || self.settings.rules.enabled(&Rule::NoBlankLineBeforeClass)
+                .enabled(Rule::SectionUnderlineNotOverIndented)
+            || self.settings.rules.enabled(Rule::TripleSingleQuotes)
+            || self.settings.rules.enabled(Rule::EscapeSequenceInDocstring)
+            || self.settings.rules.enabled(Rule::EndsInPeriod)
+            || self.settings.rules.enabled(Rule::NonImperativeMood)
+            || self.settings.rules.enabled(Rule::NoSignature)
+            || self.settings.rules.enabled(Rule::FirstLineCapitalized)
+            || self.settings.rules.enabled(Rule::DocstringStartsWithThis)
+            || self.settings.rules.enabled(Rule::CapitalizeSectionName)
+            || self.settings.rules.enabled(Rule::NewLineAfterSectionName)
             || self
                 .settings
                 .rules
-                .enabled(&Rule::MultiLineSummaryFirstLine)
+                .enabled(Rule::DashedUnderlineAfterSection)
+            || self.settings.rules.enabled(Rule::SectionUnderlineAfterName)
             || self
                 .settings
                 .rules
-                .enabled(&Rule::MultiLineSummarySecondLine)
-            || self.settings.rules.enabled(&Rule::SectionNotOverIndented)
+                .enabled(Rule::SectionUnderlineMatchesSectionLength)
+            || self.settings.rules.enabled(Rule::BlankLineAfterSection)
+            || self.settings.rules.enabled(Rule::BlankLineBeforeSection)
             || self
                 .settings
                 .rules
-                .enabled(&Rule::SectionUnderlineNotOverIndented)
-            || self.settings.rules.enabled(&Rule::TripleSingleQuotes)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::EscapeSequenceInDocstring)
-            || self.settings.rules.enabled(&Rule::EndsInPeriod)
-            || self.settings.rules.enabled(&Rule::NonImperativeMood)
-            || self.settings.rules.enabled(&Rule::NoSignature)
-            || self.settings.rules.enabled(&Rule::FirstLineCapitalized)
-            || self.settings.rules.enabled(&Rule::DocstringStartsWithThis)
-            || self.settings.rules.enabled(&Rule::CapitalizeSectionName)
-            || self.settings.rules.enabled(&Rule::NewLineAfterSectionName)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::DashedUnderlineAfterSection)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::SectionUnderlineAfterName)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::SectionUnderlineMatchesSectionLength)
-            || self.settings.rules.enabled(&Rule::BlankLineAfterSection)
-            || self.settings.rules.enabled(&Rule::BlankLineBeforeSection)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::NoBlankLinesBetweenHeaderAndContent)
-            || self
-                .settings
-                .rules
-                .enabled(&Rule::BlankLineAfterLastSection)
-            || self.settings.rules.enabled(&Rule::EmptyDocstringSection)
-            || self.settings.rules.enabled(&Rule::EndsInPunctuation)
-            || self.settings.rules.enabled(&Rule::SectionNameEndsInColon)
-            || self.settings.rules.enabled(&Rule::UndocumentedParam)
-            || self.settings.rules.enabled(&Rule::OverloadWithDocstring)
-            || self.settings.rules.enabled(&Rule::EmptyDocstring);
+                .enabled(Rule::NoBlankLinesBetweenHeaderAndContent)
+            || self.settings.rules.enabled(Rule::BlankLineAfterLastSection)
+            || self.settings.rules.enabled(Rule::EmptyDocstringSection)
+            || self.settings.rules.enabled(Rule::EndsInPunctuation)
+            || self.settings.rules.enabled(Rule::SectionNameEndsInColon)
+            || self.settings.rules.enabled(Rule::UndocumentedParam)
+            || self.settings.rules.enabled(Rule::OverloadWithDocstring)
+            || self.settings.rules.enabled(Rule::EmptyDocstring);
 
         let mut overloaded_name: Option<String> = None;
         self.deferred.definitions.reverse();
@@ -5280,7 +5134,7 @@ impl<'a> Checker<'a> {
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
             }
             if self.is_stub {
-                if self.settings.rules.enabled(&Rule::DocstringInStub) {
+                if self.settings.rules.enabled(Rule::DocstringInStub) {
                     flake8_pyi::rules::docstring_in_stubs(self, definition.docstring);
                 }
             }
@@ -5321,124 +5175,101 @@ impl<'a> Checker<'a> {
                     continue;
                 }
 
-                if self.settings.rules.enabled(&Rule::FitsOnOneLine) {
+                if self.settings.rules.enabled(Rule::FitsOnOneLine) {
                     pydocstyle::rules::one_liner(self, &docstring);
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::NoBlankLineBeforeFunction)
-                    || self.settings.rules.enabled(&Rule::NoBlankLineAfterFunction)
+                if self.settings.rules.enabled(Rule::NoBlankLineBeforeFunction)
+                    || self.settings.rules.enabled(Rule::NoBlankLineAfterFunction)
                 {
                     pydocstyle::rules::blank_before_after_function(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::OneBlankLineBeforeClass)
-                    || self.settings.rules.enabled(&Rule::OneBlankLineAfterClass)
-                    || self.settings.rules.enabled(&Rule::NoBlankLineBeforeClass)
+                if self.settings.rules.enabled(Rule::OneBlankLineBeforeClass)
+                    || self.settings.rules.enabled(Rule::OneBlankLineAfterClass)
+                    || self.settings.rules.enabled(Rule::NoBlankLineBeforeClass)
                 {
                     pydocstyle::rules::blank_before_after_class(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::BlankLineAfterSummary) {
+                if self.settings.rules.enabled(Rule::BlankLineAfterSummary) {
                     pydocstyle::rules::blank_after_summary(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::IndentWithSpaces)
-                    || self.settings.rules.enabled(&Rule::NoUnderIndentation)
-                    || self.settings.rules.enabled(&Rule::NoOverIndentation)
+                if self.settings.rules.enabled(Rule::IndentWithSpaces)
+                    || self.settings.rules.enabled(Rule::NoUnderIndentation)
+                    || self.settings.rules.enabled(Rule::NoOverIndentation)
                 {
                     pydocstyle::rules::indent(self, &docstring);
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::NewLineAfterLastParagraph)
-                {
+                if self.settings.rules.enabled(Rule::NewLineAfterLastParagraph) {
                     pydocstyle::rules::newline_after_last_paragraph(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::NoSurroundingWhitespace) {
+                if self.settings.rules.enabled(Rule::NoSurroundingWhitespace) {
                     pydocstyle::rules::no_surrounding_whitespace(self, &docstring);
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::MultiLineSummaryFirstLine)
+                if self.settings.rules.enabled(Rule::MultiLineSummaryFirstLine)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::MultiLineSummarySecondLine)
+                        .enabled(Rule::MultiLineSummarySecondLine)
                 {
                     pydocstyle::rules::multi_line_summary_start(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::TripleSingleQuotes) {
+                if self.settings.rules.enabled(Rule::TripleSingleQuotes) {
                     pydocstyle::rules::triple_quotes(self, &docstring);
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::EscapeSequenceInDocstring)
-                {
+                if self.settings.rules.enabled(Rule::EscapeSequenceInDocstring) {
                     pydocstyle::rules::backslashes(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::EndsInPeriod) {
+                if self.settings.rules.enabled(Rule::EndsInPeriod) {
                     pydocstyle::rules::ends_with_period(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::NonImperativeMood) {
+                if self.settings.rules.enabled(Rule::NonImperativeMood) {
                     pydocstyle::rules::non_imperative_mood(
                         self,
                         &docstring,
                         &self.settings.pydocstyle.property_decorators,
                     );
                 }
-                if self.settings.rules.enabled(&Rule::NoSignature) {
+                if self.settings.rules.enabled(Rule::NoSignature) {
                     pydocstyle::rules::no_signature(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::FirstLineCapitalized) {
+                if self.settings.rules.enabled(Rule::FirstLineCapitalized) {
                     pydocstyle::rules::capitalized(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::DocstringStartsWithThis) {
+                if self.settings.rules.enabled(Rule::DocstringStartsWithThis) {
                     pydocstyle::rules::starts_with_this(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::EndsInPunctuation) {
+                if self.settings.rules.enabled(Rule::EndsInPunctuation) {
                     pydocstyle::rules::ends_with_punctuation(self, &docstring);
                 }
-                if self.settings.rules.enabled(&Rule::OverloadWithDocstring) {
+                if self.settings.rules.enabled(Rule::OverloadWithDocstring) {
                     pydocstyle::rules::if_needed(self, &docstring);
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(&Rule::MultiLineSummaryFirstLine)
-                    || self.settings.rules.enabled(&Rule::SectionNotOverIndented)
+                if self.settings.rules.enabled(Rule::MultiLineSummaryFirstLine)
+                    || self.settings.rules.enabled(Rule::SectionNotOverIndented)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::SectionUnderlineNotOverIndented)
-                    || self.settings.rules.enabled(&Rule::CapitalizeSectionName)
-                    || self.settings.rules.enabled(&Rule::NewLineAfterSectionName)
+                        .enabled(Rule::SectionUnderlineNotOverIndented)
+                    || self.settings.rules.enabled(Rule::CapitalizeSectionName)
+                    || self.settings.rules.enabled(Rule::NewLineAfterSectionName)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::DashedUnderlineAfterSection)
+                        .enabled(Rule::DashedUnderlineAfterSection)
+                    || self.settings.rules.enabled(Rule::SectionUnderlineAfterName)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::SectionUnderlineAfterName)
+                        .enabled(Rule::SectionUnderlineMatchesSectionLength)
+                    || self.settings.rules.enabled(Rule::BlankLineAfterSection)
+                    || self.settings.rules.enabled(Rule::BlankLineBeforeSection)
                     || self
                         .settings
                         .rules
-                        .enabled(&Rule::SectionUnderlineMatchesSectionLength)
-                    || self.settings.rules.enabled(&Rule::BlankLineAfterSection)
-                    || self.settings.rules.enabled(&Rule::BlankLineBeforeSection)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(&Rule::NoBlankLinesBetweenHeaderAndContent)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(&Rule::BlankLineAfterLastSection)
-                    || self.settings.rules.enabled(&Rule::EmptyDocstringSection)
-                    || self.settings.rules.enabled(&Rule::SectionNameEndsInColon)
-                    || self.settings.rules.enabled(&Rule::UndocumentedParam)
+                        .enabled(Rule::NoBlankLinesBetweenHeaderAndContent)
+                    || self.settings.rules.enabled(Rule::BlankLineAfterLastSection)
+                    || self.settings.rules.enabled(Rule::EmptyDocstringSection)
+                    || self.settings.rules.enabled(Rule::SectionNameEndsInColon)
+                    || self.settings.rules.enabled(Rule::UndocumentedParam)
                 {
                     pydocstyle::rules::sections(
                         self,
@@ -5451,12 +5282,8 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_shadowing<T>(&mut self, name: &str, located: &Located<T>, is_attribute: bool) {
-        if is_attribute && matches!(self.ctx.current_scope().kind, ScopeKind::Class(_)) {
-            if self
-                .settings
-                .rules
-                .enabled(&Rule::BuiltinAttributeShadowing)
-            {
+        if is_attribute && matches!(self.ctx.scope().kind, ScopeKind::Class(_)) {
+            if self.settings.rules.enabled(Rule::BuiltinAttributeShadowing) {
                 if let Some(diagnostic) = flake8_builtins::rules::builtin_shadowing(
                     name,
                     located,
@@ -5467,7 +5294,7 @@ impl<'a> Checker<'a> {
                 }
             }
         } else {
-            if self.settings.rules.enabled(&Rule::BuiltinVariableShadowing) {
+            if self.settings.rules.enabled(Rule::BuiltinVariableShadowing) {
                 if let Some(diagnostic) = flake8_builtins::rules::builtin_shadowing(
                     name,
                     located,
@@ -5481,7 +5308,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_arg_shadowing(&mut self, name: &str, arg: &Arg) {
-        if self.settings.rules.enabled(&Rule::BuiltinArgumentShadowing) {
+        if self.settings.rules.enabled(Rule::BuiltinArgumentShadowing) {
             if let Some(diagnostic) = flake8_builtins::rules::builtin_shadowing(
                 name,
                 arg,
@@ -5519,7 +5346,6 @@ pub fn check_ast(
         stylist,
         indexer,
     );
-    checker.ctx.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 
     // Check for module docstring.
@@ -5544,7 +5370,7 @@ pub fn check_ast(
     checker.check_definitions();
 
     // Reset the scope to module-level, and check all consumed scopes.
-    checker.ctx.scope_stack = vec![GLOBAL_SCOPE_INDEX];
+    checker.ctx.scope_stack = ScopeStack::default();
     checker.ctx.pop_scope();
     checker.check_dead_scopes();
 

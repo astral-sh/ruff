@@ -24,8 +24,7 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
         rule_explanation_match_arms.extend(quote! {#(#attr)* Self::#name => #path::explanation(),});
 
         // Enable conversion from `DiagnosticKind` to `Rule`.
-        from_impls_for_diagnostic_kind
-            .extend(quote! {#(#attr)* stringify!(#name) => &Rule::#name,});
+        from_impls_for_diagnostic_kind.extend(quote! {#(#attr)* stringify!(#name) => Rule::#name,});
     }
 
     quote! {
@@ -34,6 +33,7 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
             Debug,
             PartialEq,
             Eq,
+            Copy,
             Clone,
             Hash,
             PartialOrd,
@@ -57,17 +57,13 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
             }
 
             /// Returns the autofix status of this rule.
-            pub fn autofixable(&self) -> Option<ruff_diagnostics::AutofixKind> {
+            pub const fn autofixable(&self) -> Option<ruff_diagnostics::AutofixKind> {
                 match self { #rule_autofixable_match_arms }
             }
         }
 
-        pub trait AsRule {
-            fn rule(&self) -> &'static Rule;
-        }
-
         impl AsRule for ruff_diagnostics::DiagnosticKind {
-            fn rule(&self) -> &'static Rule {
+            fn rule(&self) -> Rule {
                 match self.name.as_str() {
                     #from_impls_for_diagnostic_kind
                     _ => unreachable!("invalid rule name: {}", self.name),

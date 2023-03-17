@@ -3,7 +3,8 @@ use rustpython_parser::ast::{Expr, ExprKind};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{BindingKind, Range};
+use ruff_python_ast::scope::BindingKind;
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -65,13 +66,13 @@ pub fn check_call(checker: &mut Checker, func: &Expr) {
     let rules = &checker.settings.rules;
     let ExprKind::Attribute { value, attr, .. } = &func.node else {return};
     let violation: DiagnosticKind = match attr.as_str() {
-        "isnull" if rules.enabled(&Rule::UseOfDotIsNull) => UseOfDotIsNull.into(),
-        "notnull" if rules.enabled(&Rule::UseOfDotNotNull) => UseOfDotNotNull.into(),
-        "pivot" | "unstack" if rules.enabled(&Rule::UseOfDotPivotOrUnstack) => {
+        "isnull" if rules.enabled(Rule::UseOfDotIsNull) => UseOfDotIsNull.into(),
+        "notnull" if rules.enabled(Rule::UseOfDotNotNull) => UseOfDotNotNull.into(),
+        "pivot" | "unstack" if rules.enabled(Rule::UseOfDotPivotOrUnstack) => {
             UseOfDotPivotOrUnstack.into()
         }
-        "read_table" if rules.enabled(&Rule::UseOfDotReadTable) => UseOfDotReadTable.into(),
-        "stack" if rules.enabled(&Rule::UseOfDotStack) => UseOfDotStack.into(),
+        "read_table" if rules.enabled(Rule::UseOfDotReadTable) => UseOfDotReadTable.into(),
+        "stack" if rules.enabled(Rule::UseOfDotStack) => UseOfDotStack.into(),
         _ => return,
     };
 

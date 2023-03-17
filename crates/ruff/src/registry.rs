@@ -152,6 +152,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::BidirectionalUnicode,
     rules::pylint::rules::BadStrStripCall,
     rules::pylint::rules::CollapsibleElseIf,
+    rules::pylint::rules::ContinueInFinally,
     rules::pylint::rules::UselessImportAlias,
     rules::pylint::rules::UnnecessaryDirectLambdaCall,
     rules::pylint::rules::NonlocalWithoutBinding,
@@ -602,6 +603,7 @@ ruff_macros::register_rules!(
     rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
     rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,
+    rules::ruff::rules::PairwiseOverZipped,
     // flake8-django
     rules::flake8_django::rules::NullableModelStringField,
     rules::flake8_django::rules::LocalsInRenderFunction,
@@ -610,6 +612,10 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::ModelWithoutDunderStr,
     rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );
+
+pub trait AsRule {
+    fn rule(&self) -> Rule;
+}
 
 impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
@@ -917,6 +923,7 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
 
 #[cfg(test)]
 mod tests {
+    use std::mem::size_of;
     use strum::IntoEnumIterator;
 
     use super::{Linter, Rule, RuleNamespace};
@@ -961,5 +968,10 @@ mod tests {
                 Linter::parse_code(&code).unwrap_or_else(|| panic!("couldn't parse {code:?}"));
             assert_eq!(code, format!("{}{rest}", linter.common_prefix()));
         }
+    }
+
+    #[test]
+    fn rule_size() {
+        assert_eq!(2, size_of::<Rule>());
     }
 }

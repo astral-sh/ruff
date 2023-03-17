@@ -24,13 +24,13 @@ impl Argumentable {
         }
     }
 
-    pub const fn rule_code(&self) -> &Rule {
+    pub const fn rule_code(&self) -> Rule {
         match self {
-            Self::Function => &Rule::UnusedFunctionArgument,
-            Self::Method => &Rule::UnusedMethodArgument,
-            Self::ClassMethod => &Rule::UnusedClassMethodArgument,
-            Self::StaticMethod => &Rule::UnusedStaticMethodArgument,
-            Self::Lambda => &Rule::UnusedLambdaArgument,
+            Self::Function => Rule::UnusedFunctionArgument,
+            Self::Method => Rule::UnusedMethodArgument,
+            Self::ClassMethod => Rule::UnusedClassMethodArgument,
+            Self::StaticMethod => Rule::UnusedStaticMethodArgument,
+            Self::Lambda => Rule::UnusedLambdaArgument,
         }
     }
 }

@@ -1,0 +1,174 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 5
+    column: 8
+  end_location:
+    row: 5
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 16
+    column: 12
+  end_location:
+    row: 16
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 26
+    column: 16
+  end_location:
+    row: 26
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 33
+    column: 12
+  end_location:
+    row: 33
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 40
+    column: 12
+  end_location:
+    row: 40
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 41
+    column: 8
+  end_location:
+    row: 41
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 49
+    column: 16
+  end_location:
+    row: 49
+    column: 24
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 56
+    column: 8
+  end_location:
+    row: 56
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 69
+    column: 8
+  end_location:
+    row: 69
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 74
+    column: 12
+  end_location:
+    row: 74
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 89
+    column: 12
+  end_location:
+    row: 89
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 91
+    column: 12
+  end_location:
+    row: 91
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    name: ContinueInFinally
+    body: "`continue` not supported inside `finally` clause"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 95
+    column: 16
+  end_location:
+    row: 95
+    column: 24
+  fix: ~
+  parent: ~
+

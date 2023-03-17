@@ -15,7 +15,7 @@ pub fn check_file_path(
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
     // flake8-no-pep420
-    if settings.rules.enabled(&Rule::ImplicitNamespacePackage) {
+    if settings.rules.enabled(Rule::ImplicitNamespacePackage) {
         if let Some(diagnostic) =
             implicit_namespace_package(path, package, &settings.project_root, &settings.src)
         {
@@ -24,7 +24,7 @@ pub fn check_file_path(
     }
 
     // pep8-naming
-    if settings.rules.enabled(&Rule::InvalidModuleName) {
+    if settings.rules.enabled(Rule::InvalidModuleName) {
         if let Some(diagnostic) = invalid_module_name(path, package) {
             diagnostics.push(diagnostic);
         }

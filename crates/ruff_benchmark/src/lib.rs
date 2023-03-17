@@ -1,5 +1,6 @@
 use std::fmt::{Display, Formatter};
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
+use std::process::Command;
 use url::Url;
 
 /// Relative size of a test case. Benchmarks can use it to configure the time for how long a benchmark should run to get stable results.
@@ -58,7 +59,7 @@ impl TestCase {
     }
 
     pub fn path(&self) -> PathBuf {
-        Path::new("target").join(self.name())
+        TARGET_DIR.join(self.name())
     }
 }
 
@@ -66,6 +67,28 @@ impl TestCase {
 pub struct TestFile {
     name: String,
     code: String,
+}
+
+static TARGET_DIR: once_cell::sync::Lazy<PathBuf> = once_cell::sync::Lazy::new(|| {
+    cargo_target_directory().unwrap_or_else(|| PathBuf::from("target"))
+});
+
+fn cargo_target_directory() -> Option<PathBuf> {
+    #[derive(serde::Deserialize)]
+    struct Metadata {
+        target_directory: PathBuf,
+    }
+
+    std::env::var_os("CARGO_TARGET_DIR")
+        .map(PathBuf::from)
+        .or_else(|| {
+            let output = Command::new(std::env::var_os("CARGO")?)
+                .args(["metadata", "--format-version", "1"])
+                .output()
+                .ok()?;
+            let metadata: Metadata = serde_json::from_slice(&output.stdout).ok()?;
+            Some(metadata.target_directory)
+        })
 }
 
 impl TestFile {
@@ -77,7 +100,7 @@ impl TestFile {
     pub fn try_download(name: &str, url: &str) -> Result<TestFile, TestFileDownloadError> {
         let url = Url::parse(url)?;
 
-        let cached_filename = Path::new("target").join(name);
+        let cached_filename = TARGET_DIR.join(name);
 
         if let Ok(content) = std::fs::read_to_string(&cached_filename) {
             Ok(TestFile::new(name.to_string(), content))

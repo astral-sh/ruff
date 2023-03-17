@@ -104,7 +104,7 @@ pub fn not_missing(
 
     match definition.kind {
         DefinitionKind::Module => {
-            if checker.settings.rules.enabled(&Rule::PublicModule) {
+            if checker.settings.rules.enabled(Rule::PublicModule) {
                 checker.diagnostics.push(Diagnostic::new(
                     PublicModule,
                     Range::new(Location::new(1, 0), Location::new(1, 0)),
@@ -113,7 +113,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Package => {
-            if checker.settings.rules.enabled(&Rule::PublicPackage) {
+            if checker.settings.rules.enabled(Rule::PublicPackage) {
                 checker.diagnostics.push(Diagnostic::new(
                     PublicPackage,
                     Range::new(Location::new(1, 0), Location::new(1, 0)),
@@ -122,7 +122,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::Class(stmt) => {
-            if checker.settings.rules.enabled(&Rule::PublicClass) {
+            if checker.settings.rules.enabled(Rule::PublicClass) {
                 checker.diagnostics.push(Diagnostic::new(
                     PublicClass,
                     identifier_range(stmt, checker.locator),
@@ -131,7 +131,7 @@ pub fn not_missing(
             false
         }
         DefinitionKind::NestedClass(stmt) => {
-            if checker.settings.rules.enabled(&Rule::PublicNestedClass) {
+            if checker.settings.rules.enabled(Rule::PublicNestedClass) {
                 checker.diagnostics.push(Diagnostic::new(
                     PublicNestedClass,
                     identifier_range(stmt, checker.locator),
@@ -143,7 +143,7 @@ pub fn not_missing(
             if is_overload(&checker.ctx, cast::decorator_list(stmt)) {
                 true
             } else {
-                if checker.settings.rules.enabled(&Rule::PublicFunction) {
+                if checker.settings.rules.enabled(Rule::PublicFunction) {
                     checker.diagnostics.push(Diagnostic::new(
                         PublicFunction,
                         identifier_range(stmt, checker.locator),
@@ -158,7 +158,7 @@ pub fn not_missing(
             {
                 true
             } else if is_init(cast::name(stmt)) {
-                if checker.settings.rules.enabled(&Rule::PublicInit) {
+                if checker.settings.rules.enabled(Rule::PublicInit) {
                     checker.diagnostics.push(Diagnostic::new(
                         PublicInit,
                         identifier_range(stmt, checker.locator),
@@ -166,7 +166,7 @@ pub fn not_missing(
                 }
                 true
             } else if is_new(cast::name(stmt)) || is_call(cast::name(stmt)) {
-                if checker.settings.rules.enabled(&Rule::PublicMethod) {
+                if checker.settings.rules.enabled(Rule::PublicMethod) {
                     checker.diagnostics.push(Diagnostic::new(
                         PublicMethod,
                         identifier_range(stmt, checker.locator),
@@ -174,7 +174,7 @@ pub fn not_missing(
                 }
                 true
             } else if is_magic(cast::name(stmt)) {
-                if checker.settings.rules.enabled(&Rule::MagicMethod) {
+                if checker.settings.rules.enabled(Rule::MagicMethod) {
                     checker.diagnostics.push(Diagnostic::new(
                         MagicMethod,
                         identifier_range(stmt, checker.locator),
@@ -182,7 +182,7 @@ pub fn not_missing(
                 }
                 true
             } else {
-                if checker.settings.rules.enabled(&Rule::PublicMethod) {
+                if checker.settings.rules.enabled(Rule::PublicMethod) {
                     checker.diagnostics.push(Diagnostic::new(
                         PublicMethod,
                         identifier_range(stmt, checker.locator),
