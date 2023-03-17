@@ -1,3 +1,5 @@
+use rustpython_parser::{lexer, Mode, Tok};
+
 /// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
 const TRIPLE_QUOTE_STR_PREFIXES: &[&str] = &[
     "u\"\"\"", "u'''", "r\"\"\"", "r'''", "U\"\"\"", "U'''", "R\"\"\"", "R'''", "\"\"\"", "'''",
@@ -65,6 +67,15 @@ pub fn trailing_quote(content: &str) -> Option<&&str> {
 /// Return `true` if the string is a triple-quote string or byte prefix.
 pub fn is_triple_quote(content: &str) -> bool {
     TRIPLE_QUOTE_STR_PREFIXES.contains(&content) || TRIPLE_QUOTE_BYTE_PREFIXES.contains(&content)
+}
+
+/// Return `true` if the string expression is an implicit concatenation.
+pub fn is_implicit_concatenation(content: &str) -> bool {
+    lexer::lex(content, Mode::Module)
+        .flatten()
+        .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))
+        .nth(1)
+        .is_some()
 }
 
 #[cfg(test)]

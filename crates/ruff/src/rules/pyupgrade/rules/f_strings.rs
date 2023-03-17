@@ -3,11 +3,10 @@ use rustpython_common::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
-use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_python_ast::str::{is_implicit_concatenation, leading_quote, trailing_quote};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -127,13 +126,8 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
 
     let contents = checker.locator.slice(value);
 
-    // Tokenize: we need to avoid trying to fix implicit string concatenations.
-    if lexer::lex(contents, Mode::Module)
-        .flatten()
-        .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))
-        .count()
-        > 1
-    {
+    // Skip implicit string concatenations.
+    if is_implicit_concatenation(contents) {
         return None;
     }
 
