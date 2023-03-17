@@ -2,8 +2,8 @@ use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::context::Bindings;
-use ruff_python_ast::types::{Binding, BindingKind, Range, Scope};
+use ruff_python_ast::scope::{Binding, BindingKind, Bindings, Scope};
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -36,10 +36,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Optio
             continue;
         }
         if !matches!(
-            scope
-                .bindings
-                .get(&id.as_str())
-                .map(|index| &bindings[*index]),
+            scope.get(id.as_str()).map(|index| &bindings[*index]),
             None | Some(Binding {
                 kind: BindingKind::Builtin,
                 ..

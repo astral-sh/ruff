@@ -6,8 +6,9 @@ use rustpython_parser::{lexer, Mode, Tok};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
+use ruff_python_ast::scope::{ScopeId, ScopeKind};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::{Range, RefEquality, ScopeId, ScopeKind};
+use ruff_python_ast::types::{Range, RefEquality};
 
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -319,8 +320,7 @@ pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
     }
 
     for (name, binding) in scope
-        .bindings
-        .iter()
+        .bindings()
         .map(|(name, index)| (name, &checker.ctx.bindings[*index]))
     {
         if !binding.used()

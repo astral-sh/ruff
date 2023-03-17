@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers::{map_callable, to_call_path};
-use ruff_python_ast::types::{Binding, BindingKind, ExecutionContext, ScopeKind};
+use ruff_python_ast::scope::{Binding, BindingKind, ExecutionContext, ScopeKind};
 
 /// Return `true` if [`Expr`] is a guard for a type-checking block.
 pub fn is_type_checking_block(context: &Context, test: &Expr) -> bool {

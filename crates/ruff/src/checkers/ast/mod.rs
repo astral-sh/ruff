@@ -14,17 +14,18 @@ use rustpython_parser::ast::{
 };
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::context::{Context, ScopeStack};
+use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers::{
     binding_range, extract_handled_exceptions, to_module_path, Exceptions,
 };
 use ruff_python_ast::operations::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::relocate::relocate_expr;
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::types::{
-    Binding, BindingId, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Node, Range,
-    RefEquality, Scope, ScopeId, ScopeKind,
+use ruff_python_ast::scope::{
+    Binding, BindingId, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Scope,
+    ScopeId, ScopeKind, ScopeStack,
 };
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::types::{Node, Range, RefEquality};
 use ruff_python_ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use ruff_python_ast::{
@@ -208,7 +209,7 @@ where
                             source: Some(RefEquality(stmt)),
                             context,
                         });
-                        scope.bindings.insert(name, id);
+                        scope.add(name, id);
                     }
                 }
 
@@ -237,7 +238,7 @@ where
                             source: Some(RefEquality(stmt)),
                             context,
                         });
-                        scope.bindings.insert(name, id);
+                        scope.add(name, id);
                     }
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
@@ -249,9 +250,7 @@ where
                         scopes_iter.next_back();
 
                         for index in scopes_iter.skip(1) {
-                            if let Some(index) =
-                                self.ctx.scopes[*index].bindings.get(&name.as_str())
-                            {
+                            if let Some(index) = self.ctx.scopes[*index].get(name.as_str()) {
                                 exists = true;
                                 self.ctx.bindings[*index].runtime_usage = usage;
                             }
@@ -1874,7 +1873,6 @@ where
                     if self
                         .ctx
                         .global_scope()
-                        .bindings
                         .get(name)
                         .map_or(true, |index| self.ctx.bindings[*index].kind.is_annotation())
                     {
@@ -1887,7 +1885,7 @@ where
                             source: Some(RefEquality(stmt)),
                             context: self.ctx.execution_context(),
                         });
-                        self.ctx.global_scope_mut().bindings.insert(name, id);
+                        self.ctx.global_scope_mut().add(name, id);
                     }
                 }
 
@@ -1937,7 +1935,6 @@ where
                     if self
                         .ctx
                         .global_scope()
-                        .bindings
                         .get(name)
                         .map_or(true, |index| self.ctx.bindings[*index].kind.is_annotation())
                     {
@@ -1950,7 +1947,7 @@ where
                             source: Some(RefEquality(stmt)),
                             context: self.ctx.execution_context(),
                         });
-                        self.ctx.global_scope_mut().bindings.insert(name, id);
+                        self.ctx.global_scope_mut().add(name, id);
                     }
                 }
 
@@ -3713,7 +3710,7 @@ where
                         let name_range =
                             helpers::excepthandler_name_range(excepthandler, self.locator).unwrap();
 
-                        if self.ctx.scope().bindings.contains_key(&name.as_str()) {
+                        if self.ctx.scope().defines(name.as_str()) {
                             self.handle_node_store(
                                 name,
                                 &Expr::new(
@@ -3727,7 +3724,7 @@ where
                             );
                         }
 
-                        let definition = self.ctx.scope().bindings.get(&name.as_str()).copied();
+                        let definition = self.ctx.scope().get(name.as_str()).copied();
                         self.handle_node_store(
                             name,
                             &Expr::new(
@@ -3744,7 +3741,7 @@ where
 
                         if let Some(index) = {
                             let scope = self.ctx.scope_mut();
-                            &scope.bindings.remove(&name.as_str())
+                            &scope.remove(name.as_str())
                         } {
                             if !self.ctx.bindings[*index].used() {
                                 if self.settings.rules.enabled(Rule::UnusedVariable) {
@@ -3778,7 +3775,7 @@ where
 
                         if let Some(index) = definition {
                             let scope = self.ctx.scope_mut();
-                            scope.bindings.insert(name, index);
+                            scope.add(name, index);
                         }
                     }
                     None => walk_excepthandler(self, excepthandler),
@@ -3933,14 +3930,17 @@ impl<'a> Checker<'a> {
         'b: 'a,
     {
         let binding_id = self.ctx.bindings.next_id();
-        if let Some((stack_index, scope_index)) = self
+        if let Some((stack_index, existing_binding_index)) = self
             .ctx
             .scope_stack
             .iter()
             .enumerate()
-            .find(|(_, scope_index)| self.ctx.scopes[**scope_index].bindings.contains_key(&name))
+            .find_map(|(stack_index, scope_index)| {
+                self.ctx.scopes[*scope_index]
+                    .get(name)
+                    .map(|binding_id| (stack_index, *binding_id))
+            })
         {
-            let existing_binding_index = self.ctx.scopes[*scope_index].bindings[&name];
             let existing = &self.ctx.bindings[existing_binding_index];
             let in_current_scope = stack_index == 0;
             if !existing.kind.is_builtin()
@@ -4012,7 +4012,7 @@ impl<'a> Checker<'a> {
         }
 
         let scope = self.ctx.scope();
-        let binding = if let Some(index) = scope.bindings.get(&name) {
+        let binding = if let Some(index) = scope.get(name) {
             let existing = &self.ctx.bindings[*index];
             match &existing.kind {
                 BindingKind::Builtin => {
@@ -4044,8 +4044,8 @@ impl<'a> Checker<'a> {
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
         let scope = self.ctx.scope_mut();
-        if !(binding.kind.is_annotation() && scope.bindings.contains_key(name)) {
-            if let Some(rebound_index) = scope.bindings.insert(name, binding_id) {
+        if !(binding.kind.is_annotation() && scope.defines(name)) {
+            if let Some(rebound_index) = scope.add(name, binding_id) {
                 scope
                     .rebounds
                     .entry(name)
@@ -4076,7 +4076,7 @@ impl<'a> Checker<'a> {
                 source: None,
                 context: ExecutionContext::Runtime,
             });
-            scope.bindings.insert(builtin, id);
+            scope.add(builtin, id);
         }
     }
 
@@ -4101,7 +4101,7 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if let Some(index) = scope.bindings.get(&id.as_str()) {
+            if let Some(index) = scope.get(id.as_str()) {
                 // Mark the binding as used.
                 let context = self.ctx.execution_context();
                 self.ctx.bindings[*index].mark_used(scope_id, Range::from(expr), context);
@@ -4131,7 +4131,7 @@ impl<'a> Checker<'a> {
                             .unwrap_or_default();
                         if has_alias {
                             // Mark the sub-importation as used.
-                            if let Some(index) = scope.bindings.get(full_name) {
+                            if let Some(index) = scope.get(full_name) {
                                 self.ctx.bindings[*index].mark_used(
                                     scope_id,
                                     Range::from(expr),
@@ -4148,7 +4148,7 @@ impl<'a> Checker<'a> {
                             .unwrap_or_default();
                         if has_alias {
                             // Mark the sub-importation as used.
-                            if let Some(index) = scope.bindings.get(full_name.as_str()) {
+                            if let Some(index) = scope.get(full_name.as_str()) {
                                 self.ctx.bindings[*index].mark_used(
                                     scope_id,
                                     Range::from(expr),
@@ -4173,11 +4173,7 @@ impl<'a> Checker<'a> {
                 let mut from_list = vec![];
                 for scope_index in self.ctx.scope_stack.iter() {
                     let scope = &self.ctx.scopes[*scope_index];
-                    for binding in scope
-                        .bindings
-                        .values()
-                        .map(|index| &self.ctx.bindings[*index])
-                    {
+                    for binding in scope.binding_ids().map(|index| &self.ctx.bindings[*index]) {
                         if let BindingKind::StarImportation(level, module) = &binding.kind {
                             from_list.push(helpers::format_import_from(
                                 level.as_ref(),
@@ -4260,7 +4256,6 @@ impl<'a> Checker<'a> {
                 if !self
                     .ctx
                     .scope()
-                    .bindings
                     .get(id)
                     .map_or(false, |index| self.ctx.bindings[*index].kind.is_global())
                 {
@@ -4433,7 +4428,7 @@ impl<'a> Checker<'a> {
         }
 
         let scope = self.ctx.scope_mut();
-        if scope.bindings.remove(&id.as_str()).is_some() {
+        if scope.remove(id.as_str()).is_some() {
             return;
         }
         if !self.settings.rules.enabled(Rule::UndefinedName) {
@@ -4663,7 +4658,6 @@ impl<'a> Checker<'a> {
         let all_bindings: Option<(Vec<BindingId>, Range)> = {
             let global_scope = self.ctx.global_scope();
             let all_names: Option<(&Vec<String>, Range)> = global_scope
-                .bindings
                 .get("__all__")
                 .map(|index| &self.ctx.bindings[*index])
                 .and_then(|binding| match &binding.kind {
@@ -4675,7 +4669,7 @@ impl<'a> Checker<'a> {
                 (
                     names
                         .iter()
-                        .filter_map(|name| global_scope.bindings.get(name.as_str()).copied())
+                        .filter_map(|name| global_scope.get(name.as_str()).copied())
                         .collect(),
                     range,
                 )
@@ -4696,7 +4690,6 @@ impl<'a> Checker<'a> {
         let all_names: Option<(Vec<&str>, Range)> = self
             .ctx
             .global_scope()
-            .bindings
             .get("__all__")
             .map(|index| &self.ctx.bindings[*index])
             .and_then(|binding| match &binding.kind {
@@ -4718,8 +4711,7 @@ impl<'a> Checker<'a> {
                     .iter()
                     .map(|scope| {
                         scope
-                            .bindings
-                            .values()
+                            .binding_ids()
                             .map(|index| &self.ctx.bindings[*index])
                             .filter(|binding| {
                                 flake8_type_checking::helpers::is_valid_runtime_import(binding)
@@ -4749,7 +4741,7 @@ impl<'a> Checker<'a> {
 
             // PLW0602
             if self.settings.rules.enabled(Rule::GlobalVariableNotAssigned) {
-                for (name, index) in &scope.bindings {
+                for (name, index) in scope.bindings() {
                     let binding = &self.ctx.bindings[*index];
                     if binding.kind.is_global() {
                         if let Some(stmt) = &binding.source {
@@ -4775,7 +4767,7 @@ impl<'a> Checker<'a> {
             // unused. Note that we only store references in `redefinitions` if
             // the bindings are in different scopes.
             if self.settings.rules.enabled(Rule::RedefinedWhileUnused) {
-                for (name, index) in &scope.bindings {
+                for (name, index) in scope.bindings() {
                     let binding = &self.ctx.bindings[*index];
 
                     if matches!(
@@ -4818,11 +4810,7 @@ impl<'a> Checker<'a> {
                 if scope.import_starred {
                     if let Some((names, range)) = &all_names {
                         let mut from_list = vec![];
-                        for binding in scope
-                            .bindings
-                            .values()
-                            .map(|index| &self.ctx.bindings[*index])
-                        {
+                        for binding in scope.binding_ids().map(|index| &self.ctx.bindings[*index]) {
                             if let BindingKind::StarImportation(level, module) = &binding.kind {
                                 from_list.push(helpers::format_import_from(
                                     level.as_ref(),
@@ -4833,7 +4821,7 @@ impl<'a> Checker<'a> {
                         from_list.sort();
 
                         for &name in names {
-                            if !scope.bindings.contains_key(name) {
+                            if !scope.defines(name) {
                                 diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::ImportStarUsage {
                                         name: name.to_string(),
@@ -4859,7 +4847,7 @@ impl<'a> Checker<'a> {
                         .copied()
                         .collect()
                 };
-                for (.., index) in &scope.bindings {
+                for index in scope.binding_ids() {
                     let binding = &self.ctx.bindings[*index];
 
                     if let Some(diagnostic) =
@@ -4895,7 +4883,7 @@ impl<'a> Checker<'a> {
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
                     FxHashMap::default();
 
-                for index in scope.bindings.values() {
+                for index in scope.binding_ids() {
                     let binding = &self.ctx.bindings[*index];
 
                     let full_name = match &binding.kind {

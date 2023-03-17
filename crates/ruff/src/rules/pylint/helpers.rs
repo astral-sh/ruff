@@ -1,6 +1,6 @@
 use ruff_python_ast::function_type;
 use ruff_python_ast::function_type::FunctionType;
-use ruff_python_ast::types::{FunctionDef, ScopeKind};
+use ruff_python_ast::scope::{FunctionDef, ScopeKind};
 
 use crate::checkers::ast::Checker;
 

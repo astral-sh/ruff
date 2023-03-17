@@ -1,4 +1,4 @@
-use ruff_python_ast::context::ScopeStack;
+use ruff_python_ast::scope::ScopeStack;
 use rustpython_parser::ast::{Expr, Stmt};
 
 use ruff_python_ast::types::Range;

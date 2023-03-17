@@ -1,15 +1,13 @@
 use std::iter;
 
 use regex::Regex;
-use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arg, Arguments};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::context::Bindings;
 use ruff_python_ast::function_type;
 use ruff_python_ast::function_type::FunctionType;
-use ruff_python_ast::types::{BindingId, FunctionDef, Lambda, Scope, ScopeKind};
+use ruff_python_ast::scope::{Bindings, FunctionDef, Lambda, Scope, ScopeKind};
 use ruff_python_ast::visibility;
 
 use crate::checkers::ast::Checker;
@@ -86,7 +84,7 @@ impl Violation for UnusedLambdaArgument {
 fn function(
     argumentable: &Argumentable,
     args: &Arguments,
-    values: &FxHashMap<&str, BindingId>,
+    values: &Scope,
     bindings: &Bindings,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
@@ -113,7 +111,7 @@ fn function(
 fn method(
     argumentable: &Argumentable,
     args: &Arguments,
-    values: &FxHashMap<&str, BindingId>,
+    values: &Scope,
     bindings: &Bindings,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
@@ -140,14 +138,14 @@ fn method(
 fn call<'a>(
     argumentable: &Argumentable,
     args: impl Iterator<Item = &'a Arg>,
-    values: &FxHashMap<&str, BindingId>,
+    values: &Scope,
     bindings: &Bindings,
     dummy_variable_rgx: &Regex,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     for arg in args {
         if let Some(binding) = values
-            .get(&arg.node.arg.as_str())
+            .get(arg.node.arg.as_str())
             .map(|index| &bindings[*index])
         {
             if !binding.used()
@@ -197,7 +195,7 @@ pub fn unused_arguments(
                         function(
                             &Argumentable::Function,
                             args,
-                            &scope.bindings,
+                            scope,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -226,7 +224,7 @@ pub fn unused_arguments(
                         method(
                             &Argumentable::Method,
                             args,
-                            &scope.bindings,
+                            scope,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -255,7 +253,7 @@ pub fn unused_arguments(
                         method(
                             &Argumentable::ClassMethod,
                             args,
-                            &scope.bindings,
+                            scope,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -284,7 +282,7 @@ pub fn unused_arguments(
                         function(
                             &Argumentable::StaticMethod,
                             args,
-                            &scope.bindings,
+                            scope,
                             bindings,
                             &checker.settings.dummy_variable_rgx,
                             checker
@@ -307,7 +305,7 @@ pub fn unused_arguments(
                 function(
                     &Argumentable::Lambda,
                     args,
-                    &scope.bindings,
+                    scope,
                     bindings,
                     &checker.settings.dummy_variable_rgx,
                     checker

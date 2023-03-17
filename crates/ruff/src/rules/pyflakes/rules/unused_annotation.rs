@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::ScopeId;
+use ruff_python_ast::scope::ScopeId;
 
 use crate::checkers::ast::Checker;
 
@@ -21,8 +21,7 @@ impl Violation for UnusedAnnotation {
 pub fn unused_annotation(checker: &mut Checker, scope: ScopeId) {
     let scope = &checker.ctx.scopes[scope];
     for (name, binding) in scope
-        .bindings
-        .iter()
+        .bindings()
         .map(|(name, index)| (name, &checker.ctx.bindings[*index]))
     {
         if !binding.used()
