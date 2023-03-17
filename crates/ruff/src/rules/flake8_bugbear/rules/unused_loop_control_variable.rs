@@ -165,7 +165,6 @@ pub fn unused_loop_control_variable(
                 // Find the `BindingKind::LoopVar` corresponding to the name.
                 let scope = checker.ctx.scope();
                 let binding = scope
-                    .bindings
                     .get(name)
                     .into_iter()
                     .chain(scope.rebounds.get(name).into_iter().flatten())

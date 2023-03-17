@@ -11,7 +11,7 @@ pub struct Scope<'a> {
     pub import_starred: bool,
     pub uses_locals: bool,
     /// A map from bound name to binding index, for live bindings.
-    pub bindings: FxHashMap<&'a str, BindingId>,
+    bindings: FxHashMap<&'a str, BindingId>,
     /// A map from bound name to binding index, for bindings that were created
     /// in the scope but rebound (and thus overridden) later on in the same
     /// scope.
@@ -32,6 +32,35 @@ impl<'a> Scope<'a> {
             bindings: FxHashMap::default(),
             rebounds: FxHashMap::default(),
         }
+    }
+
+    /// Returns the [id](BindingId) of the binding with the given name.
+    pub fn get(&self, name: &str) -> Option<&BindingId> {
+        self.bindings.get(name)
+    }
+
+    /// Adds a new binding with the given name to this scope.
+    pub fn add(&mut self, name: &'a str, id: BindingId) -> Option<BindingId> {
+        self.bindings.insert(name, id)
+    }
+
+    /// Returns `true` if this scope defines a binding with the given name.
+    pub fn defines(&self, name: &str) -> bool {
+        self.bindings.contains_key(name)
+    }
+
+    /// Removes the binding with the given name
+    pub fn remove(&mut self, name: &str) -> Option<BindingId> {
+        self.bindings.remove(name)
+    }
+
+    /// Returns the ids of all bindings defined in this scope.
+    pub fn binding_ids(&self) -> std::collections::hash_map::Values<&str, BindingId> {
+        self.bindings.values()
+    }
+
+    pub fn bindings(&self) -> std::collections::hash_map::Iter<&'a str, BindingId> {
+        self.bindings.iter()
     }
 }
 

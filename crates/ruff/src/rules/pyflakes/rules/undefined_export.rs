@@ -28,7 +28,7 @@ pub fn undefined_export(
     let mut diagnostics = Vec::new();
     if !scope.import_starred && !path.ends_with("__init__.py") {
         for name in names {
-            if !scope.bindings.contains_key(name) {
+            if !scope.defines(name) {
                 diagnostics.push(Diagnostic::new(
                     UndefinedExport {
                         name: (*name).to_string(),

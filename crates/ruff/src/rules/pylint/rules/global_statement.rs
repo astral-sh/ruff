@@ -53,7 +53,7 @@ impl Violation for GlobalStatement {
 /// PLW0603
 pub fn global_statement(checker: &mut Checker, name: &str) {
     let scope = checker.ctx.scope();
-    if let Some(index) = scope.bindings.get(name) {
+    if let Some(index) = scope.get(name) {
         let binding = &checker.ctx.bindings[*index];
         if binding.kind.is_global() {
             let source: &Stmt = binding

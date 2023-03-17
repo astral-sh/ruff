@@ -125,7 +125,7 @@ impl<'a> Context<'a> {
     /// Return the current `Binding` for a given `name`.
     pub fn find_binding(&self, member: &str) -> Option<&Binding> {
         self.scopes()
-            .find_map(|scope| scope.bindings.get(member))
+            .find_map(|scope| scope.get(member))
             .map(|index| &self.bindings[*index])
     }
 
