@@ -67,11 +67,7 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 
 pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_raises(checker, func) {
-        if checker
-            .settings
-            .rules
-            .enabled(&Rule::RaisesWithoutException)
-        {
+        if checker.settings.rules.enabled(Rule::RaisesWithoutException) {
             if args.is_empty() && keywords.is_empty() {
                 checker
                     .diagnostics
@@ -79,7 +75,7 @@ pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: 
             }
         }
 
-        if checker.settings.rules.enabled(&Rule::RaisesTooBroad) {
+        if checker.settings.rules.enabled(Rule::RaisesTooBroad) {
             let match_keyword = keywords
                 .iter()
                 .find(|kw| kw.node.arg == Some("match".to_string()));

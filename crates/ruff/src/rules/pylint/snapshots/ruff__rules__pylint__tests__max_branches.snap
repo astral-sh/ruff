@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     name: TooManyBranches
-    body: Too many branches (2/1)
+    body: Too many branches (2 > 1)
     suggestion: ~
     fixable: false
   location:
@@ -17,7 +17,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: TooManyBranches
-    body: Too many branches (2/1)
+    body: Too many branches (2 > 1)
     suggestion: ~
     fixable: false
   location:

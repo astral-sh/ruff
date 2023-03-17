@@ -97,7 +97,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                         if checker
                             .settings
                             .rules
-                            .enabled(&Rule::MultiValueRepeatedKeyLiteral)
+                            .enabled(Rule::MultiValueRepeatedKeyLiteral)
                         {
                             let comparable_value: ComparableExpr = (&values[i]).into();
                             let is_duplicate_value = seen_values.contains(&comparable_value);
@@ -125,7 +125,7 @@ pub fn repeated_keys(checker: &mut Checker, keys: &[Option<Expr>], values: &[Exp
                         if checker
                             .settings
                             .rules
-                            .enabled(&Rule::MultiValueRepeatedKeyVariable)
+                            .enabled(Rule::MultiValueRepeatedKeyVariable)
                         {
                             let comparable_value: ComparableExpr = (&values[i]).into();
                             let is_duplicate_value = seen_values.contains(&comparable_value);

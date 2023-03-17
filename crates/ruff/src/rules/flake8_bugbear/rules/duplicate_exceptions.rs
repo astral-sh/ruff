@@ -83,7 +83,7 @@ fn duplicate_handler_exceptions<'a>(
     if checker
         .settings
         .rules
-        .enabled(&Rule::DuplicateHandlerException)
+        .enabled(Rule::DuplicateHandlerException)
     {
         // TODO(charlie): Handle "BaseException" and redundant exception aliases.
         if !duplicates.is_empty() {
@@ -149,7 +149,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
     if checker
         .settings
         .rules
-        .enabled(&Rule::DuplicateTryBlockException)
+        .enabled(Rule::DuplicateTryBlockException)
     {
         for (name, exprs) in duplicates {
             for expr in exprs {

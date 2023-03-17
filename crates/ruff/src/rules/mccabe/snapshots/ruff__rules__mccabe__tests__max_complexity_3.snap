@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     name: ComplexStructure
-    body: "`try_else` is too complex (4)"
+    body: "`try_else` is too complex (4 > 3)"
     suggestion: ~
     fixable: false
   location:
@@ -17,7 +17,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`handle` is too complex (9)"
+    body: "`handle` is too complex (9 > 3)"
     suggestion: ~
     fixable: false
   location:

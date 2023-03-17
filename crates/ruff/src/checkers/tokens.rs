@@ -25,39 +25,39 @@ pub fn check_tokens(
 
     let enforce_ambiguous_unicode_character = settings
         .rules
-        .enabled(&Rule::AmbiguousUnicodeCharacterString)
+        .enabled(Rule::AmbiguousUnicodeCharacterString)
         || settings
             .rules
-            .enabled(&Rule::AmbiguousUnicodeCharacterDocstring)
+            .enabled(Rule::AmbiguousUnicodeCharacterDocstring)
         || settings
             .rules
-            .enabled(&Rule::AmbiguousUnicodeCharacterComment);
-    let enforce_quotes = settings.rules.enabled(&Rule::BadQuotesInlineString)
-        || settings.rules.enabled(&Rule::BadQuotesMultilineString)
-        || settings.rules.enabled(&Rule::BadQuotesDocstring)
-        || settings.rules.enabled(&Rule::AvoidableEscapedQuote);
-    let enforce_commented_out_code = settings.rules.enabled(&Rule::CommentedOutCode);
+            .enabled(Rule::AmbiguousUnicodeCharacterComment);
+    let enforce_quotes = settings.rules.enabled(Rule::BadQuotesInlineString)
+        || settings.rules.enabled(Rule::BadQuotesMultilineString)
+        || settings.rules.enabled(Rule::BadQuotesDocstring)
+        || settings.rules.enabled(Rule::AvoidableEscapedQuote);
+    let enforce_commented_out_code = settings.rules.enabled(Rule::CommentedOutCode);
     let enforce_compound_statements = settings
         .rules
-        .enabled(&Rule::MultipleStatementsOnOneLineColon)
+        .enabled(Rule::MultipleStatementsOnOneLineColon)
         || settings
             .rules
-            .enabled(&Rule::MultipleStatementsOnOneLineSemicolon)
-        || settings.rules.enabled(&Rule::UselessSemicolon);
-    let enforce_invalid_escape_sequence = settings.rules.enabled(&Rule::InvalidEscapeSequence);
+            .enabled(Rule::MultipleStatementsOnOneLineSemicolon)
+        || settings.rules.enabled(Rule::UselessSemicolon);
+    let enforce_invalid_escape_sequence = settings.rules.enabled(Rule::InvalidEscapeSequence);
     let enforce_implicit_string_concatenation = settings
         .rules
-        .enabled(&Rule::SingleLineImplicitStringConcatenation)
+        .enabled(Rule::SingleLineImplicitStringConcatenation)
         || settings
             .rules
-            .enabled(&Rule::MultiLineImplicitStringConcatenation);
-    let enforce_trailing_comma = settings.rules.enabled(&Rule::TrailingCommaMissing)
+            .enabled(Rule::MultiLineImplicitStringConcatenation);
+    let enforce_trailing_comma = settings.rules.enabled(Rule::TrailingCommaMissing)
         || settings
             .rules
-            .enabled(&Rule::TrailingCommaOnBareTupleProhibited)
-        || settings.rules.enabled(&Rule::TrailingCommaProhibited);
-    let enforce_extraneous_parenthesis = settings.rules.enabled(&Rule::ExtraneousParentheses);
-    let enforce_type_comment_in_stub = settings.rules.enabled(&Rule::TypeCommentInStub);
+            .enabled(Rule::TrailingCommaOnBareTupleProhibited)
+        || settings.rules.enabled(Rule::TrailingCommaProhibited);
+    let enforce_extraneous_parenthesis = settings.rules.enabled(Rule::ExtraneousParentheses);
+    let enforce_type_comment_in_stub = settings.rules.enabled(Rule::TypeCommentInStub);
 
     // RUF001, RUF002, RUF003
     if enforce_ambiguous_unicode_character {
@@ -111,7 +111,7 @@ pub fn check_tokens(
                     locator,
                     *start,
                     *end,
-                    autofix.into() && settings.rules.should_fix(&Rule::InvalidEscapeSequence),
+                    autofix.into() && settings.rules.should_fix(Rule::InvalidEscapeSequence),
                 ));
             }
         }

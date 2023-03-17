@@ -123,11 +123,11 @@ pub fn marks(checker: &mut Checker, decorators: &[Expr]) {
     let enforce_parentheses = checker
         .settings
         .rules
-        .enabled(&Rule::IncorrectMarkParenthesesStyle);
+        .enabled(Rule::IncorrectMarkParenthesesStyle);
     let enforce_useless_usefixtures = checker
         .settings
         .rules
-        .enabled(&Rule::UseFixturesWithoutParameters);
+        .enabled(Rule::UseFixturesWithoutParameters);
 
     for mark in get_mark_decorators(decorators) {
         if enforce_parentheses {

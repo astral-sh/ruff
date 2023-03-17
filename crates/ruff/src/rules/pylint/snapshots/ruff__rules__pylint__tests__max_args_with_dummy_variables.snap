@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     name: TooManyArguments
-    body: Too many arguments to function call (6/5)
+    body: Too many arguments to function call (6 > 5)
     suggestion: ~
     fixable: false
   location:
