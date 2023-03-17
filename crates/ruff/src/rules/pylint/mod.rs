@@ -14,6 +14,7 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::rules::pylint;
+    use crate::settings::types::PythonVersion;
     use crate::settings::Settings;
     use crate::test::test_path;
 
@@ -63,6 +64,19 @@ mod tests {
             &Settings::for_rules(vec![rule_code]),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn continue_in_finally() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/continue_in_finally.py"),
+            &Settings {
+                target_version: PythonVersion::Py37,
+                ..Settings::for_rules(vec![Rule::ContinueInFinally])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 

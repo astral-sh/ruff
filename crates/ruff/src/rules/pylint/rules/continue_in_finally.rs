@@ -7,11 +7,12 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `continue` inside of a `finally` clause
+/// Checks for `continue` statements inside `finally`
 ///
 /// ## Why is this bad?
-/// `continue` is not supported inside a `finally` clause; this can cause a SyntaxError
-///
+/// `continue` statements were not allowed within `finally` clauses prior to
+/// Python 3.8. Using a `continue` statement within a `finally` clause can
+/// cause a `SyntaxError`.
 ///
 /// ## Example
 /// ```python
@@ -38,7 +39,7 @@ pub struct ContinueInFinally;
 impl Violation for ContinueInFinally {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`continue` not supported inside a `finally` clause")
+        format!("`continue` not supported inside `finally` clause")
     }
 }
 

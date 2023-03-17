@@ -2041,12 +2041,15 @@ where
                 }
 
                 self.ctx.handled_exceptions.push(handled_exceptions);
+
                 if self.settings.rules.enabled(Rule::JumpStatementInFinally) {
                     flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
                 }
 
                 if self.settings.rules.enabled(Rule::ContinueInFinally) {
-                    pylint::rules::continue_in_finally(self, finalbody);
+                    if self.settings.target_version <= PythonVersion::Py38 {
+                        pylint::rules::continue_in_finally(self, finalbody);
+                    }
                 }
 
                 self.visit_body(body);
