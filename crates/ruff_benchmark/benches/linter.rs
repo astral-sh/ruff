@@ -1,6 +1,10 @@
-use criterion::{black_box, criterion_group, criterion_main, BenchmarkId, Criterion, Throughput};
+use criterion::measurement::WallTime;
+use criterion::{
+    criterion_group, criterion_main, BenchmarkGroup, BenchmarkId, Criterion, Throughput,
+};
 use ruff::linter::lint_only;
 use ruff::settings::{flags, Settings};
+use ruff::RuleSelector;
 use ruff_benchmark::{TestCase, TestCaseSpeed, TestFile, TestFileDownloadError};
 use std::time::Duration;
 
@@ -35,17 +39,17 @@ fn create_test_cases() -> Result<Vec<TestCase>, TestFileDownloadError> {
     ])
 }
 
-fn benchmark_linter(criterion: &mut Criterion) {
+fn benchmark_linter(mut group: BenchmarkGroup<WallTime>, settings: &Settings) {
     let test_cases = create_test_cases().unwrap();
-    let mut group = criterion.benchmark_group("linter");
 
     for case in test_cases {
         group.throughput(Throughput::Bytes(case.code().len() as u64));
         group.measurement_time(match case.speed() {
             TestCaseSpeed::Fast => Duration::from_secs(10),
             TestCaseSpeed::Normal => Duration::from_secs(20),
-            TestCaseSpeed::Slow => Duration::from_secs(30),
+            TestCaseSpeed::Slow => Duration::from_secs(45),
         });
+
         group.bench_with_input(
             BenchmarkId::from_parameter(case.name()),
             &case,
@@ -55,7 +59,7 @@ fn benchmark_linter(criterion: &mut Criterion) {
                         case.code(),
                         &case.path(),
                         None,
-                        &black_box(Settings::default()),
+                        settings,
                         flags::Noqa::Enabled,
                         flags::Autofix::Enabled,
                     )
@@ -67,5 +71,21 @@ fn benchmark_linter(criterion: &mut Criterion) {
     group.finish();
 }
 
-criterion_group!(benches, benchmark_linter);
-criterion_main!(benches);
+fn benchmark_default_rules(criterion: &mut Criterion) {
+    let group = criterion.benchmark_group("linter/default-rules");
+    benchmark_linter(group, &Settings::default());
+}
+
+fn benchmark_all_rules(criterion: &mut Criterion) {
+    let settings = Settings {
+        rules: RuleSelector::All.into_iter().into(),
+        ..Settings::default()
+    };
+
+    let group = criterion.benchmark_group("linter/all-rules");
+    benchmark_linter(group, &settings);
+}
+
+criterion_group!(default_rules, benchmark_default_rules);
+criterion_group!(all_rules, benchmark_all_rules);
+criterion_main!(default_rules, all_rules);
