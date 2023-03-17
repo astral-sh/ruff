@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Binding, BindingKind, ExecutionContext};
+use ruff_python_ast::scope::{Binding, BindingKind, ExecutionContext};
 
 #[violation]
 pub struct RuntimeImportInTypeCheckingBlock {

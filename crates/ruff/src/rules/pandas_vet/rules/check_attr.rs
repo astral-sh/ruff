@@ -3,7 +3,8 @@ use rustpython_parser::ast::{Expr, ExprKind};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{BindingKind, Range};
+use ruff_python_ast::scope::BindingKind;
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;

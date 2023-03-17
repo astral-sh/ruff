@@ -2,7 +2,8 @@ use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Range, Scope};
+use ruff_python_ast::scope::Scope;
+use ruff_python_ast::types::Range;
 
 #[violation]
 pub struct UndefinedExport {

@@ -1,4 +1,3 @@
-use std::ops::{Deref, Index, IndexMut};
 use std::path::Path;
 
 use nohash_hasher::{BuildNoHashHasher, IntMap};
@@ -10,10 +9,11 @@ use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
 use crate::helpers::{collect_call_path, from_relative_import, Exceptions};
-use crate::types::{
-    Binding, BindingId, BindingKind, CallPath, ExecutionContext, RefEquality, Scope, ScopeId,
-    ScopeKind,
+use crate::scope::{
+    Binding, BindingId, BindingKind, Bindings, ExecutionContext, Scope, ScopeId, ScopeKind,
+    ScopeStack, Scopes,
 };
+use crate::types::{CallPath, RefEquality};
 use crate::visibility::{module_visibility, Modifier, VisibleScope};
 
 #[allow(clippy::struct_excessive_bools)]
@@ -317,134 +317,5 @@ impl<'a> Context<'a> {
         } else {
             ExecutionContext::Runtime
         }
-    }
-}
-
-/// The scopes of a program indexed by [`ScopeId`]
-#[derive(Debug)]
-pub struct Scopes<'a>(Vec<Scope<'a>>);
-
-impl<'a> Scopes<'a> {
-    /// Returns a reference to the global scope
-    pub fn global(&self) -> &Scope<'a> {
-        &self[ScopeId::global()]
-    }
-
-    /// Returns a mutable reference to the global scope
-    pub fn global_mut(&mut self) -> &mut Scope<'a> {
-        &mut self[ScopeId::global()]
-    }
-
-    /// Pushes a new scope and returns its unique id
-    fn push_scope(&mut self, kind: ScopeKind<'a>) -> ScopeId {
-        let next_id = ScopeId::try_from(self.0.len()).unwrap();
-        self.0.push(Scope::local(next_id, kind));
-        next_id
-    }
-}
-
-impl Default for Scopes<'_> {
-    fn default() -> Self {
-        Self(vec![Scope::global(ScopeKind::Module)])
-    }
-}
-
-impl<'a> Index<ScopeId> for Scopes<'a> {
-    type Output = Scope<'a>;
-
-    fn index(&self, index: ScopeId) -> &Self::Output {
-        &self.0[usize::from(index)]
-    }
-}
-
-impl<'a> IndexMut<ScopeId> for Scopes<'a> {
-    fn index_mut(&mut self, index: ScopeId) -> &mut Self::Output {
-        &mut self.0[usize::from(index)]
-    }
-}
-
-impl<'a> Deref for Scopes<'a> {
-    type Target = [Scope<'a>];
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ScopeStack(Vec<ScopeId>);
-
-impl ScopeStack {
-    /// Pushes a new scope on the stack
-    pub fn push(&mut self, id: ScopeId) {
-        self.0.push(id);
-    }
-
-    /// Pops the top most scope
-    pub fn pop(&mut self) -> Option<ScopeId> {
-        self.0.pop()
-    }
-
-    /// Returns the id of the top-most
-    pub fn top(&self) -> Option<ScopeId> {
-        self.0.last().copied()
-    }
-
-    /// Returns an iterator from the current scope to the top scope (reverse iterator)
-    pub fn iter(&self) -> std::iter::Rev<std::slice::Iter<ScopeId>> {
-        self.0.iter().rev()
-    }
-}
-
-impl Default for ScopeStack {
-    fn default() -> Self {
-        Self(vec![ScopeId::global()])
-    }
-}
-
-/// The bindings in a program.
-///
-/// Bindings are indexed by [`BindingId`]
-#[derive(Debug, Clone, Default)]
-pub struct Bindings<'a>(Vec<Binding<'a>>);
-
-impl<'a> Bindings<'a> {
-    /// Pushes a new binding and returns its id
-    pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
-        let id = self.next_id();
-        self.0.push(binding);
-        id
-    }
-
-    /// Returns the id that will be assigned when pushing the next binding
-    pub fn next_id(&self) -> BindingId {
-        BindingId::try_from(self.0.len()).unwrap()
-    }
-}
-
-impl<'a> Index<BindingId> for Bindings<'a> {
-    type Output = Binding<'a>;
-
-    fn index(&self, index: BindingId) -> &Self::Output {
-        &self.0[usize::from(index)]
-    }
-}
-
-impl<'a> IndexMut<BindingId> for Bindings<'a> {
-    fn index_mut(&mut self, index: BindingId) -> &mut Self::Output {
-        &mut self.0[usize::from(index)]
-    }
-}
-
-impl<'a> Deref for Bindings<'a> {
-    type Target = [Binding<'a>];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
-    fn from_iter<T: IntoIterator<Item = Binding<'a>>>(iter: T) -> Self {
-        Self(Vec::from_iter(iter))
     }
 }
