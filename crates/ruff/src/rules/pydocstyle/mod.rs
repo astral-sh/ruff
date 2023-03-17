@@ -153,4 +153,14 @@ mod tests {
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn d209_d400() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D209_D400.py"),
+            &settings::Settings::for_rules([Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod]),
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
 }
