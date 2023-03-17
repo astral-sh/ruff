@@ -17,7 +17,10 @@ name = "linter"
 harness = false
 
 [dependencies]
+once_cell.workspace = true
 ruff.path = "../ruff"
+serde.workspace = true
+serde_json.workspace = true
 url = "2.3.1"
 ureq = "2.6.2"
 
