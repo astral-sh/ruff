@@ -13,6 +13,10 @@ pub use invalid_all_format::{invalid_all_format, InvalidAllFormat};
 pub use invalid_all_object::{invalid_all_object, InvalidAllObject};
 pub use invalid_envvar_default::{invalid_envvar_default, InvalidEnvvarDefault};
 pub use invalid_envvar_value::{invalid_envvar_value, InvalidEnvvarValue};
+pub use invalid_string_characters::{
+    invalid_string_characters, InvalidCharacterBackspace, InvalidCharacterEsc, InvalidCharacterNul,
+    InvalidCharacterSub, InvalidCharacterZeroWidthSpace,
+};
 pub use logging::{logging_call, LoggingTooFewArgs, LoggingTooManyArgs};
 pub use magic_value_comparison::{magic_value_comparison, MagicValueComparison};
 pub use merge_isinstance::{merge_isinstance, ConsiderMergingIsinstance};
@@ -50,6 +54,7 @@ mod invalid_all_format;
 mod invalid_all_object;
 mod invalid_envvar_default;
 mod invalid_envvar_value;
+mod invalid_string_characters;
 mod logging;
 mod magic_value_comparison;
 mod merge_isinstance;

@@ -27,6 +27,11 @@ impl RuleTable {
         self.enabled.contains_key(&code)
     }
 
+    /// Returns whether any of the given rules should be checked.
+    pub fn any_enabled(&self, codes: &[Rule]) -> bool {
+        codes.iter().any(|c| self.enabled.contains_key(c))
+    }
+
     /// Returns whether violations of the given rule should be autofixed.
     #[inline]
     pub fn should_fix(&self, code: Rule) -> bool {
