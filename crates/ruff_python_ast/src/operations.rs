@@ -95,7 +95,7 @@ pub fn extract_all_names(
 
     // Grab the existing bound __all__ values.
     if let StmtKind::AugAssign { .. } = &stmt.node {
-        if let Some(index) = scope.bindings.get("__all__") {
+        if let Some(index) = scope.get("__all__") {
             if let BindingKind::Export(existing) = &ctx.bindings[*index].kind {
                 names.extend_from_slice(existing);
             }

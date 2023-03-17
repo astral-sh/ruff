@@ -320,8 +320,7 @@ pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
     }
 
     for (name, binding) in scope
-        .bindings
-        .iter()
+        .bindings()
         .map(|(name, index)| (name, &checker.ctx.bindings[*index]))
     {
         if !binding.used()
