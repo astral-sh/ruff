@@ -2045,7 +2045,7 @@ where
                     flake8_bugbear::rules::jump_statement_in_finally(self, finalbody);
                 }
 
-                if self.settings.rules.enabled(&Rule::ContinueInFinally) {
+                if self.settings.rules.enabled(Rule::ContinueInFinally) {
                     pylint::rules::continue_in_finally(self, finalbody);
                 }
 
