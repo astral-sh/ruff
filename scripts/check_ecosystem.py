@@ -63,6 +63,7 @@ REPOSITORIES = {
     "scikit-build": Repository("scikit-build", "scikit-build", "main"),
     "scikit-build-core": Repository("scikit-build", "scikit-build-core", "main"),
     "cibuildwheel": Repository("pypa", "cibuildwheel", "main"),
+    "build": Repository("pypa", "build", "main"),
     "airflow": Repository("apache", "airflow", "main"),
     "typeshed": Repository("python", "typeshed", "main", select="PYI"),
 }
