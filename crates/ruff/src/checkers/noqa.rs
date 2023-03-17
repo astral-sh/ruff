@@ -161,10 +161,15 @@ pub fn check_noqa(
                                     Location::new(row + 1, start - leading_spaces),
                                     Location::new(row + 1, end + trailing_spaces),
                                 ));
-                            } else {
+                            } else if lines[row].chars().nth(end + 1).map_or(false, |c| c == '#') {
                                 diagnostic.amend(Fix::deletion(
                                     Location::new(row + 1, start),
                                     Location::new(row + 1, end + trailing_spaces),
+                                ));
+                            } else {
+                                diagnostic.amend(Fix::deletion(
+                                    Location::new(row + 1, start + 1),
+                                    Location::new(row + 1, end),
                                 ));
                             }
                         }
@@ -242,10 +247,19 @@ pub fn check_noqa(
                                         Location::new(row + 1, start - leading_spaces),
                                         Location::new(row + 1, end + trailing_spaces),
                                     ));
-                                } else {
+                                } else if lines[row]
+                                    .chars()
+                                    .nth(end + 1)
+                                    .map_or(false, |c| c == '#')
+                                {
                                     diagnostic.amend(Fix::deletion(
                                         Location::new(row + 1, start),
                                         Location::new(row + 1, end + trailing_spaces),
+                                    ));
+                                } else {
+                                    diagnostic.amend(Fix::deletion(
+                                        Location::new(row + 1, start + 1),
+                                        Location::new(row + 1, end),
                                     ));
                                 }
                             } else {
