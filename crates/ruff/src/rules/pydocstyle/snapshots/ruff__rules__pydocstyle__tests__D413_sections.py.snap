@@ -1,6 +1,25 @@
 ---
-source: src/rules/pydocstyle/mod.rs
+source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-[]
+- kind:
+    name: BlankLineAfterLastSection
+    body: "Missing blank line after last section (\"Returns\")"
+    suggestion: "Add blank line after \"Returns\""
+    fixable: true
+  location:
+    row: 65
+    column: 4
+  end_location:
+    row: 67
+    column: 14
+  fix:
+    content: "\n    "
+    location:
+      row: 67
+      column: 11
+    end_location:
+      row: 67
+      column: 11
+  parent: ~
 

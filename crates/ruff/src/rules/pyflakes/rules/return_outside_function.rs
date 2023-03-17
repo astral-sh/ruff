@@ -2,7 +2,8 @@ use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Range, ScopeKind};
+use ruff_python_ast::scope::ScopeKind;
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -17,7 +18,7 @@ impl Violation for ReturnOutsideFunction {
 }
 
 pub fn return_outside_function(checker: &mut Checker, stmt: &Stmt) {
-    if let Some(&index) = checker.ctx.scope_stack.last() {
+    if let Some(index) = checker.ctx.scope_stack.top() {
         if matches!(
             checker.ctx.scopes[index].kind,
             ScopeKind::Class(_) | ScopeKind::Module

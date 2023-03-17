@@ -2,7 +2,8 @@ use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Binding, BindingKind, Range, Scope};
+use ruff_python_ast::scope::{Binding, BindingKind, Bindings, Scope};
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -26,7 +27,7 @@ impl AlwaysAutofixableViolation for UselessObjectInheritance {
     }
 }
 
-fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Option<Diagnostic> {
+fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Option<Diagnostic> {
     for expr in bases {
         let ExprKind::Name { id, .. } = &expr.node else {
             continue;
@@ -35,10 +36,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &[Binding]) -> Opti
             continue;
         }
         if !matches!(
-            scope
-                .bindings
-                .get(&id.as_str())
-                .map(|index| &bindings[*index]),
+            scope.get(id.as_str()).map(|index| &bindings[*index]),
             None | Some(Binding {
                 kind: BindingKind::Builtin,
                 ..
@@ -65,7 +63,7 @@ pub fn useless_object_inheritance(
     bases: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(mut diagnostic) = rule(name, bases, checker.ctx.current_scope(), &checker.ctx.bindings) else {
+    let Some(mut diagnostic) = rule(name, bases, checker.ctx.scope(), &checker.ctx.bindings) else {
         return;
     };
     if checker.patch(diagnostic.kind.rule()) {

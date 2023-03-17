@@ -310,6 +310,9 @@ Ruff is used in a number of major open-source projects, including:
 - [telemetry-airflow (Mozilla)](https://github.com/mozilla/telemetry-airflow)
 - [Stable Baselines3](https://github.com/DLR-RM/stable-baselines3)
 - [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)
+- [nox](https://github.com/wntrblm/nox)
+- [Neon](https://github.com/neondatabase/neon)
+- [The Algorithms](https://github.com/TheAlgorithms/Python)
 
 ## License
 

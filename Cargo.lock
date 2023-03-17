@@ -2041,7 +2041,10 @@ version = "0.0.0"
 dependencies = [
  "criterion",
  "mimalloc",
+ "once_cell",
  "ruff",
+ "serde",
+ "serde_json",
  "tikv-jemallocator",
  "ureq",
  "url",

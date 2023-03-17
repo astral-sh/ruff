@@ -59,6 +59,15 @@ def no_underline_and_no_description():  # noqa: D416
 
 
 @expect(_D213)
+@expect("D407: Missing dashed underline after section ('Returns')")
+@expect("D414: Section has no content ('Returns')")
+def no_underline_and_no_newline():  # noqa: D416
+    """Toggle the gizmo.
+
+    Returns"""
+
+
+@expect(_D213)
 @expect("D410: Missing blank line after section ('Returns')")
 @expect("D414: Section has no content ('Returns')")
 @expect("D411: Missing blank line before section ('Yields')")
