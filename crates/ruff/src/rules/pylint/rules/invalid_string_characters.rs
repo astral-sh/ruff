@@ -1,20 +1,23 @@
-use ruff_python_ast::newlines::UniversalNewlineIterator;
 use rustpython_parser::ast::Location;
-
-use ruff_macros::{derive_message_formats, violation};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::Fix;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers;
+use ruff_python_ast::newlines::UniversalNewlineIterator;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
 /// ## What it does
-/// Checks that strings don't have the control character BS
+/// Checks for strings that contain the control character `BS`.
 ///
 /// ## Why is this bad?
-/// Control characters can display differently in different text editors and terminals. By using the \b sequence the string's
-/// value will be the same but it will be visible in all text editors.
+/// Control characters are displayed differently by different text editors and
+/// terminals.
+///
+/// By using the `\b` sequence in lieu of the `BS` control character, the
+/// string will contain the same value, but will render visibly in all editors.
 ///
 /// ## Example
 /// ```python
@@ -40,11 +43,14 @@ impl AlwaysAutofixableViolation for InvalidCharacterBackspace {
 }
 
 /// ## What it does
-/// Checks that strings don't have the raw control character SUB
+/// Checks for strings that contain the raw control character `SUB`.
 ///
 /// ## Why is this bad?
-/// Control characters can display differently in different text editors and terminals. By using the \x1B sequence the string's
-/// value will be the same but it will be visible in all text editors.
+/// Control characters are displayed differently by different text editors and
+/// terminals.
+///
+/// By using the `\x1A` sequence in lieu of the `SUB` control character, the
+/// string will contain the same value, but will render visibly in all editors.
 ///
 /// ## Example
 /// ```python
@@ -70,11 +76,14 @@ impl AlwaysAutofixableViolation for InvalidCharacterSub {
 }
 
 /// ## What it does
-/// Checks that strings don't have the raw control character ESC
+/// Checks for strings that contain the raw control character `ESC`.
 ///
 /// ## Why is this bad?
-/// Control characters can display differently in different text editors and terminals. By using the \x1B sequence the string's
-/// value will be the same but it will be visible in all text editors.
+/// Control characters are displayed differently by different text editors and
+/// terminals.
+///
+/// By using the `\x1B` sequence in lieu of the `SUB` control character, the
+/// string will contain the same value, but will render visibly in all editors.
 ///
 /// ## Example
 /// ```python
@@ -100,11 +109,14 @@ impl AlwaysAutofixableViolation for InvalidCharacterEsc {
 }
 
 /// ## What it does
-/// Checks that strings don't have the raw control character NUL (0 byte)
+/// Checks for strings that contain the raw control character `NUL` (0 byte).
 ///
 /// ## Why is this bad?
-/// Control characters can display differently in different text editors and terminals. By using the \x1B sequence the string's
-/// value will be the same but it will be visible in all text editors.
+/// Control characters are displayed differently by different text editors and
+/// terminals.
+///
+/// By using the `\0` sequence in lieu of the `NUL` control character, the
+/// string will contain the same value, but will render visibly in all editors.
 ///
 /// ## Example
 /// ```python
@@ -130,11 +142,13 @@ impl AlwaysAutofixableViolation for InvalidCharacterNul {
 }
 
 /// ## What it does
-/// Checks that strings don't have the zero width space character
+/// Checks for strings that contain the zero width space character.
 ///
 /// ## Why is this bad?
-/// This character can be invisible in some text editors and terminals. By using the \x1B sequence the string's
-/// value will be the same but it will be visible in all text editors.
+/// This character is rendered invisibly in some text editors and terminals.
+///
+/// By using the `\u200B` sequence, the string will contain the same value,
+/// but will render visibly in all editors.
 ///
 /// ## Example
 /// ```python
@@ -169,14 +183,9 @@ pub fn invalid_string_characters(
     let mut diagnostics = Vec::new();
     let text = locator.slice(Range::new(start, end));
 
-    for (row_offset, line) in UniversalNewlineIterator::from(text).enumerate() {
-        for (col_offset, m) in line.match_indices(&['\x08', '\x1A', '\x1B', '\0', '\u{200b}']) {
-            let col = if row_offset == 0 {
-                start.column() + col_offset
-            } else {
-                col_offset
-            };
-            let (replacement, rule): (&str, DiagnosticKind) = match m.chars().next().unwrap() {
+    for (row, line) in UniversalNewlineIterator::from(text).enumerate() {
+        for (column, match_) in line.match_indices(&['\x08', '\x1A', '\x1B', '\0', '\u{200b}']) {
+            let (replacement, rule): (&str, DiagnosticKind) = match match_.chars().next().unwrap() {
                 '\x08' => ("\\b", InvalidCharacterBackspace.into()),
                 '\x1A' => ("\\x1A", InvalidCharacterSub.into()),
                 '\x1B' => ("\\x1B", InvalidCharacterEsc.into()),
@@ -184,7 +193,7 @@ pub fn invalid_string_characters(
                 '\u{200b}' => ("\\u200b", InvalidCharacterZeroWidthSpace.into()),
                 _ => unreachable!(),
             };
-            let location = Location::new(start.row() + row_offset, col);
+            let location = helpers::to_absolute(Location::new(row + 1, column), start);
             let end_location = Location::new(location.row(), location.column() + 1);
             let mut diagnostic = Diagnostic::new(rule, Range::new(location, end_location));
             if autofix {
