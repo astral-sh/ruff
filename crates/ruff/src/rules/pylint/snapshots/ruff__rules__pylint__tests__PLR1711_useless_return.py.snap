@@ -4,8 +4,8 @@ expression: diagnostics
 ---
 - kind:
     name: UselessReturn
-    body: Useless return at end of function or method
-    suggestion: Remove useless return statement at the end of the function
+    body: "Useless `return` statement at end of function"
+    suggestion: "Remove useless `return` statement"
     fixable: true
   location:
     row: 6
@@ -24,15 +24,15 @@ expression: diagnostics
   parent: ~
 - kind:
     name: UselessReturn
-    body: Useless return at end of function or method
-    suggestion: Remove useless return statement at the end of the function
+    body: "Useless `return` statement at end of function"
+    suggestion: "Remove useless `return` statement"
     fixable: true
   location:
     row: 11
     column: 4
   end_location:
     row: 11
-    column: 10
+    column: 15
   fix:
     content: ""
     location:
@@ -44,8 +44,8 @@ expression: diagnostics
   parent: ~
 - kind:
     name: UselessReturn
-    body: Useless return at end of function or method
-    suggestion: Remove useless return statement at the end of the function
+    body: "Useless `return` statement at end of function"
+    suggestion: "Remove useless `return` statement"
     fixable: true
   location:
     row: 16
@@ -64,8 +64,8 @@ expression: diagnostics
   parent: ~
 - kind:
     name: UselessReturn
-    body: Useless return at end of function or method
-    suggestion: Remove useless return statement at the end of the function
+    body: "Useless `return` statement at end of function"
+    suggestion: "Remove useless `return` statement"
     fixable: true
   location:
     row: 22
