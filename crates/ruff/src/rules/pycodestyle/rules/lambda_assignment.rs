@@ -65,7 +65,7 @@ pub fn lambda_assignment(checker: &mut Checker, target: &Expr, value: &Expr, stm
             // package like dataclasses, which wouldn't consider the
             // rewritten function definition to be equivalent.
             // See https://github.com/charliermarsh/ruff/issues/3046
-            let fixable = !matches!(checker.ctx.current_scope().kind, ScopeKind::Class(_));
+            let fixable = !matches!(checker.ctx.scope().kind, ScopeKind::Class(_));
 
             let mut diagnostic = Diagnostic::new(
                 LambdaAssignment {

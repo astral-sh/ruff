@@ -71,7 +71,7 @@ pub fn runtime_evaluated(
 }
 
 fn runtime_evaluated_base_class(context: &Context, base_classes: &[String]) -> bool {
-    if let ScopeKind::Class(class_def) = &context.current_scope().kind {
+    if let ScopeKind::Class(class_def) = &context.scope().kind {
         for base in class_def.bases.iter() {
             if let Some(call_path) = context.resolve_call_path(base) {
                 if base_classes
@@ -87,7 +87,7 @@ fn runtime_evaluated_base_class(context: &Context, base_classes: &[String]) -> b
 }
 
 fn runtime_evaluated_decorators(context: &Context, decorators: &[String]) -> bool {
-    if let ScopeKind::Class(class_def) = &context.current_scope().kind {
+    if let ScopeKind::Class(class_def) = &context.scope().kind {
         for decorator in class_def.decorator_list.iter() {
             if let Some(call_path) = context.resolve_call_path(map_callable(decorator)) {
                 if decorators

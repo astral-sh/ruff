@@ -20,7 +20,7 @@ impl Violation for AwaitOutsideAsync {
 pub fn await_outside_async(checker: &mut Checker, expr: &Expr) {
     if !checker
         .ctx
-        .current_scopes()
+        .scopes()
         .find_map(|scope| {
             if let ScopeKind::Function(FunctionDef { async_, .. }) = &scope.kind {
                 Some(*async_)

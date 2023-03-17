@@ -28,7 +28,7 @@ impl Violation for ConsiderUsingSysExit {
 /// Return `true` if the `module` was imported using a star import (e.g., `from
 /// sys import *`).
 fn is_module_star_imported(checker: &Checker, module: &str) -> bool {
-    checker.ctx.current_scopes().any(|scope| {
+    checker.ctx.scopes().any(|scope| {
         scope.bindings.values().any(|index| {
             if let BindingKind::StarImportation(_, name) = &checker.ctx.bindings[*index].kind {
                 name.as_ref().map(|name| name == module).unwrap_or_default()
@@ -42,7 +42,7 @@ fn is_module_star_imported(checker: &Checker, module: &str) -> bool {
 /// Return the appropriate `sys.exit` reference based on the current set of
 /// imports, or `None` is `sys.exit` hasn't been imported.
 fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -> Option<String> {
-    checker.ctx.current_scopes().find_map(|scope| {
+    checker.ctx.scopes().find_map(|scope| {
         scope
             .bindings
             .values()

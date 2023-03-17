@@ -40,7 +40,7 @@ impl Violation for YieldOutsideFunction {
 
 pub fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
     if matches!(
-        checker.ctx.current_scope().kind,
+        checker.ctx.scope().kind,
         ScopeKind::Class(_) | ScopeKind::Module
     ) {
         let keyword = match expr.node {
