@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     name: PairwiseOverZipped
-    body: "Prefer `itertools.pairwise()` to `zip()` if trying to fetch an iterable's successive overlapping pairs."
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
     suggestion: ~
     fixable: false
   location:
@@ -17,7 +17,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: PairwiseOverZipped
-    body: "Prefer `itertools.pairwise()` to `zip()` if trying to fetch an iterable's successive overlapping pairs."
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
     suggestion: ~
     fixable: false
   location:
@@ -30,7 +30,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: PairwiseOverZipped
-    body: "Prefer `itertools.pairwise()` to `zip()` if trying to fetch an iterable's successive overlapping pairs."
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
     suggestion: ~
     fixable: false
   location:
@@ -43,7 +43,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: PairwiseOverZipped
-    body: "Prefer `itertools.pairwise()` to `zip()` if trying to fetch an iterable's successive overlapping pairs."
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
     suggestion: ~
     fixable: false
   location:
@@ -56,7 +56,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: PairwiseOverZipped
-    body: "Prefer `itertools.pairwise()` to `zip()` if trying to fetch an iterable's successive overlapping pairs."
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
     suggestion: ~
     fixable: false
   location:
@@ -69,7 +69,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: PairwiseOverZipped
-    body: "Prefer `itertools.pairwise()` to `zip()` if trying to fetch an iterable's successive overlapping pairs."
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
     suggestion: ~
     fixable: false
   location:

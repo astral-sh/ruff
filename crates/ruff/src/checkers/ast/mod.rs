@@ -2859,7 +2859,9 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::PairwiseOverZipped) {
-                    ruff::rules::pairwise_over_zipped(self, func, args);
+                    if self.settings.target_version >= PythonVersion::Py310 {
+                        ruff::rules::pairwise_over_zipped(self, func, args);
+                    }
                 }
 
                 // flake8-simplify
