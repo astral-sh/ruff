@@ -6,9 +6,10 @@ use rustpython_parser::ast::{Arg, Arguments};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::context::Bindings;
 use ruff_python_ast::function_type;
 use ruff_python_ast::function_type::FunctionType;
-use ruff_python_ast::types::{Binding, FunctionDef, Lambda, Scope, ScopeKind};
+use ruff_python_ast::types::{BindingId, FunctionDef, Lambda, Scope, ScopeKind};
 use ruff_python_ast::visibility;
 
 use crate::checkers::ast::Checker;
@@ -85,8 +86,8 @@ impl Violation for UnusedLambdaArgument {
 fn function(
     argumentable: &Argumentable,
     args: &Arguments,
-    values: &FxHashMap<&str, usize>,
-    bindings: &[Binding],
+    values: &FxHashMap<&str, BindingId>,
+    bindings: &Bindings,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
 ) -> Vec<Diagnostic> {
@@ -112,8 +113,8 @@ fn function(
 fn method(
     argumentable: &Argumentable,
     args: &Arguments,
-    values: &FxHashMap<&str, usize>,
-    bindings: &[Binding],
+    values: &FxHashMap<&str, BindingId>,
+    bindings: &Bindings,
     dummy_variable_rgx: &Regex,
     ignore_variadic_names: bool,
 ) -> Vec<Diagnostic> {
@@ -139,8 +140,8 @@ fn method(
 fn call<'a>(
     argumentable: &Argumentable,
     args: impl Iterator<Item = &'a Arg>,
-    values: &FxHashMap<&str, usize>,
-    bindings: &[Binding],
+    values: &FxHashMap<&str, BindingId>,
+    bindings: &Bindings,
     dummy_variable_rgx: &Regex,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
@@ -168,7 +169,7 @@ pub fn unused_arguments(
     checker: &Checker,
     parent: &Scope,
     scope: &Scope,
-    bindings: &[Binding],
+    bindings: &Bindings,
 ) -> Vec<Diagnostic> {
     match &scope.kind {
         ScopeKind::Function(FunctionDef {

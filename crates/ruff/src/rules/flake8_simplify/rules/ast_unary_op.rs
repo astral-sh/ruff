@@ -93,7 +93,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(def) = &checker.ctx.current_scope().kind {
+    if let ScopeKind::Function(def) = &checker.ctx.scope().kind {
         if DUNDER_METHODS.contains(&def.name) {
             return;
         }
@@ -144,7 +144,7 @@ pub fn negation_with_not_equal_op(
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(def) = &checker.ctx.current_scope().kind {
+    if let ScopeKind::Function(def) = &checker.ctx.scope().kind {
         if DUNDER_METHODS.contains(&def.name) {
             return;
         }

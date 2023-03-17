@@ -1,3 +1,4 @@
+use ruff_python_ast::context::ScopeStack;
 use rustpython_parser::ast::{Expr, Stmt};
 
 use ruff_python_ast::types::Range;
@@ -7,7 +8,7 @@ use ruff_python_ast::visibility::{Visibility, VisibleScope};
 use crate::checkers::ast::AnnotationContext;
 use crate::docstrings::definition::Definition;
 
-type Context<'a> = (Vec<usize>, Vec<RefEquality<'a, Stmt>>);
+type Context<'a> = (ScopeStack, Vec<RefEquality<'a, Stmt>>);
 
 /// A collection of AST nodes that are deferred for later analysis.
 /// Used to, e.g., store functions, whose bodies shouldn't be analyzed until all

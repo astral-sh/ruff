@@ -17,7 +17,7 @@ impl Violation for ReturnOutsideFunction {
 }
 
 pub fn return_outside_function(checker: &mut Checker, stmt: &Stmt) {
-    if let Some(&index) = checker.ctx.scope_stack.last() {
+    if let Some(index) = checker.ctx.scope_stack.top() {
         if matches!(
             checker.ctx.scopes[index].kind,
             ScopeKind::Class(_) | ScopeKind::Module

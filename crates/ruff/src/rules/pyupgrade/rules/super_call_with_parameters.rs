@@ -38,7 +38,7 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
     if !is_super_call_with_arguments(func, args) {
         return;
     }
-    let scope = checker.ctx.current_scope();
+    let scope = checker.ctx.scope();
     let parents: Vec<&Stmt> = checker.ctx.parents.iter().map(Into::into).collect();
 
     // Check: are we in a Function scope?

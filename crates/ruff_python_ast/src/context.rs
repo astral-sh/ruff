@@ -1,6 +1,7 @@
+use std::ops::{Deref, Index, IndexMut};
 use std::path::Path;
 
-use nohash_hasher::IntMap;
+use nohash_hasher::{BuildNoHashHasher, IntMap};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
@@ -9,7 +10,10 @@ use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
 use crate::helpers::{collect_call_path, from_relative_import, Exceptions};
-use crate::types::{Binding, BindingKind, CallPath, ExecutionContext, RefEquality, Scope};
+use crate::types::{
+    Binding, BindingId, BindingKind, CallPath, ExecutionContext, RefEquality, Scope, ScopeId,
+    ScopeKind,
+};
 use crate::visibility::{module_visibility, Modifier, VisibleScope};
 
 #[allow(clippy::struct_excessive_bools)]
@@ -22,13 +26,14 @@ pub struct Context<'a> {
     pub depths: FxHashMap<RefEquality<'a, Stmt>, usize>,
     pub child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
     // A stack of all bindings created in any scope, at any point in execution.
-    pub bindings: Vec<Binding<'a>>,
+    pub bindings: Bindings<'a>,
     // Map from binding index to indexes of bindings that redefine it in other scopes.
-    pub redefinitions: IntMap<usize, Vec<usize>>,
+    pub redefinitions:
+        std::collections::HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
     pub exprs: Vec<RefEquality<'a, Expr>>,
-    pub scopes: Vec<Scope<'a>>,
-    pub scope_stack: Vec<usize>,
-    pub dead_scopes: Vec<(usize, Vec<usize>)>,
+    pub scopes: Scopes<'a>,
+    pub scope_stack: ScopeStack,
+    pub dead_scopes: Vec<(ScopeId, ScopeStack)>,
     // Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
     pub body_index: usize,
@@ -60,11 +65,11 @@ impl<'a> Context<'a> {
             parents: Vec::default(),
             depths: FxHashMap::default(),
             child_to_parent: FxHashMap::default(),
-            bindings: Vec::default(),
+            bindings: Bindings::default(),
             redefinitions: IntMap::default(),
             exprs: Vec::default(),
-            scopes: Vec::default(),
-            scope_stack: Vec::default(),
+            scopes: Scopes::default(),
+            scope_stack: ScopeStack::default(),
             dead_scopes: Vec::default(),
             body: &[],
             body_index: 0,
@@ -119,7 +124,7 @@ impl<'a> Context<'a> {
 
     /// Return the current `Binding` for a given `name`.
     pub fn find_binding(&self, member: &str) -> Option<&Binding> {
-        self.current_scopes()
+        self.scopes()
             .find_map(|scope| scope.bindings.get(member))
             .map(|index| &self.bindings[*index])
     }
@@ -217,9 +222,10 @@ impl<'a> Context<'a> {
             .expect("Attempted to pop without expression");
     }
 
-    pub fn push_scope(&mut self, scope: Scope<'a>) {
-        self.scope_stack.push(self.scopes.len());
-        self.scopes.push(scope);
+    pub fn push_scope(&mut self, kind: ScopeKind<'a>) -> ScopeId {
+        let id = self.scopes.push_scope(kind);
+        self.scope_stack.push(id);
+        id
     }
 
     pub fn pop_scope(&mut self) {
@@ -261,23 +267,41 @@ impl<'a> Context<'a> {
         self.body.get(self.body_index + 1)
     }
 
-    pub fn current_scope(&self) -> &Scope {
-        &self.scopes[*(self.scope_stack.last().expect("No current scope found"))]
+    /// Returns a reference to the global scope
+    pub fn global_scope(&self) -> &Scope<'a> {
+        self.scopes.global()
     }
 
-    pub fn current_scope_parent(&self) -> Option<&Scope> {
+    /// Returns a mutable reference to the global scope
+    pub fn global_scope_mut(&mut self) -> &mut Scope<'a> {
+        self.scopes.global_mut()
+    }
+
+    /// Returns the current top most scope.
+    pub fn scope(&self) -> &Scope<'a> {
+        &self.scopes[self.scope_stack.top().expect("No current scope found")]
+    }
+
+    /// Returns the id of the top-most scope
+    pub fn scope_id(&self) -> ScopeId {
+        self.scope_stack.top().expect("No current scope found")
+    }
+
+    /// Returns a mutable reference to the current top most scope.
+    pub fn scope_mut(&mut self) -> &mut Scope<'a> {
+        let top_id = self.scope_stack.top().expect("No current scope found");
+        &mut self.scopes[top_id]
+    }
+
+    pub fn parent_scope(&self) -> Option<&Scope> {
         self.scope_stack
             .iter()
-            .rev()
             .nth(1)
             .map(|index| &self.scopes[*index])
     }
 
-    pub fn current_scopes(&self) -> impl Iterator<Item = &Scope> {
-        self.scope_stack
-            .iter()
-            .rev()
-            .map(|index| &self.scopes[*index])
+    pub fn scopes(&self) -> impl Iterator<Item = &Scope> {
+        self.scope_stack.iter().map(|index| &self.scopes[*index])
     }
 
     pub const fn in_exception_handler(&self) -> bool {
@@ -293,5 +317,134 @@ impl<'a> Context<'a> {
         } else {
             ExecutionContext::Runtime
         }
+    }
+}
+
+/// The scopes of a program indexed by [`ScopeId`]
+#[derive(Debug)]
+pub struct Scopes<'a>(Vec<Scope<'a>>);
+
+impl<'a> Scopes<'a> {
+    /// Returns a reference to the global scope
+    pub fn global(&self) -> &Scope<'a> {
+        &self[ScopeId::global()]
+    }
+
+    /// Returns a mutable reference to the global scope
+    pub fn global_mut(&mut self) -> &mut Scope<'a> {
+        &mut self[ScopeId::global()]
+    }
+
+    /// Pushes a new scope and returns its unique id
+    fn push_scope(&mut self, kind: ScopeKind<'a>) -> ScopeId {
+        let next_id = ScopeId::try_from(self.0.len()).unwrap();
+        self.0.push(Scope::new(next_id, kind));
+        next_id
+    }
+}
+
+impl Default for Scopes<'_> {
+    fn default() -> Self {
+        Self(vec![Scope::new(ScopeId::global(), ScopeKind::Module)])
+    }
+}
+
+impl<'a> Index<ScopeId> for Scopes<'a> {
+    type Output = Scope<'a>;
+
+    fn index(&self, index: ScopeId) -> &Self::Output {
+        &self.0[usize::from(index)]
+    }
+}
+
+impl<'a> IndexMut<ScopeId> for Scopes<'a> {
+    fn index_mut(&mut self, index: ScopeId) -> &mut Self::Output {
+        &mut self.0[usize::from(index)]
+    }
+}
+
+impl<'a> Deref for Scopes<'a> {
+    type Target = [Scope<'a>];
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct ScopeStack(Vec<ScopeId>);
+
+impl ScopeStack {
+    /// Pushes a new scope on the stack
+    pub fn push(&mut self, id: ScopeId) {
+        self.0.push(id);
+    }
+
+    /// Pops the top most scope
+    pub fn pop(&mut self) -> Option<ScopeId> {
+        self.0.pop()
+    }
+
+    /// Returns the id of the top-most
+    pub fn top(&self) -> Option<ScopeId> {
+        self.0.last().copied()
+    }
+
+    /// Returns an iterator from the current scope to the top scope (reverse iterator)
+    pub fn iter(&self) -> std::iter::Rev<std::slice::Iter<ScopeId>> {
+        self.0.iter().rev()
+    }
+}
+
+impl Default for ScopeStack {
+    fn default() -> Self {
+        Self(vec![ScopeId::global()])
+    }
+}
+
+/// The bindings in a program.
+///
+/// Bindings are indexed by [`BindingId`]
+#[derive(Debug, Clone, Default)]
+pub struct Bindings<'a>(Vec<Binding<'a>>);
+
+impl<'a> Bindings<'a> {
+    /// Pushes a new binding and returns its id
+    pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
+        let id = self.next_id();
+        self.0.push(binding);
+        id
+    }
+
+    /// Returns the id that will be assigned when pushing the next binding
+    pub fn next_id(&self) -> BindingId {
+        BindingId::try_from(self.0.len()).unwrap()
+    }
+}
+
+impl<'a> Index<BindingId> for Bindings<'a> {
+    type Output = Binding<'a>;
+
+    fn index(&self, index: BindingId) -> &Self::Output {
+        &self.0[usize::from(index)]
+    }
+}
+
+impl<'a> IndexMut<BindingId> for Bindings<'a> {
+    fn index_mut(&mut self, index: BindingId) -> &mut Self::Output {
+        &mut self.0[usize::from(index)]
+    }
+}
+
+impl<'a> Deref for Bindings<'a> {
+    type Target = [Binding<'a>];
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
+    fn from_iter<T: IntoIterator<Item = Binding<'a>>>(iter: T) -> Self {
+        Self(Vec::from_iter(iter))
     }
 }

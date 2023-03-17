@@ -30,7 +30,7 @@ fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
 
 /// B019
 pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
-    if !matches!(checker.ctx.current_scope().kind, ScopeKind::Class(_)) {
+    if !matches!(checker.ctx.scope().kind, ScopeKind::Class(_)) {
         return;
     }
     for decorator in decorator_list {

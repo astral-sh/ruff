@@ -14,7 +14,7 @@ use rustpython_parser::ast::{
 };
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::context::Context;
+use ruff_python_ast::context::{Context, ScopeStack};
 use ruff_python_ast::helpers::{
     binding_range, extract_handled_exceptions, to_module_path, Exceptions,
 };
@@ -22,8 +22,8 @@ use ruff_python_ast::operations::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::types::{
-    Binding, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Node, Range,
-    RefEquality, Scope, ScopeKind,
+    Binding, BindingId, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Node, Range,
+    RefEquality, Scope, ScopeId, ScopeKind,
 };
 use ruff_python_ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
@@ -52,8 +52,6 @@ use crate::settings::{flags, Settings};
 use crate::{autofix, docstrings, noqa};
 
 mod deferred;
-
-const GLOBAL_SCOPE_INDEX: usize = 0;
 
 type AnnotationContext = (bool, bool);
 
@@ -193,16 +191,15 @@ where
         // Pre-visit.
         match &stmt.node {
             StmtKind::Global { names } => {
-                let scope_index = *self.ctx.scope_stack.last().expect("No current scope found");
+                let scope_index = self.ctx.scope_id();
                 let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
-                if scope_index != GLOBAL_SCOPE_INDEX {
+                if !scope_index.is_global() {
                     // Add the binding to the current scope.
                     let context = self.ctx.execution_context();
                     let scope = &mut self.ctx.scopes[scope_index];
                     let usage = Some((scope.id, Range::from(stmt)));
                     for (name, range) in names.iter().zip(ranges.iter()) {
-                        let index = self.ctx.bindings.len();
-                        self.ctx.bindings.push(Binding {
+                        let id = self.ctx.bindings.push(Binding {
                             kind: BindingKind::Global,
                             runtime_usage: None,
                             synthetic_usage: usage,
@@ -211,7 +208,7 @@ where
                             source: Some(RefEquality(stmt)),
                             context,
                         });
-                        scope.bindings.insert(name, index);
+                        scope.bindings.insert(name, id);
                     }
                 }
 
@@ -223,16 +220,15 @@ where
                 }
             }
             StmtKind::Nonlocal { names } => {
-                let scope_index = *self.ctx.scope_stack.last().expect("No current scope found");
+                let scope_index = self.ctx.scope_id();
                 let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
-                if scope_index != GLOBAL_SCOPE_INDEX {
+                if !scope_index.is_global() {
                     let context = self.ctx.execution_context();
                     let scope = &mut self.ctx.scopes[scope_index];
                     let usage = Some((scope.id, Range::from(stmt)));
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
-                        let index = self.ctx.bindings.len();
-                        self.ctx.bindings.push(Binding {
+                        let id = self.ctx.bindings.push(Binding {
                             kind: BindingKind::Nonlocal,
                             runtime_usage: None,
                             synthetic_usage: usage,
@@ -241,14 +237,18 @@ where
                             source: Some(RefEquality(stmt)),
                             context,
                         });
-                        scope.bindings.insert(name, index);
+                        scope.bindings.insert(name, id);
                     }
 
                     // Mark the binding in the defining scopes as used too. (Skip the global scope
                     // and the current scope.)
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let mut exists = false;
-                        for index in self.ctx.scope_stack.iter().skip(1).rev().skip(1) {
+                        let mut scopes_iter = self.ctx.scope_stack.iter();
+                        // Skip the global scope
+                        scopes_iter.next_back();
+
+                        for index in scopes_iter.skip(1) {
                             if let Some(index) =
                                 self.ctx.scopes[*index].bindings.get(&name.as_str())
                             {
@@ -354,7 +354,7 @@ where
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_first_argument_name_for_class_method(
                             self,
-                            self.ctx.current_scope(),
+                            self.ctx.scope(),
                             name,
                             decorator_list,
                             args,
@@ -372,7 +372,7 @@ where
                     if let Some(diagnostic) =
                         pep8_naming::rules::invalid_first_argument_name_for_method(
                             self,
-                            self.ctx.current_scope(),
+                            self.ctx.scope(),
                             name,
                             decorator_list,
                             args,
@@ -393,7 +393,7 @@ where
 
                 if self.settings.rules.enabled(Rule::DunderFunctionName) {
                     if let Some(diagnostic) = pep8_naming::rules::dunder_function_name(
-                        self.ctx.current_scope(),
+                        self.ctx.scope(),
                         stmt,
                         name,
                         self.locator,
@@ -592,7 +592,7 @@ where
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
                 let runtime_annotation = !self.ctx.annotations_future_enabled
                     && matches!(
-                        self.ctx.current_scope().kind,
+                        self.ctx.scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
                     );
 
@@ -849,15 +849,7 @@ where
                                 kind: BindingKind::FutureImportation,
                                 runtime_usage: None,
                                 // Always mark `__future__` imports as used.
-                                synthetic_usage: Some((
-                                    self.ctx.scopes[*(self
-                                        .ctx
-                                        .scope_stack
-                                        .last()
-                                        .expect("No current scope found"))]
-                                    .id,
-                                    Range::from(alias),
-                                )),
+                                synthetic_usage: Some((self.ctx.scope_id(), Range::from(alias))),
                                 typing_usage: None,
                                 range: Range::from(alias),
                                 source: Some(self.ctx.current_stmt().clone()),
@@ -884,15 +876,7 @@ where
                                 kind: BindingKind::SubmoduleImportation(name, full_name),
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled {
-                                    Some((
-                                        self.ctx.scopes[*(self
-                                            .ctx
-                                            .scope_stack
-                                            .last()
-                                            .expect("No current scope found"))]
-                                        .id,
-                                        Range::from(alias),
-                                    ))
+                                    Some((self.ctx.scope_id(), Range::from(alias)))
                                 } else {
                                     None
                                 },
@@ -922,15 +906,7 @@ where
                                 kind: BindingKind::Importation(name, full_name),
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled || is_explicit_reexport {
-                                    Some((
-                                        self.ctx.scopes[*(self
-                                            .ctx
-                                            .scope_stack
-                                            .last()
-                                            .expect("No current scope found"))]
-                                        .id,
-                                        Range::from(alias),
-                                    ))
+                                    Some((self.ctx.scope_id(), Range::from(alias)))
                                 } else {
                                     None
                                 },
@@ -1191,15 +1167,7 @@ where
                                 kind: BindingKind::FutureImportation,
                                 runtime_usage: None,
                                 // Always mark `__future__` imports as used.
-                                synthetic_usage: Some((
-                                    self.ctx.scopes[*(self
-                                        .ctx
-                                        .scope_stack
-                                        .last()
-                                        .expect("No current scope found"))]
-                                    .id,
-                                    Range::from(alias),
-                                )),
+                                synthetic_usage: Some((self.ctx.scope_id(), Range::from(alias))),
                                 typing_usage: None,
                                 range: Range::from(alias),
                                 source: Some(self.ctx.current_stmt().clone()),
@@ -1230,15 +1198,7 @@ where
                                 kind: BindingKind::StarImportation(*level, module.clone()),
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled {
-                                    Some((
-                                        self.ctx.scopes[*(self
-                                            .ctx
-                                            .scope_stack
-                                            .last()
-                                            .expect("No current scope found"))]
-                                        .id,
-                                        Range::from(alias),
-                                    ))
+                                    Some((self.ctx.scope_id(), Range::from(alias)))
                                 } else {
                                     None
                                 },
@@ -1250,8 +1210,7 @@ where
                         );
 
                         if self.settings.rules.enabled(Rule::ImportStarNotPermitted) {
-                            let scope = &self.ctx.scopes
-                                [*(self.ctx.scope_stack.last().expect("No current scope found"))];
+                            let scope = self.ctx.scope();
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::ImportStarNotPermitted {
@@ -1277,8 +1236,7 @@ where
                             ));
                         }
 
-                        let scope = &mut self.ctx.scopes
-                            [*(self.ctx.scope_stack.last().expect("No current scope found"))];
+                        let scope = self.ctx.scope_mut();
                         scope.import_starred = true;
                     } else {
                         if let Some(asname) = &alias.node.asname {
@@ -1308,15 +1266,7 @@ where
                                 kind: BindingKind::FromImportation(name, full_name),
                                 runtime_usage: None,
                                 synthetic_usage: if is_handled || is_explicit_reexport {
-                                    Some((
-                                        self.ctx.scopes[*(self
-                                            .ctx
-                                            .scope_stack
-                                            .last()
-                                            .expect("No current scope found"))]
-                                        .id,
-                                        Range::from(alias),
-                                    ))
+                                    Some((self.ctx.scope_id(), Range::from(alias)))
                                 } else {
                                     None
                                 },
@@ -1921,13 +1871,14 @@ where
                 // If any global bindings don't already exist in the global scope, add it.
                 let globals = operations::extract_globals(body);
                 for (name, stmt) in operations::extract_globals(body) {
-                    if self.ctx.scopes[GLOBAL_SCOPE_INDEX]
+                    if self
+                        .ctx
+                        .global_scope()
                         .bindings
                         .get(name)
                         .map_or(true, |index| self.ctx.bindings[*index].kind.is_annotation())
                     {
-                        let index = self.ctx.bindings.len();
-                        self.ctx.bindings.push(Binding {
+                        let id = self.ctx.bindings.push(Binding {
                             kind: BindingKind::Assignment,
                             runtime_usage: None,
                             synthetic_usage: None,
@@ -1936,21 +1887,18 @@ where
                             source: Some(RefEquality(stmt)),
                             context: self.ctx.execution_context(),
                         });
-                        self.ctx.scopes[GLOBAL_SCOPE_INDEX]
-                            .bindings
-                            .insert(name, index);
+                        self.ctx.global_scope_mut().bindings.insert(name, id);
                     }
                 }
 
-                self.ctx
-                    .push_scope(Scope::new(ScopeKind::Function(FunctionDef {
-                        name,
-                        body,
-                        args,
-                        decorator_list,
-                        async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
-                        globals,
-                    })));
+                self.ctx.push_scope(ScopeKind::Function(FunctionDef {
+                    name,
+                    body,
+                    args,
+                    decorator_list,
+                    async_: matches!(stmt.node, StmtKind::AsyncFunctionDef { .. }),
+                    globals,
+                }));
 
                 self.deferred.functions.push((
                     stmt,
@@ -1986,13 +1934,14 @@ where
                 // If any global bindings don't already exist in the global scope, add it.
                 let globals = operations::extract_globals(body);
                 for (name, stmt) in &globals {
-                    if self.ctx.scopes[GLOBAL_SCOPE_INDEX]
+                    if self
+                        .ctx
+                        .global_scope()
                         .bindings
                         .get(name)
                         .map_or(true, |index| self.ctx.bindings[*index].kind.is_annotation())
                     {
-                        let index = self.ctx.bindings.len();
-                        self.ctx.bindings.push(Binding {
+                        let id = self.ctx.bindings.push(Binding {
                             kind: BindingKind::Assignment,
                             runtime_usage: None,
                             synthetic_usage: None,
@@ -2001,19 +1950,17 @@ where
                             source: Some(RefEquality(stmt)),
                             context: self.ctx.execution_context(),
                         });
-                        self.ctx.scopes[GLOBAL_SCOPE_INDEX]
-                            .bindings
-                            .insert(name, index);
+                        self.ctx.global_scope_mut().bindings.insert(name, id);
                     }
                 }
 
-                self.ctx.push_scope(Scope::new(ScopeKind::Class(ClassDef {
+                self.ctx.push_scope(ScopeKind::Class(ClassDef {
                     name,
                     bases,
                     keywords,
                     decorator_list,
                     globals,
-                })));
+                }));
 
                 self.visit_body(body);
             }
@@ -2074,7 +2021,7 @@ where
                 // available at runtime.
                 // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
                 let runtime_annotation = if self.ctx.annotations_future_enabled {
-                    if matches!(self.ctx.current_scope().kind, ScopeKind::Class(..)) {
+                    if matches!(self.ctx.scope().kind, ScopeKind::Class(..)) {
                         let baseclasses = &self
                             .settings
                             .flake8_type_checking
@@ -2093,7 +2040,7 @@ where
                     }
                 } else {
                     matches!(
-                        self.ctx.current_scope().kind,
+                        self.ctx.scope().kind,
                         ScopeKind::Class(..) | ScopeKind::Module
                     )
                 };
@@ -2718,8 +2665,7 @@ where
                 }
                 if let ExprKind::Name { id, ctx } = &func.node {
                     if id == "locals" && matches!(ctx, ExprContext::Load) {
-                        let scope = &mut self.ctx.scopes
-                            [*(self.ctx.scope_stack.last().expect("No current scope found"))];
+                        let scope = self.ctx.scope_mut();
                         scope.uses_locals = true;
                     }
                 }
@@ -3365,7 +3311,7 @@ where
                     self.visit_expr(expr);
                 }
                 self.ctx
-                    .push_scope(Scope::new(ScopeKind::Lambda(Lambda { args, body })));
+                    .push_scope(ScopeKind::Lambda(Lambda { args, body }));
             }
             ExprKind::IfExp { test, body, orelse } => {
                 if self.settings.rules.enabled(Rule::IfExprWithTrueFalse) {
@@ -3391,13 +3337,13 @@ where
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(Scope::new(ScopeKind::Generator));
+                self.ctx.push_scope(ScopeKind::Generator);
             }
             ExprKind::GeneratorExp { .. } | ExprKind::DictComp { .. } => {
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
-                self.ctx.push_scope(Scope::new(ScopeKind::Generator));
+                self.ctx.push_scope(ScopeKind::Generator);
             }
             ExprKind::BoolOp { op, values } => {
                 if self.settings.rules.enabled(Rule::ConsiderMergingIsinstance) {
@@ -3767,12 +3713,7 @@ where
                         let name_range =
                             helpers::excepthandler_name_range(excepthandler, self.locator).unwrap();
 
-                        if self
-                            .ctx
-                            .current_scope()
-                            .bindings
-                            .contains_key(&name.as_str())
-                        {
+                        if self.ctx.scope().bindings.contains_key(&name.as_str()) {
                             self.handle_node_store(
                                 name,
                                 &Expr::new(
@@ -3786,12 +3727,7 @@ where
                             );
                         }
 
-                        let definition = self
-                            .ctx
-                            .current_scope()
-                            .bindings
-                            .get(&name.as_str())
-                            .copied();
+                        let definition = self.ctx.scope().bindings.get(&name.as_str()).copied();
                         self.handle_node_store(
                             name,
                             &Expr::new(
@@ -3807,8 +3743,7 @@ where
                         walk_excepthandler(self, excepthandler);
 
                         if let Some(index) = {
-                            let scope = &mut self.ctx.scopes
-                                [*(self.ctx.scope_stack.last().expect("No current scope found"))];
+                            let scope = self.ctx.scope_mut();
                             &scope.bindings.remove(&name.as_str())
                         } {
                             if !self.ctx.bindings[*index].used() {
@@ -3842,8 +3777,7 @@ where
                         }
 
                         if let Some(index) = definition {
-                            let scope = &mut self.ctx.scopes
-                                [*(self.ctx.scope_stack.last().expect("No current scope found"))];
+                            let scope = self.ctx.scope_mut();
                             scope.bindings.insert(name, index);
                         }
                     }
@@ -3998,18 +3932,16 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        let binding_index = self.ctx.bindings.len();
-
+        let binding_id = self.ctx.bindings.next_id();
         if let Some((stack_index, scope_index)) = self
             .ctx
             .scope_stack
             .iter()
-            .rev()
             .enumerate()
             .find(|(_, scope_index)| self.ctx.scopes[**scope_index].bindings.contains_key(&name))
         {
-            let existing_binding_index = self.ctx.scopes[*scope_index].bindings.get(&name).unwrap();
-            let existing = &self.ctx.bindings[*existing_binding_index];
+            let existing_binding_index = self.ctx.scopes[*scope_index].bindings[&name];
+            let existing = &self.ctx.bindings[existing_binding_index];
             let in_current_scope = stack_index == 0;
             if !existing.kind.is_builtin()
                 && existing.source.as_ref().map_or(true, |left| {
@@ -4072,14 +4004,14 @@ impl<'a> Checker<'a> {
                 } else if existing_is_import && binding.redefines(existing) {
                     self.ctx
                         .redefinitions
-                        .entry(*existing_binding_index)
+                        .entry(existing_binding_index)
                         .or_insert_with(Vec::new)
-                        .push(binding_index);
+                        .push(binding_id);
                 }
             }
         }
 
-        let scope = self.ctx.current_scope();
+        let scope = self.ctx.scope();
         let binding = if let Some(index) = scope.bindings.get(&name) {
             let existing = &self.ctx.bindings[*index];
             match &existing.kind {
@@ -4111,10 +4043,9 @@ impl<'a> Checker<'a> {
 
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
-        let scope =
-            &mut self.ctx.scopes[*(self.ctx.scope_stack.last().expect("No current scope found"))];
+        let scope = self.ctx.scope_mut();
         if !(binding.kind.is_annotation() && scope.bindings.contains_key(name)) {
-            if let Some(rebound_index) = scope.bindings.insert(name, binding_index) {
+            if let Some(rebound_index) = scope.bindings.insert(name, binding_id) {
                 scope
                     .rebounds
                     .entry(name)
@@ -4128,7 +4059,7 @@ impl<'a> Checker<'a> {
 
     fn bind_builtins(&mut self) {
         let scope =
-            &mut self.ctx.scopes[*(self.ctx.scope_stack.last().expect("No current scope found"))];
+            &mut self.ctx.scopes[self.ctx.scope_stack.top().expect("No current scope found")];
 
         for builtin in BUILTINS
             .iter()
@@ -4136,17 +4067,16 @@ impl<'a> Checker<'a> {
             .copied()
             .chain(self.settings.builtins.iter().map(String::as_str))
         {
-            let index = self.ctx.bindings.len();
-            self.ctx.bindings.push(Binding {
+            let id = self.ctx.bindings.push(Binding {
                 kind: BindingKind::Builtin,
                 range: Range::default(),
                 runtime_usage: None,
-                synthetic_usage: Some((0, Range::default())),
+                synthetic_usage: Some((ScopeId::global(), Range::default())),
                 typing_usage: None,
                 source: None,
                 context: ExecutionContext::Runtime,
             });
-            scope.bindings.insert(builtin, index);
+            scope.bindings.insert(builtin, id);
         }
     }
 
@@ -4154,13 +4084,13 @@ impl<'a> Checker<'a> {
         let ExprKind::Name { id, .. } = &expr.node else {
             return;
         };
-        let scope_id = self.ctx.current_scope().id;
+        let scope_id = self.ctx.scope_id();
 
         let mut first_iter = true;
         let mut in_generator = false;
         let mut import_starred = false;
 
-        for scope_index in self.ctx.scope_stack.iter().rev() {
+        for scope_index in self.ctx.scope_stack.iter() {
             let scope = &self.ctx.scopes[*scope_index];
 
             if matches!(scope.kind, ScopeKind::Class(_)) {
@@ -4241,7 +4171,7 @@ impl<'a> Checker<'a> {
         if import_starred {
             if self.settings.rules.enabled(Rule::ImportStarUsage) {
                 let mut from_list = vec![];
-                for scope_index in self.ctx.scope_stack.iter().rev() {
+                for scope_index in self.ctx.scope_stack.iter() {
                     let scope = &self.ctx.scopes[*scope_index];
                     for binding in scope
                         .bindings
@@ -4277,7 +4207,7 @@ impl<'a> Checker<'a> {
 
             // Allow "__module__" and "__qualname__" in class scopes.
             if (id == "__module__" || id == "__qualname__")
-                && matches!(self.ctx.current_scope().kind, ScopeKind::Class(..))
+                && matches!(self.ctx.scope().kind, ScopeKind::Class(..))
             {
                 return;
             }
@@ -4310,6 +4240,7 @@ impl<'a> Checker<'a> {
                 .ctx
                 .scope_stack
                 .iter()
+                .rev()
                 .map(|index| &self.ctx.scopes[*index])
                 .collect();
             if let Some(diagnostic) =
@@ -4324,11 +4255,11 @@ impl<'a> Checker<'a> {
             .rules
             .enabled(Rule::NonLowercaseVariableInFunction)
         {
-            if matches!(self.ctx.current_scope().kind, ScopeKind::Function(..)) {
+            if matches!(self.ctx.scope().kind, ScopeKind::Function(..)) {
                 // Ignore globals.
                 if !self
                     .ctx
-                    .current_scope()
+                    .scope()
                     .bindings
                     .get(id)
                     .map_or(false, |index| self.ctx.bindings[*index].kind.is_global())
@@ -4343,7 +4274,7 @@ impl<'a> Checker<'a> {
             .rules
             .enabled(Rule::MixedCaseVariableInClassScope)
         {
-            if matches!(self.ctx.current_scope().kind, ScopeKind::Class(..)) {
+            if matches!(self.ctx.scope().kind, ScopeKind::Class(..)) {
                 pep8_naming::rules::mixed_case_variable_in_class_scope(self, expr, parent, id);
             }
         }
@@ -4353,7 +4284,7 @@ impl<'a> Checker<'a> {
             .rules
             .enabled(Rule::MixedCaseVariableInGlobalScope)
         {
-            if matches!(self.ctx.current_scope().kind, ScopeKind::Module) {
+            if matches!(self.ctx.scope().kind, ScopeKind::Module) {
                 pep8_naming::rules::mixed_case_variable_in_global_scope(self, expr, parent, id);
             }
         }
@@ -4410,7 +4341,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let current = self.ctx.current_scope();
+        let current = self.ctx.scope();
         if id == "__all__"
             && matches!(current.kind, ScopeKind::Module)
             && matches!(
@@ -4501,8 +4432,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let scope =
-            &mut self.ctx.scopes[*(self.ctx.scope_stack.last().expect("No current scope found"))];
+        let scope = self.ctx.scope_mut();
         if scope.bindings.remove(&id.as_str()).is_some() {
             return;
         }
@@ -4646,8 +4576,9 @@ impl<'a> Checker<'a> {
     fn check_deferred_assignments(&mut self) {
         self.deferred.assignments.reverse();
         while let Some((scopes, ..)) = self.deferred.assignments.pop() {
-            let scope_index = scopes[scopes.len() - 1];
-            let parent_scope_index = scopes[scopes.len() - 2];
+            let mut scopes_iter = scopes.iter();
+            let scope_index = *scopes_iter.next().unwrap();
+            let parent_scope_index = *scopes_iter.next().unwrap();
 
             // pyflakes
             if self.settings.rules.enabled(Rule::UnusedVariable) {
@@ -4728,28 +4659,33 @@ impl<'a> Checker<'a> {
         }
 
         // Mark anything referenced in `__all__` as used.
-        let global_scope = &self.ctx.scopes[GLOBAL_SCOPE_INDEX];
-        let all_names: Option<(&Vec<String>, Range)> = global_scope
-            .bindings
-            .get("__all__")
-            .map(|index| &self.ctx.bindings[*index])
-            .and_then(|binding| match &binding.kind {
-                BindingKind::Export(names) => Some((names, binding.range)),
-                _ => None,
-            });
-        let all_bindings: Option<(Vec<usize>, Range)> = all_names.map(|(names, range)| {
-            (
-                names
-                    .iter()
-                    .filter_map(|name| global_scope.bindings.get(name.as_str()).copied())
-                    .collect(),
-                range,
-            )
-        });
+
+        let all_bindings: Option<(Vec<BindingId>, Range)> = {
+            let global_scope = self.ctx.global_scope();
+            let all_names: Option<(&Vec<String>, Range)> = global_scope
+                .bindings
+                .get("__all__")
+                .map(|index| &self.ctx.bindings[*index])
+                .and_then(|binding| match &binding.kind {
+                    BindingKind::Export(names) => Some((names, binding.range)),
+                    _ => None,
+                });
+
+            all_names.map(|(names, range)| {
+                (
+                    names
+                        .iter()
+                        .filter_map(|name| global_scope.bindings.get(name.as_str()).copied())
+                        .collect(),
+                    range,
+                )
+            })
+        };
+
         if let Some((bindings, range)) = all_bindings {
             for index in bindings {
                 self.ctx.bindings[index].mark_used(
-                    GLOBAL_SCOPE_INDEX,
+                    ScopeId::global(),
                     range,
                     ExecutionContext::Runtime,
                 );
@@ -4757,7 +4693,9 @@ impl<'a> Checker<'a> {
         }
 
         // Extract `__all__` names from the global scope.
-        let all_names: Option<(Vec<&str>, Range)> = global_scope
+        let all_names: Option<(Vec<&str>, Range)> = self
+            .ctx
+            .global_scope()
             .bindings
             .get("__all__")
             .map(|index| &self.ctx.bindings[*index])
@@ -4786,7 +4724,7 @@ impl<'a> Checker<'a> {
                             .filter(|binding| {
                                 flake8_type_checking::helpers::is_valid_runtime_import(binding)
                             })
-                            .collect::<Vec<_>>()
+                            .collect()
                     })
                     .collect::<Vec<_>>()
             }
@@ -4799,7 +4737,7 @@ impl<'a> Checker<'a> {
             let scope = &self.ctx.scopes[*index];
 
             // F822
-            if *index == GLOBAL_SCOPE_INDEX {
+            if index.is_global() {
                 if self.settings.rules.enabled(Rule::UndefinedExport) {
                     if let Some((names, range)) = &all_names {
                         diagnostics.extend(pyflakes::rules::undefined_export(
@@ -4915,8 +4853,9 @@ impl<'a> Checker<'a> {
                 } else {
                     stack
                         .iter()
+                        .rev()
                         .chain(iter::once(index))
-                        .flat_map(|index| runtime_imports[*index].iter())
+                        .flat_map(|index| runtime_imports[usize::from(*index)].iter())
                         .copied()
                         .collect()
                 };
@@ -5356,7 +5295,7 @@ impl<'a> Checker<'a> {
     }
 
     fn check_builtin_shadowing<T>(&mut self, name: &str, located: &Located<T>, is_attribute: bool) {
-        if is_attribute && matches!(self.ctx.current_scope().kind, ScopeKind::Class(_)) {
+        if is_attribute && matches!(self.ctx.scope().kind, ScopeKind::Class(_)) {
             if self.settings.rules.enabled(Rule::BuiltinAttributeShadowing) {
                 if let Some(diagnostic) = flake8_builtins::rules::builtin_shadowing(
                     name,
@@ -5420,7 +5359,6 @@ pub fn check_ast(
         stylist,
         indexer,
     );
-    checker.ctx.push_scope(Scope::new(ScopeKind::Module));
     checker.bind_builtins();
 
     // Check for module docstring.
@@ -5445,7 +5383,7 @@ pub fn check_ast(
     checker.check_definitions();
 
     // Reset the scope to module-level, and check all consumed scopes.
-    checker.ctx.scope_stack = vec![GLOBAL_SCOPE_INDEX];
+    checker.ctx.scope_stack = ScopeStack::default();
     checker.ctx.pop_scope();
     checker.check_dead_scopes();
 
