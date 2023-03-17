@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     name: NoExplicitStacklevel
-    body: No explicit stacklevel keyword argument found. The warn method from the warnings module uses a stacklevel of 1 by default. This will only show a stack trace for the line on which the warn method is called.
+    body: "No explicit `stacklevel` keyword argument found"
     suggestion: ~
     fixable: false
   location:
@@ -17,7 +17,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: NoExplicitStacklevel
-    body: No explicit stacklevel keyword argument found. The warn method from the warnings module uses a stacklevel of 1 by default. This will only show a stack trace for the line on which the warn method is called.
+    body: "No explicit `stacklevel` keyword argument found"
     suggestion: ~
     fixable: false
   location:
