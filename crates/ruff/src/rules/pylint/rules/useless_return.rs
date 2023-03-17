@@ -1,5 +1,5 @@
 use log::error;
-use rustpython_parser::ast::{Stmt, StmtKind};
+use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -54,10 +54,28 @@ pub fn useless_return<'a>(checker: &mut Checker<'a>, stmt: &'a Stmt, body: &'a [
 
     // Find the last statement in the function.
     let last_stmt = body.last().unwrap();
+    if !matches!(last_stmt.node, StmtKind::Return { .. }) {
+        return;
+    }
 
     // Skip functions that consist of a single return statement.
-    if body.len() == 1 && matches!(last_stmt.node, StmtKind::Return { .. }) {
+    if body.len() == 1 {
         return;
+    }
+
+    // Skip functions that consist of a docstring and a return statement.
+    if body.len() == 2 {
+        if let StmtKind::Expr { value } = &body[0].node {
+            if matches!(
+                value.node,
+                ExprKind::Constant {
+                    value: Constant::Str(_),
+                    ..
+                }
+            ) {
+                return;
+            }
+        }
     }
 
     // Verify that the last statement is a return statement.

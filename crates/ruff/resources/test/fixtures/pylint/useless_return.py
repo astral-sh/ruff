@@ -37,3 +37,14 @@ def print_python_version():
 def print_python_version():
     if 2 * 2 == 4:
         return None
+
+
+def print_python_version():
+    """This function returns None."""
+    return None
+
+
+def print_python_version():
+    """This function returns None."""
+    print(sys.version)
+    return None  # [useless-return]
