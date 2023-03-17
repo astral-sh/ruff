@@ -1,0 +1,105 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: UselessReturn
+    body: "Useless `return` statement at end of function"
+    suggestion: "Remove useless `return` statement"
+    fixable: true
+  location:
+    row: 6
+    column: 4
+  end_location:
+    row: 6
+    column: 15
+  fix:
+    content: ""
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 7
+      column: 0
+  parent: ~
+- kind:
+    name: UselessReturn
+    body: "Useless `return` statement at end of function"
+    suggestion: "Remove useless `return` statement"
+    fixable: true
+  location:
+    row: 11
+    column: 4
+  end_location:
+    row: 11
+    column: 15
+  fix:
+    content: ""
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 12
+      column: 0
+  parent: ~
+- kind:
+    name: UselessReturn
+    body: "Useless `return` statement at end of function"
+    suggestion: "Remove useless `return` statement"
+    fixable: true
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 15
+  fix:
+    content: ""
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 17
+      column: 0
+  parent: ~
+- kind:
+    name: UselessReturn
+    body: "Useless `return` statement at end of function"
+    suggestion: "Remove useless `return` statement"
+    fixable: true
+  location:
+    row: 22
+    column: 8
+  end_location:
+    row: 22
+    column: 19
+  fix:
+    content: ""
+    location:
+      row: 22
+      column: 0
+    end_location:
+      row: 23
+      column: 0
+  parent: ~
+- kind:
+    name: UselessReturn
+    body: "Useless `return` statement at end of function"
+    suggestion: "Remove useless `return` statement"
+    fixable: true
+  location:
+    row: 50
+    column: 4
+  end_location:
+    row: 50
+    column: 15
+  fix:
+    content: ""
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 51
+      column: 0
+  parent: ~
+
