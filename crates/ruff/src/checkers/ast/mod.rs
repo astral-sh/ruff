@@ -3186,11 +3186,7 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::TypeComparison) {
-                    self.diagnostics.extend(pycodestyle::rules::type_comparison(
-                        ops,
-                        comparators,
-                        Range::from(expr),
-                    ));
+                    pycodestyle::rules::type_comparison(self, expr, ops, comparators);
                 }
 
                 if self.settings.rules.enabled(Rule::SysVersionCmpStr3)
