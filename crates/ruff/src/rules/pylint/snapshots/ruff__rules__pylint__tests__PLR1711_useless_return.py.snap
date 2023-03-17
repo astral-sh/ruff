@@ -8,18 +8,18 @@ expression: diagnostics
     suggestion: Remove useless return statement at the end of the function
     fixable: true
   location:
-    row: 3
+    row: 6
     column: 4
   end_location:
-    row: 3
+    row: 6
     column: 15
   fix:
     content: ""
     location:
-      row: 3
+      row: 6
       column: 0
     end_location:
-      row: 4
+      row: 7
       column: 0
   parent: ~
 - kind:
@@ -28,18 +28,18 @@ expression: diagnostics
     suggestion: Remove useless return statement at the end of the function
     fixable: true
   location:
-    row: 7
+    row: 11
     column: 4
   end_location:
-    row: 7
+    row: 11
     column: 10
   fix:
     content: ""
     location:
-      row: 7
+      row: 11
       column: 0
     end_location:
-      row: 8
+      row: 12
       column: 0
   parent: ~
 - kind:
@@ -48,18 +48,38 @@ expression: diagnostics
     suggestion: Remove useless return statement at the end of the function
     fixable: true
   location:
-    row: 12
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 15
+  fix:
+    content: ""
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 17
+      column: 0
+  parent: ~
+- kind:
+    name: UselessReturn
+    body: Useless return at end of function or method
+    suggestion: Remove useless return statement at the end of the function
+    fixable: true
+  location:
+    row: 22
     column: 8
   end_location:
-    row: 12
+    row: 22
     column: 19
   fix:
     content: ""
     location:
-      row: 12
+      row: 22
       column: 0
     end_location:
-      row: 13
+      row: 23
       column: 0
   parent: ~
 

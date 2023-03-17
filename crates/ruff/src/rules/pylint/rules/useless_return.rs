@@ -3,26 +3,33 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::is_const_none;
-use ruff_python_ast::types::Range;
+use ruff_python_ast::helpers::{is_const_none, ReturnStatementVisitor};
+use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_ast::visitor::Visitor;
 
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 /// ## What it does
-/// Checks if the last statement of a function or a method is `return` or
-///  `return None`.
-/// ## Why is this bad?
+/// Checks for functions that end with an unnecessary `return` or
+/// `return None`, and contain no other `return` statements.
 ///
-/// Python implicitly assumes `None` return value at the  end of a function.
-/// This statement can be safely removed.
+/// ## Why is this bad?
+/// Python implicitly assumes a `None` return at the end of a function, making
+/// it unnecessary to explicitly write `return None`.
 ///
 /// ## Example
 /// ```python
-/// def some_fun():
+/// def f():
 ///     print(5)
 ///     return None
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def f():
+///    print(5)
 /// ```
 #[violation]
 pub struct UselessReturn;
@@ -30,48 +37,61 @@ pub struct UselessReturn;
 impl AlwaysAutofixableViolation for UselessReturn {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Useless return at end of function or method")
+        format!("Useless `return` statement at end of function")
     }
 
     fn autofix_title(&self) -> String {
-        format!("Remove useless return statement at the end of the function")
+        format!("Remove useless `return` statement")
     }
 }
 
-pub fn useless_return(checker: &mut Checker, stmt: &Stmt) {
-    let StmtKind::Return { value} = &stmt.node else {
-        return;
-    };
-    let parent_statement: Option<&Stmt> = checker.ctx.current_stmt_parent().map(Into::into);
-
-    let belongs_to_function_scope = match parent_statement {
-        Some(node) => matches!(node.node, StmtKind::FunctionDef { .. }),
-        None => false,
-    };
-    let is_last_function_statement =
-        checker.ctx.current_sibling_stmt().is_none() && belongs_to_function_scope;
-    if !is_last_function_statement {
+/// PLR1711
+pub fn useless_return<'a>(checker: &mut Checker<'a>, stmt: &'a Stmt, body: &'a [Stmt]) {
+    // Skip empty functions.
+    if body.is_empty() {
         return;
     }
 
-    let is_bare_return_or_none = match value {
-        None => true,
-        Some(loc_expr) => is_const_none(loc_expr),
-    };
-    if !is_bare_return_or_none {
+    // Find the last statement in the function.
+    let last_stmt = body.last().unwrap();
+
+    // Skip functions that consist of a single return statement.
+    if body.len() == 1 && matches!(last_stmt.node, StmtKind::Return { .. }) {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UselessReturn, Range::from(stmt));
+
+    // Verify that the last statement is a return statement.
+    let StmtKind::Return { value} = &last_stmt.node else {
+        return;
+    };
+
+    // Verify that the return statement is either bare or returns `None`.
+    if !value.as_ref().map_or(true, |expr| is_const_none(expr)) {
+        return;
+    };
+
+    // Finally: verify that there are no _other_ return statements in the function.
+    let mut visitor = ReturnStatementVisitor::default();
+    visitor.visit_body(body);
+    if visitor.returns.len() > 1 {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(UselessReturn, Range::from(last_stmt));
     if checker.patch(diagnostic.kind.rule()) {
+        let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
         match delete_stmt(
-            stmt,
-            None,
-            &[],
+            last_stmt,
+            Some(stmt),
+            &deleted,
             checker.locator,
             checker.indexer,
             checker.stylist,
         ) {
             Ok(fix) => {
+                if fix.content.is_empty() || fix.content == "pass" {
+                    checker.deletions.insert(RefEquality(last_stmt));
+                }
                 diagnostic.amend(fix);
             }
             Err(e) => {

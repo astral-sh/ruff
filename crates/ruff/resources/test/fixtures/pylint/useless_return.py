@@ -1,21 +1,39 @@
-def some_fun():
-    print(5)
-    return None
+import sys
 
-def some_other_fun():
-    print(5)
-    return
+
+def print_python_version():
+    print(sys.version)
+    return None  # [useless-return]
+
+
+def print_python_version():
+    print(sys.version)
+    return None  # [useless-return]
+
+
+def print_python_version():
+    print(sys.version)
+    return None  # [useless-return]
+
 
 class SomeClass:
-    def incredible(self):
-        print(42)
-        return None
+    def print_python_version(self):
+        print(sys.version)
+        return None  # [useless-return]
 
-def bare_return_not_final_statement():
+
+def print_python_version():
     if 2 * 2 == 4:
         return
-    print(5)
+    print(sys.version)
 
-def tricky():
+
+def print_python_version():
+    if 2 * 2 == 4:
+        return None
+    return
+
+
+def print_python_version():
     if 2 * 2 == 4:
         return None

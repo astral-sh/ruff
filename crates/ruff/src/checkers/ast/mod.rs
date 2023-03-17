@@ -436,6 +436,10 @@ where
                     flake8_return::rules::function(self, body);
                 }
 
+                if self.settings.rules.enabled(Rule::UselessReturn) {
+                    pylint::rules::useless_return(self, stmt, body);
+                }
+
                 if self.settings.rules.enabled(Rule::ComplexStructure) {
                     if let Some(diagnostic) = mccabe::rules::function_is_too_complex(
                         stmt,
@@ -674,9 +678,6 @@ where
                 }
                 if self.settings.rules.enabled(Rule::ReturnInInit) {
                     pylint::rules::return_in_init(self, stmt);
-                }
-                if self.settings.rules.enabled(Rule::UselessReturn) {
-                    pylint::rules::useless_return(self, stmt);
                 }
             }
             StmtKind::ClassDef {
