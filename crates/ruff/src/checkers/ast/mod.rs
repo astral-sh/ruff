@@ -675,7 +675,7 @@ where
                 if self.settings.rules.enabled(Rule::ReturnInInit) {
                     pylint::rules::return_in_init(self, stmt);
                 }
-                if self.settings.rules.enabled(&Rule::UselessReturn) {
+                if self.settings.rules.enabled(Rule::UselessReturn) {
                     pylint::rules::useless_return(self, stmt);
                 }
             }

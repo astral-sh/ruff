@@ -3,7 +3,10 @@ source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    UselessReturn: ~
+    name: UselessReturn
+    body: Useless return at end of function or method
+    suggestion: Remove useless return statement at the end of the function
+    fixable: true
   location:
     row: 3
     column: 4
@@ -20,7 +23,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UselessReturn: ~
+    name: UselessReturn
+    body: Useless return at end of function or method
+    suggestion: Remove useless return statement at the end of the function
+    fixable: true
   location:
     row: 7
     column: 4
@@ -37,7 +43,10 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    UselessReturn: ~
+    name: UselessReturn
+    body: Useless return at end of function or method
+    suggestion: Remove useless return statement at the end of the function
+    fixable: true
   location:
     row: 12
     column: 8

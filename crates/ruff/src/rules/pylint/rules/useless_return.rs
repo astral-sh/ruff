@@ -1,34 +1,31 @@
 use log::error;
-
 use rustpython_parser::ast::{Stmt, StmtKind};
 
-use ruff_macros::{define_violation, derive_message_formats};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_none;
+use ruff_python_ast::types::Range;
 
-use crate::{
-    ast::{helpers::is_const_none, types::Range},
-    autofix::helpers::delete_stmt,
-    checkers::ast::Checker,
-    registry::Diagnostic,
-    violation::AlwaysAutofixableViolation,
-};
+use crate::autofix::helpers::delete_stmt;
+use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 
-define_violation!(
-    /// ## What it does
-    /// Checks if the last statement of a function or a method is `return` or
-    ///  `return None`.
-    /// ## Why is this bad?
-    ///
-    /// Python implicitly assumes `None` return value at the end of a function.
-    /// This statement can be safely removed.
-    ///
-    /// ## Example
-    /// ```python
-    /// def some_fun():
-    ///     print(5)
-    ///     return None
-    /// ```
-    pub struct UselessReturn;
-);
+/// ## What it does
+/// Checks if the last statement of a function or a method is `return` or
+///  `return None`.
+/// ## Why is this bad?
+///
+/// Python implicitly assumes `None` return value at the  end of a function.
+/// This statement can be safely removed.
+///
+/// ## Example
+/// ```python
+/// def some_fun():
+///     print(5)
+///     return None
+/// ```
+#[violation]
+pub struct UselessReturn;
 
 impl AlwaysAutofixableViolation for UselessReturn {
     #[derive_message_formats]
@@ -45,15 +42,14 @@ pub fn useless_return(checker: &mut Checker, stmt: &Stmt) {
     let StmtKind::Return { value} = &stmt.node else {
         return;
     };
-    let parent_statement: Option<&Stmt> =
-        checker.current_stmt_parent().map(std::convert::Into::into);
+    let parent_statement: Option<&Stmt> = checker.ctx.current_stmt_parent().map(Into::into);
 
     let belongs_to_function_scope = match parent_statement {
         Some(node) => matches!(node.node, StmtKind::FunctionDef { .. }),
         None => false,
     };
     let is_last_function_statement =
-        checker.current_sibling_stmt().is_none() && belongs_to_function_scope;
+        checker.ctx.current_sibling_stmt().is_none() && belongs_to_function_scope;
     if !is_last_function_statement {
         return;
     }
@@ -65,7 +61,7 @@ pub fn useless_return(checker: &mut Checker, stmt: &Stmt) {
     if !is_bare_return_or_none {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UselessReturn, Range::from_located(stmt));
+    let mut diagnostic = Diagnostic::new(UselessReturn, Range::from(stmt));
     if checker.patch(diagnostic.kind.rule()) {
         match delete_stmt(
             stmt,
