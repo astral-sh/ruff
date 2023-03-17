@@ -42,9 +42,9 @@ pub(crate) use unnecessary_future_import::{unnecessary_future_import, Unnecessar
 pub(crate) use unpacked_list_comprehension::{
     unpacked_list_comprehension, UnpackedListComprehension,
 };
-pub(crate) use use_pep585_annotation::{use_pep585_annotation, DeprecatedCollectionType};
-pub(crate) use use_pep604_annotation::{use_pep604_annotation, TypingUnion};
-pub(crate) use use_pep604_isinstance::{use_pep604_isinstance, IsinstanceWithTuple};
+pub(crate) use use_pep585_annotation::{use_pep585_annotation, NonPEP585Annotation};
+pub(crate) use use_pep604_annotation::{use_pep604_annotation, NonPEP604Annotation};
+pub(crate) use use_pep604_isinstance::{use_pep604_isinstance, NonPEP604Isinstance};
 pub(crate) use useless_metaclass_type::{useless_metaclass_type, UselessMetaclassType};
 pub(crate) use useless_object_inheritance::{useless_object_inheritance, UselessObjectInheritance};
 pub(crate) use yield_in_for_loop::{yield_in_for_loop, YieldInForLoop};
