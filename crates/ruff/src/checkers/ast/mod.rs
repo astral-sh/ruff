@@ -2866,6 +2866,12 @@ where
                     flake8_pytest_style::rules::fail_call(self, func, args, keywords);
                 }
 
+                if self.settings.rules.enabled(Rule::PairwiseOverZipped) {
+                    if self.settings.target_version >= PythonVersion::Py310 {
+                        ruff::rules::pairwise_over_zipped(self, func, args);
+                    }
+                }
+
                 // flake8-simplify
                 if self
                     .settings
