@@ -22,17 +22,6 @@ pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String
     }
 }
 
-pub fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
-    match fix1.location.cmp(&fix2.location) {
-        std::cmp::Ordering::Equal => match (rule1, rule2) {
-            (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
-            (Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod) => std::cmp::Ordering::Greater,
-            _ => std::cmp::Ordering::Equal,
-        },
-        other => other,
-    }
-}
-
 /// Apply a series of fixes.
 fn apply_fixes<'a>(
     diagnostics: impl Iterator<Item = &'a Diagnostic>,
@@ -101,6 +90,18 @@ pub(crate) fn apply_fix(fix: &Fix, locator: &Locator) -> String {
     output.push_str(slice);
 
     output
+}
+
+/// Compare two fixes.
+fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
+    fix1.location
+        .cmp(&fix2.location)
+        .then_with(|| match (&rule1, &rule2) {
+            // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
+            (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
+            (Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod) => std::cmp::Ordering::Greater,
+            _ => std::cmp::Ordering::Equal,
+        })
 }
 
 #[cfg(test)]
