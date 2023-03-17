@@ -335,7 +335,9 @@ pub(crate) fn printf_string_formatting(
     }
 
     // Parse each string segment.
-    let mut format_strings = vec![];
+    let mut num_positional = 0;
+    let mut num_keyword = 0;
+    let mut format_strings = Vec::with_capacity(strings.len());
     for (start, end) in &strings {
         let string = checker.locator.slice(Range::new(*start, *end));
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
@@ -351,12 +353,45 @@ pub(crate) fn printf_string_formatting(
             return;
         }
 
+        // Count the number of positional and keyword arguments.
+        for (.., format_part) in format_string.iter() {
+            let CFormatPart::Spec(ref fmt) = format_part else {
+                continue;
+            };
+            if fmt.mapping_key.is_none() {
+                num_positional += 1;
+            } else {
+                num_keyword += 1;
+            }
+        }
+
+        // Convert the `%`-format string to a `.format` string.
         let format_string = percent_to_format(&format_string);
         format_strings.push(format!("{leader}{format_string}{trailer}"));
     }
 
     // Parse the parameters.
     let params_string = match right.node {
+        ExprKind::Constant { .. } | ExprKind::JoinedStr { .. } => {
+            format!("({})", checker.locator.slice(right))
+        }
+        ExprKind::Name { .. }
+        | ExprKind::Attribute { .. }
+        | ExprKind::Subscript { .. }
+        | ExprKind::Call { .. } => {
+            if num_keyword > 0 {
+                // If we have _any_ named fields, assume the right-hand side is a mapping.
+                format!("(**{})", checker.locator.slice(right))
+            } else if num_positional > 1 {
+                // If we have multiple fields, but no named fields, assume the right-hand side is a
+                // tuple.
+                format!("(*{})", checker.locator.slice(right))
+            } else {
+                // Otherwise, if we have a single field, assume the right-hand side is a single
+                // value.
+                format!("({})", checker.locator.slice(right))
+            }
+        }
         ExprKind::Tuple { .. } => clean_params_tuple(checker, right),
         ExprKind::Dict { .. } => {
             if let Some(params_string) = clean_params_dictionary(checker, right) {

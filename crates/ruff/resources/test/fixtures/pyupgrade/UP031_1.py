@@ -1,6 +1,4 @@
 # OK
-"%s" % unknown_type
-
 b"%s" % (b"bytestring",)
 
 "%*s" % (5, "hi")

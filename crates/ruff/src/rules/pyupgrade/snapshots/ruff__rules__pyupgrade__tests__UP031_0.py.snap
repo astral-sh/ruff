@@ -582,4 +582,224 @@ expression: diagnostics
       row: 75
       column: 35
   parent: ~
+- kind:
+    name: PrintfStringFormatting
+    body: Use format specifiers instead of percent format
+    suggestion: Replace with format specifiers
+    fixable: true
+  location:
+    row: 78
+    column: 6
+  end_location:
+    row: 78
+    column: 26
+  fix:
+    content: "'Hello {}'.format(\"World\")"
+    location:
+      row: 78
+      column: 6
+    end_location:
+      row: 78
+      column: 26
+  parent: ~
+- kind:
+    name: PrintfStringFormatting
+    body: Use format specifiers instead of percent format
+    suggestion: Replace with format specifiers
+    fixable: true
+  location:
+    row: 79
+    column: 6
+  end_location:
+    row: 79
+    column: 27
+  fix:
+    content: "'Hello {}'.format(f\"World\")"
+    location:
+      row: 79
+      column: 6
+    end_location:
+      row: 79
+      column: 27
+  parent: ~
+- kind:
+    name: PrintfStringFormatting
+    body: Use format specifiers instead of percent format
+    suggestion: Replace with format specifiers
+    fixable: true
+  location:
+    row: 80
+    column: 6
+  end_location:
+    row: 80
+    column: 22
+  fix:
+    content: "'Hello {}'.format(bar)"
+    location:
+      row: 80
+      column: 6
+    end_location:
+      row: 80
+      column: 22
+  parent: ~
+- kind:
+    name: PrintfStringFormatting
+    body: Use format specifiers instead of percent format
+    suggestion: Replace with format specifiers
+    fixable: true
+  location:
+    row: 81
+    column: 6
+  end_location:
+    row: 81
+    column: 26
+  fix:
+    content: "'Hello {}'.format(bar.baz)"
+    location:
+      row: 81
+      column: 6
+    end_location:
+      row: 81
+      column: 26
+  parent: ~
+- kind:
+    name: PrintfStringFormatting
+    body: Use format specifiers instead of percent format
+    suggestion: Replace with format specifiers
+    fixable: true
+  location:
+    row: 82
+    column: 6
+  end_location:
+    row: 82
+    column: 29
+  fix:
+    content: "'Hello {}'.format(bar['bop'])"
+    location:
+      row: 82
+      column: 6
+    end_location:
+      row: 82
+      column: 29
+  parent: ~
+- kind:
+    name: PrintfStringFormatting
+    body: Use format specifiers instead of percent format
+    suggestion: Replace with format specifiers
+    fixable: true
+  location:
+    row: 83
+    column: 6
+  end_location:
+    row: 83
+    column: 27
+  fix:
+    content: "'Hello {} ({})'.format(*bar)"
+    location:
+      row: 83
+      column: 6
+    end_location:
+      row: 83
+      column: 27
+  parent: ~
+- kind:
+    name: PrintfStringFormatting
+    body: Use format specifiers instead of percent format
+    suggestion: Replace with format specifiers
+    fixable: true
+  location:
+    row: 84
+    column: 6
+  end_location:
+    row: 84
+    column: 31
+  fix:
+    content: "'Hello {} ({})'.format(*bar.baz)"
+    location:
+      row: 84
+      column: 6
+    end_location:
+      row: 84
+      column: 31
+  parent: ~
+- kind:
+    name: PrintfStringFormatting
+    body: Use format specifiers instead of percent format
+    suggestion: Replace with format specifiers
+    fixable: true
+  location:
+    row: 85
+    column: 6
+  end_location:
+    row: 85
+    column: 34
+  fix:
+    content: "'Hello {} ({})'.format(*bar['bop'])"
+    location:
+      row: 85
+      column: 6
+    end_location:
+      row: 85
+      column: 34
+  parent: ~
+- kind:
+    name: PrintfStringFormatting
+    body: Use format specifiers instead of percent format
+    suggestion: Replace with format specifiers
+    fixable: true
+  location:
+    row: 86
+    column: 6
+  end_location:
+    row: 86
+    column: 27
+  fix:
+    content: "'Hello {arg}'.format(**bar)"
+    location:
+      row: 86
+      column: 6
+    end_location:
+      row: 86
+      column: 27
+  parent: ~
+- kind:
+    name: PrintfStringFormatting
+    body: Use format specifiers instead of percent format
+    suggestion: Replace with format specifiers
+    fixable: true
+  location:
+    row: 87
+    column: 6
+  end_location:
+    row: 87
+    column: 31
+  fix:
+    content: "'Hello {arg}'.format(**bar.baz)"
+    location:
+      row: 87
+      column: 6
+    end_location:
+      row: 87
+      column: 31
+  parent: ~
+- kind:
+    name: PrintfStringFormatting
+    body: Use format specifiers instead of percent format
+    suggestion: Replace with format specifiers
+    fixable: true
+  location:
+    row: 88
+    column: 6
+  end_location:
+    row: 88
+    column: 34
+  fix:
+    content: "'Hello {arg}'.format(**bar['bop'])"
+    location:
+      row: 88
+      column: 6
+    end_location:
+      row: 88
+      column: 34
+  parent: ~
 
