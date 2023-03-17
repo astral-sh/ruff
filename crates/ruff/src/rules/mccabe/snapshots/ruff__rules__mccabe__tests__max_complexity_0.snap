@@ -2,290 +2,290 @@
 source: crates/ruff/src/rules/mccabe/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ComplexStructure
-    body: "`trivial` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 11
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`expr_as_statement` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 4
-  end_location:
-    row: 7
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`sequential` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 4
-  end_location:
-    row: 12
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`if_elif_else_dead_path` is too complex (3 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 4
-  end_location:
-    row: 19
-    column: 26
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`nested_ifs` is too complex (3 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 4
-  end_location:
-    row: 29
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`for_loop` is too complex (2 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 4
-  end_location:
-    row: 40
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`for_else` is too complex (2 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 4
-  end_location:
-    row: 46
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`recursive` is too complex (2 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 4
-  end_location:
-    row: 54
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`nested_functions` is too complex (3 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 62
-    column: 4
-  end_location:
-    row: 62
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`a` is too complex (2 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 63
-    column: 8
-  end_location:
-    row: 63
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`b` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 64
-    column: 12
-  end_location:
-    row: 64
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`try_else` is too complex (4 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 73
-    column: 4
-  end_location:
-    row: 73
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`nested_try_finally` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 85
-    column: 4
-  end_location:
-    row: 85
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`foobar` is too complex (3 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 96
-    column: 10
-  end_location:
-    row: 96
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`annotated_assign` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 107
-    column: 4
-  end_location:
-    row: 107
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`handle` is too complex (9 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 113
-    column: 8
-  end_location:
-    row: 113
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`a` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 118
-    column: 16
-  end_location:
-    row: 118
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`b` is too complex (2 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 121
-    column: 16
-  end_location:
-    row: 121
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`c` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 126
-    column: 16
-  end_location:
-    row: 126
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`error` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 129
-    column: 16
-  end_location:
-    row: 129
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`info` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 132
-    column: 16
-  end_location:
-    row: 132
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`exception` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 135
-    column: 16
-  end_location:
-    row: 135
-    column: 25
-  fix: ~
-  parent: ~
+- - kind:
+      name: ComplexStructure
+      body: "`trivial` is too complex (1 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 4
+    end_location:
+      row: 2
+      column: 11
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`expr_as_statement` is too complex (1 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 7
+      column: 4
+    end_location:
+      row: 7
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`sequential` is too complex (1 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 12
+      column: 4
+    end_location:
+      row: 12
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`if_elif_else_dead_path` is too complex (3 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 19
+      column: 4
+    end_location:
+      row: 19
+      column: 26
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`nested_ifs` is too complex (3 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 29
+      column: 4
+    end_location:
+      row: 29
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`for_loop` is too complex (2 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 40
+      column: 4
+    end_location:
+      row: 40
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`for_else` is too complex (2 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 46
+      column: 4
+    end_location:
+      row: 46
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`recursive` is too complex (2 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 54
+      column: 4
+    end_location:
+      row: 54
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`nested_functions` is too complex (3 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 62
+      column: 4
+    end_location:
+      row: 62
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`a` is too complex (2 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 63
+      column: 8
+    end_location:
+      row: 63
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`b` is too complex (1 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 64
+      column: 12
+    end_location:
+      row: 64
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`try_else` is too complex (4 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 73
+      column: 4
+    end_location:
+      row: 73
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`nested_try_finally` is too complex (1 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 85
+      column: 4
+    end_location:
+      row: 85
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`foobar` is too complex (3 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 96
+      column: 10
+    end_location:
+      row: 96
+      column: 16
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`annotated_assign` is too complex (1 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 107
+      column: 4
+    end_location:
+      row: 107
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`handle` is too complex (9 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 113
+      column: 8
+    end_location:
+      row: 113
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`a` is too complex (1 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 118
+      column: 16
+    end_location:
+      row: 118
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`b` is too complex (2 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 121
+      column: 16
+    end_location:
+      row: 121
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`c` is too complex (1 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 126
+      column: 16
+    end_location:
+      row: 126
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`error` is too complex (1 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 129
+      column: 16
+    end_location:
+      row: 129
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`info` is too complex (1 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 132
+      column: 16
+    end_location:
+      row: 132
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`exception` is too complex (1 > 0)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 135
+      column: 16
+    end_location:
+      row: 135
+      column: 25
+    fix: ~
+    parent: ~
 

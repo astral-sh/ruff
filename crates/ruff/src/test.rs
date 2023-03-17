@@ -21,7 +21,7 @@ pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 
 /// A convenient wrapper around [`check_path`], that additionally
 /// asserts that autofixes converge after 10 iterations.
-pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diagnostic>> {
+pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Vec<Diagnostic>>> {
     let path = test_resource_path("fixtures").join(path);
     let package = path
         .parent()
@@ -50,7 +50,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
     );
 
     // Detect autofixes that don't converge after multiple iterations.
-    let mut all_diagnostics = diagnostics.clone();
+    let mut all_diagnostics = vec![diagnostics.clone()];
     if diagnostics
         .iter()
         .any(|diagnostic| diagnostic.fix.is_some())
@@ -69,7 +69,8 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
             let directives =
                 directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
             let LinterResult {
-                data: diagnostics, ..
+                data: mut diagnostics,
+                ..
             } = check_path(
                 &path,
                 package,
@@ -83,7 +84,14 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
                 flags::Noqa::Enabled,
                 flags::Autofix::Enabled,
             );
-            all_diagnostics.extend(diagnostics.clone());
+            diagnostics.retain(|diagnostic| {
+                !all_diagnostics
+                    .iter()
+                    .any(|diagnostics| diagnostics.contains(diagnostic))
+            });
+            if !diagnostics.is_empty() {
+                all_diagnostics.push(diagnostics.clone());
+            }
             if let Some((fixed_contents, _)) = fix_file(&diagnostics, &locator) {
                 if iterations < max_iterations {
                     iterations += 1;
@@ -99,7 +107,8 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
             }
         }
     }
-    all_diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-    all_diagnostics.dedup();
+    all_diagnostics
+        .iter_mut()
+        .for_each(|diagnostics| diagnostics.sort_by_key(|diagnostic| diagnostic.location));
     Ok(all_diagnostics)
 }

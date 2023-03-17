@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: OutdatedVersionBlock
-    body: Version block is outdated for minimum Python version
-    suggestion: Remove outdated version block
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 10
-    column: 28
-  fix:
-    content: "print(\"py3\")\nfor item in range(10):\n    print(f\"PY3-{item}\")"
+- - kind:
+      name: OutdatedVersionBlock
+      body: Version block is outdated for minimum Python version
+      suggestion: Remove outdated version block
+      fixable: true
     location:
       row: 3
       column: 0
     end_location:
       row: 10
       column: 28
-  parent: ~
-- kind:
-    name: OutdatedVersionBlock
-    body: Version block is outdated for minimum Python version
-    suggestion: Remove outdated version block
-    fixable: true
-  location:
-    row: 13
-    column: 4
-  end_location:
-    row: 20
-    column: 32
-  fix:
-    content: "    print(\"py3\")\n    for item in range(10):\n        print(f\"PY3-{item}\")"
+    fix:
+      content: "print(\"py3\")\nfor item in range(10):\n    print(f\"PY3-{item}\")"
+      location:
+        row: 3
+        column: 0
+      end_location:
+        row: 10
+        column: 28
+    parent: ~
+  - kind:
+      name: OutdatedVersionBlock
+      body: Version block is outdated for minimum Python version
+      suggestion: Remove outdated version block
+      fixable: true
     location:
       row: 13
-      column: 0
+      column: 4
     end_location:
       row: 20
       column: 32
-  parent: ~
-- kind:
-    name: OutdatedVersionBlock
-    body: Version block is outdated for minimum Python version
-    suggestion: Remove outdated version block
-    fixable: true
-  location:
-    row: 23
-    column: 0
-  end_location:
-    row: 24
-    column: 50
-  fix:
-    content: "print(\"PY3!\")"
+    fix:
+      content: "    print(\"py3\")\n    for item in range(10):\n        print(f\"PY3-{item}\")"
+      location:
+        row: 13
+        column: 0
+      end_location:
+        row: 20
+        column: 32
+    parent: ~
+  - kind:
+      name: OutdatedVersionBlock
+      body: Version block is outdated for minimum Python version
+      suggestion: Remove outdated version block
+      fixable: true
     location:
       row: 23
       column: 0
     end_location:
       row: 24
       column: 50
-  parent: ~
+    fix:
+      content: "print(\"PY3!\")"
+      location:
+        row: 23
+        column: 0
+      end_location:
+        row: 24
+        column: 50
+    parent: ~
 

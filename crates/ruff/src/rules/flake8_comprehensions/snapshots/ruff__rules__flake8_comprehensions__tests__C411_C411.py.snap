@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryListCall
-    body: "Unnecessary `list` call (remove the outer call to `list()`)"
-    suggestion: "Remove outer `list` call"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 20
-  fix:
-    content: "[i for i in x]"
+- - kind:
+      name: UnnecessaryListCall
+      body: "Unnecessary `list` call (remove the outer call to `list()`)"
+      suggestion: "Remove outer `list` call"
+      fixable: true
     location:
       row: 2
       column: 0
     end_location:
       row: 2
       column: 20
-  parent: ~
+    fix:
+      content: "[i for i in x]"
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 2
+        column: 20
+    parent: ~
 

@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: SectionUnderlineAfterName
-    body: "Section underline should be in the line following the section's name (\"Returns\")"
-    suggestion: "Add underline to \"Returns\""
-    fixable: true
-  location:
-    row: 94
-    column: 4
-  end_location:
-    row: 101
-    column: 7
-  fix:
-    content: ""
+- - kind:
+      name: SectionUnderlineAfterName
+      body: "Section underline should be in the line following the section's name (\"Returns\")"
+      suggestion: "Add underline to \"Returns\""
+      fixable: true
     location:
-      row: 97
-      column: 0
+      row: 94
+      column: 4
     end_location:
-      row: 98
-      column: 0
-  parent: ~
+      row: 101
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 97
+        column: 0
+      end_location:
+        row: 98
+        column: 0
+    parent: ~
 

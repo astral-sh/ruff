@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: TabBeforeOperator
-    body: Tab before operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 1
-  end_location:
-    row: 43
-    column: 1
-  fix: ~
-  parent: ~
+- - kind:
+      name: TabBeforeOperator
+      body: Tab before operator
+      suggestion: ~
+      fixable: false
+    location:
+      row: 43
+      column: 1
+    end_location:
+      row: 43
+      column: 1
+    fix: ~
+    parent: ~
 

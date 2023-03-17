@@ -2,108 +2,108 @@
 source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `elif` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 4
-  end_location:
-    row: 8
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `elif` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 4
-  end_location:
-    row: 23
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `elif` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 41
-    column: 4
-  end_location:
-    row: 41
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `else` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 53
-    column: 4
-  end_location:
-    row: 53
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `else` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 64
-    column: 8
-  end_location:
-    row: 64
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `else` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 79
-    column: 4
-  end_location:
-    row: 79
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `else` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 89
-    column: 8
-  end_location:
-    row: 89
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `else` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 99
-    column: 4
-  end_location:
-    row: 99
-    column: 8
-  fix: ~
-  parent: ~
+- - kind:
+      name: SuperfluousElseReturn
+      body: "Unnecessary `elif` after `return` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 4
+    end_location:
+      row: 8
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseReturn
+      body: "Unnecessary `elif` after `return` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 23
+      column: 4
+    end_location:
+      row: 23
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseReturn
+      body: "Unnecessary `elif` after `return` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 41
+      column: 4
+    end_location:
+      row: 41
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseReturn
+      body: "Unnecessary `else` after `return` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 53
+      column: 4
+    end_location:
+      row: 53
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseReturn
+      body: "Unnecessary `else` after `return` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 64
+      column: 8
+    end_location:
+      row: 64
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseReturn
+      body: "Unnecessary `else` after `return` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 79
+      column: 4
+    end_location:
+      row: 79
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseReturn
+      body: "Unnecessary `else` after `return` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 89
+      column: 8
+    end_location:
+      row: 89
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseReturn
+      body: "Unnecessary `else` after `return` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 99
+      column: 4
+    end_location:
+      row: 99
+      column: 8
+    fix: ~
+    parent: ~
 

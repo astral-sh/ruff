@@ -2,95 +2,95 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 1"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 18
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 0, 2"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 2"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 25
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 1"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 1"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 1, 2"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 2"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 12
-    column: 23
-  fix: ~
-  parent: ~
+- - kind:
+      name: StringDotFormatExtraPositionalArguments
+      body: "`.format` call has unused arguments at position(s): 1"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 18
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatExtraPositionalArguments
+      body: "`.format` call has unused arguments at position(s): 0, 2"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatExtraPositionalArguments
+      body: "`.format` call has unused arguments at position(s): 2"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 25
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatExtraPositionalArguments
+      body: "`.format` call has unused arguments at position(s): 1"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatExtraPositionalArguments
+      body: "`.format` call has unused arguments at position(s): 1"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatExtraPositionalArguments
+      body: "`.format` call has unused arguments at position(s): 1, 2"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatExtraPositionalArguments
+      body: "`.format` call has unused arguments at position(s): 2"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 12
+      column: 23
+    fix: ~
+    parent: ~
 

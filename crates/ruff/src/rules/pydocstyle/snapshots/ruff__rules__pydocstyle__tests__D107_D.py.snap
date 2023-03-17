@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UndocumentedPublicInit
-    body: "Missing docstring in `__init__`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 60
-    column: 8
-  end_location:
-    row: 60
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: UndocumentedPublicInit
-    body: "Missing docstring in `__init__`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 534
-    column: 8
-  end_location:
-    row: 534
-    column: 16
-  fix: ~
-  parent: ~
+- - kind:
+      name: UndocumentedPublicInit
+      body: "Missing docstring in `__init__`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 60
+      column: 8
+    end_location:
+      row: 60
+      column: 16
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndocumentedPublicInit
+      body: "Missing docstring in `__init__`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 534
+      column: 8
+    end_location:
+      row: 534
+      column: 16
+    fix: ~
+    parent: ~
 

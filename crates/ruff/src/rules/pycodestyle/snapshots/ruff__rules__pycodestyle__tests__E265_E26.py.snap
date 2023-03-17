@@ -2,56 +2,56 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NoSpaceAfterBlockComment
-    body: "Block comment should start with `# `"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: NoSpaceAfterBlockComment
-    body: "Block comment should start with `# `"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 0
-  end_location:
-    row: 14
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: NoSpaceAfterBlockComment
-    body: "Block comment should start with `# `"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 25
-    column: 0
-  end_location:
-    row: 25
-    column: 11
-  fix: ~
-  parent: ~
-- kind:
-    name: NoSpaceAfterBlockComment
-    body: "Block comment should start with `# `"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 0
-  end_location:
-    row: 32
-    column: 21
-  fix: ~
-  parent: ~
+- - kind:
+      name: NoSpaceAfterBlockComment
+      body: "Block comment should start with `# `"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: NoSpaceAfterBlockComment
+      body: "Block comment should start with `# `"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 14
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: NoSpaceAfterBlockComment
+      body: "Block comment should start with `# `"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 25
+      column: 0
+    end_location:
+      row: 25
+      column: 11
+    fix: ~
+    parent: ~
+  - kind:
+      name: NoSpaceAfterBlockComment
+      body: "Block comment should start with `# `"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 32
+      column: 0
+    end_location:
+      row: 32
+      column: 21
+    fix: ~
+    parent: ~
 

@@ -2,104 +2,104 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: TypeOfPrimitive
-    body: "Use `str` instead of `type(...)`"
-    suggestion: "Replace `type(...)` with `str`"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 8
-  fix:
-    content: str
+- - kind:
+      name: TypeOfPrimitive
+      body: "Use `str` instead of `type(...)`"
+      suggestion: "Replace `type(...)` with `str`"
+      fixable: true
     location:
       row: 1
       column: 0
     end_location:
       row: 1
       column: 8
-  parent: ~
-- kind:
-    name: TypeOfPrimitive
-    body: "Use `bytes` instead of `type(...)`"
-    suggestion: "Replace `type(...)` with `bytes`"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 9
-  fix:
-    content: bytes
+    fix:
+      content: str
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 1
+        column: 8
+    parent: ~
+  - kind:
+      name: TypeOfPrimitive
+      body: "Use `bytes` instead of `type(...)`"
+      suggestion: "Replace `type(...)` with `bytes`"
+      fixable: true
     location:
       row: 2
       column: 0
     end_location:
       row: 2
       column: 9
-  parent: ~
-- kind:
-    name: TypeOfPrimitive
-    body: "Use `int` instead of `type(...)`"
-    suggestion: "Replace `type(...)` with `int`"
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 7
-  fix:
-    content: int
+    fix:
+      content: bytes
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 2
+        column: 9
+    parent: ~
+  - kind:
+      name: TypeOfPrimitive
+      body: "Use `int` instead of `type(...)`"
+      suggestion: "Replace `type(...)` with `int`"
+      fixable: true
     location:
       row: 3
       column: 0
     end_location:
       row: 3
       column: 7
-  parent: ~
-- kind:
-    name: TypeOfPrimitive
-    body: "Use `float` instead of `type(...)`"
-    suggestion: "Replace `type(...)` with `float`"
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 9
-  fix:
-    content: float
+    fix:
+      content: int
+      location:
+        row: 3
+        column: 0
+      end_location:
+        row: 3
+        column: 7
+    parent: ~
+  - kind:
+      name: TypeOfPrimitive
+      body: "Use `float` instead of `type(...)`"
+      suggestion: "Replace `type(...)` with `float`"
+      fixable: true
     location:
       row: 4
       column: 0
     end_location:
       row: 4
       column: 9
-  parent: ~
-- kind:
-    name: TypeOfPrimitive
-    body: "Use `complex` instead of `type(...)`"
-    suggestion: "Replace `type(...)` with `complex`"
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 8
-  fix:
-    content: complex
+    fix:
+      content: float
+      location:
+        row: 4
+        column: 0
+      end_location:
+        row: 4
+        column: 9
+    parent: ~
+  - kind:
+      name: TypeOfPrimitive
+      body: "Use `complex` instead of `type(...)`"
+      suggestion: "Replace `type(...)` with `complex`"
+      fixable: true
     location:
       row: 5
       column: 0
     end_location:
       row: 5
       column: 8
-  parent: ~
+    fix:
+      content: complex
+      location:
+        row: 5
+        column: 0
+      end_location:
+        row: 5
+        column: 8
+    parent: ~
 

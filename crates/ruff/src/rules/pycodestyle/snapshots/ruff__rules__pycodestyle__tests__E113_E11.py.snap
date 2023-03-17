@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnexpectedIndentation
-    body: Unexpected indentation
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 4
-  end_location:
-    row: 12
-    column: 4
-  fix: ~
-  parent: ~
+- - kind:
+      name: UnexpectedIndentation
+      body: Unexpected indentation
+      suggestion: ~
+      fixable: false
+    location:
+      row: 12
+      column: 4
+    end_location:
+      row: 12
+      column: 4
+    fix: ~
+    parent: ~
 

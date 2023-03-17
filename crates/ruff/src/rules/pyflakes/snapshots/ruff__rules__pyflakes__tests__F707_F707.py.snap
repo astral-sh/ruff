@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: DefaultExceptNotLast
-    body: "An `except` block as not the last exception handler"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 6
-  fix: ~
-  parent: ~
-- kind:
-    name: DefaultExceptNotLast
-    body: "An `except` block as not the last exception handler"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 6
-  fix: ~
-  parent: ~
-- kind:
-    name: DefaultExceptNotLast
-    body: "An `except` block as not the last exception handler"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 0
-  end_location:
-    row: 19
-    column: 6
-  fix: ~
-  parent: ~
+- - kind:
+      name: DefaultExceptNotLast
+      body: "An `except` block as not the last exception handler"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 6
+    fix: ~
+    parent: ~
+  - kind:
+      name: DefaultExceptNotLast
+      body: "An `except` block as not the last exception handler"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 6
+    fix: ~
+    parent: ~
+  - kind:
+      name: DefaultExceptNotLast
+      body: "An `except` block as not the last exception handler"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 19
+      column: 6
+    fix: ~
+    parent: ~
 

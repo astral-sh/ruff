@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MixedCaseVariableInClassScope
-    body: "Variable `mixedCase` in class scope should not be mixedCase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 4
-  end_location:
-    row: 9
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: MixedCaseVariableInClassScope
-    body: "Variable `_mixedCase` in class scope should not be mixedCase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 4
-  end_location:
-    row: 10
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: MixedCaseVariableInClassScope
-    body: "Variable `mixed_Case` in class scope should not be mixedCase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 11
-    column: 14
-  fix: ~
-  parent: ~
+- - kind:
+      name: MixedCaseVariableInClassScope
+      body: "Variable `mixedCase` in class scope should not be mixedCase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 4
+    end_location:
+      row: 9
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: MixedCaseVariableInClassScope
+      body: "Variable `_mixedCase` in class scope should not be mixedCase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 10
+      column: 4
+    end_location:
+      row: 10
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: MixedCaseVariableInClassScope
+      body: "Variable `mixed_Case` in class scope should not be mixedCase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 4
+    end_location:
+      row: 11
+      column: 14
+    fix: ~
+    parent: ~
 

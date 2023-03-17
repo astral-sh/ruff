@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: EmptyDocstring
-    body: Docstring is empty
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 8
-  end_location:
-    row: 20
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: EmptyDocstring
-    body: Docstring is empty
-    suggestion: ~
-    fixable: false
-  location:
-    row: 74
-    column: 4
-  end_location:
-    row: 74
-    column: 11
-  fix: ~
-  parent: ~
-- kind:
-    name: EmptyDocstring
-    body: Docstring is empty
-    suggestion: ~
-    fixable: false
-  location:
-    row: 80
-    column: 8
-  end_location:
-    row: 80
-    column: 10
-  fix: ~
-  parent: ~
+- - kind:
+      name: EmptyDocstring
+      body: Docstring is empty
+      suggestion: ~
+      fixable: false
+    location:
+      row: 20
+      column: 8
+    end_location:
+      row: 20
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: EmptyDocstring
+      body: Docstring is empty
+      suggestion: ~
+      fixable: false
+    location:
+      row: 74
+      column: 4
+    end_location:
+      row: 74
+      column: 11
+    fix: ~
+    parent: ~
+  - kind:
+      name: EmptyDocstring
+      body: Docstring is empty
+      suggestion: ~
+      fixable: false
+    location:
+      row: 80
+      column: 8
+    end_location:
+      row: 80
+      column: 10
+    fix: ~
+    parent: ~
 

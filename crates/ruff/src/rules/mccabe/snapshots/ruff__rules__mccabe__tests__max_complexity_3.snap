@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/mccabe/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ComplexStructure
-    body: "`try_else` is too complex (4 > 3)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 73
-    column: 4
-  end_location:
-    row: 73
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`handle` is too complex (9 > 3)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 113
-    column: 8
-  end_location:
-    row: 113
-    column: 14
-  fix: ~
-  parent: ~
+- - kind:
+      name: ComplexStructure
+      body: "`try_else` is too complex (4 > 3)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 73
+      column: 4
+    end_location:
+      row: 73
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: ComplexStructure
+      body: "`handle` is too complex (9 > 3)"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 113
+      column: 8
+    end_location:
+      row: 113
+      column: 14
+    fix: ~
+    parent: ~
 

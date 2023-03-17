@@ -2,84 +2,84 @@
 source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: DuplicateClassFieldDefinition
-    body: "Class field `name` is defined multiple times"
-    suggestion: "Remove duplicate field definition for `name`"
-    fixable: true
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 24
-  fix:
-    content: ""
+- - kind:
+      name: DuplicateClassFieldDefinition
+      body: "Class field `name` is defined multiple times"
+      suggestion: "Remove duplicate field definition for `name`"
+      fixable: true
     location:
       row: 4
-      column: 0
+      column: 4
     end_location:
-      row: 5
-      column: 0
-  parent: ~
-- kind:
-    name: DuplicateClassFieldDefinition
-    body: "Class field `name` is defined multiple times"
-    suggestion: "Remove duplicate field definition for `name`"
-    fixable: true
-  location:
-    row: 13
-    column: 4
-  end_location:
-    row: 13
-    column: 24
-  fix:
-    content: ""
+      row: 4
+      column: 24
+    fix:
+      content: ""
+      location:
+        row: 4
+        column: 0
+      end_location:
+        row: 5
+        column: 0
+    parent: ~
+  - kind:
+      name: DuplicateClassFieldDefinition
+      body: "Class field `name` is defined multiple times"
+      suggestion: "Remove duplicate field definition for `name`"
+      fixable: true
     location:
       row: 13
-      column: 0
+      column: 4
     end_location:
-      row: 14
-      column: 0
-  parent: ~
-- kind:
-    name: DuplicateClassFieldDefinition
-    body: "Class field `bar` is defined multiple times"
-    suggestion: "Remove duplicate field definition for `bar`"
-    fixable: true
-  location:
-    row: 23
-    column: 4
-  end_location:
-    row: 23
-    column: 23
-  fix:
-    content: ""
+      row: 13
+      column: 24
+    fix:
+      content: ""
+      location:
+        row: 13
+        column: 0
+      end_location:
+        row: 14
+        column: 0
+    parent: ~
+  - kind:
+      name: DuplicateClassFieldDefinition
+      body: "Class field `bar` is defined multiple times"
+      suggestion: "Remove duplicate field definition for `bar`"
+      fixable: true
     location:
       row: 23
-      column: 0
+      column: 4
     end_location:
-      row: 24
-      column: 0
-  parent: ~
-- kind:
-    name: DuplicateClassFieldDefinition
-    body: "Class field `bar` is defined multiple times"
-    suggestion: "Remove duplicate field definition for `bar`"
-    fixable: true
-  location:
-    row: 40
-    column: 4
-  end_location:
-    row: 40
-    column: 23
-  fix:
-    content: ""
+      row: 23
+      column: 23
+    fix:
+      content: ""
+      location:
+        row: 23
+        column: 0
+      end_location:
+        row: 24
+        column: 0
+    parent: ~
+  - kind:
+      name: DuplicateClassFieldDefinition
+      body: "Class field `bar` is defined multiple times"
+      suggestion: "Remove duplicate field definition for `bar`"
+      fixable: true
     location:
       row: 40
-      column: 0
+      column: 4
     end_location:
-      row: 41
-      column: 0
-  parent: ~
+      row: 40
+      column: 23
+    fix:
+      content: ""
+      location:
+        row: 40
+        column: 0
+      end_location:
+        row: 41
+        column: 0
+    parent: ~
 

@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MultiLineImplicitStringConcatenation
-    body: Implicitly concatenated string literals over multiple lines
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 4
-  end_location:
-    row: 6
-    column: 9
-  fix: ~
-  parent: ~
+- - kind:
+      name: MultiLineImplicitStringConcatenation
+      body: Implicitly concatenated string literals over multiple lines
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 4
+    end_location:
+      row: 6
+      column: 9
+    fix: ~
+    parent: ~
 

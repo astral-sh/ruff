@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: LoggingFString
-    body: Logging statement uses f-string
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 13
-  end_location:
-    row: 4
-    column: 28
-  fix: ~
-  parent: ~
+- - kind:
+      name: LoggingFString
+      body: Logging statement uses f-string
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 13
+    end_location:
+      row: 4
+      column: 28
+    fix: ~
+    parent: ~
 

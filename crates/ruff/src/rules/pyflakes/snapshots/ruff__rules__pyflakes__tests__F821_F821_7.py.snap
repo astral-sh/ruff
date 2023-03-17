@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Undefined`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 20
-  end_location:
-    row: 11
-    column: 31
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Undefined`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 25
-  end_location:
-    row: 12
-    column: 36
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Undefined`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 20
-  end_location:
-    row: 13
-    column: 31
-  fix: ~
-  parent: ~
+- - kind:
+      name: UndefinedName
+      body: "Undefined name `Undefined`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 20
+    end_location:
+      row: 11
+      column: 31
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndefinedName
+      body: "Undefined name `Undefined`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 12
+      column: 25
+    end_location:
+      row: 12
+      column: 36
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndefinedName
+      body: "Undefined name `Undefined`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 13
+      column: 20
+    end_location:
+      row: 13
+      column: 31
+    fix: ~
+    parent: ~
 

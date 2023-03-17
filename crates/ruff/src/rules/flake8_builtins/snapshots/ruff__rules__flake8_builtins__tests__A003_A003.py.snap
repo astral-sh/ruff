@@ -2,56 +2,56 @@
 source: crates/ruff/src/rules/flake8_builtins/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BuiltinAttributeShadowing
-    body: "Class attribute `ImportError` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 15
-  fix: ~
-  parent: ~
-- kind:
-    name: BuiltinAttributeShadowing
-    body: "Class attribute `id` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 6
-  fix: ~
-  parent: ~
-- kind:
-    name: BuiltinAttributeShadowing
-    body: "Class attribute `dir` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: BuiltinAttributeShadowing
-    body: "Class attribute `str` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 12
-    column: 12
-  fix: ~
-  parent: ~
+- - kind:
+      name: BuiltinAttributeShadowing
+      body: "Class attribute `ImportError` is shadowing a python builtin"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 4
+    end_location:
+      row: 2
+      column: 15
+    fix: ~
+    parent: ~
+  - kind:
+      name: BuiltinAttributeShadowing
+      body: "Class attribute `id` is shadowing a python builtin"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 3
+      column: 6
+    fix: ~
+    parent: ~
+  - kind:
+      name: BuiltinAttributeShadowing
+      body: "Class attribute `dir` is shadowing a python builtin"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 4
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: BuiltinAttributeShadowing
+      body: "Class attribute `str` is shadowing a python builtin"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 4
+    end_location:
+      row: 12
+      column: 12
+    fix: ~
+    parent: ~
 

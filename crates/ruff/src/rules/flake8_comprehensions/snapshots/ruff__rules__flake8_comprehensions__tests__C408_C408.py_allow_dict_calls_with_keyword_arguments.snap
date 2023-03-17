@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryCollectionCall
-    body: "Unnecessary `tuple` call (rewrite as a literal)"
-    suggestion: Rewrite as a literal
-    fixable: true
-  location:
-    row: 1
-    column: 4
-  end_location:
-    row: 1
-    column: 11
-  fix:
-    content: ()
+- - kind:
+      name: UnnecessaryCollectionCall
+      body: "Unnecessary `tuple` call (rewrite as a literal)"
+      suggestion: Rewrite as a literal
+      fixable: true
     location:
       row: 1
       column: 4
     end_location:
       row: 1
       column: 11
-  parent: ~
-- kind:
-    name: UnnecessaryCollectionCall
-    body: "Unnecessary `list` call (rewrite as a literal)"
-    suggestion: Rewrite as a literal
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 10
-  fix:
-    content: "[]"
+    fix:
+      content: ()
+      location:
+        row: 1
+        column: 4
+      end_location:
+        row: 1
+        column: 11
+    parent: ~
+  - kind:
+      name: UnnecessaryCollectionCall
+      body: "Unnecessary `list` call (rewrite as a literal)"
+      suggestion: Rewrite as a literal
+      fixable: true
     location:
       row: 2
       column: 4
     end_location:
       row: 2
       column: 10
-  parent: ~
-- kind:
-    name: UnnecessaryCollectionCall
-    body: "Unnecessary `dict` call (rewrite as a literal)"
-    suggestion: Rewrite as a literal
-    fixable: true
-  location:
-    row: 3
-    column: 5
-  end_location:
-    row: 3
-    column: 11
-  fix:
-    content: "{}"
+    fix:
+      content: "[]"
+      location:
+        row: 2
+        column: 4
+      end_location:
+        row: 2
+        column: 10
+    parent: ~
+  - kind:
+      name: UnnecessaryCollectionCall
+      body: "Unnecessary `dict` call (rewrite as a literal)"
+      suggestion: Rewrite as a literal
+      fixable: true
     location:
       row: 3
       column: 5
     end_location:
       row: 3
       column: 11
-  parent: ~
+    fix:
+      content: "{}"
+      location:
+        row: 3
+        column: 5
+      end_location:
+        row: 3
+        column: 11
+    parent: ~
 

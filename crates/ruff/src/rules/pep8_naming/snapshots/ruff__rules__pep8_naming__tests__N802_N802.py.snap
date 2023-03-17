@@ -2,69 +2,69 @@
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: InvalidFunctionName
-    body: "Function name `Bad` should be lowercase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: InvalidFunctionName
-    body: "Function name `_Bad` should be lowercase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 4
-  end_location:
-    row: 8
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: InvalidFunctionName
-    body: "Function name `BAD` should be lowercase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 4
-  end_location:
-    row: 12
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: InvalidFunctionName
-    body: "Function name `BAD_FUNC` should be lowercase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 4
-  end_location:
-    row: 16
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: InvalidFunctionName
-    body: "Function name `testTest` should be lowercase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 8
-  end_location:
-    row: 40
-    column: 16
-  fix: ~
-  parent: ~
+- - kind:
+      name: InvalidFunctionName
+      body: "Function name `Bad` should be lowercase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 4
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: InvalidFunctionName
+      body: "Function name `_Bad` should be lowercase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 4
+    end_location:
+      row: 8
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: InvalidFunctionName
+      body: "Function name `BAD` should be lowercase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 12
+      column: 4
+    end_location:
+      row: 12
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: InvalidFunctionName
+      body: "Function name `BAD_FUNC` should be lowercase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 16
+      column: 4
+    end_location:
+      row: 16
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: InvalidFunctionName
+      body: "Function name `testTest` should be lowercase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 40
+      column: 8
+    end_location:
+      row: 40
+      column: 16
+    fix: ~
+    parent: ~
 

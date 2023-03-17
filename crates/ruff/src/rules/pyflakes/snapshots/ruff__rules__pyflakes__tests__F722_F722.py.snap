@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ForwardAnnotationSyntaxError
-    body: "Syntax error in forward annotation: `///`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 11
-  end_location:
-    row: 9
-    column: 16
-  fix: ~
-  parent: ~
+- - kind:
+      name: ForwardAnnotationSyntaxError
+      body: "Syntax error in forward annotation: `///`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 11
+    end_location:
+      row: 9
+      column: 16
+    fix: ~
+    parent: ~
 

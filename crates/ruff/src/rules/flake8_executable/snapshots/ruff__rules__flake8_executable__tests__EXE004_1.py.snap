@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/flake8_executable/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ShebangLeadingWhitespace
-    body: Avoid whitespace before shebang
-    suggestion: Remove whitespace before shebang
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 4
-  fix:
-    content: ""
+- - kind:
+      name: ShebangLeadingWhitespace
+      body: Avoid whitespace before shebang
+      suggestion: Remove whitespace before shebang
+      fixable: true
     location:
       row: 1
       column: 0
     end_location:
       row: 1
       column: 4
-  parent: ~
+    fix:
+      content: ""
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 1
+        column: 4
+    parent: ~
 

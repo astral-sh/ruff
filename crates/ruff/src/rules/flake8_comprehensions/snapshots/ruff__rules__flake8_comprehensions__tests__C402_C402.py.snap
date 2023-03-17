@@ -2,84 +2,84 @@
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryGeneratorDict
-    body: "Unnecessary generator (rewrite as a `dict` comprehension)"
-    suggestion: "Rewrite as a `dict` comprehension"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 30
-  fix:
-    content: "{x: x for x in range(3)}"
+- - kind:
+      name: UnnecessaryGeneratorDict
+      body: "Unnecessary generator (rewrite as a `dict` comprehension)"
+      suggestion: "Rewrite as a `dict` comprehension"
+      fixable: true
     location:
       row: 1
       column: 0
     end_location:
       row: 1
       column: 30
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorDict
-    body: "Unnecessary generator (rewrite as a `dict` comprehension)"
-    suggestion: "Rewrite as a `dict` comprehension"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 4
-    column: 1
-  fix:
-    content: "{\n    x: x for x in range(3)\n}"
+    fix:
+      content: "{x: x for x in range(3)}"
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 1
+        column: 30
+    parent: ~
+  - kind:
+      name: UnnecessaryGeneratorDict
+      body: "Unnecessary generator (rewrite as a `dict` comprehension)"
+      suggestion: "Rewrite as a `dict` comprehension"
+      fixable: true
     location:
       row: 2
       column: 0
     end_location:
       row: 4
       column: 1
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorDict
-    body: "Unnecessary generator (rewrite as a `dict` comprehension)"
-    suggestion: "Rewrite as a `dict` comprehension"
-    fixable: true
-  location:
-    row: 6
-    column: 7
-  end_location:
-    row: 6
-    column: 37
-  fix:
-    content: " {x: x for x in range(3)} "
+    fix:
+      content: "{\n    x: x for x in range(3)\n}"
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 4
+        column: 1
+    parent: ~
+  - kind:
+      name: UnnecessaryGeneratorDict
+      body: "Unnecessary generator (rewrite as a `dict` comprehension)"
+      suggestion: "Rewrite as a `dict` comprehension"
+      fixable: true
     location:
       row: 6
       column: 7
     end_location:
       row: 6
       column: 37
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorDict
-    body: "Unnecessary generator (rewrite as a `dict` comprehension)"
-    suggestion: "Rewrite as a `dict` comprehension"
-    fixable: true
-  location:
-    row: 7
-    column: 15
-  end_location:
-    row: 7
-    column: 45
-  fix:
-    content: " {x: x for x in range(3)} "
+    fix:
+      content: " {x: x for x in range(3)} "
+      location:
+        row: 6
+        column: 7
+      end_location:
+        row: 6
+        column: 37
+    parent: ~
+  - kind:
+      name: UnnecessaryGeneratorDict
+      body: "Unnecessary generator (rewrite as a `dict` comprehension)"
+      suggestion: "Rewrite as a `dict` comprehension"
+      fixable: true
     location:
       row: 7
       column: 15
     end_location:
       row: 7
       column: 45
-  parent: ~
+    fix:
+      content: " {x: x for x in range(3)} "
+      location:
+        row: 7
+        column: 15
+      end_location:
+        row: 7
+        column: 45
+    parent: ~
 

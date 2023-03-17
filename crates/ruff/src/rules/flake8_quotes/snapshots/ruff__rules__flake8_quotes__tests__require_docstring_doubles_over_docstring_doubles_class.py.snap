@@ -2,44 +2,44 @@
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 27
-  fix:
-    content: "''' Not a docstring '''"
+- - kind:
+      name: BadQuotesMultilineString
+      body: Double quote multiline found but single quotes preferred
+      suggestion: Replace double multiline quotes with single quotes
+      fixable: true
     location:
       row: 3
       column: 4
     end_location:
       row: 3
       column: 27
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 5
-    column: 22
-  end_location:
-    row: 5
-    column: 43
-  fix:
-    content: "'''not a docstring'''"
+    fix:
+      content: "''' Not a docstring '''"
+      location:
+        row: 3
+        column: 4
+      end_location:
+        row: 3
+        column: 27
+    parent: ~
+  - kind:
+      name: BadQuotesMultilineString
+      body: Double quote multiline found but single quotes preferred
+      suggestion: Replace double multiline quotes with single quotes
+      fixable: true
     location:
       row: 5
       column: 22
     end_location:
       row: 5
       column: 43
-  parent: ~
+    fix:
+      content: "'''not a docstring'''"
+      location:
+        row: 5
+        column: 22
+      end_location:
+        row: 5
+        column: 43
+    parent: ~
 

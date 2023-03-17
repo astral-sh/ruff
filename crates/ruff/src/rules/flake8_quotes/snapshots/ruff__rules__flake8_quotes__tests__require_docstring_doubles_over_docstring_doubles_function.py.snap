@@ -2,104 +2,104 @@
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 26
-  fix:
-    content: "''' not a docstring'''"
+- - kind:
+      name: BadQuotesMultilineString
+      body: Double quote multiline found but single quotes preferred
+      suggestion: Replace double multiline quotes with single quotes
+      fixable: true
     location:
       row: 3
       column: 4
     end_location:
       row: 3
       column: 26
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 11
-    column: 26
-  fix:
-    content: "''' not a docstring'''"
+    fix:
+      content: "''' not a docstring'''"
+      location:
+        row: 3
+        column: 4
+      end_location:
+        row: 3
+        column: 26
+    parent: ~
+  - kind:
+      name: BadQuotesMultilineString
+      body: Double quote multiline found but single quotes preferred
+      suggestion: Replace double multiline quotes with single quotes
+      fixable: true
     location:
       row: 11
       column: 4
     end_location:
       row: 11
       column: 26
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 15
-    column: 38
-  end_location:
-    row: 17
-    column: 3
-  fix:
-    content: "'''\n    not a\n'''"
+    fix:
+      content: "''' not a docstring'''"
+      location:
+        row: 11
+        column: 4
+      end_location:
+        row: 11
+        column: 26
+    parent: ~
+  - kind:
+      name: BadQuotesMultilineString
+      body: Double quote multiline found but single quotes preferred
+      suggestion: Replace double multiline quotes with single quotes
+      fixable: true
     location:
       row: 15
       column: 38
     end_location:
       row: 17
       column: 3
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 17
-    column: 19
-  fix:
-    content: "'''docstring'''"
+    fix:
+      content: "'''\n    not a\n'''"
+      location:
+        row: 15
+        column: 38
+      end_location:
+        row: 17
+        column: 3
+    parent: ~
+  - kind:
+      name: BadQuotesMultilineString
+      body: Double quote multiline found but single quotes preferred
+      suggestion: Replace double multiline quotes with single quotes
+      fixable: true
     location:
       row: 17
       column: 4
     end_location:
       row: 17
       column: 19
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 22
-    column: 4
-  end_location:
-    row: 22
-    column: 27
-  fix:
-    content: "''' not a docstring '''"
+    fix:
+      content: "'''docstring'''"
+      location:
+        row: 17
+        column: 4
+      end_location:
+        row: 17
+        column: 19
+    parent: ~
+  - kind:
+      name: BadQuotesMultilineString
+      body: Double quote multiline found but single quotes preferred
+      suggestion: Replace double multiline quotes with single quotes
+      fixable: true
     location:
       row: 22
       column: 4
     end_location:
       row: 22
       column: 27
-  parent: ~
+    fix:
+      content: "''' not a docstring '''"
+      location:
+        row: 22
+        column: 4
+      end_location:
+        row: 22
+        column: 27
+    parent: ~
 

@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnusedLambdaArgument
-    body: "Unused lambda argument: `x`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 28
-    column: 7
-  end_location:
-    row: 28
-    column: 8
-  fix: ~
-  parent: ~
+- - kind:
+      name: UnusedLambdaArgument
+      body: "Unused lambda argument: `x`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 28
+      column: 7
+    end_location:
+      row: 28
+      column: 8
+    fix: ~
+    parent: ~
 

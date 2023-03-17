@@ -2,82 +2,82 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: EmptyDocstringSection
-    body: "Section has no content (\"Returns\")"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 4
-  end_location:
-    row: 58
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: EmptyDocstringSection
-    body: "Section has no content (\"Returns\")"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 65
-    column: 4
-  end_location:
-    row: 67
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: EmptyDocstringSection
-    body: "Section has no content (\"Returns\")"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 76
-    column: 4
-  end_location:
-    row: 87
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: EmptyDocstringSection
-    body: "Section has no content (\"Yields\")"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 76
-    column: 4
-  end_location:
-    row: 87
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: EmptyDocstringSection
-    body: "Section has no content (\"Returns\")"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 170
-    column: 4
-  end_location:
-    row: 174
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: EmptyDocstringSection
-    body: "Section has no content (\"Returns\")"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 261
-    column: 4
-  end_location:
-    row: 271
-    column: 7
-  fix: ~
-  parent: ~
+- - kind:
+      name: EmptyDocstringSection
+      body: "Section has no content (\"Returns\")"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 54
+      column: 4
+    end_location:
+      row: 58
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: EmptyDocstringSection
+      body: "Section has no content (\"Returns\")"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 65
+      column: 4
+    end_location:
+      row: 67
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: EmptyDocstringSection
+      body: "Section has no content (\"Returns\")"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 76
+      column: 4
+    end_location:
+      row: 87
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: EmptyDocstringSection
+      body: "Section has no content (\"Yields\")"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 76
+      column: 4
+    end_location:
+      row: 87
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: EmptyDocstringSection
+      body: "Section has no content (\"Returns\")"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 170
+      column: 4
+    end_location:
+      row: 174
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: EmptyDocstringSection
+      body: "Section has no content (\"Returns\")"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 261
+      column: 4
+    end_location:
+      row: 271
+      column: 7
+    fix: ~
+    parent: ~
 

@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/flake8_2020/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: SysVersionInfoMinorCmpInt
-    body: "`sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: SysVersionInfoMinorCmpInt
-    body: "`sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 18
-  fix: ~
-  parent: ~
+- - kind:
+      name: SysVersionInfoMinorCmpInt
+      body: "`sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: SysVersionInfoMinorCmpInt
+      body: "`sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 18
+    fix: ~
+    parent: ~
 

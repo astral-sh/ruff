@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: OpenFileWithContextHandler
-    body: Use context handler for opening files
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: OpenFileWithContextHandler
-    body: Use context handler for opening files
-    suggestion: ~
-    fixable: false
-  location:
-    row: 31
-    column: 8
-  end_location:
-    row: 31
-    column: 12
-  fix: ~
-  parent: ~
+- - kind:
+      name: OpenFileWithContextHandler
+      body: Use context handler for opening files
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 4
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: OpenFileWithContextHandler
+      body: Use context handler for opening files
+      suggestion: ~
+      fixable: false
+    location:
+      row: 31
+      column: 8
+    end_location:
+      row: 31
+      column: 12
+    fix: ~
+    parent: ~
 

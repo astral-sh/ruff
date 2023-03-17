@@ -2,5 +2,5 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-[]
+- []
 

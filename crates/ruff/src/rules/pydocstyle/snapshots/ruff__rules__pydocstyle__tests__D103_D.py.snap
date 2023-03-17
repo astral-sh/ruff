@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UndocumentedPublicFunction
-    body: Missing docstring in public function
-    suggestion: ~
-    fixable: false
-  location:
-    row: 400
-    column: 4
-  end_location:
-    row: 400
-    column: 17
-  fix: ~
-  parent: ~
+- - kind:
+      name: UndocumentedPublicFunction
+      body: Missing docstring in public function
+      suggestion: ~
+      fixable: false
+    location:
+      row: 400
+      column: 4
+    end_location:
+      row: 400
+      column: 17
+    fix: ~
+    parent: ~
 

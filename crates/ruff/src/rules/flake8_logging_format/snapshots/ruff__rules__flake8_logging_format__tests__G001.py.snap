@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: LoggingStringFormat
-    body: "Logging statement uses `string.format()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 13
-  end_location:
-    row: 3
-    column: 40
-  fix: ~
-  parent: ~
+- - kind:
+      name: LoggingStringFormat
+      body: "Logging statement uses `string.format()`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 13
+    end_location:
+      row: 3
+      column: 40
+    fix: ~
+    parent: ~
 

@@ -2,56 +2,56 @@
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UseContextlibSuppress
-    body: "Use `contextlib.suppress(ValueError)` instead of try-except-pass"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 7
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: UseContextlibSuppress
-    body: "Use `contextlib.suppress(ValueError, OSError)` instead of try-except-pass"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 12
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: UseContextlibSuppress
-    body: "Use `contextlib.suppress(Exception)` instead of try-except-pass"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 0
-  end_location:
-    row: 17
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: UseContextlibSuppress
-    body: "Use `contextlib.suppress(a.Error, b.Error)` instead of try-except-pass"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 0
-  end_location:
-    row: 22
-    column: 8
-  fix: ~
-  parent: ~
+- - kind:
+      name: UseContextlibSuppress
+      body: "Use `contextlib.suppress(ValueError)` instead of try-except-pass"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 7
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: UseContextlibSuppress
+      body: "Use `contextlib.suppress(ValueError, OSError)` instead of try-except-pass"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 12
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: UseContextlibSuppress
+      body: "Use `contextlib.suppress(Exception)` instead of try-except-pass"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 14
+      column: 0
+    end_location:
+      row: 17
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: UseContextlibSuppress
+      body: "Use `contextlib.suppress(a.Error, b.Error)` instead of try-except-pass"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 22
+      column: 8
+    fix: ~
+    parent: ~
 

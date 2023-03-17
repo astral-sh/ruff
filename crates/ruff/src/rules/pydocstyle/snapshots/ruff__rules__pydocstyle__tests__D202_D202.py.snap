@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NoBlankLineAfterFunction
-    body: No blank lines allowed after function docstring (found 2)
-    suggestion: Remove blank line(s) after function docstring
-    fixable: true
-  location:
-    row: 57
-    column: 4
-  end_location:
-    row: 57
-    column: 30
-  fix:
-    content: ""
+- - kind:
+      name: NoBlankLineAfterFunction
+      body: No blank lines allowed after function docstring (found 2)
+      suggestion: Remove blank line(s) after function docstring
+      fixable: true
     location:
-      row: 58
-      column: 0
+      row: 57
+      column: 4
     end_location:
-      row: 60
-      column: 0
-  parent: ~
-- kind:
-    name: NoBlankLineAfterFunction
-    body: No blank lines allowed after function docstring (found 2)
-    suggestion: Remove blank line(s) after function docstring
-    fixable: true
-  location:
-    row: 68
-    column: 4
-  end_location:
-    row: 68
-    column: 30
-  fix:
-    content: ""
+      row: 57
+      column: 30
+    fix:
+      content: ""
+      location:
+        row: 58
+        column: 0
+      end_location:
+        row: 60
+        column: 0
+    parent: ~
+  - kind:
+      name: NoBlankLineAfterFunction
+      body: No blank lines allowed after function docstring (found 2)
+      suggestion: Remove blank line(s) after function docstring
+      fixable: true
     location:
-      row: 69
-      column: 0
+      row: 68
+      column: 4
     end_location:
-      row: 71
-      column: 0
-  parent: ~
-- kind:
-    name: NoBlankLineAfterFunction
-    body: No blank lines allowed after function docstring (found 1)
-    suggestion: Remove blank line(s) after function docstring
-    fixable: true
-  location:
-    row: 80
-    column: 4
-  end_location:
-    row: 80
-    column: 30
-  fix:
-    content: ""
+      row: 68
+      column: 30
+    fix:
+      content: ""
+      location:
+        row: 69
+        column: 0
+      end_location:
+        row: 71
+        column: 0
+    parent: ~
+  - kind:
+      name: NoBlankLineAfterFunction
+      body: No blank lines allowed after function docstring (found 1)
+      suggestion: Remove blank line(s) after function docstring
+      fixable: true
     location:
-      row: 81
-      column: 0
+      row: 80
+      column: 4
     end_location:
-      row: 82
-      column: 0
-  parent: ~
+      row: 80
+      column: 30
+    fix:
+      content: ""
+      location:
+        row: 81
+        column: 0
+      end_location:
+        row: 82
+        column: 0
+    parent: ~
 

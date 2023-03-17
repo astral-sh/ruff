@@ -2,56 +2,56 @@
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnnecessarySubscriptReversal
-    body: "Unnecessary subscript reversal of iterable within `set()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 18
-  fix: ~
-  parent: ~
-- kind:
-    name: UnnecessarySubscriptReversal
-    body: "Unnecessary subscript reversal of iterable within `reversed()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: UnnecessarySubscriptReversal
-    body: "Unnecessary subscript reversal of iterable within `sorted()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: UnnecessarySubscriptReversal
-    body: "Unnecessary subscript reversal of iterable within `sorted()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 4
-  end_location:
-    row: 5
-    column: 35
-  fix: ~
-  parent: ~
+- - kind:
+      name: UnnecessarySubscriptReversal
+      body: "Unnecessary subscript reversal of iterable within `set()`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 4
+    end_location:
+      row: 2
+      column: 18
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnnecessarySubscriptReversal
+      body: "Unnecessary subscript reversal of iterable within `reversed()`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 3
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnnecessarySubscriptReversal
+      body: "Unnecessary subscript reversal of iterable within `sorted()`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 4
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnnecessarySubscriptReversal
+      body: "Unnecessary subscript reversal of iterable within `sorted()`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 4
+    end_location:
+      row: 5
+      column: 35
+    fix: ~
+    parent: ~
 

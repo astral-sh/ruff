@@ -2,84 +2,84 @@
 source: crates/ruff/src/rules/pandas_vet/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PandasUseOfInplaceArgument
-    body: "`inplace=True` should be avoided; it has inconsistent behavior"
-    suggestion: "Assign to variable; remove `inplace` arg"
-    fixable: true
-  location:
-    row: 5
-    column: 22
-  end_location:
-    row: 5
-    column: 34
-  fix:
-    content: "x = x.drop([\"a\"], axis=1)"
+- - kind:
+      name: PandasUseOfInplaceArgument
+      body: "`inplace=True` should be avoided; it has inconsistent behavior"
+      suggestion: "Assign to variable; remove `inplace` arg"
+      fixable: true
     location:
       row: 5
-      column: 0
+      column: 22
     end_location:
       row: 5
-      column: 35
-  parent: ~
-- kind:
-    name: PandasUseOfInplaceArgument
-    body: "`inplace=True` should be avoided; it has inconsistent behavior"
-    suggestion: "Assign to variable; remove `inplace` arg"
-    fixable: true
-  location:
-    row: 7
-    column: 22
-  end_location:
-    row: 7
-    column: 34
-  fix:
-    content: "x = x.drop([\"a\"], axis=1)"
+      column: 34
+    fix:
+      content: "x = x.drop([\"a\"], axis=1)"
+      location:
+        row: 5
+        column: 0
+      end_location:
+        row: 5
+        column: 35
+    parent: ~
+  - kind:
+      name: PandasUseOfInplaceArgument
+      body: "`inplace=True` should be avoided; it has inconsistent behavior"
+      suggestion: "Assign to variable; remove `inplace` arg"
+      fixable: true
     location:
       row: 7
-      column: 0
+      column: 22
     end_location:
       row: 7
-      column: 35
-  parent: ~
-- kind:
-    name: PandasUseOfInplaceArgument
-    body: "`inplace=True` should be avoided; it has inconsistent behavior"
-    suggestion: "Assign to variable; remove `inplace` arg"
-    fixable: true
-  location:
-    row: 10
-    column: 4
-  end_location:
-    row: 10
-    column: 16
-  fix:
-    content: "x = x.drop(\n    columns=[\"a\"],\n    axis=1,\n)"
+      column: 34
+    fix:
+      content: "x = x.drop([\"a\"], axis=1)"
+      location:
+        row: 7
+        column: 0
+      end_location:
+        row: 7
+        column: 35
+    parent: ~
+  - kind:
+      name: PandasUseOfInplaceArgument
+      body: "`inplace=True` should be avoided; it has inconsistent behavior"
+      suggestion: "Assign to variable; remove `inplace` arg"
+      fixable: true
     location:
-      row: 9
-      column: 0
-    end_location:
-      row: 13
-      column: 1
-  parent: ~
-- kind:
-    name: PandasUseOfInplaceArgument
-    body: "`inplace=True` should be avoided; it has inconsistent behavior"
-    suggestion: "Assign to variable; remove `inplace` arg"
-    fixable: true
-  location:
-    row: 17
-    column: 8
-  end_location:
-    row: 17
-    column: 20
-  fix:
-    content: "x = x.drop(\n        columns=[\"a\"],\n        axis=1,\n    )"
-    location:
-      row: 16
+      row: 10
       column: 4
     end_location:
-      row: 20
-      column: 5
-  parent: ~
+      row: 10
+      column: 16
+    fix:
+      content: "x = x.drop(\n    columns=[\"a\"],\n    axis=1,\n)"
+      location:
+        row: 9
+        column: 0
+      end_location:
+        row: 13
+        column: 1
+    parent: ~
+  - kind:
+      name: PandasUseOfInplaceArgument
+      body: "`inplace=True` should be avoided; it has inconsistent behavior"
+      suggestion: "Assign to variable; remove `inplace` arg"
+      fixable: true
+    location:
+      row: 17
+      column: 8
+    end_location:
+      row: 17
+      column: 20
+    fix:
+      content: "x = x.drop(\n        columns=[\"a\"],\n        axis=1,\n    )"
+      location:
+        row: 16
+        column: 4
+      end_location:
+        row: 20
+        column: 5
+    parent: ~
 

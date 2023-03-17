@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: OSErrorAlias
-    body: "Replace aliased errors with `OSError`"
-    suggestion: "Replace with builtin `OSError`"
-    fixable: true
-  location:
-    row: 5
-    column: 7
-  end_location:
-    row: 5
-    column: 37
-  fix:
-    content: OSError
+- - kind:
+      name: OSErrorAlias
+      body: "Replace aliased errors with `OSError`"
+      suggestion: "Replace with builtin `OSError`"
+      fixable: true
     location:
       row: 5
       column: 7
     end_location:
       row: 5
       column: 37
-  parent: ~
-- kind:
-    name: OSErrorAlias
-    body: "Replace aliased errors with `OSError`"
-    suggestion: "Replace with builtin `OSError`"
-    fixable: true
-  location:
-    row: 7
-    column: 7
-  end_location:
-    row: 7
-    column: 40
-  fix:
-    content: "(OSError, KeyError)"
+    fix:
+      content: OSError
+      location:
+        row: 5
+        column: 7
+      end_location:
+        row: 5
+        column: 37
+    parent: ~
+  - kind:
+      name: OSErrorAlias
+      body: "Replace aliased errors with `OSError`"
+      suggestion: "Replace with builtin `OSError`"
+      fixable: true
     location:
       row: 7
       column: 7
     end_location:
       row: 7
       column: 40
-  parent: ~
-- kind:
-    name: OSErrorAlias
-    body: "Replace aliased errors with `OSError`"
-    suggestion: "Replace with builtin `OSError`"
-    fixable: true
-  location:
-    row: 12
-    column: 7
-  end_location:
-    row: 16
-    column: 1
-  fix:
-    content: OSError
+    fix:
+      content: "(OSError, KeyError)"
+      location:
+        row: 7
+        column: 7
+      end_location:
+        row: 7
+        column: 40
+    parent: ~
+  - kind:
+      name: OSErrorAlias
+      body: "Replace aliased errors with `OSError`"
+      suggestion: "Replace with builtin `OSError`"
+      fixable: true
     location:
       row: 12
       column: 7
     end_location:
       row: 16
       column: 1
-  parent: ~
+    fix:
+      content: OSError
+      location:
+        row: 12
+        column: 7
+      end_location:
+        row: 16
+        column: 1
+    parent: ~
 

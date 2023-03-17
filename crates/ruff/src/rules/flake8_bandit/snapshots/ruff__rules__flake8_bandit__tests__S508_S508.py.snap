@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: SnmpInsecureVersion
-    body: The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 32
-  end_location:
-    row: 3
-    column: 33
-  fix: ~
-  parent: ~
-- kind:
-    name: SnmpInsecureVersion
-    body: The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 32
-  end_location:
-    row: 4
-    column: 33
-  fix: ~
-  parent: ~
+- - kind:
+      name: SnmpInsecureVersion
+      body: The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 32
+    end_location:
+      row: 3
+      column: 33
+    fix: ~
+    parent: ~
+  - kind:
+      name: SnmpInsecureVersion
+      body: The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 32
+    end_location:
+      row: 4
+      column: 33
+    fix: ~
+    parent: ~
 

@@ -2,147 +2,147 @@
 source: crates/ruff/src/rules/flake8_self/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PrivateMemberAccess
-    body: "Private member accessed: `_private`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 34
-    column: 11
-  end_location:
-    row: 34
-    column: 28
-  fix: ~
-  parent: ~
-- kind:
-    name: PrivateMemberAccess
-    body: "Private member accessed: `_private`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 36
-    column: 11
-  end_location:
-    row: 36
-    column: 30
-  fix: ~
-  parent: ~
-- kind:
-    name: PrivateMemberAccess
-    body: "Private member accessed: `_private_thing`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 11
-  end_location:
-    row: 38
-    column: 29
-  fix: ~
-  parent: ~
-- kind:
-    name: PrivateMemberAccess
-    body: "Private member accessed: `_private_thing`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 11
-  end_location:
-    row: 43
-    column: 29
-  fix: ~
-  parent: ~
-- kind:
-    name: PrivateMemberAccess
-    body: "Private member accessed: `_private_thing`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 59
-    column: 6
-  end_location:
-    row: 59
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    name: PrivateMemberAccess
-    body: "Private member accessed: `__really_private_thing`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 60
-    column: 6
-  end_location:
-    row: 60
-    column: 32
-  fix: ~
-  parent: ~
-- kind:
-    name: PrivateMemberAccess
-    body: "Private member accessed: `_private_func`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 61
-    column: 6
-  end_location:
-    row: 61
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: PrivateMemberAccess
-    body: "Private member accessed: `__really_private_func`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 62
-    column: 6
-  end_location:
-    row: 62
-    column: 31
-  fix: ~
-  parent: ~
-- kind:
-    name: PrivateMemberAccess
-    body: "Private member accessed: `_private`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 63
-    column: 6
-  end_location:
-    row: 63
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: PrivateMemberAccess
-    body: "Private member accessed: `_private_thing`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 64
-    column: 6
-  end_location:
-    row: 64
-    column: 26
-  fix: ~
-  parent: ~
-- kind:
-    name: PrivateMemberAccess
-    body: "Private member accessed: `_private_thing__`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 65
-    column: 6
-  end_location:
-    row: 65
-    column: 28
-  fix: ~
-  parent: ~
+- - kind:
+      name: PrivateMemberAccess
+      body: "Private member accessed: `_private`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 34
+      column: 11
+    end_location:
+      row: 34
+      column: 28
+    fix: ~
+    parent: ~
+  - kind:
+      name: PrivateMemberAccess
+      body: "Private member accessed: `_private`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 36
+      column: 11
+    end_location:
+      row: 36
+      column: 30
+    fix: ~
+    parent: ~
+  - kind:
+      name: PrivateMemberAccess
+      body: "Private member accessed: `_private_thing`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 38
+      column: 11
+    end_location:
+      row: 38
+      column: 29
+    fix: ~
+    parent: ~
+  - kind:
+      name: PrivateMemberAccess
+      body: "Private member accessed: `_private_thing`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 43
+      column: 11
+    end_location:
+      row: 43
+      column: 29
+    fix: ~
+    parent: ~
+  - kind:
+      name: PrivateMemberAccess
+      body: "Private member accessed: `_private_thing`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 59
+      column: 6
+    end_location:
+      row: 59
+      column: 24
+    fix: ~
+    parent: ~
+  - kind:
+      name: PrivateMemberAccess
+      body: "Private member accessed: `__really_private_thing`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 60
+      column: 6
+    end_location:
+      row: 60
+      column: 32
+    fix: ~
+    parent: ~
+  - kind:
+      name: PrivateMemberAccess
+      body: "Private member accessed: `_private_func`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 61
+      column: 6
+    end_location:
+      row: 61
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: PrivateMemberAccess
+      body: "Private member accessed: `__really_private_func`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 62
+      column: 6
+    end_location:
+      row: 62
+      column: 31
+    fix: ~
+    parent: ~
+  - kind:
+      name: PrivateMemberAccess
+      body: "Private member accessed: `_private`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 63
+      column: 6
+    end_location:
+      row: 63
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: PrivateMemberAccess
+      body: "Private member accessed: `_private_thing`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 64
+      column: 6
+    end_location:
+      row: 64
+      column: 26
+    fix: ~
+    parent: ~
+  - kind:
+      name: PrivateMemberAccess
+      body: "Private member accessed: `_private_thing__`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 65
+      column: 6
+    end_location:
+      row: 65
+      column: 28
+    fix: ~
+    parent: ~
 

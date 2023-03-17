@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: EscapeSequenceInDocstring
-    body: "Use `r\"\"\"` if any backslashes in a docstring"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 328
-    column: 4
-  end_location:
-    row: 328
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: EscapeSequenceInDocstring
-    body: "Use `r\"\"\"` if any backslashes in a docstring"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 333
-    column: 4
-  end_location:
-    row: 333
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: EscapeSequenceInDocstring
-    body: "Use `r\"\"\"` if any backslashes in a docstring"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 338
-    column: 4
-  end_location:
-    row: 338
-    column: 21
-  fix: ~
-  parent: ~
+- - kind:
+      name: EscapeSequenceInDocstring
+      body: "Use `r\"\"\"` if any backslashes in a docstring"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 328
+      column: 4
+    end_location:
+      row: 328
+      column: 16
+    fix: ~
+    parent: ~
+  - kind:
+      name: EscapeSequenceInDocstring
+      body: "Use `r\"\"\"` if any backslashes in a docstring"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 333
+      column: 4
+    end_location:
+      row: 333
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: EscapeSequenceInDocstring
+      body: "Use `r\"\"\"` if any backslashes in a docstring"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 338
+      column: 4
+    end_location:
+      row: 338
+      column: 21
+    fix: ~
+    parent: ~
 

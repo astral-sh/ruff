@@ -2,124 +2,124 @@
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 7
-    column: 3
-  fix:
-    content: "\"\"\"\nthis is not a docstring\n\"\"\""
+- - kind:
+      name: BadQuotesMultilineString
+      body: Single quote multiline found but double quotes preferred
+      suggestion: Replace single multiline quotes with double quotes
+      fixable: true
     location:
       row: 5
       column: 0
     end_location:
       row: 7
       column: 3
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 11
-    column: 20
-  end_location:
-    row: 13
-    column: 3
-  fix:
-    content: "\"\"\"\n    class params \\t not a docstring\n\"\"\""
+    fix:
+      content: "\"\"\"\nthis is not a docstring\n\"\"\""
+      location:
+        row: 5
+        column: 0
+      end_location:
+        row: 7
+        column: 3
+    parent: ~
+  - kind:
+      name: BadQuotesMultilineString
+      body: Single quote multiline found but double quotes preferred
+      suggestion: Replace single multiline quotes with double quotes
+      fixable: true
     location:
       row: 11
       column: 20
     end_location:
       row: 13
       column: 3
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 18
-    column: 4
-  end_location:
-    row: 20
-    column: 7
-  fix:
-    content: "\"\"\"\n    this is not a docstring\n    \"\"\""
+    fix:
+      content: "\"\"\"\n    class params \\t not a docstring\n\"\"\""
+      location:
+        row: 11
+        column: 20
+      end_location:
+        row: 13
+        column: 3
+    parent: ~
+  - kind:
+      name: BadQuotesMultilineString
+      body: Single quote multiline found but double quotes preferred
+      suggestion: Replace single multiline quotes with double quotes
+      fixable: true
     location:
       row: 18
       column: 4
     end_location:
       row: 20
       column: 7
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 23
-    column: 20
-  end_location:
-    row: 24
-    column: 37
-  fix:
-    content: "\"\"\"\n        definitely not a docstring\"\"\""
+    fix:
+      content: "\"\"\"\n    this is not a docstring\n    \"\"\""
+      location:
+        row: 18
+        column: 4
+      end_location:
+        row: 20
+        column: 7
+    parent: ~
+  - kind:
+      name: BadQuotesMultilineString
+      body: Single quote multiline found but double quotes preferred
+      suggestion: Replace single multiline quotes with double quotes
+      fixable: true
     location:
       row: 23
       column: 20
     end_location:
       row: 24
       column: 37
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 32
-    column: 8
-  end_location:
-    row: 34
-    column: 11
-  fix:
-    content: "\"\"\"\n        this is not a docstring\n        \"\"\""
+    fix:
+      content: "\"\"\"\n        definitely not a docstring\"\"\""
+      location:
+        row: 23
+        column: 20
+      end_location:
+        row: 24
+        column: 37
+    parent: ~
+  - kind:
+      name: BadQuotesMultilineString
+      body: Single quote multiline found but double quotes preferred
+      suggestion: Replace single multiline quotes with double quotes
+      fixable: true
     location:
       row: 32
       column: 8
     end_location:
       row: 34
       column: 11
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 37
-    column: 12
-  end_location:
-    row: 39
-    column: 15
-  fix:
-    content: "\"\"\"\n            Looks like a docstring, but in reality it isn't - only modules, classes and functions\n            \"\"\""
+    fix:
+      content: "\"\"\"\n        this is not a docstring\n        \"\"\""
+      location:
+        row: 32
+        column: 8
+      end_location:
+        row: 34
+        column: 11
+    parent: ~
+  - kind:
+      name: BadQuotesMultilineString
+      body: Single quote multiline found but double quotes preferred
+      suggestion: Replace single multiline quotes with double quotes
+      fixable: true
     location:
       row: 37
       column: 12
     end_location:
       row: 39
       column: 15
-  parent: ~
+    fix:
+      content: "\"\"\"\n            Looks like a docstring, but in reality it isn't - only modules, classes and functions\n            \"\"\""
+      location:
+        row: 37
+        column: 12
+      end_location:
+        row: 39
+        column: 15
+    parent: ~
 

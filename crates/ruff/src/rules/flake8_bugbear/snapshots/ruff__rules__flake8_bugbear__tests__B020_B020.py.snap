@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: LoopVariableOverridesIterator
-    body: "Loop control variable `items` overrides iterable it iterates"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 4
-  end_location:
-    row: 8
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: LoopVariableOverridesIterator
-    body: "Loop control variable `values` overrides iterable it iterates"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 9
-  end_location:
-    row: 21
-    column: 15
-  fix: ~
-  parent: ~
-- kind:
-    name: LoopVariableOverridesIterator
-    body: "Loop control variable `vars` overrides iterable it iterates"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 36
-    column: 4
-  end_location:
-    row: 36
-    column: 8
-  fix: ~
-  parent: ~
+- - kind:
+      name: LoopVariableOverridesIterator
+      body: "Loop control variable `items` overrides iterable it iterates"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 4
+    end_location:
+      row: 8
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: LoopVariableOverridesIterator
+      body: "Loop control variable `values` overrides iterable it iterates"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 21
+      column: 9
+    end_location:
+      row: 21
+      column: 15
+    fix: ~
+    parent: ~
+  - kind:
+      name: LoopVariableOverridesIterator
+      body: "Loop control variable `vars` overrides iterable it iterates"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 36
+      column: 4
+    end_location:
+      row: 36
+      column: 8
+    fix: ~
+    parent: ~
 

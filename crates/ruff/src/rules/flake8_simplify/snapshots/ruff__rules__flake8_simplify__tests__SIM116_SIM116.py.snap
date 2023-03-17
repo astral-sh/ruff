@@ -2,95 +2,95 @@
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: IfElseBlockInsteadOfDictLookup
-    body: "Use a dictionary instead of consecutive `if` statements"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 12
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: IfElseBlockInsteadOfDictLookup
-    body: "Use a dictionary instead of consecutive `if` statements"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 22
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: IfElseBlockInsteadOfDictLookup
-    body: "Use a dictionary instead of consecutive `if` statements"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 25
-    column: 0
-  end_location:
-    row: 30
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: IfElseBlockInsteadOfDictLookup
-    body: "Use a dictionary instead of consecutive `if` statements"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 33
-    column: 0
-  end_location:
-    row: 40
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: IfElseBlockInsteadOfDictLookup
-    body: "Use a dictionary instead of consecutive `if` statements"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 0
-  end_location:
-    row: 48
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: IfElseBlockInsteadOfDictLookup
-    body: "Use a dictionary instead of consecutive `if` statements"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 51
-    column: 0
-  end_location:
-    row: 58
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: IfElseBlockInsteadOfDictLookup
-    body: "Use a dictionary instead of consecutive `if` statements"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 79
-    column: 0
-  end_location:
-    row: 86
-    column: 15
-  fix: ~
-  parent: ~
+- - kind:
+      name: IfElseBlockInsteadOfDictLookup
+      body: "Use a dictionary instead of consecutive `if` statements"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 12
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: IfElseBlockInsteadOfDictLookup
+      body: "Use a dictionary instead of consecutive `if` statements"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 22
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: IfElseBlockInsteadOfDictLookup
+      body: "Use a dictionary instead of consecutive `if` statements"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 25
+      column: 0
+    end_location:
+      row: 30
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: IfElseBlockInsteadOfDictLookup
+      body: "Use a dictionary instead of consecutive `if` statements"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 33
+      column: 0
+    end_location:
+      row: 40
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: IfElseBlockInsteadOfDictLookup
+      body: "Use a dictionary instead of consecutive `if` statements"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 43
+      column: 0
+    end_location:
+      row: 48
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: IfElseBlockInsteadOfDictLookup
+      body: "Use a dictionary instead of consecutive `if` statements"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 51
+      column: 0
+    end_location:
+      row: 58
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: IfElseBlockInsteadOfDictLookup
+      body: "Use a dictionary instead of consecutive `if` statements"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 79
+      column: 0
+    end_location:
+      row: 86
+      column: 15
+    fix: ~
+    parent: ~
 

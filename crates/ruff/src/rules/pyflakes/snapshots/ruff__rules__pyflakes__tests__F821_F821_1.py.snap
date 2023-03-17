@@ -2,56 +2,56 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 9
-  end_location:
-    row: 11
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 16
-  end_location:
-    row: 18
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 12
-  end_location:
-    row: 24
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 30
-    column: 10
-  end_location:
-    row: 30
-    column: 17
-  fix: ~
-  parent: ~
+- - kind:
+      name: UndefinedName
+      body: "Undefined name `Model`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 9
+    end_location:
+      row: 11
+      column: 16
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndefinedName
+      body: "Undefined name `Model`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 18
+      column: 16
+    end_location:
+      row: 18
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndefinedName
+      body: "Undefined name `Model`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 24
+      column: 12
+    end_location:
+      row: 24
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndefinedName
+      body: "Undefined name `Model`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 30
+      column: 10
+    end_location:
+      row: 30
+      column: 17
+    fix: ~
+    parent: ~
 

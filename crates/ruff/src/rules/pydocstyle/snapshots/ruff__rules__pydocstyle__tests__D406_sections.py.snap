@@ -2,44 +2,44 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NewLineAfterSectionName
-    body: "Section name should end with a newline (\"Returns\")"
-    suggestion: "Add newline after \"Returns\""
-    fixable: true
-  location:
-    row: 30
-    column: 4
-  end_location:
-    row: 36
-    column: 7
-  fix:
-    content: ""
+- - kind:
+      name: NewLineAfterSectionName
+      body: "Section name should end with a newline (\"Returns\")"
+      suggestion: "Add newline after \"Returns\""
+      fixable: true
     location:
-      row: 32
-      column: 11
+      row: 30
+      column: 4
     end_location:
-      row: 32
-      column: 12
-  parent: ~
-- kind:
-    name: NewLineAfterSectionName
-    body: "Section name should end with a newline (\"Raises\")"
-    suggestion: "Add newline after \"Raises\""
-    fixable: true
-  location:
-    row: 216
-    column: 4
-  end_location:
-    row: 230
-    column: 7
-  fix:
-    content: ""
+      row: 36
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 32
+        column: 11
+      end_location:
+        row: 32
+        column: 12
+    parent: ~
+  - kind:
+      name: NewLineAfterSectionName
+      body: "Section name should end with a newline (\"Raises\")"
+      suggestion: "Add newline after \"Raises\""
+      fixable: true
     location:
-      row: 227
-      column: 10
+      row: 216
+      column: 4
     end_location:
-      row: 227
-      column: 11
-  parent: ~
+      row: 230
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 227
+        column: 10
+      end_location:
+        row: 227
+        column: 11
+    parent: ~
 

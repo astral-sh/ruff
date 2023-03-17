@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: CamelcaseImportedAsConstant
-    body: "Camelcase `Camel` imported as constant `CAMEL`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 25
-  fix: ~
-  parent: ~
-- kind:
-    name: CamelcaseImportedAsConstant
-    body: "Camelcase `CamelCase` imported as constant `CAMELCASE`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 38
-  fix: ~
-  parent: ~
-- kind:
-    name: CamelcaseImportedAsConstant
-    body: "Camelcase `AnotherCamelCase` imported as constant `ANOTHER_CAMELCASE`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 53
-  fix: ~
-  parent: ~
+- - kind:
+      name: CamelcaseImportedAsConstant
+      body: "Camelcase `Camel` imported as constant `CAMEL`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 25
+    fix: ~
+    parent: ~
+  - kind:
+      name: CamelcaseImportedAsConstant
+      body: "Camelcase `CamelCase` imported as constant `CAMELCASE`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 38
+    fix: ~
+    parent: ~
+  - kind:
+      name: CamelcaseImportedAsConstant
+      body: "Camelcase `AnotherCamelCase` imported as constant `ANOTHER_CAMELCASE`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 53
+    fix: ~
+    parent: ~
 

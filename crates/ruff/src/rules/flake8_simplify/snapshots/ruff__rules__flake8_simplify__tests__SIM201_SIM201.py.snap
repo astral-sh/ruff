@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NegateEqualOp
-    body: "Use `a != b` instead of `not a == b`"
-    suggestion: "Replace with `!=` operator"
-    fixable: true
-  location:
-    row: 2
-    column: 3
-  end_location:
-    row: 2
-    column: 13
-  fix:
-    content: a != b
+- - kind:
+      name: NegateEqualOp
+      body: "Use `a != b` instead of `not a == b`"
+      suggestion: "Replace with `!=` operator"
+      fixable: true
     location:
       row: 2
       column: 3
     end_location:
       row: 2
       column: 13
-  parent: ~
-- kind:
-    name: NegateEqualOp
-    body: "Use `a != b + c` instead of `not a == b + c`"
-    suggestion: "Replace with `!=` operator"
-    fixable: true
-  location:
-    row: 6
-    column: 3
-  end_location:
-    row: 6
-    column: 19
-  fix:
-    content: a != b + c
+    fix:
+      content: a != b
+      location:
+        row: 2
+        column: 3
+      end_location:
+        row: 2
+        column: 13
+    parent: ~
+  - kind:
+      name: NegateEqualOp
+      body: "Use `a != b + c` instead of `not a == b + c`"
+      suggestion: "Replace with `!=` operator"
+      fixable: true
     location:
       row: 6
       column: 3
     end_location:
       row: 6
       column: 19
-  parent: ~
-- kind:
-    name: NegateEqualOp
-    body: "Use `a + b != c` instead of `not a + b == c`"
-    suggestion: "Replace with `!=` operator"
-    fixable: true
-  location:
-    row: 10
-    column: 3
-  end_location:
-    row: 10
-    column: 19
-  fix:
-    content: a + b != c
+    fix:
+      content: a != b + c
+      location:
+        row: 6
+        column: 3
+      end_location:
+        row: 6
+        column: 19
+    parent: ~
+  - kind:
+      name: NegateEqualOp
+      body: "Use `a + b != c` instead of `not a + b == c`"
+      suggestion: "Replace with `!=` operator"
+      fixable: true
     location:
       row: 10
       column: 3
     end_location:
       row: 10
       column: 19
-  parent: ~
+    fix:
+      content: a + b != c
+      location:
+        row: 10
+        column: 3
+      end_location:
+        row: 10
+        column: 19
+    parent: ~
 

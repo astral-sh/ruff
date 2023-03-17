@@ -2,44 +2,44 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NonPEP604Annotation
-    body: "Use `X | Y` for type annotations"
-    suggestion: "Convert to `X | Y`"
-    fixable: true
-  location:
-    row: 40
-    column: 3
-  end_location:
-    row: 40
-    column: 16
-  fix:
-    content: int | None
+- - kind:
+      name: NonPEP604Annotation
+      body: "Use `X | Y` for type annotations"
+      suggestion: "Convert to `X | Y`"
+      fixable: true
     location:
       row: 40
       column: 3
     end_location:
       row: 40
       column: 16
-  parent: ~
-- kind:
-    name: NonPEP604Annotation
-    body: "Use `X | Y` for type annotations"
-    suggestion: "Convert to `X | Y`"
-    fixable: true
-  location:
-    row: 42
-    column: 20
-  end_location:
-    row: 42
-    column: 47
-  fix:
-    content: "List[int] | List[str]"
+    fix:
+      content: int | None
+      location:
+        row: 40
+        column: 3
+      end_location:
+        row: 40
+        column: 16
+    parent: ~
+  - kind:
+      name: NonPEP604Annotation
+      body: "Use `X | Y` for type annotations"
+      suggestion: "Convert to `X | Y`"
+      fixable: true
     location:
       row: 42
       column: 20
     end_location:
       row: 42
       column: 47
-  parent: ~
+    fix:
+      content: "List[int] | List[str]"
+      location:
+        row: 42
+        column: 20
+      end_location:
+        row: 42
+        column: 47
+    parent: ~
 

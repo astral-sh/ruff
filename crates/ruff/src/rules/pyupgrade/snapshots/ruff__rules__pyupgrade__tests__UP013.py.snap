@@ -2,244 +2,244 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ConvertTypedDictFunctionalToClass
-    body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 50
-  fix:
-    content: "class MyType(TypedDict):\n    a: int\n    b: str"
+- - kind:
+      name: ConvertTypedDictFunctionalToClass
+      body: "Convert `MyType` from `TypedDict` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 5
       column: 0
     end_location:
       row: 5
       column: 50
-  parent: ~
-- kind:
-    name: ConvertTypedDictFunctionalToClass
-    body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 48
-  fix:
-    content: "class MyType(TypedDict):\n    a: int\n    b: str"
+    fix:
+      content: "class MyType(TypedDict):\n    a: int\n    b: str"
+      location:
+        row: 5
+        column: 0
+      end_location:
+        row: 5
+        column: 50
+    parent: ~
+  - kind:
+      name: ConvertTypedDictFunctionalToClass
+      body: "Convert `MyType` from `TypedDict` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 8
       column: 0
     end_location:
       row: 8
       column: 48
-  parent: ~
-- kind:
-    name: ConvertTypedDictFunctionalToClass
-    body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 42
-  fix:
-    content: "class MyType(TypedDict):\n    a: int\n    b: str"
+    fix:
+      content: "class MyType(TypedDict):\n    a: int\n    b: str"
+      location:
+        row: 8
+        column: 0
+      end_location:
+        row: 8
+        column: 48
+    parent: ~
+  - kind:
+      name: ConvertTypedDictFunctionalToClass
+      body: "Convert `MyType` from `TypedDict` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 11
       column: 0
     end_location:
       row: 11
       column: 42
-  parent: ~
-- kind:
-    name: ConvertTypedDictFunctionalToClass
-    body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 14
-    column: 0
-  end_location:
-    row: 14
-    column: 28
-  fix:
-    content: "class MyType(TypedDict):\n    pass"
+    fix:
+      content: "class MyType(TypedDict):\n    a: int\n    b: str"
+      location:
+        row: 11
+        column: 0
+      end_location:
+        row: 11
+        column: 42
+    parent: ~
+  - kind:
+      name: ConvertTypedDictFunctionalToClass
+      body: "Convert `MyType` from `TypedDict` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 14
       column: 0
     end_location:
       row: 14
       column: 28
-  parent: ~
-- kind:
-    name: ConvertTypedDictFunctionalToClass
-    body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 17
-    column: 0
-  end_location:
-    row: 17
-    column: 44
-  fix:
-    content: "class MyType(TypedDict):\n    a: \"hello\""
+    fix:
+      content: "class MyType(TypedDict):\n    pass"
+      location:
+        row: 14
+        column: 0
+      end_location:
+        row: 14
+        column: 28
+    parent: ~
+  - kind:
+      name: ConvertTypedDictFunctionalToClass
+      body: "Convert `MyType` from `TypedDict` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 17
       column: 0
     end_location:
       row: 17
       column: 44
-  parent: ~
-- kind:
-    name: ConvertTypedDictFunctionalToClass
-    body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 18
-    column: 0
-  end_location:
-    row: 18
-    column: 39
-  fix:
-    content: "class MyType(TypedDict):\n    a: \"hello\""
+    fix:
+      content: "class MyType(TypedDict):\n    a: \"hello\""
+      location:
+        row: 17
+        column: 0
+      end_location:
+        row: 17
+        column: 44
+    parent: ~
+  - kind:
+      name: ConvertTypedDictFunctionalToClass
+      body: "Convert `MyType` from `TypedDict` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 18
       column: 0
     end_location:
       row: 18
       column: 39
-  parent: ~
-- kind:
-    name: ConvertTypedDictFunctionalToClass
-    body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 21
-    column: 0
-  end_location:
-    row: 21
-    column: 54
-  fix:
-    content: "class MyType(TypedDict):\n    a: NotRequired[dict]"
+    fix:
+      content: "class MyType(TypedDict):\n    a: \"hello\""
+      location:
+        row: 18
+        column: 0
+      end_location:
+        row: 18
+        column: 39
+    parent: ~
+  - kind:
+      name: ConvertTypedDictFunctionalToClass
+      body: "Convert `MyType` from `TypedDict` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 21
       column: 0
     end_location:
       row: 21
       column: 54
-  parent: ~
-- kind:
-    name: ConvertTypedDictFunctionalToClass
-    body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 24
-    column: 0
-  end_location:
-    row: 24
-    column: 63
-  fix:
-    content: "class MyType(TypedDict, total=False):\n    x: int\n    y: int"
+    fix:
+      content: "class MyType(TypedDict):\n    a: NotRequired[dict]"
+      location:
+        row: 21
+        column: 0
+      end_location:
+        row: 21
+        column: 54
+    parent: ~
+  - kind:
+      name: ConvertTypedDictFunctionalToClass
+      body: "Convert `MyType` from `TypedDict` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 24
       column: 0
     end_location:
       row: 24
       column: 63
-  parent: ~
-- kind:
-    name: ConvertTypedDictFunctionalToClass
-    body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 27
-    column: 0
-  end_location:
-    row: 27
-    column: 55
-  fix:
-    content: "class MyType(TypedDict):\n    key: Literal[\"value\"]"
+    fix:
+      content: "class MyType(TypedDict, total=False):\n    x: int\n    y: int"
+      location:
+        row: 24
+        column: 0
+      end_location:
+        row: 24
+        column: 63
+    parent: ~
+  - kind:
+      name: ConvertTypedDictFunctionalToClass
+      body: "Convert `MyType` from `TypedDict` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 27
       column: 0
     end_location:
       row: 27
       column: 55
-  parent: ~
-- kind:
-    name: ConvertTypedDictFunctionalToClass
-    body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 30
-    column: 0
-  end_location:
-    row: 30
-    column: 49
-  fix:
-    content: "class MyType(typing.TypedDict):\n    key: int"
+    fix:
+      content: "class MyType(TypedDict):\n    key: Literal[\"value\"]"
+      location:
+        row: 27
+        column: 0
+      end_location:
+        row: 27
+        column: 55
+    parent: ~
+  - kind:
+      name: ConvertTypedDictFunctionalToClass
+      body: "Convert `MyType` from `TypedDict` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 30
       column: 0
     end_location:
       row: 30
       column: 49
-  parent: ~
-- kind:
-    name: ConvertTypedDictFunctionalToClass
-    body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 40
-    column: 0
-  end_location:
-    row: 40
-    column: 32
-  fix:
-    content: "class MyType(TypedDict):\n    pass"
+    fix:
+      content: "class MyType(typing.TypedDict):\n    key: int"
+      location:
+        row: 30
+        column: 0
+      end_location:
+        row: 30
+        column: 49
+    parent: ~
+  - kind:
+      name: ConvertTypedDictFunctionalToClass
+      body: "Convert `MyType` from `TypedDict` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 40
       column: 0
     end_location:
       row: 40
       column: 32
-  parent: ~
-- kind:
-    name: ConvertTypedDictFunctionalToClass
-    body: "Convert `MyType` from `TypedDict` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 43
-    column: 0
-  end_location:
-    row: 43
-    column: 36
-  fix:
-    content: "class MyType(TypedDict):\n    pass"
+    fix:
+      content: "class MyType(TypedDict):\n    pass"
+      location:
+        row: 40
+        column: 0
+      end_location:
+        row: 40
+        column: 32
+    parent: ~
+  - kind:
+      name: ConvertTypedDictFunctionalToClass
+      body: "Convert `MyType` from `TypedDict` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 43
       column: 0
     end_location:
       row: 43
       column: 36
-  parent: ~
+    fix:
+      content: "class MyType(TypedDict):\n    pass"
+      location:
+        row: 43
+        column: 0
+      end_location:
+        row: 43
+        column: 36
+    parent: ~
 

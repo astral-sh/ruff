@@ -2,404 +2,404 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 5
-    column: 8
-  end_location:
-    row: 5
-    column: 14
-  fix:
-    content: ""
+- - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
       row: 5
-      column: 7
+      column: 8
     end_location:
       row: 5
-      column: 15
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 10
-    column: 4
-  end_location:
-    row: 10
-    column: 10
-  fix:
-    content: ""
+      column: 14
+    fix:
+      content: ""
+      location:
+        row: 5
+        column: 7
+      end_location:
+        row: 5
+        column: 15
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 9
-      column: 7
+      row: 10
+      column: 4
     end_location:
-      row: 11
-      column: 1
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 16
-    column: 4
-  end_location:
-    row: 16
-    column: 10
-  fix:
-    content: ""
+      row: 10
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 9
+        column: 7
+      end_location:
+        row: 11
+        column: 1
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 15
-      column: 7
+      row: 16
+      column: 4
     end_location:
-      row: 18
-      column: 1
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 24
-    column: 4
-  end_location:
-    row: 24
-    column: 10
-  fix:
-    content: ""
+      row: 16
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 15
+        column: 7
+      end_location:
+        row: 18
+        column: 1
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 22
-      column: 7
+      row: 24
+      column: 4
     end_location:
-      row: 25
-      column: 1
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 31
-    column: 4
-  end_location:
-    row: 31
-    column: 10
-  fix:
-    content: ""
+      row: 24
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 22
+        column: 7
+      end_location:
+        row: 25
+        column: 1
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 29
-      column: 7
+      row: 31
+      column: 4
     end_location:
-      row: 32
-      column: 1
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 37
-    column: 4
-  end_location:
-    row: 37
-    column: 10
-  fix:
-    content: ""
+      row: 31
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 29
+        column: 7
+      end_location:
+        row: 32
+        column: 1
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 36
-      column: 7
+      row: 37
+      column: 4
     end_location:
-      row: 39
-      column: 1
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 45
-    column: 4
-  end_location:
-    row: 45
-    column: 10
-  fix:
-    content: ""
+      row: 37
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 36
+        column: 7
+      end_location:
+        row: 39
+        column: 1
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 43
-      column: 7
+      row: 45
+      column: 4
     end_location:
-      row: 47
-      column: 1
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 53
-    column: 4
-  end_location:
-    row: 53
-    column: 10
-  fix:
-    content: ""
+      row: 45
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 43
+        column: 7
+      end_location:
+        row: 47
+        column: 1
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 51
-      column: 7
+      row: 53
+      column: 4
     end_location:
-      row: 55
-      column: 1
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 61
-    column: 4
-  end_location:
-    row: 61
-    column: 10
-  fix:
-    content: ""
+      row: 53
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 51
+        column: 7
+      end_location:
+        row: 55
+        column: 1
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 59
-      column: 7
+      row: 61
+      column: 4
     end_location:
-      row: 63
-      column: 1
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 69
-    column: 4
-  end_location:
-    row: 69
-    column: 10
-  fix:
-    content: ""
+      row: 61
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 59
+        column: 7
+      end_location:
+        row: 63
+        column: 1
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 67
-      column: 7
+      row: 69
+      column: 4
     end_location:
-      row: 71
-      column: 1
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `B` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 75
-    column: 11
-  end_location:
-    row: 75
-    column: 17
-  fix:
-    content: ""
+      row: 69
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 67
+        column: 7
+      end_location:
+        row: 71
+        column: 1
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `B` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
       row: 75
-      column: 9
+      column: 11
     end_location:
       row: 75
       column: 17
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `B` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 79
-    column: 8
-  end_location:
-    row: 79
-    column: 14
-  fix:
-    content: ""
+    fix:
+      content: ""
+      location:
+        row: 75
+        column: 9
+      end_location:
+        row: 75
+        column: 17
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `B` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
       row: 79
       column: 8
     end_location:
       row: 79
-      column: 16
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `B` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 84
-    column: 4
-  end_location:
-    row: 84
-    column: 10
-  fix:
-    content: ""
+      column: 14
+    fix:
+      content: ""
+      location:
+        row: 79
+        column: 8
+      end_location:
+        row: 79
+        column: 16
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `B` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
       row: 84
       column: 4
     end_location:
-      row: 85
-      column: 4
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `B` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 92
-    column: 4
-  end_location:
-    row: 92
-    column: 10
-  fix:
-    content: ""
+      row: 84
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 84
+        column: 4
+      end_location:
+        row: 85
+        column: 4
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `B` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 91
-      column: 5
+      row: 92
+      column: 4
     end_location:
       row: 92
       column: 10
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `B` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 98
-    column: 4
-  end_location:
-    row: 98
-    column: 10
-  fix:
-    content: ""
+    fix:
+      content: ""
+      location:
+        row: 91
+        column: 5
+      end_location:
+        row: 92
+        column: 10
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `B` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
       row: 98
       column: 4
     end_location:
-      row: 99
-      column: 4
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `B` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 108
-    column: 4
-  end_location:
-    row: 108
-    column: 10
-  fix:
-    content: ""
+      row: 98
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 98
+        column: 4
+      end_location:
+        row: 99
+        column: 4
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `B` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 107
-      column: 5
+      row: 108
+      column: 4
     end_location:
       row: 108
       column: 10
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 114
-    column: 12
-  end_location:
-    row: 114
-    column: 18
-  fix:
-    content: ""
+    fix:
+      content: ""
+      location:
+        row: 107
+        column: 5
+      end_location:
+        row: 108
+        column: 10
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
       row: 114
-      column: 11
+      column: 12
     end_location:
       row: 114
-      column: 19
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 119
-    column: 4
-  end_location:
-    row: 119
-    column: 10
-  fix:
-    content: ""
+      column: 18
+    fix:
+      content: ""
+      location:
+        row: 114
+        column: 11
+      end_location:
+        row: 114
+        column: 19
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 118
-      column: 7
+      row: 119
+      column: 4
     end_location:
-      row: 120
-      column: 1
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 125
-    column: 4
-  end_location:
-    row: 125
-    column: 10
-  fix:
-    content: ""
+      row: 119
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 118
+        column: 7
+      end_location:
+        row: 120
+        column: 1
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 124
-      column: 7
+      row: 125
+      column: 4
     end_location:
-      row: 126
-      column: 1
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 131
-    column: 4
-  end_location:
-    row: 131
-    column: 10
-  fix:
-    content: ""
+      row: 125
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 124
+        column: 7
+      end_location:
+        row: 126
+        column: 1
+    parent: ~
+  - kind:
+      name: UselessObjectInheritance
+      body: "Class `A` inherits from `object`"
+      suggestion: "Remove `object` inheritance"
+      fixable: true
     location:
-      row: 130
-      column: 7
+      row: 131
+      column: 4
     end_location:
-      row: 133
-      column: 1
-  parent: ~
+      row: 131
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 130
+        column: 7
+      end_location:
+        row: 133
+        column: 1
+    parent: ~
 

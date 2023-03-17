@@ -2,108 +2,108 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 25
-  fix: ~
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 18
-  fix: ~
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 0
-  end_location:
-    row: 16
-    column: 25
-  fix: ~
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 0
-  end_location:
-    row: 19
-    column: 18
-  fix: ~
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 0
-  end_location:
-    row: 22
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 0
-  end_location:
-    row: 24
-    column: 35
-  fix: ~
-  parent: ~
+- - kind:
+      name: StripWithMultiCharacters
+      body: "Using `.strip()` with multi-character strings is misleading the reader"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 24
+    fix: ~
+    parent: ~
+  - kind:
+      name: StripWithMultiCharacters
+      body: "Using `.strip()` with multi-character strings is misleading the reader"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: StripWithMultiCharacters
+      body: "Using `.strip()` with multi-character strings is misleading the reader"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 25
+    fix: ~
+    parent: ~
+  - kind:
+      name: StripWithMultiCharacters
+      body: "Using `.strip()` with multi-character strings is misleading the reader"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 13
+      column: 18
+    fix: ~
+    parent: ~
+  - kind:
+      name: StripWithMultiCharacters
+      body: "Using `.strip()` with multi-character strings is misleading the reader"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 16
+      column: 25
+    fix: ~
+    parent: ~
+  - kind:
+      name: StripWithMultiCharacters
+      body: "Using `.strip()` with multi-character strings is misleading the reader"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 19
+      column: 18
+    fix: ~
+    parent: ~
+  - kind:
+      name: StripWithMultiCharacters
+      body: "Using `.strip()` with multi-character strings is misleading the reader"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 22
+      column: 0
+    end_location:
+      row: 22
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: StripWithMultiCharacters
+      body: "Using `.strip()` with multi-character strings is misleading the reader"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 24
+      column: 0
+    end_location:
+      row: 24
+      column: 35
+    fix: ~
+    parent: ~
 

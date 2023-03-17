@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: OSErrorAlias
-    body: "Replace aliased errors with `OSError`"
-    suggestion: "Replace with builtin `OSError`"
-    fixable: true
-  location:
-    row: 9
-    column: 7
-  end_location:
-    row: 9
-    column: 50
-  fix:
-    content: "(OSError, exceptions.OperationalError)"
+- - kind:
+      name: OSErrorAlias
+      body: "Replace aliased errors with `OSError`"
+      suggestion: "Replace with builtin `OSError`"
+      fixable: true
     location:
       row: 9
       column: 7
     end_location:
       row: 9
       column: 50
-  parent: ~
+    fix:
+      content: "(OSError, exceptions.OperationalError)"
+      location:
+        row: 9
+        column: 7
+      end_location:
+        row: 9
+        column: 50
+    parent: ~
 

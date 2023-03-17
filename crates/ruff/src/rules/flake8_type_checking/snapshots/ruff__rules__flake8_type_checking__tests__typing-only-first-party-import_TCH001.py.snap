@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: TypingOnlyFirstPartyImport
-    body: "Move application import `.TYP001` into a type-checking block"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 18
-  end_location:
-    row: 20
-    column: 24
-  fix: ~
-  parent: ~
+- - kind:
+      name: TypingOnlyFirstPartyImport
+      body: "Move application import `.TYP001` into a type-checking block"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 20
+      column: 18
+    end_location:
+      row: 20
+      column: 24
+    fix: ~
+    parent: ~
 

@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MultipleLeadingHashesForBlockComment
-    body: "Too many leading `#` before block comment"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 4
-  end_location:
-    row: 19
-    column: 30
-  fix: ~
-  parent: ~
-- kind:
-    name: MultipleLeadingHashesForBlockComment
-    body: "Too many leading `#` before block comment"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 4
-  end_location:
-    row: 22
-    column: 30
-  fix: ~
-  parent: ~
-- kind:
-    name: MultipleLeadingHashesForBlockComment
-    body: "Too many leading `#` before block comment"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 0
-  end_location:
-    row: 26
-    column: 21
-  fix: ~
-  parent: ~
+- - kind:
+      name: MultipleLeadingHashesForBlockComment
+      body: "Too many leading `#` before block comment"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 19
+      column: 4
+    end_location:
+      row: 19
+      column: 30
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultipleLeadingHashesForBlockComment
+      body: "Too many leading `#` before block comment"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 22
+      column: 4
+    end_location:
+      row: 22
+      column: 30
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultipleLeadingHashesForBlockComment
+      body: "Too many leading `#` before block comment"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 26
+      column: 0
+    end_location:
+      row: 26
+      column: 21
+    fix: ~
+    parent: ~
 

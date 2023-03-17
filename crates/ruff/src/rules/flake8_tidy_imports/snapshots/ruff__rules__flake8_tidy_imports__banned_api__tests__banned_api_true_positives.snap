@@ -2,160 +2,160 @@
 source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 expression: diagnostics
 ---
-- kind:
-    name: BannedApi
-    body: "`cgi` is banned: The cgi module is deprecated."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 7
-  end_location:
-    row: 2
-    column: 10
-  fix: ~
-  parent: ~
-- kind:
-    name: BannedApi
-    body: "`cgi` is banned: The cgi module is deprecated."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: BannedApi
-    body: "`cgi` is banned: The cgi module is deprecated."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: BannedApi
-    body: "`cgi` is banned: The cgi module is deprecated."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 7
-  end_location:
-    row: 9
-    column: 18
-  fix: ~
-  parent: ~
-- kind:
-    name: BannedApi
-    body: "`cgi` is banned: The cgi module is deprecated."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: BannedApi
-    body: "`cgi` is banned: The cgi module is deprecated."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 25
-  fix: ~
-  parent: ~
-- kind:
-    name: BannedApi
-    body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 19
-  end_location:
-    row: 17
-    column: 28
-  fix: ~
-  parent: ~
-- kind:
-    name: BannedApi
-    body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 0
-  end_location:
-    row: 22
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: BannedApi
-    body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 0
-  end_location:
-    row: 24
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: BannedApi
-    body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 27
-    column: 0
-  end_location:
-    row: 27
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: BannedApi
-    body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 0
-  end_location:
-    row: 29
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: BannedApi
-    body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 33
-    column: 0
-  end_location:
-    row: 33
-    column: 28
-  fix: ~
-  parent: ~
+- - kind:
+      name: BannedApi
+      body: "`cgi` is banned: The cgi module is deprecated."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 7
+    end_location:
+      row: 2
+      column: 10
+    fix: ~
+    parent: ~
+  - kind:
+      name: BannedApi
+      body: "`cgi` is banned: The cgi module is deprecated."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: BannedApi
+      body: "`cgi` is banned: The cgi module is deprecated."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: BannedApi
+      body: "`cgi` is banned: The cgi module is deprecated."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 7
+    end_location:
+      row: 9
+      column: 18
+    fix: ~
+    parent: ~
+  - kind:
+      name: BannedApi
+      body: "`cgi` is banned: The cgi module is deprecated."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: BannedApi
+      body: "`cgi` is banned: The cgi module is deprecated."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 13
+      column: 25
+    fix: ~
+    parent: ~
+  - kind:
+      name: BannedApi
+      body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 17
+      column: 19
+    end_location:
+      row: 17
+      column: 28
+    fix: ~
+    parent: ~
+  - kind:
+      name: BannedApi
+      body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 22
+      column: 0
+    end_location:
+      row: 22
+      column: 16
+    fix: ~
+    parent: ~
+  - kind:
+      name: BannedApi
+      body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 24
+      column: 0
+    end_location:
+      row: 24
+      column: 16
+    fix: ~
+    parent: ~
+  - kind:
+      name: BannedApi
+      body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 27
+      column: 0
+    end_location:
+      row: 27
+      column: 16
+    fix: ~
+    parent: ~
+  - kind:
+      name: BannedApi
+      body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 29
+      column: 0
+    end_location:
+      row: 29
+      column: 16
+    fix: ~
+    parent: ~
+  - kind:
+      name: BannedApi
+      body: "`typing.TypedDict` is banned: Use typing_extensions.TypedDict instead."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 33
+      column: 0
+    end_location:
+      row: 33
+      column: 28
+    fix: ~
+    parent: ~
 

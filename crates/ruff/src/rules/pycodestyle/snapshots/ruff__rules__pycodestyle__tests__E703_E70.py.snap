@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UselessSemicolon
-    body: Statement ends with an unnecessary semicolon
-    suggestion: Remove unnecessary semicolon
-    fixable: true
-  location:
-    row: 10
-    column: 12
-  end_location:
-    row: 10
-    column: 13
-  fix:
-    content: ""
+- - kind:
+      name: UselessSemicolon
+      body: Statement ends with an unnecessary semicolon
+      suggestion: Remove unnecessary semicolon
+      fixable: true
     location:
       row: 10
       column: 12
     end_location:
       row: 10
       column: 13
-  parent: ~
-- kind:
-    name: UselessSemicolon
-    body: Statement ends with an unnecessary semicolon
-    suggestion: Remove unnecessary semicolon
-    fixable: true
-  location:
-    row: 12
-    column: 22
-  end_location:
-    row: 12
-    column: 23
-  fix:
-    content: ""
+    fix:
+      content: ""
+      location:
+        row: 10
+        column: 12
+      end_location:
+        row: 10
+        column: 13
+    parent: ~
+  - kind:
+      name: UselessSemicolon
+      body: Statement ends with an unnecessary semicolon
+      suggestion: Remove unnecessary semicolon
+      fixable: true
     location:
       row: 12
       column: 22
     end_location:
       row: 12
       column: 23
-  parent: ~
-- kind:
-    name: UselessSemicolon
-    body: Statement ends with an unnecessary semicolon
-    suggestion: Remove unnecessary semicolon
-    fixable: true
-  location:
-    row: 25
-    column: 13
-  end_location:
-    row: 25
-    column: 14
-  fix:
-    content: ""
+    fix:
+      content: ""
+      location:
+        row: 12
+        column: 22
+      end_location:
+        row: 12
+        column: 23
+    parent: ~
+  - kind:
+      name: UselessSemicolon
+      body: Statement ends with an unnecessary semicolon
+      suggestion: Remove unnecessary semicolon
+      fixable: true
     location:
       row: 25
       column: 13
     end_location:
       row: 25
       column: 14
-  parent: ~
+    fix:
+      content: ""
+      location:
+        row: 25
+        column: 13
+      end_location:
+        row: 25
+        column: 14
+    parent: ~
 

@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UTF8EncodingDeclaration
-    body: UTF-8 encoding declaration is unnecessary
-    suggestion: Remove unnecessary coding comment
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 3
-    column: 0
-  fix:
-    content: ""
+- - kind:
+      name: UTF8EncodingDeclaration
+      body: UTF-8 encoding declaration is unnecessary
+      suggestion: Remove unnecessary coding comment
+      fixable: true
     location:
       row: 2
       column: 0
     end_location:
       row: 3
       column: 0
-  parent: ~
+    fix:
+      content: ""
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 3
+        column: 0
+    parent: ~
 

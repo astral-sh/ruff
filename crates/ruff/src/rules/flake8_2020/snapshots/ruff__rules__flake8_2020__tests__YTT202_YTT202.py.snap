@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/flake8_2020/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: SixPY3
-    body: "`six.PY3` referenced (python4), use `not six.PY2`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 3
-  end_location:
-    row: 4
-    column: 10
-  fix: ~
-  parent: ~
-- kind:
-    name: SixPY3
-    body: "`six.PY3` referenced (python4), use `not six.PY2`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 3
-  end_location:
-    row: 6
-    column: 6
-  fix: ~
-  parent: ~
+- - kind:
+      name: SixPY3
+      body: "`six.PY3` referenced (python4), use `not six.PY2`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 3
+    end_location:
+      row: 4
+      column: 10
+    fix: ~
+    parent: ~
+  - kind:
+      name: SixPY3
+      body: "`six.PY3` referenced (python4), use `not six.PY2`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 3
+    end_location:
+      row: 6
+      column: 6
+    fix: ~
+    parent: ~
 

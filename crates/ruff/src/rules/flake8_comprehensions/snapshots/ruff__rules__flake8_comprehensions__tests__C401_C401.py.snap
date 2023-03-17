@@ -2,104 +2,104 @@
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryGeneratorSet
-    body: "Unnecessary generator (rewrite as a `set` comprehension)"
-    suggestion: "Rewrite as a `set` comprehension"
-    fixable: true
-  location:
-    row: 1
-    column: 4
-  end_location:
-    row: 1
-    column: 28
-  fix:
-    content: "{x for x in range(3)}"
+- - kind:
+      name: UnnecessaryGeneratorSet
+      body: "Unnecessary generator (rewrite as a `set` comprehension)"
+      suggestion: "Rewrite as a `set` comprehension"
+      fixable: true
     location:
       row: 1
       column: 4
     end_location:
       row: 1
       column: 28
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorSet
-    body: "Unnecessary generator (rewrite as a `set` comprehension)"
-    suggestion: "Rewrite as a `set` comprehension"
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 4
-    column: 1
-  fix:
-    content: "{\n    x for x in range(3)\n}"
+    fix:
+      content: "{x for x in range(3)}"
+      location:
+        row: 1
+        column: 4
+      end_location:
+        row: 1
+        column: 28
+    parent: ~
+  - kind:
+      name: UnnecessaryGeneratorSet
+      body: "Unnecessary generator (rewrite as a `set` comprehension)"
+      suggestion: "Rewrite as a `set` comprehension"
+      fixable: true
     location:
       row: 2
       column: 4
     end_location:
       row: 4
       column: 1
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorSet
-    body: "Unnecessary generator (rewrite as a `set` comprehension)"
-    suggestion: "Rewrite as a `set` comprehension"
-    fixable: true
-  location:
-    row: 5
-    column: 7
-  end_location:
-    row: 5
-    column: 48
-  fix:
-    content: " {a if a < 6 else 0  for a in range(3)} "
+    fix:
+      content: "{\n    x for x in range(3)\n}"
+      location:
+        row: 2
+        column: 4
+      end_location:
+        row: 4
+        column: 1
+    parent: ~
+  - kind:
+      name: UnnecessaryGeneratorSet
+      body: "Unnecessary generator (rewrite as a `set` comprehension)"
+      suggestion: "Rewrite as a `set` comprehension"
+      fixable: true
     location:
       row: 5
       column: 7
     end_location:
       row: 5
       column: 48
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorSet
-    body: "Unnecessary generator (rewrite as a `set` comprehension)"
-    suggestion: "Rewrite as a `set` comprehension"
-    fixable: true
-  location:
-    row: 6
-    column: 16
-  end_location:
-    row: 6
-    column: 57
-  fix:
-    content: "{a if a < 6 else 0  for a in range(3)}"
+    fix:
+      content: " {a if a < 6 else 0  for a in range(3)} "
+      location:
+        row: 5
+        column: 7
+      end_location:
+        row: 5
+        column: 48
+    parent: ~
+  - kind:
+      name: UnnecessaryGeneratorSet
+      body: "Unnecessary generator (rewrite as a `set` comprehension)"
+      suggestion: "Rewrite as a `set` comprehension"
+      fixable: true
     location:
       row: 6
       column: 16
     end_location:
       row: 6
       column: 57
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorSet
-    body: "Unnecessary generator (rewrite as a `set` comprehension)"
-    suggestion: "Rewrite as a `set` comprehension"
-    fixable: true
-  location:
-    row: 7
-    column: 15
-  end_location:
-    row: 7
-    column: 39
-  fix:
-    content: " {a for a in range(3)} "
+    fix:
+      content: "{a if a < 6 else 0  for a in range(3)}"
+      location:
+        row: 6
+        column: 16
+      end_location:
+        row: 6
+        column: 57
+    parent: ~
+  - kind:
+      name: UnnecessaryGeneratorSet
+      body: "Unnecessary generator (rewrite as a `set` comprehension)"
+      suggestion: "Rewrite as a `set` comprehension"
+      fixable: true
     location:
       row: 7
       column: 15
     end_location:
       row: 7
       column: 39
-  parent: ~
+    fix:
+      content: " {a for a in range(3)} "
+      location:
+        row: 7
+        column: 15
+      end_location:
+        row: 7
+        column: 39
+    parent: ~
 

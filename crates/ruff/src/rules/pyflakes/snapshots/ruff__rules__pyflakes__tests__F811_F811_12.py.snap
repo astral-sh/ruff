@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: RedefinedWhileUnused
-    body: "Redefinition of unused `mixer` from line 2"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 19
-  end_location:
-    row: 6
-    column: 24
-  fix: ~
-  parent: ~
+- - kind:
+      name: RedefinedWhileUnused
+      body: "Redefinition of unused `mixer` from line 2"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 19
+    end_location:
+      row: 6
+      column: 24
+    fix: ~
+    parent: ~
 

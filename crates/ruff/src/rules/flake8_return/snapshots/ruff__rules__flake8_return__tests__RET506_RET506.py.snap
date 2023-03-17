@@ -2,95 +2,95 @@
 source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `elif` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 4
-  end_location:
-    row: 8
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `elif` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 4
-  end_location:
-    row: 23
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `else` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 34
-    column: 4
-  end_location:
-    row: 34
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `else` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 45
-    column: 8
-  end_location:
-    row: 45
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `else` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 60
-    column: 4
-  end_location:
-    row: 60
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `else` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 70
-    column: 8
-  end_location:
-    row: 70
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `else` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 80
-    column: 4
-  end_location:
-    row: 80
-    column: 8
-  fix: ~
-  parent: ~
+- - kind:
+      name: SuperfluousElseRaise
+      body: "Unnecessary `elif` after `raise` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 4
+    end_location:
+      row: 8
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseRaise
+      body: "Unnecessary `elif` after `raise` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 23
+      column: 4
+    end_location:
+      row: 23
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseRaise
+      body: "Unnecessary `else` after `raise` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 34
+      column: 4
+    end_location:
+      row: 34
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseRaise
+      body: "Unnecessary `else` after `raise` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 45
+      column: 8
+    end_location:
+      row: 45
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseRaise
+      body: "Unnecessary `else` after `raise` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 60
+      column: 4
+    end_location:
+      row: 60
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseRaise
+      body: "Unnecessary `else` after `raise` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 70
+      column: 8
+    end_location:
+      row: 70
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseRaise
+      body: "Unnecessary `else` after `raise` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 80
+      column: 4
+    end_location:
+      row: 80
+      column: 8
+    fix: ~
+    parent: ~
 

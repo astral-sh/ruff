@@ -2,44 +2,44 @@
 source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MissingRequiredImport
-    body: "Missing required import: `from __future__ import annotations`"
-    suggestion: "Insert required import: `from __future__ import annotations`"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 0
-  fix:
-    content: "\nfrom __future__ import annotations"
+- - kind:
+      name: MissingRequiredImport
+      body: "Missing required import: `from __future__ import annotations`"
+      suggestion: "Insert required import: `from __future__ import annotations`"
+      fixable: true
     location:
       row: 1
-      column: 19
+      column: 0
     end_location:
       row: 1
-      column: 19
-  parent: ~
-- kind:
-    name: MissingRequiredImport
-    body: "Missing required import: `from __future__ import generator_stop`"
-    suggestion: "Insert required import: `from __future__ import generator_stop`"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 0
-  fix:
-    content: "\nfrom __future__ import generator_stop"
+      column: 0
+    fix:
+      content: "\nfrom __future__ import annotations"
+      location:
+        row: 1
+        column: 19
+      end_location:
+        row: 1
+        column: 19
+    parent: ~
+  - kind:
+      name: MissingRequiredImport
+      body: "Missing required import: `from __future__ import generator_stop`"
+      suggestion: "Insert required import: `from __future__ import generator_stop`"
+      fixable: true
     location:
       row: 1
-      column: 19
+      column: 0
     end_location:
       row: 1
-      column: 19
-  parent: ~
+      column: 0
+    fix:
+      content: "\nfrom __future__ import generator_stop"
+      location:
+        row: 1
+        column: 19
+      end_location:
+        row: 1
+        column: 19
+    parent: ~
 

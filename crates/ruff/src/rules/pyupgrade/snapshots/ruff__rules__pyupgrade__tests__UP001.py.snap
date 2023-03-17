@@ -2,44 +2,44 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UselessMetaclassType
-    body: "`__metaclass__ = type` is implied"
-    suggestion: "Remove `__metaclass__ = type`"
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 24
-  fix:
-    content: pass
+- - kind:
+      name: UselessMetaclassType
+      body: "`__metaclass__ = type` is implied"
+      suggestion: "Remove `__metaclass__ = type`"
+      fixable: true
     location:
       row: 2
       column: 4
     end_location:
       row: 2
       column: 24
-  parent: ~
-- kind:
-    name: UselessMetaclassType
-    body: "`__metaclass__ = type` is implied"
-    suggestion: "Remove `__metaclass__ = type`"
-    fixable: true
-  location:
-    row: 6
-    column: 4
-  end_location:
-    row: 6
-    column: 24
-  fix:
-    content: ""
+    fix:
+      content: pass
+      location:
+        row: 2
+        column: 4
+      end_location:
+        row: 2
+        column: 24
+    parent: ~
+  - kind:
+      name: UselessMetaclassType
+      body: "`__metaclass__ = type` is implied"
+      suggestion: "Remove `__metaclass__ = type`"
+      fixable: true
     location:
       row: 6
-      column: 0
+      column: 4
     end_location:
-      row: 7
-      column: 0
-  parent: ~
+      row: 6
+      column: 24
+    fix:
+      content: ""
+      location:
+        row: 6
+        column: 0
+      end_location:
+        row: 7
+        column: 0
+    parent: ~
 

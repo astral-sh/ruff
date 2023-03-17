@@ -2,69 +2,69 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: TripleSingleQuotes
-    body: "Use triple double quotes `\"\"\"`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 307
-    column: 4
-  end_location:
-    row: 307
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: TripleSingleQuotes
-    body: "Use triple double quotes `\"\"\"`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 312
-    column: 4
-  end_location:
-    row: 312
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: TripleSingleQuotes
-    body: "Use triple double quotes `\"\"\"`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 317
-    column: 4
-  end_location:
-    row: 317
-    column: 15
-  fix: ~
-  parent: ~
-- kind:
-    name: TripleSingleQuotes
-    body: "Use triple double quotes `\"\"\"`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 322
-    column: 4
-  end_location:
-    row: 322
-    column: 15
-  fix: ~
-  parent: ~
-- kind:
-    name: TripleSingleQuotes
-    body: "Use triple double quotes `\"\"\"`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 328
-    column: 4
-  end_location:
-    row: 328
-    column: 16
-  fix: ~
-  parent: ~
+- - kind:
+      name: TripleSingleQuotes
+      body: "Use triple double quotes `\"\"\"`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 307
+      column: 4
+    end_location:
+      row: 307
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: TripleSingleQuotes
+      body: "Use triple double quotes `\"\"\"`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 312
+      column: 4
+    end_location:
+      row: 312
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: TripleSingleQuotes
+      body: "Use triple double quotes `\"\"\"`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 317
+      column: 4
+    end_location:
+      row: 317
+      column: 15
+    fix: ~
+    parent: ~
+  - kind:
+      name: TripleSingleQuotes
+      body: "Use triple double quotes `\"\"\"`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 322
+      column: 4
+    end_location:
+      row: 322
+      column: 15
+    fix: ~
+    parent: ~
+  - kind:
+      name: TripleSingleQuotes
+      body: "Use triple double quotes `\"\"\"`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 328
+      column: 4
+    end_location:
+      row: 328
+      column: 16
+    fix: ~
+    parent: ~
 

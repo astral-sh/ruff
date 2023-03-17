@@ -2,19 +2,19 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: RedefinedWhileUnused
-    body: "Redefinition of unused `Sequence` from line 26"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 4
-  end_location:
-    row: 32
-    column: 12
-  fix: ~
-  parent:
-    row: 30
-    column: 0
+- - kind:
+      name: RedefinedWhileUnused
+      body: "Redefinition of unused `Sequence` from line 26"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 32
+      column: 4
+    end_location:
+      row: 32
+      column: 12
+    fix: ~
+    parent:
+      row: 30
+      column: 0
 

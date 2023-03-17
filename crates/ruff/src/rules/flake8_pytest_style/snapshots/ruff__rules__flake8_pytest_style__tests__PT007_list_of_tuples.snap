@@ -2,134 +2,134 @@
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 34
-  end_location:
-    row: 4
-    column: 40
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 14
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 4
-  end_location:
-    row: 25
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 8
-  end_location:
-    row: 23
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 8
-  end_location:
-    row: 24
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 8
-  end_location:
-    row: 50
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 51
-    column: 8
-  end_location:
-    row: 51
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 61
-    column: 8
-  end_location:
-    row: 61
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 62
-    column: 8
-  end_location:
-    row: 62
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 81
-    column: 37
-  end_location:
-    row: 81
-    column: 53
-  fix: ~
-  parent: ~
+- - kind:
+      name: PytestParametrizeValuesWrongType
+      body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 34
+    end_location:
+      row: 4
+      column: 40
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestParametrizeValuesWrongType
+      body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 4
+    end_location:
+      row: 14
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestParametrizeValuesWrongType
+      body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 22
+      column: 4
+    end_location:
+      row: 25
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestParametrizeValuesWrongType
+      body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 23
+      column: 8
+    end_location:
+      row: 23
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestParametrizeValuesWrongType
+      body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 24
+      column: 8
+    end_location:
+      row: 24
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestParametrizeValuesWrongType
+      body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 50
+      column: 8
+    end_location:
+      row: 50
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestParametrizeValuesWrongType
+      body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 51
+      column: 8
+    end_location:
+      row: 51
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestParametrizeValuesWrongType
+      body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 61
+      column: 8
+    end_location:
+      row: 61
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestParametrizeValuesWrongType
+      body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 62
+      column: 8
+    end_location:
+      row: 62
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestParametrizeValuesWrongType
+      body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 81
+      column: 37
+    end_location:
+      row: 81
+      column: 53
+    fix: ~
+    parent: ~
 

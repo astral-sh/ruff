@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `F401`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 1
-    column: 18
-  end_location:
-    row: 1
-    column: 30
-  fix:
-    content: ""
+- - kind:
+      name: UnusedNOQA
+      body: "Unused `noqa` directive (unused: `F401`)"
+      suggestion: "Remove unused `noqa` directive"
+      fixable: true
     location:
       row: 1
-      column: 16
+      column: 18
     end_location:
       row: 1
       column: 30
-  parent: ~
+    fix:
+      content: ""
+      location:
+        row: 1
+        column: 16
+      end_location:
+        row: 1
+        column: 30
+    parent: ~
 

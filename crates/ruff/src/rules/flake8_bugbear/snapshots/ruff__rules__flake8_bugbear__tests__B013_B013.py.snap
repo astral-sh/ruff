@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: RedundantTupleInExceptionHandler
-    body: "A length-one tuple literal is redundant. Write `except ValueError` instead of `except (ValueError,)`."
-    suggestion: "Replace with `except ValueError`"
-    fixable: true
-  location:
-    row: 3
-    column: 7
-  end_location:
-    row: 3
-    column: 20
-  fix:
-    content: ValueError
+- - kind:
+      name: RedundantTupleInExceptionHandler
+      body: "A length-one tuple literal is redundant. Write `except ValueError` instead of `except (ValueError,)`."
+      suggestion: "Replace with `except ValueError`"
+      fixable: true
     location:
       row: 3
       column: 7
     end_location:
       row: 3
       column: 20
-  parent: ~
+    fix:
+      content: ValueError
+      location:
+        row: 3
+        column: 7
+      end_location:
+        row: 3
+        column: 20
+    parent: ~
 

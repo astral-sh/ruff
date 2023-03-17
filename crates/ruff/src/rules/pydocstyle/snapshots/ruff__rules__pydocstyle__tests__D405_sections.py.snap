@@ -2,44 +2,44 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: CapitalizeSectionName
-    body: "Section name should be properly capitalized (\"returns\")"
-    suggestion: "Capitalize \"returns\""
-    fixable: true
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 23
-    column: 7
-  fix:
-    content: Returns
+- - kind:
+      name: CapitalizeSectionName
+      body: "Section name should be properly capitalized (\"returns\")"
+      suggestion: "Capitalize \"returns\""
+      fixable: true
     location:
-      row: 19
+      row: 17
       column: 4
     end_location:
-      row: 19
-      column: 11
-  parent: ~
-- kind:
-    name: CapitalizeSectionName
-    body: "Section name should be properly capitalized (\"Short summary\")"
-    suggestion: "Capitalize \"Short summary\""
-    fixable: true
-  location:
-    row: 216
-    column: 4
-  end_location:
-    row: 230
-    column: 7
-  fix:
-    content: Short Summary
+      row: 23
+      column: 7
+    fix:
+      content: Returns
+      location:
+        row: 19
+        column: 4
+      end_location:
+        row: 19
+        column: 11
+    parent: ~
+  - kind:
+      name: CapitalizeSectionName
+      body: "Section name should be properly capitalized (\"Short summary\")"
+      suggestion: "Capitalize \"Short summary\""
+      fixable: true
     location:
-      row: 218
+      row: 216
       column: 4
     end_location:
-      row: 218
-      column: 17
-  parent: ~
+      row: 230
+      column: 7
+    fix:
+      content: Short Summary
+      location:
+        row: 218
+        column: 4
+      end_location:
+        row: 218
+        column: 17
+    parent: ~
 

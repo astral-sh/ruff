@@ -2,69 +2,69 @@
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: InvalidClassName
-    body: "Class name `bad` should use CapWords convention "
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 6
-  end_location:
-    row: 1
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: InvalidClassName
-    body: "Class name `_bad` should use CapWords convention "
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 6
-  end_location:
-    row: 5
-    column: 10
-  fix: ~
-  parent: ~
-- kind:
-    name: InvalidClassName
-    body: "Class name `bad_class` should use CapWords convention "
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 6
-  end_location:
-    row: 9
-    column: 15
-  fix: ~
-  parent: ~
-- kind:
-    name: InvalidClassName
-    body: "Class name `Bad_Class` should use CapWords convention "
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 6
-  end_location:
-    row: 13
-    column: 15
-  fix: ~
-  parent: ~
-- kind:
-    name: InvalidClassName
-    body: "Class name `BAD_CLASS` should use CapWords convention "
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 6
-  end_location:
-    row: 17
-    column: 15
-  fix: ~
-  parent: ~
+- - kind:
+      name: InvalidClassName
+      body: "Class name `bad` should use CapWords convention "
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 6
+    end_location:
+      row: 1
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: InvalidClassName
+      body: "Class name `_bad` should use CapWords convention "
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 6
+    end_location:
+      row: 5
+      column: 10
+    fix: ~
+    parent: ~
+  - kind:
+      name: InvalidClassName
+      body: "Class name `bad_class` should use CapWords convention "
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 6
+    end_location:
+      row: 9
+      column: 15
+    fix: ~
+    parent: ~
+  - kind:
+      name: InvalidClassName
+      body: "Class name `Bad_Class` should use CapWords convention "
+      suggestion: ~
+      fixable: false
+    location:
+      row: 13
+      column: 6
+    end_location:
+      row: 13
+      column: 15
+    fix: ~
+    parent: ~
+  - kind:
+      name: InvalidClassName
+      body: "Class name `BAD_CLASS` should use CapWords convention "
+      suggestion: ~
+      fixable: false
+    location:
+      row: 17
+      column: 6
+    end_location:
+      row: 17
+      column: 15
+    fix: ~
+    parent: ~
 

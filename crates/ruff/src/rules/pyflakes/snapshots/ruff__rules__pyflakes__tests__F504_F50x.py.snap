@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PercentFormatExtraNamedArguments
-    body: "`%`-format string has unused named argument(s): baz"
-    suggestion: "Remove extra named arguments: baz"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 32
-  fix:
-    content: "{'bar': 1, }"
+- - kind:
+      name: PercentFormatExtraNamedArguments
+      body: "`%`-format string has unused named argument(s): baz"
+      suggestion: "Remove extra named arguments: baz"
+      fixable: true
     location:
       row: 8
-      column: 12
+      column: 0
     end_location:
       row: 8
       column: 32
-  parent: ~
+    fix:
+      content: "{'bar': 1, }"
+      location:
+        row: 8
+        column: 12
+      end_location:
+        row: 8
+        column: 32
+    parent: ~
 

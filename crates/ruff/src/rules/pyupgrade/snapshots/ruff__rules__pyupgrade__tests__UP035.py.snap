@@ -2,612 +2,612 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 31
-  fix:
-    content: from collections.abc import Mapping
+- - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 2
       column: 0
     end_location:
       row: 2
       column: 31
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 38
-  fix:
-    content: from collections.abc import Mapping as MAP
+    fix:
+      content: from collections.abc import Mapping
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 2
+        column: 31
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 4
       column: 0
     end_location:
       row: 4
       column: 38
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`, `Sequence`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 41
-  fix:
-    content: "from collections.abc import Mapping, Sequence"
+    fix:
+      content: from collections.abc import Mapping as MAP
+      location:
+        row: 4
+        column: 0
+      end_location:
+        row: 4
+        column: 38
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`, `Sequence`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 6
       column: 0
     end_location:
       row: 6
       column: 41
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 40
-  fix:
-    content: "from collections import Counter\nfrom collections.abc import Mapping"
+    fix:
+      content: "from collections.abc import Mapping, Sequence"
+      location:
+        row: 6
+        column: 0
+      end_location:
+        row: 6
+        column: 41
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 8
       column: 0
     end_location:
       row: 8
       column: 40
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 42
-  fix:
-    content: "from collections import (Counter)\nfrom collections.abc import Mapping"
+    fix:
+      content: "from collections import Counter\nfrom collections.abc import Mapping"
+      location:
+        row: 8
+        column: 0
+      end_location:
+        row: 8
+        column: 40
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 10
       column: 0
     end_location:
       row: 10
       column: 42
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 13
-    column: 33
-  fix:
-    content: "from collections import (Counter)\nfrom collections.abc import Mapping"
+    fix:
+      content: "from collections import (Counter)\nfrom collections.abc import Mapping"
+      location:
+        row: 10
+        column: 0
+      end_location:
+        row: 10
+        column: 42
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 12
       column: 0
     end_location:
       row: 13
       column: 33
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 16
-    column: 32
-  fix:
-    content: "from collections import Counter\nfrom collections.abc import Mapping"
+    fix:
+      content: "from collections import (Counter)\nfrom collections.abc import Mapping"
+      location:
+        row: 12
+        column: 0
+      end_location:
+        row: 13
+        column: 33
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 15
       column: 0
     end_location:
       row: 16
       column: 32
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`, `Sequence`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 18
-    column: 0
-  end_location:
-    row: 18
-    column: 50
-  fix:
-    content: "from collections import Counter\nfrom collections.abc import Mapping, Sequence"
+    fix:
+      content: "from collections import Counter\nfrom collections.abc import Mapping"
+      location:
+        row: 15
+        column: 0
+      end_location:
+        row: 16
+        column: 32
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`, `Sequence`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 18
       column: 0
     end_location:
       row: 18
       column: 50
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 20
-    column: 0
-  end_location:
-    row: 20
-    column: 51
-  fix:
-    content: "from collections import Counter\nfrom collections.abc import Mapping as mapping"
+    fix:
+      content: "from collections import Counter\nfrom collections.abc import Mapping, Sequence"
+      location:
+        row: 18
+        column: 0
+      end_location:
+        row: 18
+        column: 50
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 20
       column: 0
     end_location:
       row: 20
       column: 51
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 23
-    column: 4
-  end_location:
-    row: 23
-    column: 44
-  fix:
-    content: "from collections import Counter\n    from collections.abc import Mapping"
+    fix:
+      content: "from collections import Counter\nfrom collections.abc import Mapping as mapping"
+      location:
+        row: 20
+        column: 0
+      end_location:
+        row: 20
+        column: 51
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 23
       column: 4
     end_location:
       row: 23
       column: 44
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 28
-    column: 4
-  end_location:
-    row: 28
-    column: 44
-  fix:
-    content: "from collections import Counter\n    from collections.abc import Mapping"
+    fix:
+      content: "from collections import Counter\n    from collections.abc import Mapping"
+      location:
+        row: 23
+        column: 4
+      end_location:
+        row: 23
+        column: 44
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 28
       column: 4
     end_location:
       row: 28
       column: 44
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 30
-    column: 9
-  end_location:
-    row: 30
-    column: 40
-  fix:
-    content: from collections.abc import Mapping
+    fix:
+      content: "from collections import Counter\n    from collections.abc import Mapping"
+      location:
+        row: 28
+        column: 4
+      end_location:
+        row: 28
+        column: 44
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 30
       column: 9
     end_location:
       row: 30
       column: 40
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 33
-    column: 0
-  end_location:
-    row: 33
-    column: 40
-  fix:
-    content: "from collections import Counter\nfrom collections.abc import Mapping"
+    fix:
+      content: from collections.abc import Mapping
+      location:
+        row: 30
+        column: 9
+      end_location:
+        row: 30
+        column: 40
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 33
       column: 0
     end_location:
       row: 33
       column: 40
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`, `Callable`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 37
-    column: 4
-  end_location:
-    row: 42
-    column: 5
-  fix:
-    content: "from collections import (\n        Bad,\n        Good,\n    )\n    from collections.abc import Mapping, Callable"
+    fix:
+      content: "from collections import Counter\nfrom collections.abc import Mapping"
+      location:
+        row: 33
+        column: 0
+      end_location:
+        row: 33
+        column: 40
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`, `Callable`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 37
       column: 4
     end_location:
       row: 42
       column: 5
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Callable`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 91
-  fix:
-    content: "from typing import Match, Pattern, List, OrderedDict, AbstractSet, ContextManager\nfrom collections.abc import Callable"
+    fix:
+      content: "from collections import (\n        Bad,\n        Good,\n    )\n    from collections.abc import Mapping, Callable"
+      location:
+        row: 37
+        column: 4
+      end_location:
+        row: 42
+        column: 5
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Callable`"
+      suggestion: "Import from `collections.abc`"
+      fixable: true
     location:
       row: 44
       column: 0
     end_location:
       row: 44
       column: 91
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections` instead: `OrderedDict`"
-    suggestion: "Import from `collections`"
-    fixable: true
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 91
-  fix:
-    content: "from typing import Callable, Match, Pattern, List, AbstractSet, ContextManager\nfrom collections import OrderedDict"
+    fix:
+      content: "from typing import Match, Pattern, List, OrderedDict, AbstractSet, ContextManager\nfrom collections.abc import Callable"
+      location:
+        row: 44
+        column: 0
+      end_location:
+        row: 44
+        column: 91
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections` instead: `OrderedDict`"
+      suggestion: "Import from `collections`"
+      fixable: true
     location:
       row: 44
       column: 0
     end_location:
       row: 44
       column: 91
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `re` instead: `Match`, `Pattern`"
-    suggestion: "Import from `re`"
-    fixable: true
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 91
-  fix:
-    content: "from typing import Callable, List, OrderedDict, AbstractSet, ContextManager\nfrom re import Match, Pattern"
+    fix:
+      content: "from typing import Callable, Match, Pattern, List, AbstractSet, ContextManager\nfrom collections import OrderedDict"
+      location:
+        row: 44
+        column: 0
+      end_location:
+        row: 44
+        column: 91
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `re` instead: `Match`, `Pattern`"
+      suggestion: "Import from `re`"
+      fixable: true
     location:
       row: 44
       column: 0
     end_location:
       row: 44
       column: 91
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.List` is deprecated, use `list` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 91
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.AbstractSet` is deprecated, use `collections.abc.Set` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 91
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 91
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 9
-  end_location:
-    row: 47
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections` instead: `OrderedDict`"
-    suggestion: "Import from `collections`"
-    fixable: true
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 81
-  fix:
-    content: "from typing import Match, Pattern, List, AbstractSet, ContextManager\nfrom collections import OrderedDict"
+    fix:
+      content: "from typing import Callable, List, OrderedDict, AbstractSet, ContextManager\nfrom re import Match, Pattern"
+      location:
+        row: 44
+        column: 0
+      end_location:
+        row: 44
+        column: 91
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "`typing.List` is deprecated, use `list` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 44
+      column: 0
+    end_location:
+      row: 44
+      column: 91
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "`typing.AbstractSet` is deprecated, use `collections.abc.Set` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 44
+      column: 0
+    end_location:
+      row: 44
+      column: 91
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "`typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 44
+      column: 0
+    end_location:
+      row: 44
+      column: 91
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 46
+      column: 9
+    end_location:
+      row: 47
+      column: 21
+    fix: ~
+    parent: ~
+- - kind:
+      name: DeprecatedImport
+      body: "Import from `collections` instead: `OrderedDict`"
+      suggestion: "Import from `collections`"
+      fixable: true
     location:
       row: 50
       column: 0
     end_location:
       row: 50
       column: 81
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `re` instead: `Match`, `Pattern`"
-    suggestion: "Import from `re`"
-    fixable: true
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 81
-  fix:
-    content: "from typing import List, OrderedDict, AbstractSet, ContextManager\nfrom re import Match, Pattern"
+    fix:
+      content: "from typing import Match, Pattern, List, AbstractSet, ContextManager\nfrom collections import OrderedDict"
+      location:
+        row: 50
+        column: 0
+      end_location:
+        row: 50
+        column: 81
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `re` instead: `Match`, `Pattern`"
+      suggestion: "Import from `re`"
+      fixable: true
     location:
       row: 50
       column: 0
     end_location:
       row: 50
       column: 81
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.List` is deprecated, use `list` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 81
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.AbstractSet` is deprecated, use `collections.abc.Set` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 81
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 81
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `re` instead: `Match`, `Pattern`"
-    suggestion: "Import from `re`"
-    fixable: true
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 68
-  fix:
-    content: "from typing import List, AbstractSet, ContextManager\nfrom re import Match, Pattern"
+    fix:
+      content: "from typing import List, OrderedDict, AbstractSet, ContextManager\nfrom re import Match, Pattern"
+      location:
+        row: 50
+        column: 0
+      end_location:
+        row: 50
+        column: 81
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "`typing.List` is deprecated, use `list` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 50
+      column: 81
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "`typing.AbstractSet` is deprecated, use `collections.abc.Set` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 50
+      column: 81
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "`typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 50
+      column: 81
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 53
+      column: 9
+    end_location:
+      row: 54
+      column: 21
+    fix: ~
+    parent: ~
+- - kind:
+      name: DeprecatedImport
+      body: "Import from `re` instead: `Match`, `Pattern`"
+      suggestion: "Import from `re`"
+      fixable: true
     location:
       row: 50
       column: 0
     end_location:
       row: 50
       column: 68
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.List` is deprecated, use `list` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 68
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.AbstractSet` is deprecated, use `collections.abc.Set` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 68
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 68
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.List` is deprecated, use `list` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 52
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.AbstractSet` is deprecated, use `collections.abc.Set` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 52
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 52
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 53
-    column: 9
-  end_location:
-    row: 54
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 9
-  end_location:
-    row: 55
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 55
-    column: 9
-  end_location:
-    row: 56
-    column: 21
-  fix: ~
-  parent: ~
+    fix:
+      content: "from typing import List, AbstractSet, ContextManager\nfrom re import Match, Pattern"
+      location:
+        row: 50
+        column: 0
+      end_location:
+        row: 50
+        column: 68
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "`typing.List` is deprecated, use `list` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 50
+      column: 68
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "`typing.AbstractSet` is deprecated, use `collections.abc.Set` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 50
+      column: 68
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "`typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 50
+      column: 68
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 54
+      column: 9
+    end_location:
+      row: 55
+      column: 21
+    fix: ~
+    parent: ~
+- - kind:
+      name: DeprecatedImport
+      body: "`typing.List` is deprecated, use `list` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 50
+      column: 52
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "`typing.AbstractSet` is deprecated, use `collections.abc.Set` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 50
+      column: 52
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "`typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 50
+      column: 52
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedImport
+      body: "Import from `collections.abc` instead: `Mapping`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 55
+      column: 9
+    end_location:
+      row: 56
+      column: 21
+    fix: ~
+    parent: ~
 

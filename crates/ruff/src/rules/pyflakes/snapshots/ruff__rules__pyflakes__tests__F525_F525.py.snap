@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: StringDotFormatMixingAutomatic
-    body: "`.format` string mixes automatic and manual numbering"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatMixingAutomatic
-    body: "`.format` string mixes automatic and manual numbering"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 21
-  fix: ~
-  parent: ~
+- - kind:
+      name: StringDotFormatMixingAutomatic
+      body: "`.format` string mixes automatic and manual numbering"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatMixingAutomatic
+      body: "`.format` string mixes automatic and manual numbering"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 21
+    fix: ~
+    parent: ~
 

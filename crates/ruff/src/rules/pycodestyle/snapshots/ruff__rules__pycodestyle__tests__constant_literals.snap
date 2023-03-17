@@ -2,184 +2,184 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: IsLiteral
-    body: "Use `==` to compare constant literals"
-    suggestion: "Replace `is` with `==`"
-    fixable: true
-  location:
-    row: 4
-    column: 3
-  end_location:
-    row: 4
-    column: 17
-  fix:
-    content: "=="
+- - kind:
+      name: IsLiteral
+      body: "Use `==` to compare constant literals"
+      suggestion: "Replace `is` with `==`"
+      fixable: true
     location:
       row: 4
-      column: 9
+      column: 3
     end_location:
       row: 4
-      column: 11
-  parent: ~
-- kind:
-    name: IsLiteral
-    body: "Use `==` to compare constant literals"
-    suggestion: "Replace `is` with `==`"
-    fixable: true
-  location:
-    row: 6
-    column: 3
-  end_location:
-    row: 6
-    column: 16
-  fix:
-    content: "=="
+      column: 17
+    fix:
+      content: "=="
+      location:
+        row: 4
+        column: 9
+      end_location:
+        row: 4
+        column: 11
+    parent: ~
+  - kind:
+      name: IsLiteral
+      body: "Use `==` to compare constant literals"
+      suggestion: "Replace `is` with `==`"
+      fixable: true
     location:
       row: 6
-      column: 9
+      column: 3
     end_location:
       row: 6
-      column: 11
-  parent: ~
-- kind:
-    name: IsLiteral
-    body: "Use `==` to compare constant literals"
-    suggestion: "Replace `is` with `==`"
-    fixable: true
-  location:
-    row: 8
-    column: 3
-  end_location:
-    row: 8
-    column: 16
-  fix:
-    content: "=="
+      column: 16
+    fix:
+      content: "=="
+      location:
+        row: 6
+        column: 9
+      end_location:
+        row: 6
+        column: 11
+    parent: ~
+  - kind:
+      name: IsLiteral
+      body: "Use `==` to compare constant literals"
+      suggestion: "Replace `is` with `==`"
+      fixable: true
     location:
       row: 8
+      column: 3
+    end_location:
+      row: 8
+      column: 16
+    fix:
+      content: "=="
+      location:
+        row: 8
+        column: 8
+      end_location:
+        row: 8
+        column: 10
+    parent: ~
+  - kind:
+      name: IsLiteral
+      body: "Use `==` to compare constant literals"
+      suggestion: "Replace `is` with `==`"
+      fixable: true
+    location:
+      row: 10
+      column: 3
+    end_location:
+      row: 10
+      column: 17
+    fix:
+      content: "=="
+      location:
+        row: 10
+        column: 9
+      end_location:
+        row: 10
+        column: 11
+    parent: ~
+  - kind:
+      name: IsLiteral
+      body: "Use `==` to compare constant literals"
+      suggestion: "Replace `is` with `==`"
+      fixable: true
+    location:
+      row: 12
+      column: 3
+    end_location:
+      row: 12
+      column: 17
+    fix:
+      content: "=="
+      location:
+        row: 12
+        column: 9
+      end_location:
+        row: 12
+        column: 11
+    parent: ~
+  - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `False` should be `cond is False`"
+      suggestion: "Replace with `cond is False`"
+      fixable: true
+    location:
+      row: 14
+      column: 3
+    end_location:
+      row: 14
       column: 8
-    end_location:
-      row: 8
-      column: 10
-  parent: ~
-- kind:
-    name: IsLiteral
-    body: "Use `==` to compare constant literals"
-    suggestion: "Replace `is` with `==`"
-    fixable: true
-  location:
-    row: 10
-    column: 3
-  end_location:
-    row: 10
-    column: 17
-  fix:
-    content: "=="
+    fix:
+      content: False is None
+      location:
+        row: 14
+        column: 3
+      end_location:
+        row: 14
+        column: 16
+    parent: ~
+  - kind:
+      name: NoneComparison
+      body: "Comparison to `None` should be `cond is None`"
+      suggestion: "Replace with `cond is None`"
+      fixable: true
     location:
-      row: 10
-      column: 9
+      row: 14
+      column: 12
     end_location:
-      row: 10
+      row: 14
+      column: 16
+    fix:
+      content: False is None
+      location:
+        row: 14
+        column: 3
+      end_location:
+        row: 14
+        column: 16
+    parent: ~
+  - kind:
+      name: NoneComparison
+      body: "Comparison to `None` should be `cond is None`"
+      suggestion: "Replace with `cond is None`"
+      fixable: true
+    location:
+      row: 16
+      column: 3
+    end_location:
+      row: 16
+      column: 7
+    fix:
+      content: None is False
+      location:
+        row: 16
+        column: 3
+      end_location:
+        row: 16
+        column: 16
+    parent: ~
+  - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `False` should be `cond is False`"
+      suggestion: "Replace with `cond is False`"
+      fixable: true
+    location:
+      row: 16
       column: 11
-  parent: ~
-- kind:
-    name: IsLiteral
-    body: "Use `==` to compare constant literals"
-    suggestion: "Replace `is` with `==`"
-    fixable: true
-  location:
-    row: 12
-    column: 3
-  end_location:
-    row: 12
-    column: 17
-  fix:
-    content: "=="
-    location:
-      row: 12
-      column: 9
-    end_location:
-      row: 12
-      column: 11
-  parent: ~
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `False` should be `cond is False`"
-    suggestion: "Replace with `cond is False`"
-    fixable: true
-  location:
-    row: 14
-    column: 3
-  end_location:
-    row: 14
-    column: 8
-  fix:
-    content: False is None
-    location:
-      row: 14
-      column: 3
-    end_location:
-      row: 14
-      column: 16
-  parent: ~
-- kind:
-    name: NoneComparison
-    body: "Comparison to `None` should be `cond is None`"
-    suggestion: "Replace with `cond is None`"
-    fixable: true
-  location:
-    row: 14
-    column: 12
-  end_location:
-    row: 14
-    column: 16
-  fix:
-    content: False is None
-    location:
-      row: 14
-      column: 3
-    end_location:
-      row: 14
-      column: 16
-  parent: ~
-- kind:
-    name: NoneComparison
-    body: "Comparison to `None` should be `cond is None`"
-    suggestion: "Replace with `cond is None`"
-    fixable: true
-  location:
-    row: 16
-    column: 3
-  end_location:
-    row: 16
-    column: 7
-  fix:
-    content: None is False
-    location:
-      row: 16
-      column: 3
     end_location:
       row: 16
       column: 16
-  parent: ~
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `False` should be `cond is False`"
-    suggestion: "Replace with `cond is False`"
-    fixable: true
-  location:
-    row: 16
-    column: 11
-  end_location:
-    row: 16
-    column: 16
-  fix:
-    content: None is False
-    location:
-      row: 16
-      column: 3
-    end_location:
-      row: 16
-      column: 16
-  parent: ~
+    fix:
+      content: None is False
+      location:
+        row: 16
+        column: 3
+      end_location:
+        row: 16
+        column: 16
+    parent: ~
 

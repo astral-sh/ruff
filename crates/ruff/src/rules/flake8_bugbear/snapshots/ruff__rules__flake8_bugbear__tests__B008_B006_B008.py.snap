@@ -2,199 +2,199 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `range` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 85
-    column: 60
-  end_location:
-    row: 85
-    column: 68
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `range` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 89
-    column: 63
-  end_location:
-    row: 89
-    column: 71
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `range` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 93
-    column: 59
-  end_location:
-    row: 93
-    column: 67
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `time.time` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 109
-    column: 38
-  end_location:
-    row: 109
-    column: 49
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `dt.datetime.now` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 113
-    column: 11
-  end_location:
-    row: 113
-    column: 28
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `dt.timedelta` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 113
-    column: 31
-  end_location:
-    row: 113
-    column: 51
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: Do not perform function call in argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 117
-    column: 29
-  end_location:
-    row: 117
-    column: 44
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `float` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 155
-    column: 33
-  end_location:
-    row: 155
-    column: 47
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `float` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 160
-    column: 29
-  end_location:
-    row: 160
-    column: 37
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `float` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 164
-    column: 44
-  end_location:
-    row: 164
-    column: 57
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `float` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 170
-    column: 20
-  end_location:
-    row: 170
-    column: 28
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `dt.datetime.now` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 170
-    column: 30
-  end_location:
-    row: 170
-    column: 47
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `map` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 176
-    column: 21
-  end_location:
-    row: 176
-    column: 62
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `random.randint` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 181
-    column: 18
-  end_location:
-    row: 181
-    column: 59
-  fix: ~
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `dt.datetime.now` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 181
-    column: 36
-  end_location:
-    row: 181
-    column: 53
-  fix: ~
-  parent: ~
+- - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `range` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 85
+      column: 60
+    end_location:
+      row: 85
+      column: 68
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `range` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 89
+      column: 63
+    end_location:
+      row: 89
+      column: 71
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `range` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 93
+      column: 59
+    end_location:
+      row: 93
+      column: 67
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `time.time` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 109
+      column: 38
+    end_location:
+      row: 109
+      column: 49
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `dt.datetime.now` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 113
+      column: 11
+    end_location:
+      row: 113
+      column: 28
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `dt.timedelta` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 113
+      column: 31
+    end_location:
+      row: 113
+      column: 51
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: Do not perform function call in argument defaults
+      suggestion: ~
+      fixable: false
+    location:
+      row: 117
+      column: 29
+    end_location:
+      row: 117
+      column: 44
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `float` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 155
+      column: 33
+    end_location:
+      row: 155
+      column: 47
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `float` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 160
+      column: 29
+    end_location:
+      row: 160
+      column: 37
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `float` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 164
+      column: 44
+    end_location:
+      row: 164
+      column: 57
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `float` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 170
+      column: 20
+    end_location:
+      row: 170
+      column: 28
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `dt.datetime.now` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 170
+      column: 30
+    end_location:
+      row: 170
+      column: 47
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `map` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 176
+      column: 21
+    end_location:
+      row: 176
+      column: 62
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `random.randint` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 181
+      column: 18
+    end_location:
+      row: 181
+      column: 59
+    fix: ~
+    parent: ~
+  - kind:
+      name: FunctionCallInDefaultArgument
+      body: "Do not perform function call `dt.datetime.now` in argument defaults"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 181
+      column: 36
+    end_location:
+      row: 181
+      column: 53
+    fix: ~
+    parent: ~
 

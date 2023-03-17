@@ -2,384 +2,384 @@
 source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 20
-    column: 4
-  end_location:
-    row: 21
-    column: 16
-  fix:
-    content: "\n    return None"
+- - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
-      row: 21
-      column: 16
+      row: 20
+      column: 4
     end_location:
       row: 21
       column: 16
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 27
-    column: 8
-  end_location:
-    row: 27
-    column: 15
-  fix:
-    content: "\n        return None"
+    fix:
+      content: "\n    return None"
+      location:
+        row: 21
+        column: 16
+      end_location:
+        row: 21
+        column: 16
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
       row: 27
-      column: 24
+      column: 8
     end_location:
       row: 27
-      column: 24
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 36
-    column: 4
-  end_location:
-    row: 36
-    column: 11
-  fix:
-    content: "\n    return None"
+      column: 15
+    fix:
+      content: "\n        return None"
+      location:
+        row: 27
+        column: 24
+      end_location:
+        row: 27
+        column: 24
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
       row: 36
-      column: 20
+      column: 4
     end_location:
       row: 36
-      column: 20
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 41
-    column: 4
-  end_location:
-    row: 43
-    column: 20
-  fix:
-    content: "\n    return None"
+      column: 11
+    fix:
+      content: "\n    return None"
+      location:
+        row: 36
+        column: 20
+      end_location:
+        row: 36
+        column: 20
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
-      row: 43
-      column: 20
+      row: 41
+      column: 4
     end_location:
       row: 43
       column: 20
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 52
-    column: 8
-  end_location:
-    row: 52
-    column: 15
-  fix:
-    content: "\n        return None"
+    fix:
+      content: "\n    return None"
+      location:
+        row: 43
+        column: 20
+      end_location:
+        row: 43
+        column: 20
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
       row: 52
-      column: 24
+      column: 8
     end_location:
       row: 52
-      column: 24
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 59
-    column: 4
-  end_location:
-    row: 59
-    column: 22
-  fix:
-    content: "\n    return None"
+      column: 15
+    fix:
+      content: "\n        return None"
+      location:
+        row: 52
+        column: 24
+      end_location:
+        row: 52
+        column: 24
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
       row: 59
-      column: 31
+      column: 4
     end_location:
       row: 59
-      column: 31
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 66
-    column: 4
-  end_location:
-    row: 66
-    column: 21
-  fix:
-    content: "\n    return None"
+      column: 22
+    fix:
+      content: "\n    return None"
+      location:
+        row: 59
+        column: 31
+      end_location:
+        row: 59
+        column: 31
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
       row: 66
-      column: 30
+      column: 4
     end_location:
       row: 66
-      column: 30
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 82
-    column: 4
-  end_location:
-    row: 85
-    column: 14
-  fix:
-    content: "\n    return None"
+      column: 21
+    fix:
+      content: "\n    return None"
+      location:
+        row: 66
+        column: 30
+      end_location:
+        row: 66
+        column: 30
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
+      row: 82
+      column: 4
+    end_location:
       row: 85
       column: 14
-    end_location:
-      row: 85
-      column: 14
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 113
-    column: 4
-  end_location:
-    row: 116
-    column: 16
-  fix:
-    content: "\n    return None"
+    fix:
+      content: "\n    return None"
+      location:
+        row: 85
+        column: 14
+      end_location:
+        row: 85
+        column: 14
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
-      row: 116
-      column: 16
+      row: 113
+      column: 4
     end_location:
       row: 116
       column: 16
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 120
-    column: 4
-  end_location:
-    row: 126
-    column: 19
-  fix:
-    content: "\n    return None"
+    fix:
+      content: "\n    return None"
+      location:
+        row: 116
+        column: 16
+      end_location:
+        row: 116
+        column: 16
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
-      row: 126
-      column: 19
+      row: 120
+      column: 4
     end_location:
       row: 126
       column: 19
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 130
-    column: 4
-  end_location:
-    row: 133
-    column: 16
-  fix:
-    content: "\n    return None"
+    fix:
+      content: "\n    return None"
+      location:
+        row: 126
+        column: 19
+      end_location:
+        row: 126
+        column: 19
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
-      row: 133
-      column: 16
+      row: 130
+      column: 4
     end_location:
       row: 133
       column: 16
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 137
-    column: 4
-  end_location:
-    row: 143
-    column: 19
-  fix:
-    content: "\n    return None"
+    fix:
+      content: "\n    return None"
+      location:
+        row: 133
+        column: 16
+      end_location:
+        row: 133
+        column: 16
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
-      row: 143
-      column: 19
+      row: 137
+      column: 4
     end_location:
       row: 143
       column: 19
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 274
-    column: 4
-  end_location:
-    row: 275
-    column: 20
-  fix:
-    content: "\n    return None"
+    fix:
+      content: "\n    return None"
+      location:
+        row: 143
+        column: 19
+      end_location:
+        row: 143
+        column: 19
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
-      row: 275
-      column: 20
+      row: 274
+      column: 4
     end_location:
       row: 275
       column: 20
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 291
-    column: 12
-  end_location:
-    row: 291
-    column: 19
-  fix:
-    content: "\n            return None"
+    fix:
+      content: "\n    return None"
+      location:
+        row: 275
+        column: 20
+      end_location:
+        row: 275
+        column: 20
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
       row: 291
-      column: 28
+      column: 12
     end_location:
       row: 291
-      column: 28
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 300
-    column: 8
-  end_location:
-    row: 301
-    column: 21
-  fix:
-    content: "\n        return None"
+      column: 19
+    fix:
+      content: "\n            return None"
+      location:
+        row: 291
+        column: 28
+      end_location:
+        row: 291
+        column: 28
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
-      row: 301
-      column: 21
+      row: 300
+      column: 8
     end_location:
       row: 301
       column: 21
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 305
-    column: 8
-  end_location:
-    row: 306
-    column: 21
-  fix:
-    content: "\n        return None"
+    fix:
+      content: "\n        return None"
+      location:
+        row: 301
+        column: 21
+      end_location:
+        row: 301
+        column: 21
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
-      row: 306
-      column: 21
+      row: 305
+      column: 8
     end_location:
       row: 306
       column: 21
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 310
-    column: 8
-  end_location:
-    row: 311
-    column: 21
-  fix:
-    content: "\n        return None"
+    fix:
+      content: "\n        return None"
+      location:
+        row: 306
+        column: 21
+      end_location:
+        row: 306
+        column: 21
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
-      row: 311
-      column: 37
+      row: 310
+      column: 8
     end_location:
       row: 311
-      column: 37
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 315
-    column: 8
-  end_location:
-    row: 316
-    column: 21
-  fix:
-    content: "\n        return None"
+      column: 21
+    fix:
+      content: "\n        return None"
+      location:
+        row: 311
+        column: 37
+      end_location:
+        row: 311
+        column: 37
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
-      row: 316
-      column: 24
+      row: 315
+      column: 8
     end_location:
       row: 316
-      column: 24
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 320
-    column: 8
-  end_location:
-    row: 321
-    column: 21
-  fix:
-    content: "\n        return None"
+      column: 21
+    fix:
+      content: "\n        return None"
+      location:
+        row: 316
+        column: 24
+      end_location:
+        row: 316
+        column: 24
+    parent: ~
+  - kind:
+      name: ImplicitReturn
+      body: "Missing explicit `return` at the end of function able to return non-`None` value"
+      suggestion: "Add explicit `return` statement"
+      fixable: true
     location:
-      row: 322
-      column: 33
+      row: 320
+      column: 8
     end_location:
-      row: 322
-      column: 33
-  parent: ~
+      row: 321
+      column: 21
+    fix:
+      content: "\n        return None"
+      location:
+        row: 322
+        column: 33
+      end_location:
+        row: 322
+        column: 33
+    parent: ~
 

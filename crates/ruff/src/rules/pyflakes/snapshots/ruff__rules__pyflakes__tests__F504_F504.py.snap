@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PercentFormatExtraNamedArguments
-    body: "`%`-format string has unused named argument(s): b"
-    suggestion: "Remove extra named arguments: b"
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 34
-  fix:
-    content: "{a: \"?\", }"
+- - kind:
+      name: PercentFormatExtraNamedArguments
+      body: "`%`-format string has unused named argument(s): b"
+      suggestion: "Remove extra named arguments: b"
+      fixable: true
     location:
       row: 3
-      column: 16
+      column: 0
     end_location:
       row: 3
       column: 34
-  parent: ~
-- kind:
-    name: PercentFormatExtraNamedArguments
-    body: "`%`-format string has unused named argument(s): b"
-    suggestion: "Remove extra named arguments: b"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 29
-  fix:
-    content: "{\"a\": 1, }"
+    fix:
+      content: "{a: \"?\", }"
+      location:
+        row: 3
+        column: 16
+      end_location:
+        row: 3
+        column: 34
+    parent: ~
+  - kind:
+      name: PercentFormatExtraNamedArguments
+      body: "`%`-format string has unused named argument(s): b"
+      suggestion: "Remove extra named arguments: b"
+      fixable: true
     location:
       row: 8
-      column: 10
+      column: 0
     end_location:
       row: 8
       column: 29
-  parent: ~
-- kind:
-    name: PercentFormatExtraNamedArguments
-    body: "`%`-format string has unused named argument(s): b"
-    suggestion: "Remove extra named arguments: b"
-    fixable: true
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 29
-  fix:
-    content: "{'a': 1, }"
+    fix:
+      content: "{\"a\": 1, }"
+      location:
+        row: 8
+        column: 10
+      end_location:
+        row: 8
+        column: 29
+    parent: ~
+  - kind:
+      name: PercentFormatExtraNamedArguments
+      body: "`%`-format string has unused named argument(s): b"
+      suggestion: "Remove extra named arguments: b"
+      fixable: true
     location:
       row: 9
-      column: 10
+      column: 0
     end_location:
       row: 9
       column: 29
-  parent: ~
+    fix:
+      content: "{'a': 1, }"
+      location:
+        row: 9
+        column: 10
+      end_location:
+        row: 9
+        column: 29
+    parent: ~
 

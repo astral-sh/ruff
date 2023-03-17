@@ -2,84 +2,84 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: DeprecatedUnittestAlias
-    body: "`assertEquals` is deprecated, use `assertEqual`"
-    suggestion: "Replace `assertEqual` with `assertEquals`"
-    fixable: true
-  location:
-    row: 6
-    column: 8
-  end_location:
-    row: 6
-    column: 25
-  fix:
-    content: self.assertEqual
+- - kind:
+      name: DeprecatedUnittestAlias
+      body: "`assertEquals` is deprecated, use `assertEqual`"
+      suggestion: "Replace `assertEqual` with `assertEquals`"
+      fixable: true
     location:
       row: 6
       column: 8
     end_location:
       row: 6
       column: 25
-  parent: ~
-- kind:
-    name: DeprecatedUnittestAlias
-    body: "`assertEquals` is deprecated, use `assertEqual`"
-    suggestion: "Replace `assertEqual` with `assertEquals`"
-    fixable: true
-  location:
-    row: 7
-    column: 8
-  end_location:
-    row: 7
-    column: 25
-  fix:
-    content: self.assertEqual
+    fix:
+      content: self.assertEqual
+      location:
+        row: 6
+        column: 8
+      end_location:
+        row: 6
+        column: 25
+    parent: ~
+  - kind:
+      name: DeprecatedUnittestAlias
+      body: "`assertEquals` is deprecated, use `assertEqual`"
+      suggestion: "Replace `assertEqual` with `assertEquals`"
+      fixable: true
     location:
       row: 7
       column: 8
     end_location:
       row: 7
       column: 25
-  parent: ~
-- kind:
-    name: DeprecatedUnittestAlias
-    body: "`failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`"
-    suggestion: "Replace `assertAlmostEqual` with `failUnlessAlmostEqual`"
-    fixable: true
-  location:
-    row: 9
-    column: 8
-  end_location:
-    row: 9
-    column: 34
-  fix:
-    content: self.assertAlmostEqual
+    fix:
+      content: self.assertEqual
+      location:
+        row: 7
+        column: 8
+      end_location:
+        row: 7
+        column: 25
+    parent: ~
+  - kind:
+      name: DeprecatedUnittestAlias
+      body: "`failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`"
+      suggestion: "Replace `assertAlmostEqual` with `failUnlessAlmostEqual`"
+      fixable: true
     location:
       row: 9
       column: 8
     end_location:
       row: 9
       column: 34
-  parent: ~
-- kind:
-    name: DeprecatedUnittestAlias
-    body: "`assertNotRegexpMatches` is deprecated, use `assertNotRegex`"
-    suggestion: "Replace `assertNotRegex` with `assertNotRegexpMatches`"
-    fixable: true
-  location:
-    row: 10
-    column: 8
-  end_location:
-    row: 10
-    column: 35
-  fix:
-    content: self.assertNotRegex
+    fix:
+      content: self.assertAlmostEqual
+      location:
+        row: 9
+        column: 8
+      end_location:
+        row: 9
+        column: 34
+    parent: ~
+  - kind:
+      name: DeprecatedUnittestAlias
+      body: "`assertNotRegexpMatches` is deprecated, use `assertNotRegex`"
+      suggestion: "Replace `assertNotRegex` with `assertNotRegexpMatches`"
+      fixable: true
     location:
       row: 10
       column: 8
     end_location:
       row: 10
       column: 35
-  parent: ~
+    fix:
+      content: self.assertNotRegex
+      location:
+        row: 10
+        column: 8
+      end_location:
+        row: 10
+        column: 35
+    parent: ~
 

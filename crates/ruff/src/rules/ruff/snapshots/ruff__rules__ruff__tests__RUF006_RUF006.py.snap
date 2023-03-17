@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: AsyncioDanglingTask
-    body: "Store a reference to the return value of `asyncio.create_task`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 4
-  end_location:
-    row: 6
-    column: 49
-  fix: ~
-  parent: ~
-- kind:
-    name: AsyncioDanglingTask
-    body: "Store a reference to the return value of `asyncio.ensure_future`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 11
-    column: 51
-  fix: ~
-  parent: ~
+- - kind:
+      name: AsyncioDanglingTask
+      body: "Store a reference to the return value of `asyncio.create_task`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 4
+    end_location:
+      row: 6
+      column: 49
+    fix: ~
+    parent: ~
+  - kind:
+      name: AsyncioDanglingTask
+      body: "Store a reference to the return value of `asyncio.ensure_future`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 4
+    end_location:
+      row: 11
+      column: 51
+    fix: ~
+    parent: ~
 

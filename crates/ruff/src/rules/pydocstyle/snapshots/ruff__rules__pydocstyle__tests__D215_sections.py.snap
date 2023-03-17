@@ -2,44 +2,44 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: SectionUnderlineNotOverIndented
-    body: "Section underline is over-indented (\"Returns\")"
-    suggestion: "Remove over-indentation from \"Returns\" underline"
-    fixable: true
-  location:
-    row: 156
-    column: 4
-  end_location:
-    row: 162
-    column: 7
-  fix:
-    content: "    "
+- - kind:
+      name: SectionUnderlineNotOverIndented
+      body: "Section underline is over-indented (\"Returns\")"
+      suggestion: "Remove over-indentation from \"Returns\" underline"
+      fixable: true
     location:
-      row: 159
-      column: 0
+      row: 156
+      column: 4
     end_location:
-      row: 159
-      column: 9
-  parent: ~
-- kind:
-    name: SectionUnderlineNotOverIndented
-    body: "Section underline is over-indented (\"Returns\")"
-    suggestion: "Remove over-indentation from \"Returns\" underline"
-    fixable: true
-  location:
-    row: 170
-    column: 4
-  end_location:
-    row: 174
-    column: 7
-  fix:
-    content: "    "
+      row: 162
+      column: 7
+    fix:
+      content: "    "
+      location:
+        row: 159
+        column: 0
+      end_location:
+        row: 159
+        column: 9
+    parent: ~
+  - kind:
+      name: SectionUnderlineNotOverIndented
+      body: "Section underline is over-indented (\"Returns\")"
+      suggestion: "Remove over-indentation from \"Returns\" underline"
+      fixable: true
     location:
-      row: 173
-      column: 0
+      row: 170
+      column: 4
     end_location:
-      row: 173
-      column: 9
-  parent: ~
+      row: 174
+      column: 7
+    fix:
+      content: "    "
+      location:
+        row: 173
+        column: 0
+      end_location:
+        row: 173
+        column: 9
+    parent: ~
 

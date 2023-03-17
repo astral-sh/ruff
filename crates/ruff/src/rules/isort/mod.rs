@@ -555,7 +555,7 @@ mod tests {
     #[test_case(Path::new("order_by_type.py"))]
     fn order_by_type(path: &Path) -> Result<()> {
         let snapshot = format!("order_by_type_false_{}", path.to_string_lossy());
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
@@ -566,7 +566,6 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
@@ -577,7 +576,7 @@ mod tests {
             "order_by_type_with_custom_classes_{}",
             path.to_string_lossy()
         );
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
@@ -594,7 +593,6 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
@@ -605,7 +603,7 @@ mod tests {
             "order_by_type_with_custom_constants_{}",
             path.to_string_lossy()
         );
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
@@ -624,7 +622,6 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
@@ -635,7 +632,7 @@ mod tests {
             "order_by_type_with_custom_variables_{}",
             path.to_string_lossy()
         );
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
@@ -652,7 +649,6 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
@@ -660,7 +656,7 @@ mod tests {
     #[test_case(Path::new("force_sort_within_sections.py"))]
     fn force_sort_within_sections(path: &Path) -> Result<()> {
         let snapshot = format!("force_sort_within_sections_{}", path.to_string_lossy());
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
@@ -671,7 +667,6 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
@@ -785,7 +780,7 @@ mod tests {
     #[test_case(Path::new("no_lines_before.py"))]
     fn no_lines_before(path: &Path) -> Result<()> {
         let snapshot = format!("no_lines_before.py_{}", path.to_string_lossy());
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
@@ -802,7 +797,6 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
@@ -813,7 +807,7 @@ mod tests {
             "no_lines_before_with_empty_sections.py_{}",
             path.to_string_lossy()
         );
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
@@ -827,7 +821,6 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
@@ -837,7 +830,7 @@ mod tests {
     #[test_case(Path::new("lines_after_imports_class_after.py"))]
     fn lines_after_imports(path: &Path) -> Result<()> {
         let snapshot = format!("lines_after_imports_{}", path.to_string_lossy());
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
@@ -848,7 +841,6 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
@@ -856,7 +848,7 @@ mod tests {
     #[test_case(Path::new("lines_between_types.py"))]
     fn lines_between_types(path: &Path) -> Result<()> {
         let snapshot = format!("lines_between_types{}", path.to_string_lossy());
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
@@ -867,7 +859,6 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }

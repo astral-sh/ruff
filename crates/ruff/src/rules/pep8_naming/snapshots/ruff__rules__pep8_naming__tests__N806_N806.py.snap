@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NonLowercaseVariableInFunction
-    body: "Variable `Camel` in function should be lowercase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 4
-  end_location:
-    row: 14
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: NonLowercaseVariableInFunction
-    body: "Variable `CONSTANT` in function should be lowercase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 4
-  end_location:
-    row: 15
-    column: 12
-  fix: ~
-  parent: ~
+- - kind:
+      name: NonLowercaseVariableInFunction
+      body: "Variable `Camel` in function should be lowercase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 14
+      column: 4
+    end_location:
+      row: 14
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: NonLowercaseVariableInFunction
+      body: "Variable `CONSTANT` in function should be lowercase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 15
+      column: 4
+    end_location:
+      row: 15
+      column: 12
+    fix: ~
+    parent: ~
 

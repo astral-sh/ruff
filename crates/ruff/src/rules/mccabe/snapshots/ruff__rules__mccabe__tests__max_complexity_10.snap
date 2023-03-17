@@ -1,6 +1,6 @@
 ---
-source: src/rules/mccabe/mod.rs
+source: crates/ruff/src/rules/mccabe/mod.rs
 expression: diagnostics
 ---
-[]
+- []
 

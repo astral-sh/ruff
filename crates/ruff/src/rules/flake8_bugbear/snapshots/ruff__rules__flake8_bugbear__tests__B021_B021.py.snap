@@ -2,134 +2,134 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 4
-    column: 3
-  fix: ~
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 4
-  end_location:
-    row: 14
-    column: 28
-  fix: ~
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 4
-  end_location:
-    row: 22
-    column: 28
-  fix: ~
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 30
-    column: 4
-  end_location:
-    row: 30
-    column: 28
-  fix: ~
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 4
-  end_location:
-    row: 38
-    column: 28
-  fix: ~
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 4
-  end_location:
-    row: 46
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 4
-  end_location:
-    row: 54
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 62
-    column: 4
-  end_location:
-    row: 62
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 70
-    column: 4
-  end_location:
-    row: 70
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 74
-    column: 4
-  end_location:
-    row: 74
-    column: 48
-  fix: ~
-  parent: ~
+- - kind:
+      name: FStringDocstring
+      body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 4
+      column: 3
+    fix: ~
+    parent: ~
+  - kind:
+      name: FStringDocstring
+      body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+      suggestion: ~
+      fixable: false
+    location:
+      row: 14
+      column: 4
+    end_location:
+      row: 14
+      column: 28
+    fix: ~
+    parent: ~
+  - kind:
+      name: FStringDocstring
+      body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+      suggestion: ~
+      fixable: false
+    location:
+      row: 22
+      column: 4
+    end_location:
+      row: 22
+      column: 28
+    fix: ~
+    parent: ~
+  - kind:
+      name: FStringDocstring
+      body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+      suggestion: ~
+      fixable: false
+    location:
+      row: 30
+      column: 4
+    end_location:
+      row: 30
+      column: 28
+    fix: ~
+    parent: ~
+  - kind:
+      name: FStringDocstring
+      body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+      suggestion: ~
+      fixable: false
+    location:
+      row: 38
+      column: 4
+    end_location:
+      row: 38
+      column: 28
+    fix: ~
+    parent: ~
+  - kind:
+      name: FStringDocstring
+      body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+      suggestion: ~
+      fixable: false
+    location:
+      row: 46
+      column: 4
+    end_location:
+      row: 46
+      column: 24
+    fix: ~
+    parent: ~
+  - kind:
+      name: FStringDocstring
+      body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+      suggestion: ~
+      fixable: false
+    location:
+      row: 54
+      column: 4
+    end_location:
+      row: 54
+      column: 24
+    fix: ~
+    parent: ~
+  - kind:
+      name: FStringDocstring
+      body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+      suggestion: ~
+      fixable: false
+    location:
+      row: 62
+      column: 4
+    end_location:
+      row: 62
+      column: 24
+    fix: ~
+    parent: ~
+  - kind:
+      name: FStringDocstring
+      body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+      suggestion: ~
+      fixable: false
+    location:
+      row: 70
+      column: 4
+    end_location:
+      row: 70
+      column: 24
+    fix: ~
+    parent: ~
+  - kind:
+      name: FStringDocstring
+      body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+      suggestion: ~
+      fixable: false
+    location:
+      row: 74
+      column: 4
+    end_location:
+      row: 74
+      column: 48
+    fix: ~
+    parent: ~
 

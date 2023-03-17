@@ -2,116 +2,116 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: FitsOnOneLine
-    body: One-line docstring should fit on one line
-    suggestion: Reformat to one line
-    fixable: true
-  location:
-    row: 129
-    column: 4
-  end_location:
-    row: 131
-    column: 7
-  fix:
-    content: "\"\"\"Wrong.\"\"\""
+- - kind:
+      name: FitsOnOneLine
+      body: One-line docstring should fit on one line
+      suggestion: Reformat to one line
+      fixable: true
     location:
       row: 129
       column: 4
     end_location:
       row: 131
       column: 7
-  parent: ~
-- kind:
-    name: FitsOnOneLine
-    body: One-line docstring should fit on one line
-    suggestion: Reformat to one line
-    fixable: true
-  location:
-    row: 597
-    column: 4
-  end_location:
-    row: 599
-    column: 13
-  fix:
-    content: "\"\"\"Wrong.\"\"\""
+    fix:
+      content: "\"\"\"Wrong.\"\"\""
+      location:
+        row: 129
+        column: 4
+      end_location:
+        row: 131
+        column: 7
+    parent: ~
+  - kind:
+      name: FitsOnOneLine
+      body: One-line docstring should fit on one line
+      suggestion: Reformat to one line
+      fixable: true
     location:
       row: 597
       column: 4
     end_location:
       row: 599
       column: 13
-  parent: ~
-- kind:
-    name: FitsOnOneLine
-    body: One-line docstring should fit on one line
-    suggestion: Reformat to one line
-    fixable: true
-  location:
-    row: 606
-    column: 4
-  end_location:
-    row: 608
-    column: 7
-  fix:
-    content: "r\"\"\"Wrong.\"\"\""
+    fix:
+      content: "\"\"\"Wrong.\"\"\""
+      location:
+        row: 597
+        column: 4
+      end_location:
+        row: 599
+        column: 13
+    parent: ~
+  - kind:
+      name: FitsOnOneLine
+      body: One-line docstring should fit on one line
+      suggestion: Reformat to one line
+      fixable: true
     location:
       row: 606
       column: 4
     end_location:
       row: 608
       column: 7
-  parent: ~
-- kind:
-    name: FitsOnOneLine
-    body: One-line docstring should fit on one line
-    suggestion: Reformat to one line
-    fixable: true
-  location:
-    row: 609
-    column: 4
-  end_location:
-    row: 611
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: FitsOnOneLine
-    body: One-line docstring should fit on one line
-    suggestion: Reformat to one line
-    fixable: true
-  location:
-    row: 615
-    column: 4
-  end_location:
-    row: 617
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: FitsOnOneLine
-    body: One-line docstring should fit on one line
-    suggestion: Reformat to one line
-    fixable: true
-  location:
-    row: 618
-    column: 4
-  end_location:
-    row: 620
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: FitsOnOneLine
-    body: One-line docstring should fit on one line
-    suggestion: Reformat to one line
-    fixable: true
-  location:
-    row: 624
-    column: 4
-  end_location:
-    row: 626
-    column: 14
-  fix: ~
-  parent: ~
+    fix:
+      content: "r\"\"\"Wrong.\"\"\""
+      location:
+        row: 606
+        column: 4
+      end_location:
+        row: 608
+        column: 7
+    parent: ~
+  - kind:
+      name: FitsOnOneLine
+      body: One-line docstring should fit on one line
+      suggestion: Reformat to one line
+      fixable: true
+    location:
+      row: 615
+      column: 4
+    end_location:
+      row: 617
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: FitsOnOneLine
+      body: One-line docstring should fit on one line
+      suggestion: Reformat to one line
+      fixable: true
+    location:
+      row: 624
+      column: 4
+    end_location:
+      row: 626
+      column: 14
+    fix: ~
+    parent: ~
+- - kind:
+      name: FitsOnOneLine
+      body: One-line docstring should fit on one line
+      suggestion: Reformat to one line
+      fixable: true
+    location:
+      row: 609
+      column: 4
+    end_location:
+      row: 611
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: FitsOnOneLine
+      body: One-line docstring should fit on one line
+      suggestion: Reformat to one line
+      fixable: true
+    location:
+      row: 618
+      column: 4
+    end_location:
+      row: 620
+      column: 14
+    fix: ~
+    parent: ~
 

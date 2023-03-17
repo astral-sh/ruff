@@ -2,84 +2,84 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: LRUCacheWithoutParameters
-    body: "Unnecessary parameters to `functools.lru_cache`"
-    suggestion: Remove unnecessary parameters
-    fixable: true
-  location:
-    row: 5
-    column: 20
-  end_location:
-    row: 5
-    column: 22
-  fix:
-    content: functools.lru_cache
+- - kind:
+      name: LRUCacheWithoutParameters
+      body: "Unnecessary parameters to `functools.lru_cache`"
+      suggestion: Remove unnecessary parameters
+      fixable: true
     location:
       row: 5
-      column: 1
+      column: 20
     end_location:
       row: 5
       column: 22
-  parent: ~
-- kind:
-    name: LRUCacheWithoutParameters
-    body: "Unnecessary parameters to `functools.lru_cache`"
-    suggestion: Remove unnecessary parameters
-    fixable: true
-  location:
-    row: 10
-    column: 10
-  end_location:
-    row: 10
-    column: 12
-  fix:
-    content: lru_cache
+    fix:
+      content: functools.lru_cache
+      location:
+        row: 5
+        column: 1
+      end_location:
+        row: 5
+        column: 22
+    parent: ~
+  - kind:
+      name: LRUCacheWithoutParameters
+      body: "Unnecessary parameters to `functools.lru_cache`"
+      suggestion: Remove unnecessary parameters
+      fixable: true
     location:
       row: 10
-      column: 1
+      column: 10
     end_location:
       row: 10
       column: 12
-  parent: ~
-- kind:
-    name: LRUCacheWithoutParameters
-    body: "Unnecessary parameters to `functools.lru_cache`"
-    suggestion: Remove unnecessary parameters
-    fixable: true
-  location:
-    row: 16
-    column: 20
-  end_location:
-    row: 16
-    column: 22
-  fix:
-    content: functools.lru_cache
+    fix:
+      content: lru_cache
+      location:
+        row: 10
+        column: 1
+      end_location:
+        row: 10
+        column: 12
+    parent: ~
+  - kind:
+      name: LRUCacheWithoutParameters
+      body: "Unnecessary parameters to `functools.lru_cache`"
+      suggestion: Remove unnecessary parameters
+      fixable: true
     location:
       row: 16
-      column: 1
+      column: 20
     end_location:
       row: 16
       column: 22
-  parent: ~
-- kind:
-    name: LRUCacheWithoutParameters
-    body: "Unnecessary parameters to `functools.lru_cache`"
-    suggestion: Remove unnecessary parameters
-    fixable: true
-  location:
-    row: 21
-    column: 20
-  end_location:
-    row: 21
-    column: 22
-  fix:
-    content: functools.lru_cache
+    fix:
+      content: functools.lru_cache
+      location:
+        row: 16
+        column: 1
+      end_location:
+        row: 16
+        column: 22
+    parent: ~
+  - kind:
+      name: LRUCacheWithoutParameters
+      body: "Unnecessary parameters to `functools.lru_cache`"
+      suggestion: Remove unnecessary parameters
+      fixable: true
     location:
       row: 21
-      column: 1
+      column: 20
     end_location:
       row: 21
       column: 22
-  parent: ~
+    fix:
+      content: functools.lru_cache
+      location:
+        row: 21
+        column: 1
+      end_location:
+        row: 21
+        column: 22
+    parent: ~
 

@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NoSignature
-    body: "First line should not be the function's signature"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 378
-    column: 4
-  end_location:
-    row: 378
-    column: 30
-  fix: ~
-  parent: ~
+- - kind:
+      name: NoSignature
+      body: "First line should not be the function's signature"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 378
+      column: 4
+    end_location:
+      row: 378
+      column: 30
+    fix: ~
+    parent: ~
 

@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ExprAndNotExpr
-    body: "Use `False` instead of `a and not a`"
-    suggestion: "Replace with `False`"
-    fixable: true
-  location:
-    row: 1
-    column: 3
-  end_location:
-    row: 1
-    column: 14
-  fix:
-    content: "False"
+- - kind:
+      name: ExprAndNotExpr
+      body: "Use `False` instead of `a and not a`"
+      suggestion: "Replace with `False`"
+      fixable: true
     location:
       row: 1
       column: 3
     end_location:
       row: 1
       column: 14
-  parent: ~
-- kind:
-    name: ExprAndNotExpr
-    body: "Use `False` instead of `a and not a`"
-    suggestion: "Replace with `False`"
-    fixable: true
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 15
-  fix:
-    content: "False"
+    fix:
+      content: "False"
+      location:
+        row: 1
+        column: 3
+      end_location:
+        row: 1
+        column: 14
+    parent: ~
+  - kind:
+      name: ExprAndNotExpr
+      body: "Use `False` instead of `a and not a`"
+      suggestion: "Replace with `False`"
+      fixable: true
     location:
       row: 4
       column: 4
     end_location:
       row: 4
       column: 15
-  parent: ~
-- kind:
-    name: ExprAndNotExpr
-    body: "Use `False` instead of `a and not a`"
-    suggestion: "Replace with `False`"
-    fixable: true
-  location:
-    row: 7
-    column: 4
-  end_location:
-    row: 7
-    column: 15
-  fix:
-    content: "False"
+    fix:
+      content: "False"
+      location:
+        row: 4
+        column: 4
+      end_location:
+        row: 4
+        column: 15
+    parent: ~
+  - kind:
+      name: ExprAndNotExpr
+      body: "Use `False` instead of `a and not a`"
+      suggestion: "Replace with `False`"
+      fixable: true
     location:
       row: 7
       column: 4
     end_location:
       row: 7
       column: 15
-  parent: ~
+    fix:
+      content: "False"
+      location:
+        row: 7
+        column: 4
+      end_location:
+        row: 7
+        column: 15
+    parent: ~
 

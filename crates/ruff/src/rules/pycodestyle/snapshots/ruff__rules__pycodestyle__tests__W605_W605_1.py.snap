@@ -2,84 +2,84 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: InvalidEscapeSequence
-    body: "Invalid escape sequence: `\\.`"
-    suggestion: Add backslash to escape sequence
-    fixable: true
-  location:
-    row: 2
-    column: 9
-  end_location:
-    row: 2
-    column: 11
-  fix:
-    content: "\\"
+- - kind:
+      name: InvalidEscapeSequence
+      body: "Invalid escape sequence: `\\.`"
+      suggestion: Add backslash to escape sequence
+      fixable: true
     location:
       row: 2
-      column: 10
+      column: 9
     end_location:
       row: 2
-      column: 10
-  parent: ~
-- kind:
-    name: InvalidEscapeSequence
-    body: "Invalid escape sequence: `\\.`"
-    suggestion: Add backslash to escape sequence
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 2
-  fix:
-    content: "\\"
+      column: 11
+    fix:
+      content: "\\"
+      location:
+        row: 2
+        column: 10
+      end_location:
+        row: 2
+        column: 10
+    parent: ~
+  - kind:
+      name: InvalidEscapeSequence
+      body: "Invalid escape sequence: `\\.`"
+      suggestion: Add backslash to escape sequence
+      fixable: true
     location:
       row: 6
-      column: 1
+      column: 0
     end_location:
       row: 6
-      column: 1
-  parent: ~
-- kind:
-    name: InvalidEscapeSequence
-    body: "Invalid escape sequence: `\\_`"
-    suggestion: Add backslash to escape sequence
-    fixable: true
-  location:
-    row: 11
-    column: 5
-  end_location:
-    row: 11
-    column: 7
-  fix:
-    content: "\\"
+      column: 2
+    fix:
+      content: "\\"
+      location:
+        row: 6
+        column: 1
+      end_location:
+        row: 6
+        column: 1
+    parent: ~
+  - kind:
+      name: InvalidEscapeSequence
+      body: "Invalid escape sequence: `\\_`"
+      suggestion: Add backslash to escape sequence
+      fixable: true
     location:
       row: 11
-      column: 6
+      column: 5
     end_location:
       row: 11
-      column: 6
-  parent: ~
-- kind:
-    name: InvalidEscapeSequence
-    body: "Invalid escape sequence: `\\_`"
-    suggestion: Add backslash to escape sequence
-    fixable: true
-  location:
-    row: 18
-    column: 5
-  end_location:
-    row: 18
-    column: 7
-  fix:
-    content: "\\"
+      column: 7
+    fix:
+      content: "\\"
+      location:
+        row: 11
+        column: 6
+      end_location:
+        row: 11
+        column: 6
+    parent: ~
+  - kind:
+      name: InvalidEscapeSequence
+      body: "Invalid escape sequence: `\\_`"
+      suggestion: Add backslash to escape sequence
+      fixable: true
     location:
       row: 18
-      column: 6
+      column: 5
     end_location:
       row: 18
-      column: 6
-  parent: ~
+      column: 7
+    fix:
+      content: "\\"
+      location:
+        row: 18
+        column: 6
+      end_location:
+        row: 18
+        column: 6
+    parent: ~
 

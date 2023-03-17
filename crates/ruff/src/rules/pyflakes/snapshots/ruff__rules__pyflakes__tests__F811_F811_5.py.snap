@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: RedefinedWhileUnused
-    body: "Redefinition of unused `fu` from line 1"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 12
-  end_location:
-    row: 1
-    column: 14
-  fix: ~
-  parent: ~
+- - kind:
+      name: RedefinedWhileUnused
+      body: "Redefinition of unused `fu` from line 1"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 12
+    end_location:
+      row: 1
+      column: 14
+    fix: ~
+    parent: ~
 

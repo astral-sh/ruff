@@ -2,104 +2,104 @@
 source: crates/ruff/src/rules/eradicate/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: CommentedOutCode
-    body: Found commented-out code
-    suggestion: Remove commented-out code
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 10
-  fix:
-    content: ""
+- - kind:
+      name: CommentedOutCode
+      body: Found commented-out code
+      suggestion: Remove commented-out code
+      fixable: true
     location:
       row: 1
       column: 0
     end_location:
-      row: 2
-      column: 0
-  parent: ~
-- kind:
-    name: CommentedOutCode
-    body: Found commented-out code
-    suggestion: Remove commented-out code
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 22
-  fix:
-    content: ""
+      row: 1
+      column: 10
+    fix:
+      content: ""
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 2
+        column: 0
+    parent: ~
+  - kind:
+      name: CommentedOutCode
+      body: Found commented-out code
+      suggestion: Remove commented-out code
+      fixable: true
     location:
       row: 2
       column: 0
     end_location:
-      row: 3
-      column: 0
-  parent: ~
-- kind:
-    name: CommentedOutCode
-    body: Found commented-out code
-    suggestion: Remove commented-out code
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 6
-  fix:
-    content: ""
+      row: 2
+      column: 22
+    fix:
+      content: ""
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 3
+        column: 0
+    parent: ~
+  - kind:
+      name: CommentedOutCode
+      body: Found commented-out code
+      suggestion: Remove commented-out code
+      fixable: true
     location:
       row: 3
       column: 0
     end_location:
-      row: 4
-      column: 0
-  parent: ~
-- kind:
-    name: CommentedOutCode
-    body: Found commented-out code
-    suggestion: Remove commented-out code
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 13
-  fix:
-    content: ""
+      row: 3
+      column: 6
+    fix:
+      content: ""
+      location:
+        row: 3
+        column: 0
+      end_location:
+        row: 4
+        column: 0
+    parent: ~
+  - kind:
+      name: CommentedOutCode
+      body: Found commented-out code
+      suggestion: Remove commented-out code
+      fixable: true
     location:
       row: 5
       column: 0
     end_location:
-      row: 6
-      column: 0
-  parent: ~
-- kind:
-    name: CommentedOutCode
-    body: Found commented-out code
-    suggestion: Remove commented-out code
-    fixable: true
-  location:
-    row: 12
-    column: 4
-  end_location:
-    row: 12
-    column: 16
-  fix:
-    content: ""
+      row: 5
+      column: 13
+    fix:
+      content: ""
+      location:
+        row: 5
+        column: 0
+      end_location:
+        row: 6
+        column: 0
+    parent: ~
+  - kind:
+      name: CommentedOutCode
+      body: Found commented-out code
+      suggestion: Remove commented-out code
+      fixable: true
     location:
       row: 12
-      column: 0
+      column: 4
     end_location:
-      row: 13
-      column: 0
-  parent: ~
+      row: 12
+      column: 16
+    fix:
+      content: ""
+      location:
+        row: 12
+        column: 0
+      end_location:
+        row: 13
+        column: 0
+    parent: ~
 

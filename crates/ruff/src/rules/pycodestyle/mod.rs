@@ -71,7 +71,7 @@ mod tests {
             // Replaces the platform's default line ending with `<LineEnding>` to make the test platform-
             // agnostic
             {
-                "[].fix.content" => insta::dynamic_redaction(|value, _path| {
+                "[][].fix.content" => insta::dynamic_redaction(|value, _path| {
                     value.as_str().unwrap().replace(LineEnding::default().as_str(), "<LineEnding>")
                 })
             }

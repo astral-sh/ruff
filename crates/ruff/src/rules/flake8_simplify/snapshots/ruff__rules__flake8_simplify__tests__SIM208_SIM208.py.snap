@@ -2,44 +2,44 @@
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: DoubleNegation
-    body: "Use `a` instead of `not (not a)`"
-    suggestion: "Replace with `a`"
-    fixable: true
-  location:
-    row: 1
-    column: 3
-  end_location:
-    row: 1
-    column: 14
-  fix:
-    content: a
+- - kind:
+      name: DoubleNegation
+      body: "Use `a` instead of `not (not a)`"
+      suggestion: "Replace with `a`"
+      fixable: true
     location:
       row: 1
       column: 3
     end_location:
       row: 1
       column: 14
-  parent: ~
-- kind:
-    name: DoubleNegation
-    body: "Use `a == b` instead of `not (not a == b)`"
-    suggestion: "Replace with `a == b`"
-    fixable: true
-  location:
-    row: 4
-    column: 3
-  end_location:
-    row: 4
-    column: 21
-  fix:
-    content: a == b
+    fix:
+      content: a
+      location:
+        row: 1
+        column: 3
+      end_location:
+        row: 1
+        column: 14
+    parent: ~
+  - kind:
+      name: DoubleNegation
+      body: "Use `a == b` instead of `not (not a == b)`"
+      suggestion: "Replace with `a == b`"
+      fixable: true
     location:
       row: 4
       column: 3
     end_location:
       row: 4
       column: 21
-  parent: ~
+    fix:
+      content: a == b
+      location:
+        row: 4
+        column: 3
+      end_location:
+        row: 4
+        column: 21
+    parent: ~
 

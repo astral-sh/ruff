@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: CallDateToday
-    body: "The use of `datetime.date.today()` is not allowed, use `datetime.datetime.now(tz=).date()` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: CallDateToday
-    body: "The use of `datetime.date.today()` is not allowed, use `datetime.datetime.now(tz=).date()` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 12
-  fix: ~
-  parent: ~
+- - kind:
+      name: CallDateToday
+      body: "The use of `datetime.date.today()` is not allowed, use `datetime.datetime.now(tz=).date()` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: CallDateToday
+      body: "The use of `datetime.date.today()` is not allowed, use `datetime.datetime.now(tz=).date()` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 12
+    fix: ~
+    parent: ~
 

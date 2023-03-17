@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: DeprecatedLogWarn
-    body: "`warn` is deprecated in favor of `warning`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: DeprecatedLogWarn
-    body: "`warn` is deprecated in favor of `warning`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 4
-  fix: ~
-  parent: ~
+- - kind:
+      name: DeprecatedLogWarn
+      body: "`warn` is deprecated in favor of `warning`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: DeprecatedLogWarn
+      body: "`warn` is deprecated in favor of `warning`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 4
+    fix: ~
+    parent: ~
 

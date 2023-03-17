@@ -2,575 +2,575 @@
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
-    suggestion: "Replace `assertTrue(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 11
-    column: 8
-  end_location:
-    row: 11
-    column: 23
-  fix:
-    content: assert expr
+- - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+      suggestion: "Replace `assertTrue(...)` with `assert ...`"
+      fixable: true
     location:
       row: 11
       column: 8
     end_location:
       row: 11
-      column: 29
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
-    suggestion: "Replace `assertTrue(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 12
-    column: 8
-  end_location:
-    row: 12
-    column: 23
-  fix:
-    content: assert expr
+      column: 23
+    fix:
+      content: assert expr
+      location:
+        row: 11
+        column: 8
+      end_location:
+        row: 11
+        column: 29
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+      suggestion: "Replace `assertTrue(...)` with `assert ...`"
+      fixable: true
     location:
       row: 12
       column: 8
     end_location:
       row: 12
-      column: 34
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
-    suggestion: "Replace `assertTrue(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 13
-    column: 8
-  end_location:
-    row: 13
-    column: 23
-  fix:
-    content: "assert expr, msg"
+      column: 23
+    fix:
+      content: assert expr
+      location:
+        row: 12
+        column: 8
+      end_location:
+        row: 12
+        column: 34
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+      suggestion: "Replace `assertTrue(...)` with `assert ...`"
+      fixable: true
     location:
       row: 13
       column: 8
     end_location:
       row: 13
-      column: 34
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
-    suggestion: "Replace `assertTrue(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 14
-    column: 8
-  end_location:
-    row: 14
-    column: 23
-  fix:
-    content: "assert expr, msg"
+      column: 23
+    fix:
+      content: "assert expr, msg"
+      location:
+        row: 13
+        column: 8
+      end_location:
+        row: 13
+        column: 34
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+      suggestion: "Replace `assertTrue(...)` with `assert ...`"
+      fixable: true
     location:
       row: 14
       column: 8
     end_location:
       row: 14
-      column: 43
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
-    suggestion: "Replace `assertTrue(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 15
-    column: 8
-  end_location:
-    row: 15
-    column: 23
-  fix:
-    content: "assert expr, msg"
+      column: 23
+    fix:
+      content: "assert expr, msg"
+      location:
+        row: 14
+        column: 8
+      end_location:
+        row: 14
+        column: 43
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+      suggestion: "Replace `assertTrue(...)` with `assert ...`"
+      fixable: true
     location:
       row: 15
       column: 8
     end_location:
       row: 15
-      column: 43
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
-    suggestion: "Replace `assertTrue(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 16
-    column: 8
-  end_location:
-    row: 16
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
-    suggestion: "Replace `assertTrue(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 17
-    column: 8
-  end_location:
-    row: 17
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
-    suggestion: "Replace `assertTrue(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 18
-    column: 8
-  end_location:
-    row: 18
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertTrue`"
-    suggestion: "Replace `assertTrue(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 19
-    column: 8
-  end_location:
-    row: 19
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertIsNotNone`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 12
-  end_location:
-    row: 21
-    column: 32
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertIsNone`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 17
-  end_location:
-    row: 23
-    column: 34
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertEqual`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 25
-    column: 15
-  end_location:
-    row: 25
-    column: 31
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertFalse`"
-    suggestion: "Replace `assertFalse(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 28
-    column: 8
-  end_location:
-    row: 28
-    column: 24
-  fix:
-    content: assert not True
+      column: 23
+    fix:
+      content: "assert expr, msg"
+      location:
+        row: 15
+        column: 8
+      end_location:
+        row: 15
+        column: 43
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+      suggestion: "Replace `assertTrue(...)` with `assert ...`"
+      fixable: true
     location:
-      row: 28
+      row: 16
       column: 8
     end_location:
-      row: 28
-      column: 30
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertEqual`"
-    suggestion: "Replace `assertEqual(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 31
-    column: 8
-  end_location:
-    row: 31
-    column: 24
-  fix:
-    content: assert 1 == 2
+      row: 16
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+      suggestion: "Replace `assertTrue(...)` with `assert ...`"
+      fixable: true
     location:
-      row: 31
+      row: 17
       column: 8
     end_location:
-      row: 31
-      column: 30
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertNotEqual`"
-    suggestion: "Replace `assertNotEqual(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 34
-    column: 8
-  end_location:
-    row: 34
-    column: 27
-  fix:
-    content: assert 1 != 1
+      row: 17
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+      suggestion: "Replace `assertTrue(...)` with `assert ...`"
+      fixable: true
     location:
-      row: 34
+      row: 18
       column: 8
     end_location:
-      row: 34
-      column: 33
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertGreater`"
-    suggestion: "Replace `assertGreater(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 37
-    column: 8
-  end_location:
-    row: 37
-    column: 26
-  fix:
-    content: assert 1 > 2
+      row: 18
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertTrue`"
+      suggestion: "Replace `assertTrue(...)` with `assert ...`"
+      fixable: true
     location:
-      row: 37
+      row: 19
       column: 8
     end_location:
-      row: 37
+      row: 19
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertIsNotNone`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 21
+      column: 12
+    end_location:
+      row: 21
       column: 32
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertGreaterEqual`"
-    suggestion: "Replace `assertGreaterEqual(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 40
-    column: 8
-  end_location:
-    row: 40
-    column: 31
-  fix:
-    content: assert 1 >= 2
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertIsNone`"
+      suggestion: ~
+      fixable: false
     location:
-      row: 40
-      column: 8
+      row: 23
+      column: 17
     end_location:
-      row: 40
-      column: 37
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertLess`"
-    suggestion: "Replace `assertLess(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 43
-    column: 8
-  end_location:
-    row: 43
-    column: 23
-  fix:
-    content: assert 2 < 1
-    location:
-      row: 43
-      column: 8
-    end_location:
-      row: 43
-      column: 29
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertLessEqual`"
-    suggestion: "Replace `assertLessEqual(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 46
-    column: 8
-  end_location:
-    row: 46
-    column: 28
-  fix:
-    content: assert 1 <= 2
-    location:
-      row: 46
-      column: 8
-    end_location:
-      row: 46
+      row: 23
       column: 34
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertIn`"
-    suggestion: "Replace `assertIn(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 49
-    column: 8
-  end_location:
-    row: 49
-    column: 21
-  fix:
-    content: "assert 1 in [2, 3]"
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertEqual`"
+      suggestion: ~
+      fixable: false
     location:
-      row: 49
-      column: 8
+      row: 25
+      column: 15
     end_location:
-      row: 49
-      column: 32
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertNotIn`"
-    suggestion: "Replace `assertNotIn(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 52
-    column: 8
-  end_location:
-    row: 52
-    column: 24
-  fix:
-    content: "assert 2 not in [2, 3]"
-    location:
-      row: 52
-      column: 8
-    end_location:
-      row: 52
-      column: 35
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertIsNone`"
-    suggestion: "Replace `assertIsNone(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 55
-    column: 8
-  end_location:
-    row: 55
-    column: 25
-  fix:
-    content: assert 0 is None
-    location:
-      row: 55
-      column: 8
-    end_location:
-      row: 55
-      column: 28
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertIsNotNone`"
-    suggestion: "Replace `assertIsNotNone(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 58
-    column: 8
-  end_location:
-    row: 58
-    column: 28
-  fix:
-    content: assert 0 is not None
-    location:
-      row: 58
-      column: 8
-    end_location:
-      row: 58
+      row: 25
       column: 31
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertIs`"
-    suggestion: "Replace `assertIs(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 61
-    column: 8
-  end_location:
-    row: 61
-    column: 21
-  fix:
-    content: "assert [] is []"
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertFalse`"
+      suggestion: "Replace `assertFalse(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 28
+      column: 8
+    end_location:
+      row: 28
+      column: 24
+    fix:
+      content: assert not True
+      location:
+        row: 28
+        column: 8
+      end_location:
+        row: 28
+        column: 30
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertEqual`"
+      suggestion: "Replace `assertEqual(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 31
+      column: 8
+    end_location:
+      row: 31
+      column: 24
+    fix:
+      content: assert 1 == 2
+      location:
+        row: 31
+        column: 8
+      end_location:
+        row: 31
+        column: 30
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertNotEqual`"
+      suggestion: "Replace `assertNotEqual(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 34
+      column: 8
+    end_location:
+      row: 34
+      column: 27
+    fix:
+      content: assert 1 != 1
+      location:
+        row: 34
+        column: 8
+      end_location:
+        row: 34
+        column: 33
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertGreater`"
+      suggestion: "Replace `assertGreater(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 37
+      column: 8
+    end_location:
+      row: 37
+      column: 26
+    fix:
+      content: assert 1 > 2
+      location:
+        row: 37
+        column: 8
+      end_location:
+        row: 37
+        column: 32
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertGreaterEqual`"
+      suggestion: "Replace `assertGreaterEqual(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 40
+      column: 8
+    end_location:
+      row: 40
+      column: 31
+    fix:
+      content: assert 1 >= 2
+      location:
+        row: 40
+        column: 8
+      end_location:
+        row: 40
+        column: 37
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertLess`"
+      suggestion: "Replace `assertLess(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 43
+      column: 8
+    end_location:
+      row: 43
+      column: 23
+    fix:
+      content: assert 2 < 1
+      location:
+        row: 43
+        column: 8
+      end_location:
+        row: 43
+        column: 29
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertLessEqual`"
+      suggestion: "Replace `assertLessEqual(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 46
+      column: 8
+    end_location:
+      row: 46
+      column: 28
+    fix:
+      content: assert 1 <= 2
+      location:
+        row: 46
+        column: 8
+      end_location:
+        row: 46
+        column: 34
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertIn`"
+      suggestion: "Replace `assertIn(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 49
+      column: 8
+    end_location:
+      row: 49
+      column: 21
+    fix:
+      content: "assert 1 in [2, 3]"
+      location:
+        row: 49
+        column: 8
+      end_location:
+        row: 49
+        column: 32
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertNotIn`"
+      suggestion: "Replace `assertNotIn(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 52
+      column: 8
+    end_location:
+      row: 52
+      column: 24
+    fix:
+      content: "assert 2 not in [2, 3]"
+      location:
+        row: 52
+        column: 8
+      end_location:
+        row: 52
+        column: 35
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertIsNone`"
+      suggestion: "Replace `assertIsNone(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 55
+      column: 8
+    end_location:
+      row: 55
+      column: 25
+    fix:
+      content: assert 0 is None
+      location:
+        row: 55
+        column: 8
+      end_location:
+        row: 55
+        column: 28
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertIsNotNone`"
+      suggestion: "Replace `assertIsNotNone(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 58
+      column: 8
+    end_location:
+      row: 58
+      column: 28
+    fix:
+      content: assert 0 is not None
+      location:
+        row: 58
+        column: 8
+      end_location:
+        row: 58
+        column: 31
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertIs`"
+      suggestion: "Replace `assertIs(...)` with `assert ...`"
+      fixable: true
     location:
       row: 61
       column: 8
     end_location:
       row: 61
+      column: 21
+    fix:
+      content: "assert [] is []"
+      location:
+        row: 61
+        column: 8
+      end_location:
+        row: 61
+        column: 29
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertIsNot`"
+      suggestion: "Replace `assertIsNot(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 64
+      column: 8
+    end_location:
+      row: 64
+      column: 24
+    fix:
+      content: assert 1 is not 1
+      location:
+        row: 64
+        column: 8
+      end_location:
+        row: 64
+        column: 30
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertIsInstance`"
+      suggestion: "Replace `assertIsInstance(...)` with `assert ...`"
+      fixable: true
+    location:
+      row: 67
+      column: 8
+    end_location:
+      row: 67
       column: 29
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertIsNot`"
-    suggestion: "Replace `assertIsNot(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 64
-    column: 8
-  end_location:
-    row: 64
-    column: 24
-  fix:
-    content: assert 1 is not 1
-    location:
-      row: 64
-      column: 8
-    end_location:
-      row: 64
-      column: 30
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertIsInstance`"
-    suggestion: "Replace `assertIsInstance(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 67
-    column: 8
-  end_location:
-    row: 67
-    column: 29
-  fix:
-    content: "assert isinstance(1, str)"
-    location:
-      row: 67
-      column: 8
-    end_location:
-      row: 67
-      column: 37
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertNotIsInstance`"
-    suggestion: "Replace `assertNotIsInstance(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 70
-    column: 8
-  end_location:
-    row: 70
-    column: 32
-  fix:
-    content: "assert not isinstance(1, int)"
+    fix:
+      content: "assert isinstance(1, str)"
+      location:
+        row: 67
+        column: 8
+      end_location:
+        row: 67
+        column: 37
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertNotIsInstance`"
+      suggestion: "Replace `assertNotIsInstance(...)` with `assert ...`"
+      fixable: true
     location:
       row: 70
       column: 8
     end_location:
       row: 70
-      column: 40
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertRegex`"
-    suggestion: "Replace `assertRegex(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 73
-    column: 8
-  end_location:
-    row: 73
-    column: 24
-  fix:
-    content: "assert re.search(\"def\", \"abc\")"
+      column: 32
+    fix:
+      content: "assert not isinstance(1, int)"
+      location:
+        row: 70
+        column: 8
+      end_location:
+        row: 70
+        column: 40
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertRegex`"
+      suggestion: "Replace `assertRegex(...)` with `assert ...`"
+      fixable: true
     location:
       row: 73
       column: 8
     end_location:
       row: 73
-      column: 39
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertNotRegex`"
-    suggestion: "Replace `assertNotRegex(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 76
-    column: 8
-  end_location:
-    row: 76
-    column: 27
-  fix:
-    content: "assert not re.search(\"abc\", \"abc\")"
+      column: 24
+    fix:
+      content: "assert re.search(\"def\", \"abc\")"
+      location:
+        row: 73
+        column: 8
+      end_location:
+        row: 73
+        column: 39
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertNotRegex`"
+      suggestion: "Replace `assertNotRegex(...)` with `assert ...`"
+      fixable: true
     location:
       row: 76
       column: 8
     end_location:
       row: 76
-      column: 42
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertRegexpMatches`"
-    suggestion: "Replace `assertRegexpMatches(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 79
-    column: 8
-  end_location:
-    row: 79
-    column: 32
-  fix:
-    content: "assert re.search(\"def\", \"abc\")"
+      column: 27
+    fix:
+      content: "assert not re.search(\"abc\", \"abc\")"
+      location:
+        row: 76
+        column: 8
+      end_location:
+        row: 76
+        column: 42
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertRegexpMatches`"
+      suggestion: "Replace `assertRegexpMatches(...)` with `assert ...`"
+      fixable: true
     location:
       row: 79
       column: 8
     end_location:
       row: 79
-      column: 47
-  parent: ~
-- kind:
-    name: PytestUnittestAssertion
-    body: "Use a regular `assert` instead of unittest-style `assertNotRegex`"
-    suggestion: "Replace `assertNotRegex(...)` with `assert ...`"
-    fixable: true
-  location:
-    row: 82
-    column: 8
-  end_location:
-    row: 82
-    column: 27
-  fix:
-    content: "assert not re.search(\"abc\", \"abc\")"
+      column: 32
+    fix:
+      content: "assert re.search(\"def\", \"abc\")"
+      location:
+        row: 79
+        column: 8
+      end_location:
+        row: 79
+        column: 47
+    parent: ~
+  - kind:
+      name: PytestUnittestAssertion
+      body: "Use a regular `assert` instead of unittest-style `assertNotRegex`"
+      suggestion: "Replace `assertNotRegex(...)` with `assert ...`"
+      fixable: true
     location:
       row: 82
       column: 8
     end_location:
       row: 82
-      column: 42
-  parent: ~
+      column: 27
+    fix:
+      content: "assert not re.search(\"abc\", \"abc\")"
+      location:
+        row: 82
+        column: 8
+      end_location:
+        row: 82
+        column: 42
+    parent: ~
 

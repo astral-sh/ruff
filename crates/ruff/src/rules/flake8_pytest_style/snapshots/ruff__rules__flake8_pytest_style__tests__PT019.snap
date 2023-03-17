@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PytestFixtureParamWithoutValue
-    body: "Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 13
-  end_location:
-    row: 9
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestFixtureParamWithoutValue
-    body: "Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 16
-  end_location:
-    row: 13
-    column: 24
-  fix: ~
-  parent: ~
+- - kind:
+      name: PytestFixtureParamWithoutValue
+      body: "Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 13
+    end_location:
+      row: 9
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestFixtureParamWithoutValue
+      body: "Fixture `_fixture` without value is injected as parameter, use `@pytest.mark.usefixtures` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 13
+      column: 16
+    end_location:
+      row: 13
+      column: 24
+    fix: ~
+    parent: ~
 

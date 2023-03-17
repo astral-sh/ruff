@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/flake8_2020/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: SysVersionSlice3
-    body: "`sys.version[:3]` referenced (python3.10), use `sys.version_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 6
-  end_location:
-    row: 6
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: SysVersionSlice3
-    body: "`sys.version[:3]` referenced (python3.10), use `sys.version_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 6
-  end_location:
-    row: 7
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: SysVersionSlice3
-    body: "`sys.version[:3]` referenced (python3.10), use `sys.version_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 6
-  end_location:
-    row: 8
-    column: 7
-  fix: ~
-  parent: ~
+- - kind:
+      name: SysVersionSlice3
+      body: "`sys.version[:3]` referenced (python3.10), use `sys.version_info`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 6
+    end_location:
+      row: 6
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: SysVersionSlice3
+      body: "`sys.version[:3]` referenced (python3.10), use `sys.version_info`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 7
+      column: 6
+    end_location:
+      row: 7
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: SysVersionSlice3
+      body: "`sys.version[:3]` referenced (python3.10), use `sys.version_info`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 6
+    end_location:
+      row: 8
+      column: 7
+    fix: ~
+    parent: ~
 

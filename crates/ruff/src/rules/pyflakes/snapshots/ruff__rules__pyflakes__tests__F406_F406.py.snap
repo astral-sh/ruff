@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UndefinedLocalWithNestedImportStarUsage
-    body: "`from F634 import *` only allowed at module level"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 4
-  end_location:
-    row: 5
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedLocalWithNestedImportStarUsage
-    body: "`from F634 import *` only allowed at module level"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 4
-  end_location:
-    row: 9
-    column: 22
-  fix: ~
-  parent: ~
+- - kind:
+      name: UndefinedLocalWithNestedImportStarUsage
+      body: "`from F634 import *` only allowed at module level"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 4
+    end_location:
+      row: 5
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndefinedLocalWithNestedImportStarUsage
+      body: "`from F634 import *` only allowed at module level"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 4
+    end_location:
+      row: 9
+      column: 22
+    fix: ~
+    parent: ~
 

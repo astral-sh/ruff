@@ -2,84 +2,84 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ReplaceUniversalNewlines
-    body: "`universal_newlines` is deprecated, use `text`"
-    suggestion: "Replace with `text` keyword argument"
-    fixable: true
-  location:
-    row: 6
-    column: 24
-  end_location:
-    row: 6
-    column: 42
-  fix:
-    content: text
+- - kind:
+      name: ReplaceUniversalNewlines
+      body: "`universal_newlines` is deprecated, use `text`"
+      suggestion: "Replace with `text` keyword argument"
+      fixable: true
     location:
       row: 6
       column: 24
     end_location:
       row: 6
       column: 42
-  parent: ~
-- kind:
-    name: ReplaceUniversalNewlines
-    body: "`universal_newlines` is deprecated, use `text`"
-    suggestion: "Replace with `text` keyword argument"
-    fixable: true
-  location:
-    row: 7
-    column: 22
-  end_location:
-    row: 7
-    column: 40
-  fix:
-    content: text
+    fix:
+      content: text
+      location:
+        row: 6
+        column: 24
+      end_location:
+        row: 6
+        column: 42
+    parent: ~
+  - kind:
+      name: ReplaceUniversalNewlines
+      body: "`universal_newlines` is deprecated, use `text`"
+      suggestion: "Replace with `text` keyword argument"
+      fixable: true
     location:
       row: 7
       column: 22
     end_location:
       row: 7
       column: 40
-  parent: ~
-- kind:
-    name: ReplaceUniversalNewlines
-    body: "`universal_newlines` is deprecated, use `text`"
-    suggestion: "Replace with `text` keyword argument"
-    fixable: true
-  location:
-    row: 9
-    column: 13
-  end_location:
-    row: 9
-    column: 31
-  fix:
-    content: text
+    fix:
+      content: text
+      location:
+        row: 7
+        column: 22
+      end_location:
+        row: 7
+        column: 40
+    parent: ~
+  - kind:
+      name: ReplaceUniversalNewlines
+      body: "`universal_newlines` is deprecated, use `text`"
+      suggestion: "Replace with `text` keyword argument"
+      fixable: true
     location:
       row: 9
       column: 13
     end_location:
       row: 9
       column: 31
-  parent: ~
-- kind:
-    name: ReplaceUniversalNewlines
-    body: "`universal_newlines` is deprecated, use `text`"
-    suggestion: "Replace with `text` keyword argument"
-    fixable: true
-  location:
-    row: 10
-    column: 21
-  end_location:
-    row: 10
-    column: 39
-  fix:
-    content: text
+    fix:
+      content: text
+      location:
+        row: 9
+        column: 13
+      end_location:
+        row: 9
+        column: 31
+    parent: ~
+  - kind:
+      name: ReplaceUniversalNewlines
+      body: "`universal_newlines` is deprecated, use `text`"
+      suggestion: "Replace with `text` keyword argument"
+      fixable: true
     location:
       row: 10
       column: 21
     end_location:
       row: 10
       column: 39
-  parent: ~
+    fix:
+      content: text
+      location:
+        row: 10
+        column: 21
+      end_location:
+        row: 10
+        column: 39
+    parent: ~
 

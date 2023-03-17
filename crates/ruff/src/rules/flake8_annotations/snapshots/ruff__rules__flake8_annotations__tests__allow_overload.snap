@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MissingReturnTypeUndocumentedPublicFunction
-    body: "Missing return type annotation for public function `bar`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 8
-  end_location:
-    row: 29
-    column: 11
-  fix: ~
-  parent: ~
+- - kind:
+      name: MissingReturnTypeUndocumentedPublicFunction
+      body: "Missing return type annotation for public function `bar`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 29
+      column: 8
+    end_location:
+      row: 29
+      column: 11
+    fix: ~
+    parent: ~
 

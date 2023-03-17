@@ -2,5 +2,5 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-[]
+- []
 

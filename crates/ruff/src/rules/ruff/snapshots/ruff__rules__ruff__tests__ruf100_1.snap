@@ -2,166 +2,166 @@
 source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnusedImport
-    body: "`typing.Union` imported but unused"
-    suggestion: "Remove unused import: `typing.Union`"
-    fixable: true
-  location:
-    row: 37
-    column: 8
-  end_location:
-    row: 37
-    column: 13
-  fix:
-    content: "from typing import (\n        Mapping,  # noqa: F401\n        )"
+- - kind:
+      name: UnusedImport
+      body: "`typing.Union` imported but unused"
+      suggestion: "Remove unused import: `typing.Union`"
+      fixable: true
     location:
+      row: 37
+      column: 8
+    end_location:
+      row: 37
+      column: 13
+    fix:
+      content: "from typing import (\n        Mapping,  # noqa: F401\n        )"
+      location:
+        row: 35
+        column: 4
+      end_location:
+        row: 38
+        column: 5
+    parent:
       row: 35
       column: 4
-    end_location:
-      row: 38
-      column: 5
-  parent:
-    row: 35
-    column: 4
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `F401`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 52
-    column: 19
-  end_location:
-    row: 52
-    column: 31
-  fix:
-    content: ""
+  - kind:
+      name: UnusedNOQA
+      body: "Unused `noqa` directive (unused: `F401`)"
+      suggestion: "Remove unused `noqa` directive"
+      fixable: true
     location:
       row: 52
-      column: 17
+      column: 19
     end_location:
       row: 52
       column: 31
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `F401`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 59
-    column: 19
-  end_location:
-    row: 59
-    column: 31
-  fix:
-    content: ""
+    fix:
+      content: ""
+      location:
+        row: 52
+        column: 17
+      end_location:
+        row: 52
+        column: 31
+    parent: ~
+  - kind:
+      name: UnusedNOQA
+      body: "Unused `noqa` directive (unused: `F401`)"
+      suggestion: "Remove unused `noqa` directive"
+      fixable: true
     location:
       row: 59
-      column: 17
+      column: 19
     end_location:
       row: 59
       column: 31
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (non-enabled: `F501`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 66
-    column: 15
-  end_location:
-    row: 66
-    column: 27
-  fix:
-    content: ""
+    fix:
+      content: ""
+      location:
+        row: 59
+        column: 17
+      end_location:
+        row: 59
+        column: 31
+    parent: ~
+  - kind:
+      name: UnusedNOQA
+      body: "Unused `noqa` directive (non-enabled: `F501`)"
+      suggestion: "Remove unused `noqa` directive"
+      fixable: true
     location:
       row: 66
-      column: 13
+      column: 15
     end_location:
       row: 66
       column: 27
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (non-enabled: `F501`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 72
-    column: 26
-  end_location:
-    row: 72
-    column: 38
-  fix:
-    content: ""
+    fix:
+      content: ""
+      location:
+        row: 66
+        column: 13
+      end_location:
+        row: 66
+        column: 27
+    parent: ~
+  - kind:
+      name: UnusedNOQA
+      body: "Unused `noqa` directive (non-enabled: `F501`)"
+      suggestion: "Remove unused `noqa` directive"
+      fixable: true
     location:
       row: 72
-      column: 24
+      column: 26
     end_location:
       row: 72
       column: 38
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`typing.Awaitable` imported but unused"
-    suggestion: Remove unused import
-    fixable: true
-  location:
-    row: 89
-    column: 23
-  end_location:
-    row: 89
-    column: 32
-  fix:
-    content: pass
+    fix:
+      content: ""
+      location:
+        row: 72
+        column: 24
+      end_location:
+        row: 72
+        column: 38
+    parent: ~
+  - kind:
+      name: UnusedImport
+      body: "`typing.Awaitable` imported but unused"
+      suggestion: Remove unused import
+      fixable: true
     location:
       row: 89
-      column: 4
+      column: 23
+    end_location:
+      row: 89
+      column: 32
+    fix:
+      content: pass
+      location:
+        row: 89
+        column: 4
+      end_location:
+        row: 89
+        column: 52
+    parent: ~
+  - kind:
+      name: UnusedImport
+      body: "`typing.AwaitableGenerator` imported but unused"
+      suggestion: Remove unused import
+      fixable: true
+    location:
+      row: 89
+      column: 34
     end_location:
       row: 89
       column: 52
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`typing.AwaitableGenerator` imported but unused"
-    suggestion: Remove unused import
-    fixable: true
-  location:
-    row: 89
-    column: 34
-  end_location:
-    row: 89
-    column: 52
-  fix:
-    content: pass
+    fix:
+      content: pass
+      location:
+        row: 89
+        column: 4
+      end_location:
+        row: 89
+        column: 52
+    parent: ~
+  - kind:
+      name: UnusedNOQA
+      body: "Unused `noqa` directive (non-enabled: `F501`)"
+      suggestion: "Remove unused `noqa` directive"
+      fixable: true
     location:
       row: 89
-      column: 4
-    end_location:
-      row: 89
-      column: 52
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (non-enabled: `F501`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 89
-    column: 54
-  end_location:
-    row: 89
-    column: 66
-  fix:
-    content: ""
-    location:
-      row: 89
-      column: 52
+      column: 54
     end_location:
       row: 89
       column: 66
-  parent: ~
+    fix:
+      content: ""
+      location:
+        row: 89
+        column: 52
+      end_location:
+        row: 89
+        column: 66
+    parent: ~
 

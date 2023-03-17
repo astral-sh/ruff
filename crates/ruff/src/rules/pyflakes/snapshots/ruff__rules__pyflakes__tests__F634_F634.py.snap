@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: IfTuple
-    body: "If test is a tuple, which is always `True`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 2
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: IfTuple
-    body: "If test is a tuple, which is always `True`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 4
-  end_location:
-    row: 10
-    column: 12
-  fix: ~
-  parent: ~
+- - kind:
+      name: IfTuple
+      body: "If test is a tuple, which is always `True`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 2
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: IfTuple
+      body: "If test is a tuple, which is always `True`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 7
+      column: 4
+    end_location:
+      row: 10
+      column: 12
+    fix: ~
+    parent: ~
 

@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PytestRaisesTooBroad
-    body: "`pytest.raises(ZeroDivisionError)` is too broad, set the `match` parameter or use a more specific exception"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 23
-  end_location:
-    row: 12
-    column: 40
-  fix: ~
-  parent: ~
+- - kind:
+      name: PytestRaisesTooBroad
+      body: "`pytest.raises(ZeroDivisionError)` is too broad, set the `match` parameter or use a more specific exception"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 12
+      column: 23
+    end_location:
+      row: 12
+      column: 40
+    fix: ~
+    parent: ~
 

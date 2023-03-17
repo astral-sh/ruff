@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: OneBlankLineBeforeClass
-    body: 1 blank line required before class docstring
-    suggestion: Insert 1 blank line before class docstring
-    fixable: true
-  location:
-    row: 161
-    column: 4
-  end_location:
-    row: 161
-    column: 32
-  fix:
-    content: "\n"
+- - kind:
+      name: OneBlankLineBeforeClass
+      body: 1 blank line required before class docstring
+      suggestion: Insert 1 blank line before class docstring
+      fixable: true
     location:
       row: 161
-      column: 0
+      column: 4
     end_location:
       row: 161
-      column: 0
-  parent: ~
-- kind:
-    name: OneBlankLineBeforeClass
-    body: 1 blank line required before class docstring
-    suggestion: Insert 1 blank line before class docstring
-    fixable: true
-  location:
-    row: 192
-    column: 4
-  end_location:
-    row: 192
-    column: 45
-  fix:
-    content: "\n"
+      column: 32
+    fix:
+      content: "\n"
+      location:
+        row: 161
+        column: 0
+      end_location:
+        row: 161
+        column: 0
+    parent: ~
+  - kind:
+      name: OneBlankLineBeforeClass
+      body: 1 blank line required before class docstring
+      suggestion: Insert 1 blank line before class docstring
+      fixable: true
     location:
       row: 192
-      column: 0
+      column: 4
     end_location:
       row: 192
-      column: 0
-  parent: ~
-- kind:
-    name: OneBlankLineBeforeClass
-    body: 1 blank line required before class docstring
-    suggestion: Insert 1 blank line before class docstring
-    fixable: true
-  location:
-    row: 526
-    column: 4
-  end_location:
-    row: 532
-    column: 7
-  fix:
-    content: "\n"
+      column: 45
+    fix:
+      content: "\n"
+      location:
+        row: 192
+        column: 0
+      end_location:
+        row: 192
+        column: 0
+    parent: ~
+  - kind:
+      name: OneBlankLineBeforeClass
+      body: 1 blank line required before class docstring
+      suggestion: Insert 1 blank line before class docstring
+      fixable: true
     location:
       row: 526
-      column: 0
+      column: 4
     end_location:
-      row: 526
-      column: 0
-  parent: ~
+      row: 532
+      column: 7
+    fix:
+      content: "\n"
+      location:
+        row: 526
+        column: 0
+      end_location:
+        row: 526
+        column: 0
+    parent: ~
 

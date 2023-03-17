@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: CannotRaiseLiteral
-    body: Cannot raise a literal. Did you intend to return it or raise an Exception?
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 6
-  end_location:
-    row: 6
-    column: 11
-  fix: ~
-  parent: ~
-- kind:
-    name: CannotRaiseLiteral
-    body: Cannot raise a literal. Did you intend to return it or raise an Exception?
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 6
-  end_location:
-    row: 7
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: CannotRaiseLiteral
-    body: Cannot raise a literal. Did you intend to return it or raise an Exception?
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 6
-  end_location:
-    row: 8
-    column: 14
-  fix: ~
-  parent: ~
+- - kind:
+      name: CannotRaiseLiteral
+      body: Cannot raise a literal. Did you intend to return it or raise an Exception?
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 6
+    end_location:
+      row: 6
+      column: 11
+    fix: ~
+    parent: ~
+  - kind:
+      name: CannotRaiseLiteral
+      body: Cannot raise a literal. Did you intend to return it or raise an Exception?
+      suggestion: ~
+      fixable: false
+    location:
+      row: 7
+      column: 6
+    end_location:
+      row: 7
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: CannotRaiseLiteral
+      body: Cannot raise a literal. Did you intend to return it or raise an Exception?
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 6
+    end_location:
+      row: 8
+      column: 14
+    fix: ~
+    parent: ~
 

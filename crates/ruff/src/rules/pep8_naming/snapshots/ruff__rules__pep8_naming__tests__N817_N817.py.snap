@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: CamelcaseImportedAsAcronym
-    body: "CamelCase `CaMel` imported as acronym `CM`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: CamelcaseImportedAsAcronym
-    body: "CamelCase `CamelCase` imported as acronym `CC`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 31
-  fix: ~
-  parent: ~
+- - kind:
+      name: CamelcaseImportedAsAcronym
+      body: "CamelCase `CaMel` imported as acronym `CM`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: CamelcaseImportedAsAcronym
+      body: "CamelCase `CamelCase` imported as acronym `CC`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 31
+    fix: ~
+    parent: ~
 

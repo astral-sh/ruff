@@ -2,206 +2,206 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnusedImport
-    body: "`functools` imported but unused"
-    suggestion: "Remove unused import: `functools`"
-    fixable: true
-  location:
-    row: 2
-    column: 7
-  end_location:
-    row: 2
-    column: 16
-  fix:
-    content: import os
+- - kind:
+      name: UnusedImport
+      body: "`functools` imported but unused"
+      suggestion: "Remove unused import: `functools`"
+      fixable: true
     location:
       row: 2
-      column: 0
+      column: 7
     end_location:
       row: 2
-      column: 20
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`collections.OrderedDict` imported but unused"
-    suggestion: "Remove unused import: `collections.OrderedDict`"
-    fixable: true
-  location:
-    row: 6
-    column: 4
-  end_location:
-    row: 6
-    column: 15
-  fix:
-    content: "from collections import (\n    Counter,\n    namedtuple,\n)"
+      column: 16
+    fix:
+      content: import os
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 2
+        column: 20
+    parent: ~
+  - kind:
+      name: UnusedImport
+      body: "`collections.OrderedDict` imported but unused"
+      suggestion: "Remove unused import: `collections.OrderedDict`"
+      fixable: true
     location:
-      row: 4
-      column: 0
-    end_location:
-      row: 8
-      column: 1
-  parent:
-    row: 4
-    column: 0
-- kind:
-    name: UnusedImport
-    body: "`logging.config` imported but unused"
-    suggestion: "Remove unused import: `logging.config`"
-    fixable: true
-  location:
-    row: 10
-    column: 7
-  end_location:
-    row: 10
-    column: 21
-  fix:
-    content: ""
-    location:
-      row: 10
-      column: 0
-    end_location:
-      row: 11
-      column: 0
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`logging.handlers` imported but unused"
-    suggestion: "Remove unused import: `logging.handlers`"
-    fixable: true
-  location:
-    row: 12
-    column: 7
-  end_location:
-    row: 12
-    column: 23
-  fix:
-    content: ""
-    location:
-      row: 12
-      column: 0
-    end_location:
-      row: 13
-      column: 0
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`shelve` imported but unused"
-    suggestion: "Remove unused import: `shelve`"
-    fixable: true
-  location:
-    row: 32
-    column: 11
-  end_location:
-    row: 32
-    column: 17
-  fix:
-    content: ""
-    location:
-      row: 32
-      column: 0
-    end_location:
-      row: 33
-      column: 0
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`importlib` imported but unused"
-    suggestion: "Remove unused import: `importlib`"
-    fixable: true
-  location:
-    row: 33
-    column: 11
-  end_location:
-    row: 33
-    column: 20
-  fix:
-    content: pass
-    location:
-      row: 33
+      row: 6
       column: 4
     end_location:
+      row: 6
+      column: 15
+    fix:
+      content: "from collections import (\n    Counter,\n    namedtuple,\n)"
+      location:
+        row: 4
+        column: 0
+      end_location:
+        row: 8
+        column: 1
+    parent:
+      row: 4
+      column: 0
+  - kind:
+      name: UnusedImport
+      body: "`logging.handlers` imported but unused"
+      suggestion: "Remove unused import: `logging.handlers`"
+      fixable: true
+    location:
+      row: 12
+      column: 7
+    end_location:
+      row: 12
+      column: 23
+    fix:
+      content: ""
+      location:
+        row: 12
+        column: 0
+      end_location:
+        row: 13
+        column: 0
+    parent: ~
+  - kind:
+      name: UnusedImport
+      body: "`shelve` imported but unused"
+      suggestion: "Remove unused import: `shelve`"
+      fixable: true
+    location:
+      row: 32
+      column: 11
+    end_location:
+      row: 32
+      column: 17
+    fix:
+      content: ""
+      location:
+        row: 32
+        column: 0
+      end_location:
+        row: 33
+        column: 0
+    parent: ~
+  - kind:
+      name: UnusedImport
+      body: "`importlib` imported but unused"
+      suggestion: "Remove unused import: `importlib`"
+      fixable: true
+    location:
+      row: 33
+      column: 11
+    end_location:
       row: 33
       column: 20
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`pathlib` imported but unused"
-    suggestion: "Remove unused import: `pathlib`"
-    fixable: true
-  location:
-    row: 37
-    column: 11
-  end_location:
-    row: 37
-    column: 18
-  fix:
-    content: ""
+    fix:
+      content: pass
+      location:
+        row: 33
+        column: 4
+      end_location:
+        row: 33
+        column: 20
+    parent: ~
+  - kind:
+      name: UnusedImport
+      body: "`pathlib` imported but unused"
+      suggestion: "Remove unused import: `pathlib`"
+      fixable: true
     location:
       row: 37
-      column: 0
+      column: 11
     end_location:
-      row: 38
-      column: 0
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`pickle` imported but unused"
-    suggestion: "Remove unused import: `pickle`"
-    fixable: true
-  location:
-    row: 52
-    column: 15
-  end_location:
-    row: 52
-    column: 21
-  fix:
-    content: pass
+      row: 37
+      column: 18
+    fix:
+      content: ""
+      location:
+        row: 37
+        column: 0
+      end_location:
+        row: 38
+        column: 0
+    parent: ~
+  - kind:
+      name: UnusedImport
+      body: "`pickle` imported but unused"
+      suggestion: "Remove unused import: `pickle`"
+      fixable: true
     location:
       row: 52
-      column: 8
+      column: 15
     end_location:
       row: 52
       column: 21
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`x` imported but unused"
-    suggestion: "Remove unused import: `x`"
-    fixable: true
-  location:
-    row: 93
-    column: 15
-  end_location:
-    row: 93
-    column: 16
-  fix:
-    content: ""
+    fix:
+      content: pass
+      location:
+        row: 52
+        column: 8
+      end_location:
+        row: 52
+        column: 21
+    parent: ~
+  - kind:
+      name: UnusedImport
+      body: "`x` imported but unused"
+      suggestion: "Remove unused import: `x`"
+      fixable: true
     location:
       row: 93
-      column: 0
+      column: 15
     end_location:
-      row: 94
-      column: 0
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`y` imported but unused"
-    suggestion: "Remove unused import: `y`"
-    fixable: true
-  location:
-    row: 94
-    column: 15
-  end_location:
-    row: 94
-    column: 16
-  fix:
-    content: pass
+      row: 93
+      column: 16
+    fix:
+      content: ""
+      location:
+        row: 93
+        column: 0
+      end_location:
+        row: 94
+        column: 0
+    parent: ~
+  - kind:
+      name: UnusedImport
+      body: "`y` imported but unused"
+      suggestion: "Remove unused import: `y`"
+      fixable: true
     location:
       row: 94
-      column: 8
+      column: 15
     end_location:
       row: 94
       column: 16
-  parent: ~
+    fix:
+      content: pass
+      location:
+        row: 94
+        column: 8
+      end_location:
+        row: 94
+        column: 16
+    parent: ~
+- - kind:
+      name: UnusedImport
+      body: "`logging.config` imported but unused"
+      suggestion: "Remove unused import: `logging.config`"
+      fixable: true
+    location:
+      row: 10
+      column: 7
+    end_location:
+      row: 10
+      column: 21
+    fix:
+      content: ""
+      location:
+        row: 10
+        column: 0
+      end_location:
+        row: 11
+        column: 0
+    parent: ~
 

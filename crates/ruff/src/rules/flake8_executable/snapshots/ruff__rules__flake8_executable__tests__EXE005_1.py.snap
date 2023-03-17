@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_executable/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ShebangNotFirstLine
-    body: Shebang should be at the beginning of the file
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 2
-  end_location:
-    row: 3
-    column: 17
-  fix: ~
-  parent: ~
+- - kind:
+      name: ShebangNotFirstLine
+      body: Shebang should be at the beginning of the file
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 2
+    end_location:
+      row: 3
+      column: 17
+    fix: ~
+    parent: ~
 

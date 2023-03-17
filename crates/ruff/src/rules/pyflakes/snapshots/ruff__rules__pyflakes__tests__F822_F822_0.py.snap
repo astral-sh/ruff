@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UndefinedExport
-    body: "Undefined name `b` in `__all__`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 7
-  fix: ~
-  parent: ~
+- - kind:
+      name: UndefinedExport
+      body: "Undefined name `b` in `__all__`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 7
+    fix: ~
+    parent: ~
 

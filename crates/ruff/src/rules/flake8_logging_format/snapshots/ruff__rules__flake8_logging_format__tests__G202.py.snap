@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: LoggingRedundantExcInfo
-    body: "Logging statement has redundant `exc_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 37
-  end_location:
-    row: 8
-    column: 50
-  fix: ~
-  parent: ~
-- kind:
-    name: LoggingRedundantExcInfo
-    body: "Logging statement has redundant `exc_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 37
-  end_location:
-    row: 13
-    column: 60
-  fix: ~
-  parent: ~
+- - kind:
+      name: LoggingRedundantExcInfo
+      body: "Logging statement has redundant `exc_info`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 37
+    end_location:
+      row: 8
+      column: 50
+    fix: ~
+    parent: ~
+  - kind:
+      name: LoggingRedundantExcInfo
+      body: "Logging statement has redundant `exc_info`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 13
+      column: 37
+    end_location:
+      row: 13
+      column: 60
+    fix: ~
+    parent: ~
 

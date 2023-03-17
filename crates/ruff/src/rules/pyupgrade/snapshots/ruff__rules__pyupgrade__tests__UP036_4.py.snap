@@ -2,164 +2,164 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: OutdatedVersionBlock
-    body: Version block is outdated for minimum Python version
-    suggestion: Remove outdated version block
-    fixable: true
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 5
-    column: 53
-  fix:
-    content: pass
+- - kind:
+      name: OutdatedVersionBlock
+      body: Version block is outdated for minimum Python version
+      suggestion: Remove outdated version block
+      fixable: true
     location:
       row: 4
       column: 4
     end_location:
       row: 5
       column: 53
-  parent: ~
-- kind:
-    name: OutdatedVersionBlock
-    body: Version block is outdated for minimum Python version
-    suggestion: Remove outdated version block
-    fixable: true
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 12
-    column: 53
-  fix:
-    content: ""
+    fix:
+      content: pass
+      location:
+        row: 4
+        column: 4
+      end_location:
+        row: 5
+        column: 53
+    parent: ~
+  - kind:
+      name: OutdatedVersionBlock
+      body: Version block is outdated for minimum Python version
+      suggestion: Remove outdated version block
+      fixable: true
     location:
       row: 11
-      column: 0
+      column: 4
     end_location:
-      row: 13
-      column: 0
-  parent: ~
-- kind:
-    name: OutdatedVersionBlock
-    body: Version block is outdated for minimum Python version
-    suggestion: Remove outdated version block
-    fixable: true
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 20
-    column: 51
-  fix:
-    content: ""
+      row: 12
+      column: 53
+    fix:
+      content: ""
+      location:
+        row: 11
+        column: 0
+      end_location:
+        row: 13
+        column: 0
+    parent: ~
+  - kind:
+      name: OutdatedVersionBlock
+      body: Version block is outdated for minimum Python version
+      suggestion: Remove outdated version block
+      fixable: true
     location:
       row: 17
       column: 4
     end_location:
-      row: 19
-      column: 4
-  parent: ~
-- kind:
-    name: OutdatedVersionBlock
-    body: Version block is outdated for minimum Python version
-    suggestion: Remove outdated version block
-    fixable: true
-  location:
-    row: 24
-    column: 4
-  end_location:
-    row: 25
-    column: 53
-  fix:
-    content: ""
+      row: 20
+      column: 51
+    fix:
+      content: ""
+      location:
+        row: 17
+        column: 4
+      end_location:
+        row: 19
+        column: 4
+    parent: ~
+  - kind:
+      name: OutdatedVersionBlock
+      body: Version block is outdated for minimum Python version
+      suggestion: Remove outdated version block
+      fixable: true
     location:
       row: 24
-      column: 0
+      column: 4
     end_location:
-      row: 26
-      column: 0
-  parent: ~
-- kind:
-    name: OutdatedVersionBlock
-    body: Version block is outdated for minimum Python version
-    suggestion: Remove outdated version block
-    fixable: true
-  location:
-    row: 27
-    column: 4
-  end_location:
-    row: 28
-    column: 53
-  fix:
-    content: ""
+      row: 25
+      column: 53
+    fix:
+      content: ""
+      location:
+        row: 24
+        column: 0
+      end_location:
+        row: 26
+        column: 0
+    parent: ~
+  - kind:
+      name: OutdatedVersionBlock
+      body: Version block is outdated for minimum Python version
+      suggestion: Remove outdated version block
+      fixable: true
     location:
       row: 27
-      column: 0
+      column: 4
     end_location:
-      row: 29
-      column: 0
-  parent: ~
-- kind:
-    name: OutdatedVersionBlock
-    body: Version block is outdated for minimum Python version
-    suggestion: Remove outdated version block
-    fixable: true
-  location:
-    row: 32
-    column: 4
-  end_location:
-    row: 35
-    column: 51
-  fix:
-    content: ""
+      row: 28
+      column: 53
+    fix:
+      content: ""
+      location:
+        row: 27
+        column: 0
+      end_location:
+        row: 29
+        column: 0
+    parent: ~
+  - kind:
+      name: OutdatedVersionBlock
+      body: Version block is outdated for minimum Python version
+      suggestion: Remove outdated version block
+      fixable: true
     location:
       row: 32
       column: 4
     end_location:
-      row: 34
-      column: 4
-  parent: ~
-- kind:
-    name: OutdatedVersionBlock
-    body: Version block is outdated for minimum Python version
-    suggestion: Remove outdated version block
-    fixable: true
-  location:
-    row: 37
-    column: 4
-  end_location:
-    row: 40
-    column: 51
-  fix:
-    content: "    cmd = [sys.executable, \"-m\", \"test\", \"-j0\"]"
+      row: 35
+      column: 51
+    fix:
+      content: ""
+      location:
+        row: 32
+        column: 4
+      end_location:
+        row: 34
+        column: 4
+    parent: ~
+  - kind:
+      name: OutdatedVersionBlock
+      body: Version block is outdated for minimum Python version
+      suggestion: Remove outdated version block
+      fixable: true
     location:
       row: 37
-      column: 0
+      column: 4
     end_location:
       row: 40
       column: 51
-  parent: ~
-- kind:
-    name: OutdatedVersionBlock
-    body: Version block is outdated for minimum Python version
-    suggestion: Remove outdated version block
-    fixable: true
-  location:
-    row: 42
-    column: 4
-  end_location:
-    row: 45
-    column: 51
-  fix:
-    content: ""
+    fix:
+      content: "    cmd = [sys.executable, \"-m\", \"test\", \"-j0\"]"
+      location:
+        row: 37
+        column: 0
+      end_location:
+        row: 40
+        column: 51
+    parent: ~
+  - kind:
+      name: OutdatedVersionBlock
+      body: Version block is outdated for minimum Python version
+      suggestion: Remove outdated version block
+      fixable: true
     location:
       row: 42
       column: 4
     end_location:
-      row: 44
-      column: 6
-  parent: ~
+      row: 45
+      column: 51
+    fix:
+      content: ""
+      location:
+        row: 42
+        column: 4
+      end_location:
+        row: 44
+        column: 6
+    parent: ~
 

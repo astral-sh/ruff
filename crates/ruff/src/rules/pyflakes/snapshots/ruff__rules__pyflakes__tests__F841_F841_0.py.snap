@@ -2,341 +2,341 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnusedVariable
-    body: "Local variable `e` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `e`"
-    fixable: true
-  location:
-    row: 3
-    column: 21
-  end_location:
-    row: 3
-    column: 22
-  fix:
-    content: ""
+- - kind:
+      name: UnusedVariable
+      body: "Local variable `e` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `e`"
+      fixable: true
     location:
       row: 3
-      column: 17
+      column: 21
     end_location:
       row: 3
       column: 22
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `x` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `x`"
-    fixable: true
-  location:
-    row: 14
-    column: 4
-  end_location:
-    row: 14
-    column: 5
-  fix:
-    content: ""
-    location:
-      row: 14
-      column: 0
-    end_location:
-      row: 15
-      column: 0
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `y` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `y`"
-    fixable: true
-  location:
-    row: 15
-    column: 4
-  end_location:
-    row: 15
-    column: 5
-  fix:
-    content: pass
-    location:
-      row: 15
-      column: 4
-    end_location:
-      row: 15
-      column: 9
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `z` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `z`"
-    fixable: true
-  location:
-    row: 16
-    column: 4
-  end_location:
-    row: 16
-    column: 5
-  fix:
-    content: ""
+    fix:
+      content: ""
+      location:
+        row: 3
+        column: 17
+      end_location:
+        row: 3
+        column: 22
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `z` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `z`"
+      fixable: true
     location:
       row: 16
-      column: 0
+      column: 4
     end_location:
-      row: 17
-      column: 0
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `a` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `a`"
-    fixable: true
-  location:
-    row: 18
-    column: 5
-  end_location:
-    row: 18
-    column: 6
-  fix: ~
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `b` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `b`"
-    fixable: true
-  location:
-    row: 18
-    column: 8
-  end_location:
-    row: 18
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `a` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `a`"
-    fixable: true
-  location:
-    row: 19
-    column: 5
-  end_location:
-    row: 19
-    column: 6
-  fix: ~
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `b` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `b`"
-    fixable: true
-  location:
-    row: 19
-    column: 8
-  end_location:
-    row: 19
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `foo` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `foo`"
-    fixable: true
-  location:
-    row: 20
-    column: 4
-  end_location:
-    row: 20
-    column: 7
-  fix:
-    content: ""
+      row: 16
+      column: 5
+    fix:
+      content: ""
+      location:
+        row: 16
+        column: 0
+      end_location:
+        row: 17
+        column: 0
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `foo` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `foo`"
+      fixable: true
     location:
       row: 20
-      column: 0
+      column: 4
+    end_location:
+      row: 20
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 20
+        column: 0
+      end_location:
+        row: 21
+        column: 0
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `a` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `a`"
+      fixable: true
+    location:
+      row: 21
+      column: 5
     end_location:
       row: 21
-      column: 0
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `a` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `a`"
-    fixable: true
-  location:
-    row: 21
-    column: 5
-  end_location:
-    row: 21
-    column: 6
-  fix: ~
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `b` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `b`"
-    fixable: true
-  location:
-    row: 21
-    column: 8
-  end_location:
-    row: 21
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `baz` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `baz`"
-    fixable: true
-  location:
-    row: 26
-    column: 13
-  end_location:
-    row: 26
-    column: 16
-  fix:
-    content: ""
+      column: 6
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `b` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `b`"
+      fixable: true
+    location:
+      row: 21
+      column: 8
+    end_location:
+      row: 21
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `baz` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `baz`"
+      fixable: true
     location:
       row: 26
       column: 13
     end_location:
       row: 26
-      column: 19
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `b` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `b`"
-    fixable: true
-  location:
-    row: 51
-    column: 8
-  end_location:
-    row: 51
-    column: 9
-  fix:
-    content: pass
+      column: 16
+    fix:
+      content: ""
+      location:
+        row: 26
+        column: 13
+      end_location:
+        row: 26
+        column: 19
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `b` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `b`"
+      fixable: true
     location:
       row: 51
       column: 8
     end_location:
       row: 51
-      column: 13
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `my_file` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `my_file`"
-    fixable: true
-  location:
-    row: 79
-    column: 25
-  end_location:
-    row: 79
-    column: 32
-  fix:
-    content: ""
+      column: 9
+    fix:
+      content: pass
+      location:
+        row: 51
+        column: 8
+      end_location:
+        row: 51
+        column: 13
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `my_file` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `my_file`"
+      fixable: true
     location:
       row: 79
-      column: 21
+      column: 25
     end_location:
       row: 79
       column: 32
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `my_file` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `my_file`"
-    fixable: true
-  location:
-    row: 85
-    column: 24
-  end_location:
-    row: 85
-    column: 31
-  fix:
-    content: ""
+    fix:
+      content: ""
+      location:
+        row: 79
+        column: 21
+      end_location:
+        row: 79
+        column: 32
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `my_file` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `my_file`"
+      fixable: true
     location:
       row: 85
-      column: 20
+      column: 24
     end_location:
       row: 85
       column: 31
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `msg3` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `msg3`"
-    fixable: true
-  location:
-    row: 102
-    column: 4
-  end_location:
-    row: 102
-    column: 8
-  fix:
-    content: ""
+    fix:
+      content: ""
+      location:
+        row: 85
+        column: 20
+      end_location:
+        row: 85
+        column: 31
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `msg3` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `msg3`"
+      fixable: true
     location:
       row: 102
-      column: 0
+      column: 4
     end_location:
-      row: 103
-      column: 0
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `Baz` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `Baz`"
-    fixable: true
-  location:
-    row: 115
-    column: 4
-  end_location:
-    row: 115
-    column: 7
-  fix:
-    content: ""
+      row: 102
+      column: 8
+    fix:
+      content: ""
+      location:
+        row: 102
+        column: 0
+      end_location:
+        row: 103
+        column: 0
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `Baz` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `Baz`"
+      fixable: true
     location:
       row: 115
       column: 4
     end_location:
       row: 115
-      column: 10
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `y` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `y`"
-    fixable: true
-  location:
-    row: 118
-    column: 13
-  end_location:
-    row: 118
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `y` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `y`"
-    fixable: true
-  location:
-    row: 119
-    column: 13
-  end_location:
-    row: 119
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `y` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `y`"
-    fixable: true
-  location:
-    row: 122
-    column: 13
-  end_location:
-    row: 122
-    column: 14
-  fix: ~
-  parent: ~
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 115
+        column: 4
+      end_location:
+        row: 115
+        column: 10
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `y` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `y`"
+      fixable: true
+    location:
+      row: 122
+      column: 13
+    end_location:
+      row: 122
+      column: 14
+    fix: ~
+    parent: ~
+- - kind:
+      name: UnusedVariable
+      body: "Local variable `x` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `x`"
+      fixable: true
+    location:
+      row: 14
+      column: 4
+    end_location:
+      row: 14
+      column: 5
+    fix:
+      content: ""
+      location:
+        row: 14
+        column: 0
+      end_location:
+        row: 15
+        column: 0
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `y` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `y`"
+      fixable: true
+    location:
+      row: 15
+      column: 4
+    end_location:
+      row: 15
+      column: 5
+    fix:
+      content: pass
+      location:
+        row: 15
+        column: 4
+      end_location:
+        row: 15
+        column: 9
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `a` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `a`"
+      fixable: true
+    location:
+      row: 19
+      column: 5
+    end_location:
+      row: 19
+      column: 6
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `b` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `b`"
+      fixable: true
+    location:
+      row: 19
+      column: 8
+    end_location:
+      row: 19
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `y` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `y`"
+      fixable: true
+    location:
+      row: 119
+      column: 13
+    end_location:
+      row: 119
+      column: 14
+    fix: ~
+    parent: ~
+- - kind:
+      name: UnusedVariable
+      body: "Local variable `a` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `a`"
+      fixable: true
+    location:
+      row: 18
+      column: 5
+    end_location:
+      row: 18
+      column: 6
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `b` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `b`"
+      fixable: true
+    location:
+      row: 18
+      column: 8
+    end_location:
+      row: 18
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnusedVariable
+      body: "Local variable `y` is assigned to but never used"
+      suggestion: "Remove assignment to unused variable `y`"
+      fixable: true
+    location:
+      row: 118
+      column: 13
+    end_location:
+      row: 118
+      column: 14
+    fix: ~
+    parent: ~
 

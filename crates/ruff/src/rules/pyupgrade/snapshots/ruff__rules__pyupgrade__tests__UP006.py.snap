@@ -2,110 +2,110 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 4
-    column: 9
-  end_location:
-    row: 4
-    column: 20
-  fix:
-    content: list
+- - kind:
+      name: NonPEP585Annotation
+      body: "Use `list` instead of `List` for type annotations"
+      suggestion: "Replace `List` with `list`"
+      fixable: true
     location:
       row: 4
       column: 9
     end_location:
       row: 4
       column: 20
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 11
-    column: 9
-  end_location:
-    row: 11
-    column: 13
-  fix:
-    content: list
+    fix:
+      content: list
+      location:
+        row: 4
+        column: 9
+      end_location:
+        row: 4
+        column: 20
+    parent: ~
+  - kind:
+      name: NonPEP585Annotation
+      body: "Use `list` instead of `List` for type annotations"
+      suggestion: "Replace `List` with `list`"
+      fixable: true
     location:
       row: 11
       column: 9
     end_location:
       row: 11
       column: 13
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 18
-    column: 9
-  end_location:
-    row: 18
-    column: 15
-  fix:
-    content: list
+    fix:
+      content: list
+      location:
+        row: 11
+        column: 9
+      end_location:
+        row: 11
+        column: 13
+    parent: ~
+  - kind:
+      name: NonPEP585Annotation
+      body: "Use `list` instead of `List` for type annotations"
+      suggestion: "Replace `List` with `list`"
+      fixable: true
     location:
       row: 18
       column: 9
     end_location:
       row: 18
       column: 15
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 25
-    column: 9
-  end_location:
-    row: 25
-    column: 14
-  fix:
-    content: list
+    fix:
+      content: list
+      location:
+        row: 18
+        column: 9
+      end_location:
+        row: 18
+        column: 15
+    parent: ~
+  - kind:
+      name: NonPEP585Annotation
+      body: "Use `list` instead of `List` for type annotations"
+      suggestion: "Replace `List` with `list`"
+      fixable: true
     location:
       row: 25
       column: 9
     end_location:
       row: 25
       column: 14
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 9
-  end_location:
-    row: 29
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 36
-    column: 9
-  end_location:
-    row: 36
-    column: 13
-  fix: ~
-  parent: ~
+    fix:
+      content: list
+      location:
+        row: 25
+        column: 9
+      end_location:
+        row: 25
+        column: 14
+    parent: ~
+  - kind:
+      name: NonPEP585Annotation
+      body: "Use `list` instead of `List` for type annotations"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 29
+      column: 9
+    end_location:
+      row: 29
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: NonPEP585Annotation
+      body: "Use `list` instead of `List` for type annotations"
+      suggestion: "Replace `List` with `list`"
+      fixable: true
+    location:
+      row: 36
+      column: 9
+    end_location:
+      row: 36
+      column: 13
+    fix: ~
+    parent: ~
 

@@ -2,44 +2,44 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NoBlankLineAfterSection
-    body: "Missing blank line after section (\"Returns\")"
-    suggestion: "Add blank line after \"Returns\""
-    fixable: true
-  location:
-    row: 76
-    column: 4
-  end_location:
-    row: 87
-    column: 7
-  fix:
-    content: "\n"
+- - kind:
+      name: NoBlankLineAfterSection
+      body: "Missing blank line after section (\"Returns\")"
+      suggestion: "Add blank line after \"Returns\""
+      fixable: true
     location:
-      row: 79
-      column: 11
+      row: 76
+      column: 4
     end_location:
-      row: 79
-      column: 11
-  parent: ~
-- kind:
-    name: NoBlankLineAfterSection
-    body: "Missing blank line after section (\"Returns\")"
-    suggestion: "Add blank line after \"Returns\""
-    fixable: true
-  location:
-    row: 216
-    column: 4
-  end_location:
-    row: 230
-    column: 7
-  fix:
-    content: "\n"
+      row: 87
+      column: 7
+    fix:
+      content: "\n"
+      location:
+        row: 79
+        column: 11
+      end_location:
+        row: 79
+        column: 11
+    parent: ~
+  - kind:
+      name: NoBlankLineAfterSection
+      body: "Missing blank line after section (\"Returns\")"
+      suggestion: "Add blank line after \"Returns\""
+      fixable: true
     location:
-      row: 226
-      column: 31
+      row: 216
+      column: 4
     end_location:
-      row: 226
-      column: 31
-  parent: ~
+      row: 230
+      column: 7
+    fix:
+      content: "\n"
+      location:
+        row: 226
+        column: 31
+      end_location:
+        row: 226
+        column: 31
+    parent: ~
 

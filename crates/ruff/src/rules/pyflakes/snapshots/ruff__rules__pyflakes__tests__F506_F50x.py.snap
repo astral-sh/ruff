@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PercentFormatMixedPositionalAndNamed
-    body: "`%`-format string has mixed positional and named placeholders"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 29
-  fix: ~
-  parent: ~
-- kind:
-    name: PercentFormatMixedPositionalAndNamed
-    body: "`%`-format string has mixed positional and named placeholders"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 29
-  fix: ~
-  parent: ~
-- kind:
-    name: PercentFormatMixedPositionalAndNamed
-    body: "`%`-format string has mixed positional and named placeholders"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 27
-  fix: ~
-  parent: ~
+- - kind:
+      name: PercentFormatMixedPositionalAndNamed
+      body: "`%`-format string has mixed positional and named placeholders"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 29
+    fix: ~
+    parent: ~
+  - kind:
+      name: PercentFormatMixedPositionalAndNamed
+      body: "`%`-format string has mixed positional and named placeholders"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 29
+    fix: ~
+    parent: ~
+  - kind:
+      name: PercentFormatMixedPositionalAndNamed
+      body: "`%`-format string has mixed positional and named placeholders"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 27
+    fix: ~
+    parent: ~
 

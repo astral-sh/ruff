@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: AmbiguousFunctionName
-    body: "Ambiguous function name: `l`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 4
-  end_location:
-    row: 1
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: AmbiguousFunctionName
-    body: "Ambiguous function name: `I`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 4
-  end_location:
-    row: 5
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: AmbiguousFunctionName
-    body: "Ambiguous function name: `O`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 8
-  end_location:
-    row: 10
-    column: 9
-  fix: ~
-  parent: ~
+- - kind:
+      name: AmbiguousFunctionName
+      body: "Ambiguous function name: `l`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 4
+    end_location:
+      row: 1
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: AmbiguousFunctionName
+      body: "Ambiguous function name: `I`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 4
+    end_location:
+      row: 5
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: AmbiguousFunctionName
+      body: "Ambiguous function name: `O`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 10
+      column: 8
+    end_location:
+      row: 10
+      column: 9
+    fix: ~
+    parent: ~
 

@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ImplicitReturnValue
-    body: "Do not implicitly `return None` in function able to return non-`None` value"
-    suggestion: "Add explicit `None` return value"
-    fixable: true
-  location:
-    row: 3
-    column: 8
-  end_location:
-    row: 3
-    column: 14
-  fix:
-    content: return None
+- - kind:
+      name: ImplicitReturnValue
+      body: "Do not implicitly `return None` in function able to return non-`None` value"
+      suggestion: "Add explicit `None` return value"
+      fixable: true
     location:
       row: 3
       column: 8
     end_location:
       row: 3
       column: 14
-  parent: ~
+    fix:
+      content: return None
+      location:
+        row: 3
+        column: 8
+      end_location:
+        row: 3
+        column: 14
+    parent: ~
 

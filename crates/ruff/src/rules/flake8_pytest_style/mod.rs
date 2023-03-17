@@ -248,14 +248,13 @@ mod tests {
         plugin_settings: Settings,
         name: &str,
     ) -> Result<()> {
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("flake8_pytest_style").join(path).as_path(),
             &settings::Settings {
                 flake8_pytest_style: plugin_settings,
                 ..settings::Settings::for_rule(rule_code)
             },
         )?;
-        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
         assert_yaml_snapshot!(name, diagnostics);
         Ok(())
     }

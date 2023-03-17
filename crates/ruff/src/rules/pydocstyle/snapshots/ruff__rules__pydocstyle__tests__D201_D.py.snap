@@ -2,84 +2,84 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NoBlankLineBeforeFunction
-    body: No blank lines allowed before function docstring (found 1)
-    suggestion: Remove blank line(s) before function docstring
-    fixable: true
-  location:
-    row: 137
-    column: 4
-  end_location:
-    row: 137
-    column: 24
-  fix:
-    content: ""
+- - kind:
+      name: NoBlankLineBeforeFunction
+      body: No blank lines allowed before function docstring (found 1)
+      suggestion: Remove blank line(s) before function docstring
+      fixable: true
     location:
-      row: 136
-      column: 0
+      row: 137
+      column: 4
     end_location:
       row: 137
-      column: 0
-  parent: ~
-- kind:
-    name: NoBlankLineBeforeFunction
-    body: No blank lines allowed before function docstring (found 1)
-    suggestion: Remove blank line(s) before function docstring
-    fixable: true
-  location:
-    row: 151
-    column: 4
-  end_location:
-    row: 151
-    column: 37
-  fix:
-    content: ""
+      column: 24
+    fix:
+      content: ""
+      location:
+        row: 136
+        column: 0
+      end_location:
+        row: 137
+        column: 0
+    parent: ~
+  - kind:
+      name: NoBlankLineBeforeFunction
+      body: No blank lines allowed before function docstring (found 1)
+      suggestion: Remove blank line(s) before function docstring
+      fixable: true
     location:
-      row: 150
-      column: 0
+      row: 151
+      column: 4
     end_location:
       row: 151
-      column: 0
-  parent: ~
-- kind:
-    name: NoBlankLineBeforeFunction
-    body: No blank lines allowed before function docstring (found 1)
-    suggestion: Remove blank line(s) before function docstring
-    fixable: true
-  location:
-    row: 546
-    column: 4
-  end_location:
-    row: 549
-    column: 7
-  fix:
-    content: ""
+      column: 37
+    fix:
+      content: ""
+      location:
+        row: 150
+        column: 0
+      end_location:
+        row: 151
+        column: 0
+    parent: ~
+  - kind:
+      name: NoBlankLineBeforeFunction
+      body: No blank lines allowed before function docstring (found 1)
+      suggestion: Remove blank line(s) before function docstring
+      fixable: true
     location:
-      row: 545
-      column: 0
-    end_location:
       row: 546
-      column: 0
-  parent: ~
-- kind:
-    name: NoBlankLineBeforeFunction
-    body: No blank lines allowed before function docstring (found 1)
-    suggestion: Remove blank line(s) before function docstring
-    fixable: true
-  location:
-    row: 568
-    column: 4
-  end_location:
-    row: 571
-    column: 7
-  fix:
-    content: ""
-    location:
-      row: 567
-      column: 0
+      column: 4
     end_location:
+      row: 549
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 545
+        column: 0
+      end_location:
+        row: 546
+        column: 0
+    parent: ~
+  - kind:
+      name: NoBlankLineBeforeFunction
+      body: No blank lines allowed before function docstring (found 1)
+      suggestion: Remove blank line(s) before function docstring
+      fixable: true
+    location:
       row: 568
-      column: 0
-  parent: ~
+      column: 4
+    end_location:
+      row: 571
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 567
+        column: 0
+      end_location:
+        row: 568
+        column: 0
+    parent: ~
 

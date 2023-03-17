@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnsortedImports
-    body: Import block is un-sorted or un-formatted
-    suggestion: Organize imports
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 15
-    column: 0
-  fix:
-    content: "    from line_with_88 import aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n    from line_with_89 import (\n        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n    )\n    from line_with_90 import (\n        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n    )\n    from line_with_91 import (\n        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n    )\n    from line_with_92 import (\n        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n    )\n    from line_with_93 import (\n        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n    )\n"
+- - kind:
+      name: UnsortedImports
+      body: Import block is un-sorted or un-formatted
+      suggestion: Organize imports
+      fixable: true
     location:
       row: 7
       column: 0
     end_location:
       row: 15
       column: 0
-  parent: ~
+    fix:
+      content: "    from line_with_88 import aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\n    from line_with_89 import (\n        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n    )\n    from line_with_90 import (\n        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n    )\n    from line_with_91 import (\n        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n    )\n    from line_with_92 import (\n        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n    )\n    from line_with_93 import (\n        aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa,\n    )\n"
+      location:
+        row: 7
+        column: 0
+      end_location:
+        row: 15
+        column: 0
+    parent: ~
 

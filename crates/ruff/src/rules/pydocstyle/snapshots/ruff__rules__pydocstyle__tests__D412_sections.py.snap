@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BlankLinesBetweenHeaderAndContent
-    body: "No blank lines allowed between a section header and its content (\"Short summary\")"
-    suggestion: Remove blank line(s)
-    fixable: true
-  location:
-    row: 216
-    column: 4
-  end_location:
-    row: 230
-    column: 7
-  fix:
-    content: ""
+- - kind:
+      name: BlankLinesBetweenHeaderAndContent
+      body: "No blank lines allowed between a section header and its content (\"Short summary\")"
+      suggestion: Remove blank line(s)
+      fixable: true
     location:
-      row: 220
-      column: 0
+      row: 216
+      column: 4
     end_location:
-      row: 221
-      column: 0
-  parent: ~
+      row: 230
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 220
+        column: 0
+      end_location:
+        row: 221
+        column: 0
+    parent: ~
 

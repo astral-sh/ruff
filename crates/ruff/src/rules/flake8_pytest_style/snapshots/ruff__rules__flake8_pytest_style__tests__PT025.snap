@@ -2,44 +2,44 @@
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PytestErroneousUseFixturesOnFixture
-    body: "`pytest.mark.usefixtures` has no effect on fixtures"
-    suggestion: "Remove `pytest.mark.usefixtures`"
-    fixable: true
-  location:
-    row: 9
-    column: 1
-  end_location:
-    row: 9
-    column: 29
-  fix:
-    content: ""
+- - kind:
+      name: PytestErroneousUseFixturesOnFixture
+      body: "`pytest.mark.usefixtures` has no effect on fixtures"
+      suggestion: "Remove `pytest.mark.usefixtures`"
+      fixable: true
     location:
       row: 9
-      column: 0
+      column: 1
     end_location:
-      row: 10
-      column: 0
-  parent: ~
-- kind:
-    name: PytestErroneousUseFixturesOnFixture
-    body: "`pytest.mark.usefixtures` has no effect on fixtures"
-    suggestion: "Remove `pytest.mark.usefixtures`"
-    fixable: true
-  location:
-    row: 16
-    column: 1
-  end_location:
-    row: 16
-    column: 29
-  fix:
-    content: ""
+      row: 9
+      column: 29
+    fix:
+      content: ""
+      location:
+        row: 9
+        column: 0
+      end_location:
+        row: 10
+        column: 0
+    parent: ~
+  - kind:
+      name: PytestErroneousUseFixturesOnFixture
+      body: "`pytest.mark.usefixtures` has no effect on fixtures"
+      suggestion: "Remove `pytest.mark.usefixtures`"
+      fixable: true
     location:
       row: 16
-      column: 0
+      column: 1
     end_location:
-      row: 17
-      column: 0
-  parent: ~
+      row: 16
+      column: 29
+    fix:
+      content: ""
+      location:
+        row: 16
+        column: 0
+      end_location:
+        row: 17
+        column: 0
+    parent: ~
 

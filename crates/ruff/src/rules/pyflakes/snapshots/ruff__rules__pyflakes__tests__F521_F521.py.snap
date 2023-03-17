@@ -2,95 +2,95 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: StringDotFormatInvalidFormat
-    body: "`.format` call has invalid format string: Single '{' encountered in format string"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatInvalidFormat
-    body: "`.format` call has invalid format string: Single '}' encountered in format string"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatInvalidFormat
-    body: "`.format` call has invalid format string: Expected '}' before end of string"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatInvalidFormat
-    body: "`.format` call has invalid format string: Max string recursion exceeded"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 26
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatInvalidFormat
-    body: "`.format` call has invalid format string: Empty attribute in format string"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 29
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatInvalidFormat
-    body: "`.format` call has invalid format string: Empty attribute in format string"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: StringDotFormatInvalidFormat
-    body: "`.format` call has invalid format string: Empty attribute in format string"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 26
-  fix: ~
-  parent: ~
+- - kind:
+      name: StringDotFormatInvalidFormat
+      body: "`.format` call has invalid format string: Single '{' encountered in format string"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatInvalidFormat
+      body: "`.format` call has invalid format string: Single '}' encountered in format string"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatInvalidFormat
+      body: "`.format` call has invalid format string: Expected '}' before end of string"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatInvalidFormat
+      body: "`.format` call has invalid format string: Max string recursion exceeded"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 26
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatInvalidFormat
+      body: "`.format` call has invalid format string: Empty attribute in format string"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 29
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatInvalidFormat
+      body: "`.format` call has invalid format string: Empty attribute in format string"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: StringDotFormatInvalidFormat
+      body: "`.format` call has invalid format string: Empty attribute in format string"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 26
+    fix: ~
+    parent: ~
 

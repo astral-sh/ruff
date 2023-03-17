@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PercentFormatExpectedMapping
-    body: "`%`-format string expected mapping but got sequence"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 21
-  fix: ~
-  parent: ~
+- - kind:
+      name: PercentFormatExpectedMapping
+      body: "`%`-format string expected mapping but got sequence"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 21
+    fix: ~
+    parent: ~
 

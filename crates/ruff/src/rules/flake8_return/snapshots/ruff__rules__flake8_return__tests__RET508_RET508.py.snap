@@ -2,95 +2,95 @@
 source: crates/ruff/src/rules/flake8_return/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `elif` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 8
-  end_location:
-    row: 8
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `elif` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 8
-  end_location:
-    row: 22
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `else` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 33
-    column: 8
-  end_location:
-    row: 33
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `else` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 12
-  end_location:
-    row: 44
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `else` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 60
-    column: 8
-  end_location:
-    row: 60
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `else` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 71
-    column: 12
-  end_location:
-    row: 71
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `else` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 82
-    column: 8
-  end_location:
-    row: 82
-    column: 12
-  fix: ~
-  parent: ~
+- - kind:
+      name: SuperfluousElseBreak
+      body: "Unnecessary `elif` after `break` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 8
+    end_location:
+      row: 8
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseBreak
+      body: "Unnecessary `elif` after `break` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 22
+      column: 8
+    end_location:
+      row: 22
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseBreak
+      body: "Unnecessary `else` after `break` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 33
+      column: 8
+    end_location:
+      row: 33
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseBreak
+      body: "Unnecessary `else` after `break` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 44
+      column: 12
+    end_location:
+      row: 44
+      column: 16
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseBreak
+      body: "Unnecessary `else` after `break` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 60
+      column: 8
+    end_location:
+      row: 60
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseBreak
+      body: "Unnecessary `else` after `break` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 71
+      column: 12
+    end_location:
+      row: 71
+      column: 16
+    fix: ~
+    parent: ~
+  - kind:
+      name: SuperfluousElseBreak
+      body: "Unnecessary `else` after `break` statement"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 82
+      column: 8
+    end_location:
+      row: 82
+      column: 12
+    fix: ~
+    parent: ~
 

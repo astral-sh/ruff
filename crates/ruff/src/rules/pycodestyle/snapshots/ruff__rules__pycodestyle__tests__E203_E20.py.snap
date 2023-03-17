@@ -2,82 +2,82 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: WhitespaceBeforePunctuation
-    body: "Whitespace before ',', ';', or ':'"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 51
-    column: 9
-  end_location:
-    row: 51
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: WhitespaceBeforePunctuation
-    body: "Whitespace before ',', ';', or ':'"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 55
-    column: 9
-  end_location:
-    row: 55
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: WhitespaceBeforePunctuation
-    body: "Whitespace before ',', ';', or ':'"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 60
-    column: 14
-  end_location:
-    row: 60
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: WhitespaceBeforePunctuation
-    body: "Whitespace before ',', ';', or ':'"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 63
-    column: 14
-  end_location:
-    row: 63
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: WhitespaceBeforePunctuation
-    body: "Whitespace before ',', ';', or ':'"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 67
-    column: 12
-  end_location:
-    row: 67
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: WhitespaceBeforePunctuation
-    body: "Whitespace before ',', ';', or ':'"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 71
-    column: 12
-  end_location:
-    row: 71
-    column: 12
-  fix: ~
-  parent: ~
+- - kind:
+      name: WhitespaceBeforePunctuation
+      body: "Whitespace before ',', ';', or ':'"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 51
+      column: 9
+    end_location:
+      row: 51
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: WhitespaceBeforePunctuation
+      body: "Whitespace before ',', ';', or ':'"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 55
+      column: 9
+    end_location:
+      row: 55
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: WhitespaceBeforePunctuation
+      body: "Whitespace before ',', ';', or ':'"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 60
+      column: 14
+    end_location:
+      row: 60
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: WhitespaceBeforePunctuation
+      body: "Whitespace before ',', ';', or ':'"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 63
+      column: 14
+    end_location:
+      row: 63
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: WhitespaceBeforePunctuation
+      body: "Whitespace before ',', ';', or ':'"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 67
+      column: 12
+    end_location:
+      row: 67
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: WhitespaceBeforePunctuation
+      body: "Whitespace before ',', ';', or ':'"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 71
+      column: 12
+    end_location:
+      row: 71
+      column: 12
+    fix: ~
+    parent: ~
 

@@ -2,144 +2,144 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 19
-    column: 0
-  end_location:
-    row: 19
-    column: 19
-  fix:
-    content: foo.bar
+- - kind:
+      name: GetAttrWithConstant
+      body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+      suggestion: "Replace `getattr` with attribute access"
+      fixable: true
     location:
       row: 19
       column: 0
     end_location:
       row: 19
       column: 19
-  parent: ~
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 20
-    column: 0
-  end_location:
-    row: 20
-    column: 23
-  fix:
-    content: foo._123abc
+    fix:
+      content: foo.bar
+      location:
+        row: 19
+        column: 0
+      end_location:
+        row: 19
+        column: 19
+    parent: ~
+  - kind:
+      name: GetAttrWithConstant
+      body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+      suggestion: "Replace `getattr` with attribute access"
+      fixable: true
     location:
       row: 20
       column: 0
     end_location:
       row: 20
       column: 23
-  parent: ~
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 21
-    column: 0
-  end_location:
-    row: 21
-    column: 26
-  fix:
-    content: foo.__123abc__
+    fix:
+      content: foo._123abc
+      location:
+        row: 20
+        column: 0
+      end_location:
+        row: 20
+        column: 23
+    parent: ~
+  - kind:
+      name: GetAttrWithConstant
+      body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+      suggestion: "Replace `getattr` with attribute access"
+      fixable: true
     location:
       row: 21
       column: 0
     end_location:
       row: 21
       column: 26
-  parent: ~
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 22
-    column: 0
-  end_location:
-    row: 22
-    column: 22
-  fix:
-    content: foo.abc123
+    fix:
+      content: foo.__123abc__
+      location:
+        row: 21
+        column: 0
+      end_location:
+        row: 21
+        column: 26
+    parent: ~
+  - kind:
+      name: GetAttrWithConstant
+      body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+      suggestion: "Replace `getattr` with attribute access"
+      fixable: true
     location:
       row: 22
       column: 0
     end_location:
       row: 22
       column: 22
-  parent: ~
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 23
-    column: 0
-  end_location:
-    row: 23
-    column: 23
-  fix:
-    content: foo.abc123
+    fix:
+      content: foo.abc123
+      location:
+        row: 22
+        column: 0
+      end_location:
+        row: 22
+        column: 22
+    parent: ~
+  - kind:
+      name: GetAttrWithConstant
+      body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+      suggestion: "Replace `getattr` with attribute access"
+      fixable: true
     location:
       row: 23
       column: 0
     end_location:
       row: 23
       column: 23
-  parent: ~
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 24
-    column: 14
-  end_location:
-    row: 24
-    column: 31
-  fix:
-    content: x.bar
+    fix:
+      content: foo.abc123
+      location:
+        row: 23
+        column: 0
+      end_location:
+        row: 23
+        column: 23
+    parent: ~
+  - kind:
+      name: GetAttrWithConstant
+      body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+      suggestion: "Replace `getattr` with attribute access"
+      fixable: true
     location:
       row: 24
       column: 14
     end_location:
       row: 24
       column: 31
-  parent: ~
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 25
-    column: 3
-  end_location:
-    row: 25
-    column: 20
-  fix:
-    content: x.bar
+    fix:
+      content: x.bar
+      location:
+        row: 24
+        column: 14
+      end_location:
+        row: 24
+        column: 31
+    parent: ~
+  - kind:
+      name: GetAttrWithConstant
+      body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
+      suggestion: "Replace `getattr` with attribute access"
+      fixable: true
     location:
       row: 25
       column: 3
     end_location:
       row: 25
       column: 20
-  parent: ~
+    fix:
+      content: x.bar
+      location:
+        row: 25
+        column: 3
+      end_location:
+        row: 25
+        column: 20
+    parent: ~
 

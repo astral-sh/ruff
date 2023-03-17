@@ -2,95 +2,95 @@
 source: crates/ruff/src/rules/flake8_builtins/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BuiltinArgumentShadowing
-    body: "Argument `str` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 10
-  end_location:
-    row: 1
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: BuiltinArgumentShadowing
-    body: "Argument `type` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 18
-  end_location:
-    row: 1
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: BuiltinArgumentShadowing
-    body: "Argument `complex` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 25
-  end_location:
-    row: 1
-    column: 32
-  fix: ~
-  parent: ~
-- kind:
-    name: BuiltinArgumentShadowing
-    body: "Argument `Exception` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 34
-  end_location:
-    row: 1
-    column: 43
-  fix: ~
-  parent: ~
-- kind:
-    name: BuiltinArgumentShadowing
-    body: "Argument `getattr` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 47
-  end_location:
-    row: 1
-    column: 54
-  fix: ~
-  parent: ~
-- kind:
-    name: BuiltinArgumentShadowing
-    body: "Argument `bytes` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 16
-  end_location:
-    row: 5
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: BuiltinArgumentShadowing
-    body: "Argument `float` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 15
-  end_location:
-    row: 11
-    column: 20
-  fix: ~
-  parent: ~
+- - kind:
+      name: BuiltinArgumentShadowing
+      body: "Argument `str` is shadowing a python builtin"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 10
+    end_location:
+      row: 1
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: BuiltinArgumentShadowing
+      body: "Argument `type` is shadowing a python builtin"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 18
+    end_location:
+      row: 1
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: BuiltinArgumentShadowing
+      body: "Argument `complex` is shadowing a python builtin"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 25
+    end_location:
+      row: 1
+      column: 32
+    fix: ~
+    parent: ~
+  - kind:
+      name: BuiltinArgumentShadowing
+      body: "Argument `Exception` is shadowing a python builtin"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 34
+    end_location:
+      row: 1
+      column: 43
+    fix: ~
+    parent: ~
+  - kind:
+      name: BuiltinArgumentShadowing
+      body: "Argument `getattr` is shadowing a python builtin"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 47
+    end_location:
+      row: 1
+      column: 54
+    fix: ~
+    parent: ~
+  - kind:
+      name: BuiltinArgumentShadowing
+      body: "Argument `bytes` is shadowing a python builtin"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 16
+    end_location:
+      row: 5
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: BuiltinArgumentShadowing
+      body: "Argument `float` is shadowing a python builtin"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 15
+    end_location:
+      row: 11
+      column: 20
+    fix: ~
+    parent: ~
 

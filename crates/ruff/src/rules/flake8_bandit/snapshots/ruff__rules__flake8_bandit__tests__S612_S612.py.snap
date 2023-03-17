@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: LoggingConfigInsecureListen
-    body: "Use of insecure `logging.config.listen` detected"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 25
-  fix: ~
-  parent: ~
+- - kind:
+      name: LoggingConfigInsecureListen
+      body: "Use of insecure `logging.config.listen` detected"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 3
+      column: 25
+    fix: ~
+    parent: ~
 

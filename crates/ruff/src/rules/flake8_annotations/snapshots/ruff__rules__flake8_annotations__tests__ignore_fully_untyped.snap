@@ -2,69 +2,69 @@
 source: crates/ruff/src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MissingReturnTypeUndocumentedPublicFunction
-    body: "Missing return type annotation for public function `error_partially_typed_1`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 4
-  end_location:
-    row: 24
-    column: 27
-  fix: ~
-  parent: ~
-- kind:
-    name: MissingTypeFunctionArgument
-    body: "Missing type annotation for function argument `b`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 36
-  end_location:
-    row: 24
-    column: 37
-  fix: ~
-  parent: ~
-- kind:
-    name: MissingTypeFunctionArgument
-    body: "Missing type annotation for function argument `b`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 28
-    column: 36
-  end_location:
-    row: 28
-    column: 37
-  fix: ~
-  parent: ~
-- kind:
-    name: MissingReturnTypeUndocumentedPublicFunction
-    body: "Missing return type annotation for public function `error_partially_typed_3`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 4
-  end_location:
-    row: 32
-    column: 27
-  fix: ~
-  parent: ~
-- kind:
-    name: MissingReturnTypeUndocumentedPublicFunction
-    body: "Missing return type annotation for public function `error_typed_self`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 8
-  end_location:
-    row: 43
-    column: 24
-  fix: ~
-  parent: ~
+- - kind:
+      name: MissingReturnTypeUndocumentedPublicFunction
+      body: "Missing return type annotation for public function `error_partially_typed_1`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 24
+      column: 4
+    end_location:
+      row: 24
+      column: 27
+    fix: ~
+    parent: ~
+  - kind:
+      name: MissingTypeFunctionArgument
+      body: "Missing type annotation for function argument `b`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 24
+      column: 36
+    end_location:
+      row: 24
+      column: 37
+    fix: ~
+    parent: ~
+  - kind:
+      name: MissingTypeFunctionArgument
+      body: "Missing type annotation for function argument `b`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 28
+      column: 36
+    end_location:
+      row: 28
+      column: 37
+    fix: ~
+    parent: ~
+  - kind:
+      name: MissingReturnTypeUndocumentedPublicFunction
+      body: "Missing return type annotation for public function `error_partially_typed_3`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 32
+      column: 4
+    end_location:
+      row: 32
+      column: 27
+    fix: ~
+    parent: ~
+  - kind:
+      name: MissingReturnTypeUndocumentedPublicFunction
+      body: "Missing return type annotation for public function `error_typed_self`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 43
+      column: 8
+    end_location:
+      row: 43
+      column: 24
+    fix: ~
+    parent: ~
 

@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `InnerClass`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 29
-  end_location:
-    row: 5
-    column: 41
-  fix: ~
-  parent: ~
+- - kind:
+      name: UndefinedName
+      body: "Undefined name `InnerClass`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 29
+    end_location:
+      row: 5
+      column: 41
+    fix: ~
+    parent: ~
 

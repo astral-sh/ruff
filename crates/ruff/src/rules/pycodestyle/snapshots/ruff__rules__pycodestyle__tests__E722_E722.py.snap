@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BareExcept
-    body: "Do not use bare `except`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 6
-  fix: ~
-  parent: ~
-- kind:
-    name: BareExcept
-    body: "Do not use bare `except`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 6
-  fix: ~
-  parent: ~
-- kind:
-    name: BareExcept
-    body: "Do not use bare `except`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 0
-  end_location:
-    row: 16
-    column: 6
-  fix: ~
-  parent: ~
+- - kind:
+      name: BareExcept
+      body: "Do not use bare `except`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 6
+    fix: ~
+    parent: ~
+  - kind:
+      name: BareExcept
+      body: "Do not use bare `except`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 6
+    fix: ~
+    parent: ~
+  - kind:
+      name: BareExcept
+      body: "Do not use bare `except`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 16
+      column: 6
+    fix: ~
+    parent: ~
 

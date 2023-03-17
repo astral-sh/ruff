@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ExprAndFalse
-    body: "Use `False` instead of `... and False`"
-    suggestion: "Replace with `False`"
-    fixable: true
-  location:
-    row: 1
-    column: 9
-  end_location:
-    row: 1
-    column: 14
-  fix:
-    content: "False"
+- - kind:
+      name: ExprAndFalse
+      body: "Use `False` instead of `... and False`"
+      suggestion: "Replace with `False`"
+      fixable: true
     location:
       row: 1
-      column: 3
+      column: 9
     end_location:
       row: 1
       column: 14
-  parent: ~
-- kind:
-    name: ExprAndFalse
-    body: "Use `False` instead of `... and False`"
-    suggestion: "Replace with `False`"
-    fixable: true
-  location:
-    row: 4
-    column: 16
-  end_location:
-    row: 4
-    column: 21
-  fix:
-    content: "False"
+    fix:
+      content: "False"
+      location:
+        row: 1
+        column: 3
+      end_location:
+        row: 1
+        column: 14
+    parent: ~
+  - kind:
+      name: ExprAndFalse
+      body: "Use `False` instead of `... and False`"
+      suggestion: "Replace with `False`"
+      fixable: true
     location:
       row: 4
-      column: 3
+      column: 16
     end_location:
       row: 4
       column: 21
-  parent: ~
-- kind:
-    name: ExprAndFalse
-    body: "Use `False` instead of `... and False`"
-    suggestion: "Replace with `False`"
-    fixable: true
-  location:
-    row: 7
-    column: 15
-  end_location:
-    row: 7
-    column: 20
-  fix:
-    content: "False"
+    fix:
+      content: "False"
+      location:
+        row: 4
+        column: 3
+      end_location:
+        row: 4
+        column: 21
+    parent: ~
+  - kind:
+      name: ExprAndFalse
+      body: "Use `False` instead of `... and False`"
+      suggestion: "Replace with `False`"
+      fixable: true
     location:
       row: 7
-      column: 9
+      column: 15
     end_location:
       row: 7
       column: 20
-  parent: ~
+    fix:
+      content: "False"
+      location:
+        row: 7
+        column: 9
+      end_location:
+        row: 7
+        column: 20
+    parent: ~
 

@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BadQuotesInlineString
-    body: Single quotes found but double quotes preferred
-    suggestion: Replace single quotes with double quotes
-    fixable: true
-  location:
-    row: 1
-    column: 24
-  end_location:
-    row: 1
-    column: 45
-  fix:
-    content: "\"single quote string\""
+- - kind:
+      name: BadQuotesInlineString
+      body: Single quotes found but double quotes preferred
+      suggestion: Replace single quotes with double quotes
+      fixable: true
     location:
       row: 1
       column: 24
     end_location:
       row: 1
       column: 45
-  parent: ~
-- kind:
-    name: BadQuotesInlineString
-    body: Single quotes found but double quotes preferred
-    suggestion: Replace single quotes with double quotes
-    fixable: true
-  location:
-    row: 2
-    column: 24
-  end_location:
-    row: 2
-    column: 46
-  fix:
-    content: "u\"double quote string\""
+    fix:
+      content: "\"single quote string\""
+      location:
+        row: 1
+        column: 24
+      end_location:
+        row: 1
+        column: 45
+    parent: ~
+  - kind:
+      name: BadQuotesInlineString
+      body: Single quotes found but double quotes preferred
+      suggestion: Replace single quotes with double quotes
+      fixable: true
     location:
       row: 2
       column: 24
     end_location:
       row: 2
       column: 46
-  parent: ~
-- kind:
-    name: BadQuotesInlineString
-    body: Single quotes found but double quotes preferred
-    suggestion: Replace single quotes with double quotes
-    fixable: true
-  location:
-    row: 3
-    column: 24
-  end_location:
-    row: 3
-    column: 46
-  fix:
-    content: "f\"double quote string\""
+    fix:
+      content: "u\"double quote string\""
+      location:
+        row: 2
+        column: 24
+      end_location:
+        row: 2
+        column: 46
+    parent: ~
+  - kind:
+      name: BadQuotesInlineString
+      body: Single quotes found but double quotes preferred
+      suggestion: Replace single quotes with double quotes
+      fixable: true
     location:
       row: 3
       column: 24
     end_location:
       row: 3
       column: 46
-  parent: ~
+    fix:
+      content: "f\"double quote string\""
+      location:
+        row: 3
+        column: 24
+      end_location:
+        row: 3
+        column: 46
+    parent: ~
 

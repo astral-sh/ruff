@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BadQuotesDocstring
-    body: Double quote docstring found but single quotes preferred
-    suggestion: Replace double quotes docstring with single quotes
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 3
-    column: 3
-  fix:
-    content: "'''\nDouble quotes multiline module docstring\n'''"
+- - kind:
+      name: BadQuotesDocstring
+      body: Double quote docstring found but single quotes preferred
+      suggestion: Replace double quotes docstring with single quotes
+      fixable: true
     location:
       row: 1
       column: 0
     end_location:
       row: 3
       column: 3
-  parent: ~
-- kind:
-    name: BadQuotesDocstring
-    body: Double quote docstring found but single quotes preferred
-    suggestion: Replace double quotes docstring with single quotes
-    fixable: true
-  location:
-    row: 12
-    column: 4
-  end_location:
-    row: 14
-    column: 7
-  fix:
-    content: "'''\n    Double quotes multiline class docstring\n    '''"
+    fix:
+      content: "'''\nDouble quotes multiline module docstring\n'''"
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 3
+        column: 3
+    parent: ~
+  - kind:
+      name: BadQuotesDocstring
+      body: Double quote docstring found but single quotes preferred
+      suggestion: Replace double quotes docstring with single quotes
+      fixable: true
     location:
       row: 12
       column: 4
     end_location:
       row: 14
       column: 7
-  parent: ~
-- kind:
-    name: BadQuotesDocstring
-    body: Double quote docstring found but single quotes preferred
-    suggestion: Replace double quotes docstring with single quotes
-    fixable: true
-  location:
-    row: 24
-    column: 8
-  end_location:
-    row: 26
-    column: 11
-  fix:
-    content: "'''\n        Double quotes multiline function docstring\n        '''"
+    fix:
+      content: "'''\n    Double quotes multiline class docstring\n    '''"
+      location:
+        row: 12
+        column: 4
+      end_location:
+        row: 14
+        column: 7
+    parent: ~
+  - kind:
+      name: BadQuotesDocstring
+      body: Double quote docstring found but single quotes preferred
+      suggestion: Replace double quotes docstring with single quotes
+      fixable: true
     location:
       row: 24
       column: 8
     end_location:
       row: 26
       column: 11
-  parent: ~
+    fix:
+      content: "'''\n        Double quotes multiline function docstring\n        '''"
+      location:
+        row: 24
+        column: 8
+      end_location:
+        row: 26
+        column: 11
+    parent: ~
 

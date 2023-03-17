@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BadQuotesDocstring
-    body: Double quote docstring found but single quotes preferred
-    suggestion: Replace double quotes docstring with single quotes
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 53
-  fix:
-    content: "''' Double quotes single line class docstring '''"
+- - kind:
+      name: BadQuotesDocstring
+      body: Double quote docstring found but single quotes preferred
+      suggestion: Replace double quotes docstring with single quotes
+      fixable: true
     location:
       row: 2
       column: 4
     end_location:
       row: 2
       column: 53
-  parent: ~
-- kind:
-    name: BadQuotesDocstring
-    body: Double quote docstring found but single quotes preferred
-    suggestion: Replace double quotes docstring with single quotes
-    fixable: true
-  location:
-    row: 6
-    column: 8
-  end_location:
-    row: 6
-    column: 57
-  fix:
-    content: "''' Double quotes single line method docstring'''"
+    fix:
+      content: "''' Double quotes single line class docstring '''"
+      location:
+        row: 2
+        column: 4
+      end_location:
+        row: 2
+        column: 53
+    parent: ~
+  - kind:
+      name: BadQuotesDocstring
+      body: Double quote docstring found but single quotes preferred
+      suggestion: Replace double quotes docstring with single quotes
+      fixable: true
     location:
       row: 6
       column: 8
     end_location:
       row: 6
       column: 57
-  parent: ~
-- kind:
-    name: BadQuotesDocstring
-    body: Double quote docstring found but single quotes preferred
-    suggestion: Replace double quotes docstring with single quotes
-    fixable: true
-  location:
-    row: 9
-    column: 28
-  end_location:
-    row: 9
-    column: 52
-  fix:
-    content: "''' inline docstring '''"
+    fix:
+      content: "''' Double quotes single line method docstring'''"
+      location:
+        row: 6
+        column: 8
+      end_location:
+        row: 6
+        column: 57
+    parent: ~
+  - kind:
+      name: BadQuotesDocstring
+      body: Double quote docstring found but single quotes preferred
+      suggestion: Replace double quotes docstring with single quotes
+      fixable: true
     location:
       row: 9
       column: 28
     end_location:
       row: 9
       column: 52
-  parent: ~
+    fix:
+      content: "''' inline docstring '''"
+      location:
+        row: 9
+        column: 28
+      end_location:
+        row: 9
+        column: 52
+    parent: ~
 

@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryListComprehensionDict
-    body: "Unnecessary `list` comprehension (rewrite as a `dict` comprehension)"
-    suggestion: "Rewrite as a `dict` comprehension"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 32
-  fix:
-    content: "{i: i for i in range(3)}"
+- - kind:
+      name: UnnecessaryListComprehensionDict
+      body: "Unnecessary `list` comprehension (rewrite as a `dict` comprehension)"
+      suggestion: "Rewrite as a `dict` comprehension"
+      fixable: true
     location:
       row: 1
       column: 0
     end_location:
       row: 1
       column: 32
-  parent: ~
+    fix:
+      content: "{i: i for i in range(3)}"
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 1
+        column: 32
+    parent: ~
 

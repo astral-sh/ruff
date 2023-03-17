@@ -2,56 +2,56 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BreakOutsideLoop
-    body: "`break` outside loop"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: BreakOutsideLoop
-    body: "`break` outside loop"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 4
-  end_location:
-    row: 16
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: BreakOutsideLoop
-    body: "`break` outside loop"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 4
-  end_location:
-    row: 20
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: BreakOutsideLoop
-    body: "`break` outside loop"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 0
-  end_location:
-    row: 23
-    column: 5
-  fix: ~
-  parent: ~
+- - kind:
+      name: BreakOutsideLoop
+      body: "`break` outside loop"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 4
+    end_location:
+      row: 4
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: BreakOutsideLoop
+      body: "`break` outside loop"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 16
+      column: 4
+    end_location:
+      row: 16
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: BreakOutsideLoop
+      body: "`break` outside loop"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 20
+      column: 4
+    end_location:
+      row: 20
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: BreakOutsideLoop
+      body: "`break` outside loop"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 23
+      column: 0
+    end_location:
+      row: 23
+      column: 5
+    fix: ~
+    parent: ~
 

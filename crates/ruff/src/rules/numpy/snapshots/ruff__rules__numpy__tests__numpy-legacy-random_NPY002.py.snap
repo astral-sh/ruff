@@ -2,654 +2,654 @@
 source: crates/ruff/src/rules/numpy/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.standard_normal` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 7
-  end_location:
-    row: 10
-    column: 29
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.standard_normal` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 12
-  end_location:
-    row: 11
-    column: 34
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.seed` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 15
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.get_state` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 0
-  end_location:
-    row: 16
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.set_state` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 0
-  end_location:
-    row: 17
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.rand` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 0
-  end_location:
-    row: 18
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.randn` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 0
-  end_location:
-    row: 19
-    column: 18
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.randint` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 0
-  end_location:
-    row: 20
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.random_integers` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 0
-  end_location:
-    row: 21
-    column: 28
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.random_sample` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 0
-  end_location:
-    row: 22
-    column: 26
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.choice` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 0
-  end_location:
-    row: 23
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.bytes` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 0
-  end_location:
-    row: 24
-    column: 18
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.shuffle` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 25
-    column: 0
-  end_location:
-    row: 25
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.permutation` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 0
-  end_location:
-    row: 26
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.beta` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 27
-    column: 0
-  end_location:
-    row: 27
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.binomial` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 28
-    column: 0
-  end_location:
-    row: 28
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.chisquare` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 0
-  end_location:
-    row: 29
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.dirichlet` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 30
-    column: 0
-  end_location:
-    row: 30
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.exponential` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 31
-    column: 0
-  end_location:
-    row: 31
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.f` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 0
-  end_location:
-    row: 32
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.gamma` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 33
-    column: 0
-  end_location:
-    row: 33
-    column: 18
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.geometric` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 34
-    column: 0
-  end_location:
-    row: 34
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.get_state` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 35
-    column: 0
-  end_location:
-    row: 35
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.gumbel` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 36
-    column: 0
-  end_location:
-    row: 36
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.hypergeometric` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 37
-    column: 0
-  end_location:
-    row: 37
-    column: 27
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.laplace` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 0
-  end_location:
-    row: 38
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.logistic` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 39
-    column: 0
-  end_location:
-    row: 39
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.lognormal` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 0
-  end_location:
-    row: 40
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.logseries` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 41
-    column: 0
-  end_location:
-    row: 41
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.multinomial` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 42
-    column: 0
-  end_location:
-    row: 42
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.multivariate_normal` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 0
-  end_location:
-    row: 43
-    column: 32
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.negative_binomial` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 30
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.noncentral_chisquare` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 45
-    column: 0
-  end_location:
-    row: 45
-    column: 33
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.noncentral_f` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 0
-  end_location:
-    row: 46
-    column: 25
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.normal` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 47
-    column: 0
-  end_location:
-    row: 47
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.pareto` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 48
-    column: 0
-  end_location:
-    row: 48
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.poisson` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 49
-    column: 0
-  end_location:
-    row: 49
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.power` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 0
-  end_location:
-    row: 50
-    column: 18
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.rayleigh` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 51
-    column: 0
-  end_location:
-    row: 51
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.standard_cauchy` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 52
-    column: 0
-  end_location:
-    row: 52
-    column: 28
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.standard_exponential` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 53
-    column: 0
-  end_location:
-    row: 53
-    column: 33
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.standard_gamma` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 0
-  end_location:
-    row: 54
-    column: 27
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.standard_normal` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 55
-    column: 0
-  end_location:
-    row: 55
-    column: 28
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.standard_t` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 56
-    column: 0
-  end_location:
-    row: 56
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.triangular` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 57
-    column: 0
-  end_location:
-    row: 57
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.uniform` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 58
-    column: 0
-  end_location:
-    row: 58
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.vonmises` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 59
-    column: 0
-  end_location:
-    row: 59
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.wald` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 60
-    column: 0
-  end_location:
-    row: 60
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.weibull` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 61
-    column: 0
-  end_location:
-    row: 61
-    column: 20
-  fix: ~
-  parent: ~
-- kind:
-    name: NumpyLegacyRandom
-    body: "Replace legacy `np.random.zipf` call with `np.random.Generator`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 62
-    column: 0
-  end_location:
-    row: 62
-    column: 17
-  fix: ~
-  parent: ~
+- - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.standard_normal` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 10
+      column: 7
+    end_location:
+      row: 10
+      column: 29
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.standard_normal` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 12
+    end_location:
+      row: 11
+      column: 34
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.seed` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 15
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.get_state` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 16
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.set_state` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 17
+      column: 0
+    end_location:
+      row: 17
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.rand` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 18
+      column: 0
+    end_location:
+      row: 18
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.randn` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 19
+      column: 18
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.randint` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 20
+      column: 0
+    end_location:
+      row: 20
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.random_integers` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 21
+      column: 0
+    end_location:
+      row: 21
+      column: 28
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.random_sample` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 22
+      column: 0
+    end_location:
+      row: 22
+      column: 26
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.choice` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 23
+      column: 0
+    end_location:
+      row: 23
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.bytes` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 24
+      column: 0
+    end_location:
+      row: 24
+      column: 18
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.shuffle` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 25
+      column: 0
+    end_location:
+      row: 25
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.permutation` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 26
+      column: 0
+    end_location:
+      row: 26
+      column: 24
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.beta` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 27
+      column: 0
+    end_location:
+      row: 27
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.binomial` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 28
+      column: 0
+    end_location:
+      row: 28
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.chisquare` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 29
+      column: 0
+    end_location:
+      row: 29
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.dirichlet` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 30
+      column: 0
+    end_location:
+      row: 30
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.exponential` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 31
+      column: 0
+    end_location:
+      row: 31
+      column: 24
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.f` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 32
+      column: 0
+    end_location:
+      row: 32
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.gamma` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 33
+      column: 0
+    end_location:
+      row: 33
+      column: 18
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.geometric` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 34
+      column: 0
+    end_location:
+      row: 34
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.get_state` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 35
+      column: 0
+    end_location:
+      row: 35
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.gumbel` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 36
+      column: 0
+    end_location:
+      row: 36
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.hypergeometric` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 37
+      column: 0
+    end_location:
+      row: 37
+      column: 27
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.laplace` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 38
+      column: 0
+    end_location:
+      row: 38
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.logistic` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 39
+      column: 0
+    end_location:
+      row: 39
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.lognormal` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 40
+      column: 0
+    end_location:
+      row: 40
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.logseries` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 41
+      column: 0
+    end_location:
+      row: 41
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.multinomial` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 42
+      column: 0
+    end_location:
+      row: 42
+      column: 24
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.multivariate_normal` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 43
+      column: 0
+    end_location:
+      row: 43
+      column: 32
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.negative_binomial` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 44
+      column: 0
+    end_location:
+      row: 44
+      column: 30
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.noncentral_chisquare` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 45
+      column: 0
+    end_location:
+      row: 45
+      column: 33
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.noncentral_f` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 46
+      column: 0
+    end_location:
+      row: 46
+      column: 25
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.normal` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 47
+      column: 0
+    end_location:
+      row: 47
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.pareto` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 48
+      column: 0
+    end_location:
+      row: 48
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.poisson` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 49
+      column: 0
+    end_location:
+      row: 49
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.power` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 50
+      column: 0
+    end_location:
+      row: 50
+      column: 18
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.rayleigh` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 51
+      column: 0
+    end_location:
+      row: 51
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.standard_cauchy` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 52
+      column: 0
+    end_location:
+      row: 52
+      column: 28
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.standard_exponential` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 53
+      column: 0
+    end_location:
+      row: 53
+      column: 33
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.standard_gamma` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 54
+      column: 0
+    end_location:
+      row: 54
+      column: 27
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.standard_normal` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 55
+      column: 0
+    end_location:
+      row: 55
+      column: 28
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.standard_t` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 56
+      column: 0
+    end_location:
+      row: 56
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.triangular` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 57
+      column: 0
+    end_location:
+      row: 57
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.uniform` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 58
+      column: 0
+    end_location:
+      row: 58
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.vonmises` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 59
+      column: 0
+    end_location:
+      row: 59
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.wald` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 60
+      column: 0
+    end_location:
+      row: 60
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.weibull` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 61
+      column: 0
+    end_location:
+      row: 61
+      column: 20
+    fix: ~
+    parent: ~
+  - kind:
+      name: NumpyLegacyRandom
+      body: "Replace legacy `np.random.zipf` call with `np.random.Generator`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 62
+      column: 0
+    end_location:
+      row: 62
+      column: 17
+    fix: ~
+    parent: ~
 

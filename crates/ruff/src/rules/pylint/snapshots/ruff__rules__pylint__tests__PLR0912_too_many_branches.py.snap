@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: TooManyBranches
-    body: Too many branches (13 > 12)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 4
-  end_location:
-    row: 6
-    column: 9
-  fix: ~
-  parent: ~
+- - kind:
+      name: TooManyBranches
+      body: Too many branches (13 > 12)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 4
+    end_location:
+      row: 6
+      column: 9
+    fix: ~
+    parent: ~
 

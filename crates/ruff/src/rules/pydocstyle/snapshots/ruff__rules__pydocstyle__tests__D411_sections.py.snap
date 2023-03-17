@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NoBlankLineBeforeSection
-    body: "Missing blank line before section (\"Yields\")"
-    suggestion: "Add blank line before \"Yields\""
-    fixable: true
-  location:
-    row: 76
-    column: 4
-  end_location:
-    row: 87
-    column: 7
-  fix:
-    content: "\n"
+- - kind:
+      name: NoBlankLineBeforeSection
+      body: "Missing blank line before section (\"Yields\")"
+      suggestion: "Add blank line before \"Yields\""
+      fixable: true
     location:
-      row: 80
-      column: 0
+      row: 76
+      column: 4
     end_location:
-      row: 80
-      column: 0
-  parent: ~
-- kind:
-    name: NoBlankLineBeforeSection
-    body: "Missing blank line before section (\"Returns\")"
-    suggestion: "Add blank line before \"Returns\""
-    fixable: true
-  location:
-    row: 131
-    column: 4
-  end_location:
-    row: 138
-    column: 7
-  fix:
-    content: "\n"
+      row: 87
+      column: 7
+    fix:
+      content: "\n"
+      location:
+        row: 80
+        column: 0
+      end_location:
+        row: 80
+        column: 0
+    parent: ~
+  - kind:
+      name: NoBlankLineBeforeSection
+      body: "Missing blank line before section (\"Returns\")"
+      suggestion: "Add blank line before \"Returns\""
+      fixable: true
     location:
-      row: 134
-      column: 0
+      row: 131
+      column: 4
     end_location:
-      row: 134
-      column: 0
-  parent: ~
-- kind:
-    name: NoBlankLineBeforeSection
-    body: "Missing blank line before section (\"Raises\")"
-    suggestion: "Add blank line before \"Raises\""
-    fixable: true
-  location:
-    row: 216
-    column: 4
-  end_location:
-    row: 230
-    column: 7
-  fix:
-    content: "\n"
+      row: 138
+      column: 7
+    fix:
+      content: "\n"
+      location:
+        row: 134
+        column: 0
+      end_location:
+        row: 134
+        column: 0
+    parent: ~
+  - kind:
+      name: NoBlankLineBeforeSection
+      body: "Missing blank line before section (\"Raises\")"
+      suggestion: "Add blank line before \"Raises\""
+      fixable: true
     location:
-      row: 227
-      column: 0
+      row: 216
+      column: 4
     end_location:
-      row: 227
-      column: 0
-  parent: ~
+      row: 230
+      column: 7
+    fix:
+      content: "\n"
+      location:
+        row: 227
+        column: 0
+      end_location:
+        row: 227
+        column: 0
+    parent: ~
 

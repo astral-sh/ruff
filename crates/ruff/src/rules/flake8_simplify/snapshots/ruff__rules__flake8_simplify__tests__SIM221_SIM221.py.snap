@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ExprOrNotExpr
-    body: "Use `True` instead of `a or not a`"
-    suggestion: "Replace with `True`"
-    fixable: true
-  location:
-    row: 1
-    column: 3
-  end_location:
-    row: 1
-    column: 13
-  fix:
-    content: "True"
+- - kind:
+      name: ExprOrNotExpr
+      body: "Use `True` instead of `a or not a`"
+      suggestion: "Replace with `True`"
+      fixable: true
     location:
       row: 1
       column: 3
     end_location:
       row: 1
       column: 13
-  parent: ~
-- kind:
-    name: ExprOrNotExpr
-    body: "Use `True` instead of `a or not a`"
-    suggestion: "Replace with `True`"
-    fixable: true
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 14
-  fix:
-    content: "True"
+    fix:
+      content: "True"
+      location:
+        row: 1
+        column: 3
+      end_location:
+        row: 1
+        column: 13
+    parent: ~
+  - kind:
+      name: ExprOrNotExpr
+      body: "Use `True` instead of `a or not a`"
+      suggestion: "Replace with `True`"
+      fixable: true
     location:
       row: 4
       column: 4
     end_location:
       row: 4
       column: 14
-  parent: ~
-- kind:
-    name: ExprOrNotExpr
-    body: "Use `True` instead of `a or not a`"
-    suggestion: "Replace with `True`"
-    fixable: true
-  location:
-    row: 7
-    column: 4
-  end_location:
-    row: 7
-    column: 14
-  fix:
-    content: "True"
+    fix:
+      content: "True"
+      location:
+        row: 4
+        column: 4
+      end_location:
+        row: 4
+        column: 14
+    parent: ~
+  - kind:
+      name: ExprOrNotExpr
+      body: "Use `True` instead of `a or not a`"
+      suggestion: "Replace with `True`"
+      fixable: true
     location:
       row: 7
       column: 4
     end_location:
       row: 7
       column: 14
-  parent: ~
+    fix:
+      content: "True"
+      location:
+        row: 7
+        column: 4
+      end_location:
+        row: 7
+        column: 14
+    parent: ~
 

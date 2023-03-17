@@ -2,82 +2,82 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MultipleStatementsOnOneLineSemicolon
-    body: Multiple statements on one line (semicolon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 9
-  end_location:
-    row: 6
-    column: 10
-  fix: ~
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineSemicolon
-    body: Multiple statements on one line (semicolon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 16
-  end_location:
-    row: 8
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineSemicolon
-    body: Multiple statements on one line (semicolon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 8
-  end_location:
-    row: 12
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineSemicolon
-    body: Multiple statements on one line (semicolon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 25
-    column: 10
-  end_location:
-    row: 25
-    column: 11
-  fix: ~
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineSemicolon
-    body: Multiple statements on one line (semicolon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 12
-  end_location:
-    row: 54
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineSemicolon
-    body: Multiple statements on one line (semicolon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 56
-    column: 12
-  end_location:
-    row: 56
-    column: 13
-  fix: ~
-  parent: ~
+- - kind:
+      name: MultipleStatementsOnOneLineSemicolon
+      body: Multiple statements on one line (semicolon)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 9
+    end_location:
+      row: 6
+      column: 10
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultipleStatementsOnOneLineSemicolon
+      body: Multiple statements on one line (semicolon)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 16
+    end_location:
+      row: 8
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultipleStatementsOnOneLineSemicolon
+      body: Multiple statements on one line (semicolon)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 12
+      column: 8
+    end_location:
+      row: 12
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultipleStatementsOnOneLineSemicolon
+      body: Multiple statements on one line (semicolon)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 25
+      column: 10
+    end_location:
+      row: 25
+      column: 11
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultipleStatementsOnOneLineSemicolon
+      body: Multiple statements on one line (semicolon)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 54
+      column: 12
+    end_location:
+      row: 54
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultipleStatementsOnOneLineSemicolon
+      body: Multiple statements on one line (semicolon)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 56
+      column: 12
+    end_location:
+      row: 56
+      column: 13
+    fix: ~
+    parent: ~
 

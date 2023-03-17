@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `captured`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 19
-  end_location:
-    row: 22
-    column: 27
-  fix: ~
-  parent: ~
+- - kind:
+      name: UndefinedName
+      body: "Undefined name `captured`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 22
+      column: 19
+    end_location:
+      row: 22
+      column: 27
+    fix: ~
+    parent: ~
 

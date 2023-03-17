@@ -2,108 +2,108 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnintentionalTypeAnnotation
-    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 11
-  fix: ~
-  parent: ~
-- kind:
-    name: UnintentionalTypeAnnotation
-    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: UnintentionalTypeAnnotation
-    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 12
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: UnintentionalTypeAnnotation
-    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: UnintentionalTypeAnnotation
-    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 0
-  end_location:
-    row: 16
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: UnintentionalTypeAnnotation
-    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 0
-  end_location:
-    row: 17
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: UnintentionalTypeAnnotation
-    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 0
-  end_location:
-    row: 18
-    column: 11
-  fix: ~
-  parent: ~
-- kind:
-    name: UnintentionalTypeAnnotation
-    body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 0
-  end_location:
-    row: 19
-    column: 19
-  fix: ~
-  parent: ~
+- - kind:
+      name: UnintentionalTypeAnnotation
+      body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 11
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnintentionalTypeAnnotation
+      body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 10
+      column: 0
+    end_location:
+      row: 10
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnintentionalTypeAnnotation
+      body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 12
+      column: 16
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnintentionalTypeAnnotation
+      body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 13
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnintentionalTypeAnnotation
+      body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 16
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnintentionalTypeAnnotation
+      body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 17
+      column: 0
+    end_location:
+      row: 17
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnintentionalTypeAnnotation
+      body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 18
+      column: 0
+    end_location:
+      row: 18
+      column: 11
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnintentionalTypeAnnotation
+      body: "Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 19
+      column: 0
+    end_location:
+      row: 19
+      column: 19
+    fix: ~
+    parent: ~
 

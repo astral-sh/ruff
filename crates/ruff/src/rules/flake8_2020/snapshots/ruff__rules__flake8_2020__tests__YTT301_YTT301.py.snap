@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/flake8_2020/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: SysVersion0
-    body: "`sys.version[0]` referenced (python10), use `sys.version_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 11
-  end_location:
-    row: 4
-    column: 22
-  fix: ~
-  parent: ~
-- kind:
-    name: SysVersion0
-    body: "`sys.version[0]` referenced (python10), use `sys.version_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 11
-  end_location:
-    row: 5
-    column: 18
-  fix: ~
-  parent: ~
+- - kind:
+      name: SysVersion0
+      body: "`sys.version[0]` referenced (python10), use `sys.version_info`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 11
+    end_location:
+      row: 4
+      column: 22
+    fix: ~
+    parent: ~
+  - kind:
+      name: SysVersion0
+      body: "`sys.version[0]` referenced (python10), use `sys.version_info`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 11
+    end_location:
+      row: 5
+      column: 18
+    fix: ~
+    parent: ~
 

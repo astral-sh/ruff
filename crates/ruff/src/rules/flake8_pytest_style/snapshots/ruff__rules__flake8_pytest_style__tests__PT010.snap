@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PytestRaisesWithoutException
-    body: "set the expected exception in `pytest.raises()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 9
-  end_location:
-    row: 5
-    column: 22
-  fix: ~
-  parent: ~
+- - kind:
+      name: PytestRaisesWithoutException
+      body: "set the expected exception in `pytest.raises()`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 9
+    end_location:
+      row: 5
+      column: 22
+    fix: ~
+    parent: ~
 

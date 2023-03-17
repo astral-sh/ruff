@@ -2,104 +2,104 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ConvertNamedTupleFunctionalToClass
-    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 67
-  fix:
-    content: "class MyType(NamedTuple):\n    a: int\n    b: tuple[str, ...]"
+- - kind:
+      name: ConvertNamedTupleFunctionalToClass
+      body: "Convert `MyType` from `NamedTuple` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 5
       column: 0
     end_location:
       row: 5
       column: 67
-  parent: ~
-- kind:
-    name: ConvertNamedTupleFunctionalToClass
-    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 12
-    column: 1
-  fix:
-    content: "class MyType(NamedTuple):\n    a: int\n    b: str = \"foo\"\n    c: list[bool] = [True]"
+    fix:
+      content: "class MyType(NamedTuple):\n    a: int\n    b: tuple[str, ...]"
+      location:
+        row: 5
+        column: 0
+      end_location:
+        row: 5
+        column: 67
+    parent: ~
+  - kind:
+      name: ConvertNamedTupleFunctionalToClass
+      body: "Convert `MyType` from `NamedTuple` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 8
       column: 0
     end_location:
       row: 12
       column: 1
-  parent: ~
-- kind:
-    name: ConvertNamedTupleFunctionalToClass
-    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 15
-    column: 62
-  fix:
-    content: "class MyType(typing.NamedTuple):\n    a: int\n    b: str"
+    fix:
+      content: "class MyType(NamedTuple):\n    a: int\n    b: str = \"foo\"\n    c: list[bool] = [True]"
+      location:
+        row: 8
+        column: 0
+      end_location:
+        row: 12
+        column: 1
+    parent: ~
+  - kind:
+      name: ConvertNamedTupleFunctionalToClass
+      body: "Convert `MyType` from `NamedTuple` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 15
       column: 0
     end_location:
       row: 15
       column: 62
-  parent: ~
-- kind:
-    name: ConvertNamedTupleFunctionalToClass
-    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 28
-    column: 0
-  end_location:
-    row: 28
-    column: 36
-  fix:
-    content: "class MyType(typing.NamedTuple):\n    pass"
+    fix:
+      content: "class MyType(typing.NamedTuple):\n    a: int\n    b: str"
+      location:
+        row: 15
+        column: 0
+      end_location:
+        row: 15
+        column: 62
+    parent: ~
+  - kind:
+      name: ConvertNamedTupleFunctionalToClass
+      body: "Convert `MyType` from `NamedTuple` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 28
       column: 0
     end_location:
       row: 28
       column: 36
-  parent: ~
-- kind:
-    name: ConvertNamedTupleFunctionalToClass
-    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 31
-    column: 0
-  end_location:
-    row: 31
-    column: 40
-  fix:
-    content: "class MyType(typing.NamedTuple):\n    pass"
+    fix:
+      content: "class MyType(typing.NamedTuple):\n    pass"
+      location:
+        row: 28
+        column: 0
+      end_location:
+        row: 28
+        column: 36
+    parent: ~
+  - kind:
+      name: ConvertNamedTupleFunctionalToClass
+      body: "Convert `MyType` from `NamedTuple` functional to class syntax"
+      suggestion: "Convert `MyType` to class syntax"
+      fixable: true
     location:
       row: 31
       column: 0
     end_location:
       row: 31
       column: 40
-  parent: ~
+    fix:
+      content: "class MyType(typing.NamedTuple):\n    pass"
+      location:
+        row: 31
+        column: 0
+      end_location:
+        row: 31
+        column: 40
+    parent: ~
 

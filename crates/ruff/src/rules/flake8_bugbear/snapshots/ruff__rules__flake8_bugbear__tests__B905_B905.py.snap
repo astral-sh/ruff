@@ -2,95 +2,95 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 13
-  fix: ~
-  parent: ~
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 24
-  fix: ~
-  parent: ~
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 15
-  end_location:
-    row: 4
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 4
-  end_location:
-    row: 5
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 26
-  fix: ~
-  parent: ~
+- - kind:
+      name: ZipWithoutExplicitStrict
+      body: "`zip()` without an explicit `strict=` parameter"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: ZipWithoutExplicitStrict
+      body: "`zip()` without an explicit `strict=` parameter"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: ZipWithoutExplicitStrict
+      body: "`zip()` without an explicit `strict=` parameter"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 13
+    fix: ~
+    parent: ~
+  - kind:
+      name: ZipWithoutExplicitStrict
+      body: "`zip()` without an explicit `strict=` parameter"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 24
+    fix: ~
+    parent: ~
+  - kind:
+      name: ZipWithoutExplicitStrict
+      body: "`zip()` without an explicit `strict=` parameter"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 15
+    end_location:
+      row: 4
+      column: 23
+    fix: ~
+    parent: ~
+  - kind:
+      name: ZipWithoutExplicitStrict
+      body: "`zip()` without an explicit `strict=` parameter"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 4
+    end_location:
+      row: 5
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: ZipWithoutExplicitStrict
+      body: "`zip()` without an explicit `strict=` parameter"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 26
+    fix: ~
+    parent: ~
 

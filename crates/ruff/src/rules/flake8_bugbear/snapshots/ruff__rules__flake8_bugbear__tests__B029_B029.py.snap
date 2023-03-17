@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ExceptWithEmptyTuple
-    body: "Using except (): with an empty tuple does not handle/catch anything. Add exceptions to handle."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 9
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: ExceptWithEmptyTuple
-    body: "Using except (): with an empty tuple does not handle/catch anything. Add exceptions to handle."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 14
-    column: 8
-  fix: ~
-  parent: ~
+- - kind:
+      name: ExceptWithEmptyTuple
+      body: "Using except (): with an empty tuple does not handle/catch anything. Add exceptions to handle."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 9
+      column: 8
+    fix: ~
+    parent: ~
+  - kind:
+      name: ExceptWithEmptyTuple
+      body: "Using except (): with an empty tuple does not handle/catch anything. Add exceptions to handle."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 14
+      column: 8
+    fix: ~
+    parent: ~
 

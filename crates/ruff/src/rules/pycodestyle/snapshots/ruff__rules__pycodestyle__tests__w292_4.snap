@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MissingNewlineAtEndOfFile
-    body: No newline at end of file
-    suggestion: Add trailing newline
-    fixable: true
-  location:
-    row: 1
-    column: 1
-  end_location:
-    row: 1
-    column: 1
-  fix:
-    content: "<LineEnding>"
+- - kind:
+      name: MissingNewlineAtEndOfFile
+      body: No newline at end of file
+      suggestion: Add trailing newline
+      fixable: true
     location:
       row: 1
       column: 1
     end_location:
       row: 1
       column: 1
-  parent: ~
+    fix:
+      content: "<LineEnding>"
+      location:
+        row: 1
+        column: 1
+      end_location:
+        row: 1
+        column: 1
+    parent: ~
 

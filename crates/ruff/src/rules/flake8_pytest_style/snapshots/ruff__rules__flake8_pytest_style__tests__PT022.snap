@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PytestUselessYieldFixture
-    body: "No teardown in fixture `error`, use `return` instead of `yield`"
-    suggestion: "Replace `yield` with `return`"
-    fixable: true
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 17
-    column: 18
-  fix:
-    content: return
+- - kind:
+      name: PytestUselessYieldFixture
+      body: "No teardown in fixture `error`, use `return` instead of `yield`"
+      suggestion: "Replace `yield` with `return`"
+      fixable: true
     location:
       row: 17
       column: 4
     end_location:
       row: 17
-      column: 9
-  parent: ~
+      column: 18
+    fix:
+      content: return
+      location:
+        row: 17
+        column: 4
+      end_location:
+        row: 17
+        column: 9
+    parent: ~
 

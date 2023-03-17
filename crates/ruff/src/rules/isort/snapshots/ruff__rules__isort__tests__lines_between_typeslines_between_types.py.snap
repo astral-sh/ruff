@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnsortedImports
-    body: Import block is un-sorted or un-formatted
-    suggestion: Organize imports
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 17
-    column: 0
-  fix:
-    content: "from __future__ import annotations\n\nimport datetime\nimport json\n\n\nfrom binascii import hexlify\n\nimport requests\n\n\nfrom loguru import Logger\nfrom sanic import Sanic\n\nfrom . import config\nfrom .data import Data\n"
+- - kind:
+      name: UnsortedImports
+      body: Import block is un-sorted or un-formatted
+      suggestion: Organize imports
+      fixable: true
     location:
       row: 1
       column: 0
     end_location:
       row: 17
       column: 0
-  parent: ~
+    fix:
+      content: "from __future__ import annotations\n\nimport datetime\nimport json\n\n\nfrom binascii import hexlify\n\nimport requests\n\n\nfrom loguru import Logger\nfrom sanic import Sanic\n\nfrom . import config\nfrom .data import Data\n"
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 17
+        column: 0
+    parent: ~
 

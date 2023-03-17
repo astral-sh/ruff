@@ -2,204 +2,204 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NoneComparison
-    body: "Comparison to `None` should be `cond is None`"
-    suggestion: "Replace with `cond is None`"
-    fixable: true
-  location:
-    row: 2
-    column: 10
-  end_location:
-    row: 2
-    column: 14
-  fix:
-    content: res is None
+- - kind:
+      name: NoneComparison
+      body: "Comparison to `None` should be `cond is None`"
+      suggestion: "Replace with `cond is None`"
+      fixable: true
     location:
       row: 2
-      column: 3
+      column: 10
     end_location:
       row: 2
       column: 14
-  parent: ~
-- kind:
-    name: NoneComparison
-    body: "Comparison to `None` should be `cond is not None`"
-    suggestion: "Replace with `cond is not None`"
-    fixable: true
-  location:
-    row: 5
-    column: 10
-  end_location:
-    row: 5
-    column: 14
-  fix:
-    content: res is not None
+    fix:
+      content: res is None
+      location:
+        row: 2
+        column: 3
+      end_location:
+        row: 2
+        column: 14
+    parent: ~
+  - kind:
+      name: NoneComparison
+      body: "Comparison to `None` should be `cond is not None`"
+      suggestion: "Replace with `cond is not None`"
+      fixable: true
     location:
       row: 5
-      column: 3
+      column: 10
     end_location:
       row: 5
       column: 14
-  parent: ~
-- kind:
-    name: NoneComparison
-    body: "Comparison to `None` should be `cond is None`"
-    suggestion: "Replace with `cond is None`"
-    fixable: true
-  location:
-    row: 8
-    column: 3
-  end_location:
-    row: 8
-    column: 7
-  fix:
-    content: None is res
+    fix:
+      content: res is not None
+      location:
+        row: 5
+        column: 3
+      end_location:
+        row: 5
+        column: 14
+    parent: ~
+  - kind:
+      name: NoneComparison
+      body: "Comparison to `None` should be `cond is None`"
+      suggestion: "Replace with `cond is None`"
+      fixable: true
     location:
       row: 8
       column: 3
     end_location:
       row: 8
-      column: 14
-  parent: ~
-- kind:
-    name: NoneComparison
-    body: "Comparison to `None` should be `cond is not None`"
-    suggestion: "Replace with `cond is not None`"
-    fixable: true
-  location:
-    row: 11
-    column: 3
-  end_location:
-    row: 11
-    column: 7
-  fix:
-    content: None is not res
+      column: 7
+    fix:
+      content: None is res
+      location:
+        row: 8
+        column: 3
+      end_location:
+        row: 8
+        column: 14
+    parent: ~
+  - kind:
+      name: NoneComparison
+      body: "Comparison to `None` should be `cond is not None`"
+      suggestion: "Replace with `cond is not None`"
+      fixable: true
     location:
       row: 11
       column: 3
     end_location:
       row: 11
-      column: 14
-  parent: ~
-- kind:
-    name: NoneComparison
-    body: "Comparison to `None` should be `cond is None`"
-    suggestion: "Replace with `cond is None`"
-    fixable: true
-  location:
-    row: 14
-    column: 13
-  end_location:
-    row: 14
-    column: 17
-  fix:
-    content: "res[1] is None"
+      column: 7
+    fix:
+      content: None is not res
+      location:
+        row: 11
+        column: 3
+      end_location:
+        row: 11
+        column: 14
+    parent: ~
+  - kind:
+      name: NoneComparison
+      body: "Comparison to `None` should be `cond is None`"
+      suggestion: "Replace with `cond is None`"
+      fixable: true
     location:
       row: 14
-      column: 3
+      column: 13
     end_location:
       row: 14
       column: 17
-  parent: ~
-- kind:
-    name: NoneComparison
-    body: "Comparison to `None` should be `cond is not None`"
-    suggestion: "Replace with `cond is not None`"
-    fixable: true
-  location:
-    row: 17
-    column: 13
-  end_location:
-    row: 17
-    column: 17
-  fix:
-    content: "res[1] is not None"
+    fix:
+      content: "res[1] is None"
+      location:
+        row: 14
+        column: 3
+      end_location:
+        row: 14
+        column: 17
+    parent: ~
+  - kind:
+      name: NoneComparison
+      body: "Comparison to `None` should be `cond is not None`"
+      suggestion: "Replace with `cond is not None`"
+      fixable: true
     location:
       row: 17
-      column: 3
+      column: 13
     end_location:
       row: 17
       column: 17
-  parent: ~
-- kind:
-    name: NoneComparison
-    body: "Comparison to `None` should be `cond is not None`"
-    suggestion: "Replace with `cond is not None`"
-    fixable: true
-  location:
-    row: 20
-    column: 3
-  end_location:
-    row: 20
-    column: 7
-  fix:
-    content: "None is not res[1]"
+    fix:
+      content: "res[1] is not None"
+      location:
+        row: 17
+        column: 3
+      end_location:
+        row: 17
+        column: 17
+    parent: ~
+  - kind:
+      name: NoneComparison
+      body: "Comparison to `None` should be `cond is not None`"
+      suggestion: "Replace with `cond is not None`"
+      fixable: true
     location:
       row: 20
       column: 3
     end_location:
       row: 20
-      column: 17
-  parent: ~
-- kind:
-    name: NoneComparison
-    body: "Comparison to `None` should be `cond is None`"
-    suggestion: "Replace with `cond is None`"
-    fixable: true
-  location:
-    row: 23
-    column: 3
-  end_location:
-    row: 23
-    column: 7
-  fix:
-    content: "None is res[1]"
+      column: 7
+    fix:
+      content: "None is not res[1]"
+      location:
+        row: 20
+        column: 3
+      end_location:
+        row: 20
+        column: 17
+    parent: ~
+  - kind:
+      name: NoneComparison
+      body: "Comparison to `None` should be `cond is None`"
+      suggestion: "Replace with `cond is None`"
+      fixable: true
     location:
       row: 23
       column: 3
     end_location:
       row: 23
-      column: 17
-  parent: ~
-- kind:
-    name: NoneComparison
-    body: "Comparison to `None` should be `cond is None`"
-    suggestion: "Replace with `cond is None`"
-    fixable: true
-  location:
-    row: 26
-    column: 8
-  end_location:
-    row: 26
-    column: 12
-  fix:
-    content: x is None is not None
+      column: 7
+    fix:
+      content: "None is res[1]"
+      location:
+        row: 23
+        column: 3
+      end_location:
+        row: 23
+        column: 17
+    parent: ~
+  - kind:
+      name: NoneComparison
+      body: "Comparison to `None` should be `cond is None`"
+      suggestion: "Replace with `cond is None`"
+      fixable: true
     location:
       row: 26
-      column: 3
+      column: 8
+    end_location:
+      row: 26
+      column: 12
+    fix:
+      content: x is None is not None
+      location:
+        row: 26
+        column: 3
+      end_location:
+        row: 26
+        column: 20
+    parent: ~
+  - kind:
+      name: NoneComparison
+      body: "Comparison to `None` should be `cond is not None`"
+      suggestion: "Replace with `cond is not None`"
+      fixable: true
+    location:
+      row: 26
+      column: 16
     end_location:
       row: 26
       column: 20
-  parent: ~
-- kind:
-    name: NoneComparison
-    body: "Comparison to `None` should be `cond is not None`"
-    suggestion: "Replace with `cond is not None`"
-    fixable: true
-  location:
-    row: 26
-    column: 16
-  end_location:
-    row: 26
-    column: 20
-  fix:
-    content: x is None is not None
-    location:
-      row: 26
-      column: 3
-    end_location:
-      row: 26
-      column: 20
-  parent: ~
+    fix:
+      content: x is None is not None
+      location:
+        row: 26
+        column: 3
+      end_location:
+        row: 26
+        column: 20
+    parent: ~
 

@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UndefinedLocal
-    body: "Local variable `my_var` referenced before assignment"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 4
-  end_location:
-    row: 6
-    column: 10
-  fix: ~
-  parent: ~
+- - kind:
+      name: UndefinedLocal
+      body: "Local variable `my_var` referenced before assignment"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 4
+    end_location:
+      row: 6
+      column: 10
+    fix: ~
+    parent: ~
 

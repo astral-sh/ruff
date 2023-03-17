@@ -2,56 +2,56 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnexpectedIndentationComment
-    body: Unexpected indentation (comment)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 5
-  end_location:
-    row: 15
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: UnexpectedIndentationComment
-    body: Unexpected indentation (comment)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 12
-  end_location:
-    row: 22
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: UnexpectedIndentationComment
-    body: Unexpected indentation (comment)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 12
-  end_location:
-    row: 24
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: UnexpectedIndentationComment
-    body: Unexpected indentation (comment)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 12
-  end_location:
-    row: 26
-    column: 12
-  fix: ~
-  parent: ~
+- - kind:
+      name: UnexpectedIndentationComment
+      body: Unexpected indentation (comment)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 15
+      column: 5
+    end_location:
+      row: 15
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnexpectedIndentationComment
+      body: Unexpected indentation (comment)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 22
+      column: 12
+    end_location:
+      row: 22
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnexpectedIndentationComment
+      body: Unexpected indentation (comment)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 24
+      column: 12
+    end_location:
+      row: 24
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnexpectedIndentationComment
+      body: Unexpected indentation (comment)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 26
+      column: 12
+    end_location:
+      row: 26
+      column: 12
+    fix: ~
+    parent: ~
 

@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnsortedImports
-    body: Import block is un-sorted or un-formatted
-    suggestion: Organize imports
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 9
-    column: 0
-  fix:
-    content: "from office_helper.assistants import entity_registry as er\nfrom office_helper.core import CoreState\n\nimport tests.common.foo as tcf\nfrom tests.common import async_mock_service\n\nfrom experiments.starry import *\nfrom experiments.weird import varieties\n"
+- - kind:
+      name: UnsortedImports
+      body: Import block is un-sorted or un-formatted
+      suggestion: Organize imports
+      fixable: true
     location:
       row: 3
       column: 0
     end_location:
       row: 9
       column: 0
-  parent: ~
+    fix:
+      content: "from office_helper.assistants import entity_registry as er\nfrom office_helper.core import CoreState\n\nimport tests.common.foo as tcf\nfrom tests.common import async_mock_service\n\nfrom experiments.starry import *\nfrom experiments.weird import varieties\n"
+      location:
+        row: 3
+        column: 0
+      end_location:
+        row: 9
+        column: 0
+    parent: ~
 

@@ -2,124 +2,124 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: NativeLiterals
-    body: "Unnecessary call to `str`"
-    suggestion: "Replace with `str`"
-    fixable: true
-  location:
-    row: 20
-    column: 0
-  end_location:
-    row: 20
-    column: 5
-  fix:
-    content: "\"\""
+- - kind:
+      name: NativeLiterals
+      body: "Unnecessary call to `str`"
+      suggestion: "Replace with `str`"
+      fixable: true
     location:
       row: 20
       column: 0
     end_location:
       row: 20
       column: 5
-  parent: ~
-- kind:
-    name: NativeLiterals
-    body: "Unnecessary call to `str`"
-    suggestion: "Replace with `str`"
-    fixable: true
-  location:
-    row: 21
-    column: 0
-  end_location:
-    row: 21
-    column: 10
-  fix:
-    content: "\"foo\""
+    fix:
+      content: "\"\""
+      location:
+        row: 20
+        column: 0
+      end_location:
+        row: 20
+        column: 5
+    parent: ~
+  - kind:
+      name: NativeLiterals
+      body: "Unnecessary call to `str`"
+      suggestion: "Replace with `str`"
+      fixable: true
     location:
       row: 21
       column: 0
     end_location:
       row: 21
       column: 10
-  parent: ~
-- kind:
-    name: NativeLiterals
-    body: "Unnecessary call to `str`"
-    suggestion: "Replace with `str`"
-    fixable: true
-  location:
-    row: 22
-    column: 0
-  end_location:
-    row: 23
-    column: 7
-  fix:
-    content: "\"\"\"\nfoo\"\"\""
+    fix:
+      content: "\"foo\""
+      location:
+        row: 21
+        column: 0
+      end_location:
+        row: 21
+        column: 10
+    parent: ~
+  - kind:
+      name: NativeLiterals
+      body: "Unnecessary call to `str`"
+      suggestion: "Replace with `str`"
+      fixable: true
     location:
       row: 22
       column: 0
     end_location:
       row: 23
       column: 7
-  parent: ~
-- kind:
-    name: NativeLiterals
-    body: "Unnecessary call to `bytes`"
-    suggestion: "Replace with `bytes`"
-    fixable: true
-  location:
-    row: 24
-    column: 0
-  end_location:
-    row: 24
-    column: 7
-  fix:
-    content: "b\"\""
+    fix:
+      content: "\"\"\"\nfoo\"\"\""
+      location:
+        row: 22
+        column: 0
+      end_location:
+        row: 23
+        column: 7
+    parent: ~
+  - kind:
+      name: NativeLiterals
+      body: "Unnecessary call to `bytes`"
+      suggestion: "Replace with `bytes`"
+      fixable: true
     location:
       row: 24
       column: 0
     end_location:
       row: 24
       column: 7
-  parent: ~
-- kind:
-    name: NativeLiterals
-    body: "Unnecessary call to `bytes`"
-    suggestion: "Replace with `bytes`"
-    fixable: true
-  location:
-    row: 25
-    column: 0
-  end_location:
-    row: 25
-    column: 13
-  fix:
-    content: "b\"foo\""
+    fix:
+      content: "b\"\""
+      location:
+        row: 24
+        column: 0
+      end_location:
+        row: 24
+        column: 7
+    parent: ~
+  - kind:
+      name: NativeLiterals
+      body: "Unnecessary call to `bytes`"
+      suggestion: "Replace with `bytes`"
+      fixable: true
     location:
       row: 25
       column: 0
     end_location:
       row: 25
       column: 13
-  parent: ~
-- kind:
-    name: NativeLiterals
-    body: "Unnecessary call to `bytes`"
-    suggestion: "Replace with `bytes`"
-    fixable: true
-  location:
-    row: 26
-    column: 0
-  end_location:
-    row: 27
-    column: 7
-  fix:
-    content: "b\"\"\"\nfoo\"\"\""
+    fix:
+      content: "b\"foo\""
+      location:
+        row: 25
+        column: 0
+      end_location:
+        row: 25
+        column: 13
+    parent: ~
+  - kind:
+      name: NativeLiterals
+      body: "Unnecessary call to `bytes`"
+      suggestion: "Replace with `bytes`"
+      fixable: true
     location:
       row: 26
       column: 0
     end_location:
       row: 27
       column: 7
-  parent: ~
+    fix:
+      content: "b\"\"\"\nfoo\"\"\""
+      location:
+        row: 26
+        column: 0
+      end_location:
+        row: 27
+        column: 7
+    parent: ~
 

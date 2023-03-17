@@ -2,204 +2,204 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryFutureImport
-    body: "Unnecessary `__future__` imports `generators`, `nested_scopes` for target Python version"
-    suggestion: "Remove unnecessary `__future__` import"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 48
-  fix:
-    content: ""
+- - kind:
+      name: UnnecessaryFutureImport
+      body: "Unnecessary `__future__` imports `generators`, `nested_scopes` for target Python version"
+      suggestion: "Remove unnecessary `__future__` import"
+      fixable: true
     location:
       row: 1
       column: 0
     end_location:
-      row: 2
-      column: 0
-  parent: ~
-- kind:
-    name: UnnecessaryFutureImport
-    body: "Unnecessary `__future__` imports `unicode_literals`, `with_statement` for target Python version"
-    suggestion: "Remove unnecessary `__future__` import"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 55
-  fix:
-    content: ""
+      row: 1
+      column: 48
+    fix:
+      content: ""
+      location:
+        row: 1
+        column: 0
+      end_location:
+        row: 2
+        column: 0
+    parent: ~
+  - kind:
+      name: UnnecessaryFutureImport
+      body: "Unnecessary `__future__` imports `unicode_literals`, `with_statement` for target Python version"
+      suggestion: "Remove unnecessary `__future__` import"
+      fixable: true
     location:
       row: 2
       column: 0
     end_location:
-      row: 3
-      column: 0
-  parent: ~
-- kind:
-    name: UnnecessaryFutureImport
-    body: "Unnecessary `__future__` imports `absolute_import`, `division` for target Python version"
-    suggestion: "Remove unnecessary `__future__` import"
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 48
-  fix:
-    content: ""
+      row: 2
+      column: 55
+    fix:
+      content: ""
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 3
+        column: 0
+    parent: ~
+  - kind:
+      name: UnnecessaryFutureImport
+      body: "Unnecessary `__future__` imports `absolute_import`, `division` for target Python version"
+      suggestion: "Remove unnecessary `__future__` import"
+      fixable: true
     location:
       row: 3
       column: 0
     end_location:
-      row: 4
-      column: 0
-  parent: ~
-- kind:
-    name: UnnecessaryFutureImport
-    body: "Unnecessary `__future__` import `generator_stop` for target Python version"
-    suggestion: "Remove unnecessary `__future__` import"
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 37
-  fix:
-    content: ""
+      row: 3
+      column: 48
+    fix:
+      content: ""
+      location:
+        row: 3
+        column: 0
+      end_location:
+        row: 4
+        column: 0
+    parent: ~
+  - kind:
+      name: UnnecessaryFutureImport
+      body: "Unnecessary `__future__` import `generator_stop` for target Python version"
+      suggestion: "Remove unnecessary `__future__` import"
+      fixable: true
     location:
       row: 4
       column: 0
     end_location:
-      row: 5
-      column: 0
-  parent: ~
-- kind:
-    name: UnnecessaryFutureImport
-    body: "Unnecessary `__future__` imports `generator_stop`, `print_function` for target Python version"
-    suggestion: "Remove unnecessary `__future__` import"
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 53
-  fix:
-    content: ""
+      row: 4
+      column: 37
+    fix:
+      content: ""
+      location:
+        row: 4
+        column: 0
+      end_location:
+        row: 5
+        column: 0
+    parent: ~
+  - kind:
+      name: UnnecessaryFutureImport
+      body: "Unnecessary `__future__` imports `generator_stop`, `print_function` for target Python version"
+      suggestion: "Remove unnecessary `__future__` import"
+      fixable: true
     location:
       row: 5
       column: 0
     end_location:
-      row: 6
-      column: 0
-  parent: ~
-- kind:
-    name: UnnecessaryFutureImport
-    body: "Unnecessary `__future__` import `generators` for target Python version"
-    suggestion: "Remove unnecessary `__future__` import"
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 49
-  fix:
-    content: from __future__ import invalid_module
+      row: 5
+      column: 53
+    fix:
+      content: ""
+      location:
+        row: 5
+        column: 0
+      end_location:
+        row: 6
+        column: 0
+    parent: ~
+  - kind:
+      name: UnnecessaryFutureImport
+      body: "Unnecessary `__future__` import `generators` for target Python version"
+      suggestion: "Remove unnecessary `__future__` import"
+      fixable: true
     location:
       row: 6
       column: 0
     end_location:
       row: 6
       column: 49
-  parent: ~
-- kind:
-    name: UnnecessaryFutureImport
-    body: "Unnecessary `__future__` import `generator_stop` for target Python version"
-    suggestion: "Remove unnecessary `__future__` import"
-    fixable: true
-  location:
-    row: 9
-    column: 4
-  end_location:
-    row: 9
-    column: 41
-  fix:
-    content: ""
+    fix:
+      content: from __future__ import invalid_module
+      location:
+        row: 6
+        column: 0
+      end_location:
+        row: 6
+        column: 49
+    parent: ~
+  - kind:
+      name: UnnecessaryFutureImport
+      body: "Unnecessary `__future__` import `generator_stop` for target Python version"
+      suggestion: "Remove unnecessary `__future__` import"
+      fixable: true
     location:
       row: 9
-      column: 0
+      column: 4
     end_location:
-      row: 10
-      column: 0
-  parent: ~
-- kind:
-    name: UnnecessaryFutureImport
-    body: "Unnecessary `__future__` import `generators` for target Python version"
-    suggestion: "Remove unnecessary `__future__` import"
-    fixable: true
-  location:
-    row: 10
-    column: 4
-  end_location:
-    row: 10
-    column: 37
-  fix:
-    content: pass
+      row: 9
+      column: 41
+    fix:
+      content: ""
+      location:
+        row: 9
+        column: 0
+      end_location:
+        row: 10
+        column: 0
+    parent: ~
+  - kind:
+      name: UnnecessaryFutureImport
+      body: "Unnecessary `__future__` import `generators` for target Python version"
+      suggestion: "Remove unnecessary `__future__` import"
+      fixable: true
     location:
       row: 10
       column: 4
     end_location:
       row: 10
       column: 37
-  parent: ~
-- kind:
-    name: UnnecessaryFutureImport
-    body: "Unnecessary `__future__` import `generator_stop` for target Python version"
-    suggestion: "Remove unnecessary `__future__` import"
-    fixable: true
-  location:
-    row: 13
-    column: 4
-  end_location:
-    row: 13
-    column: 41
-  fix:
-    content: ""
+    fix:
+      content: pass
+      location:
+        row: 10
+        column: 4
+      end_location:
+        row: 10
+        column: 37
+    parent: ~
+  - kind:
+      name: UnnecessaryFutureImport
+      body: "Unnecessary `__future__` import `generator_stop` for target Python version"
+      suggestion: "Remove unnecessary `__future__` import"
+      fixable: true
     location:
       row: 13
-      column: 0
+      column: 4
     end_location:
-      row: 14
-      column: 0
-  parent: ~
-- kind:
-    name: UnnecessaryFutureImport
-    body: "Unnecessary `__future__` import `generators` for target Python version"
-    suggestion: "Remove unnecessary `__future__` import"
-    fixable: true
-  location:
-    row: 14
-    column: 4
-  end_location:
-    row: 14
-    column: 53
-  fix:
-    content: from __future__ import invalid_module
+      row: 13
+      column: 41
+    fix:
+      content: ""
+      location:
+        row: 13
+        column: 0
+      end_location:
+        row: 14
+        column: 0
+    parent: ~
+  - kind:
+      name: UnnecessaryFutureImport
+      body: "Unnecessary `__future__` import `generators` for target Python version"
+      suggestion: "Remove unnecessary `__future__` import"
+      fixable: true
     location:
       row: 14
       column: 4
     end_location:
       row: 14
       column: 53
-  parent: ~
+    fix:
+      content: from __future__ import invalid_module
+      location:
+        row: 14
+        column: 4
+      end_location:
+        row: 14
+        column: 53
+    parent: ~
 

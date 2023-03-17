@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PytestAssertInExcept
-    body: "Found assertion on exception `e` in `except` block, use `pytest.raises()` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 8
-  end_location:
-    row: 19
-    column: 37
-  fix: ~
-  parent: ~
+- - kind:
+      name: PytestAssertInExcept
+      body: "Found assertion on exception `e` in `except` block, use `pytest.raises()` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 19
+      column: 8
+    end_location:
+      row: 19
+      column: 37
+    fix: ~
+    parent: ~
 

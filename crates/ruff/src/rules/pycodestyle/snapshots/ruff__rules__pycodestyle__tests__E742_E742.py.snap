@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: AmbiguousClassName
-    body: "Ambiguous class name: `l`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 6
-  end_location:
-    row: 1
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: AmbiguousClassName
-    body: "Ambiguous class name: `I`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 6
-  end_location:
-    row: 5
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: AmbiguousClassName
-    body: "Ambiguous class name: `O`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 6
-  end_location:
-    row: 9
-    column: 7
-  fix: ~
-  parent: ~
+- - kind:
+      name: AmbiguousClassName
+      body: "Ambiguous class name: `l`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 6
+    end_location:
+      row: 1
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: AmbiguousClassName
+      body: "Ambiguous class name: `I`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 6
+    end_location:
+      row: 5
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: AmbiguousClassName
+      body: "Ambiguous class name: `O`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 6
+    end_location:
+      row: 9
+      column: 7
+    fix: ~
+    parent: ~
 

@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: AssertRaisesException
-    body: "`assertRaises(Exception)` should be considered evil"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 8
-  end_location:
-    row: 23
-    column: 42
-  fix: ~
-  parent: ~
+- - kind:
+      name: AssertRaisesException
+      body: "`assertRaises(Exception)` should be considered evil"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 22
+      column: 8
+    end_location:
+      row: 23
+      column: 42
+    fix: ~
+    parent: ~
 

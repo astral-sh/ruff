@@ -1,6 +1,6 @@
 ---
-source: src/rules/ruff/mod.rs
+source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
-[]
+- []
 

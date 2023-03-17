@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnsafeYAMLLoad
-    body: "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 8
-  end_location:
-    row: 10
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: UnsafeYAMLLoad
-    body: "Probable use of unsafe loader `Loader` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 23
-  end_location:
-    row: 24
-    column: 34
-  fix: ~
-  parent: ~
+- - kind:
+      name: UnsafeYAMLLoad
+      body: "Probable use of unsafe `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 10
+      column: 8
+    end_location:
+      row: 10
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: UnsafeYAMLLoad
+      body: "Probable use of unsafe loader `Loader` with `yaml.load`. Allows instantiation of arbitrary objects. Consider `yaml.safe_load`."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 24
+      column: 23
+    end_location:
+      row: 24
+      column: 34
+    fix: ~
+    parent: ~
 

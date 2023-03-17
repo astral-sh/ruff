@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: LoggingWarn
-    body: "Logging statement uses `warn` instead of `warning`"
-    suggestion: "Convert to `warn`"
-    fixable: true
-  location:
-    row: 3
-    column: 8
-  end_location:
-    row: 3
-    column: 12
-  fix:
-    content: warning
+- - kind:
+      name: LoggingWarn
+      body: "Logging statement uses `warn` instead of `warning`"
+      suggestion: "Convert to `warn`"
+      fixable: true
     location:
       row: 3
       column: 8
     end_location:
       row: 3
       column: 12
-  parent: ~
+    fix:
+      content: warning
+      location:
+        row: 3
+        column: 8
+      end_location:
+        row: 3
+        column: 12
+    parent: ~
 

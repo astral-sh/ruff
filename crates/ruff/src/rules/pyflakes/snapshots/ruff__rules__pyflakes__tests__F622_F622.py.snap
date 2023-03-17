@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MultipleStarredExpressions
-    body: Two starred expressions in assignment
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 9
-  fix: ~
-  parent: ~
+- - kind:
+      name: MultipleStarredExpressions
+      body: Two starred expressions in assignment
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 9
+    fix: ~
+    parent: ~
 

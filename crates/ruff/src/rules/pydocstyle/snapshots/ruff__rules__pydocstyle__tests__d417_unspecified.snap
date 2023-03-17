@@ -2,121 +2,121 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument descriptions in the docstring: `y`, `z`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 4
-  end_location:
-    row: 1
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument descriptions in the docstring: `y`, `z`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 4
-  end_location:
-    row: 14
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument descriptions in the docstring: `y`, `z`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 27
-    column: 4
-  end_location:
-    row: 27
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument descriptions in the docstring: `y`, `z`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 39
-    column: 4
-  end_location:
-    row: 39
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument description in the docstring: `y`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 52
-    column: 4
-  end_location:
-    row: 52
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument description in the docstring: `y`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 65
-    column: 4
-  end_location:
-    row: 65
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument description in the docstring: `y`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 77
-    column: 4
-  end_location:
-    row: 77
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument description in the docstring: `x`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 98
-    column: 4
-  end_location:
-    row: 98
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument description in the docstring: `*args`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 108
-    column: 4
-  end_location:
-    row: 108
-    column: 5
-  fix: ~
-  parent: ~
+- - kind:
+      name: UndocumentedParam
+      body: "Missing argument descriptions in the docstring: `y`, `z`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 4
+    end_location:
+      row: 1
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndocumentedParam
+      body: "Missing argument descriptions in the docstring: `y`, `z`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 14
+      column: 4
+    end_location:
+      row: 14
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndocumentedParam
+      body: "Missing argument descriptions in the docstring: `y`, `z`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 27
+      column: 4
+    end_location:
+      row: 27
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndocumentedParam
+      body: "Missing argument descriptions in the docstring: `y`, `z`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 39
+      column: 4
+    end_location:
+      row: 39
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndocumentedParam
+      body: "Missing argument description in the docstring: `y`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 52
+      column: 4
+    end_location:
+      row: 52
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndocumentedParam
+      body: "Missing argument description in the docstring: `y`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 65
+      column: 4
+    end_location:
+      row: 65
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndocumentedParam
+      body: "Missing argument description in the docstring: `y`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 77
+      column: 4
+    end_location:
+      row: 77
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndocumentedParam
+      body: "Missing argument description in the docstring: `x`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 98
+      column: 4
+    end_location:
+      row: 98
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndocumentedParam
+      body: "Missing argument description in the docstring: `*args`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 108
+      column: 4
+    end_location:
+      row: 108
+      column: 5
+    fix: ~
+    parent: ~
 

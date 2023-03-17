@@ -2,84 +2,84 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnusedImport
-    body: "`.background.BackgroundTasks` imported but unused"
-    suggestion: "Remove unused import: `.background.BackgroundTasks`"
-    fixable: true
-  location:
-    row: 7
-    column: 24
-  end_location:
-    row: 7
-    column: 39
-  fix:
-    content: ""
+- - kind:
+      name: UnusedImport
+      body: "`.background.BackgroundTasks` imported but unused"
+      suggestion: "Remove unused import: `.background.BackgroundTasks`"
+      fixable: true
     location:
       row: 7
-      column: 0
+      column: 24
     end_location:
-      row: 8
-      column: 0
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`.datastructures.UploadFile` imported but unused"
-    suggestion: "Remove unused import: `.datastructures.UploadFile`"
-    fixable: true
-  location:
-    row: 10
-    column: 28
-  end_location:
-    row: 10
-    column: 52
-  fix:
-    content: ""
+      row: 7
+      column: 39
+    fix:
+      content: ""
+      location:
+        row: 7
+        column: 0
+      end_location:
+        row: 8
+        column: 0
+    parent: ~
+  - kind:
+      name: UnusedImport
+      body: "`.datastructures.UploadFile` imported but unused"
+      suggestion: "Remove unused import: `.datastructures.UploadFile`"
+      fixable: true
     location:
       row: 10
-      column: 0
+      column: 28
     end_location:
-      row: 11
-      column: 0
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`background` imported but unused"
-    suggestion: "Remove unused import: `background`"
-    fixable: true
-  location:
-    row: 16
-    column: 7
-  end_location:
-    row: 16
-    column: 17
-  fix:
-    content: ""
+      row: 10
+      column: 52
+    fix:
+      content: ""
+      location:
+        row: 10
+        column: 0
+      end_location:
+        row: 11
+        column: 0
+    parent: ~
+  - kind:
+      name: UnusedImport
+      body: "`background` imported but unused"
+      suggestion: "Remove unused import: `background`"
+      fixable: true
     location:
       row: 16
-      column: 0
+      column: 7
     end_location:
-      row: 17
-      column: 0
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`datastructures` imported but unused"
-    suggestion: "Remove unused import: `datastructures`"
-    fixable: true
-  location:
-    row: 19
-    column: 7
-  end_location:
-    row: 19
-    column: 35
-  fix:
-    content: ""
+      row: 16
+      column: 17
+    fix:
+      content: ""
+      location:
+        row: 16
+        column: 0
+      end_location:
+        row: 17
+        column: 0
+    parent: ~
+  - kind:
+      name: UnusedImport
+      body: "`datastructures` imported but unused"
+      suggestion: "Remove unused import: `datastructures`"
+      fixable: true
     location:
       row: 19
-      column: 0
+      column: 7
     end_location:
-      row: 20
-      column: 0
-  parent: ~
+      row: 19
+      column: 35
+    fix:
+      content: ""
+      location:
+        row: 19
+        column: 0
+      end_location:
+        row: 20
+        column: 0
+    parent: ~
 

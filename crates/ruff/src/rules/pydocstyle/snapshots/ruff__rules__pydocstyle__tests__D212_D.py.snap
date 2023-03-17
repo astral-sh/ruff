@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MultiLineSummaryFirstLine
-    body: Multi-line docstring summary should start at the first line
-    suggestion: Remove whitespace after opening quotes
-    fixable: true
-  location:
-    row: 129
-    column: 4
-  end_location:
-    row: 131
-    column: 7
-  fix:
-    content: ""
+- - kind:
+      name: MultiLineSummaryFirstLine
+      body: Multi-line docstring summary should start at the first line
+      suggestion: Remove whitespace after opening quotes
+      fixable: true
     location:
       row: 129
-      column: 7
-    end_location:
-      row: 130
       column: 4
-  parent: ~
-- kind:
-    name: MultiLineSummaryFirstLine
-    body: Multi-line docstring summary should start at the first line
-    suggestion: Remove whitespace after opening quotes
-    fixable: true
-  location:
-    row: 597
-    column: 4
-  end_location:
-    row: 599
-    column: 13
-  fix:
-    content: ""
+    end_location:
+      row: 131
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 129
+        column: 7
+      end_location:
+        row: 130
+        column: 4
+    parent: ~
+  - kind:
+      name: MultiLineSummaryFirstLine
+      body: Multi-line docstring summary should start at the first line
+      suggestion: Remove whitespace after opening quotes
+      fixable: true
     location:
       row: 597
-      column: 7
+      column: 4
     end_location:
       row: 599
-      column: 4
-  parent: ~
-- kind:
-    name: MultiLineSummaryFirstLine
-    body: Multi-line docstring summary should start at the first line
-    suggestion: Remove whitespace after opening quotes
-    fixable: true
-  location:
-    row: 624
-    column: 4
-  end_location:
-    row: 626
-    column: 14
-  fix:
-    content: ""
+      column: 13
+    fix:
+      content: ""
+      location:
+        row: 597
+        column: 7
+      end_location:
+        row: 599
+        column: 4
+    parent: ~
+  - kind:
+      name: MultiLineSummaryFirstLine
+      body: Multi-line docstring summary should start at the first line
+      suggestion: Remove whitespace after opening quotes
+      fixable: true
     location:
       row: 624
-      column: 7
+      column: 4
     end_location:
       row: 626
-      column: 4
-  parent: ~
+      column: 14
+    fix:
+      content: ""
+      location:
+        row: 624
+        column: 7
+      end_location:
+        row: 626
+        column: 4
+    parent: ~
 

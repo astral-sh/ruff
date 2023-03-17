@@ -2,56 +2,56 @@
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: DuplicateTryBlockException
-    body: "try-except block with duplicate exception `ValueError`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 7
-  end_location:
-    row: 19
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: DuplicateTryBlockException
-    body: "try-except block with duplicate exception `pickle.PickleError`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 28
-    column: 7
-  end_location:
-    row: 28
-    column: 25
-  fix: ~
-  parent: ~
-- kind:
-    name: DuplicateTryBlockException
-    body: "try-except block with duplicate exception `ValueError`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 35
-    column: 7
-  end_location:
-    row: 35
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: DuplicateTryBlockException
-    body: "try-except block with duplicate exception `TypeError`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 37
-    column: 17
-  end_location:
-    row: 37
-    column: 26
-  fix: ~
-  parent: ~
+- - kind:
+      name: DuplicateTryBlockException
+      body: "try-except block with duplicate exception `ValueError`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 19
+      column: 7
+    end_location:
+      row: 19
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: DuplicateTryBlockException
+      body: "try-except block with duplicate exception `pickle.PickleError`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 28
+      column: 7
+    end_location:
+      row: 28
+      column: 25
+    fix: ~
+    parent: ~
+  - kind:
+      name: DuplicateTryBlockException
+      body: "try-except block with duplicate exception `ValueError`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 35
+      column: 7
+    end_location:
+      row: 35
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: DuplicateTryBlockException
+      body: "try-except block with duplicate exception `TypeError`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 37
+      column: 17
+    end_location:
+      row: 37
+      column: 26
+    fix: ~
+    parent: ~
 

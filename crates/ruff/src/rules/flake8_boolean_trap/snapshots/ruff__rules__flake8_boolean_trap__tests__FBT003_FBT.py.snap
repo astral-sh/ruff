@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BooleanPositionalValueInFunctionCall
-    body: Boolean positional value in function call
-    suggestion: ~
-    fixable: false
-  location:
-    row: 42
-    column: 10
-  end_location:
-    row: 42
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: BooleanPositionalValueInFunctionCall
-    body: Boolean positional value in function call
-    suggestion: ~
-    fixable: false
-  location:
-    row: 57
-    column: 10
-  end_location:
-    row: 57
-    column: 14
-  fix: ~
-  parent: ~
-- kind:
-    name: BooleanPositionalValueInFunctionCall
-    body: Boolean positional value in function call
-    suggestion: ~
-    fixable: false
-  location:
-    row: 57
-    column: 16
-  end_location:
-    row: 57
-    column: 21
-  fix: ~
-  parent: ~
+- - kind:
+      name: BooleanPositionalValueInFunctionCall
+      body: Boolean positional value in function call
+      suggestion: ~
+      fixable: false
+    location:
+      row: 42
+      column: 10
+    end_location:
+      row: 42
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: BooleanPositionalValueInFunctionCall
+      body: Boolean positional value in function call
+      suggestion: ~
+      fixable: false
+    location:
+      row: 57
+      column: 10
+    end_location:
+      row: 57
+      column: 14
+    fix: ~
+    parent: ~
+  - kind:
+      name: BooleanPositionalValueInFunctionCall
+      body: Boolean positional value in function call
+      suggestion: ~
+      fixable: false
+    location:
+      row: 57
+      column: 16
+    end_location:
+      row: 57
+      column: 21
+    fix: ~
+    parent: ~
 

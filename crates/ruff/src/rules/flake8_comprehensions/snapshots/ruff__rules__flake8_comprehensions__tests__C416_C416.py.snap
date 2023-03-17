@@ -2,84 +2,84 @@
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryComprehension
-    body: "Unnecessary `list` comprehension (rewrite using `list()`)"
-    suggestion: "Rewrite using `list()`"
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 14
-  fix:
-    content: list(x)
+- - kind:
+      name: UnnecessaryComprehension
+      body: "Unnecessary `list` comprehension (rewrite using `list()`)"
+      suggestion: "Rewrite using `list()`"
+      fixable: true
     location:
       row: 6
       column: 0
     end_location:
       row: 6
       column: 14
-  parent: ~
-- kind:
-    name: UnnecessaryComprehension
-    body: "Unnecessary `set` comprehension (rewrite using `set()`)"
-    suggestion: "Rewrite using `set()`"
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 14
-  fix:
-    content: set(x)
+    fix:
+      content: list(x)
+      location:
+        row: 6
+        column: 0
+      end_location:
+        row: 6
+        column: 14
+    parent: ~
+  - kind:
+      name: UnnecessaryComprehension
+      body: "Unnecessary `set` comprehension (rewrite using `set()`)"
+      suggestion: "Rewrite using `set()`"
+      fixable: true
     location:
       row: 7
       column: 0
     end_location:
       row: 7
       column: 14
-  parent: ~
-- kind:
-    name: UnnecessaryComprehension
-    body: "Unnecessary `dict` comprehension (rewrite using `dict()`)"
-    suggestion: "Rewrite using `dict()`"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 20
-  fix:
-    content: dict(y)
+    fix:
+      content: set(x)
+      location:
+        row: 7
+        column: 0
+      end_location:
+        row: 7
+        column: 14
+    parent: ~
+  - kind:
+      name: UnnecessaryComprehension
+      body: "Unnecessary `dict` comprehension (rewrite using `dict()`)"
+      suggestion: "Rewrite using `dict()`"
+      fixable: true
     location:
       row: 8
       column: 0
     end_location:
       row: 8
       column: 20
-  parent: ~
-- kind:
-    name: UnnecessaryComprehension
-    body: "Unnecessary `dict` comprehension (rewrite using `dict()`)"
-    suggestion: "Rewrite using `dict()`"
-    fixable: true
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 28
-  fix:
-    content: dict(d.items())
+    fix:
+      content: dict(y)
+      location:
+        row: 8
+        column: 0
+      end_location:
+        row: 8
+        column: 20
+    parent: ~
+  - kind:
+      name: UnnecessaryComprehension
+      body: "Unnecessary `dict` comprehension (rewrite using `dict()`)"
+      suggestion: "Rewrite using `dict()`"
+      fixable: true
     location:
       row: 9
       column: 0
     end_location:
       row: 9
       column: 28
-  parent: ~
+    fix:
+      content: dict(d.items())
+      location:
+        row: 9
+        column: 0
+      end_location:
+        row: 9
+        column: 28
+    parent: ~
 

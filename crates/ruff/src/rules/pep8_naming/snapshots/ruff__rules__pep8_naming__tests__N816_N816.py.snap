@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MixedCaseVariableInGlobalScope
-    body: "Variable `mixedCase` in global scope should not be mixedCase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 9
-  fix: ~
-  parent: ~
-- kind:
-    name: MixedCaseVariableInGlobalScope
-    body: "Variable `_mixedCase` in global scope should not be mixedCase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 10
-  fix: ~
-  parent: ~
-- kind:
-    name: MixedCaseVariableInGlobalScope
-    body: "Variable `mixed_Case` in global scope should not be mixedCase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 10
-  fix: ~
-  parent: ~
+- - kind:
+      name: MixedCaseVariableInGlobalScope
+      body: "Variable `mixedCase` in global scope should not be mixedCase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 9
+    fix: ~
+    parent: ~
+  - kind:
+      name: MixedCaseVariableInGlobalScope
+      body: "Variable `_mixedCase` in global scope should not be mixedCase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 8
+      column: 10
+    fix: ~
+    parent: ~
+  - kind:
+      name: MixedCaseVariableInGlobalScope
+      body: "Variable `mixed_Case` in global scope should not be mixedCase"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 10
+    fix: ~
+    parent: ~
 

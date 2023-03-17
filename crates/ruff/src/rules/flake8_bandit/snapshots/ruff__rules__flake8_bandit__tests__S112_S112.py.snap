@@ -2,56 +2,56 @@
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: TryExceptContinue
-    body: "`try`-`except`-`continue` detected, consider logging the exception"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 4
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: TryExceptContinue
-    body: "`try`-`except`-`continue` detected, consider logging the exception"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 9
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: TryExceptContinue
-    body: "`try`-`except`-`continue` detected, consider logging the exception"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 14
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: TryExceptContinue
-    body: "`try`-`except`-`continue` detected, consider logging the exception"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 0
-  end_location:
-    row: 19
-    column: 12
-  fix: ~
-  parent: ~
+- - kind:
+      name: TryExceptContinue
+      body: "`try`-`except`-`continue` detected, consider logging the exception"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 4
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: TryExceptContinue
+      body: "`try`-`except`-`continue` detected, consider logging the exception"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 9
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: TryExceptContinue
+      body: "`try`-`except`-`continue` detected, consider logging the exception"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 14
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: TryExceptContinue
+      body: "`try`-`except`-`continue` detected, consider logging the exception"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 18
+      column: 0
+    end_location:
+      row: 19
+      column: 12
+    fix: ~
+    parent: ~
 

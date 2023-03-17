@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: SectionNotOverIndented
-    body: "Section is over-indented (\"Returns\")"
-    suggestion: "Remove over-indentation from \"Returns\""
-    fixable: true
-  location:
-    row: 144
-    column: 4
-  end_location:
-    row: 150
-    column: 7
-  fix:
-    content: "    "
+- - kind:
+      name: SectionNotOverIndented
+      body: "Section is over-indented (\"Returns\")"
+      suggestion: "Remove over-indentation from \"Returns\""
+      fixable: true
     location:
-      row: 146
-      column: 0
+      row: 144
+      column: 4
     end_location:
-      row: 146
-      column: 8
-  parent: ~
+      row: 150
+      column: 7
+    fix:
+      content: "    "
+      location:
+        row: 146
+        column: 0
+      end_location:
+        row: 146
+        column: 8
+    parent: ~
 

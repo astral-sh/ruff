@@ -2,30 +2,30 @@
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ErrorSuffixOnExceptionName
-    body: "Exception name `C` should be named with an Error suffix"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 6
-  end_location:
-    row: 9
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: ErrorSuffixOnExceptionName
-    body: "Exception name `E` should be named with an Error suffix"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 6
-  end_location:
-    row: 17
-    column: 7
-  fix: ~
-  parent: ~
+- - kind:
+      name: ErrorSuffixOnExceptionName
+      body: "Exception name `C` should be named with an Error suffix"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 6
+    end_location:
+      row: 9
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: ErrorSuffixOnExceptionName
+      body: "Exception name `E` should be named with an Error suffix"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 17
+      column: 6
+    end_location:
+      row: 17
+      column: 7
+    fix: ~
+    parent: ~
 

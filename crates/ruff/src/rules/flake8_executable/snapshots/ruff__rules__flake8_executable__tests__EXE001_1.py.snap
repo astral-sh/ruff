@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_executable/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: ShebangNotExecutable
-    body: Shebang is present but file is not executable
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 2
-  end_location:
-    row: 1
-    column: 17
-  fix: ~
-  parent: ~
+- - kind:
+      name: ShebangNotExecutable
+      body: Shebang is present but file is not executable
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 2
+    end_location:
+      row: 1
+      column: 17
+    fix: ~
+    parent: ~
 

@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnrecognizedPlatformName
-    body: "Unrecognized platform `linus`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 19
-  end_location:
-    row: 3
-    column: 26
-  fix: ~
-  parent: ~
+- - kind:
+      name: UnrecognizedPlatformName
+      body: "Unrecognized platform `linus`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 19
+    end_location:
+      row: 3
+      column: 26
+    fix: ~
+    parent: ~
 

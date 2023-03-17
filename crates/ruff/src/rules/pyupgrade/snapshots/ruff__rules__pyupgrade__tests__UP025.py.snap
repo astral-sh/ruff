@@ -2,244 +2,244 @@
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnicodeKindPrefix
-    body: Remove unicode literals from strings
-    suggestion: Remove unicode prefix
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 12
-  fix:
-    content: ""
+- - kind:
+      name: UnicodeKindPrefix
+      body: Remove unicode literals from strings
+      suggestion: Remove unicode prefix
+      fixable: true
     location:
       row: 2
       column: 4
     end_location:
       row: 2
-      column: 5
-  parent: ~
-- kind:
-    name: UnicodeKindPrefix
-    body: Remove unicode literals from strings
-    suggestion: Remove unicode prefix
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 8
-  fix:
-    content: ""
+      column: 12
+    fix:
+      content: ""
+      location:
+        row: 2
+        column: 4
+      end_location:
+        row: 2
+        column: 5
+    parent: ~
+  - kind:
+      name: UnicodeKindPrefix
+      body: Remove unicode literals from strings
+      suggestion: Remove unicode prefix
+      fixable: true
     location:
       row: 4
       column: 0
     end_location:
       row: 4
-      column: 1
-  parent: ~
-- kind:
-    name: UnicodeKindPrefix
-    body: Remove unicode literals from strings
-    suggestion: Remove unicode prefix
-    fixable: true
-  location:
-    row: 6
-    column: 6
-  end_location:
-    row: 6
-    column: 14
-  fix:
-    content: ""
+      column: 8
+    fix:
+      content: ""
+      location:
+        row: 4
+        column: 0
+      end_location:
+        row: 4
+        column: 1
+    parent: ~
+  - kind:
+      name: UnicodeKindPrefix
+      body: Remove unicode literals from strings
+      suggestion: Remove unicode prefix
+      fixable: true
     location:
       row: 6
       column: 6
     end_location:
       row: 6
-      column: 7
-  parent: ~
-- kind:
-    name: UnicodeKindPrefix
-    body: Remove unicode literals from strings
-    suggestion: Remove unicode prefix
-    fixable: true
-  location:
-    row: 8
-    column: 6
-  end_location:
-    row: 8
-    column: 14
-  fix:
-    content: ""
+      column: 14
+    fix:
+      content: ""
+      location:
+        row: 6
+        column: 6
+      end_location:
+        row: 6
+        column: 7
+    parent: ~
+  - kind:
+      name: UnicodeKindPrefix
+      body: Remove unicode literals from strings
+      suggestion: Remove unicode prefix
+      fixable: true
     location:
       row: 8
       column: 6
     end_location:
       row: 8
-      column: 7
-  parent: ~
-- kind:
-    name: UnicodeKindPrefix
-    body: Remove unicode literals from strings
-    suggestion: Remove unicode prefix
-    fixable: true
-  location:
-    row: 12
-    column: 4
-  end_location:
-    row: 12
-    column: 12
-  fix:
-    content: ""
+      column: 14
+    fix:
+      content: ""
+      location:
+        row: 8
+        column: 6
+      end_location:
+        row: 8
+        column: 7
+    parent: ~
+  - kind:
+      name: UnicodeKindPrefix
+      body: Remove unicode literals from strings
+      suggestion: Remove unicode prefix
+      fixable: true
     location:
       row: 12
       column: 4
     end_location:
       row: 12
-      column: 5
-  parent: ~
-- kind:
-    name: UnicodeKindPrefix
-    body: Remove unicode literals from strings
-    suggestion: Remove unicode prefix
-    fixable: true
-  location:
-    row: 12
-    column: 14
-  end_location:
-    row: 12
-    column: 22
-  fix:
-    content: ""
+      column: 12
+    fix:
+      content: ""
+      location:
+        row: 12
+        column: 4
+      end_location:
+        row: 12
+        column: 5
+    parent: ~
+  - kind:
+      name: UnicodeKindPrefix
+      body: Remove unicode literals from strings
+      suggestion: Remove unicode prefix
+      fixable: true
     location:
       row: 12
       column: 14
     end_location:
       row: 12
-      column: 15
-  parent: ~
-- kind:
-    name: UnicodeKindPrefix
-    body: Remove unicode literals from strings
-    suggestion: Remove unicode prefix
-    fixable: true
-  location:
-    row: 12
-    column: 26
-  end_location:
-    row: 12
-    column: 34
-  fix:
-    content: ""
+      column: 22
+    fix:
+      content: ""
+      location:
+        row: 12
+        column: 14
+      end_location:
+        row: 12
+        column: 15
+    parent: ~
+  - kind:
+      name: UnicodeKindPrefix
+      body: Remove unicode literals from strings
+      suggestion: Remove unicode prefix
+      fixable: true
     location:
       row: 12
       column: 26
     end_location:
       row: 12
-      column: 27
-  parent: ~
-- kind:
-    name: UnicodeKindPrefix
-    body: Remove unicode literals from strings
-    suggestion: Remove unicode prefix
-    fixable: true
-  location:
-    row: 12
-    column: 38
-  end_location:
-    row: 12
-    column: 46
-  fix:
-    content: ""
+      column: 34
+    fix:
+      content: ""
+      location:
+        row: 12
+        column: 26
+      end_location:
+        row: 12
+        column: 27
+    parent: ~
+  - kind:
+      name: UnicodeKindPrefix
+      body: Remove unicode literals from strings
+      suggestion: Remove unicode prefix
+      fixable: true
     location:
       row: 12
       column: 38
     end_location:
       row: 12
-      column: 39
-  parent: ~
-- kind:
-    name: UnicodeKindPrefix
-    body: Remove unicode literals from strings
-    suggestion: Remove unicode prefix
-    fixable: true
-  location:
-    row: 16
-    column: 4
-  end_location:
-    row: 16
-    column: 12
-  fix:
-    content: ""
+      column: 46
+    fix:
+      content: ""
+      location:
+        row: 12
+        column: 38
+      end_location:
+        row: 12
+        column: 39
+    parent: ~
+  - kind:
+      name: UnicodeKindPrefix
+      body: Remove unicode literals from strings
+      suggestion: Remove unicode prefix
+      fixable: true
     location:
       row: 16
       column: 4
     end_location:
       row: 16
-      column: 5
-  parent: ~
-- kind:
-    name: UnicodeKindPrefix
-    body: Remove unicode literals from strings
-    suggestion: Remove unicode prefix
-    fixable: true
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 17
-    column: 16
-  fix:
-    content: ""
+      column: 12
+    fix:
+      content: ""
+      location:
+        row: 16
+        column: 4
+      end_location:
+        row: 16
+        column: 5
+    parent: ~
+  - kind:
+      name: UnicodeKindPrefix
+      body: Remove unicode literals from strings
+      suggestion: Remove unicode prefix
+      fixable: true
     location:
       row: 17
       column: 4
     end_location:
       row: 17
-      column: 5
-  parent: ~
-- kind:
-    name: UnicodeKindPrefix
-    body: Remove unicode literals from strings
-    suggestion: Remove unicode prefix
-    fixable: true
-  location:
-    row: 18
-    column: 4
-  end_location:
-    row: 18
-    column: 16
-  fix:
-    content: ""
+      column: 16
+    fix:
+      content: ""
+      location:
+        row: 17
+        column: 4
+      end_location:
+        row: 17
+        column: 5
+    parent: ~
+  - kind:
+      name: UnicodeKindPrefix
+      body: Remove unicode literals from strings
+      suggestion: Remove unicode prefix
+      fixable: true
     location:
       row: 18
       column: 4
     end_location:
       row: 18
-      column: 5
-  parent: ~
-- kind:
-    name: UnicodeKindPrefix
-    body: Remove unicode literals from strings
-    suggestion: Remove unicode prefix
-    fixable: true
-  location:
-    row: 19
-    column: 4
-  end_location:
-    row: 19
-    column: 20
-  fix:
-    content: ""
+      column: 16
+    fix:
+      content: ""
+      location:
+        row: 18
+        column: 4
+      end_location:
+        row: 18
+        column: 5
+    parent: ~
+  - kind:
+      name: UnicodeKindPrefix
+      body: Remove unicode literals from strings
+      suggestion: Remove unicode prefix
+      fixable: true
     location:
       row: 19
       column: 4
     end_location:
       row: 19
-      column: 5
-  parent: ~
+      column: 20
+    fix:
+      content: ""
+      location:
+        row: 19
+        column: 4
+      end_location:
+        row: 19
+        column: 5
+    parent: ~
 

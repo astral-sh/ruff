@@ -2,69 +2,69 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: LineTooLong
-    body: Line too long (123 > 88 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 88
-  end_location:
-    row: 5
-    column: 123
-  fix: ~
-  parent: ~
-- kind:
-    name: LineTooLong
-    body: Line too long (127 > 88 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 25
-    column: 88
-  end_location:
-    row: 25
-    column: 127
-  fix: ~
-  parent: ~
-- kind:
-    name: LineTooLong
-    body: Line too long (132 > 88 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 88
-  end_location:
-    row: 40
-    column: 132
-  fix: ~
-  parent: ~
-- kind:
-    name: LineTooLong
-    body: Line too long (105 > 88 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 88
-  end_location:
-    row: 43
-    column: 105
-  fix: ~
-  parent: ~
-- kind:
-    name: LineTooLong
-    body: Line too long (129 > 88 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 61
-    column: 88
-  end_location:
-    row: 61
-    column: 129
-  fix: ~
-  parent: ~
+- - kind:
+      name: LineTooLong
+      body: Line too long (123 > 88 characters)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 88
+    end_location:
+      row: 5
+      column: 123
+    fix: ~
+    parent: ~
+  - kind:
+      name: LineTooLong
+      body: Line too long (127 > 88 characters)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 25
+      column: 88
+    end_location:
+      row: 25
+      column: 127
+    fix: ~
+    parent: ~
+  - kind:
+      name: LineTooLong
+      body: Line too long (132 > 88 characters)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 40
+      column: 88
+    end_location:
+      row: 40
+      column: 132
+    fix: ~
+    parent: ~
+  - kind:
+      name: LineTooLong
+      body: Line too long (105 > 88 characters)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 43
+      column: 88
+    end_location:
+      row: 43
+      column: 105
+    fix: ~
+    parent: ~
+  - kind:
+      name: LineTooLong
+      body: Line too long (129 > 88 characters)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 61
+      column: 88
+    end_location:
+      row: 61
+      column: 129
+    fix: ~
+    parent: ~
 

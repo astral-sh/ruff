@@ -2,69 +2,69 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 9
-  end_location:
-    row: 4
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 10
-  end_location:
-    row: 9
-    column: 17
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 14
-  end_location:
-    row: 14
-    column: 21
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 30
-  end_location:
-    row: 19
-    column: 37
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 18
-  end_location:
-    row: 24
-    column: 25
-  fix: ~
-  parent: ~
+- - kind:
+      name: UndefinedName
+      body: "Undefined name `Model`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 9
+    end_location:
+      row: 4
+      column: 16
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndefinedName
+      body: "Undefined name `Model`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 10
+    end_location:
+      row: 9
+      column: 17
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndefinedName
+      body: "Undefined name `Model`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 14
+      column: 14
+    end_location:
+      row: 14
+      column: 21
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndefinedName
+      body: "Undefined name `Model`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 19
+      column: 30
+    end_location:
+      row: 19
+      column: 37
+    fix: ~
+    parent: ~
+  - kind:
+      name: UndefinedName
+      body: "Undefined name `Model`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 24
+      column: 18
+    end_location:
+      row: 24
+      column: 25
+    fix: ~
+    parent: ~
 

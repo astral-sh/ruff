@@ -2,44 +2,44 @@
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 31
-  fix:
-    content: "\"\"\" this is not a docstring \"\"\""
+- - kind:
+      name: BadQuotesMultilineString
+      body: Single quote multiline found but double quotes preferred
+      suggestion: Replace single multiline quotes with double quotes
+      fixable: true
     location:
       row: 2
       column: 0
     end_location:
       row: 2
       column: 31
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 31
-  fix:
-    content: "\"\"\" this is not a docstring \"\"\""
+    fix:
+      content: "\"\"\" this is not a docstring \"\"\""
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 2
+        column: 31
+    parent: ~
+  - kind:
+      name: BadQuotesMultilineString
+      body: Single quote multiline found but double quotes preferred
+      suggestion: Replace single multiline quotes with double quotes
+      fixable: true
     location:
       row: 6
       column: 0
     end_location:
       row: 6
       column: 31
-  parent: ~
+    fix:
+      content: "\"\"\" this is not a docstring \"\"\""
+      location:
+        row: 6
+        column: 0
+      end_location:
+        row: 6
+        column: 31
+    parent: ~
 

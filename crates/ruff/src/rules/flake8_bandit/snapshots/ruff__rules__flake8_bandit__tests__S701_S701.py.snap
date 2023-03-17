@@ -2,69 +2,69 @@
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: Jinja2AutoescapeFalse
-    body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 67
-  end_location:
-    row: 9
-    column: 76
-  fix: ~
-  parent: ~
-- kind:
-    name: Jinja2AutoescapeFalse
-    body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 44
-  end_location:
-    row: 10
-    column: 49
-  fix: ~
-  parent: ~
-- kind:
-    name: Jinja2AutoescapeFalse
-    body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 23
-  end_location:
-    row: 13
-    column: 28
-  fix: ~
-  parent: ~
-- kind:
-    name: Jinja2AutoescapeFalse
-    body: "By default, jinja2 sets `autoescape` to `False`. Consider using `autoescape=True` or the `select_autoescape` function to mitigate XSS vulnerabilities."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 15
-    column: 11
-  fix: ~
-  parent: ~
-- kind:
-    name: Jinja2AutoescapeFalse
-    body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 46
-  end_location:
-    row: 29
-    column: 57
-  fix: ~
-  parent: ~
+- - kind:
+      name: Jinja2AutoescapeFalse
+      body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 67
+    end_location:
+      row: 9
+      column: 76
+    fix: ~
+    parent: ~
+  - kind:
+      name: Jinja2AutoescapeFalse
+      body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 10
+      column: 44
+    end_location:
+      row: 10
+      column: 49
+    fix: ~
+    parent: ~
+  - kind:
+      name: Jinja2AutoescapeFalse
+      body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 13
+      column: 23
+    end_location:
+      row: 13
+      column: 28
+    fix: ~
+    parent: ~
+  - kind:
+      name: Jinja2AutoescapeFalse
+      body: "By default, jinja2 sets `autoescape` to `False`. Consider using `autoescape=True` or the `select_autoescape` function to mitigate XSS vulnerabilities."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 15
+      column: 11
+    fix: ~
+    parent: ~
+  - kind:
+      name: Jinja2AutoescapeFalse
+      body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
+      suggestion: ~
+      fixable: false
+    location:
+      row: 29
+      column: 46
+    end_location:
+      row: 29
+      column: 57
+    fix: ~
+    parent: ~
 

@@ -2,121 +2,121 @@
 source: crates/ruff/src/rules/flake8_debugger/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: Debugger
-    body: "Trace found: `breakpoint` used"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Import for `pdb` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 10
-  fix: ~
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Import for `builtins.breakpoint` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 31
-  fix: ~
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Import for `pdb.set_trace` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 31
-  fix: ~
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Import for `celery.contrib.rdb.set_trace` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 40
-  fix: ~
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Import for `celery.contrib.rdb` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 25
-  fix: ~
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Trace found: `builtins.breakpoint` used"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Trace found: `pdb.set_trace` used"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 12
-    column: 4
-  fix: ~
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Trace found: `celery.contrib.rdb.set_trace` used"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 11
-  fix: ~
-  parent: ~
+- - kind:
+      name: Debugger
+      body: "Trace found: `breakpoint` used"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: Debugger
+      body: "Import for `pdb` found"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 10
+    fix: ~
+    parent: ~
+  - kind:
+      name: Debugger
+      body: "Import for `builtins.breakpoint` found"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 5
+      column: 31
+    fix: ~
+    parent: ~
+  - kind:
+      name: Debugger
+      body: "Import for `pdb.set_trace` found"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 31
+    fix: ~
+    parent: ~
+  - kind:
+      name: Debugger
+      body: "Import for `celery.contrib.rdb.set_trace` found"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 7
+      column: 0
+    end_location:
+      row: 7
+      column: 40
+    fix: ~
+    parent: ~
+  - kind:
+      name: Debugger
+      body: "Import for `celery.contrib.rdb` found"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 0
+    end_location:
+      row: 9
+      column: 25
+    fix: ~
+    parent: ~
+  - kind:
+      name: Debugger
+      body: "Trace found: `builtins.breakpoint` used"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: Debugger
+      body: "Trace found: `pdb.set_trace` used"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 12
+      column: 0
+    end_location:
+      row: 12
+      column: 4
+    fix: ~
+    parent: ~
+  - kind:
+      name: Debugger
+      body: "Trace found: `celery.contrib.rdb.set_trace` used"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 13
+      column: 0
+    end_location:
+      row: 13
+      column: 11
+    fix: ~
+    parent: ~
 

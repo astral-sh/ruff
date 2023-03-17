@@ -2,44 +2,44 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: RaiseNotImplemented
-    body: "`raise NotImplemented` should be `raise NotImplementedError`"
-    suggestion: "Use `raise NotImplementedError`"
-    fixable: true
-  location:
-    row: 2
-    column: 10
-  end_location:
-    row: 2
-    column: 24
-  fix:
-    content: NotImplementedError
+- - kind:
+      name: RaiseNotImplemented
+      body: "`raise NotImplemented` should be `raise NotImplementedError`"
+      suggestion: "Use `raise NotImplementedError`"
+      fixable: true
     location:
       row: 2
       column: 10
     end_location:
       row: 2
       column: 24
-  parent: ~
-- kind:
-    name: RaiseNotImplemented
-    body: "`raise NotImplemented` should be `raise NotImplementedError`"
-    suggestion: "Use `raise NotImplementedError`"
-    fixable: true
-  location:
-    row: 6
-    column: 10
-  end_location:
-    row: 6
-    column: 24
-  fix:
-    content: NotImplementedError
+    fix:
+      content: NotImplementedError
+      location:
+        row: 2
+        column: 10
+      end_location:
+        row: 2
+        column: 24
+    parent: ~
+  - kind:
+      name: RaiseNotImplemented
+      body: "`raise NotImplemented` should be `raise NotImplementedError`"
+      suggestion: "Use `raise NotImplementedError`"
+      fixable: true
     location:
       row: 6
       column: 10
     end_location:
       row: 6
       column: 24
-  parent: ~
+    fix:
+      content: NotImplementedError
+      location:
+        row: 6
+        column: 10
+      end_location:
+        row: 6
+        column: 24
+    parent: ~
 

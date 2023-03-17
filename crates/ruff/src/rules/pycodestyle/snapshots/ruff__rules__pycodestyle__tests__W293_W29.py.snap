@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: BlankLineWithWhitespace
-    body: Blank line contains whitespace
-    suggestion: Remove whitespace from blank line
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 4
-  fix:
-    content: ""
+- - kind:
+      name: BlankLineWithWhitespace
+      body: Blank line contains whitespace
+      suggestion: Remove whitespace from blank line
+      fixable: true
     location:
       row: 7
       column: 0
     end_location:
       row: 7
       column: 4
-  parent: ~
+    fix:
+      content: ""
+      location:
+        row: 7
+        column: 0
+      end_location:
+        row: 7
+        column: 4
+    parent: ~
 

@@ -2,64 +2,64 @@
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: AvoidableEscapedQuote
-    body: Change outer quotes to avoid escaping inner quotes
-    suggestion: Change outer quotes to avoid escaping inner quotes
-    fixable: true
-  location:
-    row: 1
-    column: 25
-  end_location:
-    row: 1
-    column: 47
-  fix:
-    content: "\"This is a 'string'\""
+- - kind:
+      name: AvoidableEscapedQuote
+      body: Change outer quotes to avoid escaping inner quotes
+      suggestion: Change outer quotes to avoid escaping inner quotes
+      fixable: true
     location:
       row: 1
       column: 25
     end_location:
       row: 1
       column: 47
-  parent: ~
-- kind:
-    name: AvoidableEscapedQuote
-    body: Change outer quotes to avoid escaping inner quotes
-    suggestion: Change outer quotes to avoid escaping inner quotes
-    fixable: true
-  location:
-    row: 2
-    column: 25
-  end_location:
-    row: 2
-    column: 52
-  fix:
-    content: "\"This is \\\\ a \\\\'string'\""
+    fix:
+      content: "\"This is a 'string'\""
+      location:
+        row: 1
+        column: 25
+      end_location:
+        row: 1
+        column: 47
+    parent: ~
+  - kind:
+      name: AvoidableEscapedQuote
+      body: Change outer quotes to avoid escaping inner quotes
+      suggestion: Change outer quotes to avoid escaping inner quotes
+      fixable: true
     location:
       row: 2
       column: 25
     end_location:
       row: 2
       column: 52
-  parent: ~
-- kind:
-    name: AvoidableEscapedQuote
-    body: Change outer quotes to avoid escaping inner quotes
-    suggestion: Change outer quotes to avoid escaping inner quotes
-    fixable: true
-  location:
-    row: 10
-    column: 4
-  end_location:
-    row: 10
-    column: 16
-  fix:
-    content: "\"'string'\""
+    fix:
+      content: "\"This is \\\\ a \\\\'string'\""
+      location:
+        row: 2
+        column: 25
+      end_location:
+        row: 2
+        column: 52
+    parent: ~
+  - kind:
+      name: AvoidableEscapedQuote
+      body: Change outer quotes to avoid escaping inner quotes
+      suggestion: Change outer quotes to avoid escaping inner quotes
+      fixable: true
     location:
       row: 10
       column: 4
     end_location:
       row: 10
       column: 16
-  parent: ~
+    fix:
+      content: "\"'string'\""
+      location:
+        row: 10
+        column: 4
+      end_location:
+        row: 10
+        column: 16
+    parent: ~
 

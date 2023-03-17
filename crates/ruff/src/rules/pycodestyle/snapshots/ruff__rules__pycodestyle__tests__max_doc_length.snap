@@ -2,56 +2,56 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: DocLineTooLong
-    body: Doc line too long (57 > 50 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 50
-  end_location:
-    row: 2
-    column: 57
-  fix: ~
-  parent: ~
-- kind:
-    name: DocLineTooLong
-    body: Doc line too long (56 > 50 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 50
-  end_location:
-    row: 6
-    column: 56
-  fix: ~
-  parent: ~
-- kind:
-    name: DocLineTooLong
-    body: Doc line too long (56 > 50 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 50
-  end_location:
-    row: 10
-    column: 56
-  fix: ~
-  parent: ~
-- kind:
-    name: DocLineTooLong
-    body: Doc line too long (61 > 50 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 50
-  end_location:
-    row: 15
-    column: 61
-  fix: ~
-  parent: ~
+- - kind:
+      name: DocLineTooLong
+      body: Doc line too long (57 > 50 characters)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 50
+    end_location:
+      row: 2
+      column: 57
+    fix: ~
+    parent: ~
+  - kind:
+      name: DocLineTooLong
+      body: Doc line too long (56 > 50 characters)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 6
+      column: 50
+    end_location:
+      row: 6
+      column: 56
+    fix: ~
+    parent: ~
+  - kind:
+      name: DocLineTooLong
+      body: Doc line too long (56 > 50 characters)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 10
+      column: 50
+    end_location:
+      row: 10
+      column: 56
+    fix: ~
+    parent: ~
+  - kind:
+      name: DocLineTooLong
+      body: Doc line too long (61 > 50 characters)
+      suggestion: ~
+      fixable: false
+    location:
+      row: 15
+      column: 50
+    end_location:
+      row: 15
+      column: 61
+    fix: ~
+    parent: ~
 

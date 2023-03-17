@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PercentFormatUnsupportedFormatCharacter
-    body: "`%`-format string has unsupported format character `j`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 11
-  fix: ~
-  parent: ~
+- - kind:
+      name: PercentFormatUnsupportedFormatCharacter
+      body: "`%`-format string has unsupported format character `j`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 4
+      column: 0
+    end_location:
+      row: 4
+      column: 11
+    fix: ~
+    parent: ~
 

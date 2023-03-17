@@ -2,371 +2,371 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `1` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 4
-  end_location:
-    row: 9
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `b\"123\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 11
-    column: 10
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 4
-  end_location:
-    row: 16
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 17
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: "Remove repeated key literal `\"a\"`"
-    fixable: true
-  location:
-    row: 18
-    column: 4
-  end_location:
-    row: 18
-    column: 7
-  fix:
-    content: ""
+- - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 3
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `1` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 9
+      column: 4
+    end_location:
+      row: 9
+      column: 5
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `b\"123\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 4
+    end_location:
+      row: 11
+      column: 10
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 16
+      column: 4
+    end_location:
+      row: 16
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
     location:
       row: 17
-      column: 10
+      column: 4
+    end_location:
+      row: 17
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: "Remove repeated key literal `\"a\"`"
+      fixable: true
+    location:
+      row: 18
+      column: 4
     end_location:
       row: 18
-      column: 10
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 4
-  end_location:
-    row: 22
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 4
-  end_location:
-    row: 23
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 4
-  end_location:
-    row: 24
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: "Remove repeated key literal `\"a\"`"
-    fixable: true
-  location:
-    row: 25
-    column: 4
-  end_location:
-    row: 25
-    column: 7
-  fix:
-    content: ""
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 17
+        column: 10
+      end_location:
+        row: 18
+        column: 10
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 23
+      column: 4
+    end_location:
+      row: 23
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
     location:
       row: 24
-      column: 10
+      column: 4
+    end_location:
+      row: 24
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: "Remove repeated key literal `\"a\"`"
+      fixable: true
+    location:
+      row: 25
+      column: 4
     end_location:
       row: 25
-      column: 10
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 4
-  end_location:
-    row: 26
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 4
-  end_location:
-    row: 29
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 30
-    column: 4
-  end_location:
-    row: 30
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: "Remove repeated key literal `\"a\"`"
-    fixable: true
-  location:
-    row: 31
-    column: 4
-  end_location:
-    row: 31
-    column: 7
-  fix:
-    content: ""
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 24
+        column: 10
+      end_location:
+        row: 25
+        column: 10
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
     location:
-      row: 30
-      column: 10
+      row: 26
+      column: 4
+    end_location:
+      row: 26
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: "Remove repeated key literal `\"a\"`"
+      fixable: true
+    location:
+      row: 31
+      column: 4
     end_location:
       row: 31
-      column: 10
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 31
-    column: 4
-  end_location:
-    row: 31
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 4
-  end_location:
-    row: 32
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 33
-    column: 4
-  end_location:
-    row: 33
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 34
-    column: 4
-  end_location:
-    row: 34
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 4
-  end_location:
-    row: 38
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 4
-  end_location:
-    row: 40
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 41
-    column: 4
-  end_location:
-    row: 41
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 4
-  end_location:
-    row: 43
-    column: 7
-  fix: ~
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: "Remove repeated key literal `\"a\"`"
-    fixable: true
-  location:
-    row: 45
-    column: 4
-  end_location:
-    row: 45
-    column: 7
-  fix:
-    content: ""
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 30
+        column: 10
+      end_location:
+        row: 31
+        column: 10
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
     location:
-      row: 44
-      column: 8
+      row: 32
+      column: 4
+    end_location:
+      row: 32
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 33
+      column: 4
+    end_location:
+      row: 33
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 34
+      column: 4
+    end_location:
+      row: 34
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 41
+      column: 4
+    end_location:
+      row: 41
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 43
+      column: 4
+    end_location:
+      row: 43
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: "Remove repeated key literal `\"a\"`"
+      fixable: true
+    location:
+      row: 45
+      column: 4
     end_location:
       row: 45
-      column: 10
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: "Remove repeated key literal `\"a\"`"
-    fixable: true
-  location:
-    row: 49
-    column: 13
-  end_location:
-    row: 49
-    column: 16
-  fix:
-    content: ""
+      column: 7
+    fix:
+      content: ""
+      location:
+        row: 44
+        column: 8
+      end_location:
+        row: 45
+        column: 10
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: "Remove repeated key literal `\"a\"`"
+      fixable: true
     location:
       row: 49
-      column: 11
+      column: 13
     end_location:
       row: 49
-      column: 19
-  parent: ~
-- kind:
-    name: MultiValueRepeatedKeyLiteral
-    body: "Dictionary key literal `\"a\"` repeated"
-    suggestion: "Remove repeated key literal `\"a\"`"
-    fixable: true
-  location:
-    row: 50
-    column: 21
-  end_location:
-    row: 50
-    column: 24
-  fix:
-    content: ""
+      column: 16
+    fix:
+      content: ""
+      location:
+        row: 49
+        column: 11
+      end_location:
+        row: 49
+        column: 19
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: "Remove repeated key literal `\"a\"`"
+      fixable: true
     location:
       row: 50
-      column: 19
+      column: 21
     end_location:
       row: 50
-      column: 27
-  parent: ~
+      column: 24
+    fix:
+      content: ""
+      location:
+        row: 50
+        column: 19
+      end_location:
+        row: 50
+        column: 27
+    parent: ~
+- - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 22
+      column: 4
+    end_location:
+      row: 22
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 29
+      column: 4
+    end_location:
+      row: 29
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 30
+      column: 4
+    end_location:
+      row: 30
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 31
+      column: 4
+    end_location:
+      row: 31
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 38
+      column: 4
+    end_location:
+      row: 38
+      column: 7
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultiValueRepeatedKeyLiteral
+      body: "Dictionary key literal `\"a\"` repeated"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 40
+      column: 4
+    end_location:
+      row: 40
+      column: 7
+    fix: ~
+    parent: ~
 

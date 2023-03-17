@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/flake8_use_pathlib/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PathlibPyPath
-    body: "`py.path` is in maintenance mode, use `pathlib` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 17
-  fix: ~
-  parent: ~
+- - kind:
+      name: PathlibPyPath
+      body: "`py.path` is in maintenance mode, use `pathlib` instead"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 4
+    end_location:
+      row: 3
+      column: 17
+    fix: ~
+    parent: ~
 

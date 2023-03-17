@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MultipleSpacesBeforeKeyword
-    body: Multiple spaces before keyword
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 1
-  end_location:
-    row: 20
-    column: 1
-  fix: ~
-  parent: ~
-- kind:
-    name: MultipleSpacesBeforeKeyword
-    body: Multiple spaces before keyword
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 1
-  end_location:
-    row: 22
-    column: 1
-  fix: ~
-  parent: ~
-- kind:
-    name: MultipleSpacesBeforeKeyword
-    body: Multiple spaces before keyword
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 4
-  end_location:
-    row: 24
-    column: 4
-  fix: ~
-  parent: ~
+- - kind:
+      name: MultipleSpacesBeforeKeyword
+      body: Multiple spaces before keyword
+      suggestion: ~
+      fixable: false
+    location:
+      row: 20
+      column: 1
+    end_location:
+      row: 20
+      column: 1
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultipleSpacesBeforeKeyword
+      body: Multiple spaces before keyword
+      suggestion: ~
+      fixable: false
+    location:
+      row: 22
+      column: 1
+    end_location:
+      row: 22
+      column: 1
+    fix: ~
+    parent: ~
+  - kind:
+      name: MultipleSpacesBeforeKeyword
+      body: Multiple spaces before keyword
+      suggestion: ~
+      fixable: false
+    location:
+      row: 24
+      column: 4
+    end_location:
+      row: 24
+      column: 4
+    fix: ~
+    parent: ~
 

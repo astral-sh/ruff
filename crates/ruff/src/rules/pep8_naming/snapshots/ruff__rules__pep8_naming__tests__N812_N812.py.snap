@@ -2,43 +2,43 @@
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: LowercaseImportedAsNonLowercase
-    body: "Lowercase `lowercase` imported as non-lowercase `Lower`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 30
-  fix: ~
-  parent: ~
-- kind:
-    name: LowercaseImportedAsNonLowercase
-    body: "Lowercase `lowercase` imported as non-lowercase `Lowercase`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 38
-  fix: ~
-  parent: ~
-- kind:
-    name: LowercaseImportedAsNonLowercase
-    body: "Lowercase `another_lowercase` imported as non-lowercase `AnotherLowercase`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 53
-  fix: ~
-  parent: ~
+- - kind:
+      name: LowercaseImportedAsNonLowercase
+      body: "Lowercase `lowercase` imported as non-lowercase `Lower`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 1
+      column: 0
+    end_location:
+      row: 1
+      column: 30
+    fix: ~
+    parent: ~
+  - kind:
+      name: LowercaseImportedAsNonLowercase
+      body: "Lowercase `lowercase` imported as non-lowercase `Lowercase`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 2
+      column: 0
+    end_location:
+      row: 2
+      column: 38
+    fix: ~
+    parent: ~
+  - kind:
+      name: LowercaseImportedAsNonLowercase
+      body: "Lowercase `another_lowercase` imported as non-lowercase `AnotherLowercase`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 3
+      column: 0
+    end_location:
+      row: 3
+      column: 53
+    fix: ~
+    parent: ~
 

@@ -2,444 +2,444 @@
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 200
-    column: 4
-  end_location:
-    row: 203
-    column: 7
-  fix:
-    content: "\n    Summary."
+- - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 200
-      column: 7
+      column: 4
     end_location:
-      row: 200
-      column: 15
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 210
-    column: 4
-  end_location:
-    row: 215
-    column: 7
-  fix:
-    content: "\n    Summary."
+      row: 203
+      column: 7
+    fix:
+      content: "\n    Summary."
+      location:
+        row: 200
+        column: 7
+      end_location:
+        row: 200
+        column: 15
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 210
-      column: 7
+      column: 4
     end_location:
-      row: 210
-      column: 15
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 220
-    column: 4
-  end_location:
-    row: 224
-    column: 7
-  fix:
-    content: "\n    Summary."
+      row: 215
+      column: 7
+    fix:
+      content: "\n    Summary."
+      location:
+        row: 210
+        column: 7
+      end_location:
+        row: 210
+        column: 15
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 220
-      column: 7
+      column: 4
     end_location:
-      row: 220
-      column: 15
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 230
-    column: 4
-  end_location:
-    row: 234
-    column: 7
-  fix:
-    content: "\n    Summary."
+      row: 224
+      column: 7
+    fix:
+      content: "\n    Summary."
+      location:
+        row: 220
+        column: 7
+      end_location:
+        row: 220
+        column: 15
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 230
-      column: 7
+      column: 4
     end_location:
-      row: 230
-      column: 15
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 240
-    column: 4
-  end_location:
-    row: 244
-    column: 3
-  fix:
-    content: "\n    Summary."
+      row: 234
+      column: 7
+    fix:
+      content: "\n    Summary."
+      location:
+        row: 230
+        column: 7
+      end_location:
+        row: 230
+        column: 15
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 240
-      column: 7
+      column: 4
     end_location:
-      row: 240
-      column: 15
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 250
-    column: 4
-  end_location:
-    row: 254
-    column: 7
-  fix:
-    content: "\n    Summary."
+      row: 244
+      column: 3
+    fix:
+      content: "\n    Summary."
+      location:
+        row: 240
+        column: 7
+      end_location:
+        row: 240
+        column: 15
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 250
-      column: 7
+      column: 4
     end_location:
-      row: 250
-      column: 15
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 260
-    column: 4
-  end_location:
-    row: 264
-    column: 11
-  fix:
-    content: "\n    Summary."
+      row: 254
+      column: 7
+    fix:
+      content: "\n    Summary."
+      location:
+        row: 250
+        column: 7
+      end_location:
+        row: 250
+        column: 15
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 260
-      column: 7
+      column: 4
     end_location:
-      row: 260
-      column: 15
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 270
-    column: 4
-  end_location:
-    row: 274
-    column: 7
-  fix:
-    content: "\n    Summary."
+      row: 264
+      column: 11
+    fix:
+      content: "\n    Summary."
+      location:
+        row: 260
+        column: 7
+      end_location:
+        row: 260
+        column: 15
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 270
-      column: 7
+      column: 4
     end_location:
-      row: 270
-      column: 15
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 281
-    column: 4
-  end_location:
-    row: 283
-    column: 19
-  fix:
-    content: "\n    Summary."
+      row: 274
+      column: 7
+    fix:
+      content: "\n    Summary."
+      location:
+        row: 270
+        column: 7
+      end_location:
+        row: 270
+        column: 15
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 281
-      column: 7
+      column: 4
     end_location:
-      row: 281
-      column: 15
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 299
-    column: 4
-  end_location:
-    row: 302
-    column: 7
-  fix:
-    content: "\n    Whitespace at the beginning."
+      row: 283
+      column: 19
+    fix:
+      content: "\n    Summary."
+      location:
+        row: 281
+        column: 7
+      end_location:
+        row: 281
+        column: 15
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 299
-      column: 7
+      column: 4
     end_location:
-      row: 299
+      row: 302
+      column: 7
+    fix:
+      content: "\n    Whitespace at the beginning."
+      location:
+        row: 299
+        column: 7
+      end_location:
+        row: 299
+        column: 36
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
+    location:
+      row: 343
+      column: 4
+    end_location:
+      row: 348
+      column: 7
+    fix:
+      content: "\n    Exclude some backslashes from D301."
+      location:
+        row: 343
+        column: 7
+      end_location:
+        row: 343
+        column: 42
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
+    location:
+      row: 383
+      column: 4
+    end_location:
+      row: 386
+      column: 7
+    fix:
+      content: "\n    First line."
+      location:
+        row: 383
+        column: 7
+      end_location:
+        row: 383
+        column: 18
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
+    location:
+      row: 392
+      column: 4
+    end_location:
+      row: 396
+      column: 7
+    fix:
+      content: "\n    One liner."
+      location:
+        row: 392
+        column: 7
+      end_location:
+        row: 392
+        column: 17
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
+    location:
+      row: 438
       column: 36
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 343
-    column: 4
-  end_location:
-    row: 348
-    column: 7
-  fix:
-    content: "\n    Exclude some backslashes from D301."
-    location:
-      row: 343
+    end_location:
+      row: 441
       column: 7
-    end_location:
-      row: 343
-      column: 42
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 383
-    column: 4
-  end_location:
-    row: 386
-    column: 7
-  fix:
-    content: "\n    First line."
-    location:
-      row: 383
-      column: 7
-    end_location:
-      row: 383
-      column: 18
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 392
-    column: 4
-  end_location:
-    row: 396
-    column: 7
-  fix:
-    content: "\n    One liner."
-    location:
-      row: 392
-      column: 7
-    end_location:
-      row: 392
-      column: 17
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 438
-    column: 36
-  end_location:
-    row: 441
-    column: 7
-  fix:
-    content: "\n    First Line."
-    location:
-      row: 438
-      column: 39
-    end_location:
-      row: 438
-      column: 50
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 450
-    column: 4
-  end_location:
-    row: 454
-    column: 7
-  fix:
-    content: "\n    Check for a bug where the previous function caused an assertion."
+    fix:
+      content: "\n    First Line."
+      location:
+        row: 438
+        column: 39
+      end_location:
+        row: 438
+        column: 50
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 450
-      column: 7
+      column: 4
     end_location:
-      row: 450
-      column: 71
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 526
-    column: 4
-  end_location:
-    row: 532
-    column: 7
-  fix:
-    content: "\n    A Blah."
+      row: 454
+      column: 7
+    fix:
+      content: "\n    Check for a bug where the previous function caused an assertion."
+      location:
+        row: 450
+        column: 7
+      end_location:
+        row: 450
+        column: 71
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 526
-      column: 7
+      column: 4
     end_location:
-      row: 526
-      column: 14
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 546
-    column: 4
-  end_location:
-    row: 549
-    column: 7
-  fix:
-    content: "\n    Leading space."
+      row: 532
+      column: 7
+    fix:
+      content: "\n    A Blah."
+      location:
+        row: 526
+        column: 7
+      end_location:
+        row: 526
+        column: 14
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 546
-      column: 7
+      column: 4
     end_location:
-      row: 546
-      column: 21
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 555
-    column: 4
-  end_location:
-    row: 558
-    column: 7
-  fix:
-    content: "\n    Leading space."
+      row: 549
+      column: 7
+    fix:
+      content: "\n    Leading space."
+      location:
+        row: 546
+        column: 7
+      end_location:
+        row: 546
+        column: 21
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 555
-      column: 7
+      column: 4
     end_location:
-      row: 555
+      row: 558
+      column: 7
+    fix:
+      content: "\n    Leading space."
+      location:
+        row: 555
+        column: 7
+      end_location:
+        row: 555
+        column: 21
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
+    location:
+      row: 568
+      column: 4
+    end_location:
+      row: 571
+      column: 7
+    fix:
+      content: "\n    Trailing and leading space."
+      location:
+        row: 568
+        column: 7
+      end_location:
+        row: 568
+        column: 34
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
+    location:
+      row: 588
+      column: 4
+    end_location:
+      row: 590
       column: 21
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 568
-    column: 4
-  end_location:
-    row: 571
-    column: 7
-  fix:
-    content: "\n    Trailing and leading space."
-    location:
-      row: 568
-      column: 7
-    end_location:
-      row: 568
-      column: 34
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 588
-    column: 4
-  end_location:
-    row: 590
-    column: 21
-  fix:
-    content: "\n    Summary."
-    location:
-      row: 588
-      column: 7
-    end_location:
-      row: 588
-      column: 15
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 606
-    column: 4
-  end_location:
-    row: 608
-    column: 7
-  fix:
-    content: "\n    Wrong."
+    fix:
+      content: "\n    Summary."
+      location:
+        row: 588
+        column: 7
+      end_location:
+        row: 588
+        column: 15
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 606
-      column: 8
+      column: 4
     end_location:
-      row: 606
-      column: 14
-  parent: ~
-- kind:
-    name: MultiLineSummarySecondLine
-    body: Multi-line docstring summary should start at the second line
-    suggestion: Insert line break and indentation after opening quotes
-    fixable: true
-  location:
-    row: 615
-    column: 4
-  end_location:
-    row: 617
-    column: 7
-  fix:
-    content: "\n    Wrong.\""
+      row: 608
+      column: 7
+    fix:
+      content: "\n    Wrong."
+      location:
+        row: 606
+        column: 8
+      end_location:
+        row: 606
+        column: 14
+    parent: ~
+  - kind:
+      name: MultiLineSummarySecondLine
+      body: Multi-line docstring summary should start at the second line
+      suggestion: Insert line break and indentation after opening quotes
+      fixable: true
     location:
       row: 615
-      column: 7
+      column: 4
     end_location:
-      row: 615
-      column: 14
-  parent: ~
+      row: 617
+      column: 7
+    fix:
+      content: "\n    Wrong.\""
+      location:
+        row: 615
+        column: 7
+      end_location:
+        row: 615
+        column: 14
+    parent: ~
 

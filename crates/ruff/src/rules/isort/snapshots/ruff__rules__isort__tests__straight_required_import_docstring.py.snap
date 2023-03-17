@@ -2,24 +2,24 @@
 source: crates/ruff/src/rules/isort/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: MissingRequiredImport
-    body: "Missing required import: `import os`"
-    suggestion: "Insert required import: `import os`"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 0
-  fix:
-    content: "\nimport os"
+- - kind:
+      name: MissingRequiredImport
+      body: "Missing required import: `import os`"
+      suggestion: "Insert required import: `import os`"
+      fixable: true
     location:
       row: 1
-      column: 19
+      column: 0
     end_location:
       row: 1
-      column: 19
-  parent: ~
+      column: 0
+    fix:
+      content: "\nimport os"
+      location:
+        row: 1
+        column: 19
+      end_location:
+        row: 1
+        column: 19
+    parent: ~
 

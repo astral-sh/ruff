@@ -2,284 +2,284 @@
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `list` call within `list()`"
-    suggestion: "Remove the inner `list` call"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 13
-  fix:
-    content: list(x)
+- - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `list` call within `list()`"
+      suggestion: "Remove the inner `list` call"
+      fixable: true
     location:
       row: 2
       column: 0
     end_location:
       row: 2
       column: 13
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `tuple` call within `list()`"
-    suggestion: "Remove the inner `tuple` call"
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 14
-  fix:
-    content: list(x)
+    fix:
+      content: list(x)
+      location:
+        row: 2
+        column: 0
+      end_location:
+        row: 2
+        column: 13
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `tuple` call within `list()`"
+      suggestion: "Remove the inner `tuple` call"
+      fixable: true
     location:
       row: 3
       column: 0
     end_location:
       row: 3
       column: 14
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `list` call within `tuple()`"
-    suggestion: "Remove the inner `list` call"
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 14
-  fix:
-    content: tuple(x)
+    fix:
+      content: list(x)
+      location:
+        row: 3
+        column: 0
+      end_location:
+        row: 3
+        column: 14
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `list` call within `tuple()`"
+      suggestion: "Remove the inner `list` call"
+      fixable: true
     location:
       row: 4
       column: 0
     end_location:
       row: 4
       column: 14
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `tuple` call within `tuple()`"
-    suggestion: "Remove the inner `tuple` call"
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 15
-  fix:
-    content: tuple(x)
+    fix:
+      content: tuple(x)
+      location:
+        row: 4
+        column: 0
+      end_location:
+        row: 4
+        column: 14
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `tuple` call within `tuple()`"
+      suggestion: "Remove the inner `tuple` call"
+      fixable: true
     location:
       row: 5
       column: 0
     end_location:
       row: 5
       column: 15
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `set` call within `set()`"
-    suggestion: "Remove the inner `set` call"
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 11
-  fix:
-    content: set(x)
+    fix:
+      content: tuple(x)
+      location:
+        row: 5
+        column: 0
+      end_location:
+        row: 5
+        column: 15
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `set` call within `set()`"
+      suggestion: "Remove the inner `set` call"
+      fixable: true
     location:
       row: 6
       column: 0
     end_location:
       row: 6
       column: 11
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `list` call within `set()`"
-    suggestion: "Remove the inner `list` call"
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 12
-  fix:
-    content: set(x)
+    fix:
+      content: set(x)
+      location:
+        row: 6
+        column: 0
+      end_location:
+        row: 6
+        column: 11
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `list` call within `set()`"
+      suggestion: "Remove the inner `list` call"
+      fixable: true
     location:
       row: 7
       column: 0
     end_location:
       row: 7
       column: 12
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `tuple` call within `set()`"
-    suggestion: "Remove the inner `tuple` call"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 13
-  fix:
-    content: set(x)
+    fix:
+      content: set(x)
+      location:
+        row: 7
+        column: 0
+      end_location:
+        row: 7
+        column: 12
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `tuple` call within `set()`"
+      suggestion: "Remove the inner `tuple` call"
+      fixable: true
     location:
       row: 8
       column: 0
     end_location:
       row: 8
       column: 13
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `sorted` call within `set()`"
-    suggestion: "Remove the inner `sorted` call"
-    fixable: true
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 14
-  fix:
-    content: set(x)
+    fix:
+      content: set(x)
+      location:
+        row: 8
+        column: 0
+      end_location:
+        row: 8
+        column: 13
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `sorted` call within `set()`"
+      suggestion: "Remove the inner `sorted` call"
+      fixable: true
     location:
       row: 9
       column: 0
     end_location:
       row: 9
       column: 14
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `reversed` call within `set()`"
-    suggestion: "Remove the inner `reversed` call"
-    fixable: true
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 16
-  fix:
-    content: set(x)
+    fix:
+      content: set(x)
+      location:
+        row: 9
+        column: 0
+      end_location:
+        row: 9
+        column: 14
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `reversed` call within `set()`"
+      suggestion: "Remove the inner `reversed` call"
+      fixable: true
     location:
       row: 10
       column: 0
     end_location:
       row: 10
       column: 16
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `list` call within `sorted()`"
-    suggestion: "Remove the inner `list` call"
-    fixable: true
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 15
-  fix:
-    content: sorted(x)
+    fix:
+      content: set(x)
+      location:
+        row: 10
+        column: 0
+      end_location:
+        row: 10
+        column: 16
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `list` call within `sorted()`"
+      suggestion: "Remove the inner `list` call"
+      fixable: true
     location:
       row: 11
       column: 0
     end_location:
       row: 11
       column: 15
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `tuple` call within `sorted()`"
-    suggestion: "Remove the inner `tuple` call"
-    fixable: true
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 12
-    column: 16
-  fix:
-    content: sorted(x)
+    fix:
+      content: sorted(x)
+      location:
+        row: 11
+        column: 0
+      end_location:
+        row: 11
+        column: 15
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `tuple` call within `sorted()`"
+      suggestion: "Remove the inner `tuple` call"
+      fixable: true
     location:
       row: 12
       column: 0
     end_location:
       row: 12
       column: 16
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `sorted` call within `sorted()`"
-    suggestion: "Remove the inner `sorted` call"
-    fixable: true
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 17
-  fix:
-    content: sorted(x)
+    fix:
+      content: sorted(x)
+      location:
+        row: 12
+        column: 0
+      end_location:
+        row: 12
+        column: 16
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `sorted` call within `sorted()`"
+      suggestion: "Remove the inner `sorted` call"
+      fixable: true
     location:
       row: 13
       column: 0
     end_location:
       row: 13
       column: 17
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `reversed` call within `sorted()`"
-    suggestion: "Remove the inner `reversed` call"
-    fixable: true
-  location:
-    row: 14
-    column: 0
-  end_location:
-    row: 14
-    column: 19
-  fix:
-    content: sorted(x)
+    fix:
+      content: sorted(x)
+      location:
+        row: 13
+        column: 0
+      end_location:
+        row: 13
+        column: 17
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `reversed` call within `sorted()`"
+      suggestion: "Remove the inner `reversed` call"
+      fixable: true
     location:
       row: 14
       column: 0
     end_location:
       row: 14
       column: 19
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `list` call within `tuple()`"
-    suggestion: "Remove the inner `list` call"
-    fixable: true
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 20
-    column: 1
-  fix:
-    content: "tuple(\n    [x, 3, \"hell\"\\\n        \"o\"]\n    )"
+    fix:
+      content: sorted(x)
+      location:
+        row: 14
+        column: 0
+      end_location:
+        row: 14
+        column: 19
+    parent: ~
+  - kind:
+      name: UnnecessaryDoubleCastOrProcess
+      body: "Unnecessary `list` call within `tuple()`"
+      suggestion: "Remove the inner `list` call"
+      fixable: true
     location:
       row: 15
       column: 0
     end_location:
       row: 20
       column: 1
-  parent: ~
+    fix:
+      content: "tuple(\n    [x, 3, \"hell\"\\\n        \"o\"]\n    )"
+      location:
+        row: 15
+        column: 0
+      end_location:
+        row: 20
+        column: 1
+    parent: ~
 

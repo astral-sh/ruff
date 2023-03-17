@@ -2,17 +2,17 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PercentFormatStarRequiresSequence
-    body: "`%`-format string `*` specifier requires sequence"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 27
-  fix: ~
-  parent: ~
+- - kind:
+      name: PercentFormatStarRequiresSequence
+      body: "`%`-format string `*` specifier requires sequence"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 11
+      column: 0
+    end_location:
+      row: 11
+      column: 27
+    fix: ~
+    parent: ~
 

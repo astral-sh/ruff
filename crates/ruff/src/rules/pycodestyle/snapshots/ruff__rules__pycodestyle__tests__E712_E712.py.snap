@@ -2,224 +2,224 @@
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `True` should be `cond is True`"
-    suggestion: "Replace with `cond is True`"
-    fixable: true
-  location:
-    row: 2
-    column: 10
-  end_location:
-    row: 2
-    column: 14
-  fix:
-    content: res is True
+- - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `True` should be `cond is True`"
+      suggestion: "Replace with `cond is True`"
+      fixable: true
     location:
       row: 2
-      column: 3
+      column: 10
     end_location:
       row: 2
       column: 14
-  parent: ~
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `False` should be `cond is not False`"
-    suggestion: "Replace with `cond is not False`"
-    fixable: true
-  location:
-    row: 5
-    column: 10
-  end_location:
-    row: 5
-    column: 15
-  fix:
-    content: res is not False
+    fix:
+      content: res is True
+      location:
+        row: 2
+        column: 3
+      end_location:
+        row: 2
+        column: 14
+    parent: ~
+  - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `False` should be `cond is not False`"
+      suggestion: "Replace with `cond is not False`"
+      fixable: true
     location:
       row: 5
-      column: 3
+      column: 10
     end_location:
       row: 5
       column: 15
-  parent: ~
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `True` should be `cond is not True`"
-    suggestion: "Replace with `cond is not True`"
-    fixable: true
-  location:
-    row: 8
-    column: 3
-  end_location:
-    row: 8
-    column: 7
-  fix:
-    content: True is not res
+    fix:
+      content: res is not False
+      location:
+        row: 5
+        column: 3
+      end_location:
+        row: 5
+        column: 15
+    parent: ~
+  - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `True` should be `cond is not True`"
+      suggestion: "Replace with `cond is not True`"
+      fixable: true
     location:
       row: 8
       column: 3
     end_location:
       row: 8
-      column: 14
-  parent: ~
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `False` should be `cond is False`"
-    suggestion: "Replace with `cond is False`"
-    fixable: true
-  location:
-    row: 11
-    column: 3
-  end_location:
-    row: 11
-    column: 8
-  fix:
-    content: False is res
+      column: 7
+    fix:
+      content: True is not res
+      location:
+        row: 8
+        column: 3
+      end_location:
+        row: 8
+        column: 14
+    parent: ~
+  - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `False` should be `cond is False`"
+      suggestion: "Replace with `cond is False`"
+      fixable: true
     location:
       row: 11
       column: 3
     end_location:
       row: 11
-      column: 15
-  parent: ~
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `True` should be `cond is True`"
-    suggestion: "Replace with `cond is True`"
-    fixable: true
-  location:
-    row: 14
-    column: 13
-  end_location:
-    row: 14
-    column: 17
-  fix:
-    content: "res[1] is True"
+      column: 8
+    fix:
+      content: False is res
+      location:
+        row: 11
+        column: 3
+      end_location:
+        row: 11
+        column: 15
+    parent: ~
+  - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `True` should be `cond is True`"
+      suggestion: "Replace with `cond is True`"
+      fixable: true
     location:
       row: 14
-      column: 3
+      column: 13
     end_location:
       row: 14
       column: 17
-  parent: ~
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `False` should be `cond is not False`"
-    suggestion: "Replace with `cond is not False`"
-    fixable: true
-  location:
-    row: 17
-    column: 13
-  end_location:
-    row: 17
-    column: 18
-  fix:
-    content: "res[1] is not False"
+    fix:
+      content: "res[1] is True"
+      location:
+        row: 14
+        column: 3
+      end_location:
+        row: 14
+        column: 17
+    parent: ~
+  - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `False` should be `cond is not False`"
+      suggestion: "Replace with `cond is not False`"
+      fixable: true
     location:
       row: 17
-      column: 3
+      column: 13
     end_location:
       row: 17
       column: 18
-  parent: ~
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `True` should be `cond is True`"
-    suggestion: "Replace with `cond is True`"
-    fixable: true
-  location:
-    row: 20
-    column: 19
-  end_location:
-    row: 20
-    column: 23
-  fix:
-    content: cond is True
+    fix:
+      content: "res[1] is not False"
+      location:
+        row: 17
+        column: 3
+      end_location:
+        row: 17
+        column: 18
+    parent: ~
+  - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `True` should be `cond is True`"
+      suggestion: "Replace with `cond is True`"
+      fixable: true
     location:
       row: 20
-      column: 11
+      column: 19
     end_location:
       row: 20
       column: 23
-  parent: ~
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `False` should be `cond is False`"
-    suggestion: "Replace with `cond is False`"
-    fixable: true
-  location:
-    row: 20
-    column: 43
-  end_location:
-    row: 20
-    column: 48
-  fix:
-    content: cond is False
+    fix:
+      content: cond is True
+      location:
+        row: 20
+        column: 11
+      end_location:
+        row: 20
+        column: 23
+    parent: ~
+  - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `False` should be `cond is False`"
+      suggestion: "Replace with `cond is False`"
+      fixable: true
     location:
       row: 20
-      column: 35
+      column: 43
     end_location:
       row: 20
       column: 48
-  parent: ~
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `True` should be `cond is True`"
-    suggestion: "Replace with `cond is True`"
-    fixable: true
-  location:
-    row: 22
-    column: 4
-  end_location:
-    row: 22
-    column: 8
-  fix:
-    content: True is TrueElement
+    fix:
+      content: cond is False
+      location:
+        row: 20
+        column: 35
+      end_location:
+        row: 20
+        column: 48
+    parent: ~
+  - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `True` should be `cond is True`"
+      suggestion: "Replace with `cond is True`"
+      fixable: true
     location:
       row: 22
-      column: 3
+      column: 4
     end_location:
       row: 22
-      column: 24
-  parent: ~
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `True` should be `cond is True`"
-    suggestion: "Replace with `cond is True`"
-    fixable: true
-  location:
-    row: 25
-    column: 10
-  end_location:
-    row: 25
-    column: 14
-  fix:
-    content: res is True is not False
+      column: 8
+    fix:
+      content: True is TrueElement
+      location:
+        row: 22
+        column: 3
+      end_location:
+        row: 22
+        column: 24
+    parent: ~
+  - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `True` should be `cond is True`"
+      suggestion: "Replace with `cond is True`"
+      fixable: true
     location:
       row: 25
-      column: 3
+      column: 10
+    end_location:
+      row: 25
+      column: 14
+    fix:
+      content: res is True is not False
+      location:
+        row: 25
+        column: 3
+      end_location:
+        row: 25
+        column: 23
+    parent: ~
+  - kind:
+      name: TrueFalseComparison
+      body: "Comparison to `False` should be `cond is not False`"
+      suggestion: "Replace with `cond is not False`"
+      fixable: true
+    location:
+      row: 25
+      column: 18
     end_location:
       row: 25
       column: 23
-  parent: ~
-- kind:
-    name: TrueFalseComparison
-    body: "Comparison to `False` should be `cond is not False`"
-    suggestion: "Replace with `cond is not False`"
-    fixable: true
-  location:
-    row: 25
-    column: 18
-  end_location:
-    row: 25
-    column: 23
-  fix:
-    content: res is True is not False
-    location:
-      row: 25
-      column: 3
-    end_location:
-      row: 25
-      column: 23
-  parent: ~
+    fix:
+      content: res is True is not False
+      location:
+        row: 25
+        column: 3
+      end_location:
+        row: 25
+        column: 23
+    parent: ~
 

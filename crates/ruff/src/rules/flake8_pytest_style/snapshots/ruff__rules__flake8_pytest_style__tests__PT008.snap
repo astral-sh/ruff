@@ -2,160 +2,160 @@
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 35
-    column: 0
-  end_location:
-    row: 35
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 36
-    column: 0
-  end_location:
-    row: 36
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 37
-    column: 0
-  end_location:
-    row: 37
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 0
-  end_location:
-    row: 38
-    column: 26
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 0
-  end_location:
-    row: 40
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 41
-    column: 0
-  end_location:
-    row: 41
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 42
-    column: 0
-  end_location:
-    row: 42
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 0
-  end_location:
-    row: 43
-    column: 26
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 45
-    column: 0
-  end_location:
-    row: 45
-    column: 12
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 0
-  end_location:
-    row: 46
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 47
-    column: 0
-  end_location:
-    row: 47
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 48
-    column: 0
-  end_location:
-    row: 48
-    column: 26
-  fix: ~
-  parent: ~
+- - kind:
+      name: PytestPatchWithLambda
+      body: "Use `return_value=` instead of patching with `lambda`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 35
+      column: 0
+    end_location:
+      row: 35
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestPatchWithLambda
+      body: "Use `return_value=` instead of patching with `lambda`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 36
+      column: 0
+    end_location:
+      row: 36
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestPatchWithLambda
+      body: "Use `return_value=` instead of patching with `lambda`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 37
+      column: 0
+    end_location:
+      row: 37
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestPatchWithLambda
+      body: "Use `return_value=` instead of patching with `lambda`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 38
+      column: 0
+    end_location:
+      row: 38
+      column: 26
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestPatchWithLambda
+      body: "Use `return_value=` instead of patching with `lambda`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 40
+      column: 0
+    end_location:
+      row: 40
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestPatchWithLambda
+      body: "Use `return_value=` instead of patching with `lambda`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 41
+      column: 0
+    end_location:
+      row: 41
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestPatchWithLambda
+      body: "Use `return_value=` instead of patching with `lambda`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 42
+      column: 0
+    end_location:
+      row: 42
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestPatchWithLambda
+      body: "Use `return_value=` instead of patching with `lambda`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 43
+      column: 0
+    end_location:
+      row: 43
+      column: 26
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestPatchWithLambda
+      body: "Use `return_value=` instead of patching with `lambda`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 45
+      column: 0
+    end_location:
+      row: 45
+      column: 12
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestPatchWithLambda
+      body: "Use `return_value=` instead of patching with `lambda`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 46
+      column: 0
+    end_location:
+      row: 46
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestPatchWithLambda
+      body: "Use `return_value=` instead of patching with `lambda`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 47
+      column: 0
+    end_location:
+      row: 47
+      column: 19
+    fix: ~
+    parent: ~
+  - kind:
+      name: PytestPatchWithLambda
+      body: "Use `return_value=` instead of patching with `lambda`"
+      suggestion: ~
+      fixable: false
+    location:
+      row: 48
+      column: 0
+    end_location:
+      row: 48
+      column: 26
+    fix: ~
+    parent: ~
 
