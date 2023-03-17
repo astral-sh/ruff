@@ -62,6 +62,7 @@ REPOSITORIES = {
     "bokeh": Repository("bokeh", "bokeh", "branch-3.2"),
     "scikit-build": Repository("scikit-build", "scikit-build", "main"),
     "scikit-build-core": Repository("scikit-build", "scikit-build-core", "main"),
+    "cibuildwheel": Repository("pypa", "cibuildwheel", "main"),
     "airflow": Repository("apache", "airflow", "main"),
     "typeshed": Repository("python", "typeshed", "main", select="PYI"),
 }
