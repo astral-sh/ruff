@@ -2456,6 +2456,9 @@ where
                 {
                     flake8_bugbear::rules::zip_without_explicit_strict(self, expr, func, keywords);
                 }
+                if self.settings.rules.enabled(Rule::NoExplicitStacklevel) {
+                    flake8_bugbear::rules::no_explicit_stacklevel(self, func, args, keywords);
+                }
 
                 // flake8-pie
                 if self.settings.rules.enabled(Rule::UnnecessaryDictKwargs) {
