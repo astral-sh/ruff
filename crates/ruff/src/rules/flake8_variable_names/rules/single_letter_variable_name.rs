@@ -35,12 +35,12 @@ impl Violation for SingleLetterVariableName {
 }
 
 fn is_single_letter_variable(name: &str) -> bool {
-    const ALLOWLIST: [&'static str; 3] = ["i", "_", "T"];
+    const ALLOWLIST: [&str; 3] = ["i", "_", "T"];
     if name.len() == 1 && !ALLOWLIST.contains(&name) {
         return true;
     }
 
-    return false;
+    false
 }
 
 /// VN001

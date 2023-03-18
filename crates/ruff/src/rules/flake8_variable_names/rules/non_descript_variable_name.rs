@@ -35,7 +35,7 @@ impl Violation for NonDescriptVariableName {
 }
 
 fn is_non_descript_variable(name: &str) -> bool {
-    const BLOCKLIST: [&'static str; 17] = [
+    const BLOCKLIST: [&str; 17] = [
         "val", "vals", "var", "vars", "variable", "contents", "handle", "file", "objs", "some",
         "do", "no", "true", "false", "foo", "bar", "baz",
     ];
@@ -44,7 +44,7 @@ fn is_non_descript_variable(name: &str) -> bool {
         return true;
     }
 
-    return false;
+    false
 }
 
 /// VN002
