@@ -468,7 +468,7 @@ pub struct Options {
     /// Options for the `flake8-unused-arguments` plugin.
     pub flake8_unused_arguments: Option<flake8_unused_arguments::settings::Options>,
     #[option_group]
-    /// OPtions for the `flake8-variable-names` plugin.
+    /// Options for the `flake8-variable-names` plugin.
     pub flake8_variable_names: Option<flake8_variable_names::settings::Options>,
     #[option_group]
     /// Options for the `isort` plugin.
