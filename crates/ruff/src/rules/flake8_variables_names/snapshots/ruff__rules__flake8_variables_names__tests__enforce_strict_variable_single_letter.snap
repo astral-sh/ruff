@@ -1,5 +1,5 @@
 ---
-source: crates/ruff/src/rules/flake8_variable_names/mod.rs
+source: crates/ruff/src/rules/flake8_variables_names/mod.rs
 expression: diagnostics
 ---
 - kind:

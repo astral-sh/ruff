@@ -18,7 +18,7 @@ use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
     flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
-    flake8_variable_names, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
+    flake8_variables_names, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::options::Options;
 use crate::settings::types::{
@@ -78,7 +78,7 @@ pub struct Configuration {
     pub flake8_tidy_imports: Option<flake8_tidy_imports::options::Options>,
     pub flake8_type_checking: Option<flake8_type_checking::settings::Options>,
     pub flake8_unused_arguments: Option<flake8_unused_arguments::settings::Options>,
-    pub flake8_variable_names: Option<flake8_variable_names::settings::Options>,
+    pub flake8_variables_names: Option<flake8_variables_names::settings::Options>,
     pub isort: Option<isort::settings::Options>,
     pub mccabe: Option<mccabe::settings::Options>,
     pub pep8_naming: Option<pep8_naming::settings::Options>,
@@ -193,7 +193,7 @@ impl Configuration {
             flake8_tidy_imports: options.flake8_tidy_imports,
             flake8_type_checking: options.flake8_type_checking,
             flake8_unused_arguments: options.flake8_unused_arguments,
-            flake8_variable_names: options.flake8_variable_names,
+            flake8_variables_names: options.flake8_variables_names,
             isort: options.isort,
             mccabe: options.mccabe,
             pep8_naming: options.pep8_naming,
@@ -264,7 +264,9 @@ impl Configuration {
             flake8_unused_arguments: self
                 .flake8_unused_arguments
                 .or(config.flake8_unused_arguments),
-            flake8_variable_names: self.flake8_variable_names.or(config.flake8_variable_names),
+            flake8_variables_names: self
+                .flake8_variables_names
+                .or(config.flake8_variables_names),
             isort: self.isort.or(config.isort),
             mccabe: self.mccabe.or(config.mccabe),
             pep8_naming: self.pep8_naming.or(config.pep8_naming),

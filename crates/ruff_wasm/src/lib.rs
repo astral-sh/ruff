@@ -12,7 +12,7 @@ use ruff::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
     flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
-    flake8_variable_names, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
+    flake8_variables_names, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
@@ -146,7 +146,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         flake8_unused_arguments: Some(
             flake8_unused_arguments::settings::Settings::default().into(),
         ),
-        flake8_variable_names: Some(flake8_variable_names::settings::Settings::default().into()),
+        flake8_variables_names: Some(flake8_variables_names::settings::Settings::default().into()),
         isort: Some(isort::settings::Settings::default().into()),
         mccabe: Some(mccabe::settings::Settings::default().into()),
         pep8_naming: Some(pep8_naming::settings::Settings::default().into()),

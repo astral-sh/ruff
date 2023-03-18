@@ -370,7 +370,7 @@ are:
     SOFTWARE.
   """
 
-- flake8-variable-names, licensed as follows:
+- flake8-variables-names, licensed as follows:
   """
     Copyright (c) 2019 BestDoctor
 

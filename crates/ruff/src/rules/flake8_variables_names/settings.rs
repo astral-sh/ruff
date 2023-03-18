@@ -1,4 +1,4 @@
-//! Settings for the `flake8-variable-names` plugin.
+//! Settings for the `flake8-variables-names` plugin.
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -10,7 +10,7 @@ use ruff_macros::{CacheKey, ConfigurationOptions};
 #[serde(
     deny_unknown_fields,
     rename_all = "kebab-case",
-    rename = "Flake8VariableNamesOptions"
+    rename = "Flake8VariablesNamesOptions"
 )]
 pub struct Options {
     #[option(

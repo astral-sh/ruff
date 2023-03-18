@@ -44,7 +44,7 @@ use crate::rules::{
     flake8_django, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise,
     flake8_return, flake8_self, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, flake8_use_pathlib, flake8_variable_names, mccabe, numpy, pandas_vet,
+    flake8_unused_arguments, flake8_use_pathlib, flake8_variables_names, mccabe, numpy, pandas_vet,
     pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff,
     tryceratops,
 };
@@ -226,10 +226,12 @@ where
                 if self.settings.rules.enabled(Rule::NonDescriptVariableName) {
                     self.diagnostics
                         .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
-                            flake8_variable_names::rules::non_descript_variable_name(
+                            flake8_variables_names::rules::non_descript_variable_name(
                                 name,
                                 *range,
-                                self.settings.flake8_variable_names.use_varnames_strict_mode,
+                                self.settings
+                                    .flake8_variables_names
+                                    .use_varnames_strict_mode,
                             )
                         }));
                 }
@@ -237,10 +239,12 @@ where
                 if self.settings.rules.enabled(Rule::SingleLetterVariableName) {
                     self.diagnostics
                         .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
-                            flake8_variable_names::rules::single_letter_variable_name(
+                            flake8_variables_names::rules::single_letter_variable_name(
                                 name,
                                 *range,
-                                self.settings.flake8_variable_names.use_varnames_strict_mode,
+                                self.settings
+                                    .flake8_variables_names
+                                    .use_varnames_strict_mode,
                             )
                         }));
                 }
@@ -304,10 +308,12 @@ where
                 if self.settings.rules.enabled(Rule::NonDescriptVariableName) {
                     self.diagnostics
                         .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
-                            flake8_variable_names::rules::non_descript_variable_name(
+                            flake8_variables_names::rules::non_descript_variable_name(
                                 name,
                                 *range,
-                                self.settings.flake8_variable_names.use_varnames_strict_mode,
+                                self.settings
+                                    .flake8_variables_names
+                                    .use_varnames_strict_mode,
                             )
                         }));
                 }
@@ -315,10 +321,12 @@ where
                 if self.settings.rules.enabled(Rule::SingleLetterVariableName) {
                     self.diagnostics
                         .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
-                            flake8_variable_names::rules::single_letter_variable_name(
+                            flake8_variables_names::rules::single_letter_variable_name(
                                 name,
                                 *range,
-                                self.settings.flake8_variable_names.use_varnames_strict_mode,
+                                self.settings
+                                    .flake8_variables_names
+                                    .use_varnames_strict_mode,
                             )
                         }));
                 }
@@ -2333,10 +2341,12 @@ where
 
                         if self.settings.rules.enabled(Rule::NonDescriptVariableName) {
                             if let Some(diagnostic) =
-                                flake8_variable_names::rules::non_descript_variable_name(
+                                flake8_variables_names::rules::non_descript_variable_name(
                                     id,
                                     Range::from(expr),
-                                    self.settings.flake8_variable_names.use_varnames_strict_mode,
+                                    self.settings
+                                        .flake8_variables_names
+                                        .use_varnames_strict_mode,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -2345,10 +2355,12 @@ where
 
                         if self.settings.rules.enabled(Rule::SingleLetterVariableName) {
                             if let Some(diagnostic) =
-                                flake8_variable_names::rules::single_letter_variable_name(
+                                flake8_variables_names::rules::single_letter_variable_name(
                                     id,
                                     Range::from(expr),
-                                    self.settings.flake8_variable_names.use_varnames_strict_mode,
+                                    self.settings
+                                        .flake8_variables_names
+                                        .use_varnames_strict_mode,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -3833,11 +3845,13 @@ where
 
                         if self.settings.rules.enabled(Rule::NonDescriptVariableName) {
                             if let Some(diagnostic) =
-                                flake8_variable_names::rules::non_descript_variable_name(
+                                flake8_variables_names::rules::non_descript_variable_name(
                                     name,
                                     helpers::excepthandler_name_range(excepthandler, self.locator)
                                         .expect("Failed to find `name` range"),
-                                    self.settings.flake8_variable_names.use_varnames_strict_mode,
+                                    self.settings
+                                        .flake8_variables_names
+                                        .use_varnames_strict_mode,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -3846,11 +3860,13 @@ where
 
                         if self.settings.rules.enabled(Rule::SingleLetterVariableName) {
                             if let Some(diagnostic) =
-                                flake8_variable_names::rules::single_letter_variable_name(
+                                flake8_variables_names::rules::single_letter_variable_name(
                                     name,
                                     helpers::excepthandler_name_range(excepthandler, self.locator)
                                         .expect("Failed to find `name` range"),
-                                    self.settings.flake8_variable_names.use_varnames_strict_mode,
+                                    self.settings
+                                        .flake8_variables_names
+                                        .use_varnames_strict_mode,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -4030,20 +4046,24 @@ where
         }
 
         if self.settings.rules.enabled(Rule::NonDescriptVariableName) {
-            if let Some(diagnostic) = flake8_variable_names::rules::non_descript_variable_name(
+            if let Some(diagnostic) = flake8_variables_names::rules::non_descript_variable_name(
                 &arg.node.arg,
                 Range::from(arg),
-                self.settings.flake8_variable_names.use_varnames_strict_mode,
+                self.settings
+                    .flake8_variables_names
+                    .use_varnames_strict_mode,
             ) {
                 self.diagnostics.push(diagnostic);
             }
         }
 
         if self.settings.rules.enabled(Rule::SingleLetterVariableName) {
-            if let Some(diagnostic) = flake8_variable_names::rules::single_letter_variable_name(
+            if let Some(diagnostic) = flake8_variables_names::rules::single_letter_variable_name(
                 &arg.node.arg,
                 Range::from(arg),
-                self.settings.flake8_variable_names.use_varnames_strict_mode,
+                self.settings
+                    .flake8_variables_names
+                    .use_varnames_strict_mode,
             ) {
                 self.diagnostics.push(diagnostic);
             }

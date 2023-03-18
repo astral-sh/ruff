@@ -264,11 +264,11 @@
         }
       ]
     },
-    "flake8-variable-names": {
-      "description": "Options for the `flake8-variable-names` plugin.",
+    "flake8-variables-names": {
+      "description": "Options for the `flake8-variables-names` plugin.",
       "anyOf": [
         {
-          "$ref": "#/definitions/Flake8VariableNamesOptions"
+          "$ref": "#/definitions/Flake8VariablesNamesOptions"
         },
         {
           "type": "null"
@@ -962,7 +962,7 @@
       },
       "additionalProperties": false
     },
-    "Flake8VariableNamesOptions": {
+    "Flake8VariablesNamesOptions": {
       "type": "object",
       "properties": {
         "use-varnames-strict-mode": {

@@ -31,7 +31,7 @@ pub mod flake8_tidy_imports;
 pub mod flake8_type_checking;
 pub mod flake8_unused_arguments;
 pub mod flake8_use_pathlib;
-pub mod flake8_variable_names;
+pub mod flake8_variables_names;
 pub mod isort;
 pub mod mccabe;
 pub mod numpy;
