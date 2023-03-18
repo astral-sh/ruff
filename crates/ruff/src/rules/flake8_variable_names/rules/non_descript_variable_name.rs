@@ -31,13 +31,20 @@ impl Violation for NonDescriptVariableName {
     }
 }
 
-fn is_non_descript_variable(name: &str) -> bool {
+fn is_non_descript_variable(name: &str, strict_mode: bool) -> bool {
     const BLOCKLIST: [&str; 17] = [
         "val", "vals", "var", "vars", "variable", "contents", "handle", "file", "objs", "some",
         "do", "no", "true", "false", "foo", "bar", "baz",
     ];
 
-    if BLOCKLIST.contains(&name.to_lowercase().as_str()) {
+    const BLOCKLIST_STRICT: [&str; 11] = [
+        "data", "result", "results", "item", "items", "value", "values", "content", "obj", "info",
+        "handler",
+    ];
+
+    if BLOCKLIST.contains(&name.to_lowercase().as_str())
+        || (strict_mode && BLOCKLIST_STRICT.contains(&name.to_lowercase().as_str()))
+    {
         return true;
     }
 
@@ -45,8 +52,12 @@ fn is_non_descript_variable(name: &str) -> bool {
 }
 
 /// VN002
-pub fn non_descript_variable_name(name: &str, range: Range) -> Option<Diagnostic> {
-    if is_non_descript_variable(name) {
+pub fn non_descript_variable_name(
+    name: &str,
+    range: Range,
+    strict_mode: bool,
+) -> Option<Diagnostic> {
+    if is_non_descript_variable(name, strict_mode) {
         Some(Diagnostic::new(
             NonDescriptVariableName(name.to_string()),
             range,

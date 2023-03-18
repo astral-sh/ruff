@@ -4,6 +4,7 @@ bar = 3  # [VN002]
 variable = "a"  # [VN002]
 no = ["AA"]  # [VN002]
 T = {12, 3, "JF"}
+info = "test" # [VN002-strict]
 
 ToCountResult = True
 flag = False

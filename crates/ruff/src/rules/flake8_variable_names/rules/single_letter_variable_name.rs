@@ -28,9 +28,12 @@ impl Violation for SingleLetterVariableName {
     }
 }
 
-fn is_single_letter_variable(name: &str) -> bool {
+fn is_single_letter_variable(name: &str, strict_mode: bool) -> bool {
     const ALLOWLIST: [&str; 3] = ["i", "_", "T"];
-    if name.len() == 1 && !ALLOWLIST.contains(&name) {
+    const ALLOWLIST_STRICT: [&str; 2] = ["_", "T"];
+    if name.len() == 1
+        && (!ALLOWLIST.contains(&name) || (strict_mode && !ALLOWLIST_STRICT.contains(&name)))
+    {
         return true;
     }
 
@@ -38,8 +41,12 @@ fn is_single_letter_variable(name: &str) -> bool {
 }
 
 /// VN001
-pub fn single_letter_variable_name(name: &str, range: Range) -> Option<Diagnostic> {
-    if is_single_letter_variable(name) {
+pub fn single_letter_variable_name(
+    name: &str,
+    range: Range,
+    strict_mode: bool,
+) -> Option<Diagnostic> {
+    if is_single_letter_variable(name, strict_mode) {
         Some(Diagnostic::new(
             SingleLetterVariableName(name.to_string()),
             range,

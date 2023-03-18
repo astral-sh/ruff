@@ -69,6 +69,19 @@ expression: diagnostics
   parent: ~
 - kind:
     name: NonDescriptVariableName
+    body: "Non-descript variable name: `info`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 4
+  fix: ~
+  parent: ~
+- kind:
+    name: NonDescriptVariableName
     body: "Non-descript variable name: `foo`"
     suggestion: ~
     fixable: false

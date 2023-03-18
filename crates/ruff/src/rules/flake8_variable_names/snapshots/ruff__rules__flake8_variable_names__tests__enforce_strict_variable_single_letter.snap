@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/flake8_variable_names/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: NonDescriptVariableName
-    body: "Non-descript variable name: `val`"
+    name: SingleLetterVariableName
+    body: "Single letter variable name: `x`"
     suggestion: ~
     fixable: false
   location:
@@ -12,12 +12,12 @@ expression: diagnostics
     column: 0
   end_location:
     row: 1
-    column: 3
+    column: 1
   fix: ~
   parent: ~
 - kind:
-    name: NonDescriptVariableName
-    body: "Non-descript variable name: `foo`"
+    name: SingleLetterVariableName
+    body: "Single letter variable name: `y`"
     suggestion: ~
     fixable: false
   location:
@@ -25,12 +25,12 @@ expression: diagnostics
     column: 0
   end_location:
     row: 2
-    column: 3
+    column: 1
   fix: ~
   parent: ~
 - kind:
-    name: NonDescriptVariableName
-    body: "Non-descript variable name: `bar`"
+    name: SingleLetterVariableName
+    body: "Single letter variable name: `z`"
     suggestion: ~
     fixable: false
   location:
@@ -38,12 +38,12 @@ expression: diagnostics
     column: 0
   end_location:
     row: 3
-    column: 3
+    column: 1
   fix: ~
   parent: ~
 - kind:
-    name: NonDescriptVariableName
-    body: "Non-descript variable name: `variable`"
+    name: SingleLetterVariableName
+    body: "Single letter variable name: `i`"
     suggestion: ~
     fixable: false
   location:
@@ -51,46 +51,46 @@ expression: diagnostics
     column: 0
   end_location:
     row: 4
-    column: 8
+    column: 1
   fix: ~
   parent: ~
 - kind:
-    name: NonDescriptVariableName
-    body: "Non-descript variable name: `no`"
+    name: SingleLetterVariableName
+    body: "Single letter variable name: `a`"
     suggestion: ~
     fixable: false
   location:
-    row: 5
-    column: 0
+    row: 10
+    column: 4
   end_location:
-    row: 5
-    column: 2
+    row: 10
+    column: 5
   fix: ~
   parent: ~
 - kind:
-    name: NonDescriptVariableName
-    body: "Non-descript variable name: `foo`"
+    name: SingleLetterVariableName
+    body: "Single letter variable name: `t`"
     suggestion: ~
     fixable: false
   location:
-    row: 21
+    row: 17
     column: 10
   end_location:
-    row: 21
-    column: 13
+    row: 17
+    column: 11
   fix: ~
   parent: ~
 - kind:
-    name: NonDescriptVariableName
-    body: "Non-descript variable name: `handle`"
+    name: SingleLetterVariableName
+    body: "Single letter variable name: `e`"
     suggestion: ~
     fixable: false
   location:
-    row: 27
+    row: 23
     column: 20
   end_location:
-    row: 27
-    column: 26
+    row: 23
+    column: 21
   fix: ~
   parent: ~
 

@@ -1,5 +1,6 @@
-//! Rules from [flake8-variab;e-names](https://pypi.org/project/flake8-variables-names/).
+//! Rules from [flake8-variable-names](https://pypi.org/project/flake8-variables-names/).
 pub(crate) mod rules;
+pub mod settings;
 
 #[cfg(test)]
 mod tests {
@@ -22,6 +23,78 @@ mod tests {
             &settings::Settings::for_rule(rule_code),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn enforce_strict_variable_single_letter() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_variable_names")
+                .join("VN001.py")
+                .as_path(),
+            &settings::Settings {
+                flake8_variable_names: super::settings::Settings {
+                    use_varnames_strict_mode: true,
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rules(vec![Rule::SingleLetterVariableName, Rule::AnyType])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn no_enforce_strict_variable_single_letter() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_variable_names")
+                .join("VN001.py")
+                .as_path(),
+            &settings::Settings {
+                flake8_variable_names: super::settings::Settings {
+                    use_varnames_strict_mode: false,
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rules(vec![Rule::SingleLetterVariableName, Rule::AnyType])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn enforce_strict_variable_non_descript() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_variable_names")
+                .join("VN002.py")
+                .as_path(),
+            &settings::Settings {
+                flake8_variable_names: super::settings::Settings {
+                    use_varnames_strict_mode: true,
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rules(vec![Rule::NonDescriptVariableName, Rule::AnyType])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn no_enforce_strict_variable_non_descript() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_variable_names")
+                .join("VN002.py")
+                .as_path(),
+            &settings::Settings {
+                flake8_variable_names: super::settings::Settings {
+                    use_varnames_strict_mode: false,
+                    ..Default::default()
+                },
+                ..settings::Settings::for_rules(vec![Rule::NonDescriptVariableName, Rule::AnyType])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 }
