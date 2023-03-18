@@ -265,7 +265,7 @@
       ]
     },
     "flake8-variable-names": {
-      "description": "OPtions for the `flake8-variable-names` plugin.",
+      "description": "Options for the `flake8-variable-names` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8VariableNamesOptions"
@@ -966,7 +966,7 @@
       "type": "object",
       "properties": {
         "use-varnames-strict-mode": {
-          "description": "Whether to allow unused variadic arguments, like `*args` and `**kwargs`.",
+          "description": "Whether to use strict settings for the allow/block lists",
           "type": [
             "boolean",
             "null"
