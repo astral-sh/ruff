@@ -113,14 +113,14 @@ mod tests {
     use ruff_python_ast::source_code::Locator;
 
     use crate::autofix::{apply_fix, apply_fixes};
-    use crate::rules::pycodestyle::rules::NoNewLineAtEndOfFile;
+    use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
     fn create_diagnostics(fixes: impl IntoIterator<Item = Fix>) -> Vec<Diagnostic> {
         fixes
             .into_iter()
             .map(|fix| Diagnostic {
                 // The choice of rule here is arbitrary.
-                kind: NoNewLineAtEndOfFile.into(),
+                kind: MissingNewlineAtEndOfFile.into(),
                 location: fix.location,
                 end_location: fix.end_location,
                 fix: Some(fix),

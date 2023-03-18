@@ -9,20 +9,20 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct UseCapitalEnvironmentVariables {
+pub struct UncapitalizedEnvironmentVariables {
     pub expected: String,
     pub original: String,
 }
 
-impl AlwaysAutofixableViolation for UseCapitalEnvironmentVariables {
+impl AlwaysAutofixableViolation for UncapitalizedEnvironmentVariables {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UseCapitalEnvironmentVariables { expected, original } = self;
+        let UncapitalizedEnvironmentVariables { expected, original } = self;
         format!("Use capitalized environment variable `{expected}` instead of `{original}`")
     }
 
     fn autofix_title(&self) -> String {
-        let UseCapitalEnvironmentVariables { expected, original } = self;
+        let UncapitalizedEnvironmentVariables { expected, original } = self;
         format!("Replace `{original}` with `{expected}`")
     }
 }
@@ -62,7 +62,7 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     }
 
     let mut diagnostic = Diagnostic::new(
-        UseCapitalEnvironmentVariables {
+        UncapitalizedEnvironmentVariables {
             expected: capital_env_var.clone(),
             original: env_var.clone(),
         },
@@ -104,7 +104,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
     }
 
     let mut diagnostic = Diagnostic::new(
-        UseCapitalEnvironmentVariables {
+        UncapitalizedEnvironmentVariables {
             expected: capital_env_var.clone(),
             original: env_var.clone(),
         },

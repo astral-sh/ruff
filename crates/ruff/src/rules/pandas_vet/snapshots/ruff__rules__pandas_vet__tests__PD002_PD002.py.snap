@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pandas_vet/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: UseOfInplaceArgument
+    name: PandasUseOfInplaceArgument
     body: "`inplace=True` should be avoided; it has inconsistent behavior"
     suggestion: "Assign to variable; remove `inplace` arg"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
-    name: UseOfInplaceArgument
+    name: PandasUseOfInplaceArgument
     body: "`inplace=True` should be avoided; it has inconsistent behavior"
     suggestion: "Assign to variable; remove `inplace` arg"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
-    name: UseOfInplaceArgument
+    name: PandasUseOfInplaceArgument
     body: "`inplace=True` should be avoided; it has inconsistent behavior"
     suggestion: "Assign to variable; remove `inplace` arg"
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    name: UseOfInplaceArgument
+    name: PandasUseOfInplaceArgument
     body: "`inplace=True` should be avoided; it has inconsistent behavior"
     suggestion: "Assign to variable; remove `inplace` arg"
     fixable: true

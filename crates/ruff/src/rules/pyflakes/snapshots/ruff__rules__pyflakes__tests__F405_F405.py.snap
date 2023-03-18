@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: ImportStarUsage
+    name: UndefinedLocalWithImportStarUsage
     body: "`name` may be undefined, or defined from star imports: `mymodule`"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: ImportStarUsage
+    name: UndefinedLocalWithImportStarUsage
     body: "`a` may be undefined, or defined from star imports: `mymodule`"
     suggestion: ~
     fixable: false

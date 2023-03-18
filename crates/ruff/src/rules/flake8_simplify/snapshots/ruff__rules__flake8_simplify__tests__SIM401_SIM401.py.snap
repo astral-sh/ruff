@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: DictGetWithDefault
+    name: IfElseBlockInsteadOfDictGet
     body: "Use `var = a_dict.get(key, \"default1\")` instead of an `if` block"
     suggestion: "Replace with `var = a_dict.get(key, \"default1\")`"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    name: DictGetWithDefault
+    name: IfElseBlockInsteadOfDictGet
     body: "Use `var = a_dict.get(key, \"default2\")` instead of an `if` block"
     suggestion: "Replace with `var = a_dict.get(key, \"default2\")`"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    name: DictGetWithDefault
+    name: IfElseBlockInsteadOfDictGet
     body: "Use `var = a_dict.get(key, val1 + val2)` instead of an `if` block"
     suggestion: "Replace with `var = a_dict.get(key, val1 + val2)`"
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    name: DictGetWithDefault
+    name: IfElseBlockInsteadOfDictGet
     body: "Use `var = a_dict.get(keys[idx], \"default\")` instead of an `if` block"
     suggestion: "Replace with `var = a_dict.get(keys[idx], \"default\")`"
     fixable: true
@@ -83,7 +83,7 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    name: DictGetWithDefault
+    name: IfElseBlockInsteadOfDictGet
     body: "Use `var = dicts[idx].get(key, \"default\")` instead of an `if` block"
     suggestion: "Replace with `var = dicts[idx].get(key, \"default\")`"
     fixable: true
@@ -103,7 +103,7 @@ expression: diagnostics
       column: 19
   parent: ~
 - kind:
-    name: DictGetWithDefault
+    name: IfElseBlockInsteadOfDictGet
     body: "Use `vars[idx] = a_dict.get(key, \"default\")` instead of an `if` block"
     suggestion: "Replace with `vars[idx] = a_dict.get(key, \"default\")`"
     fixable: true

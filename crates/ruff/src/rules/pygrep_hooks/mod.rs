@@ -13,8 +13,8 @@ mod tests {
     use crate::settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::NoEval, Path::new("PGH001_0.py"); "PGH001_0")]
-    #[test_case(Rule::NoEval, Path::new("PGH001_1.py"); "PGH001_1")]
+    #[test_case(Rule::Eval, Path::new("PGH001_0.py"); "PGH001_0")]
+    #[test_case(Rule::Eval, Path::new("PGH001_1.py"); "PGH001_1")]
     #[test_case(Rule::DeprecatedLogWarn, Path::new("PGH002_0.py"); "PGH002_0")]
     #[test_case(Rule::DeprecatedLogWarn, Path::new("PGH002_1.py"); "PGH002_1")]
     #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_0.py"); "PGH003_0")]

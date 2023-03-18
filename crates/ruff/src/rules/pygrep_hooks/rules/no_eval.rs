@@ -7,9 +7,9 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 
 #[violation]
-pub struct NoEval;
+pub struct Eval;
 
-impl Violation for NoEval {
+impl Violation for Eval {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("No builtin `eval()` allowed")
@@ -28,5 +28,5 @@ pub fn no_eval(checker: &mut Checker, func: &Expr) {
     }
     checker
         .diagnostics
-        .push(Diagnostic::new(NoEval, Range::from(func)));
+        .push(Diagnostic::new(Eval, Range::from(func)));
 }

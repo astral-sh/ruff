@@ -34,9 +34,9 @@ use crate::rules::flake8_django::rules::helpers::is_model_form;
 ///         fields = ["title", "content"]
 /// ```
 #[violation]
-pub struct ExcludeWithModelForm;
+pub struct DjangoExcludeWithModelForm;
 
-impl Violation for ExcludeWithModelForm {
+impl Violation for DjangoExcludeWithModelForm {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not use `exclude` with `ModelForm`, use `fields` instead")
@@ -68,7 +68,10 @@ pub fn exclude_with_model_form(
                     continue;
                 };
                 if id == "exclude" {
-                    return Some(Diagnostic::new(ExcludeWithModelForm, Range::from(target)));
+                    return Some(Diagnostic::new(
+                        DjangoExcludeWithModelForm,
+                        Range::from(target),
+                    ));
                 }
             }
         }

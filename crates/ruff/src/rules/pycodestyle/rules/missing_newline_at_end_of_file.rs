@@ -23,9 +23,9 @@ use ruff_python_ast::types::Range;
 /// spam(1)\n
 /// ```
 #[violation]
-pub struct NoNewLineAtEndOfFile;
+pub struct MissingNewlineAtEndOfFile;
 
-impl AlwaysAutofixableViolation for NoNewLineAtEndOfFile {
+impl AlwaysAutofixableViolation for MissingNewlineAtEndOfFile {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("No newline at end of file")
@@ -49,7 +49,7 @@ pub fn no_newline_at_end_of_file(
             // Both locations are at the end of the file (and thus the same).
             let location = Location::new(locator.count_lines(), line.len());
             let mut diagnostic =
-                Diagnostic::new(NoNewLineAtEndOfFile, Range::new(location, location));
+                Diagnostic::new(MissingNewlineAtEndOfFile, Range::new(location, location));
             if autofix {
                 diagnostic.amend(Fix::insertion(stylist.line_ending().to_string(), location));
             }

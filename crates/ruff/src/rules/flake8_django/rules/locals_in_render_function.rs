@@ -32,9 +32,9 @@ use crate::checkers::ast::Checker;
 ///     return render(request, "app/index.html", context)
 /// ```
 #[violation]
-pub struct LocalsInRenderFunction;
+pub struct DjangoLocalsInRenderFunction;
 
-impl Violation for LocalsInRenderFunction {
+impl Violation for DjangoLocalsInRenderFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Avoid passing `locals()` as context to a `render` function")
@@ -78,9 +78,10 @@ pub fn locals_in_render_function(
         return;
     };
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(LocalsInRenderFunction, Range::from(locals)));
+    checker.diagnostics.push(Diagnostic::new(
+        DjangoLocalsInRenderFunction,
+        Range::from(locals),
+    ));
 }
 
 fn is_locals_call(checker: &Checker, expr: &Expr) -> bool {

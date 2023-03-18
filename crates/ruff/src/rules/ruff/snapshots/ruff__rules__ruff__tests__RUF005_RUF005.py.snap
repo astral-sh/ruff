@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `[1, 2, 3, *foo]` instead of concatenation"
     suggestion: "Replace with `[1, 2, 3, *foo]`"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `(7, 8, 9, *zoob)` instead of concatenation"
     suggestion: "Replace with `(7, 8, 9, *zoob)`"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `(*quux, 10, 11, 12)` instead of concatenation"
     suggestion: "Replace with `(*quux, 10, 11, 12)`"
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `[*spom, 13, 14, 15]` instead of concatenation"
     suggestion: "Replace with `[*spom, 13, 14, 15]`"
     fixable: true
@@ -83,7 +83,7 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `(\"we all say\", *yay())` instead of concatenation"
     suggestion: "Replace with `(\"we all say\", *yay())`"
     fixable: true
@@ -103,7 +103,7 @@ expression: diagnostics
       column: 36
   parent: ~
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `(\"we all think\", *Fun().yay())` instead of concatenation"
     suggestion: "Replace with `(\"we all think\", *Fun().yay())`"
     fixable: true
@@ -123,7 +123,7 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `(\"we all feel\", *Fun.words)` instead of concatenation"
     suggestion: "Replace with `(\"we all feel\", *Fun.words)`"
     fixable: true
@@ -143,7 +143,7 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `[\"a\", \"b\", \"c\", *eggs]` instead of concatenation"
     suggestion: "Replace with `[\"a\", \"b\", \"c\", *eggs]`"
     fixable: true
@@ -163,7 +163,7 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `(\"yes\", \"no\", \"pants\", *zoob)` instead of concatenation"
     suggestion: "Replace with `(\"yes\", \"no\", \"pants\", *zoob)`"
     fixable: true
@@ -183,7 +183,7 @@ expression: diagnostics
       column: 67
   parent: ~
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `(*zoob,)` instead of concatenation"
     suggestion: "Replace with `(*zoob,)`"
     fixable: true
@@ -203,7 +203,7 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `[*first, 4, 5, 6]` instead of concatenation"
     suggestion: ~
     fixable: false
@@ -216,7 +216,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `[*foo]` instead of concatenation"
     suggestion: "Replace with `[*foo]`"
     fixable: true
@@ -236,7 +236,7 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    name: UnpackInsteadOfConcatenatingToCollectionLiteral
+    name: CollectionLiteralConcatenation
     body: "Consider `[*foo]` instead of concatenation"
     suggestion: "Replace with `[*foo]`"
     fixable: true

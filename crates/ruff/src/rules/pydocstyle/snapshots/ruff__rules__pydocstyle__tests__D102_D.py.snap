@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: PublicMethod
+    name: UndocumentedPublicMethod
     body: Missing docstring in public method
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PublicMethod
+    name: UndocumentedPublicMethod
     body: Missing docstring in public method
     suggestion: ~
     fixable: false
@@ -29,7 +29,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PublicMethod
+    name: UndocumentedPublicMethod
     body: Missing docstring in public method
     suggestion: ~
     fixable: false
