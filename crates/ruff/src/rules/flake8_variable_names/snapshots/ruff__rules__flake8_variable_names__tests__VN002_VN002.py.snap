@@ -73,10 +73,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 17
+    row: 20
     column: 10
   end_location:
-    row: 17
+    row: 20
     column: 13
   fix: ~
   parent: ~
@@ -86,10 +86,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 22
+    row: 26
     column: 20
   end_location:
-    row: 22
+    row: 26
     column: 26
   fix: ~
   parent: ~

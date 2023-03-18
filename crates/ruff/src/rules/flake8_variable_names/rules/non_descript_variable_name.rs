@@ -3,25 +3,22 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 /// ## What it does
-/// Checks for `env.getenv` calls with invalid default values.
+/// Checks for variable names to be vague, non-descript values
 ///
 /// ## Why is this bad?
-/// If an environment variable is set, `env.getenv` will return its value as
-/// a string. If the environment variable is _not_ set, `env.getenv` will
-/// return `None`, or the default value if one is provided.
-///
-/// If the default value is not a string or `None`, then it will be
-/// inconsistent with the return type of `env.getenv`, which can lead to
-/// confusing behavior.
+/// Non-descript letter variable names do not help the reader to quickly
+/// know what they contain.
 ///
 /// ## Example
 /// ```python
-/// int(env.getenv("FOO", 1))
+/// foo = "hi"
+/// val = 12
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// int(env.getenv("FOO", "1"))
+/// message = "hi"
+/// valueForUse = 12
 /// ```
 #[violation]
 pub struct NonDescriptVariableName(pub String);
