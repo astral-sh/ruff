@@ -29,7 +29,7 @@ class Repository(NamedTuple):
     org: str
     repo: str
     ref: str
-    select: str = "ALL"
+    select: str = ""
     ignore: str = ""
     exclude: str = ""
 
@@ -58,13 +58,14 @@ class Repository(NamedTuple):
 
 
 REPOSITORIES = {
-    "zulip": Repository("zulip", "zulip", "main"),
-    "bokeh": Repository("bokeh", "bokeh", "branch-3.2"),
+    "airflow": Repository("apache", "airflow", "main", select="ALL"),
+    "bokeh": Repository("bokeh", "bokeh", "branch-3.2", select="ALL"),
+    "cibuildwheel": Repository("pypa", "cibuildwheel", "main"),
+    "disnake": Repository("DisnakeDev", "disnake", "main"),
     "scikit-build": Repository("scikit-build", "scikit-build", "main"),
     "scikit-build-core": Repository("scikit-build", "scikit-build-core", "main"),
-    "cibuildwheel": Repository("pypa", "cibuildwheel", "main"),
-    "airflow": Repository("apache", "airflow", "main"),
     "typeshed": Repository("python", "typeshed", "main", select="PYI"),
+    "zulip": Repository("zulip", "zulip", "main", select="ALL"),
 }
 
 SUMMARY_LINE_RE = re.compile(r"^(Found \d+ error.*)|(.*potentially fixable with.*)$")
@@ -78,12 +79,14 @@ async def check(
     *,
     ruff: Path,
     path: Path,
-    select: str,
+    select: str = "",
     ignore: str = "",
     exclude: str = "",
 ) -> "Sequence[str]":
     """Run the given ruff binary against the specified path."""
-    ruff_args = ["check", "--no-cache", "--exit-zero", "--select", select]
+    ruff_args = ["check", "--no-cache", "--exit-zero"]
+    if select:
+        ruff_args.extend(["--select", select])
     if ignore:
         ruff_args.extend(["--ignore", ignore])
     if exclude:
