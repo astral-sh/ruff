@@ -2,7 +2,6 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
-
 /// ## What it does
 /// Checks for `env.getenv` calls with invalid default values.
 ///
@@ -37,20 +36,21 @@ impl Violation for SingleLetterVariableName {
 
 fn is_single_letter_variable(name: &str) -> bool {
     const ALLOWLIST: [&'static str; 3] = ["i", "_", "T"];
-    if name.len() == 1 && !ALLOWLIST.contains(&name){
+    if name.len() == 1 && !ALLOWLIST.contains(&name) {
         return true;
     }
-    
+
     return false;
 }
 
 /// VN001
 pub fn single_letter_variable_name(name: &str, range: Range) -> Option<Diagnostic> {
     if is_single_letter_variable(name) {
-    Some(Diagnostic::new(
-        SingleLetterVariableName(name.to_string()),
-        range,
-    ))
-} else {
-    None
-}}
+        Some(Diagnostic::new(
+            SingleLetterVariableName(name.to_string()),
+            range,
+        ))
+    } else {
+        None
+    }
+}

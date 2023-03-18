@@ -13,8 +13,8 @@ mod tests {
     use crate::settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::SingleLetterVariableName, Path::new("VNE001.py"); "VNE001")]
-    #[test_case(Rule::NonDescriptVariableName, Path::new("VNE002.py"); "VNE002")]
+    #[test_case(Rule::SingleLetterVariableName, Path::new("VN001.py"); "VN001")]
+    #[test_case(Rule::NonDescriptVariableName, Path::new("VN002.py"); "VN002")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

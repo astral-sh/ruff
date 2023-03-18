@@ -1,0 +1,96 @@
+---
+source: crates/ruff/src/rules/flake8_variable_names/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: NonDescriptVariableName
+    body: "Non-descript variable name: `val`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: NonDescriptVariableName
+    body: "Non-descript variable name: `foo`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: NonDescriptVariableName
+    body: "Non-descript variable name: `bar`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: NonDescriptVariableName
+    body: "Non-descript variable name: `variable`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 4
+    column: 0
+  end_location:
+    row: 4
+    column: 8
+  fix: ~
+  parent: ~
+- kind:
+    name: NonDescriptVariableName
+    body: "Non-descript variable name: `no`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 2
+  fix: ~
+  parent: ~
+- kind:
+    name: NonDescriptVariableName
+    body: "Non-descript variable name: `foo`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 17
+    column: 10
+  end_location:
+    row: 17
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    name: NonDescriptVariableName
+    body: "Non-descript variable name: `handle`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 22
+    column: 20
+  end_location:
+    row: 22
+    column: 26
+  fix: ~
+  parent: ~
+
