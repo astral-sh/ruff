@@ -246,7 +246,7 @@ fn format_import_from(
 }
 
 /// UP026
-pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
+pub fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, .. } = &expr.node {
         if collect_call_path(value).as_slice() == ["mock", "mock"] {
             let mut diagnostic = Diagnostic::new(
@@ -268,7 +268,7 @@ pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
 }
 
 /// UP026
-pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
+pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
     match &stmt.node {
         StmtKind::Import { names } => {
             // Find all `mock` imports.

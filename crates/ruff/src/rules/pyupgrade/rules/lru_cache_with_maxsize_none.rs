@@ -23,7 +23,7 @@ impl AlwaysAutofixableViolation for LRUCacheWithMaxsizeNone {
 }
 
 /// UP033
-pub fn functools_cache(checker: &mut Checker, decorator_list: &[Expr]) {
+pub fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Expr]) {
     for expr in decorator_list.iter() {
         let ExprKind::Call {
             func,

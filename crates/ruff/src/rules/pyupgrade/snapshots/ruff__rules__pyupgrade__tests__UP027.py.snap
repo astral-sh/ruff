@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: RewriteListComprehension
+    name: UnpackedListComprehension
     body: Replace unpacked list comprehension with a generator expression
     suggestion: Replace with generator expression
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 38
   parent: ~
 - kind:
-    name: RewriteListComprehension
+    name: UnpackedListComprehension
     body: Replace unpacked list comprehension with a generator expression
     suggestion: Replace with generator expression
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    name: RewriteListComprehension
+    name: UnpackedListComprehension
     body: Replace unpacked list comprehension with a generator expression
     suggestion: Replace with generator expression
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 47
   parent: ~
 - kind:
-    name: RewriteListComprehension
+    name: UnpackedListComprehension
     body: Replace unpacked list comprehension with a generator expression
     suggestion: Replace with generator expression
     fixable: true
@@ -83,7 +83,7 @@ expression: diagnostics
       column: 51
   parent: ~
 - kind:
-    name: RewriteListComprehension
+    name: UnpackedListComprehension
     body: Replace unpacked list comprehension with a generator expression
     suggestion: Replace with generator expression
     fixable: true

@@ -147,7 +147,7 @@ impl<'a> Visitor<'a> for ReferenceVisitor<'a> {
 }
 
 /// UP028
-pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
+pub fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
     // Intentionally omit async functions.
     if let StmtKind::FunctionDef { body, .. } = &stmt.node {
         let yields = {

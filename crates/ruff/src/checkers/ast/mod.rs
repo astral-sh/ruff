@@ -413,7 +413,7 @@ where
                 if self.settings.rules.enabled(Rule::LRUCacheWithMaxsizeNone)
                     && self.settings.target_version >= PythonVersion::Py39
                 {
-                    pyupgrade::rules::functools_cache(self, decorator_list);
+                    pyupgrade::rules::lru_cache_with_maxsize_none(self, decorator_list);
                 }
 
                 if self.settings.rules.enabled(Rule::UselessExpression) {
@@ -862,11 +862,11 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(Rule::RewriteCElementTree) {
-                    pyupgrade::rules::replace_c_element_tree(self, stmt);
+                if self.settings.rules.enabled(Rule::DeprecatedCElementTree) {
+                    pyupgrade::rules::deprecated_c_element_tree(self, stmt);
                 }
                 if self.settings.rules.enabled(Rule::DeprecatedMockImport) {
-                    pyupgrade::rules::rewrite_mock_import(self, stmt);
+                    pyupgrade::rules::deprecated_mock_import(self, stmt);
                 }
 
                 // If a module is imported within a `ModuleNotFoundError` body, treat that as a
@@ -1136,10 +1136,10 @@ where
                     }
                 }
                 if self.settings.rules.enabled(Rule::DeprecatedMockImport) {
-                    pyupgrade::rules::rewrite_mock_import(self, stmt);
+                    pyupgrade::rules::deprecated_mock_import(self, stmt);
                 }
-                if self.settings.rules.enabled(Rule::RewriteCElementTree) {
-                    pyupgrade::rules::replace_c_element_tree(self, stmt);
+                if self.settings.rules.enabled(Rule::DeprecatedCElementTree) {
+                    pyupgrade::rules::deprecated_c_element_tree(self, stmt);
                 }
                 if self.settings.rules.enabled(Rule::DeprecatedImport) {
                     pyupgrade::rules::deprecated_import(
@@ -1581,8 +1581,8 @@ where
                         self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self.settings.rules.enabled(Rule::PreferTypeError) {
-                    tryceratops::rules::prefer_type_error(
+                if self.settings.rules.enabled(Rule::TypeCheckWithoutTypeError) {
+                    tryceratops::rules::type_check_without_type_error(
                         self,
                         body,
                         test,
@@ -1830,8 +1830,8 @@ where
                         self, stmt, targets, value,
                     );
                 }
-                if self.settings.rules.enabled(Rule::RewriteListComprehension) {
-                    pyupgrade::rules::unpack_list_comprehension(self, targets, value);
+                if self.settings.rules.enabled(Rule::UnpackedListComprehension) {
+                    pyupgrade::rules::unpacked_list_comprehension(self, targets, value);
                 }
 
                 if self.settings.rules.enabled(Rule::PandasDfVariableName) {
@@ -1918,7 +1918,7 @@ where
                     &Documentable::Function,
                 );
                 if self.settings.rules.enabled(Rule::YieldInForLoop) {
-                    pyupgrade::rules::rewrite_yield_from(self, stmt);
+                    pyupgrade::rules::yield_in_for_loop(self, stmt);
                 }
                 let scope =
                     transition_scope(&self.ctx.visible_scope, stmt, &Documentable::Function);
@@ -2332,7 +2332,7 @@ where
                     numpy::rules::deprecated_type_alias(self, expr);
                 }
                 if self.settings.rules.enabled(Rule::DeprecatedMockImport) {
-                    pyupgrade::rules::rewrite_mock_attribute(self, expr);
+                    pyupgrade::rules::deprecated_mock_attribute(self, expr);
                 }
                 if self.settings.rules.enabled(Rule::SixPY3) {
                     flake8_2020::rules::name_or_attribute(self, expr);
@@ -3193,7 +3193,7 @@ where
                     .rules
                     .enabled(Rule::CollectionLiteralConcatenation)
                 {
-                    ruff::rules::unpack_instead_of_concatenating_to_collection_literal(self, expr);
+                    ruff::rules::collection_literal_concatenation(self, expr);
                 }
                 if self.settings.rules.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
@@ -3357,7 +3357,7 @@ where
                     }
                 }
                 if self.settings.rules.enabled(Rule::UnicodeKindPrefix) {
-                    pyupgrade::rules::rewrite_unicode_literal(self, expr, kind.as_deref());
+                    pyupgrade::rules::unicode_kind_prefix(self, expr, kind.as_deref());
                 }
             }
             ExprKind::Lambda { args, body, .. } => {

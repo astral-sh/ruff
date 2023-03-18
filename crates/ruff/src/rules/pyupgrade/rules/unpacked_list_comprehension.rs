@@ -8,9 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct RewriteListComprehension;
+pub struct UnpackedListComprehension;
 
-impl AlwaysAutofixableViolation for RewriteListComprehension {
+impl AlwaysAutofixableViolation for UnpackedListComprehension {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Replace unpacked list comprehension with a generator expression")
@@ -84,7 +84,7 @@ fn contains_await(expr: &Expr) -> bool {
 }
 
 /// UP027
-pub fn unpack_list_comprehension(checker: &mut Checker, targets: &[Expr], value: &Expr) {
+pub fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr], value: &Expr) {
     let Some(target) = targets.get(0) else {
         return;
     };
@@ -94,7 +94,7 @@ pub fn unpack_list_comprehension(checker: &mut Checker, targets: &[Expr], value:
                 return;
             }
 
-            let mut diagnostic = Diagnostic::new(RewriteListComprehension, Range::from(value));
+            let mut diagnostic = Diagnostic::new(UnpackedListComprehension, Range::from(value));
             if checker.patch(diagnostic.kind.rule()) {
                 let existing = checker.locator.slice(value);
 

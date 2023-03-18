@@ -9,9 +9,9 @@ use ruff_python_ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 
 #[violation]
-pub struct PreferTypeError;
+pub struct TypeCheckWithoutTypeError;
 
-impl Violation for PreferTypeError {
+impl Violation for TypeCheckWithoutTypeError {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Prefer `TypeError` exception for invalid type")
@@ -132,9 +132,10 @@ fn check_raise_type(checker: &mut Checker, exc: &Expr) -> bool {
 
 fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
     if check_raise_type(checker, exc) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(PreferTypeError, Range::from(item)));
+        checker.diagnostics.push(Diagnostic::new(
+            TypeCheckWithoutTypeError,
+            Range::from(item),
+        ));
     }
 }
 
@@ -171,7 +172,7 @@ fn check_orelse(checker: &mut Checker, body: &[Stmt]) {
 }
 
 /// TRY004
-pub fn prefer_type_error(
+pub fn type_check_without_type_error(
     checker: &mut Checker,
     body: &[Stmt],
     test: &Expr,

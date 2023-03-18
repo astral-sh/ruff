@@ -22,7 +22,7 @@ impl AlwaysAutofixableViolation for UnicodeKindPrefix {
 }
 
 /// UP025
-pub fn rewrite_unicode_literal(checker: &mut Checker, expr: &Expr, kind: Option<&str>) {
+pub fn unicode_kind_prefix(checker: &mut Checker, expr: &Expr, kind: Option<&str>) {
     if let Some(const_kind) = kind {
         if const_kind.to_lowercase() == "u" {
             let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, Range::from(expr));

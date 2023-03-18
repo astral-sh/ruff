@@ -1,7 +1,7 @@
 mod ambiguous_unicode_character;
 mod asyncio_dangling_task;
+mod collection_literal_concatenation;
 mod pairwise_over_zipped;
-mod unpack_instead_of_concatenating_to_collection_literal;
 mod unused_noqa;
 
 pub use ambiguous_unicode_character::{
@@ -9,10 +9,10 @@ pub use ambiguous_unicode_character::{
     AmbiguousUnicodeCharacterDocstring, AmbiguousUnicodeCharacterString,
 };
 pub use asyncio_dangling_task::{asyncio_dangling_task, AsyncioDanglingTask};
-pub use pairwise_over_zipped::{pairwise_over_zipped, PairwiseOverZipped};
-pub use unpack_instead_of_concatenating_to_collection_literal::{
-    unpack_instead_of_concatenating_to_collection_literal, CollectionLiteralConcatenation,
+pub use collection_literal_concatenation::{
+    collection_literal_concatenation, CollectionLiteralConcatenation,
 };
+pub use pairwise_over_zipped::{pairwise_over_zipped, PairwiseOverZipped};
 pub use unused_noqa::{UnusedCodes, UnusedNOQA};
 
 #[derive(Clone, Copy)]
