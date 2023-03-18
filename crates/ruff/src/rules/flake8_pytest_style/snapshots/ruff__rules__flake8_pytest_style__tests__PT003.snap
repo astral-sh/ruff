@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: ExtraneousScopeFunction
+    name: PytestExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
     suggestion: "Remove implied `scope` argument"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    name: ExtraneousScopeFunction
+    name: PytestExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
     suggestion: "Remove implied `scope` argument"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    name: ExtraneousScopeFunction
+    name: PytestExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
     suggestion: "Remove implied `scope` argument"
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 51
   parent: ~
 - kind:
-    name: ExtraneousScopeFunction
+    name: PytestExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
     suggestion: "Remove implied `scope` argument"
     fixable: true
@@ -83,7 +83,7 @@ expression: diagnostics
       column: 53
   parent: ~
 - kind:
-    name: ExtraneousScopeFunction
+    name: PytestExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
     suggestion: "Remove implied `scope` argument"
     fixable: true
@@ -103,7 +103,7 @@ expression: diagnostics
       column: 46
   parent: ~
 - kind:
-    name: ExtraneousScopeFunction
+    name: PytestExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
     suggestion: "Remove implied `scope` argument"
     fixable: true
@@ -123,7 +123,7 @@ expression: diagnostics
       column: 4
   parent: ~
 - kind:
-    name: ExtraneousScopeFunction
+    name: PytestExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
     suggestion: "Remove implied `scope` argument"
     fixable: true
@@ -143,7 +143,7 @@ expression: diagnostics
       column: 20
   parent: ~
 - kind:
-    name: ExtraneousScopeFunction
+    name: PytestExtraneousScopeFunction
     body: "`scope='function'` is implied in `@pytest.fixture()`"
     suggestion: "Remove implied `scope` argument"
     fixable: true

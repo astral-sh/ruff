@@ -7,9 +7,9 @@ use ruff_python_ast::types::Range;
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 
 #[violation]
-pub struct ShebangWhitespace;
+pub struct ShebangLeadingWhitespace;
 
-impl AlwaysAutofixableViolation for ShebangWhitespace {
+impl AlwaysAutofixableViolation for ShebangLeadingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Avoid whitespace before shebang")
@@ -29,7 +29,7 @@ pub fn shebang_whitespace(
     if let ShebangDirective::Match(n_spaces, start, ..) = shebang {
         if *n_spaces > 0 && *start == n_spaces + 2 {
             let mut diagnostic = Diagnostic::new(
-                ShebangWhitespace,
+                ShebangLeadingWhitespace,
                 Range::new(
                     Location::new(lineno + 1, 0),
                     Location::new(lineno + 1, *n_spaces),

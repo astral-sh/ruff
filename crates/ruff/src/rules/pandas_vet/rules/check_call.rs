@@ -11,9 +11,9 @@ use crate::registry::Rule;
 use crate::rules::pandas_vet::helpers::is_dataframe_candidate;
 
 #[violation]
-pub struct UseOfDotIsNull;
+pub struct PandasUseOfDotIsNull;
 
-impl Violation for UseOfDotIsNull {
+impl Violation for PandasUseOfDotIsNull {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`.isna` is preferred to `.isnull`; functionality is equivalent")
@@ -21,9 +21,9 @@ impl Violation for UseOfDotIsNull {
 }
 
 #[violation]
-pub struct UseOfDotNotNull;
+pub struct PandasUseOfDotNotNull;
 
-impl Violation for UseOfDotNotNull {
+impl Violation for PandasUseOfDotNotNull {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`.notna` is preferred to `.notnull`; functionality is equivalent")
@@ -31,9 +31,9 @@ impl Violation for UseOfDotNotNull {
 }
 
 #[violation]
-pub struct UseOfDotPivotOrUnstack;
+pub struct PandasUseOfDotPivotOrUnstack;
 
-impl Violation for UseOfDotPivotOrUnstack {
+impl Violation for PandasUseOfDotPivotOrUnstack {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -43,9 +43,9 @@ impl Violation for UseOfDotPivotOrUnstack {
 }
 
 #[violation]
-pub struct UseOfDotReadTable;
+pub struct PandasUseOfDotReadTable;
 
-impl Violation for UseOfDotReadTable {
+impl Violation for PandasUseOfDotReadTable {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`.read_csv` is preferred to `.read_table`; provides same functionality")
@@ -53,9 +53,9 @@ impl Violation for UseOfDotReadTable {
 }
 
 #[violation]
-pub struct UseOfDotStack;
+pub struct PandasUseOfDotStack;
 
-impl Violation for UseOfDotStack {
+impl Violation for PandasUseOfDotStack {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`.melt` is preferred to `.stack`; provides same functionality")
@@ -66,13 +66,15 @@ pub fn check_call(checker: &mut Checker, func: &Expr) {
     let rules = &checker.settings.rules;
     let ExprKind::Attribute { value, attr, .. } = &func.node else {return};
     let violation: DiagnosticKind = match attr.as_str() {
-        "isnull" if rules.enabled(Rule::UseOfDotIsNull) => UseOfDotIsNull.into(),
-        "notnull" if rules.enabled(Rule::UseOfDotNotNull) => UseOfDotNotNull.into(),
-        "pivot" | "unstack" if rules.enabled(Rule::UseOfDotPivotOrUnstack) => {
-            UseOfDotPivotOrUnstack.into()
+        "isnull" if rules.enabled(Rule::PandasUseOfDotIsNull) => PandasUseOfDotIsNull.into(),
+        "notnull" if rules.enabled(Rule::PandasUseOfDotNotNull) => PandasUseOfDotNotNull.into(),
+        "pivot" | "unstack" if rules.enabled(Rule::PandasUseOfDotPivotOrUnstack) => {
+            PandasUseOfDotPivotOrUnstack.into()
         }
-        "read_table" if rules.enabled(Rule::UseOfDotReadTable) => UseOfDotReadTable.into(),
-        "stack" if rules.enabled(Rule::UseOfDotStack) => UseOfDotStack.into(),
+        "read_table" if rules.enabled(Rule::PandasUseOfDotReadTable) => {
+            PandasUseOfDotReadTable.into()
+        }
+        "stack" if rules.enabled(Rule::PandasUseOfDotStack) => PandasUseOfDotStack.into(),
         _ => return,
     };
 

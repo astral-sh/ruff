@@ -7,9 +7,9 @@ use ruff_python_ast::types::Range;
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 
 #[violation]
-pub struct ShebangNewline;
+pub struct ShebangNotFirstLine;
 
-impl Violation for ShebangNewline {
+impl Violation for ShebangNotFirstLine {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Shebang should be at the beginning of the file")
@@ -21,7 +21,7 @@ pub fn shebang_newline(lineno: usize, shebang: &ShebangDirective) -> Option<Diag
     if let ShebangDirective::Match(_, start, end, _) = shebang {
         if lineno > 1 {
             let diagnostic = Diagnostic::new(
-                ShebangNewline,
+                ShebangNotFirstLine,
                 Range::new(
                     Location::new(lineno + 1, *start),
                     Location::new(lineno + 1, *end),

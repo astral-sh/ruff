@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_2020/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: SixPY3Referenced
+    name: SixPY3
     body: "`six.PY3` referenced (python4), use `not six.PY2`"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: SixPY3Referenced
+    name: SixPY3
     body: "`six.PY3` referenced (python4), use `not six.PY2`"
     suggestion: ~
     fixable: false

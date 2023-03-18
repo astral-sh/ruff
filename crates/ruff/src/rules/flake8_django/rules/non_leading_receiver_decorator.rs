@@ -38,9 +38,9 @@ use ruff_python_ast::types::{CallPath, Range};
 ///     pass
 /// ```
 #[violation]
-pub struct NonLeadingReceiverDecorator;
+pub struct DjangoNonLeadingReceiverDecorator;
 
-impl Violation for NonLeadingReceiverDecorator {
+impl Violation for DjangoNonLeadingReceiverDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`@receiver` decorator must be on top of all the other decorators")
@@ -66,7 +66,7 @@ where
         };
         if i > 0 && is_receiver && !seen_receiver {
             diagnostics.push(Diagnostic::new(
-                NonLeadingReceiverDecorator,
+                DjangoNonLeadingReceiverDecorator,
                 Range::from(decorator),
             ));
         }

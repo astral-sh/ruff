@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: BlankLineAfterSection
+    name: NoBlankLineAfterSection
     body: "Missing blank line after section (\"Returns\")"
     suggestion: "Add blank line after \"Returns\""
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    name: BlankLineAfterSection
+    name: NoBlankLineAfterSection
     body: "Missing blank line after section (\"Returns\")"
     suggestion: "Add blank line after \"Returns\""
     fixable: true

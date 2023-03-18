@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: ImportStarNotPermitted
+    name: UndefinedLocalWithNestedImportStarUsage
     body: "`from F634 import *` only allowed at module level"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: ImportStarNotPermitted
+    name: UndefinedLocalWithNestedImportStarUsage
     body: "`from F634 import *` only allowed at module level"
     suggestion: ~
     fixable: false

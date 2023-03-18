@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_2020/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: SysVersionInfo0Eq3Referenced
+    name: SysVersionInfo0Eq3
     body: "`sys.version_info[0] == 3` referenced (python4), use `>=`"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: SysVersionInfo0Eq3Referenced
+    name: SysVersionInfo0Eq3
     body: "`sys.version_info[0] == 3` referenced (python4), use `>=`"
     suggestion: ~
     fixable: false
@@ -29,7 +29,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: SysVersionInfo0Eq3Referenced
+    name: SysVersionInfo0Eq3
     body: "`sys.version_info[0] == 3` referenced (python4), use `>=`"
     suggestion: ~
     fixable: false
@@ -42,7 +42,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: SysVersionInfo0Eq3Referenced
+    name: SysVersionInfo0Eq3
     body: "`sys.version_info[0] == 3` referenced (python4), use `>=`"
     suggestion: ~
     fixable: false

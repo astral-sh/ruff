@@ -453,11 +453,11 @@ mod tests {
 
         let expected = FxHashSet::from_iter([
             Rule::TrailingWhitespace,
-            Rule::NoNewLineAtEndOfFile,
-            Rule::BlankLineContainsWhitespace,
+            Rule::MissingNewlineAtEndOfFile,
+            Rule::BlankLineWithWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
-            Rule::IndentationContainsTabs,
+            Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
 
@@ -475,10 +475,10 @@ mod tests {
         }]);
         let expected = FxHashSet::from_iter([
             Rule::TrailingWhitespace,
-            Rule::BlankLineContainsWhitespace,
+            Rule::BlankLineWithWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
-            Rule::IndentationContainsTabs,
+            Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
 
@@ -487,7 +487,7 @@ mod tests {
             ignore: vec![Pycodestyle::W.into()],
             ..RuleSelection::default()
         }]);
-        let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);
+        let expected = FxHashSet::from_iter([Rule::MissingNewlineAtEndOfFile]);
         assert_eq!(actual, expected);
 
         let actual = resolve_rules([RuleSelection {
@@ -511,11 +511,11 @@ mod tests {
         ]);
         let expected = FxHashSet::from_iter([
             Rule::TrailingWhitespace,
-            Rule::NoNewLineAtEndOfFile,
-            Rule::BlankLineContainsWhitespace,
+            Rule::MissingNewlineAtEndOfFile,
+            Rule::BlankLineWithWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
-            Rule::IndentationContainsTabs,
+            Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
 
@@ -531,7 +531,7 @@ mod tests {
                 ..RuleSelection::default()
             },
         ]);
-        let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);
+        let expected = FxHashSet::from_iter([Rule::MissingNewlineAtEndOfFile]);
         assert_eq!(actual, expected);
     }
 
@@ -550,10 +550,10 @@ mod tests {
         ]);
         let expected = FxHashSet::from_iter([
             Rule::TrailingWhitespace,
-            Rule::BlankLineContainsWhitespace,
+            Rule::BlankLineWithWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
-            Rule::IndentationContainsTabs,
+            Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
 
@@ -571,9 +571,9 @@ mod tests {
         ]);
         let expected = FxHashSet::from_iter([
             Rule::TrailingWhitespace,
-            Rule::BlankLineContainsWhitespace,
+            Rule::BlankLineWithWhitespace,
             Rule::InvalidEscapeSequence,
-            Rule::IndentationContainsTabs,
+            Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
     }

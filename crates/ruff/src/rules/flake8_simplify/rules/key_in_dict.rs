@@ -8,20 +8,20 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct KeyInDict {
+pub struct InDictKeys {
     pub key: String,
     pub dict: String,
 }
 
-impl AlwaysAutofixableViolation for KeyInDict {
+impl AlwaysAutofixableViolation for InDictKeys {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let KeyInDict { key, dict } = self;
+        let InDictKeys { key, dict } = self;
         format!("Use `{key} in {dict}` instead of `{key} in {dict}.keys()`")
     }
 
     fn autofix_title(&self) -> String {
-        let KeyInDict { key, dict } = self;
+        let InDictKeys { key, dict } = self;
         format!("Convert to `{key} in {dict}`")
     }
 }
@@ -51,7 +51,7 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
     let value_content = checker.locator.slice(value);
 
     let mut diagnostic = Diagnostic::new(
-        KeyInDict {
+        InDictKeys {
             key: left_content.to_string(),
             dict: value_content.to_string(),
         },

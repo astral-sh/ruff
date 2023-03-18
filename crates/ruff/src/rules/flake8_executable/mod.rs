@@ -35,9 +35,9 @@ mod tests {
             &settings::Settings::for_rules(vec![
                 Rule::ShebangNotExecutable,
                 Rule::ShebangMissingExecutableFile,
-                Rule::ShebangWhitespace,
-                Rule::ShebangNewline,
-                Rule::ShebangPython,
+                Rule::ShebangLeadingWhitespace,
+                Rule::ShebangNotFirstLine,
+                Rule::ShebangMissingPython,
             ]),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);

@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: FunctionCallArgumentDefault
+    name: FunctionCallInDefaultArgument
     body: "Do not perform function call `Depends` in argument defaults"
     suggestion: ~
     fixable: false

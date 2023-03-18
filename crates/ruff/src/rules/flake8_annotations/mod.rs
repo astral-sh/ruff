@@ -26,7 +26,7 @@ mod tests {
                     Rule::MissingTypeKwargs,
                     Rule::MissingTypeSelf,
                     Rule::MissingTypeCls,
-                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -54,7 +54,7 @@ mod tests {
                     Rule::MissingTypeKwargs,
                     Rule::MissingTypeSelf,
                     Rule::MissingTypeCls,
-                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -99,7 +99,7 @@ mod tests {
                     ..Default::default()
                 },
                 ..Settings::for_rules(vec![
-                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -126,7 +126,7 @@ mod tests {
                     Rule::MissingTypeKwargs,
                     Rule::MissingTypeSelf,
                     Rule::MissingTypeCls,
-                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -161,7 +161,7 @@ mod tests {
             Path::new("flake8_annotations/allow_overload.py"),
             &Settings {
                 ..Settings::for_rules(vec![
-                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,
@@ -179,7 +179,7 @@ mod tests {
             Path::new("flake8_annotations/allow_nested_overload.py"),
             &Settings {
                 ..Settings::for_rules(vec![
-                    Rule::MissingReturnTypePublicFunction,
+                    Rule::MissingReturnTypeUndocumentedPublicFunction,
                     Rule::MissingReturnTypePrivateFunction,
                     Rule::MissingReturnTypeSpecialMethod,
                     Rule::MissingReturnTypeStaticMethod,

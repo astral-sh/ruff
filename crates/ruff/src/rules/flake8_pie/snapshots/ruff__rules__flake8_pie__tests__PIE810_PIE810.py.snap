@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: SingleStartsEndsWith
+    name: MultipleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
     suggestion: "Merge into a single `startswith` call"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 46
   parent: ~
 - kind:
-    name: SingleStartsEndsWith
+    name: MultipleStartsEndsWith
     body: "Call `endswith` once with a `tuple`"
     suggestion: "Merge into a single `endswith` call"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 42
   parent: ~
 - kind:
-    name: SingleStartsEndsWith
+    name: MultipleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
     suggestion: "Merge into a single `startswith` call"
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 42
   parent: ~
 - kind:
-    name: SingleStartsEndsWith
+    name: MultipleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
     suggestion: "Merge into a single `startswith` call"
     fixable: true
@@ -83,7 +83,7 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    name: SingleStartsEndsWith
+    name: MultipleStartsEndsWith
     body: "Call `startswith` once with a `tuple`"
     suggestion: "Merge into a single `startswith` call"
     fixable: true

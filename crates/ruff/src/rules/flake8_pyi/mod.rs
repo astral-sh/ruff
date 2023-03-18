@@ -13,8 +13,8 @@ mod tests {
     use crate::settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::PrefixTypeParams, Path::new("PYI001.pyi"))]
-    #[test_case(Rule::PrefixTypeParams, Path::new("PYI001.py"))]
+    #[test_case(Rule::UnprefixedTypeParam, Path::new("PYI001.pyi"))]
+    #[test_case(Rule::UnprefixedTypeParam, Path::new("PYI001.py"))]
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.pyi"))]
     #[test_case(Rule::BadVersionInfoComparison, Path::new("PYI006.py"))]
     #[test_case(Rule::UnrecognizedPlatformCheck, Path::new("PYI007.pyi"))]
@@ -25,10 +25,10 @@ mod tests {
     #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.pyi"))]
     #[test_case(Rule::PassStatementStubBody, Path::new("PYI009.py"))]
     #[test_case(Rule::PassStatementStubBody, Path::new("PYI009.pyi"))]
-    #[test_case(Rule::TypedArgumentSimpleDefaults, Path::new("PYI011.py"))]
-    #[test_case(Rule::TypedArgumentSimpleDefaults, Path::new("PYI011.pyi"))]
-    #[test_case(Rule::ArgumentSimpleDefaults, Path::new("PYI014.py"))]
-    #[test_case(Rule::ArgumentSimpleDefaults, Path::new("PYI014.pyi"))]
+    #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.py"))]
+    #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.pyi"))]
+    #[test_case(Rule::ArgumentDefaultInStub, Path::new("PYI014.py"))]
+    #[test_case(Rule::ArgumentDefaultInStub, Path::new("PYI014.pyi"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.py"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.pyi"))]
     #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.py"))]

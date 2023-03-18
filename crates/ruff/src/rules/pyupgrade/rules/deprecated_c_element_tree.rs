@@ -8,9 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct RewriteCElementTree;
+pub struct DeprecatedCElementTree;
 
-impl AlwaysAutofixableViolation for RewriteCElementTree {
+impl AlwaysAutofixableViolation for DeprecatedCElementTree {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`cElementTree` is deprecated, use `ElementTree`")
@@ -22,7 +22,7 @@ impl AlwaysAutofixableViolation for RewriteCElementTree {
 }
 
 fn add_check_for_node<T>(checker: &mut Checker, node: &Located<T>) {
-    let mut diagnostic = Diagnostic::new(RewriteCElementTree, Range::from(node));
+    let mut diagnostic = Diagnostic::new(DeprecatedCElementTree, Range::from(node));
     if checker.patch(diagnostic.kind.rule()) {
         let contents = checker.locator.slice(node);
         diagnostic.amend(Fix::replacement(
@@ -35,7 +35,7 @@ fn add_check_for_node<T>(checker: &mut Checker, node: &Located<T>) {
 }
 
 /// UP023
-pub fn replace_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
+pub fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
     match &stmt.node {
         StmtKind::Import { names } => {
             // Ex) `import xml.etree.cElementTree as ET`

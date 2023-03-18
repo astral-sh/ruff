@@ -61,9 +61,9 @@ impl AlwaysAutofixableViolation for TrailingWhitespace {
 /// ## References
 /// - [PEP 8](https://peps.python.org/pep-0008/#other-recommendations)
 #[violation]
-pub struct BlankLineContainsWhitespace;
+pub struct BlankLineWithWhitespace;
 
-impl AlwaysAutofixableViolation for BlankLineContainsWhitespace {
+impl AlwaysAutofixableViolation for BlankLineWithWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Blank line contains whitespace")
@@ -88,11 +88,11 @@ pub fn trailing_whitespace(
         let end = Location::new(lineno + 1, line_char_count);
 
         if whitespace_count == line_char_count {
-            if settings.rules.enabled(Rule::BlankLineContainsWhitespace) {
+            if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
                 let mut diagnostic =
-                    Diagnostic::new(BlankLineContainsWhitespace, Range::new(start, end));
+                    Diagnostic::new(BlankLineWithWhitespace, Range::new(start, end));
                 if matches!(autofix, flags::Autofix::Enabled)
-                    && settings.rules.should_fix(Rule::BlankLineContainsWhitespace)
+                    && settings.rules.should_fix(Rule::BlankLineWithWhitespace)
                 {
                     diagnostic.amend(Fix::deletion(start, end));
                 }

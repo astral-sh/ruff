@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: ParametrizeNamesWrongType
+    name: PytestParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
     suggestion: "Use a `csv` for parameter names"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    name: ParametrizeNamesWrongType
+    name: PytestParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
     suggestion: "Use a `csv` for parameter names"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 36
   parent: ~
 - kind:
-    name: ParametrizeNamesWrongType
+    name: PytestParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
     suggestion: "Use a `csv` for parameter names"
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    name: ParametrizeNamesWrongType
+    name: PytestParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
     suggestion: "Use a `csv` for parameter names"
     fixable: true
@@ -83,7 +83,7 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
-    name: ParametrizeNamesWrongType
+    name: PytestParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
     suggestion: "Use a `csv` for parameter names"
     fixable: true
@@ -96,7 +96,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: ParametrizeNamesWrongType
+    name: PytestParametrizeNamesWrongType
     body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
     suggestion: "Use a `csv` for parameter names"
     fixable: true

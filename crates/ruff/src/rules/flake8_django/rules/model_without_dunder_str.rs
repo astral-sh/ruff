@@ -41,9 +41,9 @@ use super::helpers;
 ///         return f"{self.field}"
 /// ```
 #[violation]
-pub struct ModelWithoutDunderStr;
+pub struct DjangoModelWithoutDunderStr;
 
-impl Violation for ModelWithoutDunderStr {
+impl Violation for DjangoModelWithoutDunderStr {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Model does not define `__str__` method")
@@ -62,7 +62,7 @@ pub fn model_without_dunder_str(
     }
     if !has_dunder_method(body) {
         return Some(Diagnostic::new(
-            ModelWithoutDunderStr,
+            DjangoModelWithoutDunderStr,
             Range::from(class_location),
         ));
     }

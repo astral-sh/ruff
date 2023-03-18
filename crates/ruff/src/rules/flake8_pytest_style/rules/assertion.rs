@@ -54,11 +54,11 @@ use super::unittest_assert::UnittestAssert;
 ///     assert not something_else
 /// ```
 #[violation]
-pub struct CompositeAssertion {
+pub struct PytestCompositeAssertion {
     pub fixable: bool,
 }
 
-impl Violation for CompositeAssertion {
+impl Violation for PytestCompositeAssertion {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
@@ -73,14 +73,14 @@ impl Violation for CompositeAssertion {
 }
 
 #[violation]
-pub struct AssertInExcept {
+pub struct PytestAssertInExcept {
     pub name: String,
 }
 
-impl Violation for AssertInExcept {
+impl Violation for PytestAssertInExcept {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AssertInExcept { name } = self;
+        let PytestAssertInExcept { name } = self;
         format!(
             "Found assertion on exception `{name}` in `except` block, use `pytest.raises()` instead"
         )
@@ -88,9 +88,9 @@ impl Violation for AssertInExcept {
 }
 
 #[violation]
-pub struct AssertAlwaysFalse;
+pub struct PytestAssertAlwaysFalse;
 
-impl Violation for AssertAlwaysFalse {
+impl Violation for PytestAssertAlwaysFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Assertion always fails, replace with `pytest.fail()`")
@@ -98,23 +98,23 @@ impl Violation for AssertAlwaysFalse {
 }
 
 #[violation]
-pub struct UnittestAssertion {
+pub struct PytestUnittestAssertion {
     pub assertion: String,
     pub fixable: bool,
 }
 
-impl Violation for UnittestAssertion {
+impl Violation for PytestUnittestAssertion {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnittestAssertion { assertion, .. } = self;
+        let PytestUnittestAssertion { assertion, .. } = self;
         format!("Use a regular `assert` instead of unittest-style `{assertion}`")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
         self.fixable
-            .then_some(|UnittestAssertion { assertion, .. }| {
+            .then_some(|PytestUnittestAssertion { assertion, .. }| {
                 format!("Replace `{assertion}(...)` with `assert ...`")
             })
     }
@@ -159,7 +159,7 @@ where
                 if let Some(current_assert) = self.current_assert {
                     if id.as_str() == self.exception_name {
                         self.errors.push(Diagnostic::new(
-                            AssertInExcept {
+                            PytestAssertInExcept {
                                 name: id.to_string(),
                             },
                             Range::from(current_assert),
@@ -198,7 +198,7 @@ pub fn unittest_assertion(
                     && matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
                     && !has_comments_in(Range::from(expr), checker.locator);
                 let mut diagnostic = Diagnostic::new(
-                    UnittestAssertion {
+                    PytestUnittestAssertion {
                         assertion: unittest_assert.to_string(),
                         fixable,
                     },
@@ -225,7 +225,7 @@ pub fn unittest_assertion(
 /// PT015
 pub fn assert_falsy(stmt: &Stmt, test: &Expr) -> Option<Diagnostic> {
     if is_falsy_constant(test) {
-        Some(Diagnostic::new(AssertAlwaysFalse, Range::from(stmt)))
+        Some(Diagnostic::new(PytestAssertAlwaysFalse, Range::from(stmt)))
     } else {
         None
     }
@@ -432,7 +432,8 @@ pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
         let fixable = matches!(composite, CompositionKind::Simple)
             && msg.is_none()
             && !has_comments_in(Range::from(stmt), checker.locator);
-        let mut diagnostic = Diagnostic::new(CompositeAssertion { fixable }, Range::from(stmt));
+        let mut diagnostic =
+            Diagnostic::new(PytestCompositeAssertion { fixable }, Range::from(stmt));
         if fixable && checker.patch(diagnostic.kind.rule()) {
             if let Ok(fix) = fix_composite_condition(stmt, checker.locator, checker.stylist) {
                 diagnostic.amend(fix);

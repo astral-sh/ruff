@@ -24,18 +24,18 @@ pub enum MockReference {
 }
 
 #[violation]
-pub struct RewriteMockImport {
+pub struct DeprecatedMockImport {
     pub reference_type: MockReference,
 }
 
-impl AlwaysAutofixableViolation for RewriteMockImport {
+impl AlwaysAutofixableViolation for DeprecatedMockImport {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`mock` is deprecated, use `unittest.mock`")
     }
 
     fn autofix_title(&self) -> String {
-        let RewriteMockImport { reference_type } = self;
+        let DeprecatedMockImport { reference_type } = self;
         match reference_type {
             MockReference::Import => "Import from `unittest.mock` instead".to_string(),
             MockReference::Attribute => "Replace `mock.mock` with `mock`".to_string(),
@@ -246,11 +246,11 @@ fn format_import_from(
 }
 
 /// UP026
-pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
+pub fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, .. } = &expr.node {
         if collect_call_path(value).as_slice() == ["mock", "mock"] {
             let mut diagnostic = Diagnostic::new(
-                RewriteMockImport {
+                DeprecatedMockImport {
                     reference_type: MockReference::Attribute,
                 },
                 Range::from(value),
@@ -268,7 +268,7 @@ pub fn rewrite_mock_attribute(checker: &mut Checker, expr: &Expr) {
 }
 
 /// UP026
-pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
+pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
     match &stmt.node {
         StmtKind::Import { names } => {
             // Find all `mock` imports.
@@ -277,7 +277,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 .any(|name| name.node.name == "mock" || name.node.name == "mock.mock")
             {
                 // Generate the fix, if needed, which is shared between all `mock` imports.
-                let content = if checker.patch(Rule::RewriteMockImport) {
+                let content = if checker.patch(Rule::DeprecatedMockImport) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         match format_import(stmt, indent, checker.locator, checker.stylist) {
                             Ok(content) => Some(content),
@@ -297,7 +297,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 for name in names {
                     if name.node.name == "mock" || name.node.name == "mock.mock" {
                         let mut diagnostic = Diagnostic::new(
-                            RewriteMockImport {
+                            DeprecatedMockImport {
                                 reference_type: MockReference::Import,
                             },
                             Range::from(name),
@@ -325,7 +325,7 @@ pub fn rewrite_mock_import(checker: &mut Checker, stmt: &Stmt) {
 
             if module == "mock" {
                 let mut diagnostic = Diagnostic::new(
-                    RewriteMockImport {
+                    DeprecatedMockImport {
                         reference_type: MockReference::Import,
                     },
                     Range::from(stmt),

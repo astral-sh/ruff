@@ -209,14 +209,14 @@ impl Violation for MissingTypeCls {
 ///     return a + b
 /// ```
 #[violation]
-pub struct MissingReturnTypePublicFunction {
+pub struct MissingReturnTypeUndocumentedPublicFunction {
     pub name: String,
 }
 
-impl Violation for MissingReturnTypePublicFunction {
+impl Violation for MissingReturnTypeUndocumentedPublicFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingReturnTypePublicFunction { name } = self;
+        let MissingReturnTypeUndocumentedPublicFunction { name } = self;
         format!("Missing return type annotation for public function `{name}`")
     }
 }
@@ -696,10 +696,10 @@ pub fn definition(
                         if checker
                             .settings
                             .rules
-                            .enabled(Rule::MissingReturnTypePublicFunction)
+                            .enabled(Rule::MissingReturnTypeUndocumentedPublicFunction)
                         {
                             diagnostics.push(Diagnostic::new(
-                                MissingReturnTypePublicFunction {
+                                MissingReturnTypeUndocumentedPublicFunction {
                                     name: name.to_string(),
                                 },
                                 helpers::identifier_range(stmt, checker.locator),

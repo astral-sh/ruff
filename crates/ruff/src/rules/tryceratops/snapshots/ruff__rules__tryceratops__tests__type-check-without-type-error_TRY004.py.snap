@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -29,7 +29,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -42,7 +42,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -55,7 +55,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -68,7 +68,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -81,7 +81,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -94,7 +94,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -107,7 +107,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -120,7 +120,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -133,7 +133,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -146,7 +146,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -159,7 +159,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -172,7 +172,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -185,7 +185,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -198,7 +198,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -211,7 +211,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -224,7 +224,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -237,7 +237,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -250,7 +250,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -263,7 +263,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -276,7 +276,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -289,7 +289,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -302,7 +302,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -315,7 +315,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -328,7 +328,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -341,7 +341,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -354,7 +354,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -367,7 +367,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -380,7 +380,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -393,7 +393,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -406,7 +406,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -419,7 +419,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false
@@ -432,7 +432,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferTypeError
+    name: TypeCheckWithoutTypeError
     body: "Prefer `TypeError` exception for invalid type"
     suggestion: ~
     fixable: false

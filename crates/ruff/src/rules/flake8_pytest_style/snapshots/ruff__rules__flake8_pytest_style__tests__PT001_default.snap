@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: IncorrectFixtureParenthesesStyle
+    name: PytestFixtureIncorrectParenthesesStyle
     body: "Use `@pytest.fixture()` over `@pytest.fixture`"
     suggestion: Add/remove parentheses
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    name: IncorrectFixtureParenthesesStyle
+    name: PytestFixtureIncorrectParenthesesStyle
     body: "Use `@pytest.fixture()` over `@pytest.fixture`"
     suggestion: Add/remove parentheses
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    name: IncorrectFixtureParenthesesStyle
+    name: PytestFixtureIncorrectParenthesesStyle
     body: "Use `@pytest.fixture()` over `@pytest.fixture`"
     suggestion: Add/remove parentheses
     fixable: true
