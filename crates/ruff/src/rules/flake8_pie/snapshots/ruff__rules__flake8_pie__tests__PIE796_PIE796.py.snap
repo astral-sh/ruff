@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: PreferUniqueEnums
+    name: NonUniqueEnums
     body: "Enum contains duplicate value: `\"B\"`"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferUniqueEnums
+    name: NonUniqueEnums
     body: "Enum contains duplicate value: `2`"
     suggestion: ~
     fixable: false
@@ -29,7 +29,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferUniqueEnums
+    name: NonUniqueEnums
     body: "Enum contains duplicate value: `\"2\"`"
     suggestion: ~
     fixable: false
@@ -42,7 +42,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferUniqueEnums
+    name: NonUniqueEnums
     body: "Enum contains duplicate value: `2.5`"
     suggestion: ~
     fixable: false
@@ -55,7 +55,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferUniqueEnums
+    name: NonUniqueEnums
     body: "Enum contains duplicate value: `False`"
     suggestion: ~
     fixable: false
@@ -68,7 +68,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferUniqueEnums
+    name: NonUniqueEnums
     body: "Enum contains duplicate value: `None`"
     suggestion: ~
     fixable: false
@@ -81,7 +81,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PreferUniqueEnums
+    name: NonUniqueEnums
     body: "Enum contains duplicate value: `2`"
     suggestion: ~
     fixable: false

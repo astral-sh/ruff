@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 23
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -83,7 +83,7 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -103,7 +103,7 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -123,7 +123,7 @@ expression: diagnostics
       column: 11
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -143,7 +143,7 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -163,7 +163,7 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -183,7 +183,7 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -203,7 +203,7 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -223,7 +223,7 @@ expression: diagnostics
       column: 10
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -243,7 +243,7 @@ expression: diagnostics
       column: 18
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -263,7 +263,7 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -283,7 +283,7 @@ expression: diagnostics
       column: 24
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true
@@ -303,7 +303,7 @@ expression: diagnostics
       column: 8
   parent: ~
 - kind:
-    name: TypedArgumentSimpleDefaults
+    name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
     suggestion: "Replace default value by `...`"
     fixable: true

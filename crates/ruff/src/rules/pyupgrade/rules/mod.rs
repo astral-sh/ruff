@@ -10,7 +10,7 @@ pub(crate) use deprecated_unittest_alias::{deprecated_unittest_alias, Deprecated
 pub(crate) use extraneous_parentheses::{extraneous_parentheses, ExtraneousParentheses};
 pub(crate) use f_strings::{f_strings, FString};
 pub(crate) use format_literals::{format_literals, FormatLiterals};
-pub(crate) use functools_cache::{functools_cache, FunctoolsCache};
+pub(crate) use functools_cache::{functools_cache, LRUCacheWithMaxsizeNone};
 pub(crate) use lru_cache_without_parameters::{
     lru_cache_without_parameters, LRUCacheWithoutParameters,
 };
@@ -27,10 +27,10 @@ pub(crate) use replace_stdout_stderr::{replace_stdout_stderr, ReplaceStdoutStder
 pub(crate) use replace_universal_newlines::{replace_universal_newlines, ReplaceUniversalNewlines};
 pub(crate) use rewrite_c_element_tree::{replace_c_element_tree, RewriteCElementTree};
 pub(crate) use rewrite_mock_import::{
-    rewrite_mock_attribute, rewrite_mock_import, RewriteMockImport,
+    rewrite_mock_attribute, rewrite_mock_import, DeprecatedMockImport,
 };
-pub(crate) use rewrite_unicode_literal::{rewrite_unicode_literal, RewriteUnicodeLiteral};
-pub(crate) use rewrite_yield_from::{rewrite_yield_from, RewriteYieldFrom};
+pub(crate) use rewrite_unicode_literal::{rewrite_unicode_literal, UnicodeKindPrefix};
+pub(crate) use rewrite_yield_from::{rewrite_yield_from, YieldInForLoop};
 pub(crate) use super_call_with_parameters::{super_call_with_parameters, SuperCallWithParameters};
 pub(crate) use type_of_primitive::{type_of_primitive, TypeOfPrimitive};
 pub(crate) use typing_text_str_alias::{typing_text_str_alias, TypingTextStrAlias};

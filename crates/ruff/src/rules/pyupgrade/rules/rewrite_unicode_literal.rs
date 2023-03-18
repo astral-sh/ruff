@@ -8,9 +8,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct RewriteUnicodeLiteral;
+pub struct UnicodeKindPrefix;
 
-impl AlwaysAutofixableViolation for RewriteUnicodeLiteral {
+impl AlwaysAutofixableViolation for UnicodeKindPrefix {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Remove unicode literals from strings")
@@ -25,7 +25,7 @@ impl AlwaysAutofixableViolation for RewriteUnicodeLiteral {
 pub fn rewrite_unicode_literal(checker: &mut Checker, expr: &Expr, kind: Option<&str>) {
     if let Some(const_kind) = kind {
         if const_kind.to_lowercase() == "u" {
-            let mut diagnostic = Diagnostic::new(RewriteUnicodeLiteral, Range::from(expr));
+            let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, Range::from(expr));
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::deletion(
                     expr.location,

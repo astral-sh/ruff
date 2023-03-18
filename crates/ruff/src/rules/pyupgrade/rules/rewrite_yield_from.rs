@@ -11,9 +11,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct RewriteYieldFrom;
+pub struct YieldInForLoop;
 
-impl AlwaysAutofixableViolation for RewriteYieldFrom {
+impl AlwaysAutofixableViolation for YieldInForLoop {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Replace `yield` over `for` loop with `yield from`")
@@ -172,7 +172,7 @@ pub fn rewrite_yield_from(checker: &mut Checker, stmt: &Stmt) {
                 continue;
             }
 
-            let mut diagnostic = Diagnostic::new(RewriteYieldFrom, Range::from(item.stmt));
+            let mut diagnostic = Diagnostic::new(YieldInForLoop, Range::from(item.stmt));
             if checker.patch(diagnostic.kind.rule()) {
                 let contents = checker.locator.slice(item.iter);
                 let contents = format!("yield from {contents}");

@@ -9,31 +9,31 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct ConsiderUsingFromImport {
+pub struct ManualFromImport {
     pub module: String,
     pub name: String,
     pub fixable: bool,
 }
 
-impl Violation for ConsiderUsingFromImport {
+impl Violation for ManualFromImport {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ConsiderUsingFromImport { module, name, .. } = self;
+        let ManualFromImport { module, name, .. } = self;
         format!("Use `from {module} import {name}` in lieu of alias")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
         self.fixable
-            .then_some(|ConsiderUsingFromImport { module, name, .. }| {
+            .then_some(|ManualFromImport { module, name, .. }| {
                 format!("Replace with `from {module} import {name}`")
             })
     }
 }
 
 /// PLR0402
-pub fn use_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, names: &[Alias]) {
+pub fn manual_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, names: &[Alias]) {
     let Some(asname) = &alias.node.asname else {
         return;
     };
@@ -46,7 +46,7 @@ pub fn use_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, names:
 
     let fixable = names.len() == 1;
     let mut diagnostic = Diagnostic::new(
-        ConsiderUsingFromImport {
+        ManualFromImport {
             module: module.to_string(),
             name: name.to_string(),
             fixable,

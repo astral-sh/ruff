@@ -1,21 +1,26 @@
 pub use assertion::{
     assert_falsy, assert_in_exception_handler, composite_condition, unittest_assertion,
-    AssertAlwaysFalse, AssertInExcept, CompositeAssertion, UnittestAssertion,
+    PytestAssertAlwaysFalse, PytestAssertInExcept, PytestCompositeAssertion,
+    PytestUnittestAssertion,
 };
-pub use fail::{fail_call, FailWithoutMessage};
+pub use fail::{fail_call, PytestFailWithoutMessage};
 pub use fixture::{
-    fixture, DeprecatedYieldFixture, ErroneousUseFixturesOnFixture, ExtraneousScopeFunction,
-    FixtureFinalizerCallback, FixtureParamWithoutValue, FixturePositionalArgs,
-    IncorrectFixtureNameUnderscore, IncorrectFixtureParenthesesStyle, MissingFixtureNameUnderscore,
-    UnnecessaryAsyncioMarkOnFixture, UselessYieldFixture,
+    fixture, PytestDeprecatedYieldFixture, PytestErroneousUseFixturesOnFixture,
+    PytestExtraneousScopeFunction, PytestFixtureFinalizerCallback,
+    PytestFixtureIncorrectParenthesesStyle, PytestFixtureParamWithoutValue,
+    PytestFixturePositionalArgs, PytestIncorrectFixtureNameUnderscore,
+    PytestMissingFixtureNameUnderscore, PytestUnnecessaryAsyncioMarkOnFixture,
+    PytestUselessYieldFixture,
 };
-pub use imports::{import, import_from, IncorrectPytestImport};
-pub use marks::{marks, IncorrectMarkParenthesesStyle, UseFixturesWithoutParameters};
-pub use parametrize::{parametrize, ParametrizeNamesWrongType, ParametrizeValuesWrongType};
-pub use patch::{patch_with_lambda, PatchWithLambda};
+pub use imports::{import, import_from, PytestIncorrectPytestImport};
+pub use marks::{marks, PytestIncorrectMarkParenthesesStyle, PytestUseFixturesWithoutParameters};
+pub use parametrize::{
+    parametrize, PytestParametrizeNamesWrongType, PytestParametrizeValuesWrongType,
+};
+pub use patch::{patch_with_lambda, PytestPatchWithLambda};
 pub use raises::{
-    complex_raises, raises_call, RaisesTooBroad, RaisesWithMultipleStatements,
-    RaisesWithoutException,
+    complex_raises, raises_call, PytestRaisesTooBroad, PytestRaisesWithMultipleStatements,
+    PytestRaisesWithoutException,
 };
 
 mod assertion;

@@ -9,26 +9,25 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct UnpackInsteadOfConcatenatingToCollectionLiteral {
+pub struct CollectionLiteralConcatenation {
     pub expr: String,
     pub fixable: bool,
 }
 
-impl Violation for UnpackInsteadOfConcatenatingToCollectionLiteral {
+impl Violation for CollectionLiteralConcatenation {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnpackInsteadOfConcatenatingToCollectionLiteral { expr, .. } = self;
+        let CollectionLiteralConcatenation { expr, .. } = self;
         format!("Consider `{expr}` instead of concatenation")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable.then_some(
-            |UnpackInsteadOfConcatenatingToCollectionLiteral { expr, .. }| {
+        self.fixable
+            .then_some(|CollectionLiteralConcatenation { expr, .. }| {
                 format!("Replace with `{expr}`")
-            },
-        )
+            })
     }
 }
 
@@ -105,7 +104,7 @@ pub fn unpack_instead_of_concatenating_to_collection_literal(checker: &mut Check
     let fixable = !has_comments(expr, checker.locator);
 
     let mut diagnostic = Diagnostic::new(
-        UnpackInsteadOfConcatenatingToCollectionLiteral {
+        CollectionLiteralConcatenation {
             expr: contents.clone(),
             fixable,
         },

@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: NoEval
+    name: Eval
     body: "No builtin `eval()` allowed"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: NoEval
+    name: Eval
     body: "No builtin `eval()` allowed"
     suggestion: ~
     fixable: false

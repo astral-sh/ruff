@@ -10,9 +10,9 @@ use crate::message::Location;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct NoSurroundingWhitespace;
+pub struct SurroundingWhitespace;
 
-impl AlwaysAutofixableViolation for NoSurroundingWhitespace {
+impl AlwaysAutofixableViolation for SurroundingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("No whitespaces allowed surrounding docstring text")
@@ -39,7 +39,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
     if line == trimmed {
         return;
     }
-    let mut diagnostic = Diagnostic::new(NoSurroundingWhitespace, Range::from(docstring.expr));
+    let mut diagnostic = Diagnostic::new(SurroundingWhitespace, Range::from(docstring.expr));
     if checker.patch(diagnostic.kind.rule()) {
         if let Some(pattern) = leading_quote(contents) {
             // If removing whitespace would lead to an invalid string of quote

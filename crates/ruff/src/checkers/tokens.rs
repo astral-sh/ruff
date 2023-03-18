@@ -54,9 +54,9 @@ pub fn check_tokens(
     ]);
 
     let enforce_trailing_comma = settings.rules.any_enabled(&[
-        Rule::TrailingCommaMissing,
-        Rule::TrailingCommaOnBareTupleProhibited,
-        Rule::TrailingCommaProhibited,
+        Rule::MissingTrailingComma,
+        Rule::TrailingCommaOnBareTuple,
+        Rule::ProhibitedTrailingComma,
     ]);
     let enforce_extraneous_parenthesis = settings.rules.enabled(Rule::ExtraneousParentheses);
     let enforce_type_comment_in_stub = settings.rules.enabled(Rule::TypeCommentInStub);

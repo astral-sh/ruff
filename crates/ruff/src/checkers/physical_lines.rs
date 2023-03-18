@@ -12,8 +12,8 @@ use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
 };
 use crate::rules::pycodestyle::rules::{
-    doc_line_too_long, indentation_contains_tabs, line_too_long, mixed_spaces_and_tabs,
-    no_newline_at_end_of_file, trailing_whitespace,
+    doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
+    tab_indentation, trailing_whitespace,
 };
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pylint;
@@ -35,25 +35,25 @@ pub fn check_physical_lines(
     let enforce_blanket_noqa = settings.rules.enabled(Rule::BlanketNOQA);
     let enforce_shebang_not_executable = settings.rules.enabled(Rule::ShebangNotExecutable);
     let enforce_shebang_missing = settings.rules.enabled(Rule::ShebangMissingExecutableFile);
-    let enforce_shebang_whitespace = settings.rules.enabled(Rule::ShebangWhitespace);
-    let enforce_shebang_newline = settings.rules.enabled(Rule::ShebangNewline);
-    let enforce_shebang_python = settings.rules.enabled(Rule::ShebangPython);
+    let enforce_shebang_whitespace = settings.rules.enabled(Rule::ShebangLeadingWhitespace);
+    let enforce_shebang_newline = settings.rules.enabled(Rule::ShebangNotFirstLine);
+    let enforce_shebang_python = settings.rules.enabled(Rule::ShebangMissingPython);
     let enforce_blanket_type_ignore = settings.rules.enabled(Rule::BlanketTypeIgnore);
     let enforce_doc_line_too_long = settings.rules.enabled(Rule::DocLineTooLong);
     let enforce_line_too_long = settings.rules.enabled(Rule::LineTooLong);
-    let enforce_no_newline_at_end_of_file = settings.rules.enabled(Rule::NoNewLineAtEndOfFile);
+    let enforce_no_newline_at_end_of_file = settings.rules.enabled(Rule::MissingNewlineAtEndOfFile);
     let enforce_unnecessary_coding_comment = settings.rules.enabled(Rule::UTF8EncodingDeclaration);
     let enforce_mixed_spaces_and_tabs = settings.rules.enabled(Rule::MixedSpacesAndTabs);
     let enforce_bidirectional_unicode = settings.rules.enabled(Rule::BidirectionalUnicode);
     let enforce_trailing_whitespace = settings.rules.enabled(Rule::TrailingWhitespace);
     let enforce_blank_line_contains_whitespace =
-        settings.rules.enabled(Rule::BlankLineContainsWhitespace);
-    let enforce_indentation_contains_tabs = settings.rules.enabled(Rule::IndentationContainsTabs);
+        settings.rules.enabled(Rule::BlankLineWithWhitespace);
+    let enforce_tab_indentation = settings.rules.enabled(Rule::TabIndentation);
 
     let fix_unnecessary_coding_comment =
         autofix.into() && settings.rules.should_fix(Rule::UTF8EncodingDeclaration);
     let fix_shebang_whitespace =
-        autofix.into() && settings.rules.should_fix(Rule::ShebangWhitespace);
+        autofix.into() && settings.rules.should_fix(Rule::ShebangLeadingWhitespace);
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
@@ -154,8 +154,8 @@ pub fn check_physical_lines(
             }
         }
 
-        if enforce_indentation_contains_tabs {
-            if let Some(diagnostic) = indentation_contains_tabs(index, line) {
+        if enforce_tab_indentation {
+            if let Some(diagnostic) = tab_indentation(index, line) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -165,7 +165,7 @@ pub fn check_physical_lines(
         if let Some(diagnostic) = no_newline_at_end_of_file(
             locator,
             stylist,
-            autofix.into() && settings.rules.should_fix(Rule::NoNewLineAtEndOfFile),
+            autofix.into() && settings.rules.should_fix(Rule::MissingNewlineAtEndOfFile),
         ) {
             diagnostics.push(diagnostic);
         }

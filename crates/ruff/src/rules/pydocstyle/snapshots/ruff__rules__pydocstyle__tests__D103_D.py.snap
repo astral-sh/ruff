@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: PublicFunction
+    name: UndocumentedPublicFunction
     body: Missing docstring in public function
     suggestion: ~
     fixable: false

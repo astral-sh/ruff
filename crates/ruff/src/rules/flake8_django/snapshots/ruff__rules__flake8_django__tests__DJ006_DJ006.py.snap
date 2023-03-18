@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: ExcludeWithModelForm
+    name: DjangoExcludeWithModelForm
     body: "Do not use `exclude` with `ModelForm`, use `fields` instead"
     suggestion: ~
     fixable: false

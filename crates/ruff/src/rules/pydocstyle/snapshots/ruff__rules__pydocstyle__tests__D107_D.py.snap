@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: PublicInit
+    name: UndocumentedPublicInit
     body: "Missing docstring in `__init__`"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PublicInit
+    name: UndocumentedPublicInit
     body: "Missing docstring in `__init__`"
     suggestion: ~
     fixable: false

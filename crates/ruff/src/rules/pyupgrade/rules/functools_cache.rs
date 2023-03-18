@@ -9,9 +9,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct FunctoolsCache;
+pub struct LRUCacheWithMaxsizeNone;
 
-impl AlwaysAutofixableViolation for FunctoolsCache {
+impl AlwaysAutofixableViolation for LRUCacheWithMaxsizeNone {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`")
@@ -54,7 +54,7 @@ pub fn functools_cache(checker: &mut Checker, decorator_list: &[Expr]) {
                 )
             {
                 let mut diagnostic = Diagnostic::new(
-                    FunctoolsCache,
+                    LRUCacheWithMaxsizeNone,
                     Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
                 );
                 if checker.patch(diagnostic.kind.rule()) {

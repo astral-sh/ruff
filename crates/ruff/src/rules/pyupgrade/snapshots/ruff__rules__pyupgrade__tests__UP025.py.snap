@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: RewriteUnicodeLiteral
+    name: UnicodeKindPrefix
     body: Remove unicode literals from strings
     suggestion: Remove unicode prefix
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    name: RewriteUnicodeLiteral
+    name: UnicodeKindPrefix
     body: Remove unicode literals from strings
     suggestion: Remove unicode prefix
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 1
   parent: ~
 - kind:
-    name: RewriteUnicodeLiteral
+    name: UnicodeKindPrefix
     body: Remove unicode literals from strings
     suggestion: Remove unicode prefix
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    name: RewriteUnicodeLiteral
+    name: UnicodeKindPrefix
     body: Remove unicode literals from strings
     suggestion: Remove unicode prefix
     fixable: true
@@ -83,7 +83,7 @@ expression: diagnostics
       column: 7
   parent: ~
 - kind:
-    name: RewriteUnicodeLiteral
+    name: UnicodeKindPrefix
     body: Remove unicode literals from strings
     suggestion: Remove unicode prefix
     fixable: true
@@ -103,7 +103,7 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    name: RewriteUnicodeLiteral
+    name: UnicodeKindPrefix
     body: Remove unicode literals from strings
     suggestion: Remove unicode prefix
     fixable: true
@@ -123,7 +123,7 @@ expression: diagnostics
       column: 15
   parent: ~
 - kind:
-    name: RewriteUnicodeLiteral
+    name: UnicodeKindPrefix
     body: Remove unicode literals from strings
     suggestion: Remove unicode prefix
     fixable: true
@@ -143,7 +143,7 @@ expression: diagnostics
       column: 27
   parent: ~
 - kind:
-    name: RewriteUnicodeLiteral
+    name: UnicodeKindPrefix
     body: Remove unicode literals from strings
     suggestion: Remove unicode prefix
     fixable: true
@@ -163,7 +163,7 @@ expression: diagnostics
       column: 39
   parent: ~
 - kind:
-    name: RewriteUnicodeLiteral
+    name: UnicodeKindPrefix
     body: Remove unicode literals from strings
     suggestion: Remove unicode prefix
     fixable: true
@@ -183,7 +183,7 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    name: RewriteUnicodeLiteral
+    name: UnicodeKindPrefix
     body: Remove unicode literals from strings
     suggestion: Remove unicode prefix
     fixable: true
@@ -203,7 +203,7 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    name: RewriteUnicodeLiteral
+    name: UnicodeKindPrefix
     body: Remove unicode literals from strings
     suggestion: Remove unicode prefix
     fixable: true
@@ -223,7 +223,7 @@ expression: diagnostics
       column: 5
   parent: ~
 - kind:
-    name: RewriteUnicodeLiteral
+    name: UnicodeKindPrefix
     body: Remove unicode literals from strings
     suggestion: Remove unicode prefix
     fixable: true

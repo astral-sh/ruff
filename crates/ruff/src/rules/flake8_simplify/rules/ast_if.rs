@@ -96,9 +96,9 @@ impl Violation for NeedlessBool {
 /// return {1: "Hello", 2: "Goodbye"}.get(x, "Goodnight")
 /// ```
 #[violation]
-pub struct ManualDictLookup;
+pub struct IfElseBlockInsteadOfDictLookup;
 
-impl Violation for ManualDictLookup {
+impl Violation for IfElseBlockInsteadOfDictLookup {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use a dictionary instead of consecutive `if` statements")
@@ -106,23 +106,23 @@ impl Violation for ManualDictLookup {
 }
 
 #[violation]
-pub struct UseTernaryOperator {
+pub struct IfElseBlockInsteadOfIfExp {
     pub contents: String,
     pub fixable: bool,
 }
 
-impl Violation for UseTernaryOperator {
+impl Violation for IfElseBlockInsteadOfIfExp {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UseTernaryOperator { contents, .. } = self;
+        let IfElseBlockInsteadOfIfExp { contents, .. } = self;
         format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
         self.fixable
-            .then_some(|UseTernaryOperator { contents, .. }| {
+            .then_some(|IfElseBlockInsteadOfIfExp { contents, .. }| {
                 format!("Replace `if`-`else`-block with `{contents}`")
             })
     }
@@ -159,23 +159,25 @@ impl Violation for IfWithSameArms {
 }
 
 #[violation]
-pub struct DictGetWithDefault {
+pub struct IfElseBlockInsteadOfDictGet {
     pub contents: String,
     pub fixable: bool,
 }
 
-impl Violation for DictGetWithDefault {
+impl Violation for IfElseBlockInsteadOfDictGet {
     const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DictGetWithDefault { contents, .. } = self;
+        let IfElseBlockInsteadOfDictGet { contents, .. } = self;
         format!("Use `{contents}` instead of an `if` block")
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
         self.fixable
-            .then_some(|DictGetWithDefault { contents, .. }| format!("Replace with `{contents}`"))
+            .then_some(|IfElseBlockInsteadOfDictGet { contents, .. }| {
+                format!("Replace with `{contents}`")
+            })
     }
 }
 
@@ -494,7 +496,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
 
     let fixable = !has_comments(stmt, checker.locator);
     let mut diagnostic = Diagnostic::new(
-        UseTernaryOperator {
+        IfElseBlockInsteadOfIfExp {
             contents: contents.clone(),
             fixable,
         },
@@ -724,9 +726,10 @@ pub fn manual_dict_lookup(
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(ManualDictLookup, Range::from(stmt)));
+    checker.diagnostics.push(Diagnostic::new(
+        IfElseBlockInsteadOfDictLookup,
+        Range::from(stmt),
+    ));
 }
 
 /// SIM401
@@ -842,7 +845,7 @@ pub fn use_dict_get_with_default(
 
     let fixable = !has_comments(stmt, checker.locator);
     let mut diagnostic = Diagnostic::new(
-        DictGetWithDefault {
+        IfElseBlockInsteadOfDictGet {
             contents: contents.clone(),
             fixable,
         },

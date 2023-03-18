@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: ConsiderMergingIsinstance
+    name: RepeatedIsinstanceCalls
     body: "Merge these isinstance calls: `isinstance(var[3], (float, int))`"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: ConsiderMergingIsinstance
+    name: RepeatedIsinstanceCalls
     body: "Merge these isinstance calls: `isinstance(var[4], (float, int))`"
     suggestion: ~
     fixable: false
@@ -29,7 +29,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: ConsiderMergingIsinstance
+    name: RepeatedIsinstanceCalls
     body: "Merge these isinstance calls: `isinstance(var[5], (float, int))`"
     suggestion: ~
     fixable: false
@@ -42,7 +42,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: ConsiderMergingIsinstance
+    name: RepeatedIsinstanceCalls
     body: "Merge these isinstance calls: `isinstance(var[10], (list, str))`"
     suggestion: ~
     fixable: false
@@ -55,7 +55,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: ConsiderMergingIsinstance
+    name: RepeatedIsinstanceCalls
     body: "Merge these isinstance calls: `isinstance(var[11], (float, int))`"
     suggestion: ~
     fixable: false
@@ -68,7 +68,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: ConsiderMergingIsinstance
+    name: RepeatedIsinstanceCalls
     body: "Merge these isinstance calls: `isinstance(var[12], (float, int, list))`"
     suggestion: ~
     fixable: false

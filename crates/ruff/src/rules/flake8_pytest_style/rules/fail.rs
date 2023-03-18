@@ -10,9 +10,9 @@ use crate::checkers::ast::Checker;
 use super::helpers::{is_empty_or_null_string, is_pytest_fail};
 
 #[violation]
-pub struct FailWithoutMessage;
+pub struct PytestFailWithoutMessage;
 
-impl Violation for FailWithoutMessage {
+impl Violation for PytestFailWithoutMessage {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("No message passed to `pytest.fail()`")
@@ -28,12 +28,12 @@ pub fn fail_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[
             if is_empty_or_null_string(msg) {
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(FailWithoutMessage, Range::from(func)));
+                    .push(Diagnostic::new(PytestFailWithoutMessage, Range::from(func)));
             }
         } else {
             checker
                 .diagnostics
-                .push(Diagnostic::new(FailWithoutMessage, Range::from(func)));
+                .push(Diagnostic::new(PytestFailWithoutMessage, Range::from(func)));
         }
     }
 }

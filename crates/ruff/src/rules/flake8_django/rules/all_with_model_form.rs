@@ -38,9 +38,9 @@ use crate::rules::flake8_django::rules::helpers::is_model_form;
 ///         fields = ["title", "content"]
 /// ```
 #[violation]
-pub struct AllWithModelForm;
+pub struct DjangoAllWithModelForm;
 
-impl Violation for AllWithModelForm {
+impl Violation for DjangoAllWithModelForm {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Do not use `__all__` with `ModelForm`, use `fields` instead")
@@ -76,12 +76,18 @@ pub fn all_with_model_form(checker: &Checker, bases: &[Expr], body: &[Stmt]) -> 
                 match &value {
                     Constant::Str(s) => {
                         if s == "__all__" {
-                            return Some(Diagnostic::new(AllWithModelForm, Range::from(element)));
+                            return Some(Diagnostic::new(
+                                DjangoAllWithModelForm,
+                                Range::from(element),
+                            ));
                         }
                     }
                     Constant::Bytes(b) => {
                         if b == "__all__".as_bytes() {
-                            return Some(Diagnostic::new(AllWithModelForm, Range::from(element)));
+                            return Some(Diagnostic::new(
+                                DjangoAllWithModelForm,
+                                Range::from(element),
+                            ));
                         }
                     }
                     _ => (),

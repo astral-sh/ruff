@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: NoBlankLinesBetweenHeaderAndContent
+    name: BlankLinesBetweenHeaderAndContent
     body: "No blank lines allowed between a section header and its content (\"Short summary\")"
     suggestion: Remove blank line(s)
     fixable: true

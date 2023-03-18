@@ -20,7 +20,7 @@ mod tests {
     #[test_case(Rule::StripWithMultiCharacters, Path::new("B005.py"); "B005")]
     #[test_case(Rule::MutableArgumentDefault, Path::new("B006_B008.py"); "B006")]
     #[test_case(Rule::UnusedLoopControlVariable, Path::new("B007.py"); "B007")]
-    #[test_case(Rule::FunctionCallArgumentDefault, Path::new("B006_B008.py"); "B008")]
+    #[test_case(Rule::FunctionCallInDefaultArgument, Path::new("B006_B008.py"); "B008")]
     #[test_case(Rule::GetAttrWithConstant, Path::new("B009_B010.py"); "B009")]
     #[test_case(Rule::SetAttrWithConstant, Path::new("B009_B010.py"); "B010")]
     #[test_case(Rule::AssertFalse, Path::new("B011.py"); "B011")]
@@ -69,7 +69,7 @@ mod tests {
                         "fastapi.Query".to_string(),
                     ],
                 },
-                ..Settings::for_rules(vec![Rule::FunctionCallArgumentDefault])
+                ..Settings::for_rules(vec![Rule::FunctionCallInDefaultArgument])
             },
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);

@@ -21,11 +21,11 @@ pub use indentation::{
     NoIndentedBlock, NoIndentedBlockComment, OverIndented, UnexpectedIndentation,
     UnexpectedIndentationComment,
 };
-pub use indentation_contains_tabs::{indentation_contains_tabs, IndentationContainsTabs};
 pub use invalid_escape_sequence::{invalid_escape_sequence, InvalidEscapeSequence};
 pub use lambda_assignment::{lambda_assignment, LambdaAssignment};
 pub use line_too_long::{line_too_long, LineTooLong};
 pub use literal_comparisons::{literal_comparisons, NoneComparison, TrueFalseComparison};
+pub use missing_newline_at_end_of_file::{no_newline_at_end_of_file, MissingNewlineAtEndOfFile};
 pub use missing_whitespace::{missing_whitespace, MissingWhitespace};
 pub use missing_whitespace_after_keyword::{
     missing_whitespace_after_keyword, MissingWhitespaceAfterKeyword,
@@ -36,15 +36,13 @@ pub use missing_whitespace_around_operator::{
     MissingWhitespaceAroundOperator,
 };
 pub use mixed_spaces_and_tabs::{mixed_spaces_and_tabs, MixedSpacesAndTabs};
-pub use no_newline_at_end_of_file::{no_newline_at_end_of_file, NoNewLineAtEndOfFile};
 pub use not_tests::{not_tests, NotInTest, NotIsTest};
 pub use space_around_operator::{
     space_around_operator, MultipleSpacesAfterOperator, MultipleSpacesBeforeOperator,
     TabAfterOperator, TabBeforeOperator,
 };
-pub use trailing_whitespace::{
-    trailing_whitespace, BlankLineContainsWhitespace, TrailingWhitespace,
-};
+pub use tab_indentation::{tab_indentation, TabIndentation};
+pub use trailing_whitespace::{trailing_whitespace, BlankLineWithWhitespace, TrailingWhitespace};
 pub use type_comparison::{type_comparison, TypeComparison};
 pub use whitespace_around_keywords::{
     whitespace_around_keywords, MultipleSpacesAfterKeyword, MultipleSpacesBeforeKeyword,
@@ -70,18 +68,18 @@ mod errors;
 mod extraneous_whitespace;
 mod imports;
 mod indentation;
-mod indentation_contains_tabs;
 mod invalid_escape_sequence;
 mod lambda_assignment;
 mod line_too_long;
 mod literal_comparisons;
+mod missing_newline_at_end_of_file;
 mod missing_whitespace;
 mod missing_whitespace_after_keyword;
 mod missing_whitespace_around_operator;
 mod mixed_spaces_and_tabs;
-mod no_newline_at_end_of_file;
 mod not_tests;
 mod space_around_operator;
+mod tab_indentation;
 mod trailing_whitespace;
 mod type_comparison;
 mod whitespace_around_keywords;

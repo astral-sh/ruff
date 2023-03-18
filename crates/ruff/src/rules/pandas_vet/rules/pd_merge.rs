@@ -5,9 +5,9 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 #[violation]
-pub struct UseOfPdMerge;
+pub struct PandasUseOfPdMerge;
 
-impl Violation for UseOfPdMerge {
+impl Violation for PandasUseOfPdMerge {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -22,7 +22,7 @@ pub fn use_of_pd_merge(func: &Expr) -> Option<Diagnostic> {
     if let ExprKind::Attribute { attr, value, .. } = &func.node {
         if let ExprKind::Name { id, .. } = &value.node {
             if id == "pd" && attr == "merge" {
-                return Some(Diagnostic::new(UseOfPdMerge, Range::from(func)));
+                return Some(Diagnostic::new(PandasUseOfPdMerge, Range::from(func)));
             }
         }
     }

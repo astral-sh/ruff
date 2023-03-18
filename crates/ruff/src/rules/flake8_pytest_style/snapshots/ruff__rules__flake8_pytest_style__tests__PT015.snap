@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -29,7 +29,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -42,7 +42,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -55,7 +55,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -68,7 +68,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -81,7 +81,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -94,7 +94,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -107,7 +107,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -120,7 +120,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -133,7 +133,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -146,7 +146,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -159,7 +159,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -172,7 +172,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -185,7 +185,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -198,7 +198,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
@@ -211,7 +211,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: AssertAlwaysFalse
+    name: PytestAssertAlwaysFalse
     body: "Assertion always fails, replace with `pytest.fail()`"
     suggestion: ~
     fixable: false
