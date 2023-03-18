@@ -60,6 +60,7 @@ class Repository(NamedTuple):
 REPOSITORIES = {
     "airflow": Repository("apache", "airflow", "main", select="ALL"),
     "bokeh": Repository("bokeh", "bokeh", "branch-3.2", select="ALL"),
+    "build": Repository("pypa", "build", "main"),
     "cibuildwheel": Repository("pypa", "cibuildwheel", "main"),
     "disnake": Repository("DisnakeDev", "disnake", "master"),
     "scikit-build": Repository("scikit-build", "scikit-build", "main"),
