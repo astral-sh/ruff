@@ -4,7 +4,8 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Range, ScopeKind};
+use ruff_python_ast::scope::ScopeKind;
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -40,7 +41,7 @@ impl Violation for YieldOutsideFunction {
 
 pub fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
     if matches!(
-        checker.ctx.current_scope().kind,
+        checker.ctx.scope().kind,
         ScopeKind::Class(_) | ScopeKind::Module
     ) {
         let keyword = match expr.node {

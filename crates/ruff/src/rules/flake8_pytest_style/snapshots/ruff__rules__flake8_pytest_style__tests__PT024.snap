@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: UnnecessaryAsyncioMarkOnFixture
+    name: PytestUnnecessaryAsyncioMarkOnFixture
     body: "`pytest.mark.asyncio` is unnecessary for fixtures"
     suggestion: "Remove `pytest.mark.asyncio`"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    name: UnnecessaryAsyncioMarkOnFixture
+    name: PytestUnnecessaryAsyncioMarkOnFixture
     body: "`pytest.mark.asyncio` is unnecessary for fixtures"
     suggestion: "Remove `pytest.mark.asyncio`"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    name: UnnecessaryAsyncioMarkOnFixture
+    name: PytestUnnecessaryAsyncioMarkOnFixture
     body: "`pytest.mark.asyncio` is unnecessary for fixtures"
     suggestion: "Remove `pytest.mark.asyncio`"
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    name: UnnecessaryAsyncioMarkOnFixture
+    name: PytestUnnecessaryAsyncioMarkOnFixture
     body: "`pytest.mark.asyncio` is unnecessary for fixtures"
     suggestion: "Remove `pytest.mark.asyncio`"
     fixable: true

@@ -40,14 +40,14 @@ use super::helpers;
 ///     field = models.CharField(max_length=255, default="")
 /// ```
 #[violation]
-pub struct NullableModelStringField {
+pub struct DjangoNullableModelStringField {
     pub field_name: String,
 }
 
-impl Violation for NullableModelStringField {
+impl Violation for DjangoNullableModelStringField {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NullableModelStringField { field_name } = self;
+        let DjangoNullableModelStringField { field_name } = self;
         format!("Avoid using `null=True` on string-based fields such as {field_name}")
     }
 }
@@ -70,7 +70,7 @@ pub fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diag
         };
         if let Some(field_name) = is_nullable_field(checker, value) {
             errors.push(Diagnostic::new(
-                NullableModelStringField {
+                DjangoNullableModelStringField {
                     field_name: field_name.to_string(),
                 },
                 Range::from(value),

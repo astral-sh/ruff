@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: BlankLineContainsWhitespace
+    name: BlankLineWithWhitespace
     body: Blank line contains whitespace
     suggestion: Remove whitespace from blank line
     fixable: true

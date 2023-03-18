@@ -1,0 +1,25 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: InvalidCharacterSub
+    body: "Invalid unescaped character SUB, use \"\\x1A\" instead"
+    suggestion: Replace with escape sequence
+    fixable: true
+  location:
+    row: 21
+    column: 11
+  end_location:
+    row: 21
+    column: 12
+  fix:
+    content: "\\x1A"
+    location:
+      row: 21
+      column: 11
+    end_location:
+      row: 21
+      column: 12
+  parent: ~
+

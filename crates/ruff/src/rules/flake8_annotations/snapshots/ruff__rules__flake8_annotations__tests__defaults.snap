@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: MissingReturnTypePublicFunction
+    name: MissingReturnTypeUndocumentedPublicFunction
     body: "Missing return type annotation for public function `foo`"
     suggestion: ~
     fixable: false
@@ -42,7 +42,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: MissingReturnTypePublicFunction
+    name: MissingReturnTypeUndocumentedPublicFunction
     body: "Missing return type annotation for public function `foo`"
     suggestion: ~
     fixable: false
@@ -81,7 +81,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: MissingReturnTypePublicFunction
+    name: MissingReturnTypeUndocumentedPublicFunction
     body: "Missing return type annotation for public function `foo`"
     suggestion: ~
     fixable: false
@@ -94,7 +94,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: MissingReturnTypePublicFunction
+    name: MissingReturnTypeUndocumentedPublicFunction
     body: "Missing return type annotation for public function `foo`"
     suggestion: ~
     fixable: false

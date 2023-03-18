@@ -13,14 +13,14 @@ use crate::checkers::ast::Checker;
 use super::mutable_argument_default::is_mutable_func;
 
 #[violation]
-pub struct FunctionCallArgumentDefault {
+pub struct FunctionCallInDefaultArgument {
     pub name: Option<String>,
 }
 
-impl Violation for FunctionCallArgumentDefault {
+impl Violation for FunctionCallInDefaultArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let FunctionCallArgumentDefault { name } = self;
+        let FunctionCallInDefaultArgument { name } = self;
         if let Some(name) = name {
             format!("Do not perform function call `{name}` in argument defaults")
         } else {
@@ -71,7 +71,7 @@ where
                     && !is_nan_or_infinity(func, args)
                 {
                     self.diagnostics.push((
-                        FunctionCallArgumentDefault {
+                        FunctionCallInDefaultArgument {
                             name: compose_call_path(func),
                         }
                         .into(),

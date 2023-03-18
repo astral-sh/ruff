@@ -9,9 +9,9 @@ use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
 #[violation]
-pub struct PatchWithLambda;
+pub struct PytestPatchWithLambda;
 
-impl Violation for PatchWithLambda {
+impl Violation for PytestPatchWithLambda {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `return_value=` instead of patching with `lambda`")
@@ -82,7 +82,7 @@ fn check_patch_call(
             visitor.visit_expr(body);
 
             if !visitor.uses_args {
-                return Some(Diagnostic::new(PatchWithLambda, Range::from(call)));
+                return Some(Diagnostic::new(PytestPatchWithLambda, Range::from(call)));
             }
         }
     }

@@ -148,37 +148,37 @@ impl AlwaysAutofixableViolation for SectionUnderlineMatchesSectionLength {
 }
 
 #[violation]
-pub struct BlankLineAfterSection {
+pub struct NoBlankLineAfterSection {
     pub name: String,
 }
 
-impl AlwaysAutofixableViolation for BlankLineAfterSection {
+impl AlwaysAutofixableViolation for NoBlankLineAfterSection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLineAfterSection { name } = self;
+        let NoBlankLineAfterSection { name } = self;
         format!("Missing blank line after section (\"{name}\")")
     }
 
     fn autofix_title(&self) -> String {
-        let BlankLineAfterSection { name } = self;
+        let NoBlankLineAfterSection { name } = self;
         format!("Add blank line after \"{name}\"")
     }
 }
 
 #[violation]
-pub struct BlankLineBeforeSection {
+pub struct NoBlankLineBeforeSection {
     pub name: String,
 }
 
-impl AlwaysAutofixableViolation for BlankLineBeforeSection {
+impl AlwaysAutofixableViolation for NoBlankLineBeforeSection {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BlankLineBeforeSection { name } = self;
+        let NoBlankLineBeforeSection { name } = self;
         format!("Missing blank line before section (\"{name}\")")
     }
 
     fn autofix_title(&self) -> String {
-        let BlankLineBeforeSection { name } = self;
+        let NoBlankLineBeforeSection { name } = self;
         format!("Add blank line before \"{name}\"")
     }
 }
@@ -252,14 +252,14 @@ impl Violation for UndocumentedParam {
 }
 
 #[violation]
-pub struct NoBlankLinesBetweenHeaderAndContent {
+pub struct BlankLinesBetweenHeaderAndContent {
     pub name: String,
 }
 
-impl AlwaysAutofixableViolation for NoBlankLinesBetweenHeaderAndContent {
+impl AlwaysAutofixableViolation for BlankLinesBetweenHeaderAndContent {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NoBlankLinesBetweenHeaderAndContent { name } = self;
+        let BlankLinesBetweenHeaderAndContent { name } = self;
         format!("No blank lines allowed between a section header and its content (\"{name}\")")
     }
 
@@ -365,15 +365,15 @@ fn blanks_and_section_underline(
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}{}",
+                    checker.stylist.line_ending().as_str(),
                     whitespace::clean(docstring.indentation),
                     "-".repeat(context.section_name.len()),
-                    checker.stylist.line_ending().as_str()
                 );
                 diagnostic.amend(Fix::insertion(
                     content,
                     Location::new(
-                        docstring.expr.location.row() + context.original_index + 1,
-                        0,
+                        docstring.expr.location.row() + context.original_index,
+                        context.line.trim_end().chars().count(),
                     ),
                 ));
             }
@@ -537,10 +537,10 @@ fn blanks_and_section_underline(
                     if checker
                         .settings
                         .rules
-                        .enabled(Rule::NoBlankLinesBetweenHeaderAndContent)
+                        .enabled(Rule::BlankLinesBetweenHeaderAndContent)
                     {
                         let mut diagnostic = Diagnostic::new(
-                            NoBlankLinesBetweenHeaderAndContent {
+                            BlankLinesBetweenHeaderAndContent {
                                 name: context.section_name.to_string(),
                             },
                             Range::from(docstring.expr),
@@ -595,15 +595,15 @@ fn blanks_and_section_underline(
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}{}",
+                    checker.stylist.line_ending().as_str(),
                     whitespace::clean(docstring.indentation),
                     "-".repeat(context.section_name.len()),
-                    checker.stylist.line_ending().as_str()
                 );
                 diagnostic.amend(Fix::insertion(
                     content,
                     Location::new(
-                        docstring.expr.location.row() + context.original_index + 1,
-                        0,
+                        docstring.expr.location.row() + context.original_index,
+                        context.line.trim_end().chars().count(),
                     ),
                 ));
             }
@@ -613,10 +613,10 @@ fn blanks_and_section_underline(
             if checker
                 .settings
                 .rules
-                .enabled(Rule::NoBlankLinesBetweenHeaderAndContent)
+                .enabled(Rule::BlankLinesBetweenHeaderAndContent)
             {
                 let mut diagnostic = Diagnostic::new(
-                    NoBlankLinesBetweenHeaderAndContent {
+                    BlankLinesBetweenHeaderAndContent {
                         name: context.section_name.to_string(),
                     },
                     Range::from(docstring.expr),
@@ -721,37 +721,41 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline after the section.
+                    let line = context.following_lines.last().unwrap_or(&context.line);
                     diagnostic.amend(Fix::insertion(
-                        line_end.to_string(),
+                        format!("{}{}", line_end, docstring.indentation),
                         Location::new(
                             docstring.expr.location.row()
                                 + context.original_index
-                                + 1
                                 + context.following_lines.len(),
-                            0,
+                            line.trim_end().chars().count(),
                         ),
                     ));
                 }
                 checker.diagnostics.push(diagnostic);
             }
         } else {
-            if checker.settings.rules.enabled(Rule::BlankLineAfterSection) {
+            if checker
+                .settings
+                .rules
+                .enabled(Rule::NoBlankLineAfterSection)
+            {
                 let mut diagnostic = Diagnostic::new(
-                    BlankLineAfterSection {
+                    NoBlankLineAfterSection {
                         name: context.section_name.to_string(),
                     },
                     Range::from(docstring.expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline after the section.
+                    let line = context.following_lines.last().unwrap_or(&context.line);
                     diagnostic.amend(Fix::insertion(
                         line_end.to_string(),
                         Location::new(
                             docstring.expr.location.row()
                                 + context.original_index
-                                + 1
                                 + context.following_lines.len(),
-                            0,
+                            line.trim_end().chars().count(),
                         ),
                     ));
                 }
@@ -760,10 +764,14 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
         }
     }
 
-    if checker.settings.rules.enabled(Rule::BlankLineBeforeSection) {
+    if checker
+        .settings
+        .rules
+        .enabled(Rule::NoBlankLineBeforeSection)
+    {
         if !context.previous_line.is_empty() {
             let mut diagnostic = Diagnostic::new(
-                BlankLineBeforeSection {
+                NoBlankLineBeforeSection {
                     name: context.section_name.to_string(),
                 },
                 Range::from(docstring.expr),
@@ -804,9 +812,9 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     // Look for arguments that weren't included in the docstring.
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
     for arg in arguments
-        .args
+        .posonlyargs
         .iter()
-        .chain(arguments.posonlyargs.iter())
+        .chain(arguments.args.iter())
         .chain(arguments.kwonlyargs.iter())
         .skip(
             // If this is a non-static method, skip `cls` or `self`.

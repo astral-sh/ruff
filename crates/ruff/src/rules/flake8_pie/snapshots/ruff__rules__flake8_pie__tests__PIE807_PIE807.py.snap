@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: PreferListBuiltin
+    name: ReimplementedListBuiltin
     body: "Prefer `list` over useless lambda"
     suggestion: "Replace with `list`"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 53
   parent: ~
 - kind:
-    name: PreferListBuiltin
+    name: ReimplementedListBuiltin
     body: "Prefer `list` over useless lambda"
     suggestion: "Replace with `list`"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    name: PreferListBuiltin
+    name: ReimplementedListBuiltin
     body: "Prefer `list` over useless lambda"
     suggestion: "Replace with `list`"
     fixable: true

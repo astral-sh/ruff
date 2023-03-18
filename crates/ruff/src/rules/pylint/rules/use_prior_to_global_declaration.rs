@@ -2,26 +2,27 @@ use rustpython_parser::ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Range, ScopeKind};
+use ruff_python_ast::scope::ScopeKind;
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
 #[violation]
-pub struct UsedPriorGlobalDeclaration {
+pub struct UsePriorToGlobalDeclaration {
     pub name: String,
     pub line: usize,
 }
 
-impl Violation for UsedPriorGlobalDeclaration {
+impl Violation for UsePriorToGlobalDeclaration {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UsedPriorGlobalDeclaration { name, line } = self;
+        let UsePriorToGlobalDeclaration { name, line } = self;
         format!("Name `{name}` is used prior to global declaration on line {line}")
     }
 }
 /// PLE0118
-pub fn used_prior_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
-    let globals = match &checker.ctx.current_scope().kind {
+pub fn use_prior_to_global_declaration(checker: &mut Checker, name: &str, expr: &Expr) {
+    let globals = match &checker.ctx.scope().kind {
         ScopeKind::Class(class_def) => &class_def.globals,
         ScopeKind::Function(function_def) => &function_def.globals,
         _ => return,
@@ -29,7 +30,7 @@ pub fn used_prior_global_declaration(checker: &mut Checker, name: &str, expr: &E
     if let Some(stmt) = globals.get(name) {
         if expr.location < stmt.location {
             checker.diagnostics.push(Diagnostic::new(
-                UsedPriorGlobalDeclaration {
+                UsePriorToGlobalDeclaration {
                     name: name.to_string(),
                     line: stmt.location.row(),
                 },

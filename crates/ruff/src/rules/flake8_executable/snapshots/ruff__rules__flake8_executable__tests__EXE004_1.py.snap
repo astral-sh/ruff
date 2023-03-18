@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_executable/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: ShebangWhitespace
+    name: ShebangLeadingWhitespace
     body: Avoid whitespace before shebang
     suggestion: Remove whitespace before shebang
     fixable: true

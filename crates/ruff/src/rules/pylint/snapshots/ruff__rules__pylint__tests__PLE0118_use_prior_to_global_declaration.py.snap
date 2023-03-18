@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 7"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 17"
     suggestion: ~
     fixable: false
@@ -29,7 +29,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 25"
     suggestion: ~
     fixable: false
@@ -42,7 +42,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 35"
     suggestion: ~
     fixable: false
@@ -55,7 +55,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 43"
     suggestion: ~
     fixable: false
@@ -68,7 +68,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 53"
     suggestion: ~
     fixable: false
@@ -81,7 +81,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 61"
     suggestion: ~
     fixable: false
@@ -94,7 +94,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 71"
     suggestion: ~
     fixable: false
@@ -107,7 +107,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 79"
     suggestion: ~
     fixable: false
@@ -120,7 +120,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 89"
     suggestion: ~
     fixable: false
@@ -133,7 +133,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 97"
     suggestion: ~
     fixable: false
@@ -146,7 +146,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 107"
     suggestion: ~
     fixable: false
@@ -159,7 +159,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UsedPriorGlobalDeclaration
+    name: UsePriorToGlobalDeclaration
     body: "Name `x` is used prior to global declaration on line 114"
     suggestion: ~
     fixable: false

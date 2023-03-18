@@ -3,63 +3,63 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: BlankLineBeforeSection
+    name: NoBlankLineBeforeSection
     body: "Missing blank line before section (\"Yields\")"
     suggestion: "Add blank line before \"Yields\""
     fixable: true
   location:
-    row: 67
+    row: 76
     column: 4
   end_location:
-    row: 78
+    row: 87
     column: 7
   fix:
     content: "\n"
     location:
-      row: 71
+      row: 80
       column: 0
     end_location:
-      row: 71
+      row: 80
       column: 0
   parent: ~
 - kind:
-    name: BlankLineBeforeSection
+    name: NoBlankLineBeforeSection
     body: "Missing blank line before section (\"Returns\")"
     suggestion: "Add blank line before \"Returns\""
     fixable: true
   location:
-    row: 122
+    row: 131
     column: 4
   end_location:
-    row: 129
+    row: 138
     column: 7
   fix:
     content: "\n"
     location:
-      row: 125
+      row: 134
       column: 0
     end_location:
-      row: 125
+      row: 134
       column: 0
   parent: ~
 - kind:
-    name: BlankLineBeforeSection
+    name: NoBlankLineBeforeSection
     body: "Missing blank line before section (\"Raises\")"
     suggestion: "Add blank line before \"Raises\""
     fixable: true
   location:
-    row: 207
+    row: 216
     column: 4
   end_location:
-    row: 221
+    row: 230
     column: 7
   fix:
     content: "\n"
     location:
-      row: 218
+      row: 227
       column: 0
     end_location:
-      row: 218
+      row: 227
       column: 0
   parent: ~
 

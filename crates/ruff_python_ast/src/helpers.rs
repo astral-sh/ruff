@@ -15,8 +15,9 @@ use smallvec::{smallvec, SmallVec};
 
 use crate::context::Context;
 use crate::newlines::StrExt;
+use crate::scope::{Binding, BindingKind};
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
-use crate::types::{Binding, BindingKind, CallPath, Range};
+use crate::types::{CallPath, Range};
 use crate::visitor;
 use crate::visitor::Visitor;
 
