@@ -13,6 +13,10 @@ pub use invalid_all_format::{invalid_all_format, InvalidAllFormat};
 pub use invalid_all_object::{invalid_all_object, InvalidAllObject};
 pub use invalid_envvar_default::{invalid_envvar_default, InvalidEnvvarDefault};
 pub use invalid_envvar_value::{invalid_envvar_value, InvalidEnvvarValue};
+pub use invalid_string_characters::{
+    invalid_string_characters, InvalidCharacterBackspace, InvalidCharacterEsc, InvalidCharacterNul,
+    InvalidCharacterSub, InvalidCharacterZeroWidthSpace,
+};
 pub use logging::{logging_call, LoggingTooFewArgs, LoggingTooManyArgs};
 pub use magic_value_comparison::{magic_value_comparison, MagicValueComparison};
 pub use merge_isinstance::{merge_isinstance, ConsiderMergingIsinstance};
@@ -33,6 +37,7 @@ pub use used_prior_global_declaration::{
 };
 pub use useless_else_on_loop::{useless_else_on_loop, UselessElseOnLoop};
 pub use useless_import_alias::{useless_import_alias, UselessImportAlias};
+pub use useless_return::{useless_return, UselessReturn};
 pub use yield_in_init::{yield_in_init, YieldInInit};
 
 mod await_outside_async;
@@ -50,6 +55,7 @@ mod invalid_all_format;
 mod invalid_all_object;
 mod invalid_envvar_default;
 mod invalid_envvar_value;
+mod invalid_string_characters;
 mod logging;
 mod magic_value_comparison;
 mod merge_isinstance;
@@ -66,4 +72,5 @@ mod use_from_import;
 mod used_prior_global_declaration;
 mod useless_else_on_loop;
 mod useless_import_alias;
+mod useless_return;
 mod yield_in_init;

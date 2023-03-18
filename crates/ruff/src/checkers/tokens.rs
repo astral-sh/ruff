@@ -8,7 +8,7 @@ use crate::registry::{AsRule, Rule};
 use crate::rules::ruff::rules::Context;
 use crate::rules::{
     eradicate, flake8_commas, flake8_implicit_str_concat, flake8_pyi, flake8_quotes, pycodestyle,
-    pyupgrade, ruff,
+    pylint, pyupgrade, ruff,
 };
 use crate::settings::{flags, Settings};
 use ruff_diagnostics::Diagnostic;
@@ -23,39 +23,41 @@ pub fn check_tokens(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
-    let enforce_ambiguous_unicode_character = settings
-        .rules
-        .enabled(Rule::AmbiguousUnicodeCharacterString)
-        || settings
-            .rules
-            .enabled(Rule::AmbiguousUnicodeCharacterDocstring)
-        || settings
-            .rules
-            .enabled(Rule::AmbiguousUnicodeCharacterComment);
-    let enforce_quotes = settings.rules.enabled(Rule::BadQuotesInlineString)
-        || settings.rules.enabled(Rule::BadQuotesMultilineString)
-        || settings.rules.enabled(Rule::BadQuotesDocstring)
-        || settings.rules.enabled(Rule::AvoidableEscapedQuote);
+    let enforce_ambiguous_unicode_character = settings.rules.any_enabled(&[
+        Rule::AmbiguousUnicodeCharacterString,
+        Rule::AmbiguousUnicodeCharacterDocstring,
+        Rule::AmbiguousUnicodeCharacterComment,
+    ]);
+    let enforce_invalid_string_character = settings.rules.any_enabled(&[
+        Rule::InvalidCharacterBackspace,
+        Rule::InvalidCharacterSub,
+        Rule::InvalidCharacterEsc,
+        Rule::InvalidCharacterNul,
+        Rule::InvalidCharacterZeroWidthSpace,
+    ]);
+    let enforce_quotes = settings.rules.any_enabled(&[
+        Rule::BadQuotesInlineString,
+        Rule::BadQuotesMultilineString,
+        Rule::BadQuotesDocstring,
+        Rule::AvoidableEscapedQuote,
+    ]);
     let enforce_commented_out_code = settings.rules.enabled(Rule::CommentedOutCode);
-    let enforce_compound_statements = settings
-        .rules
-        .enabled(Rule::MultipleStatementsOnOneLineColon)
-        || settings
-            .rules
-            .enabled(Rule::MultipleStatementsOnOneLineSemicolon)
-        || settings.rules.enabled(Rule::UselessSemicolon);
+    let enforce_compound_statements = settings.rules.any_enabled(&[
+        Rule::MultipleStatementsOnOneLineColon,
+        Rule::MultipleStatementsOnOneLineSemicolon,
+        Rule::UselessSemicolon,
+    ]);
     let enforce_invalid_escape_sequence = settings.rules.enabled(Rule::InvalidEscapeSequence);
-    let enforce_implicit_string_concatenation = settings
-        .rules
-        .enabled(Rule::SingleLineImplicitStringConcatenation)
-        || settings
-            .rules
-            .enabled(Rule::MultiLineImplicitStringConcatenation);
-    let enforce_trailing_comma = settings.rules.enabled(Rule::TrailingCommaMissing)
-        || settings
-            .rules
-            .enabled(Rule::TrailingCommaOnBareTupleProhibited)
-        || settings.rules.enabled(Rule::TrailingCommaProhibited);
+    let enforce_implicit_string_concatenation = settings.rules.any_enabled(&[
+        Rule::SingleLineImplicitStringConcatenation,
+        Rule::MultiLineImplicitStringConcatenation,
+    ]);
+
+    let enforce_trailing_comma = settings.rules.any_enabled(&[
+        Rule::TrailingCommaMissing,
+        Rule::TrailingCommaOnBareTupleProhibited,
+        Rule::TrailingCommaProhibited,
+    ]);
     let enforce_extraneous_parenthesis = settings.rules.enabled(Rule::ExtraneousParentheses);
     let enforce_type_comment_in_stub = settings.rules.enabled(Rule::TypeCommentInStub);
 
@@ -113,6 +115,18 @@ pub fn check_tokens(
                     *end,
                     autofix.into() && settings.rules.should_fix(Rule::InvalidEscapeSequence),
                 ));
+            }
+        }
+    }
+    // PLE2510, PLE2512, PLE2513
+    if enforce_invalid_string_character {
+        for (start, tok, end) in tokens.iter().flatten() {
+            if matches!(tok, Tok::String { .. }) {
+                diagnostics.extend(
+                    pylint::rules::invalid_string_characters(locator, *start, *end, autofix.into())
+                        .into_iter()
+                        .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
+                );
             }
         }
     }

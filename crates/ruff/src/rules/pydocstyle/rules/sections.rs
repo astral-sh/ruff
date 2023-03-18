@@ -365,15 +365,15 @@ fn blanks_and_section_underline(
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}{}",
+                    checker.stylist.line_ending().as_str(),
                     whitespace::clean(docstring.indentation),
                     "-".repeat(context.section_name.len()),
-                    checker.stylist.line_ending().as_str()
                 );
                 diagnostic.amend(Fix::insertion(
                     content,
                     Location::new(
-                        docstring.expr.location.row() + context.original_index + 1,
-                        0,
+                        docstring.expr.location.row() + context.original_index,
+                        context.line.trim_end().chars().count(),
                     ),
                 ));
             }
@@ -595,15 +595,15 @@ fn blanks_and_section_underline(
                 // Add a dashed line (of the appropriate length) under the section header.
                 let content = format!(
                     "{}{}{}",
+                    checker.stylist.line_ending().as_str(),
                     whitespace::clean(docstring.indentation),
                     "-".repeat(context.section_name.len()),
-                    checker.stylist.line_ending().as_str()
                 );
                 diagnostic.amend(Fix::insertion(
                     content,
                     Location::new(
-                        docstring.expr.location.row() + context.original_index + 1,
-                        0,
+                        docstring.expr.location.row() + context.original_index,
+                        context.line.trim_end().chars().count(),
                     ),
                 ));
             }
@@ -721,14 +721,14 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline after the section.
+                    let line = context.following_lines.last().unwrap_or(&context.line);
                     diagnostic.amend(Fix::insertion(
-                        line_end.to_string(),
+                        format!("{}{}", line_end, docstring.indentation),
                         Location::new(
                             docstring.expr.location.row()
                                 + context.original_index
-                                + 1
                                 + context.following_lines.len(),
-                            0,
+                            line.trim_end().chars().count(),
                         ),
                     ));
                 }
@@ -744,14 +744,14 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline after the section.
+                    let line = context.following_lines.last().unwrap_or(&context.line);
                     diagnostic.amend(Fix::insertion(
                         line_end.to_string(),
                         Location::new(
                             docstring.expr.location.row()
                                 + context.original_index
-                                + 1
                                 + context.following_lines.len(),
-                            0,
+                            line.trim_end().chars().count(),
                         ),
                     ));
                 }
@@ -804,9 +804,9 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     // Look for arguments that weren't included in the docstring.
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
     for arg in arguments
-        .args
+        .posonlyargs
         .iter()
-        .chain(arguments.posonlyargs.iter())
+        .chain(arguments.args.iter())
         .chain(arguments.kwonlyargs.iter())
         .skip(
             // If this is a non-static method, skip `cls` or `self`.

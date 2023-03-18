@@ -2,7 +2,8 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Range, ScopeKind};
+use ruff_python_ast::scope::ScopeKind;
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -30,7 +31,7 @@ fn is_cache_func(checker: &Checker, expr: &Expr) -> bool {
 
 /// B019
 pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
-    if !matches!(checker.ctx.current_scope().kind, ScopeKind::Class(_)) {
+    if !matches!(checker.ctx.scope().kind, ScopeKind::Class(_)) {
         return;
     }
     for decorator in decorator_list {

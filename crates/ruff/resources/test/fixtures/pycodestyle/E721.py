@@ -54,3 +54,7 @@ if type(a) != type(b) or type(a) == type(ccc):
     pass
 
 assert type(res) == type(None)
+
+types = StrEnum
+if x == types.X:
+    pass

@@ -143,6 +143,7 @@ ruff_macros::register_rules!(
     rules::pyflakes::rules::UnusedAnnotation,
     rules::pyflakes::rules::RaiseNotImplemented,
     // pylint
+    rules::pylint::rules::UselessReturn,
     rules::pylint::rules::YieldInInit,
     rules::pylint::rules::InvalidAllObject,
     rules::pylint::rules::InvalidAllFormat,
@@ -150,6 +151,11 @@ ruff_macros::register_rules!(
     rules::pylint::rules::InvalidEnvvarValue,
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
+    rules::pylint::rules::InvalidCharacterBackspace,
+    rules::pylint::rules::InvalidCharacterSub,
+    rules::pylint::rules::InvalidCharacterEsc,
+    rules::pylint::rules::InvalidCharacterNul,
+    rules::pylint::rules::InvalidCharacterZeroWidthSpace,
     rules::pylint::rules::BadStrStripCall,
     rules::pylint::rules::CollapsibleElseIf,
     rules::pylint::rules::ContinueInFinally,
@@ -186,6 +192,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::UnreliableCallableCheck,
     rules::flake8_bugbear::rules::StripWithMultiCharacters,
     rules::flake8_bugbear::rules::MutableArgumentDefault,
+    rules::flake8_bugbear::rules::NoExplicitStacklevel,
     rules::flake8_bugbear::rules::UnusedLoopControlVariable,
     rules::flake8_bugbear::rules::FunctionCallArgumentDefault,
     rules::flake8_bugbear::rules::GetAttrWithConstant,
@@ -602,6 +609,7 @@ ruff_macros::register_rules!(
     rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
     rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,
+    rules::ruff::rules::PairwiseOverZipped,
     // flake8-django
     rules::flake8_django::rules::NullableModelStringField,
     rules::flake8_django::rules::LocalsInRenderFunction,
@@ -853,6 +861,11 @@ impl Rule {
             | Rule::BadQuotesMultilineString
             | Rule::CommentedOutCode
             | Rule::MultiLineImplicitStringConcatenation
+            | Rule::InvalidCharacterBackspace
+            | Rule::InvalidCharacterSub
+            | Rule::InvalidCharacterEsc
+            | Rule::InvalidCharacterNul
+            | Rule::InvalidCharacterZeroWidthSpace
             | Rule::ExtraneousParentheses
             | Rule::InvalidEscapeSequence
             | Rule::SingleLineImplicitStringConcatenation

@@ -142,4 +142,14 @@ mod tests {
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn ruff_pairwise_over_zipped() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF007.py"),
+            &settings::Settings::for_rules(vec![Rule::PairwiseOverZipped]),
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
 }

@@ -8,19 +8,19 @@ expression: diagnostics
     suggestion: "Add blank line after \"Returns\""
     fixable: true
   location:
-    row: 67
+    row: 76
     column: 4
   end_location:
-    row: 78
+    row: 87
     column: 7
   fix:
     content: "\n"
     location:
-      row: 71
-      column: 0
+      row: 79
+      column: 11
     end_location:
-      row: 71
-      column: 0
+      row: 79
+      column: 11
   parent: ~
 - kind:
     name: BlankLineAfterSection
@@ -28,18 +28,18 @@ expression: diagnostics
     suggestion: "Add blank line after \"Returns\""
     fixable: true
   location:
-    row: 207
+    row: 216
     column: 4
   end_location:
-    row: 221
+    row: 230
     column: 7
   fix:
     content: "\n"
     location:
-      row: 218
-      column: 0
+      row: 226
+      column: 31
     end_location:
-      row: 218
-      column: 0
+      row: 226
+      column: 31
   parent: ~
 
