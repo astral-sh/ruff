@@ -804,9 +804,9 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     // Look for arguments that weren't included in the docstring.
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
     for arg in arguments
-        .args
+        .posonlyargs
         .iter()
-        .chain(arguments.posonlyargs.iter())
+        .chain(arguments.args.iter())
         .chain(arguments.kwonlyargs.iter())
         .skip(
             // If this is a non-static method, skip `cls` or `self`.
