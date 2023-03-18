@@ -9,7 +9,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 
 /// Return the index of the first logical line in a string.
-pub fn logical_line(content: &str) -> Option<usize> {
+pub(crate) fn logical_line(content: &str) -> Option<usize> {
     // Find the first logical line.
     let mut logical_line = None;
     for (i, line) in content.universal_newlines().enumerate() {
@@ -28,14 +28,14 @@ pub fn logical_line(content: &str) -> Option<usize> {
 
 /// Normalize a word by removing all non-alphanumeric characters
 /// and converting it to lowercase.
-pub fn normalize_word(first_word: &str) -> String {
+pub(crate) fn normalize_word(first_word: &str) -> String {
     first_word
         .replace(|c: char| !c.is_alphanumeric(), "")
         .to_lowercase()
 }
 
 /// Check decorator list to see if function should be ignored.
-pub fn should_ignore_definition(
+pub(crate) fn should_ignore_definition(
     checker: &Checker,
     definition: &Definition,
     ignore_decorators: &BTreeSet<String>,
@@ -63,7 +63,7 @@ pub fn should_ignore_definition(
 }
 
 /// Check if a docstring should be ignored.
-pub fn should_ignore_docstring(contents: &str) -> bool {
+pub(crate) fn should_ignore_docstring(contents: &str) -> bool {
     // Avoid analyzing docstrings that contain implicit string concatenations.
     // Python does consider these docstrings, but they're almost certainly a
     // user error, and supporting them "properly" is extremely difficult.
