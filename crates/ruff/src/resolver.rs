@@ -260,38 +260,6 @@ pub fn python_files_in_path(
         std::sync::Mutex::new(vec![]);
     walker.run(|| {
         Box::new(|result| {
-            // Search for the `pyproject.toml` file in this directory, before we visit any
-            // of its contents.
-            if pyproject_strategy.is_hierarchical() {
-                if let Ok(entry) = &result {
-                    if entry
-                        .file_type()
-                        .map_or(false, |file_type| file_type.is_dir())
-                    {
-                        match settings_toml(entry.path()) {
-                            Ok(Some(pyproject)) => match resolve_scoped_settings(
-                                &pyproject,
-                                &Relativity::Parent,
-                                processor,
-                            ) {
-                                Ok((root, settings)) => {
-                                    resolver.write().unwrap().add(root, settings);
-                                }
-                                Err(err) => {
-                                    *error.lock().unwrap() = Err(err);
-                                    return WalkState::Quit;
-                                }
-                            },
-                            Ok(None) => {}
-                            Err(err) => {
-                                *error.lock().unwrap() = Err(err);
-                                return WalkState::Quit;
-                            }
-                        }
-                    }
-                }
-            }
-
             // Respect our own exclusion behavior.
             if let Ok(entry) = &result {
                 if entry.depth() > 0 {
@@ -319,6 +287,38 @@ pub fn python_files_in_path(
                         Err(err) => {
                             debug!("Ignored path due to error in parsing: {:?}: {}", path, err);
                             return WalkState::Skip;
+                        }
+                    }
+                }
+            }
+
+            // Search for the `pyproject.toml` file in this directory, before we visit any
+            // of its contents.
+            if pyproject_strategy.is_hierarchical() {
+                if let Ok(entry) = &result {
+                    if entry
+                        .file_type()
+                        .map_or(false, |file_type| file_type.is_dir())
+                    {
+                        match settings_toml(entry.path()) {
+                            Ok(Some(pyproject)) => match resolve_scoped_settings(
+                                &pyproject,
+                                &Relativity::Parent,
+                                processor,
+                            ) {
+                                Ok((root, settings)) => {
+                                    resolver.write().unwrap().add(root, settings);
+                                }
+                                Err(err) => {
+                                    *error.lock().unwrap() = Err(err);
+                                    return WalkState::Quit;
+                                }
+                            },
+                            Ok(None) => {}
+                            Err(err) => {
+                                *error.lock().unwrap() = Err(err);
+                                return WalkState::Quit;
+                            }
                         }
                     }
                 }
