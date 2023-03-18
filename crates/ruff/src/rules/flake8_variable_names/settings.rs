@@ -18,7 +18,7 @@ pub struct Options {
         value_type = "bool",
         example = "use-varnames-strict-mode = true"
     )]
-    /// Whether to allow unused variadic arguments, like `*args` and `**kwargs`.
+    /// Whether to use strict settings for the allow/block lists
     pub use_varnames_strict_mode: Option<bool>,
 }
 
