@@ -143,35 +143,26 @@ pub fn check_noqa(
             match directive {
                 Directive::All(leading_spaces, start_byte, end_byte, trailing_spaces) => {
                     if matches.is_empty() {
-                        let start = lines[row][..start_byte].chars().count();
-                        let end = start + lines[row][start_byte..end_byte].chars().count();
+                        let start_char = lines[row][..start_byte].chars().count();
+                        let end_char =
+                            start_char + lines[row][start_byte..end_byte].chars().count();
 
                         let mut diagnostic = Diagnostic::new(
                             UnusedNOQA { codes: None },
-                            Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
+                            Range::new(
+                                Location::new(row + 1, start_char),
+                                Location::new(row + 1, end_char),
+                            ),
                         );
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-                            if start - leading_spaces == 0 && end == lines[row].chars().count() {
-                                diagnostic.amend(Fix::deletion(
-                                    Location::new(row + 1, 0),
-                                    Location::new(row + 2, 0),
-                                ));
-                            } else if end == lines[row].chars().count() {
-                                diagnostic.amend(Fix::deletion(
-                                    Location::new(row + 1, start - leading_spaces),
-                                    Location::new(row + 1, end + trailing_spaces),
-                                ));
-                            } else if lines[row].chars().nth(end + 1).map_or(false, |c| c == '#') {
-                                diagnostic.amend(Fix::deletion(
-                                    Location::new(row + 1, start),
-                                    Location::new(row + 1, end + trailing_spaces),
-                                ));
-                            } else {
-                                diagnostic.amend(Fix::deletion(
-                                    Location::new(row + 1, start + 1),
-                                    Location::new(row + 1, end),
-                                ));
-                            }
+                            diagnostic.amend(delete_noqa(
+                                row,
+                                lines[row],
+                                leading_spaces,
+                                start_byte,
+                                end_byte,
+                                trailing_spaces,
+                            ));
                         }
                         diagnostics.push(diagnostic);
                     }
@@ -212,8 +203,9 @@ pub fn check_noqa(
                         && unknown_codes.is_empty()
                         && unmatched_codes.is_empty())
                     {
-                        let start = lines[row][..start_byte].chars().count();
-                        let end = start + lines[row][start_byte..end_byte].chars().count();
+                        let start_char = lines[row][..start_byte].chars().count();
+                        let end_char =
+                            start_char + lines[row][start_byte..end_byte].chars().count();
 
                         let mut diagnostic = Diagnostic::new(
                             UnusedNOQA {
@@ -232,41 +224,26 @@ pub fn check_noqa(
                                         .collect(),
                                 }),
                             },
-                            Range::new(Location::new(row + 1, start), Location::new(row + 1, end)),
+                            Range::new(
+                                Location::new(row + 1, start_char),
+                                Location::new(row + 1, end_char),
+                            ),
                         );
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
-                                if start - leading_spaces == 0 && end == lines[row].chars().count()
-                                {
-                                    diagnostic.amend(Fix::deletion(
-                                        Location::new(row + 1, 0),
-                                        Location::new(row + 2, 0),
-                                    ));
-                                } else if end == lines[row].chars().count() {
-                                    diagnostic.amend(Fix::deletion(
-                                        Location::new(row + 1, start - leading_spaces),
-                                        Location::new(row + 1, end + trailing_spaces),
-                                    ));
-                                } else if lines[row]
-                                    .chars()
-                                    .nth(end + 1)
-                                    .map_or(false, |c| c == '#')
-                                {
-                                    diagnostic.amend(Fix::deletion(
-                                        Location::new(row + 1, start),
-                                        Location::new(row + 1, end + trailing_spaces),
-                                    ));
-                                } else {
-                                    diagnostic.amend(Fix::deletion(
-                                        Location::new(row + 1, start + 1),
-                                        Location::new(row + 1, end),
-                                    ));
-                                }
+                                diagnostic.amend(delete_noqa(
+                                    row,
+                                    lines[row],
+                                    leading_spaces,
+                                    start_byte,
+                                    end_byte,
+                                    trailing_spaces,
+                                ));
                             } else {
                                 diagnostic.amend(Fix::replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),
-                                    Location::new(row + 1, start),
-                                    Location::new(row + 1, end),
+                                    Location::new(row + 1, start_char),
+                                    Location::new(row + 1, end_char),
                                 ));
                             }
                         }
@@ -280,4 +257,43 @@ pub fn check_noqa(
 
     ignored_diagnostics.sort_unstable();
     ignored_diagnostics
+}
+
+/// Generate a [`Fix`] to delete a `noqa` directive.
+fn delete_noqa(
+    row: usize,
+    line: &str,
+    leading_spaces: usize,
+    start_byte: usize,
+    end_byte: usize,
+    trailing_spaces: usize,
+) -> Fix {
+    if start_byte - leading_spaces == 0 && end_byte == line.len() {
+        // Ex) `# noqa`
+        Fix::deletion(Location::new(row + 1, 0), Location::new(row + 2, 0))
+    } else if end_byte == line.len() {
+        // Ex) `x = 1  # noqa`
+        let start_char = line[..start_byte].chars().count();
+        let end_char = start_char + line[start_byte..end_byte].chars().count();
+        Fix::deletion(
+            Location::new(row + 1, start_char - leading_spaces),
+            Location::new(row + 1, end_char + trailing_spaces),
+        )
+    } else if line[end_byte..].trim_start().starts_with('#') {
+        // Ex) `x = 1  # noqa  # type: ignore`
+        let start_char = line[..start_byte].chars().count();
+        let end_char = start_char + line[start_byte..end_byte].chars().count();
+        Fix::deletion(
+            Location::new(row + 1, start_char),
+            Location::new(row + 1, end_char + trailing_spaces),
+        )
+    } else {
+        // Ex) `x = 1  # noqa here`
+        let start_char = line[..start_byte].chars().count();
+        let end_char = start_char + line[start_byte..end_byte].chars().count();
+        Fix::deletion(
+            Location::new(row + 1, start_char + 1 + 1),
+            Location::new(row + 1, end_char + trailing_spaces),
+        )
+    }
 }
