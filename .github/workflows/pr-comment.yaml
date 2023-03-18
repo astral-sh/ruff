@@ -65,6 +65,7 @@ jobs:
           then
             echo "### Ecosystem" >> $GITHUB_OUTPUT
             cat pr/ecosystem/ecosystem-result >> $GITHUB_OUTPUT
+            echo "" >> $GITHUB_OUTPUT
           fi
 
           if [[ -f pr/benchmark/summary.md ]]
