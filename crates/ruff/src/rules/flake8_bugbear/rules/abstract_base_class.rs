@@ -115,7 +115,7 @@ pub fn abstract_base_class(
         if !checker
             .settings
             .rules
-            .enabled(&Rule::EmptyMethodWithoutAbstractDecorator)
+            .enabled(Rule::EmptyMethodWithoutAbstractDecorator)
         {
             continue;
         }
@@ -135,7 +135,7 @@ pub fn abstract_base_class(
     if checker
         .settings
         .rules
-        .enabled(&Rule::AbstractBaseClassWithoutAbstractMethod)
+        .enabled(Rule::AbstractBaseClassWithoutAbstractMethod)
     {
         if !has_abstract_method {
             checker.diagnostics.push(Diagnostic::new(

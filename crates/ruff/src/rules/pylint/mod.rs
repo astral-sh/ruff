@@ -14,22 +14,19 @@ mod tests {
 
     use crate::registry::Rule;
     use crate::rules::pylint;
+    use crate::settings::types::PythonVersion;
     use crate::settings::Settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"); "PLE1205")]
-    #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"); "PLE1206")]
-    #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"); "PLE0101")]
-    #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
-    #[test_case(Rule::UnnecessaryDirectLambdaCall, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
-    #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"); "PLE0117")]
-    #[test_case(Rule::UsedPriorGlobalDeclaration, Path::new("used_prior_global_declaration.py"); "PLE0118")]
     #[test_case(Rule::AwaitOutsideAsync, Path::new("await_outside_async.py"); "PLE1142")]
+    #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE01310")]
+    #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"); "PLE1307")]
+    #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"); "PLE2502")]
+    #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"); "PLR5501")]
     #[test_case(Rule::CompareToEmptyString, Path::new("compare_to_empty_string.py"); "PLC1901")]
     #[test_case(Rule::ComparisonOfConstant, Path::new("comparison_of_constant.py"); "PLR0133")]
-    #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"); "PLR0206")]
-    #[test_case(Rule::ConsiderUsingFromImport, Path::new("import_aliasing.py"); "PLR0402")]
     #[test_case(Rule::ConsiderMergingIsinstance, Path::new("consider_merging_isinstance.py"); "PLR1701")]
+    #[test_case(Rule::ConsiderUsingFromImport, Path::new("import_aliasing.py"); "PLR0402")]
     #[test_case(Rule::ConsiderUsingSysExit, Path::new("consider_using_sys_exit_0.py"); "PLR1722_0")]
     #[test_case(Rule::ConsiderUsingSysExit, Path::new("consider_using_sys_exit_1.py"); "PLR1722_1")]
     #[test_case(Rule::ConsiderUsingSysExit, Path::new("consider_using_sys_exit_2.py"); "PLR1722_2")]
@@ -37,24 +34,35 @@ mod tests {
     #[test_case(Rule::ConsiderUsingSysExit, Path::new("consider_using_sys_exit_4.py"); "PLR1722_4")]
     #[test_case(Rule::ConsiderUsingSysExit, Path::new("consider_using_sys_exit_5.py"); "PLR1722_5")]
     #[test_case(Rule::ConsiderUsingSysExit, Path::new("consider_using_sys_exit_6.py"); "PLR1722_6")]
-    #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"); "PLR2004")]
-    #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]
-    #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
+    #[test_case(Rule::ContinueInFinally, Path::new("continue_in_finally.py"); "PLE0116")]
     #[test_case(Rule::GlobalStatement, Path::new("global_statement.py"); "PLW0603")]
+    #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"); "PLE0604")]
+    #[test_case(Rule::InvalidCharacterBackspace, Path::new("invalid_characters.py"); "PLE2510")]
+    #[test_case(Rule::InvalidCharacterEsc, Path::new("invalid_characters.py"); "PLE2513")]
+    #[test_case(Rule::InvalidCharacterNul, Path::new("invalid_characters.py"); "PLE2514")]
+    #[test_case(Rule::InvalidCharacterSub, Path::new("invalid_characters.py"); "PLE2512")]
+    #[test_case(Rule::InvalidCharacterZeroWidthSpace, Path::new("invalid_characters.py"); "PLE2515")]
     #[test_case(Rule::InvalidEnvvarDefault, Path::new("invalid_envvar_default.py"); "PLW1508")]
     #[test_case(Rule::InvalidEnvvarValue, Path::new("invalid_envvar_value.py"); "PLE1507")]
-    #[test_case(Rule::TooManyReturnStatements, Path::new("too_many_return_statements.py"); "PLR0911")]
+    #[test_case(Rule::LoggingTooFewArgs, Path::new("logging_too_few_args.py"); "PLE1206")]
+    #[test_case(Rule::LoggingTooManyArgs, Path::new("logging_too_many_args.py"); "PLE1205")]
+    #[test_case(Rule::MagicValueComparison, Path::new("magic_value_comparison.py"); "PLR2004")]
+    #[test_case(Rule::NonlocalWithoutBinding, Path::new("nonlocal_without_binding.py"); "PLE0117")]
+    #[test_case(Rule::PropertyWithParameters, Path::new("property_with_parameters.py"); "PLR0206")]
+    #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"); "PLW2901")]
+    #[test_case(Rule::ReturnInInit, Path::new("return_in_init.py"); "PLE0101")]
     #[test_case(Rule::TooManyArguments, Path::new("too_many_arguments.py"); "PLR0913")]
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"); "PLR0912")]
+    #[test_case(Rule::TooManyReturnStatements, Path::new("too_many_return_statements.py"); "PLR0911")]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"); "PLR0915")]
-    #[test_case(Rule::CollapsibleElseIf, Path::new("collapsible_else_if.py"); "PLR5501")]
-    #[test_case(Rule::BadStringFormatType, Path::new("bad_string_format_type.py"); "PLE1307")]
-    #[test_case(Rule::BidirectionalUnicode, Path::new("bidirectional_unicode.py"); "PLE2502")]
-    #[test_case(Rule::BadStrStripCall, Path::new("bad_str_strip_call.py"); "PLE01310")]
+    #[test_case(Rule::UnnecessaryDirectLambdaCall, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
+    #[test_case(Rule::UsedPriorGlobalDeclaration, Path::new("used_prior_global_declaration.py"); "PLE0118")]
+    #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]
+    #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
+    #[test_case(Rule::UselessReturn, Path::new("useless_return.py"); "PLR1711")]
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"); "PLE0100")]
-    #[test_case(Rule::RedefinedLoopName, Path::new("redefined_loop_name.py"); "PLW2901")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -62,6 +70,19 @@ mod tests {
             &Settings::for_rules(vec![rule_code]),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn continue_in_finally() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pylint/continue_in_finally.py"),
+            &Settings {
+                target_version: PythonVersion::Py37,
+                ..Settings::for_rules(vec![Rule::ContinueInFinally])
+            },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
 

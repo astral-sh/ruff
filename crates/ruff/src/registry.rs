@@ -143,6 +143,7 @@ ruff_macros::register_rules!(
     rules::pyflakes::rules::UnusedAnnotation,
     rules::pyflakes::rules::RaiseNotImplemented,
     // pylint
+    rules::pylint::rules::UselessReturn,
     rules::pylint::rules::YieldInInit,
     rules::pylint::rules::InvalidAllObject,
     rules::pylint::rules::InvalidAllFormat,
@@ -150,8 +151,14 @@ ruff_macros::register_rules!(
     rules::pylint::rules::InvalidEnvvarValue,
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
+    rules::pylint::rules::InvalidCharacterBackspace,
+    rules::pylint::rules::InvalidCharacterSub,
+    rules::pylint::rules::InvalidCharacterEsc,
+    rules::pylint::rules::InvalidCharacterNul,
+    rules::pylint::rules::InvalidCharacterZeroWidthSpace,
     rules::pylint::rules::BadStrStripCall,
     rules::pylint::rules::CollapsibleElseIf,
+    rules::pylint::rules::ContinueInFinally,
     rules::pylint::rules::UselessImportAlias,
     rules::pylint::rules::UnnecessaryDirectLambdaCall,
     rules::pylint::rules::NonlocalWithoutBinding,
@@ -185,6 +192,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::UnreliableCallableCheck,
     rules::flake8_bugbear::rules::StripWithMultiCharacters,
     rules::flake8_bugbear::rules::MutableArgumentDefault,
+    rules::flake8_bugbear::rules::NoExplicitStacklevel,
     rules::flake8_bugbear::rules::UnusedLoopControlVariable,
     rules::flake8_bugbear::rules::FunctionCallArgumentDefault,
     rules::flake8_bugbear::rules::GetAttrWithConstant,
@@ -601,6 +609,7 @@ ruff_macros::register_rules!(
     rules::ruff::rules::UnpackInsteadOfConcatenatingToCollectionLiteral,
     rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,
+    rules::ruff::rules::PairwiseOverZipped,
     // flake8-django
     rules::flake8_django::rules::NullableModelStringField,
     rules::flake8_django::rules::LocalsInRenderFunction,
@@ -609,6 +618,10 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::ModelWithoutDunderStr,
     rules::flake8_django::rules::NonLeadingReceiverDecorator,
 );
+
+pub trait AsRule {
+    fn rule(&self) -> Rule;
+}
 
 impl Rule {
     pub fn from_code(code: &str) -> Result<Self, FromCodeError> {
@@ -848,6 +861,11 @@ impl Rule {
             | Rule::BadQuotesMultilineString
             | Rule::CommentedOutCode
             | Rule::MultiLineImplicitStringConcatenation
+            | Rule::InvalidCharacterBackspace
+            | Rule::InvalidCharacterSub
+            | Rule::InvalidCharacterEsc
+            | Rule::InvalidCharacterNul
+            | Rule::InvalidCharacterZeroWidthSpace
             | Rule::ExtraneousParentheses
             | Rule::InvalidEscapeSequence
             | Rule::SingleLineImplicitStringConcatenation
@@ -916,6 +934,7 @@ pub const INCOMPATIBLE_CODES: &[(Rule, Rule, &str); 2] = &[
 
 #[cfg(test)]
 mod tests {
+    use std::mem::size_of;
     use strum::IntoEnumIterator;
 
     use super::{Linter, Rule, RuleNamespace};
@@ -960,5 +979,10 @@ mod tests {
                 Linter::parse_code(&code).unwrap_or_else(|| panic!("couldn't parse {code:?}"));
             assert_eq!(code, format!("{}{rest}", linter.common_prefix()));
         }
+    }
+
+    #[test]
+    fn rule_size() {
+        assert_eq!(2, size_of::<Rule>());
     }
 }

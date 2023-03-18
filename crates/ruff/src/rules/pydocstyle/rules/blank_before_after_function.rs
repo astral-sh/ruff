@@ -61,7 +61,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
     if checker
         .settings
         .rules
-        .enabled(&Rule::NoBlankLineBeforeFunction)
+        .enabled(Rule::NoBlankLineBeforeFunction)
     {
         let before = checker
             .locator
@@ -94,7 +94,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
     if checker
         .settings
         .rules
-        .enabled(&Rule::NoBlankLineAfterFunction)
+        .enabled(Rule::NoBlankLineAfterFunction)
     {
         let after = checker.locator.slice(Range::new(
             docstring.expr.end_location.unwrap(),

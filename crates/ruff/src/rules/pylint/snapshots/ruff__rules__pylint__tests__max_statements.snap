@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     name: TooManyStatements
-    body: Too many statements (2/1)
+    body: Too many statements (2 > 1)
     suggestion: ~
     fixable: false
   location:
@@ -17,7 +17,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: TooManyStatements
-    body: Too many statements (3/1)
+    body: Too many statements (3 > 1)
     suggestion: ~
     fixable: false
   location:
@@ -30,7 +30,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: TooManyStatements
-    body: Too many statements (2/1)
+    body: Too many statements (2 > 1)
     suggestion: ~
     fixable: false
   location:

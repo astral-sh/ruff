@@ -1,24 +1,29 @@
-# These should be changed
+# Error (`from unittest import mock`)
 if True:
     import mock
 
+# Error (`from unittest import mock`)
 if True:
     import mock, sys
 
-# This goes to from unitest import mock
+# Error (`from unittest.mock import *`)
+if True:
+    from mock import *
+
+# Error (`from unittest import mock`)
 import mock.mock
 
-# Mock should go on a new line as `from unittest import mock`
+# Error (`from unittest import mock`)
 import contextlib, mock, sys
 
-# Mock should go on a new line as `from unittest import mock`
+# Error (`from unittest import mock`)
 import mock, sys
 x = "This code should be preserved one line below the mock"
 
-# Mock should go on a new line as `from unittest import mock`
+# Error (`from unittest import mock`)
 from mock import mock
 
-# Should keep trailing comma
+# Error (keep trailing comma)
 from mock import (
     mock,
     a,
@@ -32,7 +37,7 @@ from mock import (
     mock,
 )
 
-# Should not get a trailing comma
+# Error (avoid trailing comma)
 from mock import (
     mock,
     a,
@@ -57,16 +62,16 @@ if True:
             c
         )
 
-# These should not change:
+# OK
 import os, io
 
-# Mock should go on a new line as `from unittest import mock`
+# Error (`from unittest import mock`)
 import mock, mock
 
-# Mock should go on a new line as `from unittest import mock as foo`
+# Error (`from unittest import mock as foo`)
 import mock as foo
 
-# Mock should go on a new line as `from unittest import mock as foo`
+# Error (`from unittest import mock as foo`)
 from mock import mock as foo
 
 if True:
@@ -81,8 +86,8 @@ if True:
     from mock import mock as foo, mock as bar, mock
 
 
-# This should be unchanged.
+# OK.
 x = mock.Mock()
 
-# This should change to `mock.Mock`().
+# Error (`mock.Mock()`).
 x = mock.mock.Mock()

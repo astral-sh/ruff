@@ -3,7 +3,8 @@ use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Stmt, StmtKind, Unaryop};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
-use ruff_python_ast::types::{Range, ScopeKind};
+use ruff_python_ast::scope::ScopeKind;
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -93,7 +94,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(def) = &checker.ctx.current_scope().kind {
+    if let ScopeKind::Function(def) = &checker.ctx.scope().kind {
         if DUNDER_METHODS.contains(&def.name) {
             return;
         }
@@ -144,7 +145,7 @@ pub fn negation_with_not_equal_op(
     }
 
     // Avoid flagging issues in dunder implementations.
-    if let ScopeKind::Function(def) = &checker.ctx.current_scope().kind {
+    if let ScopeKind::Function(def) = &checker.ctx.scope().kind {
         if DUNDER_METHODS.contains(&def.name) {
             return;
         }

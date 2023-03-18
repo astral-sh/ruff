@@ -260,7 +260,7 @@ pub fn trailing_commas(
                     end_location: comma.2,
                 },
             );
-            if autofix.into() && settings.rules.should_fix(&Rule::TrailingCommaProhibited) {
+            if autofix.into() && settings.rules.should_fix(Rule::TrailingCommaProhibited) {
                 diagnostic.amend(Fix::deletion(comma.0, comma.2));
             }
             diagnostics.push(diagnostic);
@@ -304,7 +304,7 @@ pub fn trailing_commas(
                     end_location: missing_comma.2,
                 },
             );
-            if autofix.into() && settings.rules.should_fix(&Rule::TrailingCommaMissing) {
+            if autofix.into() && settings.rules.should_fix(Rule::TrailingCommaMissing) {
                 // Create a replacement that includes the final bracket (or other token),
                 // rather than just inserting a comma at the end. This prevents the UP034 autofix
                 // removing any brackets in the same linter pass - doing both at the same time could

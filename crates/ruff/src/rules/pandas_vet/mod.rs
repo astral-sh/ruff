@@ -48,7 +48,7 @@ mod tests {
         );
         let actual: Vec<Rule> = diagnostics
             .into_iter()
-            .map(|diagnostic| diagnostic.kind.rule().clone())
+            .map(|diagnostic| diagnostic.kind.rule())
             .collect();
         assert_eq!(actual, expected);
     }

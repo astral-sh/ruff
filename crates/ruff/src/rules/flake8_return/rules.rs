@@ -514,13 +514,13 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
         return;
     }
 
-    if checker.settings.rules.enabled(&Rule::SuperfluousElseReturn)
-        || checker.settings.rules.enabled(&Rule::SuperfluousElseRaise)
+    if checker.settings.rules.enabled(Rule::SuperfluousElseReturn)
+        || checker.settings.rules.enabled(Rule::SuperfluousElseRaise)
         || checker
             .settings
             .rules
-            .enabled(&Rule::SuperfluousElseContinue)
-        || checker.settings.rules.enabled(&Rule::SuperfluousElseBreak)
+            .enabled(Rule::SuperfluousElseContinue)
+        || checker.settings.rules.enabled(Rule::SuperfluousElseBreak)
     {
         if superfluous_elif(checker, &stack) {
             return;
@@ -536,20 +536,20 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
     }
 
     if !result_exists(&stack.returns) {
-        if checker.settings.rules.enabled(&Rule::UnnecessaryReturnNone) {
+        if checker.settings.rules.enabled(Rule::UnnecessaryReturnNone) {
             unnecessary_return_none(checker, &stack);
         }
         return;
     }
 
-    if checker.settings.rules.enabled(&Rule::ImplicitReturnValue) {
+    if checker.settings.rules.enabled(Rule::ImplicitReturnValue) {
         implicit_return_value(checker, &stack);
     }
-    if checker.settings.rules.enabled(&Rule::ImplicitReturn) {
+    if checker.settings.rules.enabled(Rule::ImplicitReturn) {
         implicit_return(checker, last_stmt);
     }
 
-    if checker.settings.rules.enabled(&Rule::UnnecessaryAssign) {
+    if checker.settings.rules.enabled(Rule::UnnecessaryAssign) {
         for (_, expr) in &stack.returns {
             if let Some(expr) = expr {
                 unnecessary_assign(checker, &stack, expr);

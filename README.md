@@ -137,7 +137,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.256'
+  rev: 'v0.0.257'
   hooks:
     - id: ruff
 ```
@@ -227,6 +227,54 @@ stylistic rules made obsolete by the use of an autoformatter, like
 If you're just getting started with Ruff, **the default rule set is a great place to start**: it
 catches a wide variety of common errors (like unused imports) with zero configuration.
 
+Beyond the defaults, Ruff re-implements some of the most popular Flake8 plugins and related code
+quality tools, including:
+
+- [autoflake](https://pypi.org/project/autoflake/)
+- [eradicate](https://pypi.org/project/eradicate/)
+- [flake8-2020](https://pypi.org/project/flake8-2020/)
+- [flake8-annotations](https://pypi.org/project/flake8-annotations/)
+- [flake8-bandit](https://pypi.org/project/flake8-bandit/) ([#1646](https://github.com/charliermarsh/ruff/issues/1646))
+- [flake8-blind-except](https://pypi.org/project/flake8-blind-except/)
+- [flake8-boolean-trap](https://pypi.org/project/flake8-boolean-trap/)
+- [flake8-bugbear](https://pypi.org/project/flake8-bugbear/)
+- [flake8-builtins](https://pypi.org/project/flake8-builtins/)
+- [flake8-commas](https://pypi.org/project/flake8-commas/)
+- [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
+- [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
+- [flake8-debugger](https://pypi.org/project/flake8-debugger/)
+- [flake8-django](https://pypi.org/project/flake8-django/) ([#2817](https://github.com/charliermarsh/ruff/issues/2817))
+- [flake8-docstrings](https://pypi.org/project/flake8-docstrings/)
+- [flake8-eradicate](https://pypi.org/project/flake8-eradicate/)
+- [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
+- [flake8-executable](https://pypi.org/project/flake8-executable/)
+- [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
+- [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
+- [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)
+- [flake8-no-pep420](https://pypi.org/project/flake8-no-pep420)
+- [flake8-pie](https://pypi.org/project/flake8-pie/)
+- [flake8-print](https://pypi.org/project/flake8-print/)
+- [flake8-pyi](https://pypi.org/project/flake8-pyi/)
+- [flake8-pytest-style](https://pypi.org/project/flake8-pytest-style/)
+- [flake8-quotes](https://pypi.org/project/flake8-quotes/)
+- [flake8-raise](https://pypi.org/project/flake8-raise/)
+- [flake8-return](https://pypi.org/project/flake8-return/)
+- [flake8-self](https://pypi.org/project/flake8-self/)
+- [flake8-simplify](https://pypi.org/project/flake8-simplify/)
+- [flake8-super](https://pypi.org/project/flake8-super/)
+- [flake8-tidy-imports](https://pypi.org/project/flake8-tidy-imports/)
+- [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
+- [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
+- [isort](https://pypi.org/project/isort/)
+- [mccabe](https://pypi.org/project/mccabe/)
+- [pandas-vet](https://pypi.org/project/pandas-vet/)
+- [pep8-naming](https://pypi.org/project/pep8-naming/)
+- [pydocstyle](https://pypi.org/project/pydocstyle/)
+- [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) ([#980](https://github.com/charliermarsh/ruff/issues/980))
+- [pyupgrade](https://pypi.org/project/pyupgrade/)
+- [tryceratops](https://pypi.org/project/tryceratops/)
+- [yesqa](https://pypi.org/project/yesqa/)
+
 <!-- End section: Rules -->
 
 For a complete enumeration of the supported rules, see [_Rules_](https://beta.ruff.rs/docs/rules/).
@@ -309,6 +357,10 @@ Ruff is used in a number of major open-source projects, including:
 - [Starlite](https://github.com/starlite-api/starlite)
 - [telemetry-airflow (Mozilla)](https://github.com/mozilla/telemetry-airflow)
 - [Stable Baselines3](https://github.com/DLR-RM/stable-baselines3)
+- [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)
+- [nox](https://github.com/wntrblm/nox)
+- [Neon](https://github.com/neondatabase/neon)
+- [The Algorithms](https://github.com/TheAlgorithms/Python)
 
 ## License
 

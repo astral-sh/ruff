@@ -2,7 +2,8 @@ use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Range, Scope};
+use ruff_python_ast::scope::Scope;
+use ruff_python_ast::types::Range;
 
 #[violation]
 pub struct UndefinedExport {
@@ -27,7 +28,7 @@ pub fn undefined_export(
     let mut diagnostics = Vec::new();
     if !scope.import_starred && !path.ends_with("__init__.py") {
         for name in names {
-            if !scope.bindings.contains_key(name) {
+            if !scope.defines(name) {
                 diagnostics.push(Diagnostic::new(
                     UndefinedExport {
                         name: (*name).to_string(),

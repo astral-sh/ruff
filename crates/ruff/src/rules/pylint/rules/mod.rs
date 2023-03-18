@@ -6,12 +6,17 @@ pub use collapsible_else_if::{collapsible_else_if, CollapsibleElseIf};
 pub use compare_to_empty_string::{compare_to_empty_string, CompareToEmptyString};
 pub use comparison_of_constant::{comparison_of_constant, ComparisonOfConstant};
 pub use consider_using_sys_exit::{consider_using_sys_exit, ConsiderUsingSysExit};
+pub use continue_in_finally::{continue_in_finally, ContinueInFinally};
 pub use global_statement::{global_statement, GlobalStatement};
 pub use global_variable_not_assigned::GlobalVariableNotAssigned;
 pub use invalid_all_format::{invalid_all_format, InvalidAllFormat};
 pub use invalid_all_object::{invalid_all_object, InvalidAllObject};
 pub use invalid_envvar_default::{invalid_envvar_default, InvalidEnvvarDefault};
 pub use invalid_envvar_value::{invalid_envvar_value, InvalidEnvvarValue};
+pub use invalid_string_characters::{
+    invalid_string_characters, InvalidCharacterBackspace, InvalidCharacterEsc, InvalidCharacterNul,
+    InvalidCharacterSub, InvalidCharacterZeroWidthSpace,
+};
 pub use logging::{logging_call, LoggingTooFewArgs, LoggingTooManyArgs};
 pub use magic_value_comparison::{magic_value_comparison, MagicValueComparison};
 pub use merge_isinstance::{merge_isinstance, ConsiderMergingIsinstance};
@@ -32,6 +37,7 @@ pub use used_prior_global_declaration::{
 };
 pub use useless_else_on_loop::{useless_else_on_loop, UselessElseOnLoop};
 pub use useless_import_alias::{useless_import_alias, UselessImportAlias};
+pub use useless_return::{useless_return, UselessReturn};
 pub use yield_in_init::{yield_in_init, YieldInInit};
 
 mod await_outside_async;
@@ -42,12 +48,14 @@ mod collapsible_else_if;
 mod compare_to_empty_string;
 mod comparison_of_constant;
 mod consider_using_sys_exit;
+mod continue_in_finally;
 mod global_statement;
 mod global_variable_not_assigned;
 mod invalid_all_format;
 mod invalid_all_object;
 mod invalid_envvar_default;
 mod invalid_envvar_value;
+mod invalid_string_characters;
 mod logging;
 mod magic_value_comparison;
 mod merge_isinstance;
@@ -64,4 +72,5 @@ mod use_from_import;
 mod used_prior_global_declaration;
 mod useless_else_on_loop;
 mod useless_import_alias;
+mod useless_return;
 mod yield_in_init;
