@@ -45,7 +45,7 @@ use crate::rules::{
     flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise,
     flake8_return, flake8_self, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, flake8_use_pathlib, mccabe, numpy, pandas_vet, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops, flake8_variable_names,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -221,6 +221,20 @@ where
                             pycodestyle::rules::ambiguous_variable_name(name, *range)
                         }));
                 }
+
+                if self.settings.rules.enabled(Rule::NonDescriptVariableName) {
+                    self.diagnostics
+                        .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
+                            flake8_variable_names::rules::non_descript_variable_name(name, *range)
+                        }));
+                }
+
+                if self.settings.rules.enabled(Rule::SingleLetterVariableName) {
+                    self.diagnostics
+                        .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
+                            flake8_variable_names::rules::single_letter_variable_name(name, *range)
+                        }));
+                }
             }
             StmtKind::Nonlocal { names } => {
                 let scope_index = *self.ctx.scope_stack.last().expect("No current scope found");
@@ -275,6 +289,21 @@ where
                     self.diagnostics
                         .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
                             pycodestyle::rules::ambiguous_variable_name(name, *range)
+                        }));
+                }
+
+
+                if self.settings.rules.enabled(Rule::NonDescriptVariableName) {
+                    self.diagnostics
+                        .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
+                            flake8_variable_names::rules::non_descript_variable_name(name, *range)
+                        }));
+                }
+
+                if self.settings.rules.enabled(Rule::SingleLetterVariableName) {
+                    self.diagnostics
+                        .extend(names.iter().zip(ranges.iter()).filter_map(|(name, range)| {
+                            flake8_variable_names::rules::single_letter_variable_name(name, *range)
                         }));
                 }
             }
@@ -2286,6 +2315,23 @@ where
                             }
                         }
 
+
+                        if self.settings.rules.enabled(Rule::NonDescriptVariableName) {
+                            if let Some(diagnostic) =
+                            flake8_variable_names::rules::non_descript_variable_name(id, Range::from(expr))
+                            {
+                                self.diagnostics.push(diagnostic);
+                            }
+                        }
+
+                        if self.settings.rules.enabled(Rule::SingleLetterVariableName) {
+                            if let Some(diagnostic) =
+                            flake8_variable_names::rules::single_letter_variable_name(id, Range::from(expr))
+                            {
+                                self.diagnostics.push(diagnostic);
+                            }
+                        }
+
                         self.check_builtin_shadowing(id, expr, true);
 
                         self.handle_node_store(id, expr);
@@ -3762,6 +3808,27 @@ where
                             }
                         }
 
+
+                        if self.settings.rules.enabled(Rule::NonDescriptVariableName) {
+                            if let Some(diagnostic) = flake8_variable_names::rules::non_descript_variable_name(
+                                name,
+                                helpers::excepthandler_name_range(excepthandler, self.locator)
+                                    .expect("Failed to find `name` range"),
+                            ) {
+                                self.diagnostics.push(diagnostic);
+                            }
+                        }
+
+                        if self.settings.rules.enabled(Rule::SingleLetterVariableName) {
+                            if let Some(diagnostic) = flake8_variable_names::rules::single_letter_variable_name(
+                                name,
+                                helpers::excepthandler_name_range(excepthandler, self.locator)
+                                    .expect("Failed to find `name` range"),
+                            ) {
+                                self.diagnostics.push(diagnostic);
+                            }
+                        }
+
                         self.check_builtin_shadowing(name, excepthandler, false);
 
                         let name_range =
@@ -3929,6 +3996,22 @@ where
         if self.settings.rules.enabled(Rule::AmbiguousVariableName) {
             if let Some(diagnostic) =
                 pycodestyle::rules::ambiguous_variable_name(&arg.node.arg, Range::from(arg))
+            {
+                self.diagnostics.push(diagnostic);
+            }
+        }
+
+        if self.settings.rules.enabled(Rule::NonDescriptVariableName) {
+            if let Some(diagnostic) =
+            flake8_variable_names::rules::non_descript_variable_name(&arg.node.arg, Range::from(arg))
+            {
+                self.diagnostics.push(diagnostic);
+            }
+        }
+
+        if self.settings.rules.enabled(Rule::SingleLetterVariableName) {
+            if let Some(diagnostic) =
+                flake8_variable_names::rules::single_letter_variable_name(&arg.node.arg, Range::from(arg))
             {
                 self.diagnostics.push(diagnostic);
             }

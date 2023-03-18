@@ -592,6 +592,9 @@ ruff_macros::register_rules!(
     rules::flake8_raise::rules::UnnecessaryParenOnRaiseException,
     // flake8-self
     rules::flake8_self::rules::PrivateMemberAccess,
+    // flake8-variable-names
+    rules::flake8_variable_names::rules::SingleLetterVariableName,
+    rules::flake8_variable_names::rules::NonDescriptVariableName,
     // numpy
     rules::numpy::rules::NumpyDeprecatedTypeAlias,
     rules::numpy::rules::NumpyLegacyRandom,
@@ -747,6 +750,9 @@ pub enum Linter {
     /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
     #[prefix = "PTH"]
     Flake8UsePathlib,
+    /// [flake8-variable-names](https://pypi.org/project/flake8-variables-names/)
+    #[prefix = "VN"]
+    Flake8VariableNames,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,

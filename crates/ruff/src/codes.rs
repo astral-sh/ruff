@@ -343,6 +343,10 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Simplify, "300") => Rule::YodaConditions,
         (Flake8Simplify, "401") => Rule::DictGetWithDefault,
 
+        // flake8-variable-names
+        (Flake8VariableNames, "001") => Rule::SingleLetterVariableName,
+        (Flake8VariableNames, "002") => Rule::NonDescriptVariableName,
+
         // pyupgrade
         (Pyupgrade, "001") => Rule::UselessMetaclassType,
         (Pyupgrade, "003") => Rule::TypeOfPrimitive,
