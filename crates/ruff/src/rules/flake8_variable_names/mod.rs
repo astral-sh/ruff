@@ -34,8 +34,7 @@ mod tests {
                 .as_path(),
             &settings::Settings {
                 flake8_variable_names: super::settings::Settings {
-                    use_varnames_strict_mode: true,
-                    ..Default::default()
+                    use_varnames_strict_mode: true
                 },
                 ..settings::Settings::for_rules(vec![Rule::SingleLetterVariableName, Rule::AnyType])
             },
@@ -52,8 +51,7 @@ mod tests {
                 .as_path(),
             &settings::Settings {
                 flake8_variable_names: super::settings::Settings {
-                    use_varnames_strict_mode: false,
-                    ..Default::default()
+                    use_varnames_strict_mode: false
                 },
                 ..settings::Settings::for_rules(vec![Rule::SingleLetterVariableName, Rule::AnyType])
             },
@@ -70,8 +68,7 @@ mod tests {
                 .as_path(),
             &settings::Settings {
                 flake8_variable_names: super::settings::Settings {
-                    use_varnames_strict_mode: true,
-                    ..Default::default()
+                    use_varnames_strict_mode: true
                 },
                 ..settings::Settings::for_rules(vec![Rule::NonDescriptVariableName, Rule::AnyType])
             },
@@ -88,8 +85,7 @@ mod tests {
                 .as_path(),
             &settings::Settings {
                 flake8_variable_names: super::settings::Settings {
-                    use_varnames_strict_mode: false,
-                    ..Default::default()
+                    use_varnames_strict_mode: false
                 },
                 ..settings::Settings::for_rules(vec![Rule::NonDescriptVariableName, Rule::AnyType])
             },
