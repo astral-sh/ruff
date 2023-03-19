@@ -95,7 +95,7 @@ Ruff is not a "pure" drop-in replacement for Pylint (and vice versa), as they en
 of rules.
 
 Despite these differences, many users have successfully switched from Pylint to Ruff, especially
-those using Ruff alongside a [type checker](https://github.com/charliermarsh/ruff#how-does-ruff-compare-to-mypy-or-pyright-or-pyre),
+those using Ruff alongside a [type checker](faq.md#how-does-ruff-compare-to-mypy-or-pyright-or-pyre),
 which can cover some of the functionality that Pylint provides.
 
 Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all rules natively.
