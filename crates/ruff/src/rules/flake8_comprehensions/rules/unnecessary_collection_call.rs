@@ -41,7 +41,7 @@ pub fn unnecessary_collection_call(
     if !args.is_empty() {
         return;
     }
-    let Some(id) = helpers::function_name(func) else {
+    let Some(id) = helpers::expr_name(func) else {
         return;
     };
     match id {

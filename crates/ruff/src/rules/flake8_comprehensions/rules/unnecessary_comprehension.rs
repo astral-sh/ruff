@@ -93,20 +93,28 @@ pub fn unnecessary_dict_comprehension(
     if !(generator.ifs.is_empty() && generator.is_async == 0) {
         return;
     }
-    let Some(key_id) = helpers::function_name(key) else {
+    let Some(key_id) = helpers::expr_name(key) else {
         return;
     };
-    let Some(value_id) = helpers::function_name(value) else {
+    let Some(value_id) = helpers::expr_name(value) else {
         return;
     };
-    let target_ids: Vec<&str> = match &generator.target.node {
-        ExprKind::Tuple { elts, .. } => elts.iter().filter_map(helpers::function_name).collect(),
-        _ => return,
+    let ExprKind::Tuple { elts, .. } = &generator.target.node else {
+        return;
     };
-    if target_ids.len() != 2 {
+    if elts.len() != 2 {
         return;
     }
-    if key_id != target_ids[0] && value_id != target_ids[1] {
+    let Some(target_key_id) = helpers::expr_name(&elts[0]) else {
+        return;
+    };
+    if target_key_id != key_id {
+        return;
+    }
+    let Some(target_value_id) = helpers::expr_name(&elts[1]) else {
+        return;
+    };
+    if target_value_id != value_id {
         return;
     }
     add_diagnostic(checker, expr);
@@ -126,10 +134,10 @@ pub fn unnecessary_list_set_comprehension(
     if !(generator.ifs.is_empty() && generator.is_async == 0) {
         return;
     }
-    let Some(elt_id) = helpers::function_name(elt) else {
+    let Some(elt_id) = helpers::expr_name(elt) else {
         return;
     };
-    let Some(target_id) = helpers::function_name(&generator.target) else {
+    let Some(target_id) = helpers::expr_name(&generator.target) else {
         return;
     };
     if elt_id != target_id {
