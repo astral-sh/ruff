@@ -1,4 +1,3 @@
-use itertools::{EitherOrBoth, Itertools};
 use log::error;
 use rustpython_parser::ast::{Comprehension, Expr, ExprKind};
 
@@ -30,46 +29,8 @@ impl AlwaysAutofixableViolation for UnnecessaryComprehension {
     }
 }
 
-/// C416
-pub fn unnecessary_comprehension(
-    checker: &mut Checker,
-    expr: &Expr,
-    elts: &[&Expr],
-    generators: &[Comprehension],
-) {
-    if generators.len() != 1 {
-        return;
-    }
-    let generator = &generators[0];
-    if !(generator.ifs.is_empty() && generator.is_async == 0) {
-        return;
-    }
-    let elt_ids: Vec<Option<&str>> = elts.iter().map(|&e| helpers::function_name(e)).collect();
-
-    let target_ids: Vec<Option<&str>> = match &generator.target.node {
-        ExprKind::Name { id, .. } => vec![Some(id.as_str())],
-        ExprKind::Tuple { elts, .. } => {
-            // If the target is a tuple of length 1, the comprehension is
-            // used to flatten the iterable. E.g., [(1,), (2,)] => [1, 2]
-            if elts.len() == 1 {
-                return;
-            }
-            elts.iter().map(helpers::function_name).collect()
-        }
-        _ => return,
-    };
-
-    if !elt_ids
-        .iter()
-        .zip_longest(target_ids.iter())
-        .all(|e| match e {
-            EitherOrBoth::Both(&Some(e), &Some(t)) => e == t,
-            _ => false,
-        })
-    {
-        return;
-    }
-
+/// Add diagnostic for C416 based on the expression node id.
+fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
     let id = match &expr.node {
         ExprKind::ListComp { .. } => "list",
         ExprKind::SetComp { .. } => "set",
@@ -94,4 +55,64 @@ pub fn unnecessary_comprehension(
         }
     }
     checker.diagnostics.push(diagnostic);
+}
+
+/// C416
+pub fn unnecessary_dict_comprehension(
+    checker: &mut Checker,
+    expr: &Expr,
+    key: &Expr,
+    value: &Expr,
+    generators: &[Comprehension],
+) {
+    if generators.len() != 1 {
+        return;
+    }
+    let generator = &generators[0];
+    if !(generator.ifs.is_empty() && generator.is_async == 0) {
+        return;
+    }
+    let Some(key_id) = helpers::function_name(key) else {
+        return;
+    };
+    let Some(value_id) = helpers::function_name(value) else {
+        return;
+    };
+    let target_ids: Vec<&str> = match &generator.target.node {
+        ExprKind::Tuple { elts, .. } => elts.iter().filter_map(helpers::function_name).collect(),
+        _ => return,
+    };
+    if target_ids.len() != 2 {
+        return;
+    }
+    if key_id != target_ids[0] && value_id != target_ids[1] {
+        return;
+    }
+    add_diagnostic(checker, expr);
+}
+
+/// C416
+pub fn unnecessary_list_set_comprehension(
+    checker: &mut Checker,
+    expr: &Expr,
+    elt: &Expr,
+    generators: &[Comprehension],
+) {
+    if generators.len() != 1 {
+        return;
+    }
+    let generator = &generators[0];
+    if !(generator.ifs.is_empty() && generator.is_async == 0) {
+        return;
+    }
+    let Some(elt_id) = helpers::function_name(elt) else {
+        return;
+    };
+    let Some(target_id) = helpers::function_name(&generator.target) else {
+        return;
+    };
+    if elt_id != target_id {
+        return;
+    }
+    add_diagnostic(checker, expr);
 }

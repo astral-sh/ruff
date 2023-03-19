@@ -3330,9 +3330,8 @@ where
             }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.rules.enabled(Rule::UnnecessaryComprehension) {
-                    let elts: Vec<&Expr> = vec![elt];
-                    flake8_comprehensions::rules::unnecessary_comprehension(
-                        self, expr, &elts, generators,
+                    flake8_comprehensions::rules::unnecessary_list_set_comprehension(
+                        self, expr, elt, generators,
                     );
                 }
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
@@ -3346,9 +3345,8 @@ where
                 generators,
             } => {
                 if self.settings.rules.enabled(Rule::UnnecessaryComprehension) {
-                    let elts: Vec<&Expr> = vec![key, value];
-                    flake8_comprehensions::rules::unnecessary_comprehension(
-                        self, expr, &elts, generators,
+                    flake8_comprehensions::rules::unnecessary_dict_comprehension(
+                        self, expr, key, value, generators,
                     );
                 }
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
