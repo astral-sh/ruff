@@ -3,14 +3,10 @@ import argparse
 import re
 import shutil
 import subprocess
-import sys
 from pathlib import Path
 from typing import NamedTuple
 
 import yaml
-
-if sys.version_info < (3, 9):
-    raise RuntimeError("You need at least python 3.9 to run this script")
 
 
 class Section(NamedTuple):
