@@ -1,24 +1,25 @@
 use std::io;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::Instant;
 
 use anyhow::Result;
 use colored::Colorize;
 use ignore::Error;
-use log::{debug, error};
+use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 
+use crate::panic::catch_unwind;
 use ruff::message::{Location, Message};
 use ruff::registry::Rule;
 use ruff::resolver::PyprojectDiscovery;
-use ruff::settings::flags;
+use ruff::settings::{flags, AllSettings};
 use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError, Range};
 use ruff_diagnostics::Diagnostic;
 
 use crate::args::Overrides;
 use crate::cache;
-use crate::diagnostics::{lint_path, Diagnostics};
+use crate::diagnostics::Diagnostics;
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -83,6 +84,7 @@ pub fn run(
                         .and_then(|parent| package_roots.get(parent))
                         .and_then(|package| *package);
                     let settings = resolver.resolve_all(path, pyproject_strategy);
+
                     lint_path(path, package, settings, cache, noqa, autofix)
                         .map_err(|e| (Some(path.to_owned()), e.to_string()))
                 }
@@ -134,4 +136,40 @@ pub fn run(
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);
 
     Ok(diagnostics)
+}
+
+/// Wraps [`lint_path`](crate::diagnostics::lint_path) in a [`catch_unwind`](std::panic::catch_unwind) and emits
+/// a diagnostic if the linting the file panics.
+fn lint_path(
+    path: &Path,
+    package: Option<&Path>,
+    settings: &AllSettings,
+    cache: flags::Cache,
+    noqa: flags::Noqa,
+    autofix: fix::FixMode,
+) -> Result<Diagnostics> {
+    let result = catch_unwind(|| {
+        crate::diagnostics::lint_path(path, package, settings, cache, noqa, autofix)
+    });
+
+    match result {
+        Ok(inner) => inner,
+        Err(error) => {
+            let message = r#"This indicates a bug in `ruff`. If you could open an issue at:
+
+https://github.com/charliermarsh/ruff/issues/new?title=%5BLinter%20panic%5D
+
+with the relevant file contents, the `pyproject.toml` settings, and the following stack trace, we'd be very appreciative!
+"#;
+
+            warn!(
+                "{}{}{} {message}\n{error}",
+                "Linting panicked ".bold(),
+                fs::relativize_path(path).bold(),
+                ":".bold()
+            );
+
+            Ok(Diagnostics::default())
+        }
+    }
 }
