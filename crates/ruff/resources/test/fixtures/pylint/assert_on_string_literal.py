@@ -9,14 +9,14 @@ def test_division():
 
 
 try:
-    assert "bad"
+    assert "bad"  # [assert-on-string-literal]
 except:
-    assert "bad again"
+    assert "bad again"  # [assert-on-string-literal]
 
 a = 12
-assert f"hello {a}"
-assert ""
-assert b"hello"
-assert "", b"hi"
+assert f"hello {a}"  # [assert-on-string-literal]
+assert ""  # [assert-on-string-literal]
+assert b"hello"  # [assert-on-string-literal]
+assert "", b"hi"  # [assert-on-string-literal]
 assert "WhyNotHere?", "HereIsOk"  # [assert-on-string-literal]
 assert 12, "ok here"
