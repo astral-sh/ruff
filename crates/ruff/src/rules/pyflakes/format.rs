@@ -26,6 +26,7 @@ pub(crate) struct FormatSummary {
     pub indexes: Vec<usize>,
     pub keywords: Vec<String>,
     pub has_nested_parts: bool,
+    pub format_string: FormatString,
 }
 
 impl TryFrom<&str> for FormatSummary {
@@ -39,7 +40,7 @@ impl TryFrom<&str> for FormatSummary {
         let mut keywords = Vec::new();
         let mut has_nested_parts = false;
 
-        for format_part in format_string.format_parts {
+        for format_part in &format_string.format_parts {
             let FormatPart::Field {
                 field_name,
                 format_spec,
@@ -47,14 +48,14 @@ impl TryFrom<&str> for FormatSummary {
             } = format_part else {
                 continue;
             };
-            let parsed = FieldName::parse(&field_name)?;
+            let parsed = FieldName::parse(field_name)?;
             match parsed.field_type {
                 FieldType::Auto => autos.push(autos.len()),
                 FieldType::Index(i) => indexes.push(i),
                 FieldType::Keyword(k) => keywords.push(k),
             };
 
-            let nested = FormatString::from_str(&format_spec)?;
+            let nested = FormatString::from_str(format_spec)?;
             for nested_part in nested.format_parts {
                 let FormatPart::Field { field_name, .. } = nested_part else {
                     continue;
@@ -74,6 +75,7 @@ impl TryFrom<&str> for FormatSummary {
             indexes,
             keywords,
             has_nested_parts,
+            format_string,
         })
     }
 }
