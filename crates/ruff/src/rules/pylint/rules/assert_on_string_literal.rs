@@ -18,26 +18,60 @@ use crate::checkers::ast::Checker;
 /// assert "always true"
 /// ```
 #[violation]
-pub struct AssertOnStringLiteral;
+pub struct AssertOnStringLiteral {
+    length: usize,
+    f_type: bool,
+}
 
 impl Violation for AssertOnStringLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Asserting on a string literal will always pass")
+        let AssertOnStringLiteral { length, f_type } = self;
+        if *f_type == true {
+            format!("Asserting on a string literal may have unintended results")
+        } else {
+            if *length == 0 {
+                format!("Asserting on an empty string literal will always pass")
+            } else {
+                format!("Asserting on a non-empty string literal will always pass")
+            }
+        }
     }
 }
 
 /// PLW0129
 pub fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
-    if matches!(
-        test.node,
-        ExprKind::Constant {
-            value: Constant::Str(..),
-            ..
+    match &test.node {
+        ExprKind::Constant { value, .. } => match value {
+            Constant::Str(s, ..) => {
+                checker.diagnostics.push(Diagnostic::new(
+                    AssertOnStringLiteral {
+                        length: s.len(),
+                        f_type: false,
+                    },
+                    Range::from(test),
+                ));
+            }
+            Constant::Bytes(b) => {
+                checker.diagnostics.push(Diagnostic::new(
+                    AssertOnStringLiteral {
+                        length: b.len(),
+                        f_type: false,
+                    },
+                    Range::from(test),
+                ));
+            }
+            _ => {}
+        },
+        ExprKind::JoinedStr { .. } => {
+            checker.diagnostics.push(Diagnostic::new(
+                AssertOnStringLiteral {
+                    length: 0,
+                    f_type: true,
+                },
+                Range::from(test),
+            ));
         }
-    ) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(AssertOnStringLiteral, Range::from(test)));
+        _ => {}
     }
 }
