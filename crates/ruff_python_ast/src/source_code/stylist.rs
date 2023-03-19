@@ -8,10 +8,9 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::source_code::Locator;
-use ruff_rustpython::vendor;
-
-use crate::str::leading_quote;
+use crate::str::LeadingQuote;
 use crate::types::Range;
+use ruff_rustpython::vendor;
 
 pub struct Stylist<'a> {
     contents: &'a str,
@@ -180,7 +179,7 @@ fn detect_quote(contents: &str, locator: &Locator) -> Option<Quote> {
     for (start, tok, end) in lexer::lex(contents, Mode::Module).flatten() {
         if let Tok::String { .. } = tok {
             let content = locator.slice(Range::new(start, end));
-            if let Some(pattern) = leading_quote(content) {
+            if let Some(pattern) = LeadingQuote::try_from_str(content) {
                 if pattern.contains("\"\"\"") {
                     continue;
                 } else if pattern.contains('\'') {

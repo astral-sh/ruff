@@ -6,7 +6,7 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::str::{is_implicit_concatenation, leading_quote, trailing_quote};
+use ruff_python_ast::str::{is_implicit_concatenation, LeadingQuote, TrailingQuote};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -143,10 +143,10 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
     }
 
     // Remove the leading and trailing quotes.
-    let Some(leading_quote) = leading_quote(contents) else {
+    let Some(leading_quote) = LeadingQuote::try_from_str(contents) else {
         return None;
     };
-    let Some(trailing_quote) = trailing_quote(contents) else {
+    let Some(trailing_quote) = TrailingQuote::try_from_str(contents) else {
         return None;
     };
     let contents = &contents[leading_quote.len()..contents.len() - trailing_quote.len()];
@@ -228,9 +228,9 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
     // Construct the format string.
     let mut contents = String::with_capacity(1 + converted.len());
     contents.push('f');
-    contents.push_str(leading_quote);
+    contents.push_str(leading_quote.as_str());
     contents.push_str(&converted);
-    contents.push_str(trailing_quote);
+    contents.push_str(trailing_quote.as_str());
     Some(contents)
 }
 

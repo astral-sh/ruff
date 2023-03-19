@@ -5157,7 +5157,7 @@ impl<'a> Checker<'a> {
                     continue;
                 }
 
-                let body = str::raw_contents(contents);
+                let body = str::strip_quotes(contents);
                 let docstring = Docstring {
                     kind: definition.kind,
                     expr,

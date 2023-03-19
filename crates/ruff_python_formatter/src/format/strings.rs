@@ -2,7 +2,7 @@ use rustpython_parser::{Mode, Tok};
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{write, Format};
-use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_python_ast::str::{LeadingQuote, TrailingQuote};
 use ruff_python_ast::types::Range;
 use ruff_text_size::TextSize;
 
@@ -23,8 +23,8 @@ impl Format<ASTFormatContext<'_>> for StringLiteralPart {
 
         // Extract leading and trailing quotes.
         let contents = &contents[start_index..end_index];
-        let leading_quote = leading_quote(contents).unwrap();
-        let trailing_quote = trailing_quote(contents).unwrap();
+        let leading_quote = LeadingQuote::try_from_str(contents).unwrap();
+        let trailing_quote = TrailingQuote::try_from_str(contents).unwrap();
         let body = &contents[leading_quote.len()..contents.len() - trailing_quote.len()];
 
         // Determine the correct quote style.

@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
-use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_python_ast::str::{LeadingQuote, TrailingQuote};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -40,8 +40,8 @@ pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
         let mut diagnostic = Diagnostic::new(FitsOnOneLine, Range::from(docstring.expr));
         if checker.patch(diagnostic.kind.rule()) {
             if let (Some(leading), Some(trailing)) = (
-                leading_quote(docstring.contents),
-                trailing_quote(docstring.contents),
+                LeadingQuote::try_from_str(docstring.contents),
+                TrailingQuote::try_from_str(docstring.contents),
             ) {
                 // If removing whitespace would lead to an invalid string of quote
                 // characters, avoid applying the fix.

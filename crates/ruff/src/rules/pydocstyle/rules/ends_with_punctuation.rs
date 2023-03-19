@@ -3,7 +3,7 @@ use strum::IntoEnumIterator;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::str::leading_quote;
+use ruff_python_ast::str::LeadingQuote;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -66,7 +66,7 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
                 && !trimmed.ends_with(';')
             {
                 if let Some((row, column)) = if index == 0 {
-                    leading_quote(contents).map(|pattern| {
+                    LeadingQuote::try_from_str(contents).map(|pattern| {
                         (
                             docstring.expr.location.row(),
                             docstring.expr.location.column()

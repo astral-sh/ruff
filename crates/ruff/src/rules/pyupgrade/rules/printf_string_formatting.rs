@@ -8,7 +8,7 @@ use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::str::{leading_quote, trailing_quote};
+use ruff_python_ast::str::{LeadingQuote, TrailingQuote};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_stdlib::identifiers::is_identifier;
@@ -338,7 +338,7 @@ pub(crate) fn printf_string_formatting(
     let mut format_strings = vec![];
     for (start, end) in &strings {
         let string = checker.locator.slice(Range::new(*start, *end));
-        let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
+        let (Some(leader), Some(trailer)) = (LeadingQuote::try_from_str(string), TrailingQuote::try_from_str(string)) else {
             return;
         };
         let string = &string[leader.len()..string.len() - trailer.len()];

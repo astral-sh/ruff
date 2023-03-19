@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{NewlineWithTrailingNewline, StrExt};
-use ruff_python_ast::str::{is_triple_quote, leading_quote};
+use ruff_python_ast::str::LeadingQuote;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -52,7 +52,12 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
     {
         return;
     };
-    if is_triple_quote(first_line) {
+
+    let is_leading_triple_quote = LeadingQuote::try_from_str(first_line).map_or(false, |leading| {
+        leading.kind().is_triple() && first_line.len() == leading.len()
+    });
+
+    if is_leading_triple_quote {
         if checker
             .settings
             .rules
@@ -114,14 +119,17 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
 
                 if fixable {
                     let location = docstring.expr.location;
-                    let prefix = leading_quote(contents).unwrap();
+                    let prefix = LeadingQuote::try_from_str(contents).unwrap();
                     // Use replacement instead of insert to trim possible whitespace between leading
                     // quote and text.
                     let repl = format!(
                         "{}{}{}",
                         checker.stylist.line_ending().as_str(),
                         indentation,
-                        first_line.strip_prefix(prefix).unwrap().trim_start()
+                        first_line
+                            .strip_prefix(prefix.as_str())
+                            .unwrap()
+                            .trim_start()
                     );
                     diagnostic.amend(Fix::replacement(
                         repl,
