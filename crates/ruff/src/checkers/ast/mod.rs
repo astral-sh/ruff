@@ -38,6 +38,7 @@ use crate::checkers::ast::deferred::Deferred;
 use crate::docstrings::definition::{
     transition_scope, Definition, DefinitionKind, Docstring, Documentable,
 };
+use crate::fs::relativize_path;
 use crate::registry::{AsRule, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
@@ -50,7 +51,7 @@ use crate::rules::{
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
-use crate::{autofix, docstrings, noqa};
+use crate::{autofix, docstrings, noqa, warn_user};
 
 mod deferred;
 
@@ -5101,6 +5102,7 @@ impl<'a> Checker<'a> {
                 }
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
             }
+
             if self.is_stub {
                 if self.settings.rules.enabled(Rule::DocstringInStub) {
                     flake8_pyi::rules::docstring_in_stubs(self, definition.docstring);
@@ -5129,6 +5131,16 @@ impl<'a> Checker<'a> {
                     Location::new(expr.location.row(), 0),
                     Location::new(expr.location.row(), expr.location.column()),
                 ));
+
+                if pydocstyle::helpers::should_ignore_docstring(contents) {
+                    warn_user!(
+                        "Docstring at {}:{}:{} contains implicit string concatenation; ignoring...",
+                        relativize_path(self.path),
+                        expr.location.row(),
+                        expr.location.column() + 1
+                    );
+                    continue;
+                }
 
                 let body = str::raw_contents(contents);
                 let docstring = Docstring {
