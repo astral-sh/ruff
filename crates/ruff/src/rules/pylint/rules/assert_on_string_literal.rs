@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// An `assert` on a non-empty string literal will always pass.
-/// An 'assert' on an emtpy string literal will always fail.
+/// An `assert` on an emtpy string literal will always fail.
 ///
 /// ## Example
 /// ```python
