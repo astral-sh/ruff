@@ -33,15 +33,11 @@ impl Violation for AssertOnStringLiteral {
 
 /// PLW0129
 pub fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
-    match &test.node {
-        ExprKind::Constant { value, .. } => match value {
-            Constant::Str(..) => {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(AssertOnStringLiteral, Range::from(test)));
-            }
-            _ => {}
-        },
-        _ => {}
+    if let ExprKind::Constant { value, .. } = &test.node {
+        if let Constant::Str(..) = value {
+            checker
+                .diagnostics
+                .push(Diagnostic::new(AssertOnStringLiteral, Range::from(test)));
+        }
     }
 }
