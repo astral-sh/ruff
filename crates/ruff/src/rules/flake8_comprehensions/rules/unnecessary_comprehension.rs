@@ -53,9 +53,8 @@ pub fn unnecessary_comprehension(
             // used to flatten the iterable. E.g., [(1,), (2,)] => [1, 2]
             if elts.len() == 1 {
                 return;
-            } else {
-                elts.iter().map(helpers::function_name).collect()
             }
+            elts.iter().map(helpers::function_name).collect()
         }
         _ => return,
     };
