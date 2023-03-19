@@ -7,10 +7,11 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `assert` statements with a string literal as the first argument
+/// Checks for `assert` statements that use a string literal as the first
+/// argument.
 ///
 /// ## Why is this bad?
-/// `assert` statements passed a string literal will always pass.
+/// An `assert` on a string literal will always pass.
 ///
 /// ## Example
 /// ```python
@@ -33,11 +34,13 @@ impl Violation for AssertOnStringLiteral {
 
 /// PLW0129
 pub fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
-    if let ExprKind::Constant {
-        value: Constant::Str(..),
-        ..
-    } = &test.node
-    {
+    if matches!(
+        test.node,
+        ExprKind::Constant {
+            value: Constant::Str(..),
+            ..
+        }
+    ) {
         checker
             .diagnostics
             .push(Diagnostic::new(AssertOnStringLiteral, Range::from(test)));
