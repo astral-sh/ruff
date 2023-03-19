@@ -111,23 +111,26 @@ impl Imports {
             Some(level) => {
                 // last part of path is always the module itself
                 let resolved_module = if *level > 0 {
-                    modules
-                        .iter()
-                        .rev()
-                        .take(*level)
-                        .collect::<Vec<_>>()
-                        .iter()
-                        .rev()
-                        .map(|s| (**s).to_string())
-                        .collect::<Vec<String>>()
-                        .join(".")
+                    format!(
+                        "{}.",
+                        modules
+                            .iter()
+                            .rev()
+                            .take(*level)
+                            .collect::<Vec<_>>()
+                            .iter()
+                            .rev()
+                            .map(|s| (**s).to_string())
+                            .collect::<Vec<String>>()
+                            .join(".")
+                    )
                 } else {
-                    modules[0].to_string()
+                    String::new()
                 };
                 if let Some(module_name) = module.as_ref() {
-                    format!("{resolved_module}.{module_name}.{name}")
+                    format!("{resolved_module}{module_name}.{name}")
                 } else {
-                    format!("{resolved_module}.{name}")
+                    format!("{resolved_module}{name}")
                 }
             }
             None => format!("{}.{}", module.as_ref().unwrap_or(&String::new()), name),
