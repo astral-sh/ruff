@@ -38,6 +38,7 @@ use crate::checkers::ast::deferred::Deferred;
 use crate::docstrings::definition::{
     transition_scope, Definition, DefinitionKind, Docstring, Documentable,
 };
+use crate::fs::relativize_path;
 use crate::registry::{AsRule, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
@@ -50,7 +51,7 @@ use crate::rules::{
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
-use crate::{autofix, docstrings, noqa};
+use crate::{autofix, docstrings, noqa, warn_user};
 
 mod deferred;
 
@@ -316,7 +317,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(Rule::NonLeadingReceiverDecorator)
+                    .enabled(Rule::DjangoNonLeadingReceiverDecorator)
                 {
                     self.diagnostics
                         .extend(flake8_django::rules::non_leading_receiver_decorator(
@@ -410,10 +411,10 @@ where
                 {
                     pyupgrade::rules::lru_cache_without_parameters(self, decorator_list);
                 }
-                if self.settings.rules.enabled(Rule::FunctoolsCache)
+                if self.settings.rules.enabled(Rule::LRUCacheWithMaxsizeNone)
                     && self.settings.target_version >= PythonVersion::Py39
                 {
-                    pyupgrade::rules::functools_cache(self, decorator_list);
+                    pyupgrade::rules::lru_cache_with_maxsize_none(self, decorator_list);
                 }
 
                 if self.settings.rules.enabled(Rule::UselessExpression) {
@@ -424,15 +425,16 @@ where
                     flake8_bugbear::rules::cached_instance_method(self, decorator_list);
                 }
 
-                if self.settings.rules.enabled(Rule::UnnecessaryReturnNone)
-                    || self.settings.rules.enabled(Rule::ImplicitReturnValue)
-                    || self.settings.rules.enabled(Rule::ImplicitReturn)
-                    || self.settings.rules.enabled(Rule::UnnecessaryAssign)
-                    || self.settings.rules.enabled(Rule::SuperfluousElseReturn)
-                    || self.settings.rules.enabled(Rule::SuperfluousElseRaise)
-                    || self.settings.rules.enabled(Rule::SuperfluousElseContinue)
-                    || self.settings.rules.enabled(Rule::SuperfluousElseBreak)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::UnnecessaryReturnNone,
+                    Rule::ImplicitReturnValue,
+                    Rule::ImplicitReturn,
+                    Rule::UnnecessaryAssign,
+                    Rule::SuperfluousElseReturn,
+                    Rule::SuperfluousElseRaise,
+                    Rule::SuperfluousElseContinue,
+                    Rule::SuperfluousElseBreak,
+                ]) {
                     flake8_return::rules::function(self, body);
                 }
 
@@ -498,33 +500,19 @@ where
                     }
                 }
 
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::IncorrectFixtureParenthesesStyle)
-                    || self.settings.rules.enabled(Rule::FixturePositionalArgs)
-                    || self.settings.rules.enabled(Rule::ExtraneousScopeFunction)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::MissingFixtureNameUnderscore)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::IncorrectFixtureNameUnderscore)
-                    || self.settings.rules.enabled(Rule::FixtureParamWithoutValue)
-                    || self.settings.rules.enabled(Rule::DeprecatedYieldFixture)
-                    || self.settings.rules.enabled(Rule::FixtureFinalizerCallback)
-                    || self.settings.rules.enabled(Rule::UselessYieldFixture)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::UnnecessaryAsyncioMarkOnFixture)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::ErroneousUseFixturesOnFixture)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::PytestFixtureIncorrectParenthesesStyle,
+                    Rule::PytestFixturePositionalArgs,
+                    Rule::PytestExtraneousScopeFunction,
+                    Rule::PytestMissingFixtureNameUnderscore,
+                    Rule::PytestIncorrectFixtureNameUnderscore,
+                    Rule::PytestFixtureParamWithoutValue,
+                    Rule::PytestDeprecatedYieldFixture,
+                    Rule::PytestFixtureFinalizerCallback,
+                    Rule::PytestUselessYieldFixture,
+                    Rule::PytestUnnecessaryAsyncioMarkOnFixture,
+                    Rule::PytestErroneousUseFixturesOnFixture,
+                ]) {
                     flake8_pytest_style::rules::fixture(
                         self,
                         stmt,
@@ -535,24 +523,17 @@ where
                     );
                 }
 
-                if self.settings.rules.enabled(Rule::ParametrizeNamesWrongType)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::ParametrizeValuesWrongType)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::PytestParametrizeNamesWrongType,
+                    Rule::PytestParametrizeValuesWrongType,
+                ]) {
                     flake8_pytest_style::rules::parametrize(self, decorator_list);
                 }
 
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::IncorrectMarkParenthesesStyle)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::UseFixturesWithoutParameters)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::PytestIncorrectMarkParenthesesStyle,
+                    Rule::PytestUseFixturesWithoutParameters,
+                ]) {
                     flake8_pytest_style::rules::marks(self, decorator_list);
                 }
 
@@ -687,28 +668,40 @@ where
                 decorator_list,
                 body,
             } => {
-                if self.settings.rules.enabled(Rule::NullableModelStringField) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::DjangoNullableModelStringField)
+                {
                     self.diagnostics
                         .extend(flake8_django::rules::nullable_model_string_field(
                             self, body,
                         ));
                 }
 
-                if self.settings.rules.enabled(Rule::ExcludeWithModelForm) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::DjangoExcludeWithModelForm)
+                {
                     if let Some(diagnostic) =
                         flake8_django::rules::exclude_with_model_form(self, bases, body)
                     {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(Rule::AllWithModelForm) {
+                if self.settings.rules.enabled(Rule::DjangoAllWithModelForm) {
                     if let Some(diagnostic) =
                         flake8_django::rules::all_with_model_form(self, bases, body)
                     {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(Rule::ModelWithoutDunderStr) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::DjangoModelWithoutDunderStr)
+                {
                     if let Some(diagnostic) =
                         flake8_django::rules::model_without_dunder_str(self, bases, body, stmt)
                     {
@@ -758,15 +751,10 @@ where
                 }
 
                 if !self.is_stub {
-                    if self
-                        .settings
-                        .rules
-                        .enabled(Rule::AbstractBaseClassWithoutAbstractMethod)
-                        || self
-                            .settings
-                            .rules
-                            .enabled(Rule::EmptyMethodWithoutAbstractDecorator)
-                    {
+                    if self.settings.rules.any_enabled(&[
+                        Rule::AbstractBaseClassWithoutAbstractMethod,
+                        Rule::EmptyMethodWithoutAbstractDecorator,
+                    ]) {
                         flake8_bugbear::rules::abstract_base_class(
                             self, stmt, name, bases, keywords, body,
                         );
@@ -781,17 +769,21 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(Rule::IncorrectMarkParenthesesStyle)
+                    .enabled(Rule::PytestIncorrectMarkParenthesesStyle)
                 {
                     flake8_pytest_style::rules::marks(self, decorator_list);
                 }
 
-                if self.settings.rules.enabled(Rule::DupeClassFieldDefinitions) {
-                    flake8_pie::rules::dupe_class_field_definitions(self, stmt, body);
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::DuplicateClassFieldDefinition)
+                {
+                    flake8_pie::rules::duplicate_class_field_definition(self, stmt, body);
                 }
 
-                if self.settings.rules.enabled(Rule::PreferUniqueEnums) {
-                    flake8_pie::rules::prefer_unique_enums(self, stmt, body);
+                if self.settings.rules.enabled(Rule::NonUniqueEnums) {
+                    flake8_pie::rules::non_unique_enums(self, stmt, body);
                 }
 
                 self.check_builtin_shadowing(name, stmt, false);
@@ -828,11 +820,11 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(Rule::RewriteCElementTree) {
-                    pyupgrade::rules::replace_c_element_tree(self, stmt);
+                if self.settings.rules.enabled(Rule::DeprecatedCElementTree) {
+                    pyupgrade::rules::deprecated_c_element_tree(self, stmt);
                 }
-                if self.settings.rules.enabled(Rule::RewriteMockImport) {
-                    pyupgrade::rules::rewrite_mock_import(self, stmt);
+                if self.settings.rules.enabled(Rule::DeprecatedMockImport) {
+                    pyupgrade::rules::deprecated_mock_import(self, stmt);
                 }
 
                 // If a module is imported within a `ModuleNotFoundError` body, treat that as a
@@ -951,8 +943,8 @@ where
                     if self.settings.rules.enabled(Rule::UselessImportAlias) {
                         pylint::rules::useless_import_alias(self, alias);
                     }
-                    if self.settings.rules.enabled(Rule::ConsiderUsingFromImport) {
-                        pylint::rules::use_from_import(self, stmt, alias, names);
+                    if self.settings.rules.enabled(Rule::ManualFromImport) {
+                        pylint::rules::manual_from_import(self, stmt, alias, names);
                     }
 
                     if let Some(asname) = &alias.node.asname {
@@ -1056,7 +1048,11 @@ where
                         }
                     }
 
-                    if self.settings.rules.enabled(Rule::IncorrectPytestImport) {
+                    if self
+                        .settings
+                        .rules
+                        .enabled(Rule::PytestIncorrectPytestImport)
+                    {
                         if let Some(diagnostic) = flake8_pytest_style::rules::import(
                             stmt,
                             &alias.node.name,
@@ -1097,11 +1093,11 @@ where
                         pyupgrade::rules::unnecessary_future_import(self, stmt, names);
                     }
                 }
-                if self.settings.rules.enabled(Rule::RewriteMockImport) {
-                    pyupgrade::rules::rewrite_mock_import(self, stmt);
+                if self.settings.rules.enabled(Rule::DeprecatedMockImport) {
+                    pyupgrade::rules::deprecated_mock_import(self, stmt);
                 }
-                if self.settings.rules.enabled(Rule::RewriteCElementTree) {
-                    pyupgrade::rules::replace_c_element_tree(self, stmt);
+                if self.settings.rules.enabled(Rule::DeprecatedCElementTree) {
+                    pyupgrade::rules::deprecated_c_element_tree(self, stmt);
                 }
                 if self.settings.rules.enabled(Rule::DeprecatedImport) {
                     pyupgrade::rules::deprecated_import(
@@ -1143,7 +1139,11 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(Rule::IncorrectPytestImport) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::PytestIncorrectPytestImport)
+                {
                     if let Some(diagnostic) = flake8_pytest_style::rules::import_from(
                         stmt,
                         module.as_deref(),
@@ -1212,11 +1212,15 @@ where
                             },
                         );
 
-                        if self.settings.rules.enabled(Rule::ImportStarNotPermitted) {
+                        if self
+                            .settings
+                            .rules
+                            .enabled(Rule::UndefinedLocalWithNestedImportStarUsage)
+                        {
                             let scope = self.ctx.scope();
                             if !matches!(scope.kind, ScopeKind::Module) {
                                 self.diagnostics.push(Diagnostic::new(
-                                    pyflakes::rules::ImportStarNotPermitted {
+                                    pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
                                         name: helpers::format_import_from(
                                             level.as_ref(),
                                             module.as_deref(),
@@ -1227,9 +1231,13 @@ where
                             }
                         }
 
-                        if self.settings.rules.enabled(Rule::ImportStar) {
+                        if self
+                            .settings
+                            .rules
+                            .enabled(Rule::UndefinedLocalWithImportStar)
+                        {
                             self.diagnostics.push(Diagnostic::new(
-                                pyflakes::rules::ImportStar {
+                                pyflakes::rules::UndefinedLocalWithImportStar {
                                     name: helpers::format_import_from(
                                         level.as_ref(),
                                         module.as_deref(),
@@ -1430,10 +1438,11 @@ where
                         flake8_bugbear::rules::cannot_raise_literal(self, exc);
                     }
                 }
-                if self.settings.rules.enabled(Rule::RawStringInException)
-                    || self.settings.rules.enabled(Rule::FStringInException)
-                    || self.settings.rules.enabled(Rule::DotFormatInException)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::RawStringInException,
+                    Rule::FStringInException,
+                    Rule::DotFormatInException,
+                ]) {
                     if let Some(exc) = exc {
                         flake8_errmsg::rules::string_in_exception(self, exc);
                     }
@@ -1496,7 +1505,11 @@ where
                 if self.settings.rules.enabled(Rule::NeedlessBool) {
                     flake8_simplify::rules::needless_bool(self, stmt);
                 }
-                if self.settings.rules.enabled(Rule::ManualDictLookup) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::IfElseBlockInsteadOfDictLookup)
+                {
                     flake8_simplify::rules::manual_dict_lookup(
                         self,
                         stmt,
@@ -1506,14 +1519,18 @@ where
                         self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self.settings.rules.enabled(Rule::UseTernaryOperator) {
+                if self.settings.rules.enabled(Rule::IfElseBlockInsteadOfIfExp) {
                     flake8_simplify::rules::use_ternary_operator(
                         self,
                         stmt,
                         self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self.settings.rules.enabled(Rule::DictGetWithDefault) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::IfElseBlockInsteadOfDictGet)
+                {
                     flake8_simplify::rules::use_dict_get_with_default(
                         self,
                         stmt,
@@ -1523,8 +1540,8 @@ where
                         self.ctx.current_stmt_parent().map(Into::into),
                     );
                 }
-                if self.settings.rules.enabled(Rule::PreferTypeError) {
-                    tryceratops::rules::prefer_type_error(
+                if self.settings.rules.enabled(Rule::TypeCheckWithoutTypeError) {
+                    tryceratops::rules::type_check_without_type_error(
                         self,
                         body,
                         test,
@@ -1554,12 +1571,12 @@ where
                     self.diagnostics
                         .push(flake8_bandit::rules::assert_used(stmt));
                 }
-                if self.settings.rules.enabled(Rule::AssertAlwaysFalse) {
+                if self.settings.rules.enabled(Rule::PytestAssertAlwaysFalse) {
                     if let Some(diagnostic) = flake8_pytest_style::rules::assert_falsy(stmt, test) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(Rule::CompositeAssertion) {
+                if self.settings.rules.enabled(Rule::PytestCompositeAssertion) {
                     flake8_pytest_style::rules::composite_condition(
                         self,
                         stmt,
@@ -1575,7 +1592,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(Rule::RaisesWithMultipleStatements)
+                    .enabled(Rule::PytestRaisesWithMultipleStatements)
                 {
                     flake8_pytest_style::rules::complex_raises(self, stmt, items, body);
                 }
@@ -1643,7 +1660,7 @@ where
                             self.ctx.current_sibling_stmt(),
                         );
                     }
-                    if self.settings.rules.enabled(Rule::KeyInDict) {
+                    if self.settings.rules.enabled(Rule::InDictKeys) {
                         flake8_simplify::rules::key_in_dict_for(self, target, iter);
                     }
                 }
@@ -1669,12 +1686,10 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(Rule::DuplicateHandlerException)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::DuplicateTryBlockException)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::DuplicateHandlerException,
+                    Rule::DuplicateTryBlockException,
+                ]) {
                     flake8_bugbear::rules::duplicate_exceptions(self, handlers);
                 }
                 if self
@@ -1687,7 +1702,7 @@ where
                 if self.settings.rules.enabled(Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias_handlers(self, handlers);
                 }
-                if self.settings.rules.enabled(Rule::AssertInExcept) {
+                if self.settings.rules.enabled(Rule::PytestAssertInExcept) {
                     self.diagnostics.extend(
                         flake8_pytest_style::rules::assert_in_exception_handler(handlers),
                     );
@@ -1738,7 +1753,7 @@ where
                 }
 
                 if self.is_stub {
-                    if self.settings.rules.enabled(Rule::PrefixTypeParams) {
+                    if self.settings.rules.enabled(Rule::UnprefixedTypeParam) {
                         flake8_pyi::rules::prefix_type_params(self, value, targets);
                     }
                 }
@@ -1772,11 +1787,11 @@ where
                         self, stmt, targets, value,
                     );
                 }
-                if self.settings.rules.enabled(Rule::RewriteListComprehension) {
-                    pyupgrade::rules::unpack_list_comprehension(self, targets, value);
+                if self.settings.rules.enabled(Rule::UnpackedListComprehension) {
+                    pyupgrade::rules::unpacked_list_comprehension(self, targets, value);
                 }
 
-                if self.settings.rules.enabled(Rule::DfIsABadVariableName) {
+                if self.settings.rules.enabled(Rule::PandasDfVariableName) {
                     if let Some(diagnostic) = pandas_vet::rules::assignment_to_df(targets) {
                         self.diagnostics.push(diagnostic);
                     }
@@ -1817,7 +1832,7 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(Rule::UseCapitalEnvironmentVariables)
+                    .enabled(Rule::UncapitalizedEnvironmentVariables)
                 {
                     flake8_simplify::rules::use_capital_environment_variables(self, value);
                 }
@@ -1859,8 +1874,8 @@ where
                     body,
                     &Documentable::Function,
                 );
-                if self.settings.rules.enabled(Rule::RewriteYieldFrom) {
-                    pyupgrade::rules::rewrite_yield_from(self, stmt);
+                if self.settings.rules.enabled(Rule::YieldInForLoop) {
+                    pyupgrade::rules::yield_in_for_loop(self, stmt);
                 }
                 let scope =
                     transition_scope(&self.ctx.visible_scope, stmt, &Documentable::Function);
@@ -2166,17 +2181,12 @@ where
                     self.ctx.in_literal = true;
                 }
 
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::SysVersionSlice3Referenced)
-                    || self.settings.rules.enabled(Rule::SysVersion2Referenced)
-                    || self.settings.rules.enabled(Rule::SysVersion0Referenced)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::SysVersionSlice1Referenced)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::SysVersionSlice3,
+                    Rule::SysVersion2,
+                    Rule::SysVersion0,
+                    Rule::SysVersionSlice1,
+                ]) {
                     flake8_2020::rules::subscript(self, value, slice);
                 }
             }
@@ -2186,8 +2196,10 @@ where
                         .settings
                         .rules
                         .enabled(Rule::ExpressionsInStarAssignment);
-                    let check_two_starred_expressions =
-                        self.settings.rules.enabled(Rule::TwoStarredExpressions);
+                    let check_two_starred_expressions = self
+                        .settings
+                        .rules
+                        .enabled(Rule::MultipleStarredExpressions);
                     if let Some(diagnostic) = pyflakes::rules::starred_expressions(
                         elts,
                         check_too_many_expressions,
@@ -2241,16 +2253,16 @@ where
                     ExprContext::Del => self.handle_node_delete(expr),
                 }
 
-                if self.settings.rules.enabled(Rule::SixPY3Referenced) {
+                if self.settings.rules.enabled(Rule::SixPY3) {
                     flake8_2020::rules::name_or_attribute(self, expr);
                 }
 
                 if self
                     .settings
                     .rules
-                    .enabled(Rule::UsedPriorGlobalDeclaration)
+                    .enabled(Rule::UsePriorToGlobalDeclaration)
                 {
-                    pylint::rules::used_prior_global_declaration(self, id, expr);
+                    pylint::rules::use_prior_to_global_declaration(self, id, expr);
                 }
             }
             ExprKind::Attribute { attr, value, .. } => {
@@ -2277,10 +2289,10 @@ where
                 if self.settings.rules.enabled(Rule::NumpyDeprecatedTypeAlias) {
                     numpy::rules::deprecated_type_alias(self, expr);
                 }
-                if self.settings.rules.enabled(Rule::RewriteMockImport) {
-                    pyupgrade::rules::rewrite_mock_attribute(self, expr);
+                if self.settings.rules.enabled(Rule::DeprecatedMockImport) {
+                    pyupgrade::rules::deprecated_mock_attribute(self, expr);
                 }
-                if self.settings.rules.enabled(Rule::SixPY3Referenced) {
+                if self.settings.rules.enabled(Rule::SixPY3) {
                     flake8_2020::rules::name_or_attribute(self, expr);
                 }
                 if self.settings.rules.enabled(Rule::BannedApi) {
@@ -2296,16 +2308,17 @@ where
                 args,
                 keywords,
             } => {
-                // pyflakes
-                if self.settings.rules.enabled(Rule::StringDotFormatInvalidFormat)
-                    || self.settings.rules.enabled(Rule::StringDotFormatExtraNamedArguments)
-                    || self.settings.rules.enabled(Rule::StringDotFormatExtraPositionalArguments)
-                    || self.settings.rules.enabled(Rule::StringDotFormatMissingArguments)
-                    || self.settings.rules.enabled(Rule::StringDotFormatMixingAutomatic)
+                if self.settings.rules.any_enabled(&[
+                    // pyflakes
+                    Rule::StringDotFormatInvalidFormat,
+                    Rule::StringDotFormatExtraNamedArguments,
+                    Rule::StringDotFormatExtraPositionalArguments,
+                    Rule::StringDotFormatMissingArguments,
+                    Rule::StringDotFormatMixingAutomatic,
                     // pyupgrade
-                    || self.settings.rules.enabled(Rule::FormatLiterals)
-                    || self.settings.rules.enabled(Rule::FString)
-                {
+                    Rule::FormatLiterals,
+                    Rule::FString,
+                ]) {
                     if let ExprKind::Attribute { value, attr, .. } = &func.node {
                         if let ExprKind::Constant {
                             value: Constant::Str(value),
@@ -2424,8 +2437,10 @@ where
                 }
 
                 // flake8-print
-                if self.settings.rules.enabled(Rule::PrintFound)
-                    || self.settings.rules.enabled(Rule::PPrintFound)
+                if self
+                    .settings
+                    .rules
+                    .any_enabled(&[Rule::Print, Rule::PPrint])
                 {
                     flake8_print::rules::print_call(self, func, keywords);
                 }
@@ -2466,7 +2481,7 @@ where
 
                 // flake8-pie
                 if self.settings.rules.enabled(Rule::UnnecessaryDictKwargs) {
-                    flake8_pie::rules::no_unnecessary_dict_kwargs(self, expr, keywords);
+                    flake8_pie::rules::unnecessary_dict_kwargs(self, expr, keywords);
                 }
                 if self
                     .settings
@@ -2680,14 +2695,18 @@ where
                 }
 
                 // pandas-vet
-                if self.settings.rules.enabled(Rule::UseOfInplaceArgument) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::PandasUseOfInplaceArgument)
+                {
                     self.diagnostics.extend(
                         pandas_vet::rules::inplace_argument(self, expr, args, keywords).into_iter(),
                     );
                 }
                 pandas_vet::rules::check_call(self, func);
 
-                if self.settings.rules.enabled(Rule::UseOfPdMerge) {
+                if self.settings.rules.enabled(Rule::PandasUseOfPdMerge) {
                     if let Some(diagnostic) = pandas_vet::rules::use_of_pd_merge(func) {
                         self.diagnostics.push(diagnostic);
                     };
@@ -2762,7 +2781,7 @@ where
                 }
 
                 // pygrep-hooks
-                if self.settings.rules.enabled(Rule::NoEval) {
+                if self.settings.rules.enabled(Rule::Eval) {
                     pygrep_hooks::rules::no_eval(self, func);
                 }
                 if self.settings.rules.enabled(Rule::DeprecatedLogWarn) {
@@ -2777,8 +2796,8 @@ where
                 {
                     pylint::rules::unnecessary_direct_lambda_call(self, expr, func);
                 }
-                if self.settings.rules.enabled(Rule::ConsiderUsingSysExit) {
-                    pylint::rules::consider_using_sys_exit(self, func);
+                if self.settings.rules.enabled(Rule::SysExitAlias) {
+                    pylint::rules::sys_exit_alias(self, func);
                 }
                 if self.settings.rules.enabled(Rule::BadStrStripCall) {
                     pylint::rules::bad_str_strip_call(self, func, args);
@@ -2791,14 +2810,14 @@ where
                 }
 
                 // flake8-pytest-style
-                if self.settings.rules.enabled(Rule::PatchWithLambda) {
+                if self.settings.rules.enabled(Rule::PytestPatchWithLambda) {
                     if let Some(diagnostic) =
                         flake8_pytest_style::rules::patch_with_lambda(func, args, keywords)
                     {
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(Rule::UnittestAssertion) {
+                if self.settings.rules.enabled(Rule::PytestUnittestAssertion) {
                     if let Some(diagnostic) = flake8_pytest_style::rules::unittest_assertion(
                         self, expr, func, args, keywords,
                     ) {
@@ -2806,13 +2825,14 @@ where
                     }
                 }
 
-                if self.settings.rules.enabled(Rule::RaisesWithoutException)
-                    || self.settings.rules.enabled(Rule::RaisesTooBroad)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::PytestRaisesWithoutException,
+                    Rule::PytestRaisesTooBroad,
+                ]) {
                     flake8_pytest_style::rules::raises_call(self, func, args, keywords);
                 }
 
-                if self.settings.rules.enabled(Rule::FailWithoutMessage) {
+                if self.settings.rules.enabled(Rule::PytestFailWithoutMessage) {
                     flake8_pytest_style::rules::fail_call(self, func, args, keywords);
                 }
 
@@ -2832,31 +2852,32 @@ where
                 }
 
                 // flake8-use-pathlib
-                if self.settings.rules.enabled(Rule::PathlibAbspath)
-                    || self.settings.rules.enabled(Rule::PathlibChmod)
-                    || self.settings.rules.enabled(Rule::PathlibMkdir)
-                    || self.settings.rules.enabled(Rule::PathlibMakedirs)
-                    || self.settings.rules.enabled(Rule::PathlibRename)
-                    || self.settings.rules.enabled(Rule::PathlibReplace)
-                    || self.settings.rules.enabled(Rule::PathlibRmdir)
-                    || self.settings.rules.enabled(Rule::PathlibRemove)
-                    || self.settings.rules.enabled(Rule::PathlibUnlink)
-                    || self.settings.rules.enabled(Rule::PathlibGetcwd)
-                    || self.settings.rules.enabled(Rule::PathlibExists)
-                    || self.settings.rules.enabled(Rule::PathlibExpanduser)
-                    || self.settings.rules.enabled(Rule::PathlibIsDir)
-                    || self.settings.rules.enabled(Rule::PathlibIsFile)
-                    || self.settings.rules.enabled(Rule::PathlibIsLink)
-                    || self.settings.rules.enabled(Rule::PathlibReadlink)
-                    || self.settings.rules.enabled(Rule::PathlibStat)
-                    || self.settings.rules.enabled(Rule::PathlibIsAbs)
-                    || self.settings.rules.enabled(Rule::PathlibJoin)
-                    || self.settings.rules.enabled(Rule::PathlibBasename)
-                    || self.settings.rules.enabled(Rule::PathlibSamefile)
-                    || self.settings.rules.enabled(Rule::PathlibSplitext)
-                    || self.settings.rules.enabled(Rule::PathlibOpen)
-                    || self.settings.rules.enabled(Rule::PathlibPyPath)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::PathlibAbspath,
+                    Rule::PathlibChmod,
+                    Rule::PathlibMkdir,
+                    Rule::PathlibMakedirs,
+                    Rule::PathlibRename,
+                    Rule::PathlibReplace,
+                    Rule::PathlibRmdir,
+                    Rule::PathlibRemove,
+                    Rule::PathlibUnlink,
+                    Rule::PathlibGetcwd,
+                    Rule::PathlibExists,
+                    Rule::PathlibExpanduser,
+                    Rule::PathlibIsDir,
+                    Rule::PathlibIsFile,
+                    Rule::PathlibIsLink,
+                    Rule::PathlibReadlink,
+                    Rule::PathlibStat,
+                    Rule::PathlibIsAbs,
+                    Rule::PathlibJoin,
+                    Rule::PathlibBasename,
+                    Rule::PathlibSamefile,
+                    Rule::PathlibSplitext,
+                    Rule::PathlibOpen,
+                    Rule::PathlibPyPath,
+                ]) {
                     flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
                 }
 
@@ -2866,45 +2887,47 @@ where
                 }
 
                 // flake8-logging-format
-                if self.settings.rules.enabled(Rule::LoggingStringFormat)
-                    || self.settings.rules.enabled(Rule::LoggingPercentFormat)
-                    || self.settings.rules.enabled(Rule::LoggingStringConcat)
-                    || self.settings.rules.enabled(Rule::LoggingFString)
-                    || self.settings.rules.enabled(Rule::LoggingWarn)
-                    || self.settings.rules.enabled(Rule::LoggingExtraAttrClash)
-                    || self.settings.rules.enabled(Rule::LoggingExcInfo)
-                    || self.settings.rules.enabled(Rule::LoggingRedundantExcInfo)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::LoggingStringFormat,
+                    Rule::LoggingPercentFormat,
+                    Rule::LoggingStringConcat,
+                    Rule::LoggingFString,
+                    Rule::LoggingWarn,
+                    Rule::LoggingExtraAttrClash,
+                    Rule::LoggingExcInfo,
+                    Rule::LoggingRedundantExcInfo,
+                ]) {
                     flake8_logging_format::rules::logging_call(self, func, args, keywords);
                 }
 
                 // pylint logging checker
-                if self.settings.rules.enabled(Rule::LoggingTooFewArgs)
-                    || self.settings.rules.enabled(Rule::LoggingTooManyArgs)
+                if self
+                    .settings
+                    .rules
+                    .any_enabled(&[Rule::LoggingTooFewArgs, Rule::LoggingTooManyArgs])
                 {
                     pylint::rules::logging_call(self, func, args, keywords);
                 }
 
                 // flake8-django
-                if self.settings.rules.enabled(Rule::LocalsInRenderFunction) {
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::DjangoLocalsInRenderFunction)
+                {
                     flake8_django::rules::locals_in_render_function(self, func, args, keywords);
                 }
             }
             ExprKind::Dict { keys, values } => {
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::MultiValueRepeatedKeyLiteral)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::MultiValueRepeatedKeyVariable)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::MultiValueRepeatedKeyLiteral,
+                    Rule::MultiValueRepeatedKeyVariable,
+                ]) {
                     pyflakes::rules::repeated_keys(self, keys, values);
                 }
 
                 if self.settings.rules.enabled(Rule::UnnecessarySpread) {
-                    flake8_pie::rules::no_unnecessary_spread(self, keys, values);
+                    flake8_pie::rules::unnecessary_spread(self, keys, values);
                 }
             }
             ExprKind::Yield { .. } => {
@@ -2962,43 +2985,17 @@ where
                     ..
                 } = &left.node
                 {
-                    if self
-                        .settings
-                        .rules
-                        .enabled(Rule::PercentFormatInvalidFormat)
-                        || self
-                            .settings
-                            .rules
-                            .enabled(Rule::PercentFormatExpectedMapping)
-                        || self
-                            .settings
-                            .rules
-                            .enabled(Rule::PercentFormatExpectedSequence)
-                        || self
-                            .settings
-                            .rules
-                            .enabled(Rule::PercentFormatExtraNamedArguments)
-                        || self
-                            .settings
-                            .rules
-                            .enabled(Rule::PercentFormatMissingArgument)
-                        || self
-                            .settings
-                            .rules
-                            .enabled(Rule::PercentFormatMixedPositionalAndNamed)
-                        || self
-                            .settings
-                            .rules
-                            .enabled(Rule::PercentFormatPositionalCountMismatch)
-                        || self
-                            .settings
-                            .rules
-                            .enabled(Rule::PercentFormatStarRequiresSequence)
-                        || self
-                            .settings
-                            .rules
-                            .enabled(Rule::PercentFormatUnsupportedFormatCharacter)
-                    {
+                    if self.settings.rules.any_enabled(&[
+                        Rule::PercentFormatInvalidFormat,
+                        Rule::PercentFormatExpectedMapping,
+                        Rule::PercentFormatExpectedSequence,
+                        Rule::PercentFormatExtraNamedArguments,
+                        Rule::PercentFormatMissingArgument,
+                        Rule::PercentFormatMixedPositionalAndNamed,
+                        Rule::PercentFormatPositionalCountMismatch,
+                        Rule::PercentFormatStarRequiresSequence,
+                        Rule::PercentFormatUnsupportedFormatCharacter,
+                    ]) {
                         let location = Range::from(expr);
                         match pyflakes::cformat::CFormatSummary::try_from(value.as_str()) {
                             Err(CFormatError {
@@ -3126,9 +3123,9 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(Rule::UnpackInsteadOfConcatenatingToCollectionLiteral)
+                    .enabled(Rule::CollectionLiteralConcatenation)
                 {
-                    ruff::rules::unpack_instead_of_concatenating_to_collection_literal(self, expr);
+                    ruff::rules::collection_literal_concatenation(self, expr);
                 }
                 if self.settings.rules.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
@@ -3196,15 +3193,13 @@ where
                     pycodestyle::rules::type_comparison(self, expr, ops, comparators);
                 }
 
-                if self.settings.rules.enabled(Rule::SysVersionCmpStr3)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::SysVersionInfo0Eq3Referenced)
-                    || self.settings.rules.enabled(Rule::SysVersionInfo1CmpInt)
-                    || self.settings.rules.enabled(Rule::SysVersionInfoMinorCmpInt)
-                    || self.settings.rules.enabled(Rule::SysVersionCmpStr10)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::SysVersionCmpStr3,
+                    Rule::SysVersionInfo0Eq3,
+                    Rule::SysVersionInfo1CmpInt,
+                    Rule::SysVersionInfoMinorCmpInt,
+                    Rule::SysVersionCmpStr10,
+                ]) {
                     flake8_2020::rules::compare(self, left, ops, comparators);
                 }
 
@@ -3229,7 +3224,7 @@ where
                     pylint::rules::magic_value_comparison(self, left, comparators);
                 }
 
-                if self.settings.rules.enabled(Rule::KeyInDict) {
+                if self.settings.rules.enabled(Rule::InDictKeys) {
                     flake8_simplify::rules::key_in_dict_compare(self, expr, left, ops, comparators);
                 }
 
@@ -3238,9 +3233,10 @@ where
                 }
 
                 if self.is_stub {
-                    if self.settings.rules.enabled(Rule::UnrecognizedPlatformCheck)
-                        || self.settings.rules.enabled(Rule::UnrecognizedPlatformName)
-                    {
+                    if self.settings.rules.any_enabled(&[
+                        Rule::UnrecognizedPlatformCheck,
+                        Rule::UnrecognizedPlatformName,
+                    ]) {
                         flake8_pyi::rules::unrecognized_platform(
                             self,
                             expr,
@@ -3294,13 +3290,13 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
-                if self.settings.rules.enabled(Rule::RewriteUnicodeLiteral) {
-                    pyupgrade::rules::rewrite_unicode_literal(self, expr, kind.as_deref());
+                if self.settings.rules.enabled(Rule::UnicodeKindPrefix) {
+                    pyupgrade::rules::unicode_kind_prefix(self, expr, kind.as_deref());
                 }
             }
             ExprKind::Lambda { args, body, .. } => {
-                if self.settings.rules.enabled(Rule::PreferListBuiltin) {
-                    flake8_pie::rules::prefer_list_builtin(self, expr);
+                if self.settings.rules.enabled(Rule::ReimplementedListBuiltin) {
+                    flake8_pie::rules::reimplemented_list_builtin(self, expr);
                 }
 
                 // Visit the default arguments, but avoid the body, which will be deferred.
@@ -3361,11 +3357,11 @@ where
                 self.ctx.push_scope(ScopeKind::Generator);
             }
             ExprKind::BoolOp { op, values } => {
-                if self.settings.rules.enabled(Rule::ConsiderMergingIsinstance) {
-                    pylint::rules::merge_isinstance(self, expr, op, values);
+                if self.settings.rules.enabled(Rule::RepeatedIsinstanceCalls) {
+                    pylint::rules::repeated_isinstance_calls(self, expr, op, values);
                 }
-                if self.settings.rules.enabled(Rule::SingleStartsEndsWith) {
-                    flake8_pie::rules::single_starts_ends_with(self, expr);
+                if self.settings.rules.enabled(Rule::MultipleStartsEndsWith) {
+                    flake8_pie::rules::multiple_starts_ends_with(self, expr);
                 }
                 if self.settings.rules.enabled(Rule::DuplicateIsinstanceCall) {
                     flake8_simplify::rules::duplicate_isinstance_call(self, expr);
@@ -3638,7 +3634,7 @@ where
     }
 
     fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
-        if self.settings.rules.enabled(Rule::KeyInDict) {
+        if self.settings.rules.enabled(Rule::InDictKeys) {
             flake8_simplify::rules::key_in_dict_for(
                 self,
                 &comprehension.target,
@@ -3820,7 +3816,7 @@ where
         if self
             .settings
             .rules
-            .enabled(Rule::FunctionCallArgumentDefault)
+            .enabled(Rule::FunctionCallInDefaultArgument)
         {
             flake8_bugbear::rules::function_call_argument_default(self, arguments);
         }
@@ -3829,13 +3825,13 @@ where
             if self
                 .settings
                 .rules
-                .enabled(Rule::TypedArgumentSimpleDefaults)
+                .enabled(Rule::TypedArgumentDefaultInStub)
             {
                 flake8_pyi::rules::typed_argument_simple_defaults(self, arguments);
             }
         }
         if self.is_stub {
-            if self.settings.rules.enabled(Rule::ArgumentSimpleDefaults) {
+            if self.settings.rules.enabled(Rule::ArgumentDefaultInStub) {
                 flake8_pyi::rules::argument_simple_defaults(self, arguments);
             }
         }
@@ -4187,7 +4183,11 @@ impl<'a> Checker<'a> {
         }
 
         if import_starred {
-            if self.settings.rules.enabled(Rule::ImportStarUsage) {
+            if self
+                .settings
+                .rules
+                .enabled(Rule::UndefinedLocalWithImportStarUsage)
+            {
                 let mut from_list = vec![];
                 for scope_index in self.ctx.scope_stack.iter() {
                     let scope = &self.ctx.scopes[*scope_index];
@@ -4203,7 +4203,7 @@ impl<'a> Checker<'a> {
                 from_list.sort();
 
                 self.diagnostics.push(Diagnostic::new(
-                    pyflakes::rules::ImportStarUsage {
+                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
                         name: id.to_string(),
                         sources: from_list,
                     },
@@ -4603,15 +4603,13 @@ impl<'a> Checker<'a> {
 
             if !self.is_stub {
                 // flake8-unused-arguments
-                if self.settings.rules.enabled(Rule::UnusedFunctionArgument)
-                    || self.settings.rules.enabled(Rule::UnusedMethodArgument)
-                    || self.settings.rules.enabled(Rule::UnusedClassMethodArgument)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::UnusedStaticMethodArgument)
-                    || self.settings.rules.enabled(Rule::UnusedLambdaArgument)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::UnusedFunctionArgument,
+                    Rule::UnusedMethodArgument,
+                    Rule::UnusedClassMethodArgument,
+                    Rule::UnusedStaticMethodArgument,
+                    Rule::UnusedLambdaArgument,
+                ]) {
                     self.diagnostics
                         .extend(flake8_unused_arguments::rules::unused_arguments(
                             self,
@@ -4644,29 +4642,21 @@ impl<'a> Checker<'a> {
 
     fn check_dead_scopes(&mut self) {
         let enforce_typing_imports = !self.is_stub
-            && (self.settings.rules.enabled(Rule::GlobalVariableNotAssigned)
-                || self
-                    .settings
-                    .rules
-                    .enabled(Rule::RuntimeImportInTypeCheckingBlock)
-                || self
-                    .settings
-                    .rules
-                    .enabled(Rule::TypingOnlyFirstPartyImport)
-                || self
-                    .settings
-                    .rules
-                    .enabled(Rule::TypingOnlyThirdPartyImport)
-                || self
-                    .settings
-                    .rules
-                    .enabled(Rule::TypingOnlyStandardLibraryImport));
+            && self.settings.rules.any_enabled(&[
+                Rule::GlobalVariableNotAssigned,
+                Rule::RuntimeImportInTypeCheckingBlock,
+                Rule::TypingOnlyFirstPartyImport,
+                Rule::TypingOnlyThirdPartyImport,
+                Rule::TypingOnlyStandardLibraryImport,
+            ]);
 
-        if !(self.settings.rules.enabled(Rule::UnusedImport)
-            || self.settings.rules.enabled(Rule::ImportStarUsage)
-            || self.settings.rules.enabled(Rule::RedefinedWhileUnused)
-            || self.settings.rules.enabled(Rule::UndefinedExport)
-            || enforce_typing_imports)
+        if !(enforce_typing_imports
+            || self.settings.rules.any_enabled(&[
+                Rule::UnusedImport,
+                Rule::UndefinedLocalWithImportStarUsage,
+                Rule::RedefinedWhileUnused,
+                Rule::UndefinedExport,
+            ]))
         {
             return;
         }
@@ -4824,7 +4814,11 @@ impl<'a> Checker<'a> {
                 }
             }
 
-            if self.settings.rules.enabled(Rule::ImportStarUsage) {
+            if self
+                .settings
+                .rules
+                .enabled(Rule::UndefinedLocalWithImportStarUsage)
+            {
                 if scope.import_starred {
                     if let Some((names, range)) = &all_names {
                         let mut from_list = vec![];
@@ -4841,7 +4835,7 @@ impl<'a> Checker<'a> {
                         for &name in names {
                             if !scope.defines(name) {
                                 diagnostics.push(Diagnostic::new(
-                                    pyflakes::rules::ImportStarUsage {
+                                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
                                         name: name.to_string(),
                                         sources: from_list.clone(),
                                     },
@@ -5030,96 +5024,67 @@ impl<'a> Checker<'a> {
     }
 
     fn check_definitions(&mut self) {
-        let enforce_annotations = self
-            .settings
-            .rules
-            .enabled(Rule::MissingTypeFunctionArgument)
-            || self.settings.rules.enabled(Rule::MissingTypeArgs)
-            || self.settings.rules.enabled(Rule::MissingTypeKwargs)
-            || self.settings.rules.enabled(Rule::MissingTypeSelf)
-            || self.settings.rules.enabled(Rule::MissingTypeCls)
-            || self
-                .settings
-                .rules
-                .enabled(Rule::MissingReturnTypePublicFunction)
-            || self
-                .settings
-                .rules
-                .enabled(Rule::MissingReturnTypePrivateFunction)
-            || self
-                .settings
-                .rules
-                .enabled(Rule::MissingReturnTypeSpecialMethod)
-            || self
-                .settings
-                .rules
-                .enabled(Rule::MissingReturnTypeStaticMethod)
-            || self
-                .settings
-                .rules
-                .enabled(Rule::MissingReturnTypeClassMethod)
-            || self.settings.rules.enabled(Rule::AnyType);
-        let enforce_docstrings = self.settings.rules.enabled(Rule::PublicModule)
-            || self.settings.rules.enabled(Rule::PublicClass)
-            || self.settings.rules.enabled(Rule::PublicMethod)
-            || self.settings.rules.enabled(Rule::PublicFunction)
-            || self.settings.rules.enabled(Rule::PublicPackage)
-            || self.settings.rules.enabled(Rule::MagicMethod)
-            || self.settings.rules.enabled(Rule::PublicNestedClass)
-            || self.settings.rules.enabled(Rule::PublicInit)
-            || self.settings.rules.enabled(Rule::FitsOnOneLine)
-            || self.settings.rules.enabled(Rule::NoBlankLineBeforeFunction)
-            || self.settings.rules.enabled(Rule::NoBlankLineAfterFunction)
-            || self.settings.rules.enabled(Rule::OneBlankLineBeforeClass)
-            || self.settings.rules.enabled(Rule::OneBlankLineAfterClass)
-            || self.settings.rules.enabled(Rule::BlankLineAfterSummary)
-            || self.settings.rules.enabled(Rule::IndentWithSpaces)
-            || self.settings.rules.enabled(Rule::NoUnderIndentation)
-            || self.settings.rules.enabled(Rule::NoOverIndentation)
-            || self.settings.rules.enabled(Rule::NewLineAfterLastParagraph)
-            || self.settings.rules.enabled(Rule::NoSurroundingWhitespace)
-            || self.settings.rules.enabled(Rule::NoBlankLineBeforeClass)
-            || self.settings.rules.enabled(Rule::MultiLineSummaryFirstLine)
-            || self
-                .settings
-                .rules
-                .enabled(Rule::MultiLineSummarySecondLine)
-            || self.settings.rules.enabled(Rule::SectionNotOverIndented)
-            || self
-                .settings
-                .rules
-                .enabled(Rule::SectionUnderlineNotOverIndented)
-            || self.settings.rules.enabled(Rule::TripleSingleQuotes)
-            || self.settings.rules.enabled(Rule::EscapeSequenceInDocstring)
-            || self.settings.rules.enabled(Rule::EndsInPeriod)
-            || self.settings.rules.enabled(Rule::NonImperativeMood)
-            || self.settings.rules.enabled(Rule::NoSignature)
-            || self.settings.rules.enabled(Rule::FirstLineCapitalized)
-            || self.settings.rules.enabled(Rule::DocstringStartsWithThis)
-            || self.settings.rules.enabled(Rule::CapitalizeSectionName)
-            || self.settings.rules.enabled(Rule::NewLineAfterSectionName)
-            || self
-                .settings
-                .rules
-                .enabled(Rule::DashedUnderlineAfterSection)
-            || self.settings.rules.enabled(Rule::SectionUnderlineAfterName)
-            || self
-                .settings
-                .rules
-                .enabled(Rule::SectionUnderlineMatchesSectionLength)
-            || self.settings.rules.enabled(Rule::BlankLineAfterSection)
-            || self.settings.rules.enabled(Rule::BlankLineBeforeSection)
-            || self
-                .settings
-                .rules
-                .enabled(Rule::NoBlankLinesBetweenHeaderAndContent)
-            || self.settings.rules.enabled(Rule::BlankLineAfterLastSection)
-            || self.settings.rules.enabled(Rule::EmptyDocstringSection)
-            || self.settings.rules.enabled(Rule::EndsInPunctuation)
-            || self.settings.rules.enabled(Rule::SectionNameEndsInColon)
-            || self.settings.rules.enabled(Rule::UndocumentedParam)
-            || self.settings.rules.enabled(Rule::OverloadWithDocstring)
-            || self.settings.rules.enabled(Rule::EmptyDocstring);
+        let enforce_annotations = self.settings.rules.any_enabled(&[
+            Rule::MissingTypeFunctionArgument,
+            Rule::MissingTypeArgs,
+            Rule::MissingTypeKwargs,
+            Rule::MissingTypeSelf,
+            Rule::MissingTypeCls,
+            Rule::MissingReturnTypeUndocumentedPublicFunction,
+            Rule::MissingReturnTypePrivateFunction,
+            Rule::MissingReturnTypeSpecialMethod,
+            Rule::MissingReturnTypeStaticMethod,
+            Rule::MissingReturnTypeClassMethod,
+            Rule::AnyType,
+        ]);
+        let enforce_docstrings = self.settings.rules.any_enabled(&[
+            Rule::UndocumentedPublicModule,
+            Rule::UndocumentedPublicClass,
+            Rule::UndocumentedPublicMethod,
+            Rule::UndocumentedPublicFunction,
+            Rule::UndocumentedPublicPackage,
+            Rule::UndocumentedMagicMethod,
+            Rule::UndocumentedPublicNestedClass,
+            Rule::UndocumentedPublicInit,
+            Rule::FitsOnOneLine,
+            Rule::NoBlankLineBeforeFunction,
+            Rule::NoBlankLineAfterFunction,
+            Rule::OneBlankLineBeforeClass,
+            Rule::OneBlankLineAfterClass,
+            Rule::BlankLineAfterSummary,
+            Rule::IndentWithSpaces,
+            Rule::UnderIndentation,
+            Rule::OverIndentation,
+            Rule::NewLineAfterLastParagraph,
+            Rule::SurroundingWhitespace,
+            Rule::BlankLineBeforeClass,
+            Rule::MultiLineSummaryFirstLine,
+            Rule::MultiLineSummarySecondLine,
+            Rule::SectionNotOverIndented,
+            Rule::SectionUnderlineNotOverIndented,
+            Rule::TripleSingleQuotes,
+            Rule::EscapeSequenceInDocstring,
+            Rule::EndsInPeriod,
+            Rule::NonImperativeMood,
+            Rule::NoSignature,
+            Rule::FirstLineCapitalized,
+            Rule::DocstringStartsWithThis,
+            Rule::CapitalizeSectionName,
+            Rule::NewLineAfterSectionName,
+            Rule::DashedUnderlineAfterSection,
+            Rule::SectionUnderlineAfterName,
+            Rule::SectionUnderlineMatchesSectionLength,
+            Rule::NoBlankLineAfterSection,
+            Rule::NoBlankLineBeforeSection,
+            Rule::BlankLinesBetweenHeaderAndContent,
+            Rule::BlankLineAfterLastSection,
+            Rule::EmptyDocstringSection,
+            Rule::EndsInPunctuation,
+            Rule::SectionNameEndsInColon,
+            Rule::UndocumentedParam,
+            Rule::OverloadWithDocstring,
+            Rule::EmptyDocstring,
+        ]);
 
         let mut overloaded_name: Option<String> = None;
         self.deferred.definitions.reverse();
@@ -5152,6 +5117,7 @@ impl<'a> Checker<'a> {
                 }
                 overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
             }
+
             if self.is_stub {
                 if self.settings.rules.enabled(Rule::DocstringInStub) {
                     flake8_pyi::rules::docstring_in_stubs(self, definition.docstring);
@@ -5181,6 +5147,16 @@ impl<'a> Checker<'a> {
                     Location::new(expr.location.row(), expr.location.column()),
                 ));
 
+                if pydocstyle::helpers::should_ignore_docstring(contents) {
+                    warn_user!(
+                        "Docstring at {}:{}:{} contains implicit string concatenation; ignoring...",
+                        relativize_path(self.path),
+                        expr.location.row(),
+                        expr.location.column() + 1
+                    );
+                    continue;
+                }
+
                 let body = str::raw_contents(contents);
                 let docstring = Docstring {
                     kind: definition.kind,
@@ -5197,38 +5173,39 @@ impl<'a> Checker<'a> {
                 if self.settings.rules.enabled(Rule::FitsOnOneLine) {
                     pydocstyle::rules::one_liner(self, &docstring);
                 }
-                if self.settings.rules.enabled(Rule::NoBlankLineBeforeFunction)
-                    || self.settings.rules.enabled(Rule::NoBlankLineAfterFunction)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::NoBlankLineBeforeFunction,
+                    Rule::NoBlankLineAfterFunction,
+                ]) {
                     pydocstyle::rules::blank_before_after_function(self, &docstring);
                 }
-                if self.settings.rules.enabled(Rule::OneBlankLineBeforeClass)
-                    || self.settings.rules.enabled(Rule::OneBlankLineAfterClass)
-                    || self.settings.rules.enabled(Rule::NoBlankLineBeforeClass)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::OneBlankLineBeforeClass,
+                    Rule::OneBlankLineAfterClass,
+                    Rule::BlankLineBeforeClass,
+                ]) {
                     pydocstyle::rules::blank_before_after_class(self, &docstring);
                 }
                 if self.settings.rules.enabled(Rule::BlankLineAfterSummary) {
                     pydocstyle::rules::blank_after_summary(self, &docstring);
                 }
-                if self.settings.rules.enabled(Rule::IndentWithSpaces)
-                    || self.settings.rules.enabled(Rule::NoUnderIndentation)
-                    || self.settings.rules.enabled(Rule::NoOverIndentation)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::IndentWithSpaces,
+                    Rule::UnderIndentation,
+                    Rule::OverIndentation,
+                ]) {
                     pydocstyle::rules::indent(self, &docstring);
                 }
                 if self.settings.rules.enabled(Rule::NewLineAfterLastParagraph) {
                     pydocstyle::rules::newline_after_last_paragraph(self, &docstring);
                 }
-                if self.settings.rules.enabled(Rule::NoSurroundingWhitespace) {
+                if self.settings.rules.enabled(Rule::SurroundingWhitespace) {
                     pydocstyle::rules::no_surrounding_whitespace(self, &docstring);
                 }
-                if self.settings.rules.enabled(Rule::MultiLineSummaryFirstLine)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::MultiLineSummarySecondLine)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::MultiLineSummaryFirstLine,
+                    Rule::MultiLineSummarySecondLine,
+                ]) {
                     pydocstyle::rules::multi_line_summary_start(self, &docstring);
                 }
                 if self.settings.rules.enabled(Rule::TripleSingleQuotes) {
@@ -5262,34 +5239,23 @@ impl<'a> Checker<'a> {
                 if self.settings.rules.enabled(Rule::OverloadWithDocstring) {
                     pydocstyle::rules::if_needed(self, &docstring);
                 }
-                if self.settings.rules.enabled(Rule::MultiLineSummaryFirstLine)
-                    || self.settings.rules.enabled(Rule::SectionNotOverIndented)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::SectionUnderlineNotOverIndented)
-                    || self.settings.rules.enabled(Rule::CapitalizeSectionName)
-                    || self.settings.rules.enabled(Rule::NewLineAfterSectionName)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::DashedUnderlineAfterSection)
-                    || self.settings.rules.enabled(Rule::SectionUnderlineAfterName)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::SectionUnderlineMatchesSectionLength)
-                    || self.settings.rules.enabled(Rule::BlankLineAfterSection)
-                    || self.settings.rules.enabled(Rule::BlankLineBeforeSection)
-                    || self
-                        .settings
-                        .rules
-                        .enabled(Rule::NoBlankLinesBetweenHeaderAndContent)
-                    || self.settings.rules.enabled(Rule::BlankLineAfterLastSection)
-                    || self.settings.rules.enabled(Rule::EmptyDocstringSection)
-                    || self.settings.rules.enabled(Rule::SectionNameEndsInColon)
-                    || self.settings.rules.enabled(Rule::UndocumentedParam)
-                {
+                if self.settings.rules.any_enabled(&[
+                    Rule::MultiLineSummaryFirstLine,
+                    Rule::SectionNotOverIndented,
+                    Rule::SectionUnderlineNotOverIndented,
+                    Rule::CapitalizeSectionName,
+                    Rule::NewLineAfterSectionName,
+                    Rule::DashedUnderlineAfterSection,
+                    Rule::SectionUnderlineAfterName,
+                    Rule::SectionUnderlineMatchesSectionLength,
+                    Rule::NoBlankLineAfterSection,
+                    Rule::NoBlankLineBeforeSection,
+                    Rule::BlankLinesBetweenHeaderAndContent,
+                    Rule::BlankLineAfterLastSection,
+                    Rule::EmptyDocstringSection,
+                    Rule::SectionNameEndsInColon,
+                    Rule::UndocumentedParam,
+                ]) {
                     pydocstyle::rules::sections(
                         self,
                         &docstring,

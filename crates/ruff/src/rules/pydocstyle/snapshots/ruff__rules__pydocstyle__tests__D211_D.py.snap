@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: NoBlankLineBeforeClass
+    name: BlankLineBeforeClass
     body: No blank lines allowed before class docstring
     suggestion: Remove blank line(s) before class docstring
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 0
   parent: ~
 - kind:
-    name: NoBlankLineBeforeClass
+    name: BlankLineBeforeClass
     body: No blank lines allowed before class docstring
     suggestion: Remove blank line(s) before class docstring
     fixable: true

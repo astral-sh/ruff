@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: ImportStar
+    name: UndefinedLocalWithImportStar
     body: "`from F634 import *` used; unable to detect undefined names"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: ImportStar
+    name: UndefinedLocalWithImportStar
     body: "`from F634 import *` used; unable to detect undefined names"
     suggestion: ~
     fixable: false

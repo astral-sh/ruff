@@ -35,10 +35,10 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_9.py"); "F401_9")]
     #[test_case(Rule::UnusedImport, Path::new("F401_10.py"); "F401_10")]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"); "F402")]
-    #[test_case(Rule::ImportStar, Path::new("F403.py"); "F403")]
+    #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"); "F403")]
     #[test_case(Rule::LateFutureImport, Path::new("F404.py"); "F404")]
-    #[test_case(Rule::ImportStarUsage, Path::new("F405.py"); "F405")]
-    #[test_case(Rule::ImportStarNotPermitted, Path::new("F406.py"); "F406")]
+    #[test_case(Rule::UndefinedLocalWithImportStarUsage, Path::new("F405.py"); "F405")]
+    #[test_case(Rule::UndefinedLocalWithNestedImportStarUsage, Path::new("F406.py"); "F406")]
     #[test_case(Rule::FutureFeatureNotDefined, Path::new("F407.py"); "F407")]
     #[test_case(Rule::PercentFormatInvalidFormat, Path::new("F50x.py"); "F501")]
     #[test_case(Rule::PercentFormatExpectedMapping, Path::new("F502.py"); "F502_1")]
@@ -61,7 +61,7 @@ mod tests {
     #[test_case(Rule::FStringMissingPlaceholders, Path::new("F541.py"); "F541")]
     #[test_case(Rule::MultiValueRepeatedKeyLiteral, Path::new("F601.py"); "F601")]
     #[test_case(Rule::MultiValueRepeatedKeyVariable, Path::new("F602.py"); "F602")]
-    #[test_case(Rule::TwoStarredExpressions, Path::new("F622.py"); "F622")]
+    #[test_case(Rule::MultipleStarredExpressions, Path::new("F622.py"); "F622")]
     #[test_case(Rule::AssertTuple, Path::new("F631.py"); "F631")]
     #[test_case(Rule::IsLiteral, Path::new("F632.py"); "F632")]
     #[test_case(Rule::InvalidPrintSyntax, Path::new("F633.py"); "F633")]
@@ -469,7 +469,10 @@ mod tests {
         // Can't find undefined names with import *.
         flakes(
             "from fu import *; bar",
-            &[Rule::ImportStar, Rule::ImportStarUsage],
+            &[
+                Rule::UndefinedLocalWithImportStar,
+                Rule::UndefinedLocalWithImportStarUsage,
+            ],
         );
     }
 
@@ -2485,10 +2488,10 @@ mod tests {
         csc(1)
         "#,
             &[
-                Rule::ImportStar,
-                Rule::ImportStarUsage,
-                Rule::ImportStarUsage,
-                Rule::ImportStarUsage,
+                Rule::UndefinedLocalWithImportStar,
+                Rule::UndefinedLocalWithImportStarUsage,
+                Rule::UndefinedLocalWithImportStarUsage,
+                Rule::UndefinedLocalWithImportStarUsage,
             ],
         );
     }
@@ -2503,7 +2506,7 @@ mod tests {
         a = 1
         __all__ = ['a']
         "#,
-            &[Rule::ImportStar, Rule::UnusedImport],
+            &[Rule::UndefinedLocalWithImportStar, Rule::UnusedImport],
         );
     }
 

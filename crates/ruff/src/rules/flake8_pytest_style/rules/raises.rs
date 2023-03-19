@@ -11,9 +11,9 @@ use crate::registry::Rule;
 use super::helpers::is_empty_or_null_string;
 
 #[violation]
-pub struct RaisesWithMultipleStatements;
+pub struct PytestRaisesWithMultipleStatements;
 
-impl Violation for RaisesWithMultipleStatements {
+impl Violation for PytestRaisesWithMultipleStatements {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`pytest.raises()` block should contain a single simple statement")
@@ -21,14 +21,14 @@ impl Violation for RaisesWithMultipleStatements {
 }
 
 #[violation]
-pub struct RaisesTooBroad {
+pub struct PytestRaisesTooBroad {
     pub exception: String,
 }
 
-impl Violation for RaisesTooBroad {
+impl Violation for PytestRaisesTooBroad {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let RaisesTooBroad { exception } = self;
+        let PytestRaisesTooBroad { exception } = self;
         format!(
             "`pytest.raises({exception})` is too broad, set the `match` parameter or use a more \
              specific exception"
@@ -37,9 +37,9 @@ impl Violation for RaisesTooBroad {
 }
 
 #[violation]
-pub struct RaisesWithoutException;
+pub struct PytestRaisesWithoutException;
 
-impl Violation for RaisesWithoutException {
+impl Violation for PytestRaisesWithoutException {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("set the expected exception in `pytest.raises()`")
@@ -67,15 +67,20 @@ const fn is_non_trivial_with_body(body: &[Stmt]) -> bool {
 
 pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if is_pytest_raises(checker, func) {
-        if checker.settings.rules.enabled(Rule::RaisesWithoutException) {
+        if checker
+            .settings
+            .rules
+            .enabled(Rule::PytestRaisesWithoutException)
+        {
             if args.is_empty() && keywords.is_empty() {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(RaisesWithoutException, Range::from(func)));
+                checker.diagnostics.push(Diagnostic::new(
+                    PytestRaisesWithoutException,
+                    Range::from(func),
+                ));
             }
         }
 
-        if checker.settings.rules.enabled(Rule::RaisesTooBroad) {
+        if checker.settings.rules.enabled(Rule::PytestRaisesTooBroad) {
             let match_keyword = keywords
                 .iter()
                 .find(|kw| kw.node.arg == Some("match".to_string()));
@@ -127,7 +132,7 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
 
         if is_too_complex {
             checker.diagnostics.push(Diagnostic::new(
-                RaisesWithMultipleStatements,
+                PytestRaisesWithMultipleStatements,
                 Range::from(stmt),
             ));
         }
@@ -160,7 +165,7 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
         })
     {
         checker.diagnostics.push(Diagnostic::new(
-            RaisesTooBroad {
+            PytestRaisesTooBroad {
                 exception: call_path,
             },
             Range::from(exception),

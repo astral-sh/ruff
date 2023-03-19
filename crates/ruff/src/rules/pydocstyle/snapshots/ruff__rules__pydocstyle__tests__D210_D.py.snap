@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: NoSurroundingWhitespace
+    name: SurroundingWhitespace
     body: No whitespaces allowed surrounding docstring text
     suggestion: Trim surrounding whitespace
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    name: NoSurroundingWhitespace
+    name: SurroundingWhitespace
     body: No whitespaces allowed surrounding docstring text
     suggestion: Trim surrounding whitespace
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    name: NoSurroundingWhitespace
+    name: SurroundingWhitespace
     body: No whitespaces allowed surrounding docstring text
     suggestion: Trim surrounding whitespace
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 36
   parent: ~
 - kind:
-    name: NoSurroundingWhitespace
+    name: SurroundingWhitespace
     body: No whitespaces allowed surrounding docstring text
     suggestion: Trim surrounding whitespace
     fixable: true

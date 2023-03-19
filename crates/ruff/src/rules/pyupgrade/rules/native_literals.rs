@@ -1,10 +1,10 @@
 use std::fmt;
 
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
-use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::str::is_implicit_concatenation;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -112,16 +112,9 @@ pub fn native_literals(
             return;
         }
 
-        // rust-python merges adjacent string/bytes literals into one node, but we can't
-        // safely remove the outer call in this situation. We're following pyupgrade
-        // here and skip.
+        // Skip implicit string concatenations.
         let arg_code = checker.locator.slice(arg);
-        if lexer::lex_located(arg_code, Mode::Module, arg.location)
-            .flatten()
-            .filter(|(_, tok, _)| matches!(tok, Tok::String { .. }))
-            .count()
-            > 1
-        {
+        if is_implicit_concatenation(arg_code) {
             return;
         }
 

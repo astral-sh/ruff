@@ -18,9 +18,9 @@ mod tests {
     use super::settings::Settings;
     use super::types;
 
-    #[test_case(Rule::IncorrectFixtureParenthesesStyle, Path::new("PT001.py"), Settings::default(), "PT001_default"; "PT001_0")]
+    #[test_case(Rule::PytestFixtureIncorrectParenthesesStyle, Path::new("PT001.py"), Settings::default(), "PT001_default"; "PT001_0")]
     #[test_case(
-        Rule::IncorrectFixtureParenthesesStyle,
+        Rule::PytestFixtureIncorrectParenthesesStyle,
         Path::new("PT001.py"),
         Settings {
             fixture_parentheses: false,
@@ -29,13 +29,13 @@ mod tests {
         "PT001_no_parentheses";
         "PT001_1"
     )]
-    #[test_case(Rule::FixturePositionalArgs, Path::new("PT002.py"), Settings::default(), "PT002"; "PT002")]
-    #[test_case(Rule::ExtraneousScopeFunction, Path::new("PT003.py"), Settings::default(), "PT003"; "PT003")]
-    #[test_case(Rule::MissingFixtureNameUnderscore, Path::new("PT004.py"), Settings::default(), "PT004"; "PT004")]
-    #[test_case(Rule::IncorrectFixtureNameUnderscore, Path::new("PT005.py"), Settings::default(), "PT005"; "PT005")]
-    #[test_case(Rule::ParametrizeNamesWrongType, Path::new("PT006.py"), Settings::default(), "PT006_default"; "PT006_0")]
+    #[test_case(Rule::PytestFixturePositionalArgs, Path::new("PT002.py"), Settings::default(), "PT002"; "PT002")]
+    #[test_case(Rule::PytestExtraneousScopeFunction, Path::new("PT003.py"), Settings::default(), "PT003"; "PT003")]
+    #[test_case(Rule::PytestMissingFixtureNameUnderscore, Path::new("PT004.py"), Settings::default(), "PT004"; "PT004")]
+    #[test_case(Rule::PytestIncorrectFixtureNameUnderscore, Path::new("PT005.py"), Settings::default(), "PT005"; "PT005")]
+    #[test_case(Rule::PytestParametrizeNamesWrongType, Path::new("PT006.py"), Settings::default(), "PT006_default"; "PT006_0")]
     #[test_case(
-        Rule::ParametrizeNamesWrongType,
+        Rule::PytestParametrizeNamesWrongType,
         Path::new("PT006.py"),
         Settings {
             parametrize_names_type: types::ParametrizeNameType::Csv,
@@ -45,7 +45,7 @@ mod tests {
         "PT006_1"
     )]
     #[test_case(
-        Rule::ParametrizeNamesWrongType,
+        Rule::PytestParametrizeNamesWrongType,
         Path::new("PT006.py"),
         Settings {
             parametrize_names_type: types::ParametrizeNameType::List,
@@ -55,14 +55,14 @@ mod tests {
         "PT006_2"
     )]
     #[test_case(
-        Rule::ParametrizeValuesWrongType,
+        Rule::PytestParametrizeValuesWrongType,
         Path::new("PT007.py"),
         Settings::default(),
         "PT007_list_of_tuples";
         "PT007_0"
     )]
     #[test_case(
-        Rule::ParametrizeValuesWrongType,
+        Rule::PytestParametrizeValuesWrongType,
         Path::new("PT007.py"),
         Settings {
             parametrize_values_type: types::ParametrizeValuesType::Tuple,
@@ -72,7 +72,7 @@ mod tests {
         "PT007_1"
     )]
     #[test_case(
-        Rule::ParametrizeValuesWrongType,
+        Rule::PytestParametrizeValuesWrongType,
         Path::new("PT007.py"),
         Settings {
             parametrize_values_type: types::ParametrizeValuesType::Tuple,
@@ -83,7 +83,7 @@ mod tests {
         "PT007_2"
     )]
     #[test_case(
-        Rule::ParametrizeValuesWrongType,
+        Rule::PytestParametrizeValuesWrongType,
         Path::new("PT007.py"),
         Settings {
             parametrize_values_row_type: types::ParametrizeValuesRowType::List,
@@ -93,29 +93,29 @@ mod tests {
         "PT007_3"
     )]
     #[test_case(
-        Rule::PatchWithLambda,
+        Rule::PytestPatchWithLambda,
         Path::new("PT008.py"),
         Settings::default(),
         "PT008";
         "PT008"
     )]
     #[test_case(
-        Rule::UnittestAssertion,
+        Rule::PytestUnittestAssertion,
         Path::new("PT009.py"),
         Settings::default(),
         "PT009";
         "PT009"
     )]
-    #[test_case(Rule::RaisesWithoutException, Path::new("PT010.py"), Settings::default(), "PT010"; "PT0010")]
+    #[test_case(Rule::PytestRaisesWithoutException, Path::new("PT010.py"), Settings::default(), "PT010"; "PT0010")]
     #[test_case(
-        Rule::RaisesTooBroad,
+        Rule::PytestRaisesTooBroad,
         Path::new("PT011.py"),
         Settings::default(),
         "PT011_default";
         "PT011_0"
     )]
     #[test_case(
-        Rule::RaisesTooBroad,
+        Rule::PytestRaisesTooBroad,
         Path::new("PT011.py"),
         Settings {
             raises_extend_require_match_for: vec!["ZeroDivisionError".to_string()],
@@ -125,7 +125,7 @@ mod tests {
         "PT011_1"
     )]
     #[test_case(
-        Rule::RaisesTooBroad,
+        Rule::PytestRaisesTooBroad,
         Path::new("PT011.py"),
         Settings {
             raises_require_match_for: vec!["ZeroDivisionError".to_string()],
@@ -135,84 +135,84 @@ mod tests {
         "PT011_2"
     )]
     #[test_case(
-        Rule::RaisesWithMultipleStatements,
+        Rule::PytestRaisesWithMultipleStatements,
         Path::new("PT012.py"),
         Settings::default(),
         "PT012";
         "PT012"
     )]
     #[test_case(
-        Rule::IncorrectPytestImport,
+        Rule::PytestIncorrectPytestImport,
         Path::new("PT013.py"),
         Settings::default(),
         "PT013";
         "PT013"
     )]
     #[test_case(
-        Rule::AssertAlwaysFalse,
+        Rule::PytestAssertAlwaysFalse,
         Path::new("PT015.py"),
         Settings::default(),
         "PT015";
         "PT015"
     )]
     #[test_case(
-        Rule::FailWithoutMessage,
+        Rule::PytestFailWithoutMessage,
         Path::new("PT016.py"),
         Settings::default(),
         "PT016";
         "PT016"
     )]
     #[test_case(
-        Rule::AssertInExcept,
+        Rule::PytestAssertInExcept,
         Path::new("PT017.py"),
         Settings::default(),
         "PT017";
         "PT017"
     )]
     #[test_case(
-        Rule::CompositeAssertion,
+        Rule::PytestCompositeAssertion,
         Path::new("PT018.py"),
         Settings::default(),
         "PT018";
         "PT018"
     )]
     #[test_case(
-        Rule::FixtureParamWithoutValue,
+        Rule::PytestFixtureParamWithoutValue,
         Path::new("PT019.py"),
         Settings::default(),
         "PT019";
         "PT019"
     )]
     #[test_case(
-        Rule::DeprecatedYieldFixture,
+        Rule::PytestDeprecatedYieldFixture,
         Path::new("PT020.py"),
         Settings::default(),
         "PT020";
         "PT020"
     )]
     #[test_case(
-        Rule::FixtureFinalizerCallback,
+        Rule::PytestFixtureFinalizerCallback,
         Path::new("PT021.py"),
         Settings::default(),
         "PT021";
         "PT021"
     )]
     #[test_case(
-        Rule::UselessYieldFixture,
+        Rule::PytestUselessYieldFixture,
         Path::new("PT022.py"),
         Settings::default(),
         "PT022";
         "PT022"
     )]
     #[test_case(
-        Rule::IncorrectMarkParenthesesStyle,
+        Rule::PytestIncorrectMarkParenthesesStyle,
         Path::new("PT023.py"),
         Settings::default(),
         "PT023_default";
         "PT023_0"
     )]
     #[test_case(
-        Rule::IncorrectMarkParenthesesStyle,
+        Rule::PytestIncorrectMarkParenthesesStyle,
         Path::new("PT023.py"),
         Settings {
             mark_parentheses: false,
@@ -222,21 +222,21 @@ mod tests {
         "PT023_1"
     )]
     #[test_case(
-        Rule::UnnecessaryAsyncioMarkOnFixture,
+        Rule::PytestUnnecessaryAsyncioMarkOnFixture,
         Path::new("PT024.py"),
         Settings::default(),
         "PT024";
         "PT024"
     )]
     #[test_case(
-        Rule::ErroneousUseFixturesOnFixture,
+        Rule::PytestErroneousUseFixturesOnFixture,
         Path::new("PT025.py"),
         Settings::default(),
         "PT025";
         "PT025"
     )]
     #[test_case(
-        Rule::UseFixturesWithoutParameters,
+        Rule::PytestUseFixturesWithoutParameters,
         Path::new("PT026.py"),
         Settings::default(),
         "PT026";

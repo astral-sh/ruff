@@ -48,8 +48,7 @@ textwrap = { version = "0.16.0" }
 toml = { version = "0.7.2" }
 
 [profile.release]
-panic = "abort"
-lto = "thin"
+lto = "fat"
 codegen-units = 1
 opt-level = 3
 

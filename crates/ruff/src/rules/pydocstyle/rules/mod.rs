@@ -1,8 +1,7 @@
 pub use backslashes::{backslashes, EscapeSequenceInDocstring};
 pub use blank_after_summary::{blank_after_summary, BlankLineAfterSummary};
 pub use blank_before_after_class::{
-    blank_before_after_class, NoBlankLineBeforeClass, OneBlankLineAfterClass,
-    OneBlankLineBeforeClass,
+    blank_before_after_class, BlankLineBeforeClass, OneBlankLineAfterClass, OneBlankLineBeforeClass,
 };
 pub use blank_before_after_function::{
     blank_before_after_function, NoBlankLineAfterFunction, NoBlankLineBeforeFunction,
@@ -11,24 +10,25 @@ pub use capitalized::{capitalized, FirstLineCapitalized};
 pub use ends_with_period::{ends_with_period, EndsInPeriod};
 pub use ends_with_punctuation::{ends_with_punctuation, EndsInPunctuation};
 pub use if_needed::{if_needed, OverloadWithDocstring};
-pub use indent::{indent, IndentWithSpaces, NoOverIndentation, NoUnderIndentation};
+pub use indent::{indent, IndentWithSpaces, OverIndentation, UnderIndentation};
 pub use multi_line_summary_start::{
     multi_line_summary_start, MultiLineSummaryFirstLine, MultiLineSummarySecondLine,
 };
 pub use newline_after_last_paragraph::{newline_after_last_paragraph, NewLineAfterLastParagraph};
 pub use no_signature::{no_signature, NoSignature};
-pub use no_surrounding_whitespace::{no_surrounding_whitespace, NoSurroundingWhitespace};
+pub use no_surrounding_whitespace::{no_surrounding_whitespace, SurroundingWhitespace};
 pub use non_imperative_mood::{non_imperative_mood, NonImperativeMood};
 pub use not_empty::{not_empty, EmptyDocstring};
 pub use not_missing::{
-    not_missing, MagicMethod, PublicClass, PublicFunction, PublicInit, PublicMethod, PublicModule,
-    PublicNestedClass, PublicPackage,
+    not_missing, UndocumentedMagicMethod, UndocumentedPublicClass, UndocumentedPublicFunction,
+    UndocumentedPublicInit, UndocumentedPublicMethod, UndocumentedPublicModule,
+    UndocumentedPublicNestedClass, UndocumentedPublicPackage,
 };
 pub use one_liner::{one_liner, FitsOnOneLine};
 pub use sections::{
-    sections, BlankLineAfterLastSection, BlankLineAfterSection, BlankLineBeforeSection,
-    CapitalizeSectionName, DashedUnderlineAfterSection, EmptyDocstringSection,
-    NewLineAfterSectionName, NoBlankLinesBetweenHeaderAndContent, SectionNameEndsInColon,
+    sections, BlankLineAfterLastSection, BlankLinesBetweenHeaderAndContent, CapitalizeSectionName,
+    DashedUnderlineAfterSection, EmptyDocstringSection, NewLineAfterSectionName,
+    NoBlankLineAfterSection, NoBlankLineBeforeSection, SectionNameEndsInColon,
     SectionNotOverIndented, SectionUnderlineAfterName, SectionUnderlineMatchesSectionLength,
     SectionUnderlineNotOverIndented, UndocumentedParam,
 };

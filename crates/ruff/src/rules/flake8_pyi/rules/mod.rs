@@ -2,10 +2,10 @@ pub use bad_version_info_comparison::{bad_version_info_comparison, BadVersionInf
 pub use docstring_in_stubs::{docstring_in_stubs, DocstringInStub};
 pub use non_empty_stub_body::{non_empty_stub_body, NonEmptyStubBody};
 pub use pass_statement_stub_body::{pass_statement_stub_body, PassStatementStubBody};
-pub use prefix_type_params::{prefix_type_params, PrefixTypeParams};
+pub use prefix_type_params::{prefix_type_params, UnprefixedTypeParam};
 pub use simple_defaults::{
-    argument_simple_defaults, typed_argument_simple_defaults, ArgumentSimpleDefaults,
-    TypedArgumentSimpleDefaults,
+    argument_simple_defaults, typed_argument_simple_defaults, ArgumentDefaultInStub,
+    TypedArgumentDefaultInStub,
 };
 pub use type_comment_in_stub::{type_comment_in_stub, TypeCommentInStub};
 pub use unrecognized_platform::{

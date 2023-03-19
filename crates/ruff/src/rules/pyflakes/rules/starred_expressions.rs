@@ -15,9 +15,9 @@ impl Violation for ExpressionsInStarAssignment {
 }
 
 #[violation]
-pub struct TwoStarredExpressions;
+pub struct MultipleStarredExpressions;
 
-impl Violation for TwoStarredExpressions {
+impl Violation for MultipleStarredExpressions {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Two starred expressions in assignment")
@@ -36,7 +36,7 @@ pub fn starred_expressions(
     for (index, elt) in elts.iter().enumerate() {
         if matches!(elt.node, ExprKind::Starred { .. }) {
             if has_starred && check_two_starred_expressions {
-                return Some(Diagnostic::new(TwoStarredExpressions, location));
+                return Some(Diagnostic::new(MultipleStarredExpressions, location));
             }
             has_starred = true;
             starred_index = Some(index);

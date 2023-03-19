@@ -19,9 +19,9 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_commas").join(path).as_path(),
             &settings::Settings::for_rules(vec![
-                Rule::TrailingCommaMissing,
-                Rule::TrailingCommaOnBareTupleProhibited,
-                Rule::TrailingCommaProhibited,
+                Rule::MissingTrailingComma,
+                Rule::TrailingCommaOnBareTuple,
+                Rule::ProhibitedTrailingComma,
             ]),
         )?;
         assert_yaml_snapshot!(snapshot, diagnostics);

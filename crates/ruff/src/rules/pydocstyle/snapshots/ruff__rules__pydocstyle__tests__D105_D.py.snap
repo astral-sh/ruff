@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: MagicMethod
+    name: UndocumentedMagicMethod
     body: Missing docstring in magic method
     suggestion: ~
     fixable: false

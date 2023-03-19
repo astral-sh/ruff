@@ -16,7 +16,7 @@ pub use except_with_non_exception_classes::{
 };
 pub use f_string_docstring::{f_string_docstring, FStringDocstring};
 pub use function_call_argument_default::{
-    function_call_argument_default, FunctionCallArgumentDefault,
+    function_call_argument_default, FunctionCallInDefaultArgument,
 };
 pub use function_uses_loop_variable::{function_uses_loop_variable, FunctionUsesLoopVariable};
 pub use getattr_with_constant::{getattr_with_constant, GetAttrWithConstant};

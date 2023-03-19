@@ -13,7 +13,7 @@ use strum::IntoEnumIterator;
 use ruff_cache::cache_dir;
 use ruff_macros::CacheKey;
 
-use crate::registry::{Rule, RuleNamespace, INCOMPATIBLE_CODES};
+use crate::registry::{Rule, RuleNamespace, RuleSet, INCOMPATIBLE_CODES};
 use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
@@ -33,7 +33,7 @@ pub mod flags;
 pub mod options;
 pub mod options_base;
 pub mod pyproject;
-mod rule_table;
+pub mod rule_table;
 pub mod types;
 
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -80,7 +80,7 @@ pub struct CliSettings {
 #[allow(clippy::struct_excessive_bools)]
 pub struct Settings {
     pub rules: RuleTable,
-    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, FxHashSet<Rule>)>,
+    pub per_file_ignores: Vec<(GlobMatcher, GlobMatcher, RuleSet)>,
 
     pub show_source: bool,
     pub target_version: PythonVersion,
@@ -229,7 +229,7 @@ impl Settings {
     #[cfg(test)]
     pub fn for_rule(rule_code: Rule) -> Self {
         Self {
-            rules: [rule_code].into(),
+            rules: RuleTable::from_iter([rule_code]),
             ..Self::default()
         }
     }
@@ -237,7 +237,7 @@ impl Settings {
     #[cfg(test)]
     pub fn for_rules(rules: impl IntoIterator<Item = Rule>) -> Self {
         Self {
-            rules: rules.into(),
+            rules: RuleTable::from_iter(rules),
             ..Self::default()
         }
     }
@@ -246,9 +246,9 @@ impl Settings {
 impl From<&Configuration> for RuleTable {
     fn from(config: &Configuration) -> Self {
         // The select_set keeps track of which rules have been selected.
-        let mut select_set: FxHashSet<Rule> = defaults::PREFIXES.iter().flatten().collect();
+        let mut select_set: RuleSet = defaults::PREFIXES.iter().flatten().collect();
         // The fixable set keeps track of which rules are fixable.
-        let mut fixable_set: FxHashSet<Rule> = RuleSelector::All.into_iter().collect();
+        let mut fixable_set: RuleSet = RuleSelector::All.into_iter().collect();
 
         // Ignores normally only subtract from the current set of selected
         // rules.  By that logic the ignore in `select = [], ignore = ["E501"]`
@@ -310,7 +310,7 @@ impl From<&Configuration> for RuleTable {
                     .filter(|s| s.specificity() == spec)
                 {
                     for rule in selector {
-                        fixable_set.remove(&rule);
+                        fixable_set.remove(rule);
                     }
                 }
             }
@@ -335,7 +335,7 @@ impl From<&Configuration> for RuleTable {
                     if enabled {
                         select_set.insert(rule);
                     } else {
-                        select_set.remove(&rule);
+                        select_set.remove(rule);
                     }
                 }
             }
@@ -374,7 +374,7 @@ impl From<&Configuration> for RuleTable {
         let mut rules = Self::empty();
 
         for rule in select_set {
-            let fix = fixable_set.contains(&rule);
+            let fix = fixable_set.contains(rule);
             rules.enable(rule, fix);
         }
 
@@ -406,7 +406,7 @@ impl From<&Configuration> for RuleTable {
 /// Given a list of patterns, create a `GlobSet`.
 pub fn resolve_per_file_ignores(
     per_file_ignores: Vec<PerFileIgnore>,
-) -> Result<Vec<(GlobMatcher, GlobMatcher, FxHashSet<Rule>)>> {
+) -> Result<Vec<(GlobMatcher, GlobMatcher, RuleSet)>> {
     per_file_ignores
         .into_iter()
         .map(|per_file_ignore| {
@@ -424,23 +424,20 @@ pub fn resolve_per_file_ignores(
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashSet;
-
     use crate::codes::{self, Pycodestyle};
-    use crate::registry::Rule;
+    use crate::registry::{Rule, RuleSet};
     use crate::settings::configuration::Configuration;
     use crate::settings::rule_table::RuleTable;
 
     use super::configuration::RuleSelection;
 
     #[allow(clippy::needless_pass_by_value)]
-    fn resolve_rules(selections: impl IntoIterator<Item = RuleSelection>) -> FxHashSet<Rule> {
+    fn resolve_rules(selections: impl IntoIterator<Item = RuleSelection>) -> RuleSet {
         RuleTable::from(&Configuration {
             rule_selections: selections.into_iter().collect(),
             ..Configuration::default()
         })
         .iter_enabled()
-        .copied()
         .collect()
     }
 
@@ -451,13 +448,13 @@ mod tests {
             ..RuleSelection::default()
         }]);
 
-        let expected = FxHashSet::from_iter([
+        let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
-            Rule::NoNewLineAtEndOfFile,
-            Rule::BlankLineContainsWhitespace,
+            Rule::MissingNewlineAtEndOfFile,
+            Rule::BlankLineWithWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
-            Rule::IndentationContainsTabs,
+            Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
 
@@ -465,7 +462,7 @@ mod tests {
             select: Some(vec![Pycodestyle::W6.into()]),
             ..RuleSelection::default()
         }]);
-        let expected = FxHashSet::from_iter([Rule::InvalidEscapeSequence]);
+        let expected = RuleSet::from_rule(Rule::InvalidEscapeSequence);
         assert_eq!(actual, expected);
 
         let actual = resolve_rules([RuleSelection {
@@ -473,12 +470,12 @@ mod tests {
             ignore: vec![Pycodestyle::W292.into()],
             ..RuleSelection::default()
         }]);
-        let expected = FxHashSet::from_iter([
+        let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
-            Rule::BlankLineContainsWhitespace,
+            Rule::BlankLineWithWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
-            Rule::IndentationContainsTabs,
+            Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
 
@@ -487,7 +484,7 @@ mod tests {
             ignore: vec![Pycodestyle::W.into()],
             ..RuleSelection::default()
         }]);
-        let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);
+        let expected = RuleSet::from_rule(Rule::MissingNewlineAtEndOfFile);
         assert_eq!(actual, expected);
 
         let actual = resolve_rules([RuleSelection {
@@ -495,7 +492,7 @@ mod tests {
             ignore: vec![Pycodestyle::W605.into()],
             ..RuleSelection::default()
         }]);
-        let expected = FxHashSet::from_iter([]);
+        let expected = RuleSet::empty();
         assert_eq!(actual, expected);
 
         let actual = resolve_rules([
@@ -509,13 +506,13 @@ mod tests {
                 ..RuleSelection::default()
             },
         ]);
-        let expected = FxHashSet::from_iter([
+        let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
-            Rule::NoNewLineAtEndOfFile,
-            Rule::BlankLineContainsWhitespace,
+            Rule::MissingNewlineAtEndOfFile,
+            Rule::BlankLineWithWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
-            Rule::IndentationContainsTabs,
+            Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
 
@@ -531,7 +528,7 @@ mod tests {
                 ..RuleSelection::default()
             },
         ]);
-        let expected = FxHashSet::from_iter([Rule::NoNewLineAtEndOfFile]);
+        let expected = RuleSet::from_rule(Rule::MissingNewlineAtEndOfFile);
         assert_eq!(actual, expected);
     }
 
@@ -548,12 +545,12 @@ mod tests {
                 ..RuleSelection::default()
             },
         ]);
-        let expected = FxHashSet::from_iter([
+        let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
-            Rule::BlankLineContainsWhitespace,
+            Rule::BlankLineWithWhitespace,
             Rule::DocLineTooLong,
             Rule::InvalidEscapeSequence,
-            Rule::IndentationContainsTabs,
+            Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
 
@@ -569,11 +566,11 @@ mod tests {
                 ..RuleSelection::default()
             },
         ]);
-        let expected = FxHashSet::from_iter([
+        let expected = RuleSet::from_rules(&[
             Rule::TrailingWhitespace,
-            Rule::BlankLineContainsWhitespace,
+            Rule::BlankLineWithWhitespace,
             Rule::InvalidEscapeSequence,
-            Rule::IndentationContainsTabs,
+            Rule::TabIndentation,
         ]);
         assert_eq!(actual, expected);
     }

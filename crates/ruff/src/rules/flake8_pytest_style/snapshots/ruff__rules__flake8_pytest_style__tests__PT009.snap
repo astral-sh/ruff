@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertTrue`"
     suggestion: "Replace `assertTrue(...)` with `assert ...`"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertTrue`"
     suggestion: "Replace `assertTrue(...)` with `assert ...`"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertTrue`"
     suggestion: "Replace `assertTrue(...)` with `assert ...`"
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertTrue`"
     suggestion: "Replace `assertTrue(...)` with `assert ...`"
     fixable: true
@@ -83,7 +83,7 @@ expression: diagnostics
       column: 43
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertTrue`"
     suggestion: "Replace `assertTrue(...)` with `assert ...`"
     fixable: true
@@ -103,7 +103,7 @@ expression: diagnostics
       column: 43
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertTrue`"
     suggestion: "Replace `assertTrue(...)` with `assert ...`"
     fixable: true
@@ -116,7 +116,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertTrue`"
     suggestion: "Replace `assertTrue(...)` with `assert ...`"
     fixable: true
@@ -129,7 +129,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertTrue`"
     suggestion: "Replace `assertTrue(...)` with `assert ...`"
     fixable: true
@@ -142,7 +142,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertTrue`"
     suggestion: "Replace `assertTrue(...)` with `assert ...`"
     fixable: true
@@ -155,7 +155,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertIsNotNone`"
     suggestion: ~
     fixable: false
@@ -168,7 +168,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertIsNone`"
     suggestion: ~
     fixable: false
@@ -181,7 +181,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertEqual`"
     suggestion: ~
     fixable: false
@@ -194,7 +194,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertFalse`"
     suggestion: "Replace `assertFalse(...)` with `assert ...`"
     fixable: true
@@ -214,7 +214,7 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertEqual`"
     suggestion: "Replace `assertEqual(...)` with `assert ...`"
     fixable: true
@@ -234,7 +234,7 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertNotEqual`"
     suggestion: "Replace `assertNotEqual(...)` with `assert ...`"
     fixable: true
@@ -254,7 +254,7 @@ expression: diagnostics
       column: 33
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertGreater`"
     suggestion: "Replace `assertGreater(...)` with `assert ...`"
     fixable: true
@@ -274,7 +274,7 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertGreaterEqual`"
     suggestion: "Replace `assertGreaterEqual(...)` with `assert ...`"
     fixable: true
@@ -294,7 +294,7 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertLess`"
     suggestion: "Replace `assertLess(...)` with `assert ...`"
     fixable: true
@@ -314,7 +314,7 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertLessEqual`"
     suggestion: "Replace `assertLessEqual(...)` with `assert ...`"
     fixable: true
@@ -334,7 +334,7 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertIn`"
     suggestion: "Replace `assertIn(...)` with `assert ...`"
     fixable: true
@@ -354,7 +354,7 @@ expression: diagnostics
       column: 32
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertNotIn`"
     suggestion: "Replace `assertNotIn(...)` with `assert ...`"
     fixable: true
@@ -374,7 +374,7 @@ expression: diagnostics
       column: 35
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertIsNone`"
     suggestion: "Replace `assertIsNone(...)` with `assert ...`"
     fixable: true
@@ -394,7 +394,7 @@ expression: diagnostics
       column: 28
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertIsNotNone`"
     suggestion: "Replace `assertIsNotNone(...)` with `assert ...`"
     fixable: true
@@ -414,7 +414,7 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertIs`"
     suggestion: "Replace `assertIs(...)` with `assert ...`"
     fixable: true
@@ -434,7 +434,7 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertIsNot`"
     suggestion: "Replace `assertIsNot(...)` with `assert ...`"
     fixable: true
@@ -454,7 +454,7 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertIsInstance`"
     suggestion: "Replace `assertIsInstance(...)` with `assert ...`"
     fixable: true
@@ -474,7 +474,7 @@ expression: diagnostics
       column: 37
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertNotIsInstance`"
     suggestion: "Replace `assertNotIsInstance(...)` with `assert ...`"
     fixable: true
@@ -494,7 +494,7 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertRegex`"
     suggestion: "Replace `assertRegex(...)` with `assert ...`"
     fixable: true
@@ -514,7 +514,7 @@ expression: diagnostics
       column: 39
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertNotRegex`"
     suggestion: "Replace `assertNotRegex(...)` with `assert ...`"
     fixable: true
@@ -534,7 +534,7 @@ expression: diagnostics
       column: 42
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertRegexpMatches`"
     suggestion: "Replace `assertRegexpMatches(...)` with `assert ...`"
     fixable: true
@@ -554,7 +554,7 @@ expression: diagnostics
       column: 47
   parent: ~
 - kind:
-    name: UnittestAssertion
+    name: PytestUnittestAssertion
     body: "Use a regular `assert` instead of unittest-style `assertNotRegex`"
     suggestion: "Replace `assertNotRegex(...)` with `assert ...`"
     fixable: true

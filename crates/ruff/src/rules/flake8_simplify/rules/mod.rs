@@ -3,11 +3,11 @@ pub use ast_bool_op::{
     expr_or_not_expr, expr_or_true, CompareWithTuple, DuplicateIsinstanceCall, ExprAndFalse,
     ExprAndNotExpr, ExprOrNotExpr, ExprOrTrue,
 };
-pub use ast_expr::{use_capital_environment_variables, UseCapitalEnvironmentVariables};
+pub use ast_expr::{use_capital_environment_variables, UncapitalizedEnvironmentVariables};
 pub use ast_if::{
     if_with_same_arms, manual_dict_lookup, needless_bool, nested_if_statements,
-    use_dict_get_with_default, use_ternary_operator, CollapsibleIf, DictGetWithDefault,
-    IfWithSameArms, ManualDictLookup, NeedlessBool, UseTernaryOperator,
+    use_dict_get_with_default, use_ternary_operator, CollapsibleIf, IfElseBlockInsteadOfDictGet,
+    IfElseBlockInsteadOfDictLookup, IfElseBlockInsteadOfIfExp, IfWithSameArms, NeedlessBool,
 };
 pub use ast_ifexp::{
     explicit_false_true_in_ifexpr, explicit_true_false_in_ifexpr, twisted_arms_in_ifexpr,
@@ -18,7 +18,7 @@ pub use ast_unary_op::{
     NegateEqualOp, NegateNotEqualOp,
 };
 pub use ast_with::{multiple_with_statements, MultipleWithStatements};
-pub use key_in_dict::{key_in_dict_compare, key_in_dict_for, KeyInDict};
+pub use key_in_dict::{key_in_dict_compare, key_in_dict_for, InDictKeys};
 pub use open_file_with_context_handler::{
     open_file_with_context_handler, OpenFileWithContextHandler,
 };

@@ -5,9 +5,9 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 #[violation]
-pub struct IncorrectPytestImport;
+pub struct PytestIncorrectPytestImport;
 
-impl Violation for IncorrectPytestImport {
+impl Violation for PytestIncorrectPytestImport {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Found incorrect import of pytest, use simple `import pytest` instead")
@@ -24,7 +24,7 @@ pub fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Di
         if let Some(alias) = asname {
             if alias != name {
                 return Some(Diagnostic::new(
-                    IncorrectPytestImport,
+                    PytestIncorrectPytestImport,
                     Range::from(import_from),
                 ));
             }
@@ -49,7 +49,7 @@ pub fn import_from(
     if let Some(module) = module {
         if is_pytest_or_subpackage(module) {
             return Some(Diagnostic::new(
-                IncorrectPytestImport,
+                PytestIncorrectPytestImport,
                 Range::from(import_from),
             ));
         }

@@ -9,9 +9,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
 #[violation]
-pub struct SysVersionSlice3Referenced;
+pub struct SysVersionSlice3;
 
-impl Violation for SysVersionSlice3Referenced {
+impl Violation for SysVersionSlice3 {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`sys.version[:3]` referenced (python3.10), use `sys.version_info`")
@@ -19,9 +19,9 @@ impl Violation for SysVersionSlice3Referenced {
 }
 
 #[violation]
-pub struct SysVersion2Referenced;
+pub struct SysVersion2;
 
-impl Violation for SysVersion2Referenced {
+impl Violation for SysVersion2 {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`sys.version[2]` referenced (python3.10), use `sys.version_info`")
@@ -39,9 +39,9 @@ impl Violation for SysVersionCmpStr3 {
 }
 
 #[violation]
-pub struct SysVersionInfo0Eq3Referenced;
+pub struct SysVersionInfo0Eq3;
 
-impl Violation for SysVersionInfo0Eq3Referenced {
+impl Violation for SysVersionInfo0Eq3 {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`sys.version_info[0] == 3` referenced (python4), use `>=`")
@@ -49,9 +49,9 @@ impl Violation for SysVersionInfo0Eq3Referenced {
 }
 
 #[violation]
-pub struct SixPY3Referenced;
+pub struct SixPY3;
 
-impl Violation for SixPY3Referenced {
+impl Violation for SixPY3 {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`six.PY3` referenced (python4), use `not six.PY2`")
@@ -85,9 +85,9 @@ impl Violation for SysVersionInfoMinorCmpInt {
 }
 
 #[violation]
-pub struct SysVersion0Referenced;
+pub struct SysVersion0;
 
-impl Violation for SysVersion0Referenced {
+impl Violation for SysVersion0 {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`sys.version[0]` referenced (python10), use `sys.version_info`")
@@ -105,9 +105,9 @@ impl Violation for SysVersionCmpStr10 {
 }
 
 #[violation]
-pub struct SysVersionSlice1Referenced;
+pub struct SysVersionSlice1;
 
-impl Violation for SysVersionSlice1Referenced {
+impl Violation for SysVersionSlice1 {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`sys.version[:1]` referenced (python10), use `sys.version_info`")
@@ -137,25 +137,17 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 } = &upper.node
                 {
                     if *i == BigInt::from(1)
-                        && checker
-                            .settings
-                            .rules
-                            .enabled(Rule::SysVersionSlice1Referenced)
+                        && checker.settings.rules.enabled(Rule::SysVersionSlice1)
                     {
-                        checker.diagnostics.push(Diagnostic::new(
-                            SysVersionSlice1Referenced,
-                            Range::from(value),
-                        ));
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(SysVersionSlice1, Range::from(value)));
                     } else if *i == BigInt::from(3)
-                        && checker
-                            .settings
-                            .rules
-                            .enabled(Rule::SysVersionSlice3Referenced)
+                        && checker.settings.rules.enabled(Rule::SysVersionSlice3)
                     {
-                        checker.diagnostics.push(Diagnostic::new(
-                            SysVersionSlice3Referenced,
-                            Range::from(value),
-                        ));
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(SysVersionSlice3, Range::from(value)));
                     }
                 }
             }
@@ -164,18 +156,15 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 value: Constant::Int(i),
                 ..
             } => {
-                if *i == BigInt::from(2)
-                    && checker.settings.rules.enabled(Rule::SysVersion2Referenced)
+                if *i == BigInt::from(2) && checker.settings.rules.enabled(Rule::SysVersion2) {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(SysVersion2, Range::from(value)));
+                } else if *i == BigInt::from(0) && checker.settings.rules.enabled(Rule::SysVersion0)
                 {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(SysVersion2Referenced, Range::from(value)));
-                } else if *i == BigInt::from(0)
-                    && checker.settings.rules.enabled(Rule::SysVersion0Referenced)
-                {
-                    checker
-                        .diagnostics
-                        .push(Diagnostic::new(SysVersion0Referenced, Range::from(value)));
+                        .push(Diagnostic::new(SysVersion0, Range::from(value)));
                 }
             }
 
@@ -207,15 +196,11 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                     ) = (ops, comparators)
                     {
                         if *n == BigInt::from(3)
-                            && checker
-                                .settings
-                                .rules
-                                .enabled(Rule::SysVersionInfo0Eq3Referenced)
+                            && checker.settings.rules.enabled(Rule::SysVersionInfo0Eq3)
                         {
-                            checker.diagnostics.push(Diagnostic::new(
-                                SysVersionInfo0Eq3Referenced,
-                                Range::from(left),
-                            ));
+                            checker
+                                .diagnostics
+                                .push(Diagnostic::new(SysVersionInfo0Eq3, Range::from(left)));
                         }
                     }
                 } else if *i == BigInt::from(1) {
@@ -309,6 +294,6 @@ pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
     {
         checker
             .diagnostics
-            .push(Diagnostic::new(SixPY3Referenced, Range::from(expr)));
+            .push(Diagnostic::new(SixPY3, Range::from(expr)));
     }
 }

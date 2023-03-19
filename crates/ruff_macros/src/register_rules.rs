@@ -42,6 +42,7 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
             AsRefStr,
             ::strum_macros::IntoStaticStr,
         )]
+        #[repr(u16)]
         #[strum(serialize_all = "kebab-case")]
         pub enum Rule { #rule_variants }
 
