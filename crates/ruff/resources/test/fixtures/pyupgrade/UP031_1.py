@@ -55,3 +55,9 @@ pytest.param('"%8s" % (None,)', id="unsafe width-string conversion"),
     """
     % (x,)
 )
+
+'Hello %s' % bar
+
+'Hello %s' % bar.baz
+
+'Hello %s' % bar['bop']

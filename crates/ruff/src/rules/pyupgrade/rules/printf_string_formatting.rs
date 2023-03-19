@@ -335,8 +335,8 @@ pub(crate) fn printf_string_formatting(
     }
 
     // Parse each string segment.
-    let mut num_positional = 0;
-    let mut num_keyword = 0;
+    let mut num_positional_arguments = 0;
+    let mut num_keyword_arguments = 0;
     let mut format_strings = Vec::with_capacity(strings.len());
     for (start, end) in &strings {
         let string = checker.locator.slice(Range::new(*start, *end));
@@ -359,9 +359,9 @@ pub(crate) fn printf_string_formatting(
                 continue;
             };
             if fmt.mapping_key.is_none() {
-                num_positional += 1;
+                num_positional_arguments += 1;
             } else {
-                num_keyword += 1;
+                num_keyword_arguments += 1;
             }
         }
 
@@ -379,17 +379,24 @@ pub(crate) fn printf_string_formatting(
         | ExprKind::Attribute { .. }
         | ExprKind::Subscript { .. }
         | ExprKind::Call { .. } => {
-            if num_keyword > 0 {
+            if num_keyword_arguments > 0 {
                 // If we have _any_ named fields, assume the right-hand side is a mapping.
                 format!("(**{})", checker.locator.slice(right))
-            } else if num_positional > 1 {
+            } else if num_positional_arguments > 1 {
                 // If we have multiple fields, but no named fields, assume the right-hand side is a
                 // tuple.
                 format!("(*{})", checker.locator.slice(right))
             } else {
-                // Otherwise, if we have a single field, assume the right-hand side is a single
-                // value.
-                format!("({})", checker.locator.slice(right))
+                // Otherwise, if we have a single field, we can't make any assumptions about the
+                // right-hand side. It _could_ be a tuple, but it could also be a single value,
+                // and we can't differentiate between them.
+                // For example:
+                // ```python
+                // x = (1,)
+                // print("%s" % x)
+                // print("{}".format(x))
+                // ```
+                return;
             }
         }
         ExprKind::Tuple { .. } => clean_params_tuple(checker, right),
