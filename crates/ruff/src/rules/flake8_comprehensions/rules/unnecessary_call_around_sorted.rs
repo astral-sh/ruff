@@ -59,7 +59,7 @@ pub fn unnecessary_call_around_sorted(
     func: &Expr,
     args: &[Expr],
 ) {
-    let Some(outer) = helpers::function_name(func) else {
+    let Some(outer) = helpers::expr_name(func) else {
         return;
     };
     if !(outer == "list" || outer == "reversed") {
@@ -71,7 +71,7 @@ pub fn unnecessary_call_around_sorted(
     let ExprKind::Call { func, .. } = &arg.node else {
         return;
     };
-    let Some(inner) = helpers::function_name(func) else {
+    let Some(inner) = helpers::expr_name(func) else {
         return;
     };
     if inner != "sorted" {

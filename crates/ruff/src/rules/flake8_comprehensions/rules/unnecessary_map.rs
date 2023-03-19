@@ -84,7 +84,7 @@ pub fn unnecessary_map(
         )
     }
 
-    let Some(id) = helpers::function_name(func)  else {
+    let Some(id) = helpers::expr_name(func)  else {
         return;
     };
     match id {
@@ -96,7 +96,7 @@ pub fn unnecessary_map(
             // Exclude the parent if already matched by other arms
             if let Some(parent) = parent {
                 if let ExprKind::Call { func: f, .. } = &parent.node {
-                    if let Some(id_parent) = helpers::function_name(f) {
+                    if let Some(id_parent) = helpers::expr_name(f) {
                         if id_parent == "dict" || id_parent == "set" || id_parent == "list" {
                             return;
                         }

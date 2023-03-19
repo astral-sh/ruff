@@ -3326,7 +3326,7 @@ where
             }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.rules.enabled(Rule::UnnecessaryComprehension) {
-                    flake8_comprehensions::rules::unnecessary_comprehension(
+                    flake8_comprehensions::rules::unnecessary_list_set_comprehension(
                         self, expr, elt, generators,
                     );
                 }
@@ -3335,7 +3335,22 @@ where
                 }
                 self.ctx.push_scope(ScopeKind::Generator);
             }
-            ExprKind::GeneratorExp { .. } | ExprKind::DictComp { .. } => {
+            ExprKind::DictComp {
+                key,
+                value,
+                generators,
+            } => {
+                if self.settings.rules.enabled(Rule::UnnecessaryComprehension) {
+                    flake8_comprehensions::rules::unnecessary_dict_comprehension(
+                        self, expr, key, value, generators,
+                    );
+                }
+                if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
+                    flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
+                }
+                self.ctx.push_scope(ScopeKind::Generator);
+            }
+            ExprKind::GeneratorExp { .. } => {
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }
