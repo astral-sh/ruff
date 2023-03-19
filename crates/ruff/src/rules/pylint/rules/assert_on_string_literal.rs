@@ -17,11 +17,6 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// assert "always true"
 /// ```
-///
-/// Use instead:
-/// ```python
-/// assert a == 3
-/// ```
 #[violation]
 pub struct AssertOnStringLiteral;
 
