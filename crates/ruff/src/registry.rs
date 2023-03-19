@@ -1,5 +1,7 @@
 //! Registry of all [`Rule`] implementations.
 
+mod rule_set;
+
 use strum_macros::{AsRefStr, EnumIter};
 
 use ruff_diagnostics::Violation;
@@ -7,6 +9,7 @@ use ruff_macros::RuleNamespace;
 
 use crate::codes::{self, RuleCodePrefix};
 use crate::rules;
+pub use rule_set::{RuleSet, RuleSetIterator};
 
 ruff_macros::register_rules!(
     // pycodestyle errors

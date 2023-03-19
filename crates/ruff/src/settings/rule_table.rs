@@ -1,67 +1,74 @@
-use std::collections::{hash_map, HashMap};
+use std::fmt::Debug;
 
 use ruff_macros::CacheKey;
-use rustc_hash::FxHashMap;
 
-use crate::registry::Rule;
+use crate::registry::{Rule, RuleSet, RuleSetIterator};
 
 /// A table to keep track of which rules are enabled
 /// and Whether they should be autofixed.
-#[derive(Debug, CacheKey)]
+#[derive(Debug, CacheKey, Default)]
 pub struct RuleTable {
     /// Maps rule codes to a boolean indicating if the rule should be autofixed.
-    enabled: FxHashMap<Rule, bool>,
+    enabled: RuleSet,
+    should_fix: RuleSet,
 }
 
 impl RuleTable {
     /// Creates a new empty rule table.
-    pub fn empty() -> Self {
+    pub const fn empty() -> Self {
         Self {
-            enabled: HashMap::default(),
+            enabled: RuleSet::empty(),
+            should_fix: RuleSet::empty(),
         }
     }
 
     /// Returns whether the given rule should be checked.
     #[inline]
-    pub fn enabled(&self, code: Rule) -> bool {
-        self.enabled.contains_key(&code)
+    pub const fn enabled(&self, rule: Rule) -> bool {
+        self.enabled.contains(rule)
     }
 
     /// Returns whether any of the given rules should be checked.
-    pub fn any_enabled(&self, codes: &[Rule]) -> bool {
-        codes.iter().any(|c| self.enabled.contains_key(c))
+    #[inline]
+    pub const fn any_enabled(&self, rules: &[Rule]) -> bool {
+        self.enabled.intersects(&RuleSet::from_rules(rules))
     }
 
     /// Returns whether violations of the given rule should be autofixed.
     #[inline]
-    pub fn should_fix(&self, code: Rule) -> bool {
-        *self.enabled.get(&code).unwrap_or(&false)
+    pub const fn should_fix(&self, rule: Rule) -> bool {
+        self.should_fix.contains(rule)
     }
 
     /// Returns an iterator over all enabled rules.
-    pub fn iter_enabled(&self) -> hash_map::Keys<Rule, bool> {
-        self.enabled.keys()
+    pub fn iter_enabled(&self) -> RuleSetIterator {
+        self.enabled.iter()
     }
 
     /// Enables the given rule.
     #[inline]
-    pub fn enable(&mut self, code: Rule, should_fix: bool) {
-        self.enabled.insert(code, should_fix);
+    pub fn enable(&mut self, rule: Rule, should_fix: bool) {
+        self.enabled.insert(rule);
+
+        if should_fix {
+            self.should_fix.insert(rule);
+        }
     }
 
     /// Disables the given rule.
     #[inline]
     pub fn disable(&mut self, rule: Rule) {
-        self.enabled.remove(&rule);
+        self.enabled.remove(rule);
+        self.should_fix.remove(rule);
     }
 }
 
-impl<I: IntoIterator<Item = Rule>> From<I> for RuleTable {
-    fn from(codes: I) -> Self {
-        let mut enabled = FxHashMap::default();
-        for code in codes {
-            enabled.insert(code, true);
+impl FromIterator<Rule> for RuleTable {
+    fn from_iter<T: IntoIterator<Item = Rule>>(iter: T) -> Self {
+        let rules = RuleSet::from_iter(iter);
+        Self {
+            enabled: rules.clone(),
+            should_fix: rules,
         }
-        Self { enabled }
     }
 }

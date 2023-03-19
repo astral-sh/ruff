@@ -81,7 +81,7 @@ fn benchmark_default_rules(criterion: &mut Criterion) {
 
 fn benchmark_all_rules(criterion: &mut Criterion) {
     let settings = Settings {
-        rules: RuleSelector::All.into_iter().into(),
+        rules: RuleSelector::All.into_iter().collect(),
         ..Settings::default()
     };
 
