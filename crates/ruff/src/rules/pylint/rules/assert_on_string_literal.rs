@@ -27,7 +27,7 @@ impl Violation for AssertOnStringLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
         let AssertOnStringLiteral { length, f_type } = self;
-        if *f_type == true {
+        if *f_type {
             format!("Asserting on a string literal may have unintended results")
         } else {
             if *length == 0 {
