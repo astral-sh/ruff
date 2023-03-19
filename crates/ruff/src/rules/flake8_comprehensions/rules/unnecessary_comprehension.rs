@@ -1,3 +1,4 @@
+use itertools::{EitherOrBoth, Itertools};
 use log::error;
 use rustpython_parser::ast::{Comprehension, Expr, ExprKind};
 
@@ -43,24 +44,30 @@ pub fn unnecessary_comprehension(
     if !(generator.ifs.is_empty() && generator.is_async == 0) {
         return;
     }
-    let elt_ids: Vec<&str> = elts
-        .iter()
-        .filter_map(|&e| helpers::function_name(e))
-        .collect();
-    if elt_ids.is_empty() {
-        return;
-    }
+    let elt_ids: Vec<Option<&str>> = elts.iter().map(|&e| helpers::function_name(e)).collect();
 
-    let target_ids: Vec<&str> = match &generator.target.node {
-        ExprKind::Name { id, .. } => vec![id.as_str()],
-        ExprKind::Tuple { elts, .. } => elts.iter().filter_map(helpers::function_name).collect(),
+    let target_ids: Vec<Option<&str>> = match &generator.target.node {
+        ExprKind::Name { id, .. } => vec![Some(id.as_str())],
+        ExprKind::Tuple { elts, .. } => {
+            // If the target is a tuple of length 1, the comprehension is
+            // used to flatten the iterable. E.g., [(1,), (2,)] => [1, 2]
+            if elts.len() == 1 {
+                return;
+            } else {
+                elts.iter().map(helpers::function_name).collect()
+            }
+        }
         _ => return,
     };
-    if target_ids.is_empty() {
-        return;
-    }
 
-    if !elt_ids.iter().zip(target_ids.iter()).all(|(&e, &t)| e == t) {
+    if !elt_ids
+        .iter()
+        .zip_longest(target_ids.iter())
+        .all(|e| match e {
+            EitherOrBoth::Both(&Some(e), &Some(t)) => e == t,
+            _ => false,
+        })
+    {
         return;
     }
 
