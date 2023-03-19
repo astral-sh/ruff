@@ -28,17 +28,17 @@ repos:
       - id: cargo-fmt
         name: cargo fmt
         entry: cargo fmt --
-        language: rust
+        language: system
         types: [rust]
       - id: clippy
         name: clippy
         entry: cargo clippy --workspace --all-targets --all-features -- -D warnings
-        language: rust
+        language: system
         pass_filenames: false
       - id: ruff
         name: ruff
         entry: cargo run -p ruff_cli -- check --no-cache --force-exclude --fix --exit-non-zero-on-fix
-        language: rust
+        language: system
         types_or: [python, pyi]
         require_serial: true
         exclude: |
@@ -49,7 +49,7 @@ repos:
       - id: dev-generate-all
         name: dev-generate-all
         entry: cargo dev generate-all
-        language: rust
+        language: system
         pass_filenames: false
         exclude: target
 
@@ -63,6 +63,3 @@ repos:
             crates/ruff/resources/.*|
             crates/ruff_python_formatter/resources/.*
           )$
-
-ci:
-  skip: [cargo-fmt, clippy, dev-generate-all]

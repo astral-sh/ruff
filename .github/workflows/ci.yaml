@@ -85,7 +85,6 @@ jobs:
           name: ruff
           path: target/debug/ruff
 
-
   cargo-test-wasm:
     runs-on: ubuntu-latest
     name: "cargo test (wasm)"
@@ -176,3 +175,16 @@ jobs:
         with:
           name: ecosystem-result
           path: ecosystem-result
+
+  pre-commit:
+    name: "pre-commit"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - run: pip install pre-commit
+      - run: SKIP=cargo-fmt,clippy,dev-generate-all pre-commit run --all-files
