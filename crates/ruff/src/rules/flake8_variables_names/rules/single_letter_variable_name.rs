@@ -40,7 +40,7 @@ fn is_single_letter_variable(name: &str, strict_mode: bool) -> bool {
     false
 }
 
-/// VN001
+/// VNE001
 pub fn single_letter_variable_name(
     name: &str,
     range: Range,

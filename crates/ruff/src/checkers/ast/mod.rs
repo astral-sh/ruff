@@ -227,9 +227,7 @@ where
                             flake8_variables_names::rules::non_descript_variable_name(
                                 name,
                                 *range,
-                                self.settings
-                                    .flake8_variables_names
-                                    .use_varnames_strict_mode,
+                                self.settings.flake8_variables_names.strict,
                             )
                         }));
                 }
@@ -240,9 +238,7 @@ where
                             flake8_variables_names::rules::single_letter_variable_name(
                                 name,
                                 *range,
-                                self.settings
-                                    .flake8_variables_names
-                                    .use_varnames_strict_mode,
+                                self.settings.flake8_variables_names.strict,
                             )
                         }));
                 }
@@ -310,9 +306,7 @@ where
                             flake8_variables_names::rules::non_descript_variable_name(
                                 name,
                                 *range,
-                                self.settings
-                                    .flake8_variables_names
-                                    .use_varnames_strict_mode,
+                                self.settings.flake8_variables_names.strict,
                             )
                         }));
                 }
@@ -323,9 +317,7 @@ where
                             flake8_variables_names::rules::single_letter_variable_name(
                                 name,
                                 *range,
-                                self.settings
-                                    .flake8_variables_names
-                                    .use_varnames_strict_mode,
+                                self.settings.flake8_variables_names.strict,
                             )
                         }));
                 }
@@ -2346,9 +2338,7 @@ where
                                 flake8_variables_names::rules::non_descript_variable_name(
                                     id,
                                     Range::from(expr),
-                                    self.settings
-                                        .flake8_variables_names
-                                        .use_varnames_strict_mode,
+                                    self.settings.flake8_variables_names.strict,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -2360,9 +2350,7 @@ where
                                 flake8_variables_names::rules::single_letter_variable_name(
                                     id,
                                     Range::from(expr),
-                                    self.settings
-                                        .flake8_variables_names
-                                        .use_varnames_strict_mode,
+                                    self.settings.flake8_variables_names.strict,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -3857,9 +3845,7 @@ where
                                     name,
                                     helpers::excepthandler_name_range(excepthandler, self.locator)
                                         .expect("Failed to find `name` range"),
-                                    self.settings
-                                        .flake8_variables_names
-                                        .use_varnames_strict_mode,
+                                    self.settings.flake8_variables_names.strict,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -3872,9 +3858,7 @@ where
                                     name,
                                     helpers::excepthandler_name_range(excepthandler, self.locator)
                                         .expect("Failed to find `name` range"),
-                                    self.settings
-                                        .flake8_variables_names
-                                        .use_varnames_strict_mode,
+                                    self.settings.flake8_variables_names.strict,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -4045,9 +4029,7 @@ where
             if let Some(diagnostic) = flake8_variables_names::rules::non_descript_variable_name(
                 &arg.node.arg,
                 Range::from(arg),
-                self.settings
-                    .flake8_variables_names
-                    .use_varnames_strict_mode,
+                self.settings.flake8_variables_names.strict,
             ) {
                 self.diagnostics.push(diagnostic);
             }
@@ -4057,9 +4039,7 @@ where
             if let Some(diagnostic) = flake8_variables_names::rules::single_letter_variable_name(
                 &arg.node.arg,
                 Range::from(arg),
-                self.settings
-                    .flake8_variables_names
-                    .use_varnames_strict_mode,
+                self.settings.flake8_variables_names.strict,
             ) {
                 self.diagnostics.push(diagnostic);
             }

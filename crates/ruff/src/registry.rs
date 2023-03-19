@@ -758,7 +758,7 @@ pub enum Linter {
     #[prefix = "PTH"]
     Flake8UsePathlib,
     /// [flake8-variables-names](https://pypi.org/project/flake8-variables-names/)
-    #[prefix = "VN"]
+    #[prefix = "VNE"]
     Flake8VariablesNames,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]

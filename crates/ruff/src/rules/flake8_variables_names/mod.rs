@@ -14,8 +14,8 @@ mod tests {
     use crate::settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::SingleLetterVariableName, Path::new("VN001.py"); "VN001")]
-    #[test_case(Rule::NonDescriptVariableName, Path::new("VN002.py"); "VN002")]
+    #[test_case(Rule::SingleLetterVariableName, Path::new("VNE001.py"); "VNE001")]
+    #[test_case(Rule::NonDescriptVariableName, Path::new("VNE002.py"); "VNE002")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -30,12 +30,10 @@ mod tests {
     fn enforce_strict_variable_single_letter() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_variables_names")
-                .join("VN001.py")
+                .join("VNE001.py")
                 .as_path(),
             &settings::Settings {
-                flake8_variables_names: super::settings::Settings {
-                    use_varnames_strict_mode: true,
-                },
+                flake8_variables_names: super::settings::Settings { strict: true },
                 ..settings::Settings::for_rules(vec![Rule::SingleLetterVariableName, Rule::AnyType])
             },
         )?;
@@ -47,12 +45,10 @@ mod tests {
     fn no_enforce_strict_variable_single_letter() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_variables_names")
-                .join("VN001.py")
+                .join("VNE001.py")
                 .as_path(),
             &settings::Settings {
-                flake8_variables_names: super::settings::Settings {
-                    use_varnames_strict_mode: false,
-                },
+                flake8_variables_names: super::settings::Settings { strict: false },
                 ..settings::Settings::for_rules(vec![Rule::SingleLetterVariableName, Rule::AnyType])
             },
         )?;
@@ -64,12 +60,10 @@ mod tests {
     fn enforce_strict_variable_non_descript() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_variables_names")
-                .join("VN002.py")
+                .join("VNE002.py")
                 .as_path(),
             &settings::Settings {
-                flake8_variables_names: super::settings::Settings {
-                    use_varnames_strict_mode: true,
-                },
+                flake8_variables_names: super::settings::Settings { strict: true },
                 ..settings::Settings::for_rules(vec![Rule::NonDescriptVariableName, Rule::AnyType])
             },
         )?;
@@ -81,12 +75,10 @@ mod tests {
     fn no_enforce_strict_variable_non_descript() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_variables_names")
-                .join("VN002.py")
+                .join("VNE002.py")
                 .as_path(),
             &settings::Settings {
-                flake8_variables_names: super::settings::Settings {
-                    use_varnames_strict_mode: false,
-                },
+                flake8_variables_names: super::settings::Settings { strict: false },
                 ..settings::Settings::for_rules(vec![Rule::NonDescriptVariableName, Rule::AnyType])
             },
         )?;

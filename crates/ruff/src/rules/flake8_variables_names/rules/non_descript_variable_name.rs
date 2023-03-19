@@ -51,7 +51,7 @@ fn is_non_descript_variable(name: &str, strict_mode: bool) -> bool {
     false
 }
 
-/// VN002
+/// VNE002
 pub fn non_descript_variable_name(
     name: &str,
     range: Range,

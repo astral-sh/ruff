@@ -965,8 +965,8 @@
     "Flake8VariablesNamesOptions": {
       "type": "object",
       "properties": {
-        "use-varnames-strict-mode": {
-          "description": "Whether to use strict settings for the allow/block lists",
+        "strict": {
+          "description": "Whether to use strict settings for the allow/block lists. Strict mode allows `_` or `T` for single char variables and increases the blocklist for vague/non-descript variable names such as `results`, `data`, `info`, etc.",
           "type": [
             "boolean",
             "null"
@@ -2202,11 +2202,11 @@
         "UP036",
         "UP037",
         "UP038",
-        "VN",
-        "VN0",
-        "VN00",
-        "VN001",
-        "VN002",
+        "VNE",
+        "VNE0",
+        "VNE00",
+        "VNE001",
+        "VNE002",
         "W",
         "W1",
         "W19",

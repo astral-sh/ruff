@@ -18,19 +18,22 @@ pub struct Options {
         value_type = "bool",
         example = "use-varnames-strict-mode = true"
     )]
-    /// Whether to use strict settings for the allow/block lists
-    pub use_varnames_strict_mode: Option<bool>,
+    /// Whether to use strict settings for the allow/block lists.
+    /// Strict mode allows `_` or `T` for single char variables
+    /// and increases the blocklist for vague/non-descript variable names
+    /// such as `results`, `data`, `info`, etc.
+    pub strict: Option<bool>,
 }
 
 #[derive(Debug, Default, CacheKey)]
 pub struct Settings {
-    pub use_varnames_strict_mode: bool,
+    pub strict: bool,
 }
 
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
-            use_varnames_strict_mode: options.use_varnames_strict_mode.unwrap_or(false),
+            strict: options.strict.unwrap_or(false),
         }
     }
 }
@@ -38,7 +41,7 @@ impl From<Options> for Settings {
 impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
-            use_varnames_strict_mode: Some(settings.use_varnames_strict_mode),
+            strict: Some(settings.strict),
         }
     }
 }
