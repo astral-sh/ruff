@@ -3330,8 +3330,9 @@ where
             }
             ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
                 if self.settings.rules.enabled(Rule::UnnecessaryComprehension) {
+                    let elts: Vec<&Expr> = vec![elt];
                     flake8_comprehensions::rules::unnecessary_comprehension(
-                        self, expr, elt, generators,
+                        self, expr, &elts, generators,
                     );
                 }
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
@@ -3339,7 +3340,23 @@ where
                 }
                 self.ctx.push_scope(ScopeKind::Generator);
             }
-            ExprKind::GeneratorExp { .. } | ExprKind::DictComp { .. } => {
+            ExprKind::DictComp {
+                key,
+                value,
+                generators,
+            } => {
+                if self.settings.rules.enabled(Rule::UnnecessaryComprehension) {
+                    let elts: Vec<&Expr> = vec![key, value];
+                    flake8_comprehensions::rules::unnecessary_comprehension(
+                        self, expr, &elts, generators,
+                    );
+                }
+                if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
+                    flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
+                }
+                self.ctx.push_scope(ScopeKind::Generator);
+            }
+            ExprKind::GeneratorExp { .. } => {
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Expr(expr));
                 }

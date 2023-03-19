@@ -33,7 +33,7 @@ impl AlwaysAutofixableViolation for UnnecessaryComprehension {
 pub fn unnecessary_comprehension(
     checker: &mut Checker,
     expr: &Expr,
-    elt: &Expr,
+    elts: &[&Expr],
     generators: &[Comprehension],
 ) {
     if generators.len() != 1 {
@@ -43,19 +43,31 @@ pub fn unnecessary_comprehension(
     if !(generator.ifs.is_empty() && generator.is_async == 0) {
         return;
     }
-    let Some(elt_id) = helpers::function_name(elt) else {
-        return;
-    };
-
-    let Some(target_id) = helpers::function_name(&generator.target) else {
-        return;
-    };
-    if elt_id != target_id {
+    let elt_ids: Vec<&str> = elts
+        .iter()
+        .filter_map(|&e| helpers::function_name(e))
+        .collect();
+    if elt_ids.is_empty() {
         return;
     }
+
+    let target_ids: Vec<&str> = match &generator.target.node {
+        ExprKind::Name { id, .. } => vec![id.as_str()],
+        ExprKind::Tuple { elts, .. } => elts.iter().filter_map(helpers::function_name).collect(),
+        _ => return,
+    };
+    if target_ids.is_empty() {
+        return;
+    }
+
+    if !elt_ids.iter().zip(target_ids.iter()).all(|(&e, &t)| e == t) {
+        return;
+    }
+
     let id = match &expr.node {
         ExprKind::ListComp { .. } => "list",
         ExprKind::SetComp { .. } => "set",
+        ExprKind::DictComp { .. } => "dict",
         _ => return,
     };
     if !checker.ctx.is_builtin(id) {

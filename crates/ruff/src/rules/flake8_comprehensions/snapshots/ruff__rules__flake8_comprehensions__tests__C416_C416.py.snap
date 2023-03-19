@@ -8,18 +8,18 @@ expression: diagnostics
     suggestion: "Rewrite using `list()`"
     fixable: true
   location:
-    row: 2
+    row: 4
     column: 0
   end_location:
-    row: 2
+    row: 4
     column: 14
   fix:
     content: list(x)
     location:
-      row: 2
+      row: 4
       column: 0
     end_location:
-      row: 2
+      row: 4
       column: 14
   parent: ~
 - kind:
@@ -28,18 +28,38 @@ expression: diagnostics
     suggestion: "Rewrite using `set()`"
     fixable: true
   location:
-    row: 3
+    row: 5
     column: 0
   end_location:
-    row: 3
+    row: 5
     column: 14
   fix:
     content: set(x)
     location:
-      row: 3
+      row: 5
       column: 0
     end_location:
-      row: 3
+      row: 5
       column: 14
+  parent: ~
+- kind:
+    name: UnnecessaryComprehension
+    body: "Unnecessary `dict` comprehension (rewrite using `dict()`)"
+    suggestion: "Rewrite using `dict()`"
+    fixable: true
+  location:
+    row: 6
+    column: 0
+  end_location:
+    row: 6
+    column: 20
+  fix:
+    content: dict(y)
+    location:
+      row: 6
+      column: 0
+    end_location:
+      row: 6
+      column: 20
   parent: ~
 
