@@ -504,3 +504,12 @@ Testing this incorrectly indented docstring.
             x: Test argument.
 
         """
+
+
+def implicit_string_concatenation():
+    """Toggle the gizmo.
+
+    Returns
+    A value of some sort.
+
+    """"Extra content"

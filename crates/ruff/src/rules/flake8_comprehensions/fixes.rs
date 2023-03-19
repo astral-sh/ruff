@@ -961,8 +961,30 @@ pub fn fix_unnecessary_comprehension(
                 whitespace_before_args: ParenthesizableWhitespace::default(),
             }));
         }
+        Expression::DictComp(inner) => {
+            body.value = Expression::Call(Box::new(Call {
+                func: Box::new(Expression::Name(Box::new(Name {
+                    value: "dict",
+                    lpar: vec![],
+                    rpar: vec![],
+                }))),
+                args: vec![Arg {
+                    value: inner.for_in.iter.clone(),
+                    keyword: None,
+                    equal: None,
+                    comma: None,
+                    star: "",
+                    whitespace_after_star: ParenthesizableWhitespace::default(),
+                    whitespace_after_arg: ParenthesizableWhitespace::default(),
+                }],
+                lpar: vec![],
+                rpar: vec![],
+                whitespace_after_func: ParenthesizableWhitespace::default(),
+                whitespace_before_args: ParenthesizableWhitespace::default(),
+            }));
+        }
         _ => {
-            bail!("Expected Expression::ListComp | Expression:SetComp");
+            bail!("Expected Expression::ListComp | Expression:SetComp | Expression:DictComp");
         }
     }
 

@@ -2,7 +2,9 @@ pub use unnecessary_call_around_sorted::{
     unnecessary_call_around_sorted, UnnecessaryCallAroundSorted,
 };
 pub use unnecessary_collection_call::{unnecessary_collection_call, UnnecessaryCollectionCall};
-pub use unnecessary_comprehension::{unnecessary_comprehension, UnnecessaryComprehension};
+pub use unnecessary_comprehension::{
+    unnecessary_dict_comprehension, unnecessary_list_set_comprehension, UnnecessaryComprehension,
+};
 pub use unnecessary_double_cast_or_process::{
     unnecessary_double_cast_or_process, UnnecessaryDoubleCastOrProcess,
 };

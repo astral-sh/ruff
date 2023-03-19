@@ -32,7 +32,7 @@ pub fn unnecessary_subscript_reversal(
     let Some(first_arg) = args.first() else {
         return;
     };
-    let Some(id) = helpers::function_name(func) else {
+    let Some(id) = helpers::expr_name(func) else {
         return;
     };
     if !(id == "set" || id == "sorted" || id == "reversed") {
