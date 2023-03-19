@@ -71,7 +71,13 @@ pub fn check_imports(
             );
             modules
         }
-        None => vec![],
+        None => path
+            .iter()
+            .rev()
+            .skip(1)
+            .take(1)
+            .map(|p| p.to_str().unwrap())
+            .collect::<Vec<_>>(),
     };
     for &block in &blocks {
         block.imports.iter().for_each(|&stmt| match &stmt.node {
