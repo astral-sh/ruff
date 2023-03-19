@@ -11,6 +11,27 @@ use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for unnecessary `dict`, `list`, and `set` comprehension.
+///
+/// ## Why is this bad?
+/// It's unnecessary to use a `dict`/`list`/`set` comprehension to build a
+/// data structure if the elements are unchanged. Wrap the iterable with
+/// `dict()`, `list()`, or `set()` instead.
+///
+/// ## Examples
+/// ```python
+/// {a: b for a, b in iterable}
+/// [x for x in iterable]
+/// {x for x in iterable}
+/// ```
+///
+/// Use instead:
+/// ```python
+/// dict(iterable)
+/// list(iterable)
+/// set(iterable)
+/// ```
 #[violation]
 pub struct UnnecessaryComprehension {
     pub obj_type: String,
