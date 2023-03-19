@@ -100,6 +100,9 @@ fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Orderi
             // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
             (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
             (Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod) => std::cmp::Ordering::Greater,
+            // Apply `UnderIndentation` fixes before `InvalidEscapeSequence` fixes.
+            (Rule::UnderIndentation, Rule::InvalidEscapeSequence) => std::cmp::Ordering::Less,
+            (Rule::InvalidEscapeSequence, Rule::UnderIndentation) => std::cmp::Ordering::Greater,
             _ => std::cmp::Ordering::Equal,
         })
 }
