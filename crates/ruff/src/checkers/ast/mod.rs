@@ -1583,6 +1583,10 @@ where
                         msg.as_deref(),
                     );
                 }
+
+                if self.settings.rules.enabled(Rule::AssertOnStringLiteral) {
+                    pylint::rules::assert_on_string_literal(self, test);
+                }
             }
             StmtKind::With { items, body, .. } => {
                 if self.settings.rules.enabled(Rule::AssertRaisesException) {

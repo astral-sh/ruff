@@ -146,6 +146,7 @@ ruff_macros::register_rules!(
     rules::pyflakes::rules::UnusedAnnotation,
     rules::pyflakes::rules::RaiseNotImplemented,
     // pylint
+    rules::pylint::rules::AssertOnStringLiteral,
     rules::pylint::rules::UselessReturn,
     rules::pylint::rules::YieldInInit,
     rules::pylint::rules::InvalidAllObject,
