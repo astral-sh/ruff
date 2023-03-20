@@ -10,7 +10,7 @@ use strum::IntoEnumIterator;
 
 use ruff::registry::{Linter, Rule, RuleNamespace};
 use ruff::settings::options::Options;
-use ruff_diagnostics::Availability;
+use ruff_diagnostics::AutofixKind;
 
 use crate::ROOT_DIR;
 
@@ -36,13 +36,18 @@ pub fn main(args: &Args) -> Result<()> {
                 output.push('\n');
             }
 
-            if let Some(autofix) = rule.autofixable() {
-                output.push_str(match autofix.available {
-                    Availability::Sometimes => "Autofix is sometimes available.",
-                    Availability::Always => "Autofix is always available.",
-                });
-                output.push('\n');
-                output.push('\n');
+            match rule.autofixable() {
+                AutofixKind::Sometimes => {
+                    output.push_str("Autofix is sometimes available.");
+                    output.push('\n');
+                    output.push('\n');
+                }
+                AutofixKind::Always => {
+                    output.push_str("Autofix is always available.");
+                    output.push('\n');
+                    output.push('\n');
+                }
+                AutofixKind::None => {}
             }
 
             process_documentation(explanation.trim(), &mut output);

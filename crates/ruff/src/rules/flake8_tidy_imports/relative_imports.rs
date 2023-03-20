@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation, CacheKey};
 use ruff_python_ast::helpers::{create_stmt, from_relative_import, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
@@ -64,7 +64,7 @@ pub struct RelativeImports {
 }
 
 impl Violation for RelativeImports {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

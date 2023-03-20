@@ -1,24 +1,15 @@
 use std::fmt::Debug;
 
-pub enum Availability {
+pub enum AutofixKind {
     Sometimes,
     Always,
-}
-
-pub struct AutofixKind {
-    pub available: Availability,
-}
-
-impl AutofixKind {
-    pub const fn new(available: Availability) -> Self {
-        Self { available }
-    }
+    None,
 }
 
 pub trait Violation: Debug + PartialEq + Eq {
     /// `None` in the case an autofix is never available or otherwise Some
     /// [`AutofixKind`] describing the available autofix.
-    const AUTOFIX: Option<AutofixKind> = None;
+    const AUTOFIX: AutofixKind = AutofixKind::None;
 
     /// The message used to describe the violation.
     fn message(&self) -> String;
@@ -60,7 +51,7 @@ pub trait AlwaysAutofixableViolation: Debug + PartialEq + Eq {
 
 /// A blanket implementation.
 impl<VA: AlwaysAutofixableViolation> Violation for VA {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Always));
+    const AUTOFIX: AutofixKind = AutofixKind::Always;
 
     fn message(&self) -> String {
         <Self as AlwaysAutofixableViolation>::message(self)

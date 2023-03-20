@@ -10,7 +10,7 @@ use rustpython_parser::ast::{
     Unaryop,
 };
 
-use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_comments_in, unparse_stmt};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -59,7 +59,7 @@ pub struct PytestCompositeAssertion {
 }
 
 impl Violation for PytestCompositeAssertion {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -104,7 +104,7 @@ pub struct PytestUnittestAssertion {
 }
 
 impl Violation for PytestUnittestAssertion {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
