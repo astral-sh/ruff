@@ -5,10 +5,11 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::types::Range;
-use ruff_python_ast::visibility;
 use ruff_python_ast::visibility::Visibility;
+use ruff_python_ast::visibility::{self};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{cast, helpers};
+use ruff_python_stdlib::typing::SIMPLE_MAGIC_RETURN_TYPES;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
@@ -650,7 +651,7 @@ pub fn definition(
                         helpers::identifier_range(stmt, checker.locator),
                     ));
                 }
-            } else if is_method && visibility::is_init(cast::name(stmt)) {
+            } else if is_method && visibility::is_init(name) {
                 // Allow omission of return annotation in `__init__` functions, as long as at
                 // least one argument is typed.
                 if checker
@@ -667,7 +668,7 @@ pub fn definition(
                             helpers::identifier_range(stmt, checker.locator),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            match fixes::add_return_none_annotation(checker.locator, stmt) {
+                            match fixes::add_return_annotation(checker.locator, stmt, "None") {
                                 Ok(fix) => {
                                     diagnostic.amend(fix);
                                 }
@@ -677,18 +678,30 @@ pub fn definition(
                         diagnostics.push(diagnostic);
                     }
                 }
-            } else if is_method && visibility::is_magic(cast::name(stmt)) {
+            } else if is_method && visibility::is_magic(name) {
                 if checker
                     .settings
                     .rules
                     .enabled(Rule::MissingReturnTypeSpecialMethod)
                 {
-                    diagnostics.push(Diagnostic::new(
+                    let mut diagnostic = Diagnostic::new(
                         MissingReturnTypeSpecialMethod {
                             name: name.to_string(),
                         },
                         helpers::identifier_range(stmt, checker.locator),
-                    ));
+                    );
+                    let return_type = SIMPLE_MAGIC_RETURN_TYPES.get(name);
+                    if let Some(return_type) = return_type {
+                        if checker.patch(diagnostic.kind.rule()) {
+                            match fixes::add_return_annotation(checker.locator, stmt, return_type) {
+                                Ok(fix) => {
+                                    diagnostic.amend(fix);
+                                }
+                                Err(e) => error!("Failed to generate fix: {e}"),
+                            }
+                        }
+                    }
+                    diagnostics.push(diagnostic);
                 }
             } else {
                 match visibility {
