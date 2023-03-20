@@ -15,6 +15,8 @@ except:
 
 a = 12
 assert f"hello {a}"  # [assert-on-string-literal]
+assert f"{a}"  # [assert-on-string-literal]
+assert f""  # [assert-on-string-literal]
 assert ""  # [assert-on-string-literal]
 assert b"hello"  # [assert-on-string-literal]
 assert "", b"hi"  # [assert-on-string-literal]

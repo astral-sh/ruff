@@ -43,7 +43,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: AssertOnStringLiteral
-    body: Asserting on a string literal may have unintended results
+    body: Asserting on a non-empty string literal will always pass
     suggestion: ~
     fixable: false
   location:
@@ -56,7 +56,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: AssertOnStringLiteral
-    body: Asserting on an empty string literal will always pass
+    body: Asserting on a string literal may have unintended results
     suggestion: ~
     fixable: false
   location:
@@ -64,6 +64,32 @@ expression: diagnostics
     column: 7
   end_location:
     row: 18
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    name: AssertOnStringLiteral
+    body: Asserting on an empty string literal will never pass
+    suggestion: ~
+    fixable: false
+  location:
+    row: 19
+    column: 7
+  end_location:
+    row: 19
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    name: AssertOnStringLiteral
+    body: Asserting on an empty string literal will never pass
+    suggestion: ~
+    fixable: false
+  location:
+    row: 20
+    column: 7
+  end_location:
+    row: 20
     column: 9
   fix: ~
   parent: ~
@@ -73,23 +99,23 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 19
+    row: 21
     column: 7
   end_location:
-    row: 19
+    row: 21
     column: 15
   fix: ~
   parent: ~
 - kind:
     name: AssertOnStringLiteral
-    body: Asserting on an empty string literal will always pass
+    body: Asserting on an empty string literal will never pass
     suggestion: ~
     fixable: false
   location:
-    row: 20
+    row: 22
     column: 7
   end_location:
-    row: 20
+    row: 22
     column: 9
   fix: ~
   parent: ~
@@ -99,10 +125,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 21
+    row: 23
     column: 7
   end_location:
-    row: 21
+    row: 23
     column: 20
   fix: ~
   parent: ~

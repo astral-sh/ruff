@@ -6,13 +6,20 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+enum Kind {
+    Empty,
+    NonEmpty,
+    Unknown,
+}
+
 /// ## What it does
 /// Checks for `assert` statements that use a string literal as the first
 /// argument.
 ///
 /// ## Why is this bad?
-/// An `assert` on a non-empty string literal will always pass.
-/// An `assert` on an empty string literal will always fail.
+/// An `assert` on a non-empty string literal will always pass, while an
+/// `assert` on an empty string literal will always fail.
 ///
 /// ## Example
 /// ```python
@@ -20,22 +27,17 @@ use crate::checkers::ast::Checker;
 /// ```
 #[violation]
 pub struct AssertOnStringLiteral {
-    length: usize,
-    f_type: bool,
+    kind: Kind,
 }
 
 impl Violation for AssertOnStringLiteral {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AssertOnStringLiteral { length, f_type } = self;
-        if *f_type {
-            format!("Asserting on a string literal may have unintended results")
-        } else {
-            if *length == 0 {
-                format!("Asserting on an empty string literal will always pass")
-            } else {
-                format!("Asserting on a non-empty string literal will always pass")
-            }
+        let AssertOnStringLiteral { kind } = self;
+        match kind {
+            Kind::Empty => format!("Asserting on an empty string literal will never pass"),
+            Kind::NonEmpty => format!("Asserting on a non-empty string literal will always pass"),
+            Kind::Unknown => format!("Asserting on a string literal may have unintended results"),
         }
     }
 }
@@ -44,31 +46,56 @@ impl Violation for AssertOnStringLiteral {
 pub fn assert_on_string_literal(checker: &mut Checker, test: &Expr) {
     match &test.node {
         ExprKind::Constant { value, .. } => match value {
-            Constant::Str(s, ..) => {
+            Constant::Str(value, ..) => {
                 checker.diagnostics.push(Diagnostic::new(
                     AssertOnStringLiteral {
-                        length: s.len(),
-                        f_type: false,
+                        kind: if value.is_empty() {
+                            Kind::Empty
+                        } else {
+                            Kind::NonEmpty
+                        },
                     },
                     Range::from(test),
                 ));
             }
-            Constant::Bytes(b) => {
+            Constant::Bytes(value) => {
                 checker.diagnostics.push(Diagnostic::new(
                     AssertOnStringLiteral {
-                        length: b.len(),
-                        f_type: false,
+                        kind: if value.is_empty() {
+                            Kind::Empty
+                        } else {
+                            Kind::NonEmpty
+                        },
                     },
                     Range::from(test),
                 ));
             }
             _ => {}
         },
-        ExprKind::JoinedStr { .. } => {
+        ExprKind::JoinedStr { values } => {
             checker.diagnostics.push(Diagnostic::new(
                 AssertOnStringLiteral {
-                    length: 0,
-                    f_type: true,
+                    kind: if values.iter().all(|value| match &value.node {
+                        ExprKind::Constant { value, .. } => match value {
+                            Constant::Str(value, ..) => value.is_empty(),
+                            Constant::Bytes(value) => value.is_empty(),
+                            _ => false,
+                        },
+                        _ => false,
+                    }) {
+                        Kind::Empty
+                    } else if values.iter().any(|value| match &value.node {
+                        ExprKind::Constant { value, .. } => match value {
+                            Constant::Str(value, ..) => !value.is_empty(),
+                            Constant::Bytes(value) => !value.is_empty(),
+                            _ => false,
+                        },
+                        _ => false,
+                    }) {
+                        Kind::NonEmpty
+                    } else {
+                        Kind::Unknown
+                    },
                 },
                 Range::from(test),
             ));
