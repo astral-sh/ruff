@@ -11,6 +11,22 @@ use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for unnecessary list comprehensions.
+///
+/// ## Why is it bad?
+/// It's unnecessary to use a list comprehension inside a call to `dict`,
+/// since there are equivalent comprehensions for these types.
+///
+/// ## Examples
+/// ```python
+/// dict([(x, f(x)) for x in foo])
+/// ```
+///
+/// Use instead:
+/// ```python
+/// {x: f(x) for x in foo}
+/// ```
 #[violation]
 pub struct UnnecessaryListComprehensionDict;
 

@@ -12,6 +12,29 @@ use crate::rules::flake8_comprehensions::settings::Settings;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for unnecessary `dict`, `list` or `tuple` calls.
+///
+/// ## Why is this bad?
+/// It's unnecessary to call e.g., `dict()` than using the empty literal.
+/// The former is slower because the name `dict` must be looked up in the
+/// global scope in case it has been rebound.
+///
+/// ## Examples
+/// ```python
+/// dict()
+/// dict(a=1, b=2)
+/// list()
+/// tuple()
+/// ```
+///
+/// Use instead:
+/// ```python
+/// {}
+/// {"a": 1, "b": 2}
+/// []
+/// ()
+/// ```
 #[violation]
 pub struct UnnecessaryCollectionCall {
     pub obj_type: String,
