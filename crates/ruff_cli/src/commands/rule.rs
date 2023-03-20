@@ -32,18 +32,11 @@ pub fn rule(rule: Rule, format: HelpFormat) -> Result<()> {
             output.push('\n');
             output.push('\n');
 
-            match rule.autofixable() {
-                AutofixKind::Sometimes => {
-                    output.push_str("Autofix is sometimes available.");
-                    output.push('\n');
-                    output.push('\n');
-                }
-                AutofixKind::Always => {
-                    output.push_str("Autofix is always available.");
-                    output.push('\n');
-                    output.push('\n');
-                }
-                AutofixKind::None => {}
+            let autofix = rule.autofixable();
+            if matches!(autofix, AutofixKind::Always | AutofixKind::Sometimes) {
+                output.push_str(&autofix.to_string());
+                output.push('\n');
+                output.push('\n');
             }
 
             if let Some(explanation) = rule.explanation() {

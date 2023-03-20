@@ -1,9 +1,19 @@
-use std::fmt::Debug;
+use std::fmt::{Debug, Display};
 
 pub enum AutofixKind {
     Sometimes,
     Always,
     None,
+}
+
+impl Display for AutofixKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            AutofixKind::Sometimes => write!(f, "Autofix is sometimes available."),
+            AutofixKind::Always => write!(f, "Autofix is always available."),
+            AutofixKind::None => write!(f, "Autofix is not available."),
+        }
+    }
 }
 
 pub trait Violation: Debug + PartialEq + Eq {
