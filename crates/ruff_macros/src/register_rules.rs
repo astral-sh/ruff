@@ -58,7 +58,7 @@ pub fn register_rules(input: &Input) -> proc_macro2::TokenStream {
             }
 
             /// Returns the autofix status of this rule.
-            pub const fn autofixable(&self) -> Option<ruff_diagnostics::AutofixKind> {
+            pub const fn autofixable(&self) -> ruff_diagnostics::AutofixKind {
                 match self { #rule_autofixable_match_arms }
             }
         }
