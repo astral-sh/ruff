@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Stmt, StmtKind};
+use rustpython_parser::ast::{Excepthandler, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -17,8 +17,13 @@ impl Violation for TryConsiderElse {
 }
 
 /// TRY300
-pub fn try_consider_else(checker: &mut Checker, body: &[Stmt], orelse: &[Stmt]) {
-    if body.len() > 1 && orelse.is_empty() {
+pub fn try_consider_else(
+    checker: &mut Checker,
+    body: &[Stmt],
+    orelse: &[Stmt],
+    handler: &[Excepthandler],
+) {
+    if body.len() > 1 && orelse.is_empty() && !handler.is_empty() {
         if let Some(stmt) = body.last() {
             if let StmtKind::Return { .. } = &stmt.node {
                 checker

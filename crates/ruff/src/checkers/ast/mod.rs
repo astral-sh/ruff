@@ -1722,7 +1722,7 @@ where
                     );
                 }
                 if self.settings.rules.enabled(Rule::TryConsiderElse) {
-                    tryceratops::rules::try_consider_else(self, body, orelse);
+                    tryceratops::rules::try_consider_else(self, body, orelse, handlers);
                 }
                 if self.settings.rules.enabled(Rule::VerboseRaise) {
                     tryceratops::rules::verbose_raise(self, handlers);
