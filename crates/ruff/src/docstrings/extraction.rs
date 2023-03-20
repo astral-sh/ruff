@@ -2,15 +2,18 @@
 
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
-use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
 use ruff_python_ast::visibility::{Modifier, VisibleScope};
+
+use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
 
 /// Extract a docstring from a function or class body.
 pub fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
     let stmt = suite.first()?;
+    // Require the docstring to be a standalone expression.
     let StmtKind::Expr { value } = &stmt.node else {
         return None;
     };
+    // Only match strings.
     if !matches!(
         &value.node,
         ExprKind::Constant {

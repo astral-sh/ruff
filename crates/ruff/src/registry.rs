@@ -1,5 +1,7 @@
 //! Registry of all [`Rule`] implementations.
 
+mod rule_set;
+
 use strum_macros::{AsRefStr, EnumIter};
 
 use ruff_diagnostics::Violation;
@@ -7,6 +9,7 @@ use ruff_macros::RuleNamespace;
 
 use crate::codes::{self, RuleCodePrefix};
 use crate::rules;
+pub use rule_set::{RuleSet, RuleSetIterator};
 
 ruff_macros::register_rules!(
     // pycodestyle errors
@@ -143,6 +146,7 @@ ruff_macros::register_rules!(
     rules::pyflakes::rules::UnusedAnnotation,
     rules::pyflakes::rules::RaiseNotImplemented,
     // pylint
+    rules::pylint::rules::AssertOnStringLiteral,
     rules::pylint::rules::UselessReturn,
     rules::pylint::rules::YieldInInit,
     rules::pylint::rules::InvalidAllObject,

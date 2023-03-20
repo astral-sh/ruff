@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
-pub fn function_name(func: &Expr) -> Option<&str> {
+pub fn expr_name(func: &Expr) -> Option<&str> {
     if let ExprKind::Name { id, .. } = &func.node {
         Some(id)
     } else {
@@ -20,7 +20,7 @@ pub fn exactly_one_argument_with_matching_function<'a>(
     if args.len() != 1 {
         return None;
     }
-    if function_name(func)? != name {
+    if expr_name(func)? != name {
         return None;
     }
     Some(&args[0].node)
@@ -31,7 +31,7 @@ pub fn first_argument_with_matching_function<'a>(
     func: &Expr,
     args: &'a [Expr],
 ) -> Option<&'a ExprKind> {
-    if function_name(func)? == name {
+    if expr_name(func)? == name {
         Some(&args.first()?.node)
     } else {
         None

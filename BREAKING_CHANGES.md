@@ -145,4 +145,4 @@ default.
 `pyproject.toml` files are now resolved hierarchically, such that for each Python file, we find
 the first `pyproject.toml` file in its path, and use that to determine its lint settings.
 
-See the [README](https://github.com/charliermarsh/ruff#pyprojecttoml-discovery) for more.
+See the [documentation](https://beta.ruff.rs/docs/configuration/#python-file-discovery) for more.

@@ -7,7 +7,6 @@ use std::string::ToString;
 use anyhow::{bail, Result};
 use globset::{Glob, GlobSet, GlobSetBuilder};
 use pep440_rs::{Version as Pep440Version, VersionSpecifiers};
-use rustc_hash::FxHashSet;
 use schemars::JsonSchema;
 use serde::{de, Deserialize, Deserializer, Serialize};
 use strum::IntoEnumIterator;
@@ -17,7 +16,7 @@ use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_macros::CacheKey;
 
 use crate::fs;
-use crate::registry::Rule;
+use crate::registry::RuleSet;
 use crate::rule_selector::RuleSelector;
 
 #[derive(
@@ -157,12 +156,12 @@ impl CacheKey for FilePatternSet {
 pub struct PerFileIgnore {
     pub(crate) basename: String,
     pub(crate) absolute: PathBuf,
-    pub(crate) rules: FxHashSet<Rule>,
+    pub(crate) rules: RuleSet,
 }
 
 impl PerFileIgnore {
     pub fn new(pattern: String, prefixes: &[RuleSelector], project_root: Option<&Path>) -> Self {
-        let rules: FxHashSet<_> = prefixes.iter().flat_map(IntoIterator::into_iter).collect();
+        let rules: RuleSet = prefixes.iter().flat_map(IntoIterator::into_iter).collect();
         let path = Path::new(&pattern);
         let absolute = match project_root {
             Some(project_root) => fs::normalize_path_to(path, project_root),
