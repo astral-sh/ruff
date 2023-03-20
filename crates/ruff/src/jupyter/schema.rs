@@ -4,10 +4,10 @@
 //! <https://github.com/jupyter/nbformat/blob/16b53251aabf472ad9406ddb1f78b0421c014eeb/nbformat/v4/nbformat.v4.schema.json>
 //! Jupyter Notebook v4.5 JSON schema.
 //!
-//! Compared to the generated version, `Cell::id` is optional because it wasn't required <v4.5,
-//! I added `#[serde(deny_unknown_fields)]` where the schema had `"additionalProperties": false`
-//! and `#[serde(flatten)] pub other: BTreeMap<String, Value>` otherwise as initial part for
-//! round-trip support.
+//! The following changes were made to the generated version: `Cell::id` is optional because it
+//! wasn't required <v4.5, `#[serde(deny_unknown_fields)]` was added where the schema had
+//! `"additionalProperties": false` and `#[serde(flatten)] pub other: BTreeMap<String, Value>`
+//! for `"additionalProperties": true` as preparation for round-trip support.
 
 use std::collections::{BTreeMap, HashMap};
 

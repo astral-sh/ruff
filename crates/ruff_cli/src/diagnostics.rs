@@ -69,7 +69,7 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Diagnost
             {
                 // Not a python notebook, this could e.g. be an R notebook which we want to just skip
                 debug!(
-                    "Skipping {} because it's not a python notebook",
+                    "Skipping {} because it's not a Python notebook",
                     path.display()
                 );
                 return Err(Diagnostics::default());
