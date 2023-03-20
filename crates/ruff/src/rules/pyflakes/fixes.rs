@@ -26,17 +26,12 @@ pub fn remove_unused_format_arguments_from_dict(
     let mut tree = match_expression(module_text)?;
     let dict = match_dict(&mut tree)?;
 
-    dict.elements = dict
-        .elements
-        .iter()
-        .filter_map(|e| match e {
-            DictElement::Simple {
-                key: Expression::SimpleString(name),
-                ..
-            } if unused_arguments.contains(&raw_contents(name.value)) => None,
-            e => Some(e.clone()),
-        })
-        .collect();
+    dict.elements.retain(|e| {
+        !matches!(e, DictElement::Simple {
+            key: Expression::SimpleString(name),
+            ..
+        } if unused_arguments.contains(&raw_contents(name.value)))
+    });
 
     let mut state = CodegenState {
         default_newline: stylist.line_ending(),
@@ -61,16 +56,10 @@ pub fn remove_unused_keyword_arguments_from_format_call(
 ) -> Result<Fix> {
     let module_text = locator.slice(location);
     let mut tree = match_expression(module_text)?;
-    let mut call = match_call(&mut tree)?;
+    let call = match_call(&mut tree)?;
 
-    call.args = call
-        .args
-        .iter()
-        .filter_map(|e| match &e.keyword {
-            Some(kw) if unused_arguments.contains(&kw.value) => None,
-            _ => Some(e.clone()),
-        })
-        .collect();
+    call.args
+        .retain(|e| !matches!(&e.keyword, Some(kw) if unused_arguments.contains(&kw.value)));
 
     let mut state = CodegenState {
         default_newline: stylist.line_ending(),
@@ -154,28 +143,22 @@ pub fn remove_unused_positional_arguments_from_format_call(
 ) -> Result<Fix> {
     let module_text = locator.slice(location);
     let mut tree = match_expression(module_text)?;
-    let mut call = match_call(&mut tree)?;
+    let call = match_call(&mut tree)?;
 
-    call.args = call
-        .args
-        .iter()
-        .enumerate()
-        .filter_map(|(i, e)| (!unused_arguments.contains(&i)).then_some(e.clone()))
-        .collect();
+    let mut index = 0;
+    call.args.retain(|_| {
+        index += 1;
+        !unused_arguments.contains(&(index - 1))
+    });
 
-    let min_unused_index = unused_arguments
-        .iter()
-        .enumerate()
-        .scan(0, |state, (i, &arg)| {
-            if arg == i {
-                *state += 1;
-                Some(*state)
-            } else {
-                None
-            }
-        })
-        .last()
-        .unwrap_or(0);
+    let mut min_unused_index = 0;
+    for index in unused_arguments {
+        if *index == min_unused_index {
+            min_unused_index += 1;
+        } else {
+            break;
+        }
+    }
 
     let mut new_format_string;
     if min_unused_index > 0 {
