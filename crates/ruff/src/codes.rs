@@ -355,8 +355,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pyupgrade, "003") => Rule::TypeOfPrimitive,
         (Pyupgrade, "004") => Rule::UselessObjectInheritance,
         (Pyupgrade, "005") => Rule::DeprecatedUnittestAlias,
-        (Pyupgrade, "006") => Rule::DeprecatedCollectionType,
-        (Pyupgrade, "007") => Rule::TypingUnion,
+        (Pyupgrade, "006") => Rule::NonPEP585Annotation,
+        (Pyupgrade, "007") => Rule::NonPEP604Annotation,
         (Pyupgrade, "008") => Rule::SuperCallWithParameters,
         (Pyupgrade, "009") => Rule::UTF8EncodingDeclaration,
         (Pyupgrade, "010") => Rule::UnnecessaryFutureImport,
@@ -386,7 +386,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pyupgrade, "035") => Rule::DeprecatedImport,
         (Pyupgrade, "036") => Rule::OutdatedVersionBlock,
         (Pyupgrade, "037") => Rule::QuotedAnnotation,
-        (Pyupgrade, "038") => Rule::IsinstanceWithTuple,
+        (Pyupgrade, "038") => Rule::NonPEP604Isinstance,
 
         // pydocstyle
         (Pydocstyle, "100") => Rule::UndocumentedPublicModule,
