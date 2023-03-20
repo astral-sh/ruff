@@ -62,6 +62,11 @@ pub(crate) fn should_ignore_definition(
     false
 }
 
+/// Return true if a line ends with an odd number of backslashes (i.e., ends with an escape).
+pub(crate) fn ends_with_backslash(line: &str) -> bool {
+    line.chars().rev().take_while(|c| *c == '\\').count() % 2 == 1
+}
+
 /// Check if a docstring should be ignored.
 pub(crate) fn should_ignore_docstring(contents: &str) -> bool {
     // Avoid analyzing docstrings that contain implicit string concatenations.

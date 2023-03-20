@@ -8,6 +8,7 @@ use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
 use crate::message::Location;
 use crate::registry::AsRule;
+use crate::rules::pydocstyle::helpers::ends_with_backslash;
 
 #[violation]
 pub struct SurroundingWhitespace;
@@ -46,6 +47,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
             // characters, avoid applying the fix.
             if !trimmed.ends_with(pattern.chars().last().unwrap())
                 && !trimmed.starts_with(pattern.chars().last().unwrap())
+                && !ends_with_backslash(trimmed)
             {
                 diagnostic.amend(Fix::replacement(
                     trimmed.to_string(),
