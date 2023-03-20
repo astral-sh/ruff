@@ -247,17 +247,33 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
 
     // Currently, the only issue we know of is in LibCST:
     // https://github.com/Instagram/LibCST/issues/846
-    let Some(contents) = try_convert_to_f_string(checker, expr) else {
+    let Some(mut contents) = try_convert_to_f_string(checker, expr) else {
         return;
     };
 
     // Avoid refactors that increase the resulting string length.
-    let existing = checker.locator.slice(expr);
-    if contents.len() > existing.len() {
-        return;
+    let expr_range = Range::from(expr);
+    if expr_range.location.column() == 0 {
+        let existing = checker.locator.slice(expr_range);
+        if contents.len() > existing.len() {
+            return;
+        }
+    } else {
+        let existing = checker.locator.slice(Range::new(
+            expr_range.location.with_col_offset(-1),
+            expr_range.end_location,
+        ));
+        if contents.len() > existing.len() - 1 {
+            return;
+        }
+        // Add a space if there is none between a keyword and the string.
+        // `return`, `yield`, `assert`, …
+        if existing.chars().next().unwrap().is_ascii_alphabetic() {
+            contents.insert(0, ' ');
+        }
     }
 
-    let mut diagnostic = Diagnostic::new(FString, Range::from(expr));
+    let mut diagnostic = Diagnostic::new(FString, expr_range);
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
