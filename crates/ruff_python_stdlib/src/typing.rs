@@ -1,5 +1,5 @@
 use once_cell::sync::Lazy;
-use rustc_hash::FxHashSet;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 // See: https://pypi.org/project/typing-extensions/
 pub static TYPING_EXTENSIONS: Lazy<FxHashSet<&'static str>> = Lazy::new(|| {
@@ -197,3 +197,24 @@ pub const PEP_585_BUILTINS_ELIGIBLE: &[&[&str]] = &[
     &["typing", "Type"],
     &["typing_extensions", "Type"],
 ];
+
+// See: https://github.com/JelleZijlstra/autotyping/blob/f65b5ee3a8fdb77999f84b4c87edb996e25269a5/autotyping/autotyping.py#L69-L84
+pub static SIMPLE_MAGIC_RETURN_TYPES: Lazy<FxHashMap<&'static str, &'static str>> =
+    Lazy::new(|| {
+        FxHashMap::from_iter([
+            ("__str__", "str"),
+            ("__repr__", "str"),
+            ("__len__", "int"),
+            ("__length_hint__", "int"),
+            ("__init__", "None"),
+            ("__del__", "None"),
+            ("__bool__", "bool"),
+            ("__bytes__", "bytes"),
+            ("__format__", "str"),
+            ("__contains__", "bool"),
+            ("__complex__", "complex"),
+            ("__int__", "int"),
+            ("__float__", "float"),
+            ("__index__", "int"),
+        ])
+    });
