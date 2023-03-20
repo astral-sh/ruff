@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: TypingUnion
+    name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
     suggestion: "Convert to `X | Y`"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 16
   parent: ~
 - kind:
-    name: TypingUnion
+    name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
     suggestion: "Convert to `X | Y`"
     fixable: true

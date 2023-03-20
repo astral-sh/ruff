@@ -2,7 +2,7 @@ use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
-use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{
@@ -40,7 +40,7 @@ pub struct CollapsibleIf {
 }
 
 impl Violation for CollapsibleIf {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -60,7 +60,7 @@ pub struct NeedlessBool {
 }
 
 impl Violation for NeedlessBool {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -112,7 +112,7 @@ pub struct IfElseBlockInsteadOfIfExp {
 }
 
 impl Violation for IfElseBlockInsteadOfIfExp {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -165,7 +165,7 @@ pub struct IfElseBlockInsteadOfDictGet {
 }
 
 impl Violation for IfElseBlockInsteadOfDictGet {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
