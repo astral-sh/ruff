@@ -12,7 +12,8 @@ use crate::rules::flake8_comprehensions::fixes;
 use super::helpers;
 
 /// ## What it does
-/// Checks for unnecessary list or tuple literal passed to a `tuple()` call.
+/// Checks for `tuple` calls that take unnecessary list or tuple literals as
+/// arguments.
 ///
 /// ## Why is it bad?
 /// It's unnecessary to use a list or tuple literal within a `tuple()` call,

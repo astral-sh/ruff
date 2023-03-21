@@ -14,12 +14,12 @@ use super::helpers;
 
 /// ## What it does
 /// Checks for unnecessary `dict`, `list` or `tuple` calls that can be
-/// rewritten as an empty literal.
+/// rewritten as empty literals.
 ///
 /// ## Why is this bad?
-/// It's unnecessary to call e.g., `dict()` than using the empty literal.
-/// The former is slower because the name `dict` must be looked up in the
-/// global scope in case it has been rebound.
+/// It's unnecessary to call e.g., `dict()` as opposed to using an empty
+/// literal (`{}`). The former is slower because the name `dict` must be
+/// looked up in the global scope in case it has been rebound.
 ///
 /// ## Examples
 /// ```python

@@ -12,11 +12,12 @@ use crate::rules::flake8_comprehensions::fixes;
 use super::helpers;
 
 /// ## What it does
-/// Checks for unnecessary `list` or `tuple` literal.
+/// Checks for `set` calls that take unnecessary `list` or `tuple` literals
+/// as arguments.
 ///
 /// ## Why is it bad?
 /// It's unnecessary to use a list or tuple literal within a call to `set`.
-/// It can be rewritten as a set literal.
+/// Instead, the expression can be rewritten as a set literal.
 ///
 /// ## Examples
 /// ```python

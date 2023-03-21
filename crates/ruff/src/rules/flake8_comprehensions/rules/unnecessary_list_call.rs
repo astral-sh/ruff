@@ -12,11 +12,10 @@ use crate::rules::flake8_comprehensions::fixes;
 use super::helpers;
 
 /// ## What it does
-/// Checks for unnecessary `list` calls around a list comprehension.
+/// Checks for unnecessary `list` calls around list comprehensions.
 ///
 /// ## Why is it bad?
-/// It is unnecessary to use a `list` around a list comprehension, since
-/// it is equivalent without it.
+/// It is redundant to use a `list` call around a list comprehension.
 ///
 /// ## Examples
 /// ```python

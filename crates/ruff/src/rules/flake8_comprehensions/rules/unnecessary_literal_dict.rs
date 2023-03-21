@@ -12,11 +12,11 @@ use crate::rules::flake8_comprehensions::fixes;
 use super::helpers;
 
 /// ## What it does
-/// Checks for unnecessary `list` or `tuple` literal.
+/// Checks for unnecessary `list` or `tuple` literals.
 ///
 /// ## Why is it bad?
 /// It's unnecessary to use a list or tuple literal within a call to `dict`.
-/// It can be rewritten as a dict literal.
+/// It can be rewritten as a dict literal (`{}`).
 ///
 /// ## Examples
 /// ```python
