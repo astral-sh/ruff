@@ -85,7 +85,6 @@ jobs:
           name: ruff
           path: target/debug/ruff
 
-
   cargo-test-wasm:
     runs-on: ubuntu-latest
     name: "cargo test (wasm)"
@@ -176,3 +175,15 @@ jobs:
         with:
           name: ecosystem-result
           path: ecosystem-result
+
+  cargo-udeps:
+    name: "cargo udeps"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: "Install Rust toolchain"
+        run: rustup toolchain install nightly
+      - name: "Install cargo-udeps"
+        uses: taiki-e/install-action@cargo-udeps
+      - name: "Run cargo-udeps"
+        run: cargo +nightly udeps
