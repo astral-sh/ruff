@@ -186,4 +186,4 @@ jobs:
       - name: "Install cargo-udeps"
         uses: taiki-e/install-action@cargo-udeps
       - name: "Run cargo-udeps"
-        run: cargo +nightly udeps
+        run: cargo +nightly udeps | tee $GITHUB_STEP_SUMMARY
