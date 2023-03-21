@@ -80,6 +80,12 @@ enum TypingMember {
 
 /// UP007
 pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, slice: &Expr) {
+    // If any of the _arguments_ are forward references, we can't use PEP 604.
+    // Ex) `Union["str", "int"]` can't be converted to `"str" | "int"`.
+    if any_arg_is_str(slice) {
+        return;
+    }
+
     let Some(typing_member) = checker.ctx.resolve_call_path(value).as_ref().and_then(|call_path| {
         if checker.ctx.match_typing_call_path(call_path, "Optional") {
             Some(TypingMember::Optional)
@@ -92,8 +98,8 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         return;
     };
 
-    // Avoid fixing forward annotations.
-    let fixable = !checker.ctx.in_deferred_string_type_definition && !any_arg_is_str(slice);
+    // Avoid fixing forward references.
+    let fixable = !checker.ctx.in_deferred_string_type_definition;
 
     match typing_member {
         TypingMember::Optional => {
