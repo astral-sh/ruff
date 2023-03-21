@@ -328,6 +328,7 @@ Ruff is used in a number of major open-source projects, including:
 - [Zulip](https://github.com/zulip/zulip)
 - [Bokeh](https://github.com/bokeh/bokeh)
 - [Pydantic](https://github.com/pydantic/pydantic)
+- [PostHog](https://github.com/PostHog/posthog)
 - [Dagster](https://github.com/dagster-io/dagster)
 - [Dagger](https://github.com/dagger/dagger)
 - [Sphinx](https://github.com/sphinx-doc/sphinx)
