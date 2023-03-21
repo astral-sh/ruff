@@ -190,4 +190,14 @@ mod tests {
         assert_yaml_snapshot!(diagnostics);
         Ok(())
     }
+
+    #[test]
+    fn simple_magic_methods() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_annotations/simple_magic_methods.py"),
+            &Settings::for_rule(Rule::MissingReturnTypeSpecialMethod),
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
 }
