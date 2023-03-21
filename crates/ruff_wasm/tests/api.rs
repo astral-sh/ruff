@@ -23,13 +23,13 @@ macro_rules! check {
 #[wasm_bindgen_test]
 fn empty_config() {
     check!(
-        "if (1, 2):\n pass",
+        "if (1, 2):\n    pass",
         r#"{}"#,
         [ExpandedMessage {
             code: Rule::IfTuple.noqa_code().to_string(),
             message: "If test is a tuple, which is always `True`".to_string(),
             location: Location::new(1, 0),
-            end_location: Location::new(2, 5),
+            end_location: Location::new(2, 8),
             fix: None,
         }]
     );
@@ -37,7 +37,7 @@ fn empty_config() {
 
 #[wasm_bindgen_test]
 fn partial_config() {
-    check!("if (1, 2):\n pass", r#"{"ignore": ["F"]}"#, []);
+    check!("if (1, 2):\n    pass", r#"{"ignore": ["F"]}"#, []);
 }
 
 #[wasm_bindgen_test]

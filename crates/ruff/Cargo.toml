@@ -74,5 +74,4 @@ test-case = { workspace = true }
 
 [features]
 default = []
-logical_lines = []
 jupyter_notebook = []

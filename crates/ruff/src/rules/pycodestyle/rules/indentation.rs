@@ -230,7 +230,7 @@ impl Violation for OverIndented {
 }
 
 /// E111, E114, E112, E113, E115, E116, E117
-#[cfg(feature = "logical_lines")]
+#[cfg(debug_assertions)]
 pub fn indentation(
     logical_line: &LogicalLine,
     prev_logical_line: Option<&LogicalLine>,
@@ -284,7 +284,7 @@ pub fn indentation(
     diagnostics
 }
 
-#[cfg(not(feature = "logical_lines"))]
+#[cfg(not(debug_assertions))]
 pub fn indentation(
     _logical_line: &LogicalLine,
     _prev_logical_line: Option<&LogicalLine>,
