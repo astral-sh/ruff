@@ -10,16 +10,16 @@ use crate::registry::{AsRule, Rule};
 use super::helpers::{get_mark_decorators, get_mark_name};
 
 #[violation]
-pub struct IncorrectMarkParenthesesStyle {
+pub struct PytestIncorrectMarkParenthesesStyle {
     pub mark_name: String,
     pub expected_parens: String,
     pub actual_parens: String,
 }
 
-impl AlwaysAutofixableViolation for IncorrectMarkParenthesesStyle {
+impl AlwaysAutofixableViolation for PytestIncorrectMarkParenthesesStyle {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IncorrectMarkParenthesesStyle {
+        let PytestIncorrectMarkParenthesesStyle {
             mark_name,
             expected_parens,
             actual_parens,
@@ -36,9 +36,9 @@ impl AlwaysAutofixableViolation for IncorrectMarkParenthesesStyle {
 }
 
 #[violation]
-pub struct UseFixturesWithoutParameters;
+pub struct PytestUseFixturesWithoutParameters;
 
-impl AlwaysAutofixableViolation for UseFixturesWithoutParameters {
+impl AlwaysAutofixableViolation for PytestUseFixturesWithoutParameters {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Useless `pytest.mark.usefixtures` without parameters")
@@ -57,7 +57,7 @@ fn pytest_mark_parentheses(
     actual: &str,
 ) {
     let mut diagnostic = Diagnostic::new(
-        IncorrectMarkParenthesesStyle {
+        PytestIncorrectMarkParenthesesStyle {
             mark_name: get_mark_name(decorator).to_string(),
             expected_parens: preferred.to_string(),
             actual_parens: actual.to_string(),
@@ -110,7 +110,8 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
     }
 
     if !has_parameters {
-        let mut diagnostic = Diagnostic::new(UseFixturesWithoutParameters, Range::from(decorator));
+        let mut diagnostic =
+            Diagnostic::new(PytestUseFixturesWithoutParameters, Range::from(decorator));
         if checker.patch(diagnostic.kind.rule()) {
             let at_start = Location::new(decorator.location.row(), decorator.location.column() - 1);
             diagnostic.amend(Fix::deletion(at_start, decorator.end_location.unwrap()));
@@ -123,11 +124,11 @@ pub fn marks(checker: &mut Checker, decorators: &[Expr]) {
     let enforce_parentheses = checker
         .settings
         .rules
-        .enabled(&Rule::IncorrectMarkParenthesesStyle);
+        .enabled(Rule::PytestIncorrectMarkParenthesesStyle);
     let enforce_useless_usefixtures = checker
         .settings
         .rules
-        .enabled(&Rule::UseFixturesWithoutParameters);
+        .enabled(Rule::PytestUseFixturesWithoutParameters);
 
     for mark in get_mark_decorators(decorators) {
         if enforce_parentheses {

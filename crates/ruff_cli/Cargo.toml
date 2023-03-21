@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.256"
+version = "0.0.257"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -48,6 +48,7 @@ path-absolutize = { workspace = true, features = ["once_cell_cache"] }
 quick-junit = { version = "0.3.2" }
 rayon = { version = "1.7.0" }
 regex = { workspace = true }
+ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 rustc-hash = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -60,6 +61,9 @@ walkdir = { version = "2.3.2" }
 [dev-dependencies]
 assert_cmd = { version = "2.0.8" }
 ureq = { version = "2.6.2", features = [] }
+
+[features]
+jupyter_notebook = ["ruff/jupyter_notebook"]
 
 [package.metadata.maturin]
 name = "ruff"

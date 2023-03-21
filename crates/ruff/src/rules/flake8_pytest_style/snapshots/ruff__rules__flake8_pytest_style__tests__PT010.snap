@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: RaisesWithoutException
+    name: PytestRaisesWithoutException
     body: "set the expected exception in `pytest.raises()`"
     suggestion: ~
     fixable: false

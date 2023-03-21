@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: DeprecatedCollectionType
+    name: NonPEP585Annotation
     body: "Use `list` instead of `List` for type annotations"
     suggestion: "Replace `List` with `list`"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 21
   parent: ~
 - kind:
-    name: DeprecatedCollectionType
+    name: NonPEP585Annotation
     body: "Use `list` instead of `List` for type annotations"
     suggestion: "Replace `List` with `list`"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 12
   parent: ~
 - kind:
-    name: DeprecatedCollectionType
+    name: NonPEP585Annotation
     body: "Use `list` instead of `List` for type annotations"
     suggestion: "Replace `List` with `list`"
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 30
   parent: ~
 - kind:
-    name: DeprecatedCollectionType
+    name: NonPEP585Annotation
     body: "Use `list` instead of `List` for type annotations"
     suggestion: "Replace `List` with `list`"
     fixable: true

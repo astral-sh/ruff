@@ -22,8 +22,8 @@ mod tests {
     #[test_case(Rule::TypeOfPrimitive, Path::new("UP003.py"); "UP003")]
     #[test_case(Rule::UselessObjectInheritance, Path::new("UP004.py"); "UP004")]
     #[test_case(Rule::DeprecatedUnittestAlias, Path::new("UP005.py"); "UP005")]
-    #[test_case(Rule::DeprecatedCollectionType, Path::new("UP006.py"); "UP006")]
-    #[test_case(Rule::TypingUnion, Path::new("UP007.py"); "UP007")]
+    #[test_case(Rule::NonPEP585Annotation, Path::new("UP006.py"); "UP006")]
+    #[test_case(Rule::NonPEP604Annotation, Path::new("UP007.py"); "UP007")]
     #[test_case(Rule::SuperCallWithParameters, Path::new("UP008.py"); "UP008")]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_0.py"); "UP009_0")]
     #[test_case(Rule::UTF8EncodingDeclaration, Path::new("UP009_1.py"); "UP009_1")]
@@ -40,17 +40,17 @@ mod tests {
     #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"); "UP019")]
     #[test_case(Rule::ReplaceUniversalNewlines, Path::new("UP021.py"); "UP021")]
     #[test_case(Rule::ReplaceStdoutStderr, Path::new("UP022.py"); "UP022")]
-    #[test_case(Rule::RewriteCElementTree, Path::new("UP023.py"); "UP023")]
+    #[test_case(Rule::DeprecatedCElementTree, Path::new("UP023.py"); "UP023")]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_0.py"); "UP024_0")]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_1.py"); "UP024_1")]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_2.py"); "UP024_2")]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_3.py"); "UP024_3")]
     #[test_case(Rule::OSErrorAlias, Path::new("UP024_4.py"); "UP024_4")]
-    #[test_case(Rule::RewriteUnicodeLiteral, Path::new("UP025.py"); "UP025")]
-    #[test_case(Rule::RewriteMockImport, Path::new("UP026.py"); "UP026")]
-    #[test_case(Rule::RewriteListComprehension, Path::new("UP027.py"); "UP027")]
-    #[test_case(Rule::RewriteYieldFrom, Path::new("UP028_0.py"); "UP028_0")]
-    #[test_case(Rule::RewriteYieldFrom, Path::new("UP028_1.py"); "UP028_1")]
+    #[test_case(Rule::UnicodeKindPrefix, Path::new("UP025.py"); "UP025")]
+    #[test_case(Rule::DeprecatedMockImport, Path::new("UP026.py"); "UP026")]
+    #[test_case(Rule::UnpackedListComprehension, Path::new("UP027.py"); "UP027")]
+    #[test_case(Rule::YieldInForLoop, Path::new("UP028_0.py"); "UP028_0")]
+    #[test_case(Rule::YieldInForLoop, Path::new("UP028_1.py"); "UP028_1")]
     #[test_case(Rule::UnnecessaryBuiltinImport, Path::new("UP029.py"); "UP029")]
     #[test_case(Rule::FormatLiterals, Path::new("UP030_0.py"); "UP030_0")]
     #[test_case(Rule::FormatLiterals, Path::new("UP030_1.py"); "UP030_1")]
@@ -58,7 +58,7 @@ mod tests {
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_0.py"); "UP031_0")]
     #[test_case(Rule::PrintfStringFormatting, Path::new("UP031_1.py"); "UP031_1")]
     #[test_case(Rule::FString, Path::new("UP032.py"); "UP032")]
-    #[test_case(Rule::FunctoolsCache, Path::new("UP033.py"); "UP033")]
+    #[test_case(Rule::LRUCacheWithMaxsizeNone, Path::new("UP033.py"); "UP033")]
     #[test_case(Rule::ExtraneousParentheses, Path::new("UP034.py"); "UP034")]
     #[test_case(Rule::DeprecatedImport, Path::new("UP035.py"); "UP035")]
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_0.py"); "UP036_0")]
@@ -67,7 +67,7 @@ mod tests {
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_3.py"); "UP036_3")]
     #[test_case(Rule::OutdatedVersionBlock, Path::new("UP036_4.py"); "UP036_4")]
     #[test_case(Rule::QuotedAnnotation, Path::new("UP037.py"); "UP037")]
-    #[test_case(Rule::IsinstanceWithTuple, Path::new("UP038.py"); "UP038")]
+    #[test_case(Rule::NonPEP604Isinstance, Path::new("UP038.py"); "UP038")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = path.to_string_lossy().to_string();
         let diagnostics = test_path(
@@ -84,7 +84,7 @@ mod tests {
             Path::new("pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(Rule::DeprecatedCollectionType)
+                ..settings::Settings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -97,7 +97,7 @@ mod tests {
             Path::new("pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py310,
-                ..settings::Settings::for_rule(Rule::DeprecatedCollectionType)
+                ..settings::Settings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -110,7 +110,7 @@ mod tests {
             Path::new("pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py37,
-                ..settings::Settings::for_rule(Rule::TypingUnion)
+                ..settings::Settings::for_rule(Rule::NonPEP604Annotation)
             },
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -123,7 +123,7 @@ mod tests {
             Path::new("pyupgrade/future_annotations.py"),
             &settings::Settings {
                 target_version: PythonVersion::Py310,
-                ..settings::Settings::for_rule(Rule::TypingUnion)
+                ..settings::Settings::for_rule(Rule::NonPEP604Annotation)
             },
         )?;
         assert_yaml_snapshot!(diagnostics);

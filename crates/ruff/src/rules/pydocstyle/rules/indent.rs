@@ -21,9 +21,9 @@ impl Violation for IndentWithSpaces {
 }
 
 #[violation]
-pub struct NoUnderIndentation;
+pub struct UnderIndentation;
 
-impl AlwaysAutofixableViolation for NoUnderIndentation {
+impl AlwaysAutofixableViolation for UnderIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Docstring is under-indented")
@@ -35,9 +35,9 @@ impl AlwaysAutofixableViolation for NoUnderIndentation {
 }
 
 #[violation]
-pub struct NoOverIndentation;
+pub struct OverIndentation;
 
-impl AlwaysAutofixableViolation for NoOverIndentation {
+impl AlwaysAutofixableViolation for OverIndentation {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Docstring is over-indented")
@@ -80,14 +80,14 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
         // yet.
         has_seen_tab = has_seen_tab || line_indent.contains('\t');
 
-        if checker.settings.rules.enabled(&Rule::NoUnderIndentation) {
+        if checker.settings.rules.enabled(Rule::UnderIndentation) {
             // We report under-indentation on every line. This isn't great, but enables
             // autofix.
             if (i == lines.len() - 1 || !is_blank)
                 && line_indent.len() < docstring.indentation.len()
             {
                 let mut diagnostic = Diagnostic::new(
-                    NoUnderIndentation,
+                    UnderIndentation,
                     Range::new(
                         Location::new(docstring.expr.location.row() + i, 0),
                         Location::new(docstring.expr.location.row() + i, 0),
@@ -119,7 +119,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
         }
     }
 
-    if checker.settings.rules.enabled(&Rule::IndentWithSpaces) {
+    if checker.settings.rules.enabled(Rule::IndentWithSpaces) {
         if has_seen_tab {
             checker.diagnostics.push(Diagnostic::new(
                 IndentWithSpaces,
@@ -128,7 +128,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
         }
     }
 
-    if checker.settings.rules.enabled(&Rule::NoOverIndentation) {
+    if checker.settings.rules.enabled(Rule::OverIndentation) {
         // If every line (except the last) is over-indented...
         if is_over_indented {
             for i in over_indented_lines {
@@ -137,7 +137,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                     // We report over-indentation on every line. This isn't great, but
                     // enables autofix.
                     let mut diagnostic = Diagnostic::new(
-                        NoOverIndentation,
+                        OverIndentation,
                         Range::new(
                             Location::new(docstring.expr.location.row() + i, 0),
                             Location::new(docstring.expr.location.row() + i, 0),
@@ -161,7 +161,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
             let line_indent = whitespace::leading_space(lines[i]);
             if line_indent.len() > docstring.indentation.len() {
                 let mut diagnostic = Diagnostic::new(
-                    NoOverIndentation,
+                    OverIndentation,
                     Range::new(
                         Location::new(docstring.expr.location.row() + i, 0),
                         Location::new(docstring.expr.location.row() + i, 0),

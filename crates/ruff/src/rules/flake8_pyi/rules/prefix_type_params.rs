@@ -47,14 +47,14 @@ impl fmt::Display for VarKind {
 /// _T = TypeVar("_T")
 /// ```
 #[violation]
-pub struct PrefixTypeParams {
+pub struct UnprefixedTypeParam {
     pub kind: VarKind,
 }
 
-impl Violation for PrefixTypeParams {
+impl Violation for UnprefixedTypeParam {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PrefixTypeParams { kind } = self;
+        let UnprefixedTypeParam { kind } = self;
         format!("Name of private `{kind}` must start with `_`")
     }
 }
@@ -85,7 +85,7 @@ pub fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr])
             return;
         };
         checker.diagnostics.push(Diagnostic::new(
-            PrefixTypeParams { kind },
+            UnprefixedTypeParam { kind },
             Range::from(value),
         ));
     }

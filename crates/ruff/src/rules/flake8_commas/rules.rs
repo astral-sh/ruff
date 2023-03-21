@@ -111,9 +111,9 @@ impl Context {
 }
 
 #[violation]
-pub struct TrailingCommaMissing;
+pub struct MissingTrailingComma;
 
-impl AlwaysAutofixableViolation for TrailingCommaMissing {
+impl AlwaysAutofixableViolation for MissingTrailingComma {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Trailing comma missing")
@@ -125,9 +125,9 @@ impl AlwaysAutofixableViolation for TrailingCommaMissing {
 }
 
 #[violation]
-pub struct TrailingCommaOnBareTupleProhibited;
+pub struct TrailingCommaOnBareTuple;
 
-impl Violation for TrailingCommaOnBareTupleProhibited {
+impl Violation for TrailingCommaOnBareTuple {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Trailing comma on bare tuple prohibited")
@@ -135,9 +135,9 @@ impl Violation for TrailingCommaOnBareTupleProhibited {
 }
 
 #[violation]
-pub struct TrailingCommaProhibited;
+pub struct ProhibitedTrailingComma;
 
-impl AlwaysAutofixableViolation for TrailingCommaProhibited {
+impl AlwaysAutofixableViolation for ProhibitedTrailingComma {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Trailing comma prohibited")
@@ -254,13 +254,13 @@ pub fn trailing_commas(
         if comma_prohibited {
             let comma = prev.spanned.unwrap();
             let mut diagnostic = Diagnostic::new(
-                TrailingCommaProhibited,
+                ProhibitedTrailingComma,
                 Range {
                     location: comma.0,
                     end_location: comma.2,
                 },
             );
-            if autofix.into() && settings.rules.should_fix(&Rule::TrailingCommaProhibited) {
+            if autofix.into() && settings.rules.should_fix(Rule::ProhibitedTrailingComma) {
                 diagnostic.amend(Fix::deletion(comma.0, comma.2));
             }
             diagnostics.push(diagnostic);
@@ -273,7 +273,7 @@ pub fn trailing_commas(
         if bare_comma_prohibited {
             let comma = prev.spanned.unwrap();
             diagnostics.push(Diagnostic::new(
-                TrailingCommaOnBareTupleProhibited,
+                TrailingCommaOnBareTuple,
                 Range {
                     location: comma.0,
                     end_location: comma.2,
@@ -298,13 +298,13 @@ pub fn trailing_commas(
         if comma_required {
             let missing_comma = prev_prev.spanned.unwrap();
             let mut diagnostic = Diagnostic::new(
-                TrailingCommaMissing,
+                MissingTrailingComma,
                 Range {
                     location: missing_comma.2,
                     end_location: missing_comma.2,
                 },
             );
-            if autofix.into() && settings.rules.should_fix(&Rule::TrailingCommaMissing) {
+            if autofix.into() && settings.rules.should_fix(Rule::MissingTrailingComma) {
                 // Create a replacement that includes the final bracket (or other token),
                 // rather than just inserting a comma at the end. This prevents the UP034 autofix
                 // removing any brackets in the same linter pass - doing both at the same time could

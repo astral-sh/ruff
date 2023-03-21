@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     name: ComplexStructure
-    body: "`trivial` is too complex (1)"
+    body: "`trivial` is too complex (1 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -17,7 +17,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`expr_as_statement` is too complex (1)"
+    body: "`expr_as_statement` is too complex (1 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -30,7 +30,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`sequential` is too complex (1)"
+    body: "`sequential` is too complex (1 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -43,7 +43,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`if_elif_else_dead_path` is too complex (3)"
+    body: "`if_elif_else_dead_path` is too complex (3 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -56,7 +56,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`nested_ifs` is too complex (3)"
+    body: "`nested_ifs` is too complex (3 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -69,7 +69,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`for_loop` is too complex (2)"
+    body: "`for_loop` is too complex (2 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -82,7 +82,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`for_else` is too complex (2)"
+    body: "`for_else` is too complex (2 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -95,7 +95,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`recursive` is too complex (2)"
+    body: "`recursive` is too complex (2 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -108,7 +108,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`nested_functions` is too complex (3)"
+    body: "`nested_functions` is too complex (3 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -121,7 +121,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`a` is too complex (2)"
+    body: "`a` is too complex (2 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -134,7 +134,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`b` is too complex (1)"
+    body: "`b` is too complex (1 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -147,7 +147,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`try_else` is too complex (4)"
+    body: "`try_else` is too complex (4 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -160,7 +160,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`nested_try_finally` is too complex (1)"
+    body: "`nested_try_finally` is too complex (1 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -173,7 +173,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`foobar` is too complex (3)"
+    body: "`foobar` is too complex (3 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -186,7 +186,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`annotated_assign` is too complex (1)"
+    body: "`annotated_assign` is too complex (1 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -199,7 +199,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`handle` is too complex (9)"
+    body: "`handle` is too complex (9 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -212,7 +212,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`a` is too complex (1)"
+    body: "`a` is too complex (1 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -225,7 +225,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`b` is too complex (2)"
+    body: "`b` is too complex (2 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -238,7 +238,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`c` is too complex (1)"
+    body: "`c` is too complex (1 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -251,7 +251,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`error` is too complex (1)"
+    body: "`error` is too complex (1 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -264,7 +264,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`info` is too complex (1)"
+    body: "`info` is too complex (1 > 0)"
     suggestion: ~
     fixable: false
   location:
@@ -277,7 +277,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ComplexStructure
-    body: "`exception` is too complex (1)"
+    body: "`exception` is too complex (1 > 0)"
     suggestion: ~
     fixable: false
   location:

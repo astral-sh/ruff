@@ -80,7 +80,7 @@ pub fn unnecessary_double_cast_or_process(
         )
     }
 
-    let Some(outer) = helpers::function_name(func) else {
+    let Some(outer) = helpers::expr_name(func) else {
         return;
     };
     if !(outer == "list"
@@ -97,7 +97,7 @@ pub fn unnecessary_double_cast_or_process(
     let ExprKind::Call { func, .. } = &arg.node else {
         return;
     };
-    let Some(inner) = helpers::function_name(func) else {
+    let Some(inner) = helpers::expr_name(func) else {
         return;
     };
     if !checker.ctx.is_builtin(inner) || !checker.ctx.is_builtin(outer) {

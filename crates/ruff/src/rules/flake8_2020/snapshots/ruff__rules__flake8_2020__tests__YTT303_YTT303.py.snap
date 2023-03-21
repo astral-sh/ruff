@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_2020/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: SysVersionSlice1Referenced
+    name: SysVersionSlice1
     body: "`sys.version[:1]` referenced (python10), use `sys.version_info`"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: SysVersionSlice1Referenced
+    name: SysVersionSlice1
     body: "`sys.version[:1]` referenced (python10), use `sys.version_info`"
     suggestion: ~
     fixable: false

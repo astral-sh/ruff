@@ -18,7 +18,7 @@ impl Violation for TooManyBranches {
             branches,
             max_branches,
         } = self;
-        format!("Too many branches ({branches}/{max_branches})")
+        format!("Too many branches ({branches} > {max_branches})")
     }
 }
 

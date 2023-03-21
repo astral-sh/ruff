@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: PrefixTypeParams
+    name: UnprefixedTypeParam
     body: "Name of private `TypeVar` must start with `_`"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PrefixTypeParams
+    name: UnprefixedTypeParam
     body: "Name of private `TypeVarTuple` must start with `_`"
     suggestion: ~
     fixable: false
@@ -29,7 +29,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: PrefixTypeParams
+    name: UnprefixedTypeParam
     body: "Name of private `ParamSpec` must start with `_`"
     suggestion: ~
     fixable: false

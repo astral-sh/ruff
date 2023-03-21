@@ -19,9 +19,9 @@ mod tests {
     use super::settings::{Convention, Settings};
 
     #[test_case(Rule::BlankLineAfterLastSection, Path::new("sections.py"); "D413")]
-    #[test_case(Rule::BlankLineAfterSection, Path::new("sections.py"); "D410")]
+    #[test_case(Rule::NoBlankLineAfterSection, Path::new("sections.py"); "D410")]
     #[test_case(Rule::BlankLineAfterSummary, Path::new("D.py"); "D205")]
-    #[test_case(Rule::BlankLineBeforeSection, Path::new("sections.py"); "D411")]
+    #[test_case(Rule::NoBlankLineBeforeSection, Path::new("sections.py"); "D411")]
     #[test_case(Rule::CapitalizeSectionName, Path::new("sections.py"); "D405")]
     #[test_case(Rule::DashedUnderlineAfterSection, Path::new("sections.py"); "D407")]
     #[test_case(Rule::UndocumentedParam, Path::new("canonical_google_examples.py"); "D417_2")]
@@ -33,35 +33,35 @@ mod tests {
     #[test_case(Rule::FirstLineCapitalized, Path::new("D.py"); "D403")]
     #[test_case(Rule::FitsOnOneLine, Path::new("D.py"); "D200")]
     #[test_case(Rule::IndentWithSpaces, Path::new("D.py"); "D206")]
-    #[test_case(Rule::MagicMethod, Path::new("D.py"); "D105")]
+    #[test_case(Rule::UndocumentedMagicMethod, Path::new("D.py"); "D105")]
     #[test_case(Rule::MultiLineSummaryFirstLine, Path::new("D.py"); "D212")]
     #[test_case(Rule::MultiLineSummarySecondLine, Path::new("D.py"); "D213")]
     #[test_case(Rule::NewLineAfterLastParagraph, Path::new("D.py"); "D209")]
     #[test_case(Rule::NewLineAfterSectionName, Path::new("sections.py"); "D406")]
     #[test_case(Rule::NoBlankLineAfterFunction, Path::new("D.py"); "D202_0")]
     #[test_case(Rule::NoBlankLineAfterFunction, Path::new("D202.py"); "D202_1")]
-    #[test_case(Rule::NoBlankLineBeforeClass, Path::new("D.py"); "D211")]
+    #[test_case(Rule::BlankLineBeforeClass, Path::new("D.py"); "D211")]
     #[test_case(Rule::NoBlankLineBeforeFunction, Path::new("D.py"); "D201")]
-    #[test_case(Rule::NoBlankLinesBetweenHeaderAndContent, Path::new("sections.py"); "D412")]
-    #[test_case(Rule::NoOverIndentation, Path::new("D.py"); "D208")]
+    #[test_case(Rule::BlankLinesBetweenHeaderAndContent, Path::new("sections.py"); "D412")]
+    #[test_case(Rule::OverIndentation, Path::new("D.py"); "D208")]
     #[test_case(Rule::NoSignature, Path::new("D.py"); "D402")]
-    #[test_case(Rule::NoSurroundingWhitespace, Path::new("D.py"); "D210")]
+    #[test_case(Rule::SurroundingWhitespace, Path::new("D.py"); "D210")]
     #[test_case(Rule::DocstringStartsWithThis, Path::new("D.py"); "D404")]
-    #[test_case(Rule::NoUnderIndentation, Path::new("D.py"); "D207")]
+    #[test_case(Rule::UnderIndentation, Path::new("D.py"); "D207")]
     #[test_case(Rule::EmptyDocstring, Path::new("D.py"); "D419")]
     #[test_case(Rule::EmptyDocstringSection, Path::new("sections.py"); "D414")]
     #[test_case(Rule::NonImperativeMood, Path::new("D401.py"); "D401")]
     #[test_case(Rule::OneBlankLineAfterClass, Path::new("D.py"); "D204")]
     #[test_case(Rule::OneBlankLineBeforeClass, Path::new("D.py"); "D203")]
-    #[test_case(Rule::PublicClass, Path::new("D.py"); "D101")]
-    #[test_case(Rule::PublicFunction, Path::new("D.py"); "D103")]
-    #[test_case(Rule::PublicInit, Path::new("D.py"); "D107")]
-    #[test_case(Rule::PublicMethod, Path::new("D.py"); "D102_0")]
-    #[test_case(Rule::PublicMethod, Path::new("setter.py"); "D102_1")]
-    #[test_case(Rule::PublicModule, Path::new("D.py"); "D100")]
-    #[test_case(Rule::PublicNestedClass, Path::new("D.py"); "D106")]
-    #[test_case(Rule::PublicPackage, Path::new("D.py"); "D104_0")]
-    #[test_case(Rule::PublicPackage, Path::new("D104/__init__.py"); "D104_1")]
+    #[test_case(Rule::UndocumentedPublicClass, Path::new("D.py"); "D101")]
+    #[test_case(Rule::UndocumentedPublicFunction, Path::new("D.py"); "D103")]
+    #[test_case(Rule::UndocumentedPublicInit, Path::new("D.py"); "D107")]
+    #[test_case(Rule::UndocumentedPublicMethod, Path::new("D.py"); "D102_0")]
+    #[test_case(Rule::UndocumentedPublicMethod, Path::new("setter.py"); "D102_1")]
+    #[test_case(Rule::UndocumentedPublicModule, Path::new("D.py"); "D100")]
+    #[test_case(Rule::UndocumentedPublicNestedClass, Path::new("D.py"); "D106")]
+    #[test_case(Rule::UndocumentedPublicPackage, Path::new("D.py"); "D104_0")]
+    #[test_case(Rule::UndocumentedPublicPackage, Path::new("D104/__init__.py"); "D104_1")]
     #[test_case(Rule::SectionNameEndsInColon, Path::new("D.py"); "D416")]
     #[test_case(Rule::SectionNotOverIndented, Path::new("sections.py"); "D214")]
     #[test_case(Rule::SectionUnderlineAfterName, Path::new("sections.py"); "D408")]
@@ -149,6 +149,16 @@ mod tests {
                 },
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn d209_d400() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("pydocstyle/D209_D400.py"),
+            &settings::Settings::for_rules([Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod]),
         )?;
         assert_yaml_snapshot!(diagnostics);
         Ok(())

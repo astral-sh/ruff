@@ -41,11 +41,11 @@ impl AlwaysAutofixableViolation for OneBlankLineAfterClass {
 }
 
 #[violation]
-pub struct NoBlankLineBeforeClass {
+pub struct BlankLineBeforeClass {
     pub lines: usize,
 }
 
-impl AlwaysAutofixableViolation for NoBlankLineBeforeClass {
+impl AlwaysAutofixableViolation for BlankLineBeforeClass {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("No blank lines allowed before class docstring")
@@ -65,11 +65,8 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
     if checker
         .settings
         .rules
-        .enabled(&Rule::OneBlankLineBeforeClass)
-        || checker
-            .settings
-            .rules
-            .enabled(&Rule::NoBlankLineBeforeClass)
+        .enabled(Rule::OneBlankLineBeforeClass)
+        || checker.settings.rules.enabled(Rule::BlankLineBeforeClass)
     {
         let before = checker
             .locator
@@ -81,14 +78,10 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
             .skip(1)
             .take_while(|line| line.trim().is_empty())
             .count();
-        if checker
-            .settings
-            .rules
-            .enabled(&Rule::NoBlankLineBeforeClass)
-        {
+        if checker.settings.rules.enabled(Rule::BlankLineBeforeClass) {
             if blank_lines_before != 0 {
                 let mut diagnostic = Diagnostic::new(
-                    NoBlankLineBeforeClass {
+                    BlankLineBeforeClass {
                         lines: blank_lines_before,
                     },
                     Range::from(docstring.expr),
@@ -106,7 +99,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         if checker
             .settings
             .rules
-            .enabled(&Rule::OneBlankLineBeforeClass)
+            .enabled(Rule::OneBlankLineBeforeClass)
         {
             if blank_lines_before != 1 {
                 let mut diagnostic = Diagnostic::new(
@@ -128,11 +121,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
         }
     }
 
-    if checker
-        .settings
-        .rules
-        .enabled(&Rule::OneBlankLineAfterClass)
-    {
+    if checker.settings.rules.enabled(Rule::OneBlankLineAfterClass) {
         let after = checker.locator.slice(Range::new(
             docstring.expr.end_location.unwrap(),
             parent.end_location.unwrap(),

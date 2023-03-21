@@ -16,7 +16,7 @@ pub use except_with_non_exception_classes::{
 };
 pub use f_string_docstring::{f_string_docstring, FStringDocstring};
 pub use function_call_argument_default::{
-    function_call_argument_default, FunctionCallArgumentDefault,
+    function_call_argument_default, FunctionCallInDefaultArgument,
 };
 pub use function_uses_loop_variable::{function_uses_loop_variable, FunctionUsesLoopVariable};
 pub use getattr_with_constant::{getattr_with_constant, GetAttrWithConstant};
@@ -25,6 +25,7 @@ pub use loop_variable_overrides_iterator::{
     loop_variable_overrides_iterator, LoopVariableOverridesIterator,
 };
 pub use mutable_argument_default::{mutable_argument_default, MutableArgumentDefault};
+pub use no_explicit_stacklevel::{no_explicit_stacklevel, NoExplicitStacklevel};
 pub use raise_without_from_inside_except::{
     raise_without_from_inside_except, RaiseWithoutFromInsideExcept,
 };
@@ -63,6 +64,7 @@ mod getattr_with_constant;
 mod jump_statement_in_finally;
 mod loop_variable_overrides_iterator;
 mod mutable_argument_default;
+mod no_explicit_stacklevel;
 mod raise_without_from_inside_except;
 mod redundant_tuple_in_exception_handler;
 mod setattr_with_constant;

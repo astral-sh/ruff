@@ -13,33 +13,33 @@ use super::super::types;
 use super::helpers::{is_pytest_parametrize, split_names};
 
 #[violation]
-pub struct ParametrizeNamesWrongType {
+pub struct PytestParametrizeNamesWrongType {
     pub expected: types::ParametrizeNameType,
 }
 
-impl AlwaysAutofixableViolation for ParametrizeNamesWrongType {
+impl AlwaysAutofixableViolation for PytestParametrizeNamesWrongType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ParametrizeNamesWrongType { expected } = self;
+        let PytestParametrizeNamesWrongType { expected } = self;
         format!("Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}`")
     }
 
     fn autofix_title(&self) -> String {
-        let ParametrizeNamesWrongType { expected } = self;
+        let PytestParametrizeNamesWrongType { expected } = self;
         format!("Use a `{expected}` for parameter names")
     }
 }
 
 #[violation]
-pub struct ParametrizeValuesWrongType {
+pub struct PytestParametrizeValuesWrongType {
     pub values: types::ParametrizeValuesType,
     pub row: types::ParametrizeValuesRowType,
 }
 
-impl Violation for ParametrizeValuesWrongType {
+impl Violation for PytestParametrizeValuesWrongType {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ParametrizeValuesWrongType { values, row } = self;
+        let PytestParametrizeValuesWrongType { values, row } = self;
         format!("Wrong values type in `@pytest.mark.parametrize` expected `{values}` of `{row}`")
     }
 }
@@ -94,7 +94,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
                         let mut diagnostic = Diagnostic::new(
-                            ParametrizeNamesWrongType {
+                            PytestParametrizeNamesWrongType {
                                 expected: names_type,
                             },
                             Range::from(expr),
@@ -127,7 +127,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     }
                     types::ParametrizeNameType::List => {
                         let mut diagnostic = Diagnostic::new(
-                            ParametrizeNamesWrongType {
+                            PytestParametrizeNamesWrongType {
                                 expected: names_type,
                             },
                             Range::from(expr),
@@ -169,7 +169,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     types::ParametrizeNameType::Tuple => {}
                     types::ParametrizeNameType::List => {
                         let mut diagnostic = Diagnostic::new(
-                            ParametrizeNamesWrongType {
+                            PytestParametrizeNamesWrongType {
                                 expected: names_type,
                             },
                             Range::from(expr),
@@ -191,7 +191,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     }
                     types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
-                            ParametrizeNamesWrongType {
+                            PytestParametrizeNamesWrongType {
                                 expected: names_type,
                             },
                             Range::from(expr),
@@ -220,7 +220,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     types::ParametrizeNameType::List => {}
                     types::ParametrizeNameType::Tuple => {
                         let mut diagnostic = Diagnostic::new(
-                            ParametrizeNamesWrongType {
+                            PytestParametrizeNamesWrongType {
                                 expected: names_type,
                             },
                             Range::from(expr),
@@ -245,7 +245,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                     }
                     types::ParametrizeNameType::Csv => {
                         let mut diagnostic = Diagnostic::new(
-                            ParametrizeNamesWrongType {
+                            PytestParametrizeNamesWrongType {
                                 expected: names_type,
                             },
                             Range::from(expr),
@@ -291,7 +291,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         ExprKind::List { elts, .. } => {
             if values_type != types::ParametrizeValuesType::List {
                 checker.diagnostics.push(Diagnostic::new(
-                    ParametrizeValuesWrongType {
+                    PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
                     },
@@ -305,7 +305,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
         ExprKind::Tuple { elts, .. } => {
             if values_type != types::ParametrizeValuesType::Tuple {
                 checker.diagnostics.push(Diagnostic::new(
-                    ParametrizeValuesWrongType {
+                    PytestParametrizeValuesWrongType {
                         values: values_type,
                         row: values_row_type,
                     },
@@ -322,7 +322,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
 
 fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     let mut diagnostic = Diagnostic::new(
-        ParametrizeNamesWrongType {
+        PytestParametrizeNamesWrongType {
             expected: types::ParametrizeNameType::Csv,
         },
         Range::from(expr),
@@ -349,7 +349,7 @@ fn handle_value_rows(
             ExprKind::Tuple { .. } => {
                 if values_row_type != types::ParametrizeValuesRowType::Tuple {
                     checker.diagnostics.push(Diagnostic::new(
-                        ParametrizeValuesWrongType {
+                        PytestParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
                         },
@@ -360,7 +360,7 @@ fn handle_value_rows(
             ExprKind::List { .. } => {
                 if values_row_type != types::ParametrizeValuesRowType::List {
                     checker.diagnostics.push(Diagnostic::new(
-                        ParametrizeValuesWrongType {
+                        PytestParametrizeValuesWrongType {
                             values: values_type,
                             row: values_row_type,
                         },
@@ -380,7 +380,7 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
                 if checker
                     .settings
                     .rules
-                    .enabled(&Rule::ParametrizeNamesWrongType)
+                    .enabled(Rule::PytestParametrizeNamesWrongType)
                 {
                     if let Some(names) = args.get(0) {
                         check_names(checker, names);
@@ -389,7 +389,7 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
                 if checker
                     .settings
                     .rules
-                    .enabled(&Rule::ParametrizeValuesWrongType)
+                    .enabled(Rule::PytestParametrizeValuesWrongType)
                 {
                     if let Some(names) = args.get(0) {
                         if let Some(values) = args.get(1) {

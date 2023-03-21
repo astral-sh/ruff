@@ -9,7 +9,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
 use crate::linter::FixTable;
-use crate::registry::AsRule;
+use crate::registry::{AsRule, Rule};
 
 pub mod helpers;
 
@@ -39,7 +39,7 @@ fn apply_fixes<'a>(
                 .as_ref()
                 .map(|fix| (diagnostic.kind.rule(), fix))
         })
-        .sorted_by_key(|(.., fix)| fix.location)
+        .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
         // If we already applied an identical fix as part of another correction, skip
         // any re-application.
@@ -92,6 +92,18 @@ pub(crate) fn apply_fix(fix: &Fix, locator: &Locator) -> String {
     output
 }
 
+/// Compare two fixes.
+fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
+    fix1.location
+        .cmp(&fix2.location)
+        .then_with(|| match (&rule1, &rule2) {
+            // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
+            (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
+            (Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod) => std::cmp::Ordering::Greater,
+            _ => std::cmp::Ordering::Equal,
+        })
+}
+
 #[cfg(test)]
 mod tests {
     use rustpython_parser::ast::Location;
@@ -101,14 +113,14 @@ mod tests {
     use ruff_python_ast::source_code::Locator;
 
     use crate::autofix::{apply_fix, apply_fixes};
-    use crate::rules::pycodestyle::rules::NoNewLineAtEndOfFile;
+    use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
     fn create_diagnostics(fixes: impl IntoIterator<Item = Fix>) -> Vec<Diagnostic> {
         fixes
             .into_iter()
             .map(|fix| Diagnostic {
                 // The choice of rule here is arbitrary.
-                kind: NoNewLineAtEndOfFile.into(),
+                kind: MissingNewlineAtEndOfFile.into(),
                 location: fix.location,
                 end_location: fix.end_location,
                 fix: Some(fix),

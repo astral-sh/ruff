@@ -2,3 +2,6 @@ avoid-*
 do-not-*
 uses-*
 *-used
+rewrite-*
+prefer-*
+consider-*

@@ -8,10 +8,10 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct TypedArgumentSimpleDefaults;
+pub struct TypedArgumentDefaultInStub;
 
 /// PYI011
-impl AlwaysAutofixableViolation for TypedArgumentSimpleDefaults {
+impl AlwaysAutofixableViolation for TypedArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Only simple default values allowed for typed arguments")
@@ -23,10 +23,10 @@ impl AlwaysAutofixableViolation for TypedArgumentSimpleDefaults {
 }
 
 #[violation]
-pub struct ArgumentSimpleDefaults;
+pub struct ArgumentDefaultInStub;
 
 /// PYI014
-impl Violation for ArgumentSimpleDefaults {
+impl Violation for ArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Only simple default values allowed for arguments")
@@ -194,7 +194,7 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 if arg.node.annotation.is_some() {
                     if !is_valid_default_value_with_annotation(default, checker) {
                         let mut diagnostic =
-                            Diagnostic::new(TypedArgumentSimpleDefaults, Range::from(default));
+                            Diagnostic::new(TypedArgumentDefaultInStub, Range::from(default));
 
                         if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::replacement(
@@ -221,7 +221,7 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 if kwarg.node.annotation.is_some() {
                     if !is_valid_default_value_with_annotation(default, checker) {
                         let mut diagnostic =
-                            Diagnostic::new(TypedArgumentSimpleDefaults, Range::from(default));
+                            Diagnostic::new(TypedArgumentDefaultInStub, Range::from(default));
 
                         if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.amend(Fix::replacement(
@@ -250,10 +250,9 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
             {
                 if arg.node.annotation.is_none() {
                     if !is_valid_default_value_with_annotation(default, checker) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            ArgumentSimpleDefaults,
-                            Range::from(default),
-                        ));
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(ArgumentDefaultInStub, Range::from(default)));
                     }
                 }
             }
@@ -269,10 +268,9 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
             {
                 if kwarg.node.annotation.is_none() {
                     if !is_valid_default_value_with_annotation(default, checker) {
-                        checker.diagnostics.push(Diagnostic::new(
-                            ArgumentSimpleDefaults,
-                            Range::from(default),
-                        ));
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(ArgumentDefaultInStub, Range::from(default)));
                     }
                 }
             }

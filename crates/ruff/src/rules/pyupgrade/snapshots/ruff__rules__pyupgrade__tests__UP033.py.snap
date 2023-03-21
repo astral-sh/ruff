@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: FunctoolsCache
+    name: LRUCacheWithMaxsizeNone
     body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
     suggestion: "Rewrite with `@functools.cache"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    name: FunctoolsCache
+    name: LRUCacheWithMaxsizeNone
     body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
     suggestion: "Rewrite with `@functools.cache"
     fixable: true
@@ -36,7 +36,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: FunctoolsCache
+    name: LRUCacheWithMaxsizeNone
     body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
     suggestion: "Rewrite with `@functools.cache"
     fixable: true
@@ -56,7 +56,7 @@ expression: diagnostics
       column: 34
   parent: ~
 - kind:
-    name: FunctoolsCache
+    name: LRUCacheWithMaxsizeNone
     body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
     suggestion: "Rewrite with `@functools.cache"
     fixable: true

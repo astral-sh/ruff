@@ -1,0 +1,83 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: RepeatedIsinstanceCalls
+    body: "Merge these isinstance calls: `isinstance(var[3], (float, int))`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 15
+    column: 7
+  end_location:
+    row: 15
+    column: 96
+  fix: ~
+  parent: ~
+- kind:
+    name: RepeatedIsinstanceCalls
+    body: "Merge these isinstance calls: `isinstance(var[4], (float, int))`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 17
+    column: 13
+  end_location:
+    row: 17
+    column: 103
+  fix: ~
+  parent: ~
+- kind:
+    name: RepeatedIsinstanceCalls
+    body: "Merge these isinstance calls: `isinstance(var[5], (float, int))`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 19
+    column: 13
+  end_location:
+    row: 19
+    column: 73
+  fix: ~
+  parent: ~
+- kind:
+    name: RepeatedIsinstanceCalls
+    body: "Merge these isinstance calls: `isinstance(var[10], (list, str))`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 23
+    column: 13
+  end_location:
+    row: 23
+    column: 158
+  fix: ~
+  parent: ~
+- kind:
+    name: RepeatedIsinstanceCalls
+    body: "Merge these isinstance calls: `isinstance(var[11], (float, int))`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 24
+    column: 13
+  end_location:
+    row: 24
+    column: 95
+  fix: ~
+  parent: ~
+- kind:
+    name: RepeatedIsinstanceCalls
+    body: "Merge these isinstance calls: `isinstance(var[12], (float, int, list))`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 30
+    column: 13
+  end_location:
+    row: 30
+    column: 75
+  fix: ~
+  parent: ~
+

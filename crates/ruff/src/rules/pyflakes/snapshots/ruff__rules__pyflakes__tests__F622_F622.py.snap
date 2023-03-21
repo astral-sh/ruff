@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: TwoStarredExpressions
+    name: MultipleStarredExpressions
     body: Two starred expressions in assignment
     suggestion: ~
     fixable: false

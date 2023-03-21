@@ -74,6 +74,14 @@ pub fn compare_to_empty_string(
     ops: &[Cmpop],
     comparators: &[Expr],
 ) {
+    // Omit string comparison rules within subscripts. This is mostly commonly used within
+    // DataFrame and np.ndarray indexing.
+    for parent in checker.ctx.expr_ancestors() {
+        if matches!(parent.node, ExprKind::Subscript { .. }) {
+            return;
+        }
+    }
+
     let mut first = true;
     for ((lhs, rhs), op) in std::iter::once(left)
         .chain(comparators.iter())

@@ -9,9 +9,9 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct PrintFound;
+pub struct Print;
 
-impl Violation for PrintFound {
+impl Violation for Print {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`print` found")
@@ -19,9 +19,9 @@ impl Violation for PrintFound {
 }
 
 #[violation]
-pub struct PPrintFound;
+pub struct PPrint;
 
-impl Violation for PPrintFound {
+impl Violation for PPrint {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`pprint` found")
@@ -54,11 +54,11 @@ pub fn print_call(checker: &mut Checker, func: &Expr, keywords: &[Keyword]) {
                     }
                 }
             }
-            Diagnostic::new(PrintFound, Range::from(func))
+            Diagnostic::new(Print, Range::from(func))
         } else if call_path.as_ref().map_or(false, |call_path| {
             *call_path.as_slice() == ["pprint", "pprint"]
         }) {
-            Diagnostic::new(PPrintFound, Range::from(func))
+            Diagnostic::new(PPrint, Range::from(func))
         } else {
             return;
         }

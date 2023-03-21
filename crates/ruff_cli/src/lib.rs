@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::CommandFactory;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
-use std::io;
+use std::io::{self, BufWriter};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -18,6 +18,7 @@ pub mod args;
 mod cache;
 mod commands;
 mod diagnostics;
+mod panic;
 mod printer;
 mod resolve;
 
@@ -46,7 +47,6 @@ pub fn run(
         log_level_args,
     }: Args,
 ) -> Result<ExitStatus> {
-    #[cfg(not(debug_assertions))]
     {
         use colored::Colorize;
 
@@ -69,11 +69,15 @@ quoting the executed command, along with the relevant file contents and `pyproje
         }));
     }
 
+    // Enabled ANSI colors on Windows 10.
+    #[cfg(windows)]
+    assert!(colored::control::set_virtual_terminal(true).is_ok());
+
     let log_level: LogLevel = (&log_level_args).into();
     set_up_logging(&log_level)?;
 
     match command {
-        Command::Rule { rule, format } => commands::rule::rule(&rule, format)?,
+        Command::Rule { rule, format } => commands::rule::rule(rule, format)?,
         Command::Config { option } => return Ok(commands::config::config(option.as_deref())),
         Command::Linter { format } => commands::linter::linter(format)?,
         Command::Clean => commands::clean::clean(log_level)?,
@@ -258,7 +262,8 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             if cli.statistics {
                 printer.write_statistics(&diagnostics)?;
             } else {
-                printer.write_once(&diagnostics)?;
+                let mut stdout = BufWriter::new(io::stdout().lock());
+                printer.write_once(&diagnostics, &mut stdout)?;
             }
         }
 

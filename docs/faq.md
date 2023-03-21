@@ -65,6 +65,7 @@ natively, including:
 - [pydocstyle](https://pypi.org/project/pydocstyle/)
 - [pygrep-hooks](https://github.com/pre-commit/pygrep-hooks) ([#980](https://github.com/charliermarsh/ruff/issues/980))
 - [pyupgrade](https://pypi.org/project/pyupgrade/)
+- [tryceratops](https://pypi.org/project/tryceratops/)
 - [yesqa](https://github.com/asottile/yesqa)
 
 Note that, in some cases, Ruff uses different rule codes and prefixes than would be found in the
@@ -94,7 +95,7 @@ Ruff is not a "pure" drop-in replacement for Pylint (and vice versa), as they en
 of rules.
 
 Despite these differences, many users have successfully switched from Pylint to Ruff, especially
-those using Ruff alongside a [type checker](https://github.com/charliermarsh/ruff#how-does-ruff-compare-to-mypy-or-pyright-or-pyre),
+those using Ruff alongside a [type checker](faq.md#how-does-ruff-compare-to-mypy-or-pyright-or-pyre),
 which can cover some of the functionality that Pylint provides.
 
 Like Flake8, Pylint supports plugins (called "checkers"), while Ruff implements all rules natively.
@@ -157,6 +158,7 @@ Today, Ruff can be used to replace Flake8 when used with any of the following pl
 - [pandas-vet](https://pypi.org/project/pandas-vet/)
 - [pep8-naming](https://pypi.org/project/pep8-naming/)
 - [pydocstyle](https://pypi.org/project/pydocstyle/)
+- [tryceratops](https://pypi.org/project/tryceratops/)
 
 Ruff can also replace [isort](https://pypi.org/project/isort/),
 [yesqa](https://github.com/asottile/yesqa), [eradicate](https://pypi.org/project/eradicate/), and

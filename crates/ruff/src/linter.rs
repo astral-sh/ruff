@@ -53,7 +53,7 @@ impl<T> LinterResult<T> {
 
 type DiagnosticsAndImports = (Vec<Diagnostic>, Imports);
 pub type MessagesAndImports = (Vec<Message>, Imports);
-pub type FixTable = FxHashMap<&'static Rule, usize>;
+pub type FixTable = FxHashMap<Rule, usize>;
 
 /// Generate `Diagnostic`s from the source code contents at the
 /// given `Path`.
@@ -78,7 +78,7 @@ pub fn check_path(
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
     // (for docstrings), which demands special-casing at this level.
-    let use_doc_lines = settings.rules.enabled(&Rule::DocLineTooLong);
+    let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
         doc_lines.extend(doc_lines_from_tokens(&tokens));
@@ -165,14 +165,14 @@ pub fn check_path(
                 }
             }
             Err(parse_error) => {
-                if settings.rules.enabled(&Rule::SyntaxError) {
+                if settings.rules.enabled(Rule::SyntaxError) {
                     pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error);
                 }
 
                 // If the syntax error is ignored, suppress it (regardless of whether
                 // `Rule::SyntaxError` is enabled).
                 if !rule_is_ignored(
-                    &Rule::SyntaxError,
+                    Rule::SyntaxError,
                     parse_error.location.row(),
                     &directives.noqa_line_for,
                     locator,

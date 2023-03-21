@@ -33,9 +33,9 @@ use crate::rules::pandas_vet::fixes::fix_inplace_argument;
 /// ## References
 /// - [_Why You Should Probably Never Use pandas inplace=True_](https://towardsdatascience.com/why-you-should-probably-never-use-pandas-inplace-true-9f9f211849e4)
 #[violation]
-pub struct UseOfInplaceArgument;
+pub struct PandasUseOfInplaceArgument;
 
-impl AlwaysAutofixableViolation for UseOfInplaceArgument {
+impl AlwaysAutofixableViolation for PandasUseOfInplaceArgument {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`inplace=True` should be avoided; it has inconsistent behavior")
@@ -65,7 +65,8 @@ pub fn inplace_argument(
                 _ => false,
             };
             if is_true_literal {
-                let mut diagnostic = Diagnostic::new(UseOfInplaceArgument, Range::from(keyword));
+                let mut diagnostic =
+                    Diagnostic::new(PandasUseOfInplaceArgument, Range::from(keyword));
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(fix) = fix_inplace_argument(
                         checker.locator,

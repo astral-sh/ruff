@@ -2,7 +2,7 @@ use log::error;
 use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::{AutofixKind, Availability, Violation};
+use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -44,7 +44,7 @@ pub struct UnnecessaryMap {
 }
 
 impl Violation for UnnecessaryMap {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -84,7 +84,7 @@ pub fn unnecessary_map(
         )
     }
 
-    let Some(id) = helpers::function_name(func)  else {
+    let Some(id) = helpers::expr_name(func)  else {
         return;
     };
     match id {
@@ -96,7 +96,7 @@ pub fn unnecessary_map(
             // Exclude the parent if already matched by other arms
             if let Some(parent) = parent {
                 if let ExprKind::Call { func: f, .. } = &parent.node {
-                    if let Some(id_parent) = helpers::function_name(f) {
+                    if let Some(id_parent) = helpers::expr_name(f) {
                         if id_parent == "dict" || id_parent == "set" || id_parent == "list" {
                             return;
                         }

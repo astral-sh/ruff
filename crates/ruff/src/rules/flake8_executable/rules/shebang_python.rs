@@ -7,9 +7,9 @@ use ruff_python_ast::types::Range;
 use crate::rules::flake8_executable::helpers::ShebangDirective;
 
 #[violation]
-pub struct ShebangPython;
+pub struct ShebangMissingPython;
 
-impl Violation for ShebangPython {
+impl Violation for ShebangMissingPython {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Shebang should contain `python`")
@@ -23,7 +23,7 @@ pub fn shebang_python(lineno: usize, shebang: &ShebangDirective) -> Option<Diagn
             None
         } else {
             let diagnostic = Diagnostic::new(
-                ShebangPython,
+                ShebangMissingPython,
                 Range::new(
                     Location::new(lineno + 1, start - 2),
                     Location::new(lineno + 1, *end),

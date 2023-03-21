@@ -1,8 +1,8 @@
-## Ruff Micro-benchmarks
+# Ruff Micro-benchmarks
 
 Benchmarks for the different Ruff-tools.
 
-### Run Benchmark
+## Run Benchmark
 
 You can run the benchmarks with
 
@@ -10,7 +10,7 @@ You can run the benchmarks with
 cargo benchmark
 ```
 
-### Benchmark driven Development
+## Benchmark driven Development
 
 You can use `--save-baseline=<name>` to store an initial baseline benchmark (e.g. on `main`) and then use
 `--benchmark=<name>` to compare against that benchmark. Criterion will print a message telling you if the benchmark improved/regressed compared to that baseline.
@@ -23,7 +23,8 @@ cargo benchmark --save-baseline=main
 cargo benchmark --baseline=main
 ```
 
-### PR Summary
+## PR Summary
+
 You can use `--save-baseline` and `critcmp` to get a pretty comparison between two recordings.
 This is useful to illustrate the improvements of a PR.
 
@@ -43,11 +44,11 @@ You must install [`critcmp`](https://github.com/BurntSushi/critcmp) for the comp
 cargo install critcmp
 ```
 
-### Tips
+## Tips
 
-* Use `cargo benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark linter/pydantic` to only run the pydantic tests.
-* Use `cargo benchmark --quiet` for a more cleaned up output (without statistical relevance)
-* Use `cargo benchmark --quick` to get faster results (more prone to noise)
+- Use `cargo benchmark <filter>` to only run specific benchmarks. For example: `cargo benchmark linter/pydantic` to only run the pydantic tests.
+- Use `cargo benchmark --quiet` for a more cleaned up output (without statistical relevance)
+- Use `cargo benchmark --quick` to get faster results (more prone to noise)
 
 ## Profiling
 
@@ -83,5 +84,5 @@ Then run the profiler with
 cargo instruments -t time --bench linter --profile release-debug -p ruff_benchmark -- --profile-time=1
 ```
 
-* `-t`: Specifies what to profile. Useful options are `time` to profile the wall time and `alloc` for profiling the allocations.
-* You may want to pass an additional filter to run a single test file
+- `-t`: Specifies what to profile. Useful options are `time` to profile the wall time and `alloc` for profiling the allocations.
+- You may want to pass an additional filter to run a single test file

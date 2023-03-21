@@ -22,7 +22,7 @@ pub fn not_empty(checker: &mut Checker, docstring: &Docstring) -> bool {
         return true;
     }
 
-    if checker.settings.rules.enabled(&Rule::EmptyDocstring) {
+    if checker.settings.rules.enabled(Rule::EmptyDocstring) {
         checker
             .diagnostics
             .push(Diagnostic::new(EmptyDocstring, Range::from(docstring.expr)));

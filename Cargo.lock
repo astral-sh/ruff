@@ -780,7 +780,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.256"
+version = "0.0.257"
 dependencies = [
  "anyhow",
  "clap 4.1.8",
@@ -1982,7 +1982,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.256"
+version = "0.0.257"
 dependencies = [
  "anyhow",
  "bisection",
@@ -2025,6 +2025,7 @@ dependencies = [
  "schemars",
  "semver",
  "serde",
+ "serde_json",
  "shellexpand",
  "smallvec",
  "strum",
@@ -2041,7 +2042,10 @@ version = "0.0.0"
 dependencies = [
  "criterion",
  "mimalloc",
+ "once_cell",
  "ruff",
+ "serde",
+ "serde_json",
  "tikv-jemallocator",
  "ureq",
  "url",
@@ -2060,7 +2064,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.256"
+version = "0.0.257"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2089,6 +2093,7 @@ dependencies = [
  "ruff_cache",
  "ruff_diagnostics",
  "ruff_python_ast",
+ "ruff_python_stdlib",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -2504,6 +2509,7 @@ version = "1.0.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cad406b69c91885b5107daf2c29572f6c8cdb3c66826821e286c533490c0bc76"
 dependencies = [
+ "indexmap",
  "itoa",
  "ryu",
  "serde",

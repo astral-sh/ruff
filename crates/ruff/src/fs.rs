@@ -4,9 +4,8 @@ use anyhow::{anyhow, Result};
 use globset::GlobMatcher;
 use log::debug;
 use path_absolutize::{path_dedot, Absolutize};
-use rustc_hash::FxHashSet;
 
-use crate::registry::Rule;
+use crate::registry::RuleSet;
 
 /// Extract the absolute path and basename (as strings) from a Path.
 pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
@@ -22,33 +21,34 @@ pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
 }
 
 /// Create a set with codes matching the pattern/code pairs.
-pub(crate) fn ignores_from_path<'a>(
+pub(crate) fn ignores_from_path(
     path: &Path,
-    pattern_code_pairs: &'a [(GlobMatcher, GlobMatcher, FxHashSet<Rule>)],
-) -> FxHashSet<&'a Rule> {
+    pattern_code_pairs: &[(GlobMatcher, GlobMatcher, RuleSet)],
+) -> RuleSet {
     let (file_path, file_basename) = extract_path_names(path).expect("Unable to parse filename");
+
     pattern_code_pairs
         .iter()
-        .filter_map(|(absolute, basename, codes)| {
+        .filter_map(|(absolute, basename, rules)| {
             if basename.is_match(file_basename) {
                 debug!(
                     "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
                     path,
                     basename.glob().regex(),
-                    codes
+                    rules
                 );
-                return Some(codes.iter());
-            }
-            if absolute.is_match(file_path) {
+                Some(rules)
+            } else if absolute.is_match(file_path) {
                 debug!(
                     "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
                     path,
                     absolute.glob().regex(),
-                    codes
+                    rules
                 );
-                return Some(codes.iter());
+                Some(rules)
+            } else {
+                None
             }
-            None
         })
         .flatten()
         .collect()

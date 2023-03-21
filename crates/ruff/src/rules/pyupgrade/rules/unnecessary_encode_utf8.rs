@@ -161,7 +161,7 @@ pub fn unnecessary_encode_utf8(
                         expr,
                         variable,
                         checker.locator,
-                        checker.patch(&Rule::UnnecessaryEncodeUTF8),
+                        checker.patch(Rule::UnnecessaryEncodeUTF8),
                     ));
                 } else {
                     // "unicode text©".encode("utf-8")
@@ -169,7 +169,7 @@ pub fn unnecessary_encode_utf8(
                         expr,
                         args,
                         kwargs,
-                        checker.patch(&Rule::UnnecessaryEncodeUTF8),
+                        checker.patch(Rule::UnnecessaryEncodeUTF8),
                     ) {
                         checker.diagnostics.push(diagnostic);
                     }
@@ -183,7 +183,7 @@ pub fn unnecessary_encode_utf8(
                     expr,
                     args,
                     kwargs,
-                    checker.patch(&Rule::UnnecessaryEncodeUTF8),
+                    checker.patch(Rule::UnnecessaryEncodeUTF8),
                 ) {
                     checker.diagnostics.push(diagnostic);
                 }

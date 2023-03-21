@@ -2,6 +2,7 @@
 name = "scripts"
 version = "0.0.1"
 dependencies = ["sphinx"]
+requires-python = ">=3.9"
 
 [tool.black]
 line-length = 88
@@ -11,7 +12,7 @@ line-length = 88
 select = ["ALL"]
 ignore = [
     "PL",  # pylint
-    "S",  # bandit
+    "S",   # bandit
 ]
 
 [tool.ruff.pydocstyle]

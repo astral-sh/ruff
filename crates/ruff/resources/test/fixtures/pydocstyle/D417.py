@@ -113,3 +113,13 @@ def f(x, *args, **kwargs):
         **kwargs: keyword arguments
     """
     return x
+
+
+class Test:
+    def f(self, /, arg1: int) -> None:
+        """
+        Some beauty description.
+
+        Args:
+            arg1: some description of arg
+        """

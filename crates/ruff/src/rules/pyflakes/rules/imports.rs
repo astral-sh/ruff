@@ -2,7 +2,7 @@ use itertools::Itertools;
 use rustpython_parser::ast::Alias;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::{AutofixKind, Availability, Violation};
+use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 use ruff_python_stdlib::future::ALL_FEATURE_NAMES;
@@ -25,7 +25,7 @@ fn fmt_unused_import_autofix_msg(unused_import: &UnusedImport) -> String {
     }
 }
 impl Violation for UnusedImport {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -66,14 +66,14 @@ impl Violation for ImportShadowedByLoopVar {
 }
 
 #[violation]
-pub struct ImportStar {
+pub struct UndefinedLocalWithImportStar {
     pub name: String,
 }
 
-impl Violation for ImportStar {
+impl Violation for UndefinedLocalWithImportStar {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportStar { name } = self;
+        let UndefinedLocalWithImportStar { name } = self;
         format!("`from {name} import *` used; unable to detect undefined names")
     }
 }
@@ -89,15 +89,15 @@ impl Violation for LateFutureImport {
 }
 
 #[violation]
-pub struct ImportStarUsage {
+pub struct UndefinedLocalWithImportStarUsage {
     pub name: String,
     pub sources: Vec<String>,
 }
 
-impl Violation for ImportStarUsage {
+impl Violation for UndefinedLocalWithImportStarUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportStarUsage { name, sources } = self;
+        let UndefinedLocalWithImportStarUsage { name, sources } = self;
         let sources = sources
             .iter()
             .map(|source| format!("`{source}`"))
@@ -107,14 +107,14 @@ impl Violation for ImportStarUsage {
 }
 
 #[violation]
-pub struct ImportStarNotPermitted {
+pub struct UndefinedLocalWithNestedImportStarUsage {
     pub name: String,
 }
 
-impl Violation for ImportStarNotPermitted {
+impl Violation for UndefinedLocalWithNestedImportStarUsage {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ImportStarNotPermitted { name } = self;
+        let UndefinedLocalWithNestedImportStarUsage { name } = self;
         format!("`from {name} import *` only allowed at module level")
     }
 }

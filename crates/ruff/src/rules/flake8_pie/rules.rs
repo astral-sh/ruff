@@ -39,30 +39,30 @@ impl AlwaysAutofixableViolation for UnnecessaryPass {
 }
 
 #[violation]
-pub struct DupeClassFieldDefinitions(pub String);
+pub struct DuplicateClassFieldDefinition(pub String);
 
-impl AlwaysAutofixableViolation for DupeClassFieldDefinitions {
+impl AlwaysAutofixableViolation for DuplicateClassFieldDefinition {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DupeClassFieldDefinitions(name) = self;
+        let DuplicateClassFieldDefinition(name) = self;
         format!("Class field `{name}` is defined multiple times")
     }
 
     fn autofix_title(&self) -> String {
-        let DupeClassFieldDefinitions(name) = self;
+        let DuplicateClassFieldDefinition(name) = self;
         format!("Remove duplicate field definition for `{name}`")
     }
 }
 
 #[violation]
-pub struct PreferUniqueEnums {
+pub struct NonUniqueEnums {
     pub value: String,
 }
 
-impl Violation for PreferUniqueEnums {
+impl Violation for NonUniqueEnums {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let PreferUniqueEnums { value } = self;
+        let NonUniqueEnums { value } = self;
         format!("Enum contains duplicate value: `{value}`")
     }
 }
@@ -122,19 +122,19 @@ impl Violation for UnnecessarySpread {
 }
 
 #[violation]
-pub struct SingleStartsEndsWith {
+pub struct MultipleStartsEndsWith {
     pub attr: String,
 }
 
-impl AlwaysAutofixableViolation for SingleStartsEndsWith {
+impl AlwaysAutofixableViolation for MultipleStartsEndsWith {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let SingleStartsEndsWith { attr } = self;
+        let MultipleStartsEndsWith { attr } = self;
         format!("Call `{attr}` once with a `tuple`")
     }
 
     fn autofix_title(&self) -> String {
-        let SingleStartsEndsWith { attr } = self;
+        let MultipleStartsEndsWith { attr } = self;
         format!("Merge into a single `{attr}` call")
     }
 }
@@ -150,9 +150,9 @@ impl Violation for UnnecessaryDictKwargs {
 }
 
 #[violation]
-pub struct PreferListBuiltin;
+pub struct ReimplementedListBuiltin;
 
-impl AlwaysAutofixableViolation for PreferListBuiltin {
+impl AlwaysAutofixableViolation for ReimplementedListBuiltin {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Prefer `list` over useless lambda")
@@ -216,7 +216,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
 }
 
 /// PIE794
-pub fn dupe_class_field_definitions<'a, 'b>(
+pub fn duplicate_class_field_definition<'a, 'b>(
     checker: &mut Checker<'a>,
     parent: &'b Stmt,
     body: &'b [Stmt],
@@ -249,7 +249,7 @@ pub fn dupe_class_field_definitions<'a, 'b>(
 
         if !seen_targets.insert(target) {
             let mut diagnostic = Diagnostic::new(
-                DupeClassFieldDefinitions(target.to_string()),
+                DuplicateClassFieldDefinition(target.to_string()),
                 Range::from(stmt),
             );
             if checker.patch(diagnostic.kind.rule()) {
@@ -278,7 +278,7 @@ pub fn dupe_class_field_definitions<'a, 'b>(
 }
 
 /// PIE796
-pub fn prefer_unique_enums<'a, 'b>(checker: &mut Checker<'a>, parent: &'b Stmt, body: &'b [Stmt])
+pub fn non_unique_enums<'a, 'b>(checker: &mut Checker<'a>, parent: &'b Stmt, body: &'b [Stmt])
 where
     'b: 'a,
 {
@@ -313,7 +313,7 @@ where
 
         if !seen_targets.insert(ComparableExpr::from(value)) {
             let diagnostic = Diagnostic::new(
-                PreferUniqueEnums {
+                NonUniqueEnums {
                     value: unparse_expr(value, checker.stylist),
                 },
                 Range::from(stmt),
@@ -324,7 +324,7 @@ where
 }
 
 /// PIE800
-pub fn no_unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
+pub fn unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: &[Expr]) {
     for item in keys.iter().zip(values.iter()) {
         if let (None, value) = item {
             // We only care about when the key is None which indicates a spread `**`
@@ -384,7 +384,7 @@ fn is_valid_kwarg_name(key: &Expr) -> bool {
 }
 
 /// PIE804
-pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
+pub fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Keyword]) {
     for kw in kwargs {
         // keyword is a spread operator (indicated by None)
         if kw.node.arg.is_none() {
@@ -403,7 +403,7 @@ pub fn no_unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[
 }
 
 /// PIE810
-pub fn single_starts_ends_with(checker: &mut Checker, expr: &Expr) {
+pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
     let ExprKind::BoolOp { op: Boolop::Or, values } = &expr.node else {
         return;
     };
@@ -445,7 +445,7 @@ pub fn single_starts_ends_with(checker: &mut Checker, expr: &Expr) {
     for ((attr_name, arg_name), indices) in duplicates {
         if indices.len() > 1 {
             let mut diagnostic = Diagnostic::new(
-                SingleStartsEndsWith {
+                MultipleStartsEndsWith {
                     attr: attr_name.to_string(),
                 },
                 Range::from(expr),
@@ -518,7 +518,7 @@ pub fn single_starts_ends_with(checker: &mut Checker, expr: &Expr) {
 }
 
 /// PIE807
-pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
+pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Lambda { args, body } = &expr.node else {
         unreachable!("Expected ExprKind::Lambda");
     };
@@ -530,7 +530,7 @@ pub fn prefer_list_builtin(checker: &mut Checker, expr: &Expr) {
     {
         if let ExprKind::List { elts, .. } = &body.node {
             if elts.is_empty() {
-                let mut diagnostic = Diagnostic::new(PreferListBuiltin, Range::from(expr));
+                let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
                         "list".to_string(),

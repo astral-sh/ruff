@@ -13,9 +13,9 @@ use crate::message::Location;
 use crate::registry::Rule;
 
 #[violation]
-pub struct PublicModule;
+pub struct UndocumentedPublicModule;
 
-impl Violation for PublicModule {
+impl Violation for UndocumentedPublicModule {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing docstring in public module")
@@ -23,9 +23,9 @@ impl Violation for PublicModule {
 }
 
 #[violation]
-pub struct PublicClass;
+pub struct UndocumentedPublicClass;
 
-impl Violation for PublicClass {
+impl Violation for UndocumentedPublicClass {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing docstring in public class")
@@ -33,9 +33,9 @@ impl Violation for PublicClass {
 }
 
 #[violation]
-pub struct PublicMethod;
+pub struct UndocumentedPublicMethod;
 
-impl Violation for PublicMethod {
+impl Violation for UndocumentedPublicMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing docstring in public method")
@@ -43,9 +43,9 @@ impl Violation for PublicMethod {
 }
 
 #[violation]
-pub struct PublicFunction;
+pub struct UndocumentedPublicFunction;
 
-impl Violation for PublicFunction {
+impl Violation for UndocumentedPublicFunction {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing docstring in public function")
@@ -53,9 +53,9 @@ impl Violation for PublicFunction {
 }
 
 #[violation]
-pub struct PublicPackage;
+pub struct UndocumentedPublicPackage;
 
-impl Violation for PublicPackage {
+impl Violation for UndocumentedPublicPackage {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing docstring in public package")
@@ -63,9 +63,9 @@ impl Violation for PublicPackage {
 }
 
 #[violation]
-pub struct MagicMethod;
+pub struct UndocumentedMagicMethod;
 
-impl Violation for MagicMethod {
+impl Violation for UndocumentedMagicMethod {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing docstring in magic method")
@@ -73,9 +73,9 @@ impl Violation for MagicMethod {
 }
 
 #[violation]
-pub struct PublicNestedClass;
+pub struct UndocumentedPublicNestedClass;
 
-impl Violation for PublicNestedClass {
+impl Violation for UndocumentedPublicNestedClass {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing docstring in public nested class")
@@ -83,9 +83,9 @@ impl Violation for PublicNestedClass {
 }
 
 #[violation]
-pub struct PublicInit;
+pub struct UndocumentedPublicInit;
 
-impl Violation for PublicInit {
+impl Violation for UndocumentedPublicInit {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing docstring in `__init__`")
@@ -104,36 +104,52 @@ pub fn not_missing(
 
     match definition.kind {
         DefinitionKind::Module => {
-            if checker.settings.rules.enabled(&Rule::PublicModule) {
+            if checker
+                .settings
+                .rules
+                .enabled(Rule::UndocumentedPublicModule)
+            {
                 checker.diagnostics.push(Diagnostic::new(
-                    PublicModule,
+                    UndocumentedPublicModule,
                     Range::new(Location::new(1, 0), Location::new(1, 0)),
                 ));
             }
             false
         }
         DefinitionKind::Package => {
-            if checker.settings.rules.enabled(&Rule::PublicPackage) {
+            if checker
+                .settings
+                .rules
+                .enabled(Rule::UndocumentedPublicPackage)
+            {
                 checker.diagnostics.push(Diagnostic::new(
-                    PublicPackage,
+                    UndocumentedPublicPackage,
                     Range::new(Location::new(1, 0), Location::new(1, 0)),
                 ));
             }
             false
         }
         DefinitionKind::Class(stmt) => {
-            if checker.settings.rules.enabled(&Rule::PublicClass) {
+            if checker
+                .settings
+                .rules
+                .enabled(Rule::UndocumentedPublicClass)
+            {
                 checker.diagnostics.push(Diagnostic::new(
-                    PublicClass,
+                    UndocumentedPublicClass,
                     identifier_range(stmt, checker.locator),
                 ));
             }
             false
         }
         DefinitionKind::NestedClass(stmt) => {
-            if checker.settings.rules.enabled(&Rule::PublicNestedClass) {
+            if checker
+                .settings
+                .rules
+                .enabled(Rule::UndocumentedPublicNestedClass)
+            {
                 checker.diagnostics.push(Diagnostic::new(
-                    PublicNestedClass,
+                    UndocumentedPublicNestedClass,
                     identifier_range(stmt, checker.locator),
                 ));
             }
@@ -143,9 +159,13 @@ pub fn not_missing(
             if is_overload(&checker.ctx, cast::decorator_list(stmt)) {
                 true
             } else {
-                if checker.settings.rules.enabled(&Rule::PublicFunction) {
+                if checker
+                    .settings
+                    .rules
+                    .enabled(Rule::UndocumentedPublicFunction)
+                {
                     checker.diagnostics.push(Diagnostic::new(
-                        PublicFunction,
+                        UndocumentedPublicFunction,
                         identifier_range(stmt, checker.locator),
                     ));
                 }
@@ -158,33 +178,45 @@ pub fn not_missing(
             {
                 true
             } else if is_init(cast::name(stmt)) {
-                if checker.settings.rules.enabled(&Rule::PublicInit) {
+                if checker.settings.rules.enabled(Rule::UndocumentedPublicInit) {
                     checker.diagnostics.push(Diagnostic::new(
-                        PublicInit,
+                        UndocumentedPublicInit,
                         identifier_range(stmt, checker.locator),
                     ));
                 }
                 true
             } else if is_new(cast::name(stmt)) || is_call(cast::name(stmt)) {
-                if checker.settings.rules.enabled(&Rule::PublicMethod) {
+                if checker
+                    .settings
+                    .rules
+                    .enabled(Rule::UndocumentedPublicMethod)
+                {
                     checker.diagnostics.push(Diagnostic::new(
-                        PublicMethod,
+                        UndocumentedPublicMethod,
                         identifier_range(stmt, checker.locator),
                     ));
                 }
                 true
             } else if is_magic(cast::name(stmt)) {
-                if checker.settings.rules.enabled(&Rule::MagicMethod) {
+                if checker
+                    .settings
+                    .rules
+                    .enabled(Rule::UndocumentedMagicMethod)
+                {
                     checker.diagnostics.push(Diagnostic::new(
-                        MagicMethod,
+                        UndocumentedMagicMethod,
                         identifier_range(stmt, checker.locator),
                     ));
                 }
                 true
             } else {
-                if checker.settings.rules.enabled(&Rule::PublicMethod) {
+                if checker
+                    .settings
+                    .rules
+                    .enabled(Rule::UndocumentedPublicMethod)
+                {
                     checker.diagnostics.push(Diagnostic::new(
-                        PublicMethod,
+                        UndocumentedPublicMethod,
                         identifier_range(stmt, checker.locator),
                     ));
                 }

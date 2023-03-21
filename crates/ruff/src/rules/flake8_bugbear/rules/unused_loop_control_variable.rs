@@ -22,7 +22,7 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 use serde::{Deserialize, Serialize};
 
-use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{Range, RefEquality};
 use ruff_python_ast::visitor::Visitor;
@@ -52,7 +52,7 @@ pub struct UnusedLoopControlVariable {
 }
 
 impl Violation for UnusedLoopControlVariable {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -163,9 +163,8 @@ pub fn unused_loop_control_variable(
         if let Some(rename) = rename {
             if certainty.into() && checker.patch(diagnostic.kind.rule()) {
                 // Find the `BindingKind::LoopVar` corresponding to the name.
-                let scope = checker.ctx.current_scope();
+                let scope = checker.ctx.scope();
                 let binding = scope
-                    .bindings
                     .get(name)
                     .into_iter()
                     .chain(scope.rebounds.get(name).into_iter().flatten())

@@ -48,7 +48,7 @@ mod tests {
         );
         let actual: Vec<Rule> = diagnostics
             .into_iter()
-            .map(|diagnostic| diagnostic.kind.rule().clone())
+            .map(|diagnostic| diagnostic.kind.rule())
             .collect();
         assert_eq!(actual, expected);
     }
@@ -62,7 +62,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         x.drop(['a'], axis=1, inplace=True)
-    "#, &[Rule::UseOfInplaceArgument]; "PD002_fail")]
+    "#, &[Rule::PandasUseOfInplaceArgument]; "PD002_fail")]
     #[test_case(r#"
         import pandas as pd
         nas = pd.isna(val)
@@ -70,7 +70,7 @@ mod tests {
     #[test_case(r#"
         import pandas as pd
         nulls = pd.isnull(val)
-    "#, &[Rule::UseOfDotIsNull]; "PD003_fail")]
+    "#, &[Rule::PandasUseOfDotIsNull]; "PD003_fail")]
     #[test_case(r#"
         import pandas as pd
         print('bah humbug')
@@ -82,7 +82,7 @@ mod tests {
     #[test_case(r#"
         import pandas as pd
         not_nulls = pd.notnull(val)
-    "#, &[Rule::UseOfDotNotNull]; "PD004_fail")]
+    "#, &[Rule::PandasUseOfDotNotNull]; "PD004_fail")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -97,7 +97,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         y = x.ix[[0, 2], 'A']
-    "#, &[Rule::UseOfDotIx]; "PD007_fail")]
+    "#, &[Rule::PandasUseOfDotIx]; "PD007_fail")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -107,7 +107,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         index = x.at[:, ['B', 'A']]
-    "#, &[Rule::UseOfDotAt]; "PD008_fail")]
+    "#, &[Rule::PandasUseOfDotAt]; "PD008_fail")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -117,7 +117,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         index = x.iat[:, 1:3]
-    "#, &[Rule::UseOfDotIat]; "PD009_fail")]
+    "#, &[Rule::PandasUseOfDotIat]; "PD009_fail")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -139,7 +139,7 @@ mod tests {
             columns='bar',
             values='baz'
         )
-    "#, &[Rule::UseOfDotPivotOrUnstack]; "PD010_fail_pivot")]
+    "#, &[Rule::PandasUseOfDotPivotOrUnstack]; "PD010_fail_pivot")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -154,7 +154,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         result = x.values
-    "#, &[Rule::UseOfDotValues]; "PD011_fail_values")]
+    "#, &[Rule::PandasUseOfDotValues]; "PD011_fail_values")]
     #[test_case(r#"
         import pandas as pd
         x = pd.DataFrame()
@@ -183,7 +183,7 @@ mod tests {
     #[test_case(r#"
         import pandas as pd
         employees = pd.read_table(input_file)
-    "#, &[Rule::UseOfDotReadTable]; "PD012_fail_read_table")]
+    "#, &[Rule::PandasUseOfDotReadTable]; "PD012_fail_read_table")]
     #[test_case(r#"
         import pandas as pd
         employees = read_table
@@ -210,7 +210,7 @@ mod tests {
         import pandas as pd
         x = pd.DataFrame()
         y = x.stack(level=-1, dropna=True)
-    "#, &[Rule::UseOfDotStack]; "PD013_fail_stack")]
+    "#, &[Rule::PandasUseOfDotStack]; "PD013_fail_stack")]
     #[test_case(r#"
         import pandas as pd
         pd.stack(
@@ -226,7 +226,7 @@ mod tests {
         x = pd.DataFrame()
         y = pd.DataFrame()
         pd.merge(x, y)
-    "#, &[Rule::UseOfPdMerge]; "PD015_fail_merge_on_pandas_object")]
+    "#, &[Rule::PandasUseOfPdMerge]; "PD015_fail_merge_on_pandas_object")]
     #[test_case(
         "pd.to_datetime(timestamp * 10 ** 9).strftime('%Y-%m-%d %H:%M:%S.%f')",
         &[];
@@ -247,12 +247,12 @@ mod tests {
     #[test_case(r#"
         import pandas as pd
         df = pd.DataFrame()
-    "#, &[Rule::DfIsABadVariableName]; "PD901_fail_df_var")]
+    "#, &[Rule::PandasDfVariableName]; "PD901_fail_df_var")]
     fn test_pandas_vet(code: &str, expected: &[Rule]) {
         rule_code(code, expected);
     }
 
-    #[test_case(Rule::UseOfInplaceArgument, Path::new("PD002.py"); "PD002")]
+    #[test_case(Rule::PandasUseOfInplaceArgument, Path::new("PD002.py"); "PD002")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

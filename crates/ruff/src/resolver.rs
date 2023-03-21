@@ -14,6 +14,7 @@ use ruff_python_stdlib::path::is_python_file;
 use rustc_hash::FxHashSet;
 
 use crate::fs;
+use crate::jupyter::is_jupyter_notebook;
 use crate::settings::configuration::Configuration;
 use crate::settings::pyproject::settings_toml;
 use crate::settings::{pyproject, AllSettings, Settings};
@@ -193,15 +194,15 @@ fn match_exclusion(file_path: &str, file_basename: &str, exclusion: &globset::Gl
     exclusion.is_match(file_path) || exclusion.is_match(file_basename)
 }
 
-/// Return `true` if the [`DirEntry`] appears to be that of a Python file.
+/// Return `true` if the [`DirEntry`] appears to be that of a Python file or jupyter notebook.
 pub fn is_python_entry(entry: &DirEntry) -> bool {
-    is_python_file(entry.path())
+    (is_python_file(entry.path()) || is_jupyter_notebook(entry.path()))
         && !entry
             .file_type()
             .map_or(false, |file_type| file_type.is_dir())
 }
 
-/// Find all Python (`.py` and `.pyi` files) in a set of paths.
+/// Find all Python (`.py`, `.pyi` and `.ipynb` files) in a set of paths.
 pub fn python_files_in_path(
     paths: &[PathBuf],
     pyproject_strategy: &PyprojectDiscovery,
@@ -260,38 +261,6 @@ pub fn python_files_in_path(
         std::sync::Mutex::new(vec![]);
     walker.run(|| {
         Box::new(|result| {
-            // Search for the `pyproject.toml` file in this directory, before we visit any
-            // of its contents.
-            if pyproject_strategy.is_hierarchical() {
-                if let Ok(entry) = &result {
-                    if entry
-                        .file_type()
-                        .map_or(false, |file_type| file_type.is_dir())
-                    {
-                        match settings_toml(entry.path()) {
-                            Ok(Some(pyproject)) => match resolve_scoped_settings(
-                                &pyproject,
-                                &Relativity::Parent,
-                                processor,
-                            ) {
-                                Ok((root, settings)) => {
-                                    resolver.write().unwrap().add(root, settings);
-                                }
-                                Err(err) => {
-                                    *error.lock().unwrap() = Err(err);
-                                    return WalkState::Quit;
-                                }
-                            },
-                            Ok(None) => {}
-                            Err(err) => {
-                                *error.lock().unwrap() = Err(err);
-                                return WalkState::Quit;
-                            }
-                        }
-                    }
-                }
-            }
-
             // Respect our own exclusion behavior.
             if let Ok(entry) = &result {
                 if entry.depth() > 0 {
@@ -319,6 +288,38 @@ pub fn python_files_in_path(
                         Err(err) => {
                             debug!("Ignored path due to error in parsing: {:?}: {}", path, err);
                             return WalkState::Skip;
+                        }
+                    }
+                }
+            }
+
+            // Search for the `pyproject.toml` file in this directory, before we visit any
+            // of its contents.
+            if pyproject_strategy.is_hierarchical() {
+                if let Ok(entry) = &result {
+                    if entry
+                        .file_type()
+                        .map_or(false, |file_type| file_type.is_dir())
+                    {
+                        match settings_toml(entry.path()) {
+                            Ok(Some(pyproject)) => match resolve_scoped_settings(
+                                &pyproject,
+                                &Relativity::Parent,
+                                processor,
+                            ) {
+                                Ok((root, settings)) => {
+                                    resolver.write().unwrap().add(root, settings);
+                                }
+                                Err(err) => {
+                                    *error.lock().unwrap() = Err(err);
+                                    return WalkState::Quit;
+                                }
+                            },
+                            Ok(None) => {}
+                            Err(err) => {
+                                *error.lock().unwrap() = Err(err);
+                                return WalkState::Quit;
+                            }
                         }
                     }
                 }

@@ -17,7 +17,7 @@ mod tests {
     use crate::settings::types::PerFileIgnore;
     use crate::test::test_path;
 
-    #[test_case(Rule::UnpackInsteadOfConcatenatingToCollectionLiteral, Path::new("RUF005.py"); "RUF005")]
+    #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"); "RUF005")]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"); "RUF006")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
@@ -55,7 +55,7 @@ mod tests {
                 Rule::LineTooLong,
                 Rule::UnusedImport,
                 Rule::UnusedVariable,
-                Rule::IndentationContainsTabs,
+                Rule::TabIndentation,
             ]),
         )?;
         assert_yaml_snapshot!(diagnostics);
@@ -137,7 +137,17 @@ mod tests {
     fn redirects() -> Result<()> {
         let diagnostics = test_path(
             Path::new("ruff/redirects.py"),
-            &settings::Settings::for_rules(vec![Rule::TypingUnion]),
+            &settings::Settings::for_rules(vec![Rule::NonPEP604Annotation]),
+        )?;
+        assert_yaml_snapshot!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn ruff_pairwise_over_zipped() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("ruff/RUF007.py"),
+            &settings::Settings::for_rules(vec![Rule::PairwiseOverZipped]),
         )?;
         assert_yaml_snapshot!(diagnostics);
         Ok(())

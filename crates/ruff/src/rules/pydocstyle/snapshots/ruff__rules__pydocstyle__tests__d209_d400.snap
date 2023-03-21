@@ -1,0 +1,45 @@
+---
+source: crates/ruff/src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: NewLineAfterLastParagraph
+    body: Multi-line docstring closing quotes should be on a separate line
+    suggestion: Move closing quotes to new line
+    fixable: true
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 3
+    column: 72
+  fix:
+    content: "\n    "
+    location:
+      row: 3
+      column: 69
+    end_location:
+      row: 3
+      column: 69
+  parent: ~
+- kind:
+    name: EndsInPeriod
+    body: First line should end with a period
+    suggestion: Add period
+    fixable: true
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 3
+    column: 72
+  fix:
+    content: "."
+    location:
+      row: 3
+      column: 69
+    end_location:
+      row: 3
+      column: 69
+  parent: ~
+

@@ -8,7 +8,7 @@ use log::warn;
 use nohash_hasher::IntMap;
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::Diagnostic;
@@ -17,7 +17,7 @@ use ruff_python_ast::source_code::{LineEnding, Locator};
 use ruff_python_ast::types::Range;
 
 use crate::codes::NoqaCode;
-use crate::registry::{AsRule, Rule};
+use crate::registry::{AsRule, Rule, RuleSet};
 use crate::rule_redirects::get_redirect_target;
 
 static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
@@ -121,7 +121,7 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
 
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
-pub fn includes(needle: &Rule, haystack: &[&str]) -> bool {
+pub fn includes(needle: Rule, haystack: &[&str]) -> bool {
     let needle = needle.noqa_code();
     haystack
         .iter()
@@ -130,7 +130,7 @@ pub fn includes(needle: &Rule, haystack: &[&str]) -> bool {
 
 /// Returns `true` if the given [`Rule`] is ignored at the specified `lineno`.
 pub fn rule_is_ignored(
-    code: &Rule,
+    code: Rule,
     lineno: usize,
     noqa_line_for: &IntMap<usize, usize>,
     locator: &Locator,
@@ -174,7 +174,7 @@ fn add_noqa_inner(
     line_ending: &LineEnding,
 ) -> (usize, String) {
     // Map of line number to set of (non-ignored) diagnostic codes that are triggered on that line.
-    let mut matches_by_line: FxHashMap<usize, FxHashSet<&Rule>> = FxHashMap::default();
+    let mut matches_by_line: FxHashMap<usize, RuleSet> = FxHashMap::default();
 
     // Whether the file is exempted from all checks.
     let mut file_exempted = false;
@@ -280,7 +280,7 @@ fn add_noqa_inner(
                         output.push_str("  # noqa: ");
 
                         // Add codes.
-                        push_codes(&mut output, rules.iter().map(|r| r.noqa_code()));
+                        push_codes(&mut output, rules.iter().map(|rule| rule.noqa_code()));
                         output.push_str(line_ending);
                         count += 1;
                     }
