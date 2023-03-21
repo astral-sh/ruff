@@ -8,10 +8,10 @@ use smallvec::smallvec;
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
-use crate::helpers::{collect_call_path, from_relative_import, Exceptions};
+use crate::helpers::{collect_call_path, from_relative_import};
 use crate::scope::{
-    Binding, BindingId, BindingKind, Bindings, ExecutionContext, Scope, ScopeId, ScopeKind,
-    ScopeStack, Scopes,
+    Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, Scope, ScopeId,
+    ScopeKind, ScopeStack, Scopes,
 };
 use crate::types::{CallPath, RefEquality};
 use crate::visibility::{module_visibility, Modifier, VisibleScope};
@@ -308,6 +308,7 @@ impl<'a> Context<'a> {
         self.in_exception_handler
     }
 
+    /// Return the [`ExecutionContext`] of the current scope.
     pub const fn execution_context(&self) -> ExecutionContext {
         if self.in_type_checking_block
             || self.in_annotation
@@ -317,5 +318,14 @@ impl<'a> Context<'a> {
         } else {
             ExecutionContext::Runtime
         }
+    }
+
+    /// Return the union of all handled exceptions as an [`Exceptions`] bitflag.
+    pub fn exceptions(&self) -> Exceptions {
+        let mut exceptions = Exceptions::empty();
+        for exception in &self.handled_exceptions {
+            exceptions.insert(*exception);
+        }
+        exceptions
     }
 }

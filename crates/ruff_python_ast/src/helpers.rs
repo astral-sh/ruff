@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use bitflags::bitflags;
 use itertools::Itertools;
 use log::error;
 use once_cell::sync::Lazy;
@@ -575,13 +574,6 @@ pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
         let KeywordData { value, .. } = &keyword.node;
         !is_const_none(value)
     })
-}
-
-bitflags! {
-    pub struct Exceptions: u32 {
-        const NAME_ERROR = 0b0000_0001;
-        const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
-    }
 }
 
 /// Extract the names of all handled exceptions.

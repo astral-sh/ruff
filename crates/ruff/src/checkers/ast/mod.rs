@@ -15,14 +15,12 @@ use rustpython_parser::ast::{
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::context::Context;
-use ruff_python_ast::helpers::{
-    binding_range, extract_handled_exceptions, to_module_path, Exceptions,
-};
+use ruff_python_ast::helpers::{binding_range, extract_handled_exceptions, to_module_path};
 use ruff_python_ast::operations::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::scope::{
-    Binding, BindingId, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Scope,
-    ScopeId, ScopeKind, ScopeStack,
+    Binding, BindingId, BindingKind, ClassDef, Exceptions, ExecutionContext, FunctionDef, Lambda,
+    Scope, ScopeId, ScopeKind, ScopeStack,
 };
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::types::{Node, Range, RefEquality};
@@ -198,6 +196,7 @@ where
                 if !scope_index.is_global() {
                     // Add the binding to the current scope.
                     let context = self.ctx.execution_context();
+                    let exceptions = self.ctx.exceptions();
                     let scope = &mut self.ctx.scopes[scope_index];
                     let usage = Some((scope.id, Range::from(stmt)));
                     for (name, range) in names.iter().zip(ranges.iter()) {
@@ -209,6 +208,7 @@ where
                             range: *range,
                             source: Some(RefEquality(stmt)),
                             context,
+                            exceptions,
                         });
                         scope.add(name, id);
                     }
@@ -226,6 +226,7 @@ where
                 let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
                 if !scope_index.is_global() {
                     let context = self.ctx.execution_context();
+                    let exceptions = self.ctx.exceptions();
                     let scope = &mut self.ctx.scopes[scope_index];
                     let usage = Some((scope.id, Range::from(stmt)));
                     for (name, range) in names.iter().zip(ranges.iter()) {
@@ -238,6 +239,7 @@ where
                             range: *range,
                             source: Some(RefEquality(stmt)),
                             context,
+                            exceptions,
                         });
                         scope.add(name, id);
                     }
@@ -639,7 +641,6 @@ where
                     self.visit_expr(expr);
                 }
 
-                let context = self.ctx.execution_context();
                 self.add_binding(
                     name,
                     Binding {
@@ -649,7 +650,8 @@ where
                         typing_usage: None,
                         range: Range::from(stmt),
                         source: Some(self.ctx.current_stmt().clone()),
-                        context,
+                        context: self.ctx.execution_context(),
+                        exceptions: self.ctx.exceptions(),
                     },
                 );
             }
@@ -834,14 +836,6 @@ where
                     pyupgrade::rules::deprecated_mock_import(self, stmt);
                 }
 
-                // If a module is imported within a `ModuleNotFoundError` body, treat that as a
-                // synthetic usage.
-                let is_handled = self
-                    .ctx
-                    .handled_exceptions
-                    .iter()
-                    .any(|exceptions| exceptions.contains(Exceptions::MODULE_NOT_FOUND_ERROR));
-
                 for alias in names {
                     if alias.node.name == "__future__" {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
@@ -856,6 +850,7 @@ where
                                 range: Range::from(alias),
                                 source: Some(self.ctx.current_stmt().clone()),
                                 context: self.ctx.execution_context(),
+                                exceptions: self.ctx.exceptions(),
                             },
                         );
 
@@ -877,15 +872,12 @@ where
                             Binding {
                                 kind: BindingKind::SubmoduleImportation(name, full_name),
                                 runtime_usage: None,
-                                synthetic_usage: if is_handled {
-                                    Some((self.ctx.scope_id(), Range::from(alias)))
-                                } else {
-                                    None
-                                },
+                                synthetic_usage: None,
                                 typing_usage: None,
                                 range: Range::from(alias),
                                 source: Some(self.ctx.current_stmt().clone()),
                                 context: self.ctx.execution_context(),
+                                exceptions: self.ctx.exceptions(),
                             },
                         );
                     } else {
@@ -907,7 +899,7 @@ where
                             Binding {
                                 kind: BindingKind::Importation(name, full_name),
                                 runtime_usage: None,
-                                synthetic_usage: if is_handled || is_explicit_reexport {
+                                synthetic_usage: if is_explicit_reexport {
                                     Some((self.ctx.scope_id(), Range::from(alias)))
                                 } else {
                                     None
@@ -916,6 +908,7 @@ where
                                 range: Range::from(alias),
                                 source: Some(self.ctx.current_stmt().clone()),
                                 context: self.ctx.execution_context(),
+                                exceptions: self.ctx.exceptions(),
                             },
                         );
 
@@ -1160,14 +1153,6 @@ where
                     }
                 }
 
-                // If a module is imported within a `ModuleNotFoundError` body, treat that as a
-                // synthetic usage.
-                let is_handled = self
-                    .ctx
-                    .handled_exceptions
-                    .iter()
-                    .any(|exceptions| exceptions.contains(Exceptions::MODULE_NOT_FOUND_ERROR));
-
                 for alias in names {
                     if let Some("__future__") = module.as_deref() {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
@@ -1182,6 +1167,7 @@ where
                                 range: Range::from(alias),
                                 source: Some(self.ctx.current_stmt().clone()),
                                 context: self.ctx.execution_context(),
+                                exceptions: self.ctx.exceptions(),
                             },
                         );
 
@@ -1207,15 +1193,12 @@ where
                             Binding {
                                 kind: BindingKind::StarImportation(*level, module.clone()),
                                 runtime_usage: None,
-                                synthetic_usage: if is_handled {
-                                    Some((self.ctx.scope_id(), Range::from(alias)))
-                                } else {
-                                    None
-                                },
+                                synthetic_usage: None,
                                 typing_usage: None,
                                 range: Range::from(stmt),
                                 source: Some(self.ctx.current_stmt().clone()),
                                 context: self.ctx.execution_context(),
+                                exceptions: self.ctx.exceptions(),
                             },
                         );
 
@@ -1283,16 +1266,16 @@ where
                             Binding {
                                 kind: BindingKind::FromImportation(name, full_name),
                                 runtime_usage: None,
-                                synthetic_usage: if is_handled || is_explicit_reexport {
+                                synthetic_usage: if is_explicit_reexport {
                                     Some((self.ctx.scope_id(), Range::from(alias)))
                                 } else {
                                     None
                                 },
                                 typing_usage: None,
                                 range: Range::from(alias),
-
                                 source: Some(self.ctx.current_stmt().clone()),
                                 context: self.ctx.execution_context(),
+                                exceptions: self.ctx.exceptions(),
                             },
                         );
                     }
@@ -1914,6 +1897,7 @@ where
                             range: Range::from(stmt),
                             source: Some(RefEquality(stmt)),
                             context: self.ctx.execution_context(),
+                            exceptions: self.ctx.exceptions(),
                         });
                         self.ctx.global_scope_mut().add(name, id);
                     }
@@ -1976,6 +1960,7 @@ where
                             range: Range::from(*stmt),
                             source: Some(RefEquality(stmt)),
                             context: self.ctx.execution_context(),
+                            exceptions: self.ctx.exceptions(),
                         });
                         self.ctx.global_scope_mut().add(name, id);
                     }
@@ -2125,6 +2110,7 @@ where
                         range: Range::from(stmt),
                         source: Some(self.ctx.current_stmt().clone()),
                         context: self.ctx.execution_context(),
+                        exceptions: self.ctx.exceptions(),
                     },
                 );
             }
@@ -3905,6 +3891,7 @@ where
                 range: Range::from(arg),
                 source: Some(self.ctx.current_stmt().clone()),
                 context: self.ctx.execution_context(),
+                exceptions: self.ctx.exceptions(),
             },
         );
 
@@ -3948,6 +3935,7 @@ where
                     range: Range::from(pattern),
                     source: Some(self.ctx.current_stmt().clone()),
                     context: self.ctx.execution_context(),
+                    exceptions: self.ctx.exceptions(),
                 },
             );
         }
@@ -4126,6 +4114,7 @@ impl<'a> Checker<'a> {
                 typing_usage: None,
                 source: None,
                 context: ExecutionContext::Runtime,
+                exceptions: Exceptions::empty(),
             });
             scope.add(builtin, id);
         }
@@ -4350,6 +4339,7 @@ impl<'a> Checker<'a> {
                     range: Range::from(expr),
                     source: Some(self.ctx.current_stmt().clone()),
                     context: self.ctx.execution_context(),
+                    exceptions: self.ctx.exceptions(),
                 },
             );
             return;
@@ -4370,6 +4360,7 @@ impl<'a> Checker<'a> {
                     range: Range::from(expr),
                     source: Some(self.ctx.current_stmt().clone()),
                     context: self.ctx.execution_context(),
+                    exceptions: self.ctx.exceptions(),
                 },
             );
             return;
@@ -4386,6 +4377,7 @@ impl<'a> Checker<'a> {
                     range: Range::from(expr),
                     source: Some(self.ctx.current_stmt().clone()),
                     context: self.ctx.execution_context(),
+                    exceptions: self.ctx.exceptions(),
                 },
             );
             return;
@@ -4451,6 +4443,7 @@ impl<'a> Checker<'a> {
                         range: Range::from(expr),
                         source: Some(self.ctx.current_stmt().clone()),
                         context: self.ctx.execution_context(),
+                        exceptions: self.ctx.exceptions(),
                     },
                 );
                 return;
@@ -4467,6 +4460,7 @@ impl<'a> Checker<'a> {
                 range: Range::from(expr),
                 source: Some(self.ctx.current_stmt().clone()),
                 context: self.ctx.execution_context(),
+                exceptions: self.ctx.exceptions(),
             },
         );
     }
@@ -4925,8 +4919,11 @@ impl<'a> Checker<'a> {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
                 type UnusedImport<'a> = (&'a str, &'a Range);
-                type BindingContext<'a, 'b> =
-                    (&'a RefEquality<'b, Stmt>, Option<&'a RefEquality<'b, Stmt>>);
+                type BindingContext<'a, 'b> = (
+                    &'a RefEquality<'b, Stmt>,
+                    Option<&'a RefEquality<'b, Stmt>>,
+                    Exceptions,
+                );
 
                 let mut unused: FxHashMap<BindingContext, Vec<UnusedImport>> = FxHashMap::default();
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
@@ -4948,6 +4945,7 @@ impl<'a> Checker<'a> {
 
                     let defined_by = binding.source.as_ref().unwrap();
                     let defined_in = self.ctx.child_to_parent.get(defined_by);
+                    let exceptions = binding.exceptions;
                     let child: &Stmt = defined_by.into();
 
                     let diagnostic_lineno = binding.range.location.row();
@@ -4965,27 +4963,30 @@ impl<'a> Checker<'a> {
                         })
                     {
                         ignored
-                            .entry((defined_by, defined_in))
+                            .entry((defined_by, defined_in, exceptions))
                             .or_default()
                             .push((full_name, &binding.range));
                     } else {
                         unused
-                            .entry((defined_by, defined_in))
+                            .entry((defined_by, defined_in, exceptions))
                             .or_default()
                             .push((full_name, &binding.range));
                     }
                 }
 
-                let ignore_init =
+                let in_init =
                     self.settings.ignore_init_module_imports && self.path.ends_with("__init__.py");
-                for ((defined_by, defined_in), unused_imports) in unused
+                for ((defined_by, defined_in, exceptions), unused_imports) in unused
                     .into_iter()
-                    .sorted_by_key(|((defined_by, _), _)| defined_by.location)
+                    .sorted_by_key(|((defined_by, ..), ..)| defined_by.location)
                 {
                     let child: &Stmt = defined_by.into();
                     let parent: Option<&Stmt> = defined_in.map(Into::into);
+                    let multiple = unused_imports.len() > 1;
+                    let in_except_handler = exceptions
+                        .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
 
-                    let fix = if !ignore_init && self.patch(Rule::UnusedImport) {
+                    let fix = if !in_init && !in_except_handler && self.patch(Rule::UnusedImport) {
                         let deleted: Vec<&Stmt> = self.deletions.iter().map(Into::into).collect();
                         match autofix::helpers::remove_unused_imports(
                             unused_imports.iter().map(|(full_name, _)| *full_name),
@@ -5011,12 +5012,17 @@ impl<'a> Checker<'a> {
                         None
                     };
 
-                    let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut diagnostic = Diagnostic::new(
                             pyflakes::rules::UnusedImport {
                                 name: full_name.to_string(),
-                                ignore_init,
+                                context: if in_except_handler {
+                                    Some(pyflakes::rules::UnusedImportContext::ExceptHandler)
+                                } else if in_init {
+                                    Some(pyflakes::rules::UnusedImportContext::Init)
+                                } else {
+                                    None
+                                },
                                 multiple,
                             },
                             *range,
@@ -5032,17 +5038,25 @@ impl<'a> Checker<'a> {
                         diagnostics.push(diagnostic);
                     }
                 }
-                for ((defined_by, ..), unused_imports) in ignored
+                for ((defined_by, .., exceptions), unused_imports) in ignored
                     .into_iter()
-                    .sorted_by_key(|((defined_by, _), _)| defined_by.location)
+                    .sorted_by_key(|((defined_by, ..), ..)| defined_by.location)
                 {
                     let child: &Stmt = defined_by.into();
                     let multiple = unused_imports.len() > 1;
+                    let in_except_handler = exceptions
+                        .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
                     for (full_name, range) in unused_imports {
                         let mut diagnostic = Diagnostic::new(
                             pyflakes::rules::UnusedImport {
                                 name: full_name.to_string(),
-                                ignore_init,
+                                context: if in_except_handler {
+                                    Some(pyflakes::rules::UnusedImportContext::ExceptHandler)
+                                } else if in_init {
+                                    Some(pyflakes::rules::UnusedImportContext::Init)
+                                } else {
+                                    None
+                                },
                                 multiple,
                             },
                             *range,
