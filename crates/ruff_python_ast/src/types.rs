@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use std::path::PathBuf;
 
-
 use rustpython_parser::ast::{Expr, Located, Location, Stmt};
 
 #[derive(Clone)]
