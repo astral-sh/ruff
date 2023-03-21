@@ -1,5 +1,5 @@
 use num_traits::ToPrimitive;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Unaryop};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, KeywordData, Unaryop};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -88,14 +88,53 @@ fn to_bound(expr: &Expr) -> Option<i64> {
 }
 
 /// RUF007
-pub fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
+pub fn pairwise_over_zipped(
+    checker: &mut Checker,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) {
     let ExprKind::Name { id, .. } = &func.node else {
         return;
     };
 
-    if !(args.len() > 1 && id == "zip" && checker.ctx.is_builtin(id)) {
+    // Require exactly two positional arguments.
+    if args.len() != 2 {
         return;
-    };
+    }
+
+    // Allow `strict=False`, but no other keyword arguments.
+    if keywords.iter().any(|keyword| {
+        let KeywordData {
+            arg: Some(arg),
+            value,
+        } = &keyword.node else {
+            return true;
+        };
+        if arg != "strict" {
+            return true;
+        }
+        if matches!(
+            value.node,
+            ExprKind::Constant {
+                value: Constant::Bool(false),
+                ..
+            }
+        ) {
+            return false;
+        }
+        true
+    }) {
+        return;
+    }
+
+    // Require the function to be the builtin `zip`.
+    if id != "zip" {
+        return;
+    }
+    if !checker.ctx.is_builtin(id) {
+        return;
+    }
 
     // Allow the first argument to be a `Name` or `Subscript`.
     let Some(first_arg_info) = ({
