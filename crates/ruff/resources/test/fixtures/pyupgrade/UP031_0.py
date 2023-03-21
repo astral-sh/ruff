@@ -73,3 +73,13 @@ print("%s \N{snowman}" % (a,))
 print("%(foo)s \N{snowman}" % {"foo": 1})
 
 print(("foo %s " "bar %s") % (x, y))
+
+# Single-value expressions
+print('Hello %s' % "World")
+print('Hello %s' % f"World")
+print('Hello %s (%s)' % bar)
+print('Hello %s (%s)' % bar.baz)
+print('Hello %s (%s)' % bar['bop'])
+print('Hello %(arg)s' % bar)
+print('Hello %(arg)s' % bar.baz)
+print('Hello %(arg)s' % bar['bop'])
