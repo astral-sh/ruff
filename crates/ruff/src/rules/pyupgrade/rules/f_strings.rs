@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use rustpython_common::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
-use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData, Location};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -252,28 +252,24 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     };
 
     // Avoid refactors that increase the resulting string length.
-    let expr_range = Range::from(expr);
-    if expr_range.location.column() == 0 {
-        let existing = checker.locator.slice(expr_range);
-        if contents.len() > existing.len() {
-            return;
-        }
-    } else {
+    let existing = checker.locator.slice(expr);
+    if contents.len() > existing.len() {
+        return;
+    }
+
+    // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
+    // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
+    if expr.location.column() > 0 {
         let existing = checker.locator.slice(Range::new(
-            expr_range.location.with_col_offset(-1),
-            expr_range.end_location,
+            Location::new(expr.location.row(), expr.location.column() - 1),
+            expr.end_location.unwrap(),
         ));
-        if contents.len() > existing.len() - 1 {
-            return;
-        }
-        // Add a space if there is none between a keyword and the string.
-        // `return`, `yield`, `assert`, …
         if existing.chars().next().unwrap().is_ascii_alphabetic() {
             contents.insert(0, ' ');
         }
     }
 
-    let mut diagnostic = Diagnostic::new(FString, expr_range);
+    let mut diagnostic = Diagnostic::new(FString, Range::from(expr));
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.amend(Fix::replacement(
             contents,
