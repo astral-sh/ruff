@@ -2025,6 +2025,7 @@ dependencies = [
  "schemars",
  "semver",
  "serde",
+ "serde_json",
  "shellexpand",
  "smallvec",
  "strum",
@@ -2091,6 +2092,7 @@ dependencies = [
  "ruff",
  "ruff_cache",
  "ruff_diagnostics",
+ "ruff_python_stdlib",
  "rustc-hash",
  "serde",
  "serde_json",
@@ -2505,6 +2507,7 @@ version = "1.0.93"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "cad406b69c91885b5107daf2c29572f6c8cdb3c66826821e286c533490c0bc76"
 dependencies = [
+ "indexmap",
  "itoa",
  "ryu",
  "serde",

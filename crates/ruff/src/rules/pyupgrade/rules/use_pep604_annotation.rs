@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Operator};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
@@ -8,18 +8,21 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-// TODO: document referencing [PEP 604]: https://peps.python.org/pep-0604/
 #[violation]
-pub struct TypingUnion;
+pub struct NonPEP604Annotation {
+    pub fixable: bool,
+}
 
-impl AlwaysAutofixableViolation for TypingUnion {
+impl Violation for NonPEP604Annotation {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `X | Y` for type annotations")
     }
 
-    fn autofix_title(&self) -> String {
-        "Convert to `X | Y`".to_string()
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        self.fixable.then_some(|_| format!("Convert to `X | Y`"))
     }
 }
 
@@ -77,7 +80,8 @@ enum TypingMember {
 
 /// UP007
 pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, slice: &Expr) {
-    // Avoid rewriting forward annotations.
+    // If any of the _arguments_ are forward references, we can't use PEP 604.
+    // Ex) `Union["str", "int"]` can't be converted to `"str" | "int"`.
     if any_arg_is_str(slice) {
         return;
     }
@@ -94,10 +98,14 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         return;
     };
 
+    // Avoid fixing forward references.
+    let fixable = !checker.ctx.in_deferred_string_type_definition;
+
     match typing_member {
         TypingMember::Optional => {
-            let mut diagnostic = Diagnostic::new(TypingUnion, Range::from(expr));
-            if checker.patch(diagnostic.kind.rule()) {
+            let mut diagnostic =
+                Diagnostic::new(NonPEP604Annotation { fixable }, Range::from(expr));
+            if fixable && checker.patch(diagnostic.kind.rule()) {
                 diagnostic.amend(Fix::replacement(
                     unparse_expr(&optional(slice), checker.stylist),
                     expr.location,
@@ -107,8 +115,9 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             checker.diagnostics.push(diagnostic);
         }
         TypingMember::Union => {
-            let mut diagnostic = Diagnostic::new(TypingUnion, Range::from(expr));
-            if checker.patch(diagnostic.kind.rule()) {
+            let mut diagnostic =
+                Diagnostic::new(NonPEP604Annotation { fixable }, Range::from(expr));
+            if fixable && checker.patch(diagnostic.kind.rule()) {
                 match &slice.node {
                     ExprKind::Slice { .. } => {
                         // Invalid type annotation.

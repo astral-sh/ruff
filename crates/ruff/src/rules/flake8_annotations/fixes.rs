@@ -7,7 +7,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
 /// ANN204
-pub fn add_return_none_annotation(locator: &Locator, stmt: &Stmt) -> Result<Fix> {
+pub fn add_return_annotation(locator: &Locator, stmt: &Stmt, annotation: &str) -> Result<Fix> {
     let range = Range::from(stmt);
     let contents = locator.slice(range);
 
@@ -18,7 +18,7 @@ pub fn add_return_none_annotation(locator: &Locator, stmt: &Stmt) -> Result<Fix>
     for (start, tok, ..) in lexer::lex_located(contents, Mode::Module, range.location).flatten() {
         if seen_lpar && seen_rpar {
             if matches!(tok, Tok::Colon) {
-                return Ok(Fix::insertion(" -> None".to_string(), start));
+                return Ok(Fix::insertion(format!(" -> {annotation}"), start));
             }
         }
 

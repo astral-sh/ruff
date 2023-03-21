@@ -85,8 +85,15 @@ pub fn run(
                         .and_then(|package| *package);
                     let settings = resolver.resolve_all(path, pyproject_strategy);
 
-                    lint_path(path, package, settings, cache, noqa, autofix)
-                        .map_err(|e| (Some(path.to_owned()), e.to_string()))
+                    lint_path(path, package, settings, cache, noqa, autofix).map_err(|e| {
+                        (Some(path.to_owned()), {
+                            let mut error = e.to_string();
+                            for cause in e.chain() {
+                                error += &format!("\n  Caused by: {cause}");
+                            }
+                            error
+                        })
+                    })
                 }
                 Err(e) => Err((
                     if let Error::WithPath { path, .. } = e {
@@ -171,5 +178,91 @@ with the relevant file contents, the `pyproject.toml` settings, and the followin
 
             Ok(Diagnostics::default())
         }
+    }
+}
+
+#[cfg(test)]
+#[cfg(feature = "jupyter_notebook")]
+mod test {
+    use std::path::PathBuf;
+    use std::str::FromStr;
+
+    use anyhow::Result;
+    use path_absolutize::Absolutize;
+
+    use ruff::fix::FixMode;
+    use ruff::logging::LogLevel;
+    use ruff::resolver::PyprojectDiscovery;
+    use ruff::settings::configuration::{Configuration, RuleSelection};
+    use ruff::settings::flags::{Cache, Noqa};
+    use ruff::settings::types::SerializationFormat;
+    use ruff::settings::AllSettings;
+    use ruff::RuleSelector;
+
+    use crate::args::Overrides;
+    use crate::printer::{Flags, Printer};
+
+    use super::run;
+
+    #[test]
+    fn test_jupyter_notebook_integration() -> Result<()> {
+        let overrides: Overrides = Overrides {
+            select: Some(vec![
+                RuleSelector::from_str("B")?,
+                RuleSelector::from_str("F")?,
+            ]),
+            ..Default::default()
+        };
+
+        let mut configuration = Configuration::default();
+        configuration.rule_selections.push(RuleSelection {
+            select: Some(vec![
+                RuleSelector::from_str("B")?,
+                RuleSelector::from_str("F")?,
+            ]),
+            ..Default::default()
+        });
+
+        let root_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+            .join("..")
+            .join("ruff")
+            .join("resources")
+            .join("test")
+            .join("fixtures")
+            .join("jupyter");
+
+        let diagnostics = run(
+            &[root_path.join("valid.ipynb")],
+            &PyprojectDiscovery::Fixed(AllSettings::from_configuration(configuration, &root_path)?),
+            &overrides,
+            Cache::Disabled,
+            Noqa::Enabled,
+            FixMode::None,
+        )?;
+
+        let printer = Printer::new(
+            SerializationFormat::Text,
+            LogLevel::Default,
+            FixMode::None,
+            Flags::SHOW_VIOLATIONS,
+        );
+        let mut writer: Vec<u8> = Vec::new();
+        // Mute the terminal color codes
+        colored::control::set_override(false);
+        printer.write_once(&diagnostics, &mut writer)?;
+        // TODO(konstin): Set jupyter notebooks as none-fixable for now
+        // TODO(konstin) 2: Make jupyter notebooks fixable
+        let expected = format!(
+            "{valid_ipynb}:cell 1:2:5: F841 [*] Local variable `x` is assigned to but never used
+{valid_ipynb}:cell 3:1:24: B006 Do not use mutable data structures for argument defaults
+Found 2 errors.
+[*] 1 potentially fixable with the --fix option.
+",
+            valid_ipynb = root_path.join("valid.ipynb").absolutize()?.display()
+        );
+
+        assert_eq!(expected, String::from_utf8(writer)?);
+
+        Ok(())
     }
 }

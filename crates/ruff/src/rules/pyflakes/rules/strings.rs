@@ -14,6 +14,7 @@ use crate::registry::AsRule;
 use super::super::cformat::CFormatSummary;
 use super::super::fixes::{
     remove_unused_format_arguments_from_dict, remove_unused_keyword_arguments_from_format_call,
+    remove_unused_positional_arguments_from_format_call,
 };
 use super::super::format::FormatSummary;
 
@@ -169,12 +170,18 @@ pub struct StringDotFormatExtraPositionalArguments {
     pub missing: Vec<String>,
 }
 
-impl Violation for StringDotFormatExtraPositionalArguments {
+impl AlwaysAutofixableViolation for StringDotFormatExtraPositionalArguments {
     #[derive_message_formats]
     fn message(&self) -> String {
         let StringDotFormatExtraPositionalArguments { missing } = self;
         let message = missing.join(", ");
         format!("`.format` call has unused arguments at position(s): {message}")
+    }
+
+    fn autofix_title(&self) -> String {
+        let StringDotFormatExtraPositionalArguments { missing } = self;
+        let message = missing.join(", ");
+        format!("Remove extra positional arguments at position(s): {message}")
     }
 }
 
@@ -505,7 +512,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         return;
     }
 
-    checker.diagnostics.push(Diagnostic::new(
+    let mut diagnostic = Diagnostic::new(
         StringDotFormatExtraPositionalArguments {
             missing: missing
                 .iter()
@@ -513,7 +520,22 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
                 .collect::<Vec<String>>(),
         },
         location,
-    ));
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        match remove_unused_positional_arguments_from_format_call(
+            &missing,
+            location,
+            checker.locator,
+            checker.stylist,
+            &summary.format_string,
+        ) {
+            Ok(fix) => {
+                diagnostic.amend(fix);
+            }
+            Err(e) => error!("Failed to remove unused positional arguments: {e}"),
+        }
+    }
+    checker.diagnostics.push(diagnostic);
 }
 
 /// F524

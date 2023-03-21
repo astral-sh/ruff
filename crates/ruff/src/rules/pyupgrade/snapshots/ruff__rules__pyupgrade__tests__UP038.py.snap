@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: IsinstanceWithTuple
+    name: NonPEP604Isinstance
     body: "Use `X | Y` in `isinstance` call instead of `(X, Y)`"
     suggestion: "Convert to `X | Y`"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 26
   parent: ~
 - kind:
-    name: IsinstanceWithTuple
+    name: NonPEP604Isinstance
     body: "Use `X | Y` in `issubclass` call instead of `(X, Y)`"
     suggestion: "Convert to `X | Y`"
     fixable: true
