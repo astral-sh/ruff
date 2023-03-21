@@ -93,7 +93,7 @@ pub fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
         return;
     };
 
-    if !(args.len() > 1 && id == "zip" && checker.ctx.is_builtin(id)) {
+    if !(args.len() == 2 && id == "zip" && checker.ctx.is_builtin(id)) {
         return;
     };
 

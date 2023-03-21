@@ -8,32 +8,6 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 3
-  fix: ~
-  parent: ~
-- kind:
-    name: PairwiseOverZipped
-    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 0
-  end_location:
-    row: 14
-    column: 3
-  fix: ~
-  parent: ~
-- kind:
-    name: PairwiseOverZipped
-    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
-    suggestion: ~
-    fixable: false
-  location:
     row: 15
     column: 0
   end_location:
@@ -74,9 +48,35 @@ expression: diagnostics
     fixable: false
   location:
     row: 18
+    column: 0
+  end_location:
+    row: 18
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 20
     column: 5
   end_location:
-    row: 18
+    row: 20
     column: 8
   fix: ~
   parent: ~
@@ -86,10 +86,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 19
+    row: 21
     column: 5
   end_location:
-    row: 19
+    row: 21
     column: 8
   fix: ~
   parent: ~
