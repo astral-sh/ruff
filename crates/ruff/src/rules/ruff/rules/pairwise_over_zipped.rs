@@ -98,30 +98,43 @@ pub fn pairwise_over_zipped(
         return;
     };
 
-    if !(args.len() == 2
-        && id == "zip"
-        && checker.ctx.is_builtin(id)
-        && keywords.iter().all(|k| {
-            let KeywordData {
-                arg: Some(arg),
-                value,
-            } = &k.node else {
-                return true;
-            };
-            if arg != "strict" {
-                return true;
-            }
-            match &value.node {
-                ExprKind::Constant {
-                    value: Constant::Bool(strict),
-                    ..
-                } => !strict,
-                _ => true,
-            }
-        }))
-    {
+    // Require exactly two positional arguments.
+    if args.len() != 2 {
         return;
-    };
+    }
+
+    // Allow `strict=False`, but no other keyword arguments.
+    if keywords.iter().any(|keyword| {
+        let KeywordData {
+            arg: Some(arg),
+            value,
+        } = &keyword.node else {
+            return true;
+        };
+        if arg != "strict" {
+            return true;
+        }
+        if matches!(
+            value.node,
+            ExprKind::Constant {
+                value: Constant::Bool(false),
+                ..
+            }
+        ) {
+            return false;
+        }
+        true
+    }) {
+        return;
+    }
+
+    // Require the function to be the builtin `zip`.
+    if id != "zip" {
+        return;
+    }
+    if !checker.ctx.is_builtin(id) {
+        return;
+    }
 
     // Allow the first argument to be a `Name` or `Subscript`.
     let Some(first_arg_info) = ({

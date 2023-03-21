@@ -9,9 +9,10 @@ zip(input, input[2:])  # not successive
 zip(input[:-1], input[2:])  # not successive
 list(zip(input, otherInput))  # nested call
 zip(input, input[1::2])  # not successive
-zip(foo[:-1], foo[1:], foo, strict=False) # more than 2 inputs
-zip(foo[:-1], foo[1:], foo, strict=True) # more than 2 inputs
-zip(foo[:-1], foo[1:], strict=True) # use strict
+zip(foo[:-1], foo[1:], foo, strict=False)  # more than 2 inputs
+zip(foo[:-1], foo[1:], foo, strict=True)  # more than 2 inputs
+zip(foo[:-1], foo[1:], strict=True)  # use strict
+zip(foo[:-1], foo[1:], strict=bool(foo))  # use strict
 
 # Errors
 zip(input, input[1:])
