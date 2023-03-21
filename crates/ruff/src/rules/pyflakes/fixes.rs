@@ -47,7 +47,7 @@ pub fn remove_unused_format_arguments_from_dict(
     ))
 }
 
-/// Generate a [`Fix`] to remove unused keyword arguments from format call.
+/// Generate a [`Fix`] to remove unused keyword arguments from a `format` call.
 pub fn remove_unused_keyword_arguments_from_format_call(
     unused_arguments: &[&str],
     location: Range,
@@ -75,7 +75,7 @@ pub fn remove_unused_keyword_arguments_from_format_call(
     ))
 }
 
-pub fn unparse_format_part(format_part: FormatPart) -> String {
+fn unparse_format_part(format_part: FormatPart) -> String {
     match format_part {
         FormatPart::Literal(literal) => literal,
         FormatPart::Field {
@@ -95,7 +95,7 @@ pub fn unparse_format_part(format_part: FormatPart) -> String {
     }
 }
 
-pub fn update_field_types(format_string: &FormatString, min_unused: usize) -> String {
+fn update_field_types(format_string: &FormatString, min_unused: usize) -> String {
     format_string
         .format_parts
         .iter()
@@ -110,7 +110,7 @@ pub fn update_field_types(format_string: &FormatString, min_unused: usize) -> St
                 let mut new_field_name_string = match new_field_name.field_type {
                     FieldType::Auto => String::new(),
                     FieldType::Index(i) => (i - min_unused).to_string(),
-                    FieldType::Keyword(kw) => kw,
+                    FieldType::Keyword(keyword) => keyword,
                 };
                 for field_name_part in &new_field_name.parts {
                     let field_name_part_string = match field_name_part {
@@ -133,7 +133,7 @@ pub fn update_field_types(format_string: &FormatString, min_unused: usize) -> St
         .collect()
 }
 
-/// Generate a [`Fix`] to remove unused keyword arguments from format call.
+/// Generate a [`Fix`] to remove unused positional arguments from a `format` call.
 pub fn remove_unused_positional_arguments_from_format_call(
     unused_arguments: &[usize],
     location: Range,
