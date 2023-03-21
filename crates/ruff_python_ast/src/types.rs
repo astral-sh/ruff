@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
 use std::path::PathBuf;
-use std::sync::atomic::{AtomicUsize, Ordering};
+
 
 use rustpython_parser::ast::{Expr, Located, Location, Stmt};
 
@@ -81,14 +81,14 @@ impl<'a> From<&RefEquality<'a, Expr>> for &'a Expr {
 
 pub type CallPath<'a> = smallvec::SmallVec<[&'a str; 8]>;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Import {
     pub name: String,
     pub location: Location,
     pub end_location: Location,
 }
 
-#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Imports {
     inner: FxHashMap<PathBuf, Vec<Import>>,
 }

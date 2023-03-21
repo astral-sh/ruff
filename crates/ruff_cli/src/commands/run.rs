@@ -115,7 +115,7 @@ pub fn run(
                         ":".bold()
                     );
                     let settings = resolver.resolve(path, pyproject_strategy);
-                    if settings.rules.enabled(&Rule::IOError) {
+                    if settings.rules.enabled(Rule::IOError) {
                         Diagnostics::new(
                             vec![Message::from_diagnostic(
                                 Diagnostic::new(
