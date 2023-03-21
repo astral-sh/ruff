@@ -78,11 +78,11 @@ jobs:
       - name: "Install Rust toolchain"
         run: rustup show
 
-      - uses: Swatinem/rust-cache@v2
+      - name: "Install cargo-binstall"
+        uses: taiki-e/install-action@cargo-binstall
 
       - name: "Install critcmp"
-        # Use debug build: Building takes much longer than the "slowness" of using the debug build.
-        run: cargo install --debug critcmp
+        run: cargo binstall critcmp -y
 
       - name: "Linux | Download PR benchmark results"
         uses: actions/download-artifact@v3
