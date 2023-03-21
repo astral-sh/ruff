@@ -199,6 +199,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "W0129") => Rule::AssertOnStringLiteral,
         (Pylint, "W0602") => Rule::GlobalVariableNotAssigned,
         (Pylint, "W0603") => Rule::GlobalStatement,
+        (Pylint, "W0711") => Rule::BinaryOpException,
         (Pylint, "W1508") => Rule::InvalidEnvvarDefault,
         (Pylint, "W2901") => Rule::RedefinedLoopName,
 

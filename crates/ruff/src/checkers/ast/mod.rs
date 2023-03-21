@@ -3706,6 +3706,10 @@ where
                 if self.settings.rules.enabled(Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
                 }
+
+                if self.settings.rules.enabled(Rule::BinaryOpException) {
+                    pylint::rules::binary_op_exception(self, excepthandler);
+                }
                 match name {
                     Some(name) => {
                         if self.settings.rules.enabled(Rule::AmbiguousVariableName) {
