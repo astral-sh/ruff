@@ -1,0 +1,38 @@
+---
+source: crates/ruff/src/rules/pyupgrade/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: OpenAlias
+    body: "Use builtin `open`"
+    suggestion: "Replace with builtin `open`"
+    fixable: true
+  location:
+    row: 3
+    column: 5
+  end_location:
+    row: 3
+    column: 55
+  fix:
+    content: open
+    location:
+      row: 3
+      column: 5
+    end_location:
+      row: 3
+      column: 12
+  parent: ~
+- kind:
+    name: OpenAlias
+    body: "Use builtin `open`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 8
+    column: 5
+  end_location:
+    row: 8
+    column: 18
+  fix: ~
+  parent: ~
+
