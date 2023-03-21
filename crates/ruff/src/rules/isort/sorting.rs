@@ -138,6 +138,17 @@ pub fn cmp_import_from(
     })
 }
 
+/// Compare an import to an import-from.
+fn cmp_import_import_from(
+    import: &AliasData,
+    import_from: &ImportFromData,
+    force_to_top: &BTreeSet<String>,
+) -> Ordering {
+    cmp_force_to_top(import.name, &import_from.module_name(), force_to_top).then_with(|| {
+        natord::compare_ignore_case(import.name, import_from.module.unwrap_or_default())
+    })
+}
+
 /// Compare two [`EitherImport`] enums which may be [`Import`] or [`ImportFrom`]
 /// structs.
 pub fn cmp_either_import(
@@ -149,10 +160,10 @@ pub fn cmp_either_import(
     match (a, b) {
         (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2, force_to_top),
         (ImportFrom((import_from, ..)), Import((alias, _))) => {
-            natord::compare_ignore_case(import_from.module.unwrap_or_default(), alias.name)
+            cmp_import_import_from(alias, import_from, force_to_top).reverse()
         }
         (Import((alias, _)), ImportFrom((import_from, ..))) => {
-            natord::compare_ignore_case(alias.name, import_from.module.unwrap_or_default())
+            cmp_import_import_from(alias, import_from, force_to_top)
         }
         (ImportFrom((import_from1, ..)), ImportFrom((import_from2, ..))) => cmp_import_from(
             import_from1,
