@@ -13,7 +13,8 @@ use crate::rules::flake8_comprehensions::settings::Settings;
 use super::helpers;
 
 /// ## What it does
-/// Checks for unnecessary `dict`, `list` or `tuple` calls.
+/// Checks for unnecessary `dict`, `list` or `tuple` calls that can be
+/// rewritten as an empty literal.
 ///
 /// ## Why is this bad?
 /// It's unnecessary to call e.g., `dict()` than using the empty literal.

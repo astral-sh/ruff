@@ -16,7 +16,7 @@ use super::helpers;
 ///
 /// ## Why is it bad?
 /// It's unnecessary to use a list comprehension inside a call to `set`,
-/// since there are equivalent comprehensions for these types.
+/// since there is an equivalent comprehension for this type.
 ///
 /// ## Examples
 /// ```python
