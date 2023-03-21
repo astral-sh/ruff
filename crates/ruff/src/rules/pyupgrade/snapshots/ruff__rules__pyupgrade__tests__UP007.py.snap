@@ -184,32 +184,6 @@ expression: diagnostics
 - kind:
     name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 9
-  end_location:
-    row: 38
-    column: 26
-  fix: ~
-  parent: ~
-- kind:
-    name: NonPEP604Annotation
-    body: "Use `X | Y` for type annotations"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 42
-    column: 9
-  end_location:
-    row: 42
-    column: 37
-  fix: ~
-  parent: ~
-- kind:
-    name: NonPEP604Annotation
-    body: "Use `X | Y` for type annotations"
     suggestion: "Convert to `X | Y`"
     fixable: true
   location:
@@ -226,5 +200,25 @@ expression: diagnostics
     end_location:
       row: 47
       column: 20
+  parent: ~
+- kind:
+    name: NonPEP604Annotation
+    body: "Use `X | Y` for type annotations"
+    suggestion: "Convert to `X | Y`"
+    fixable: true
+  location:
+    row: 52
+    column: 7
+  end_location:
+    row: 52
+    column: 22
+  fix:
+    content: str | int
+    location:
+      row: 52
+      column: 7
+    end_location:
+      row: 52
+      column: 22
   parent: ~
 
