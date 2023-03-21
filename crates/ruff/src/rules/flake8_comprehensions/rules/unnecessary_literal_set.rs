@@ -11,6 +11,27 @@ use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for `set` calls that take unnecessary `list` or `tuple` literals
+/// as arguments.
+///
+/// ## Why is it bad?
+/// It's unnecessary to use a list or tuple literal within a call to `set`.
+/// Instead, the expression can be rewritten as a set literal.
+///
+/// ## Examples
+/// ```python
+/// set([1, 2])
+/// set((1, 2))
+/// set([])
+/// ```
+///
+/// Use instead:
+/// ```python
+/// {1, 2}
+/// {1, 2}
+/// set()
+/// ```
 #[violation]
 pub struct UnnecessaryLiteralSet {
     pub obj_type: String,

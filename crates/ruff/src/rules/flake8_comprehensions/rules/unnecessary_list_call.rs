@@ -11,6 +11,21 @@ use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for unnecessary `list` calls around list comprehensions.
+///
+/// ## Why is it bad?
+/// It is redundant to use a `list` call around a list comprehension.
+///
+/// ## Examples
+/// ```python
+/// list([f(x) for x in foo])
+/// ```
+///
+/// Use instead
+/// ```python
+/// [f(x) for x in foo]
+/// ```
 #[violation]
 pub struct UnnecessaryListCall;
 

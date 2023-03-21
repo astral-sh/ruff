@@ -11,6 +11,26 @@ use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for unnecessary `list` or `tuple` literals.
+///
+/// ## Why is it bad?
+/// It's unnecessary to use a list or tuple literal within a call to `dict`.
+/// It can be rewritten as a dict literal (`{}`).
+///
+/// ## Examples
+/// ```python
+/// dict([(1, 2), (3, 4)])
+/// dict(((1, 2), (3, 4)))
+/// dict([])
+/// ```
+///
+/// Use instead:
+/// ```python
+/// {1: 2, 3: 4}
+/// {1: 2, 3: 4}
+/// {}
+/// ```
 #[violation]
 pub struct UnnecessaryLiteralDict {
     pub obj_type: String,

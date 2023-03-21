@@ -32,6 +32,7 @@ use super::helpers;
 ///
 /// This rule also applies to `map` calls within `list`, `set`, and `dict`
 /// calls. For example:
+///
 /// - Instead of `list(map(lambda num: num * 2, nums))`, use
 ///   `[num * 2 for num in nums]`.
 /// - Instead of `set(map(lambda num: num % 2 == 0, nums))`, use
