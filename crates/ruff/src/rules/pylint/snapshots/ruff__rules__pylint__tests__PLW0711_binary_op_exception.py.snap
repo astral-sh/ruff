@@ -4,28 +4,28 @@ expression: diagnostics
 ---
 - kind:
     name: BinaryOpException
-    body: Exception to catch is the result of a binary operation
+    body: "Exception to catch is the result of a binary `or` operation"
     suggestion: ~
     fixable: false
   location:
     row: 3
-    column: 0
+    column: 7
   end_location:
-    row: 4
-    column: 8
+    row: 3
+    column: 38
   fix: ~
   parent: ~
 - kind:
     name: BinaryOpException
-    body: Exception to catch is the result of a binary operation
+    body: "Exception to catch is the result of a binary `and` operation"
     suggestion: ~
     fixable: false
   location:
     row: 8
-    column: 0
+    column: 7
   end_location:
-    row: 9
-    column: 12
+    row: 8
+    column: 39
   fix: ~
   parent: ~
 
