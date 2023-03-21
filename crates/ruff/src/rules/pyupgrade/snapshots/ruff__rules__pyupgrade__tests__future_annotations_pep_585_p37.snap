@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: DeprecatedCollectionType
+    name: NonPEP585Annotation
     body: "Use `list` instead of `List` for type annotations"
     suggestion: "Replace `List` with `list`"
     fixable: true

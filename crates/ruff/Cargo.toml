@@ -65,6 +65,7 @@ strum_macros = { workspace = true }
 textwrap = { workspace = true }
 thiserror = { version = "1.0.38" }
 toml = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
 criterion = { version = "0.4.0" }
@@ -75,3 +76,4 @@ test-case = { workspace = true }
 [features]
 default = []
 logical_lines = []
+jupyter_notebook = []

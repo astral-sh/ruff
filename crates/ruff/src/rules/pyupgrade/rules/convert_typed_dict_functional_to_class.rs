@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use log::debug;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
-use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
@@ -20,7 +20,7 @@ pub struct ConvertTypedDictFunctionalToClass {
 }
 
 impl Violation for ConvertTypedDictFunctionalToClass {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

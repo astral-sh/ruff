@@ -1,7 +1,8 @@
-use ruff_python_stdlib::typing::{PEP_585_BUILTINS_ELIGIBLE, PEP_593_SUBSCRIPTS, SUBSCRIPTS};
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::types::CallPath;
+use ruff_python_stdlib::typing::{PEP_585_BUILTINS_ELIGIBLE, PEP_593_SUBSCRIPTS, SUBSCRIPTS};
+
+use crate::context::Context;
 
 pub enum Callable {
     ForwardRef,
@@ -18,14 +19,11 @@ pub enum SubscriptKind {
     PEP593AnnotatedSubscript,
 }
 
-pub fn match_annotated_subscript<'a, F>(
-    expr: &'a Expr,
-    resolve_call_path: F,
+pub fn match_annotated_subscript<'a>(
+    expr: &Expr,
+    context: &Context,
     typing_modules: impl Iterator<Item = &'a str>,
-) -> Option<SubscriptKind>
-where
-    F: FnOnce(&'a Expr) -> Option<CallPath<'a>>,
-{
+) -> Option<SubscriptKind> {
     if !matches!(
         expr.node,
         ExprKind::Name { .. } | ExprKind::Attribute { .. }
@@ -33,7 +31,7 @@ where
         return None;
     }
 
-    resolve_call_path(expr).and_then(|call_path| {
+    context.resolve_call_path(expr).and_then(|call_path| {
         if SUBSCRIPTS.contains(&call_path.as_slice()) {
             return Some(SubscriptKind::AnnotatedSubscript);
         }
@@ -63,11 +61,8 @@ where
 
 /// Returns `true` if `Expr` represents a reference to a typing object with a
 /// PEP 585 built-in.
-pub fn is_pep585_builtin<'a, F>(expr: &'a Expr, resolve_call_path: F) -> bool
-where
-    F: FnOnce(&'a Expr) -> Option<CallPath<'a>>,
-{
-    resolve_call_path(expr).map_or(false, |call_path| {
+pub fn is_pep585_builtin(expr: &Expr, context: &Context) -> bool {
+    context.resolve_call_path(expr).map_or(false, |call_path| {
         PEP_585_BUILTINS_ELIGIBLE.contains(&call_path.as_slice())
     })
 }
