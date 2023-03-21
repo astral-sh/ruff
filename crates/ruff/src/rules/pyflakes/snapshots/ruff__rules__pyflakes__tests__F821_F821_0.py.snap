@@ -61,10 +61,10 @@ expression: diagnostics
     fixable: false
   location:
     row: 58
-    column: 3
+    column: 4
   end_location:
     row: 58
-    column: 8
+    column: 7
   fix: ~
   parent: ~
 - kind:
@@ -139,10 +139,10 @@ expression: diagnostics
     fixable: false
   location:
     row: 115
-    column: 8
+    column: 9
   end_location:
     row: 115
-    column: 23
+    column: 22
   fix: ~
   parent: ~
 - kind:
@@ -152,10 +152,10 @@ expression: diagnostics
     fixable: false
   location:
     row: 123
-    column: 13
+    column: 14
   end_location:
     row: 123
-    column: 18
+    column: 17
   fix: ~
   parent: ~
 - kind:
@@ -165,10 +165,10 @@ expression: diagnostics
     fixable: false
   location:
     row: 123
-    column: 20
+    column: 21
   end_location:
     row: 123
-    column: 25
+    column: 24
   fix: ~
   parent: ~
 

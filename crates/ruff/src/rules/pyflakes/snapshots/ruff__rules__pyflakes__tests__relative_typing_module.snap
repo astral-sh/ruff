@@ -9,10 +9,10 @@ expression: diagnostics
     fixable: false
   location:
     row: 26
-    column: 15
+    column: 16
   end_location:
     row: 26
-    column: 20
+    column: 19
   fix: ~
   parent: ~
 

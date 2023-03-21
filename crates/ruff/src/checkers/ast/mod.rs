@@ -6,7 +6,6 @@ use log::error;
 use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
-use rustpython_parser as parser;
 use rustpython_parser::ast::{
     Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
     ExprKind, KeywordData, Located, Location, Operator, Pattern, PatternKind, Stmt, StmtKind,
@@ -19,14 +18,15 @@ use ruff_python_ast::helpers::{
     binding_range, extract_handled_exceptions, to_module_path, Exceptions,
 };
 use ruff_python_ast::operations::{extract_all_names, AllNamesFlags};
-use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::scope::{
     Binding, BindingId, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Scope,
     ScopeId, ScopeKind, ScopeStack,
 };
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::types::{Node, Range, RefEquality};
-use ruff_python_ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
+use ruff_python_ast::typing::{
+    match_annotated_subscript, parse_type_annotation, Callable, SubscriptKind,
+};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use ruff_python_ast::{
     branch_detection, cast, helpers, operations, str, typing, visibility, visitor,
@@ -2142,7 +2142,8 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
-        if !(self.ctx.in_deferred_type_definition || self.ctx.in_deferred_string_type_definition)
+        if !self.ctx.in_deferred_type_definition
+            && self.ctx.in_deferred_string_type_definition.is_none()
             && self.ctx.in_type_definition
             && self.ctx.annotations_future_enabled
         {
@@ -4158,7 +4159,7 @@ impl<'a> Checker<'a> {
                 self.ctx.bindings[*index].mark_used(scope_id, Range::from(expr), context);
 
                 if self.ctx.bindings[*index].kind.is_annotation()
-                    && !self.ctx.in_deferred_string_type_definition
+                    && self.ctx.in_deferred_string_type_definition.is_none()
                     && !self.ctx.in_deferred_type_definition
                 {
                     continue;
@@ -4542,20 +4543,19 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        let mut stacks = vec![];
+        let mut stacks = Vec::with_capacity(self.deferred.string_type_definitions.len());
         self.deferred.string_type_definitions.reverse();
-        while let Some((range, expression, (in_annotation, in_type_checking_block), deferral)) =
+        while let Some((range, value, (in_annotation, in_type_checking_block), deferral)) =
             self.deferred.string_type_definitions.pop()
         {
-            if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
+            if let Ok((expr, kind)) = parse_type_annotation(value, range, self.locator) {
                 if in_annotation && self.ctx.annotations_future_enabled {
                     if self.settings.rules.enabled(Rule::QuotedAnnotation) {
-                        pyupgrade::rules::quoted_annotation(self, expression, range);
+                        pyupgrade::rules::quoted_annotation(self, value, range);
                     }
                 }
-                relocate_expr(&mut expr, range);
                 allocator.push(expr);
-                stacks.push(((in_annotation, in_type_checking_block), deferral));
+                stacks.push((kind, (in_annotation, in_type_checking_block), deferral));
             } else {
                 if self
                     .settings
@@ -4564,14 +4564,14 @@ impl<'a> Checker<'a> {
                 {
                     self.diagnostics.push(Diagnostic::new(
                         pyflakes::rules::ForwardAnnotationSyntaxError {
-                            body: expression.to_string(),
+                            body: value.to_string(),
                         },
                         range,
                     ));
                 }
             }
         }
-        for (expr, ((in_annotation, in_type_checking_block), (scopes, parents))) in
+        for (expr, (kind, (in_annotation, in_type_checking_block), (scopes, parents))) in
             allocator.iter().zip(stacks)
         {
             self.ctx.scope_stack = scopes;
@@ -4579,9 +4579,9 @@ impl<'a> Checker<'a> {
             self.ctx.in_annotation = in_annotation;
             self.ctx.in_type_checking_block = in_type_checking_block;
             self.ctx.in_type_definition = true;
-            self.ctx.in_deferred_string_type_definition = true;
+            self.ctx.in_deferred_string_type_definition = Some(kind);
             self.visit_expr(expr);
-            self.ctx.in_deferred_string_type_definition = false;
+            self.ctx.in_deferred_string_type_definition = None;
             self.ctx.in_type_definition = false;
         }
     }
