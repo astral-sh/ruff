@@ -146,6 +146,7 @@ ruff_macros::register_rules!(
     rules::pyflakes::rules::UnusedAnnotation,
     rules::pyflakes::rules::RaiseNotImplemented,
     // pylint
+    rules::pylint::rules::AssertOnStringLiteral,
     rules::pylint::rules::UselessReturn,
     rules::pylint::rules::YieldInInit,
     rules::pylint::rules::InvalidAllObject,
@@ -325,8 +326,8 @@ ruff_macros::register_rules!(
     rules::pyupgrade::rules::TypeOfPrimitive,
     rules::pyupgrade::rules::UselessObjectInheritance,
     rules::pyupgrade::rules::DeprecatedUnittestAlias,
-    rules::pyupgrade::rules::DeprecatedCollectionType,
-    rules::pyupgrade::rules::TypingUnion,
+    rules::pyupgrade::rules::NonPEP585Annotation,
+    rules::pyupgrade::rules::NonPEP604Annotation,
     rules::pyupgrade::rules::SuperCallWithParameters,
     rules::pyupgrade::rules::UTF8EncodingDeclaration,
     rules::pyupgrade::rules::UnnecessaryFutureImport,
@@ -356,7 +357,7 @@ ruff_macros::register_rules!(
     rules::pyupgrade::rules::DeprecatedImport,
     rules::pyupgrade::rules::OutdatedVersionBlock,
     rules::pyupgrade::rules::QuotedAnnotation,
-    rules::pyupgrade::rules::IsinstanceWithTuple,
+    rules::pyupgrade::rules::NonPEP604Isinstance,
     // pydocstyle
     rules::pydocstyle::rules::UndocumentedPublicModule,
     rules::pydocstyle::rules::UndocumentedPublicClass,

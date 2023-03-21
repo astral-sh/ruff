@@ -1,0 +1,135 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: AssertOnStringLiteral
+    body: Asserting on a non-empty string literal will always pass
+    suggestion: ~
+    fixable: false
+  location:
+    row: 3
+    column: 11
+  end_location:
+    row: 3
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    name: AssertOnStringLiteral
+    body: Asserting on a non-empty string literal will always pass
+    suggestion: ~
+    fixable: false
+  location:
+    row: 12
+    column: 11
+  end_location:
+    row: 12
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: AssertOnStringLiteral
+    body: Asserting on a non-empty string literal will always pass
+    suggestion: ~
+    fixable: false
+  location:
+    row: 14
+    column: 11
+  end_location:
+    row: 14
+    column: 22
+  fix: ~
+  parent: ~
+- kind:
+    name: AssertOnStringLiteral
+    body: Asserting on a non-empty string literal will always pass
+    suggestion: ~
+    fixable: false
+  location:
+    row: 17
+    column: 7
+  end_location:
+    row: 17
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    name: AssertOnStringLiteral
+    body: Asserting on a string literal may have unintended results
+    suggestion: ~
+    fixable: false
+  location:
+    row: 18
+    column: 7
+  end_location:
+    row: 18
+    column: 13
+  fix: ~
+  parent: ~
+- kind:
+    name: AssertOnStringLiteral
+    body: Asserting on an empty string literal will never pass
+    suggestion: ~
+    fixable: false
+  location:
+    row: 19
+    column: 7
+  end_location:
+    row: 19
+    column: 10
+  fix: ~
+  parent: ~
+- kind:
+    name: AssertOnStringLiteral
+    body: Asserting on an empty string literal will never pass
+    suggestion: ~
+    fixable: false
+  location:
+    row: 20
+    column: 7
+  end_location:
+    row: 20
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    name: AssertOnStringLiteral
+    body: Asserting on a non-empty string literal will always pass
+    suggestion: ~
+    fixable: false
+  location:
+    row: 21
+    column: 7
+  end_location:
+    row: 21
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    name: AssertOnStringLiteral
+    body: Asserting on an empty string literal will never pass
+    suggestion: ~
+    fixable: false
+  location:
+    row: 22
+    column: 7
+  end_location:
+    row: 22
+    column: 9
+  fix: ~
+  parent: ~
+- kind:
+    name: AssertOnStringLiteral
+    body: Asserting on a non-empty string literal will always pass
+    suggestion: ~
+    fixable: false
+  location:
+    row: 23
+    column: 7
+  end_location:
+    row: 23
+    column: 20
+  fix: ~
+  parent: ~
+

@@ -35,13 +35,12 @@ impl CallKind {
     }
 }
 
-// TODO: document referencing [PEP 604]: https://peps.python.org/pep-0604/
 #[violation]
-pub struct IsinstanceWithTuple {
+pub struct NonPEP604Isinstance {
     pub kind: CallKind,
 }
 
-impl AlwaysAutofixableViolation for IsinstanceWithTuple {
+impl AlwaysAutofixableViolation for NonPEP604Isinstance {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use `X | Y` in `{}` call instead of `(X, Y)`", self.kind)
@@ -93,7 +92,7 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                 }
 
                 let mut diagnostic =
-                    Diagnostic::new(IsinstanceWithTuple { kind }, Range::from(expr));
+                    Diagnostic::new(NonPEP604Isinstance { kind }, Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.amend(Fix::replacement(
                         unparse_expr(&union(elts), checker.stylist),

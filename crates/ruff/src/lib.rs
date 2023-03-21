@@ -20,6 +20,7 @@ mod docstrings;
 pub mod fix;
 pub mod flake8_to_ruff;
 pub mod fs;
+pub mod jupyter;
 mod lex;
 pub mod linter;
 pub mod logging;

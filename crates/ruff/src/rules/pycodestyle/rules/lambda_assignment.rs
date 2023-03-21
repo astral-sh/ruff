@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Location, Stmt, StmtKind};
 
-use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{match_leading_content, match_trailing_content, unparse_stmt};
 use ruff_python_ast::newlines::StrExt;
@@ -43,7 +43,7 @@ pub struct LambdaAssignment {
 }
 
 impl Violation for LambdaAssignment {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

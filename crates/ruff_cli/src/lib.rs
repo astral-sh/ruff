@@ -1,7 +1,7 @@
 use anyhow::Result;
 use clap::CommandFactory;
 use notify::{recommended_watcher, RecursiveMode, Watcher};
-use std::io;
+use std::io::{self, BufWriter};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
@@ -262,7 +262,8 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             if cli.statistics {
                 printer.write_statistics(&diagnostics)?;
             } else {
-                printer.write_once(&diagnostics)?;
+                let mut stdout = BufWriter::new(io::stdout().lock());
+                printer.write_once(&diagnostics, &mut stdout)?;
             }
         }
 
