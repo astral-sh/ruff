@@ -2,7 +2,7 @@ use rustc_hash::FxHashMap;
 use rustpython_common::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
-use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData, Location};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -247,7 +247,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
 
     // Currently, the only issue we know of is in LibCST:
     // https://github.com/Instagram/LibCST/issues/846
-    let Some(contents) = try_convert_to_f_string(checker, expr) else {
+    let Some(mut contents) = try_convert_to_f_string(checker, expr) else {
         return;
     };
 
@@ -255,6 +255,18 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
     let existing = checker.locator.slice(expr);
     if contents.len() > existing.len() {
         return;
+    }
+
+    // If necessary, add a space between any leading keyword (`return`, `yield`, `assert`, etc.)
+    // and the string. For example, `return"foo"` is valid, but `returnf"foo"` is not.
+    if expr.location.column() > 0 {
+        let existing = checker.locator.slice(Range::new(
+            Location::new(expr.location.row(), expr.location.column() - 1),
+            expr.end_location.unwrap(),
+        ));
+        if existing.chars().next().unwrap().is_ascii_alphabetic() {
+            contents.insert(0, ' ');
+        }
     }
 
     let mut diagnostic = Diagnostic::new(FString, Range::from(expr));
