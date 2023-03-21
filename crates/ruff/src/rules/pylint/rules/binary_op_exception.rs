@@ -12,7 +12,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## Why is this bad?
 /// A binary operation will not catch multiple exceptions. Only the first exception is caught when an `or` is use
-/// and using an `and` produces unexpected results.
+/// and using an `and` produces unintended results.
 ///
 /// ## Example
 /// ```python
