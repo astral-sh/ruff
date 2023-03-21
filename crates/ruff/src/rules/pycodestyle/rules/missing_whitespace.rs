@@ -32,7 +32,7 @@ impl AlwaysAutofixableViolation for MissingWhitespace {
 }
 
 /// E231
-#[cfg(feature = "logical_lines")]
+#[cfg(debug_assertions)]
 pub fn missing_whitespace(line: &str, row: usize, autofix: bool) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
     for (idx, char) in line.chars().enumerate() {
@@ -74,7 +74,7 @@ pub fn missing_whitespace(line: &str, row: usize, autofix: bool) -> Vec<Diagnost
     diagnostics
 }
 
-#[cfg(not(feature = "logical_lines"))]
+#[cfg(not(debug_assertions))]
 pub fn missing_whitespace(_line: &str, _row: usize, _autofix: bool) -> Vec<Diagnostic> {
     vec![]
 }
