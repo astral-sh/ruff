@@ -630,17 +630,6 @@
           "items": {
             "type": "string"
           }
-        },
-        "severity": {
-          "description": "The minimum severity to catch. Choose from `low`, `medium`, `high`,",
-          "anyOf": [
-            {
-              "$ref": "#/definitions/Severity"
-            },
-            {
-              "type": "null"
-            }
-          ]
         }
       },
       "additionalProperties": false
@@ -2042,9 +2031,6 @@
         "RUF10",
         "RUF100",
         "S",
-        "S0",
-        "S00",
-        "S001",
         "S1",
         "S10",
         "S101",
@@ -2060,7 +2046,30 @@
         "S112",
         "S113",
         "S3",
+        "S30",
+        "S301",
+        "S302",
+        "S303",
+        "S304",
+        "S305",
+        "S306",
+        "S307",
+        "S308",
+        "S31",
+        "S310",
+        "S311",
+        "S312",
+        "S313",
+        "S314",
+        "S315",
+        "S316",
+        "S317",
+        "S318",
+        "S319",
         "S32",
+        "S320",
+        "S321",
+        "S323",
         "S324",
         "S5",
         "S50",
@@ -2241,14 +2250,6 @@
         "gitlab",
         "pylint",
         "azure"
-      ]
-    },
-    "Severity": {
-      "type": "string",
-      "enum": [
-        "Low",
-        "Medium",
-        "High"
       ]
     },
     "Strictness": {

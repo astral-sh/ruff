@@ -2445,8 +2445,30 @@ where
                 }
 
                 // flake8-bandit
-                if self.settings.rules.enabled(Rule::DeniedFunctionCall) {
-                    flake8_bandit::rules::denied_function_call(self, expr);
+                if self.settings.rules.any_enabled(&[
+                    Rule::SuspiciousPickleUsage,
+                    Rule::SuspiciousMarshalUsage,
+                    Rule::SuspiciousInsecureHashUsage,
+                    Rule::SuspiciousInsecureCipherUsage,
+                    Rule::SuspiciousInsecureCipherModeUsage,
+                    Rule::SuspiciousMktempUsage,
+                    Rule::SuspiciousEvalUsage,
+                    Rule::SuspiciousMarkSafeUsage,
+                    Rule::SuspiciousURLOpenUsage,
+                    Rule::SuspiciousNonCryptographicRandomUsage,
+                    Rule::SuspiciousXMLCElementTreeUsage,
+                    Rule::SuspiciousXMLElementTreeUsage,
+                    Rule::SuspiciousXMLExpatReaderUsage,
+                    Rule::SuspiciousXMLExpatBuilderUsage,
+                    Rule::SuspiciousXMLSaxUsage,
+                    Rule::SuspiciousXMLMiniDOMUsage,
+                    Rule::SuspiciousXMLPullDOMUsage,
+                    Rule::SuspiciousXMLETreeUsage,
+                    Rule::SuspiciousUnverifiedContextUsage,
+                    Rule::SuspiciousTelnetUsage,
+                    Rule::SuspiciousFTPLibUsage,
+                ]) {
+                    flake8_bandit::rules::suspicious_function_call(self, expr);
                 }
 
                 // flake8-bugbear
