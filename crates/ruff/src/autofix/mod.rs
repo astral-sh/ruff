@@ -28,7 +28,7 @@ fn apply_fixes<'a>(
     locator: &'a Locator<'a>,
 ) -> (String, FixTable) {
     let mut output = String::with_capacity(locator.len());
-    let mut last_pos: Location = Location::new(1, 0);
+    let mut last_pos: Option<Location> = None;
     let mut applied: BTreeSet<&Fix> = BTreeSet::default();
     let mut fixed = FxHashMap::default();
 
@@ -50,25 +50,25 @@ fn apply_fixes<'a>(
 
         // Best-effort approach: if this fix overlaps with a fix we've already applied,
         // skip it.
-        if last_pos > fix.location {
+        if last_pos.map_or(false, |last_pos| last_pos >= fix.location) {
             continue;
         }
 
         // Add all contents from `last_pos` to `fix.location`.
-        let slice = locator.slice(Range::new(last_pos, fix.location));
+        let slice = locator.slice(Range::new(last_pos.unwrap_or_default(), fix.location));
         output.push_str(slice);
 
         // Add the patch itself.
         output.push_str(&fix.content);
 
         // Track that the fix was applied.
-        last_pos = fix.end_location;
+        last_pos = Some(fix.end_location);
         applied.insert(fix);
         *fixed.entry(rule).or_default() += 1;
     }
 
     // Add the remaining content.
-    let slice = locator.skip(last_pos);
+    let slice = locator.skip(last_pos.unwrap_or_default());
     output.push_str(slice);
 
     (output, fixed)
@@ -194,7 +194,7 @@ class A:
     fn apply_two_removals() {
         let locator = Locator::new(
             r#"
-class A(object, object):
+class A(object, object, object):
     ...
 "#
             .trim(),
@@ -202,13 +202,13 @@ class A(object, object):
         let diagnostics = create_diagnostics([
             Fix {
                 content: String::new(),
-                location: Location::new(1, 7),
+                location: Location::new(1, 8),
                 end_location: Location::new(1, 16),
             },
             Fix {
                 content: String::new(),
-                location: Location::new(1, 16),
-                end_location: Location::new(1, 23),
+                location: Location::new(1, 22),
+                end_location: Location::new(1, 30),
             },
         ]);
         let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
@@ -216,7 +216,7 @@ class A(object, object):
         assert_eq!(
             contents,
             r#"
-class A:
+class A(object):
     ...
 "#
             .trim()

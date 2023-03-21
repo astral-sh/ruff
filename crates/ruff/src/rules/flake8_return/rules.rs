@@ -219,8 +219,6 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        // This is the last statement in the function. So it has to be followed by
-                        // a newline, or comments, or nothing.
                         diagnostic.amend(Fix::insertion(
                             content,
                             end_of_statement(stmt, checker.locator),
