@@ -5,3 +5,4 @@ uses-*
 rewrite-*
 prefer-*
 consider-*
+use-*

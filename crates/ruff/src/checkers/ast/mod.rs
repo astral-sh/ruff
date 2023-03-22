@@ -1718,8 +1718,8 @@ where
                         flake8_pytest_style::rules::assert_in_exception_handler(handlers),
                     );
                 }
-                if self.settings.rules.enabled(Rule::UseContextlibSuppress) {
-                    flake8_simplify::rules::use_contextlib_suppress(
+                if self.settings.rules.enabled(Rule::SuppressibleException) {
+                    flake8_simplify::rules::suppressible_exception(
                         self, stmt, body, handlers, orelse, finalbody,
                     );
                 }
@@ -2267,9 +2267,9 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(Rule::UsePriorToGlobalDeclaration)
+                    .enabled(Rule::LoadBeforeGlobalDeclaration)
                 {
-                    pylint::rules::use_prior_to_global_declaration(self, id, expr);
+                    pylint::rules::load_before_global_declaration(self, id, expr);
                 }
             }
             ExprKind::Attribute { attr, value, .. } => {

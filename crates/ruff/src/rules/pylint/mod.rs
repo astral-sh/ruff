@@ -60,7 +60,7 @@ mod tests {
     #[test_case(Rule::TooManyReturnStatements, Path::new("too_many_return_statements.py"); "PLR0911")]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"); "PLR0915")]
     #[test_case(Rule::UnnecessaryDirectLambdaCall, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
-    #[test_case(Rule::UsePriorToGlobalDeclaration, Path::new("use_prior_to_global_declaration.py"); "PLE0118")]
+    #[test_case(Rule::LoadBeforeGlobalDeclaration, Path::new("load_before_global_declaration.py"); "PLE0118")]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(Rule::UselessReturn, Path::new("useless_return.py"); "PLR1711")]
