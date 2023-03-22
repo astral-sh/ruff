@@ -1,6 +1,5 @@
 //! `NoQA` enforcement and validation.
 
-use log::warn;
 use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
@@ -10,7 +9,7 @@ use ruff_python_ast::types::Range;
 
 use crate::codes::NoqaCode;
 use crate::noqa;
-use crate::noqa::{extract_file_exemption, Directive, Exemption};
+use crate::noqa::{Directive, FileExemption};
 use crate::registry::{AsRule, Rule};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
@@ -26,44 +25,26 @@ pub fn check_noqa(
 ) -> Vec<usize> {
     let enforce_noqa = settings.rules.enabled(Rule::UnusedNOQA);
 
-    // Whether the file is exempted from all checks.
-    let mut file_exempted = false;
+    let lines: Vec<&str> = contents.universal_newlines().collect();
 
-    // Codes that are globally exempted (within the current file).
-    let mut file_exemptions: Vec<NoqaCode> = vec![];
+    // Identify any codes that are globally exempted (within the current file).
+    let exemption = noqa::file_exemption(&lines, commented_lines);
 
     // Map from line number to `noqa` directive on that line, along with any codes
     // that were matched by the directive.
     let mut noqa_directives: IntMap<usize, (Directive, Vec<NoqaCode>)> = IntMap::default();
 
-    // Indices of diagnostics that were ignored by a `noqa` directive.
-    let mut ignored_diagnostics = vec![];
-
-    let lines: Vec<&str> = contents.universal_newlines().collect();
-    for lineno in commented_lines {
-        match extract_file_exemption(lines[lineno - 1]) {
-            Exemption::All => {
-                file_exempted = true;
-            }
-            Exemption::Codes(codes) => {
-                file_exemptions.extend(codes.into_iter().filter_map(|code| {
-                    if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code)) {
-                        Some(rule.noqa_code())
-                    } else {
-                        warn!("Invalid code provided to `# ruff: noqa`: {}", code);
-                        None
-                    }
-                }));
-            }
-            Exemption::None => {}
-        }
-
-        if enforce_noqa {
+    // Extract all `noqa` directives.
+    if enforce_noqa {
+        for lineno in commented_lines {
             noqa_directives
                 .entry(lineno - 1)
                 .or_insert_with(|| (noqa::extract_noqa_directive(lines[lineno - 1]), vec![]));
         }
     }
+
+    // Indices of diagnostics that were ignored by a `noqa` directive.
+    let mut ignored_diagnostics = vec![];
 
     // Remove any ignored diagnostics.
     for (index, diagnostic) in diagnostics.iter().enumerate() {
@@ -71,18 +52,20 @@ pub fn check_noqa(
             continue;
         }
 
-        // If the file is exempted, ignore all diagnostics.
-        if file_exempted {
-            ignored_diagnostics.push(index);
-            continue;
-        }
-
-        // If the diagnostic is ignored by a global exemption, ignore it.
-        if !file_exemptions.is_empty() {
-            if file_exemptions.contains(&diagnostic.kind.rule().noqa_code()) {
+        match &exemption {
+            FileExemption::All => {
+                // If the file is exempted, ignore all diagnostics.
                 ignored_diagnostics.push(index);
                 continue;
             }
+            FileExemption::Codes(codes) => {
+                // If the diagnostic is ignored by a global exemption, ignore it.
+                if codes.contains(&diagnostic.kind.rule().noqa_code()) {
+                    ignored_diagnostics.push(index);
+                    continue;
+                }
+            }
+            FileExemption::None => {}
         }
 
         // Is the violation ignored by a `noqa` directive on the parent line?
