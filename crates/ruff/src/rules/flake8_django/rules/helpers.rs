@@ -23,6 +23,18 @@ pub fn is_model_form(checker: &Checker, base: &Expr) -> bool {
         })
 }
 
+/// Return `true` if the expression is constructor for a Django model field.
+pub fn is_model_field(checker: &Checker, expr: &Expr) -> bool {
+    checker
+        .ctx
+        .resolve_call_path(expr)
+        .map_or(false, |call_path| {
+            call_path
+                .as_slice()
+                .starts_with(&["django", "db", "models"])
+        })
+}
+
 /// Return the name of the field type, if the expression is constructor for a Django model field.
 pub fn get_model_field_name<'a>(checker: &'a Checker, expr: &'a Expr) -> Option<&'a str> {
     checker.ctx.resolve_call_path(expr).and_then(|call_path| {

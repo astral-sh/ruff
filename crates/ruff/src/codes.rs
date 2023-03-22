@@ -677,6 +677,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Django, "006") => Rule::DjangoExcludeWithModelForm,
         (Flake8Django, "007") => Rule::DjangoAllWithModelForm,
         (Flake8Django, "008") => Rule::DjangoModelWithoutDunderStr,
+        (Flake8Django, "012") => Rule::DjangoUnorderedBodyContentInModel,
         (Flake8Django, "013") => Rule::DjangoNonLeadingReceiverDecorator,
 
         _ => return None,

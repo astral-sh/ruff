@@ -1,0 +1,57 @@
+---
+source: crates/ruff/src/rules/flake8_django/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: DjangoUnorderedBodyContentInModel
+    body: "Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 28
+    column: 4
+  end_location:
+    row: 28
+    column: 48
+  fix: ~
+  parent: ~
+- kind:
+    name: DjangoUnorderedBodyContentInModel
+    body: "Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before manager declaration"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 43
+    column: 4
+  end_location:
+    row: 43
+    column: 48
+  fix: ~
+  parent: ~
+- kind:
+    name: DjangoUnorderedBodyContentInModel
+    body: "Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `__str__` method should come before custom method"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 56
+    column: 4
+  end_location:
+    row: 57
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    name: DjangoUnorderedBodyContentInModel
+    body: "Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `save` method should come before `get_absolute_url` method"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 69
+    column: 4
+  end_location:
+    row: 70
+    column: 12
+  fix: ~
+  parent: ~
+
