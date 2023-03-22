@@ -49,7 +49,7 @@ impl Violation for DjangoAllWithModelForm {
 
 /// DJ007
 pub fn all_with_model_form(checker: &Checker, bases: &[Expr], body: &[Stmt]) -> Option<Diagnostic> {
-    if !bases.iter().any(|base| is_model_form(checker, base)) {
+    if !bases.iter().any(|base| is_model_form(&checker.ctx, base)) {
         return None;
     }
     for element in body.iter() {

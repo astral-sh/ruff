@@ -103,7 +103,7 @@ fn get_element_type(checker: &Checker, element: &StmtKind) -> Option<ContentType
     match element {
         StmtKind::Assign { targets, value, .. } => {
             if let ExprKind::Call { func, .. } = &value.node {
-                if helpers::is_model_field(checker, func) {
+                if helpers::is_model_field(&checker.ctx, func) {
                     return Some(ContentType::FieldDeclaration);
                 }
             }
@@ -138,7 +138,10 @@ fn get_element_type(checker: &Checker, element: &StmtKind) -> Option<ContentType
 
 /// DJ012
 pub fn unordered_body_content_in_model(checker: &mut Checker, bases: &[Expr], body: &[Stmt]) {
-    if !bases.iter().any(|base| helpers::is_model(checker, base)) {
+    if !bases
+        .iter()
+        .any(|base| helpers::is_model(&checker.ctx, base))
+    {
         return;
     }
     let mut elements_type_found = Vec::new();

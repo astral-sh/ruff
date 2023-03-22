@@ -86,7 +86,7 @@ fn checker_applies(checker: &Checker, bases: &[Expr], body: &[Stmt]) -> bool {
         if is_model_abstract(body) {
             continue;
         }
-        if helpers::is_model(checker, base) {
+        if helpers::is_model(&checker.ctx, base) {
             return true;
         }
     }
