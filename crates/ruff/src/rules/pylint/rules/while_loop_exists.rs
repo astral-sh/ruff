@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `while` loop use
-/// 
+///
 /// (`while_used` in Pylint configuration must be set to `true` for this rule to run)
 ///
 /// ## Why is this bad?
