@@ -33,7 +33,12 @@ impl AlwaysAutofixableViolation for MissingWhitespace {
 
 /// E231
 #[cfg(debug_assertions)]
-pub fn missing_whitespace(line: &str, row: usize, autofix: bool) -> Vec<Diagnostic> {
+pub fn missing_whitespace(
+    line: &str,
+    row: usize,
+    autofix: bool,
+    indent_level: usize,
+) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
     for (idx, char) in line.chars().enumerate() {
         if idx + 1 == line.len() {
@@ -62,11 +67,17 @@ pub fn missing_whitespace(line: &str, row: usize, autofix: bool) -> Vec<Diagnost
 
             let mut diagnostic = Diagnostic::new(
                 kind,
-                Range::new(Location::new(row, idx), Location::new(row, idx)),
+                Range::new(
+                    Location::new(row, indent_level + idx),
+                    Location::new(row, indent_level + idx),
+                ),
             );
 
             if autofix {
-                diagnostic.amend(Fix::insertion(" ".to_string(), Location::new(row, idx + 1)));
+                diagnostic.amend(Fix::insertion(
+                    " ".to_string(),
+                    Location::new(row, indent_level + idx + 1),
+                ));
             }
             diagnostics.push(diagnostic);
         }

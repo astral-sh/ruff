@@ -171,7 +171,9 @@ pub fn check_logical_lines(
             #[cfg(not(debug_assertions))]
             let should_fix = false;
 
-            for diagnostic in missing_whitespace(&line.text, start_loc.row(), should_fix) {
+            for diagnostic in
+                missing_whitespace(&line.text, start_loc.row(), should_fix, indent_level)
+            {
                 if settings.rules.enabled(diagnostic.kind.rule()) {
                     diagnostics.push(diagnostic);
                 }
