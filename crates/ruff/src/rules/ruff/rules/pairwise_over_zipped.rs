@@ -1,5 +1,5 @@
 use num_traits::ToPrimitive;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, KeywordData, Unaryop};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Unaryop};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -88,43 +88,13 @@ fn to_bound(expr: &Expr) -> Option<i64> {
 }
 
 /// RUF007
-pub fn pairwise_over_zipped(
-    checker: &mut Checker,
-    func: &Expr,
-    args: &[Expr],
-    keywords: &[Keyword],
-) {
+pub fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
     let ExprKind::Name { id, .. } = &func.node else {
         return;
     };
 
     // Require exactly two positional arguments.
     if args.len() != 2 {
-        return;
-    }
-
-    // Allow `strict=False`, but no other keyword arguments.
-    if keywords.iter().any(|keyword| {
-        let KeywordData {
-            arg: Some(arg),
-            value,
-        } = &keyword.node else {
-            return true;
-        };
-        if arg != "strict" {
-            return true;
-        }
-        if matches!(
-            value.node,
-            ExprKind::Constant {
-                value: Constant::Bool(false),
-                ..
-            }
-        ) {
-            return false;
-        }
-        true
-    }) {
         return;
     }
 
