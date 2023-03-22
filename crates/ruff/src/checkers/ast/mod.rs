@@ -2858,7 +2858,7 @@ where
 
                 if self.settings.rules.enabled(Rule::PairwiseOverZipped) {
                     if self.settings.target_version >= PythonVersion::Py310 {
-                        ruff::rules::pairwise_over_zipped(self, func, args, keywords);
+                        ruff::rules::pairwise_over_zipped(self, func, args);
                     }
                 }
 
