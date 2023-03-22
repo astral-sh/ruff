@@ -243,7 +243,7 @@ quality tools, including:
 - [flake8-comprehensions](https://pypi.org/project/flake8-comprehensions/)
 - [flake8-datetimez](https://pypi.org/project/flake8-datetimez/)
 - [flake8-debugger](https://pypi.org/project/flake8-debugger/)
-- [flake8-django](https://pypi.org/project/flake8-django/) ([#2817](https://github.com/charliermarsh/ruff/issues/2817))
+- [flake8-django](https://pypi.org/project/flake8-django/)
 - [flake8-docstrings](https://pypi.org/project/flake8-docstrings/)
 - [flake8-eradicate](https://pypi.org/project/flake8-eradicate/)
 - [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
