@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: WhileUsed
+    name: WhileLoopUsed
     body: "Used `while` loop"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: WhileUsed
+    name: WhileLoopUsed
     body: "Used `while` loop"
     suggestion: ~
     fixable: false
