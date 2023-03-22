@@ -26,9 +26,9 @@ use crate::checkers::ast::Checker;
 ///     print(i)
 /// ```
 #[violation]
-pub struct WhileLoopUsed;
+pub struct WhileLoopExists;
 
-impl Violation for WhileLoopUsed {
+impl Violation for WhileLoopExists {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Used `while` loop")
@@ -36,8 +36,8 @@ impl Violation for WhileLoopUsed {
 }
 
 /// PLW0149
-pub fn while_loop_used(checker: &mut Checker, stmt: &Stmt) {
+pub fn while_loop_exists(checker: &mut Checker, stmt: &Stmt) {
     checker
         .diagnostics
-        .push(Diagnostic::new(WhileLoopUsed, Range::from(stmt)));
+        .push(Diagnostic::new(WhileLoopExists, Range::from(stmt)));
 }

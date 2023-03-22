@@ -63,7 +63,7 @@ mod tests {
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]
     #[test_case(Rule::UselessImportAlias, Path::new("import_aliasing.py"); "PLC0414")]
     #[test_case(Rule::UselessReturn, Path::new("useless_return.py"); "PLR1711")]
-    #[test_case(Rule::WhileLoopUsed, Path::new("while_used.py"); "PLW0149")]
+    #[test_case(Rule::WhileLoopExists, Path::new("while_loop_exists.py"); "PLW0149")]
     #[test_case(Rule::YieldInInit, Path::new("yield_in_init.py"); "PLE0100")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
