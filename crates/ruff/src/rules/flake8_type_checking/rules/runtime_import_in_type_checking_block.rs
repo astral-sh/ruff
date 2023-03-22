@@ -1,6 +1,8 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::scope::{Binding, BindingKind, ExecutionContext};
+use ruff_python_ast::scope::{
+    Binding, BindingKind, ExecutionContext, FromImportation, Importation, SubmoduleImportation,
+};
 
 #[violation]
 pub struct RuntimeImportInTypeCheckingBlock {
@@ -21,9 +23,9 @@ impl Violation for RuntimeImportInTypeCheckingBlock {
 /// TCH004
 pub fn runtime_import_in_type_checking_block(binding: &Binding) -> Option<Diagnostic> {
     let full_name = match &binding.kind {
-        BindingKind::Importation(.., full_name) => full_name,
-        BindingKind::FromImportation(.., full_name) => full_name.as_str(),
-        BindingKind::SubmoduleImportation(.., full_name) => full_name,
+        BindingKind::Importation(Importation { full_name, .. }) => full_name,
+        BindingKind::FromImportation(FromImportation { full_name, .. }) => full_name.as_str(),
+        BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => full_name,
         _ => return None,
     };
 

@@ -2,7 +2,9 @@ use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::scope::{Binding, BindingKind, ExecutionContext};
+use ruff_python_ast::scope::{
+    Binding, BindingKind, ExecutionContext, FromImportation, Importation, SubmoduleImportation,
+};
 
 use crate::rules::isort::{categorize, ImportType};
 use crate::settings::Settings;
@@ -55,30 +57,54 @@ impl Violation for TypingOnlyStandardLibraryImport {
 /// Return `true` if `this` is implicitly loaded via importing `that`.
 fn is_implicit_import(this: &Binding, that: &Binding) -> bool {
     match &this.kind {
-        BindingKind::Importation(.., this_name)
-        | BindingKind::SubmoduleImportation(this_name, ..) => match &that.kind {
-            BindingKind::FromImportation(.., that_name) => {
+        BindingKind::Importation(Importation {
+            full_name: this_name,
+            ..
+        })
+        | BindingKind::SubmoduleImportation(SubmoduleImportation {
+            name: this_name, ..
+        }) => match &that.kind {
+            BindingKind::FromImportation(FromImportation {
+                full_name: that_name,
+                ..
+            }) => {
                 // Ex) `pkg.A` vs. `pkg`
                 this_name
                     .rfind('.')
                     .map_or(false, |i| this_name[..i] == *that_name)
             }
-            BindingKind::Importation(.., that_name)
-            | BindingKind::SubmoduleImportation(that_name, ..) => {
+            BindingKind::Importation(Importation {
+                full_name: that_name,
+                ..
+            })
+            | BindingKind::SubmoduleImportation(SubmoduleImportation {
+                name: that_name, ..
+            }) => {
                 // Ex) `pkg.A` vs. `pkg.B`
                 this_name == that_name
             }
             _ => false,
         },
-        BindingKind::FromImportation(.., this_name) => match &that.kind {
-            BindingKind::Importation(.., that_name)
-            | BindingKind::SubmoduleImportation(that_name, ..) => {
+        BindingKind::FromImportation(FromImportation {
+            full_name: this_name,
+            ..
+        }) => match &that.kind {
+            BindingKind::Importation(Importation {
+                full_name: that_name,
+                ..
+            })
+            | BindingKind::SubmoduleImportation(SubmoduleImportation {
+                name: that_name, ..
+            }) => {
                 // Ex) `pkg.A` vs. `pkg`
                 this_name
                     .rfind('.')
                     .map_or(false, |i| &this_name[..i] == *that_name)
             }
-            BindingKind::FromImportation(.., that_name) => {
+            BindingKind::FromImportation(FromImportation {
+                full_name: that_name,
+                ..
+            }) => {
                 // Ex) `pkg.A` vs. `pkg.B`
                 this_name.rfind('.').map_or(false, |i| {
                     that_name
@@ -126,9 +152,9 @@ pub fn typing_only_runtime_import(
     }
 
     let full_name = match &binding.kind {
-        BindingKind::Importation(.., full_name) => full_name,
-        BindingKind::FromImportation(.., full_name) => full_name.as_str(),
-        BindingKind::SubmoduleImportation(.., full_name) => full_name,
+        BindingKind::Importation(Importation { full_name, .. }) => full_name,
+        BindingKind::FromImportation(FromImportation { full_name, .. }) => full_name.as_str(),
+        BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => full_name,
         _ => return None,
     };
 

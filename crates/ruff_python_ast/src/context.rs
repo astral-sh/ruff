@@ -10,8 +10,8 @@ use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
 use crate::helpers::{collect_call_path, from_relative_import};
 use crate::scope::{
-    Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, Scope, ScopeId,
-    ScopeKind, ScopeStack, Scopes,
+    Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
+    Importation, Scope, ScopeId, ScopeKind, ScopeStack, Scopes, SubmoduleImportation,
 };
 use crate::types::{CallPath, RefEquality};
 use crate::typing::AnnotationKind;
@@ -156,7 +156,10 @@ impl<'a> Context<'a> {
             return None;
         };
         match &binding.kind {
-            BindingKind::Importation(.., name) | BindingKind::SubmoduleImportation(name, ..) => {
+            BindingKind::Importation(Importation {
+                full_name: name, ..
+            })
+            | BindingKind::SubmoduleImportation(SubmoduleImportation { name, .. }) => {
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
@@ -171,7 +174,9 @@ impl<'a> Context<'a> {
                     Some(source_path)
                 }
             }
-            BindingKind::FromImportation(.., name) => {
+            BindingKind::FromImportation(FromImportation {
+                full_name: name, ..
+            }) => {
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);

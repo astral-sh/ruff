@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Expr, ExprKind};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::scope::BindingKind;
+use ruff_python_ast::scope::{BindingKind, Importation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -86,7 +86,10 @@ pub fn check_call(checker: &mut Checker, func: &Expr) {
     // irrelevant bindings (like non-Pandas imports).
     if let ExprKind::Name { id, .. } = &value.node {
         if checker.ctx.find_binding(id).map_or(true, |binding| {
-            if let BindingKind::Importation(.., module) = &binding.kind {
+            if let BindingKind::Importation(Importation {
+                full_name: module, ..
+            }) = &binding.kind
+            {
                 module != &"pandas"
             } else {
                 matches!(
