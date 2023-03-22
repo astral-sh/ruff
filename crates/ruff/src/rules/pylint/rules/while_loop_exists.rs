@@ -8,6 +8,8 @@ use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for `while` loop use
+/// 
+/// (`while_used` in Pylint configuration must be set to `true` for this rule to run)
 ///
 /// ## Why is this bad?
 /// Unbounded `while` loops can often be rewritten as bounded `for` loops to avoid out of range or other similar errors

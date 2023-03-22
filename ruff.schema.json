@@ -1350,6 +1350,13 @@
           ],
           "format": "uint",
           "minimum": 0.0
+        },
+        "while-used": {
+          "description": "Flag while loops in use (see: `PLW0149`).",
+          "type": [
+            "boolean",
+            "null"
+          ]
         }
       },
       "additionalProperties": false

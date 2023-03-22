@@ -70,6 +70,8 @@ pub struct Options {
     /// Maximum number of statements allowed for a function or method body (see:
     /// `PLR0915`).
     pub max_statements: Option<usize>,
+    /// Flag while loops in use (see: `PLW0149`).
+    pub while_used: Option<bool>,
 }
 
 #[derive(Debug, CacheKey)]
@@ -79,6 +81,7 @@ pub struct Settings {
     pub max_returns: usize,
     pub max_branches: usize,
     pub max_statements: usize,
+    pub while_used: bool,
 }
 
 impl Default for Settings {
@@ -89,6 +92,7 @@ impl Default for Settings {
             max_returns: 6,
             max_branches: 12,
             max_statements: 50,
+            while_used: false,
         }
     }
 }
@@ -104,6 +108,7 @@ impl From<Options> for Settings {
             max_returns: options.max_returns.unwrap_or(defaults.max_returns),
             max_branches: options.max_branches.unwrap_or(defaults.max_branches),
             max_statements: options.max_statements.unwrap_or(defaults.max_statements),
+            while_used: options.while_used.unwrap_or(defaults.while_used),
         }
     }
 }
@@ -116,6 +121,7 @@ impl From<Settings> for Options {
             max_returns: Some(settings.max_returns),
             max_branches: Some(settings.max_branches),
             max_statements: Some(settings.max_statements),
+            while_used: Some(settings.while_used),
         }
     }
 }

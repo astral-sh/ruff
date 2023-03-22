@@ -1619,7 +1619,9 @@ where
                 if self.settings.rules.enabled(Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
-                if self.settings.rules.enabled(Rule::WhileLoopExists) {
+                if self.settings.pylint.while_used
+                    && self.settings.rules.enabled(Rule::WhileLoopExists)
+                {
                     pylint::rules::while_loop_exists(self, stmt);
                 }
             }
