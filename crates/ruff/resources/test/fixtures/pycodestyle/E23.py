@@ -13,3 +13,8 @@ result = {
     'key1': 'value',
     'key2': 'value',
 }
+
+def foo() -> None:
+    #: E231
+    if (1,2):
+        pass
