@@ -197,6 +197,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "R5501") => Rule::CollapsibleElseIf,
         (Pylint, "W0120") => Rule::UselessElseOnLoop,
         (Pylint, "W0129") => Rule::AssertOnStringLiteral,
+        (Pylint, "W0149") => Rule::WhileUsed,
         (Pylint, "W0602") => Rule::GlobalVariableNotAssigned,
         (Pylint, "W0603") => Rule::GlobalStatement,
         (Pylint, "W1508") => Rule::InvalidEnvvarDefault,

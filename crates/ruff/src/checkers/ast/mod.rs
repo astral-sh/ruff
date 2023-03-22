@@ -1619,6 +1619,9 @@ where
                 if self.settings.rules.enabled(Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
+                if self.settings.rules.enabled(Rule::WhileUsed) {
+                    pylint::rules::while_used(self, stmt);
+                }
             }
             StmtKind::For {
                 target,

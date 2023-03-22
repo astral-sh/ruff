@@ -186,6 +186,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::RedefinedLoopName,
     rules::pylint::rules::LoggingTooFewArgs,
     rules::pylint::rules::LoggingTooManyArgs,
+    rules::pylint::rules::WhileUsed,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
