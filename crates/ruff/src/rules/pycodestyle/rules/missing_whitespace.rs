@@ -86,6 +86,11 @@ pub fn missing_whitespace(
 }
 
 #[cfg(not(debug_assertions))]
-pub fn missing_whitespace(_line: &str, _row: usize, _autofix: bool) -> Vec<Diagnostic> {
+pub fn missing_whitespace(
+    _line: &str,
+    _row: usize,
+    _autofix: bool,
+    indent_level: usize,
+) -> Vec<Diagnostic> {
     vec![]
 }
