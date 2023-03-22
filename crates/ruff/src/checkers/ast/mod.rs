@@ -2305,7 +2305,6 @@ where
                     flake8_self::rules::private_member_access(self, expr);
                 }
                 pandas_vet::rules::check_attr(self, attr, value, expr);
-                // push to scope?
             }
             ExprKind::Call {
                 func,

@@ -56,6 +56,29 @@ pub fn check_imports(
     }
     let mut imports = Imports::default();
     let mut imports_vec = vec![];
+    // find the difference between the current path and the package root (inc root)
+    let modules: Vec<&str> = match package {
+        Some(package) => {
+            let mut modules: Vec<&str> = vec![package.iter().last().unwrap().to_str().unwrap()];
+            modules.extend(
+                path.strip_prefix(package)
+                    .iter()
+                    .rev()
+                    // we don't want the end module as it is the current one
+                    .skip(1)
+                    .map(|p| p.to_str().unwrap())
+                    .rev(),
+            );
+            modules
+        }
+        None => path
+            .iter()
+            .rev()
+            .skip(1)
+            .take(1)
+            .map(|p| p.to_str().unwrap())
+            .collect::<Vec<_>>(),
+    };
     for &block in &blocks {
         block.imports.iter().for_each(|&stmt| match &stmt.node {
             StmtKind::Import { names } => {
@@ -66,13 +89,13 @@ pub fn check_imports(
                     end_location: stmt.end_location.unwrap(),
                 });
             }
-            StmtKind::ImportFrom { module, names, .. } => {
+            StmtKind::ImportFrom {
+                module,
+                names,
+                level,
+            } => {
                 imports_vec.extend(names.iter().map(|name| Import {
-                    name: format!(
-                        "{}.{}",
-                        module.as_ref().unwrap_or(&String::new()),
-                        name.node.name
-                    ),
+                    name: Imports::expand_relative(&modules, module, &name.node.name, level),
                     location: name.location,
                     end_location: name.end_location.unwrap(),
                 }));
