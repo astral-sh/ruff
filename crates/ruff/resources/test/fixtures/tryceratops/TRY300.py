@@ -45,3 +45,10 @@ def still_good():
         return process()
     except MyException:
         logger.exception("process failed")
+
+def good_noexcept():
+    try:
+        pass
+        return process()
+    finally:
+        logger.exception("process failed")

@@ -1,22 +1,24 @@
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-// TODO: document referencing [PEP 585]: https://peps.python.org/pep-0585/
 #[violation]
-pub struct DeprecatedCollectionType {
+pub struct NonPEP585Annotation {
     pub name: String,
+    pub fixable: bool,
 }
 
-impl AlwaysAutofixableViolation for DeprecatedCollectionType {
+impl Violation for NonPEP585Annotation {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DeprecatedCollectionType { name } = self;
+        let NonPEP585Annotation { name, .. } = self;
         format!(
             "Use `{}` instead of `{}` for type annotations",
             name.to_lowercase(),
@@ -24,9 +26,10 @@ impl AlwaysAutofixableViolation for DeprecatedCollectionType {
         )
     }
 
-    fn autofix_title(&self) -> String {
-        let DeprecatedCollectionType { name } = self;
-        format!("Replace `{name}` with `{}`", name.to_lowercase())
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        self.fixable.then_some(|NonPEP585Annotation { name, .. }| {
+            format!("Replace `{name}` with `{}`", name.to_lowercase())
+        })
     }
 }
 
@@ -37,13 +40,15 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
         .resolve_call_path(expr)
         .and_then(|call_path| call_path.last().copied())
     {
+        let fixable = !checker.ctx.in_deferred_string_type_definition;
         let mut diagnostic = Diagnostic::new(
-            DeprecatedCollectionType {
+            NonPEP585Annotation {
                 name: binding.to_string(),
+                fixable,
             },
             Range::from(expr),
         );
-        if checker.patch(diagnostic.kind.rule()) {
+        if fixable && checker.patch(diagnostic.kind.rule()) {
             let binding = binding.to_lowercase();
             if checker.ctx.is_builtin(&binding) {
                 diagnostic.amend(Fix::replacement(

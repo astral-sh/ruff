@@ -1,0 +1,285 @@
+---
+source: crates/ruff/src/rules/flake8_annotations/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__str__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 2
+    column: 8
+  end_location:
+    row: 2
+    column: 15
+  fix:
+    content: " -> str"
+    location:
+      row: 2
+      column: 21
+    end_location:
+      row: 2
+      column: 21
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__repr__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 5
+    column: 8
+  end_location:
+    row: 5
+    column: 16
+  fix:
+    content: " -> str"
+    location:
+      row: 5
+      column: 22
+    end_location:
+      row: 5
+      column: 22
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__len__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 8
+    column: 8
+  end_location:
+    row: 8
+    column: 15
+  fix:
+    content: " -> int"
+    location:
+      row: 8
+      column: 21
+    end_location:
+      row: 8
+      column: 21
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__length_hint__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 11
+    column: 8
+  end_location:
+    row: 11
+    column: 23
+  fix:
+    content: " -> int"
+    location:
+      row: 11
+      column: 29
+    end_location:
+      row: 11
+      column: 29
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__init__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 14
+    column: 8
+  end_location:
+    row: 14
+    column: 16
+  fix:
+    content: " -> None"
+    location:
+      row: 14
+      column: 22
+    end_location:
+      row: 14
+      column: 22
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__del__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 17
+    column: 8
+  end_location:
+    row: 17
+    column: 15
+  fix:
+    content: " -> None"
+    location:
+      row: 17
+      column: 21
+    end_location:
+      row: 17
+      column: 21
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__bool__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 20
+    column: 8
+  end_location:
+    row: 20
+    column: 16
+  fix:
+    content: " -> bool"
+    location:
+      row: 20
+      column: 22
+    end_location:
+      row: 20
+      column: 22
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__bytes__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 23
+    column: 8
+  end_location:
+    row: 23
+    column: 17
+  fix:
+    content: " -> bytes"
+    location:
+      row: 23
+      column: 23
+    end_location:
+      row: 23
+      column: 23
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__format__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 26
+    column: 8
+  end_location:
+    row: 26
+    column: 18
+  fix:
+    content: " -> str"
+    location:
+      row: 26
+      column: 37
+    end_location:
+      row: 26
+      column: 37
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__contains__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 29
+    column: 8
+  end_location:
+    row: 29
+    column: 20
+  fix:
+    content: " -> bool"
+    location:
+      row: 29
+      column: 32
+    end_location:
+      row: 29
+      column: 32
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__complex__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 32
+    column: 8
+  end_location:
+    row: 32
+    column: 19
+  fix:
+    content: " -> complex"
+    location:
+      row: 32
+      column: 25
+    end_location:
+      row: 32
+      column: 25
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__int__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 35
+    column: 8
+  end_location:
+    row: 35
+    column: 15
+  fix:
+    content: " -> int"
+    location:
+      row: 35
+      column: 21
+    end_location:
+      row: 35
+      column: 21
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__float__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 38
+    column: 8
+  end_location:
+    row: 38
+    column: 17
+  fix:
+    content: " -> float"
+    location:
+      row: 38
+      column: 23
+    end_location:
+      row: 38
+      column: 23
+  parent: ~
+- kind:
+    name: MissingReturnTypeSpecialMethod
+    body: "Missing return type annotation for special method `__index__`"
+    suggestion: "Add `None` return type"
+    fixable: true
+  location:
+    row: 41
+    column: 8
+  end_location:
+    row: 41
+    column: 17
+  fix:
+    content: " -> int"
+    location:
+      row: 41
+      column: 23
+    end_location:
+      row: 41
+      column: 23
+  parent: ~
+

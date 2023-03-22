@@ -1990,7 +1990,6 @@ dependencies = [
  "chrono",
  "clap 4.1.8",
  "colored",
- "criterion",
  "dirs",
  "fern",
  "glob",
@@ -2212,7 +2211,6 @@ name = "ruff_python_stdlib"
 version = "0.0.0"
 dependencies = [
  "once_cell",
- "regex",
  "rustc-hash",
 ]
 

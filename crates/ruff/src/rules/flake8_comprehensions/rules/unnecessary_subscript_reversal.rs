@@ -9,6 +9,27 @@ use crate::checkers::ast::Checker;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for unnecessary subscript reversal of iterable.
+///
+/// ## Why is it bad?
+/// It's unnecessary to reverse the order of an iterable when passing it
+/// into `reversed()`, `set()` or `sorted()` functions as they will change
+/// the order of the elements again.
+///
+/// ## Examples
+/// ```python
+/// reversed(iterable[::-1])
+/// set(iterable[::-1])
+/// sorted(iterable)[::-1]
+/// ```
+///
+/// Use instead:
+/// ```python
+/// reversed(iterable)
+/// set(iterable)
+/// sorted(iterable, reverse=True)
+/// ```
 #[violation]
 pub struct UnnecessarySubscriptReversal {
     pub func: String,

@@ -31,6 +31,7 @@ use super::helpers;
 ///
 /// This rule applies to a variety of functions, including `list`, `reversed`,
 /// `set`, `sorted`, and `tuple`. For example:
+///
 /// - Instead of `list(list(iterable))`, use `list(iterable)`.
 /// - Instead of `list(tuple(iterable))`, use `list(iterable)`.
 /// - Instead of `tuple(list(iterable))`, use `tuple(iterable)`.

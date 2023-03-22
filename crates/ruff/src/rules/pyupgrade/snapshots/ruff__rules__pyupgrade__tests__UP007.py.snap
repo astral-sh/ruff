@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: TypingUnion
+    name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
     suggestion: "Convert to `X | Y`"
     fixable: true
@@ -23,7 +23,7 @@ expression: diagnostics
       column: 22
   parent: ~
 - kind:
-    name: TypingUnion
+    name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
     suggestion: "Convert to `X | Y`"
     fixable: true
@@ -43,7 +43,7 @@ expression: diagnostics
       column: 29
   parent: ~
 - kind:
-    name: TypingUnion
+    name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
     suggestion: "Convert to `X | Y`"
     fixable: true
@@ -63,7 +63,7 @@ expression: diagnostics
       column: 45
   parent: ~
 - kind:
-    name: TypingUnion
+    name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
     suggestion: "Convert to `X | Y`"
     fixable: true
@@ -83,7 +83,7 @@ expression: diagnostics
       column: 44
   parent: ~
 - kind:
-    name: TypingUnion
+    name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
     suggestion: "Convert to `X | Y`"
     fixable: true
@@ -103,7 +103,7 @@ expression: diagnostics
       column: 31
   parent: ~
 - kind:
-    name: TypingUnion
+    name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
     suggestion: "Convert to `X | Y`"
     fixable: true
@@ -123,7 +123,7 @@ expression: diagnostics
       column: 33
   parent: ~
 - kind:
-    name: TypingUnion
+    name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
     suggestion: "Convert to `X | Y`"
     fixable: true
@@ -143,7 +143,46 @@ expression: diagnostics
       column: 40
   parent: ~
 - kind:
-    name: TypingUnion
+    name: NonPEP604Annotation
+    body: "Use `X | Y` for type annotations"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 30
+    column: 9
+  end_location:
+    row: 30
+    column: 47
+  fix: ~
+  parent: ~
+- kind:
+    name: NonPEP604Annotation
+    body: "Use `X | Y` for type annotations"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 30
+    column: 9
+  end_location:
+    row: 30
+    column: 47
+  fix: ~
+  parent: ~
+- kind:
+    name: NonPEP604Annotation
+    body: "Use `X | Y` for type annotations"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 34
+    column: 9
+  end_location:
+    row: 34
+    column: 33
+  fix: ~
+  parent: ~
+- kind:
+    name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
     suggestion: "Convert to `X | Y`"
     fixable: true
@@ -161,5 +200,25 @@ expression: diagnostics
     end_location:
       row: 47
       column: 20
+  parent: ~
+- kind:
+    name: NonPEP604Annotation
+    body: "Use `X | Y` for type annotations"
+    suggestion: "Convert to `X | Y`"
+    fixable: true
+  location:
+    row: 52
+    column: 7
+  end_location:
+    row: 52
+    column: 22
+  fix:
+    content: str | int
+    location:
+      row: 52
+      column: 7
+    end_location:
+      row: 52
+      column: 22
   parent: ~
 

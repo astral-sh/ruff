@@ -1767,7 +1767,7 @@ where
                     );
                 }
                 if self.settings.rules.enabled(Rule::TryConsiderElse) {
-                    tryceratops::rules::try_consider_else(self, body, orelse);
+                    tryceratops::rules::try_consider_else(self, body, orelse, handlers);
                 }
                 if self.settings.rules.enabled(Rule::VerboseRaise) {
                     tryceratops::rules::verbose_raise(self, handlers);
@@ -2215,9 +2215,8 @@ where
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) Optional[...], Union[...]
                 if self.ctx.in_type_definition
-                    && !self.ctx.in_deferred_string_type_definition
                     && !self.settings.pyupgrade.keep_runtime_typing
-                    && self.settings.rules.enabled(Rule::TypingUnion)
+                    && self.settings.rules.enabled(Rule::NonPEP604Annotation)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.ctx.annotations_future_enabled
@@ -2270,16 +2269,13 @@ where
                         }
 
                         // Ex) List[...]
-                        if !self.ctx.in_deferred_string_type_definition
-                            && !self.settings.pyupgrade.keep_runtime_typing
-                            && self.settings.rules.enabled(Rule::DeprecatedCollectionType)
+                        if !self.settings.pyupgrade.keep_runtime_typing
+                            && self.settings.rules.enabled(Rule::NonPEP585Annotation)
                             && (self.settings.target_version >= PythonVersion::Py39
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.ctx.annotations_future_enabled
                                     && self.ctx.in_annotation))
-                            && typing::is_pep585_builtin(expr, |expr| {
-                                self.ctx.resolve_call_path(expr)
-                            })
+                            && typing::is_pep585_builtin(expr, &self.ctx)
                         {
                             pyupgrade::rules::use_pep585_annotation(self, expr);
                         }
@@ -2340,14 +2336,13 @@ where
             }
             ExprKind::Attribute { attr, value, .. } => {
                 // Ex) typing.List[...]
-                if !self.ctx.in_deferred_string_type_definition
-                    && !self.settings.pyupgrade.keep_runtime_typing
-                    && self.settings.rules.enabled(Rule::DeprecatedCollectionType)
+                if !self.settings.pyupgrade.keep_runtime_typing
+                    && self.settings.rules.enabled(Rule::NonPEP585Annotation)
                     && (self.settings.target_version >= PythonVersion::Py39
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.ctx.annotations_future_enabled
                             && self.ctx.in_annotation))
-                    && typing::is_pep585_builtin(expr, |expr| self.ctx.resolve_call_path(expr))
+                    && typing::is_pep585_builtin(expr, &self.ctx)
                 {
                     pyupgrade::rules::use_pep585_annotation(self, expr);
                 }
@@ -2503,7 +2498,7 @@ where
                 if self.settings.rules.enabled(Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias_call(self, func);
                 }
-                if self.settings.rules.enabled(Rule::IsinstanceWithTuple)
+                if self.settings.rules.enabled(Rule::NonPEP604Isinstance)
                     && self.settings.target_version >= PythonVersion::Py310
                 {
                     pyupgrade::rules::use_pep604_isinstance(self, expr, func, args);
@@ -2516,6 +2511,33 @@ where
                     .any_enabled(&[Rule::Print, Rule::PPrint])
                 {
                     flake8_print::rules::print_call(self, func, keywords);
+                }
+
+                // flake8-bandit
+                if self.settings.rules.any_enabled(&[
+                    Rule::SuspiciousPickleUsage,
+                    Rule::SuspiciousMarshalUsage,
+                    Rule::SuspiciousInsecureHashUsage,
+                    Rule::SuspiciousInsecureCipherUsage,
+                    Rule::SuspiciousInsecureCipherModeUsage,
+                    Rule::SuspiciousMktempUsage,
+                    Rule::SuspiciousEvalUsage,
+                    Rule::SuspiciousMarkSafeUsage,
+                    Rule::SuspiciousURLOpenUsage,
+                    Rule::SuspiciousNonCryptographicRandomUsage,
+                    Rule::SuspiciousXMLCElementTreeUsage,
+                    Rule::SuspiciousXMLElementTreeUsage,
+                    Rule::SuspiciousXMLExpatReaderUsage,
+                    Rule::SuspiciousXMLExpatBuilderUsage,
+                    Rule::SuspiciousXMLSaxUsage,
+                    Rule::SuspiciousXMLMiniDOMUsage,
+                    Rule::SuspiciousXMLPullDOMUsage,
+                    Rule::SuspiciousXMLETreeUsage,
+                    Rule::SuspiciousUnverifiedContextUsage,
+                    Rule::SuspiciousTelnetUsage,
+                    Rule::SuspiciousFTPLibUsage,
+                ]) {
+                    flake8_bandit::rules::suspicious_function_call(self, expr);
                 }
 
                 // flake8-bugbear
@@ -2911,7 +2933,7 @@ where
 
                 if self.settings.rules.enabled(Rule::PairwiseOverZipped) {
                     if self.settings.target_version >= PythonVersion::Py310 {
-                        ruff::rules::pairwise_over_zipped(self, func, args);
+                        ruff::rules::pairwise_over_zipped(self, func, args, keywords);
                     }
                 }
 
@@ -3644,7 +3666,7 @@ where
                 } else {
                     match match_annotated_subscript(
                         value,
-                        |expr| self.ctx.resolve_call_path(expr),
+                        &self.ctx,
                         self.settings.typing_modules.iter().map(String::as_str),
                     ) {
                         Some(subscript) => {
@@ -3779,6 +3801,10 @@ where
                 }
                 if self.settings.rules.enabled(Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
+                }
+
+                if self.settings.rules.enabled(Rule::BinaryOpException) {
+                    pylint::rules::binary_op_exception(self, excepthandler);
                 }
                 match name {
                     Some(name) => {

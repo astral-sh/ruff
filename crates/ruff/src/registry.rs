@@ -14,67 +14,67 @@ pub use rule_set::{RuleSet, RuleSetIterator};
 ruff_macros::register_rules!(
     // pycodestyle errors
     rules::pycodestyle::rules::MixedSpacesAndTabs,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::IndentationWithInvalidMultiple,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::NoIndentedBlock,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::UnexpectedIndentation,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::IndentationWithInvalidMultipleComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::NoIndentedBlockComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::UnexpectedIndentationComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::OverIndented,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::WhitespaceAfterOpenBracket,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::WhitespaceBeforeCloseBracket,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::WhitespaceBeforePunctuation,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MultipleSpacesBeforeOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MultipleSpacesAfterOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::TabBeforeOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::TabAfterOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::TooFewSpacesBeforeInlineComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::NoSpaceAfterInlineComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::NoSpaceAfterBlockComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MultipleLeadingHashesForBlockComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespace,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespaceAfterKeyword,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespaceAroundOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespaceAroundArithmeticOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespaceAroundBitwiseOrShiftOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespaceAroundModuloOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::TabAfterKeyword,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::UnexpectedSpacesAroundKeywordParameterEquals,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespaceAroundParameterEquals,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::WhitespaceBeforeParameters,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::TabBeforeKeyword,
     rules::pycodestyle::rules::MultipleImportsOnOneLine,
     rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
@@ -155,6 +155,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::InvalidEnvvarValue,
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
+    rules::pylint::rules::BinaryOpException,
     rules::pylint::rules::InvalidCharacterBackspace,
     rules::pylint::rules::InvalidCharacterSub,
     rules::pylint::rules::InvalidCharacterEsc,
@@ -325,8 +326,8 @@ ruff_macros::register_rules!(
     rules::pyupgrade::rules::TypeOfPrimitive,
     rules::pyupgrade::rules::UselessObjectInheritance,
     rules::pyupgrade::rules::DeprecatedUnittestAlias,
-    rules::pyupgrade::rules::DeprecatedCollectionType,
-    rules::pyupgrade::rules::TypingUnion,
+    rules::pyupgrade::rules::NonPEP585Annotation,
+    rules::pyupgrade::rules::NonPEP604Annotation,
     rules::pyupgrade::rules::SuperCallWithParameters,
     rules::pyupgrade::rules::UTF8EncodingDeclaration,
     rules::pyupgrade::rules::UnnecessaryFutureImport,
@@ -356,7 +357,7 @@ ruff_macros::register_rules!(
     rules::pyupgrade::rules::DeprecatedImport,
     rules::pyupgrade::rules::OutdatedVersionBlock,
     rules::pyupgrade::rules::QuotedAnnotation,
-    rules::pyupgrade::rules::IsinstanceWithTuple,
+    rules::pyupgrade::rules::NonPEP604Isinstance,
     // pydocstyle
     rules::pydocstyle::rules::UndocumentedPublicModule,
     rules::pydocstyle::rules::UndocumentedPublicClass,
@@ -428,24 +429,45 @@ ruff_macros::register_rules!(
     rules::eradicate::rules::CommentedOutCode,
     // flake8-bandit
     rules::flake8_bandit::rules::Assert,
-    rules::flake8_bandit::rules::ExecBuiltin,
     rules::flake8_bandit::rules::BadFilePermissions,
+    rules::flake8_bandit::rules::ExecBuiltin,
     rules::flake8_bandit::rules::HardcodedBindAllInterfaces,
-    rules::flake8_bandit::rules::HardcodedPasswordString,
-    rules::flake8_bandit::rules::HardcodedPasswordFuncArg,
     rules::flake8_bandit::rules::HardcodedPasswordDefault,
+    rules::flake8_bandit::rules::HardcodedPasswordFuncArg,
+    rules::flake8_bandit::rules::HardcodedPasswordString,
     rules::flake8_bandit::rules::HardcodedSQLExpression,
     rules::flake8_bandit::rules::HardcodedTempFile,
-    rules::flake8_bandit::rules::TryExceptPass,
-    rules::flake8_bandit::rules::TryExceptContinue,
-    rules::flake8_bandit::rules::RequestWithoutTimeout,
     rules::flake8_bandit::rules::HashlibInsecureHashFunction,
+    rules::flake8_bandit::rules::Jinja2AutoescapeFalse,
+    rules::flake8_bandit::rules::LoggingConfigInsecureListen,
     rules::flake8_bandit::rules::RequestWithNoCertValidation,
-    rules::flake8_bandit::rules::UnsafeYAMLLoad,
+    rules::flake8_bandit::rules::RequestWithoutTimeout,
     rules::flake8_bandit::rules::SnmpInsecureVersion,
     rules::flake8_bandit::rules::SnmpWeakCryptography,
-    rules::flake8_bandit::rules::LoggingConfigInsecureListen,
-    rules::flake8_bandit::rules::Jinja2AutoescapeFalse,
+    rules::flake8_bandit::rules::SuspiciousEvalUsage,
+    rules::flake8_bandit::rules::SuspiciousFTPLibUsage,
+    rules::flake8_bandit::rules::SuspiciousInsecureCipherUsage,
+    rules::flake8_bandit::rules::SuspiciousInsecureCipherModeUsage,
+    rules::flake8_bandit::rules::SuspiciousInsecureHashUsage,
+    rules::flake8_bandit::rules::SuspiciousMarkSafeUsage,
+    rules::flake8_bandit::rules::SuspiciousMarshalUsage,
+    rules::flake8_bandit::rules::SuspiciousMktempUsage,
+    rules::flake8_bandit::rules::SuspiciousNonCryptographicRandomUsage,
+    rules::flake8_bandit::rules::SuspiciousPickleUsage,
+    rules::flake8_bandit::rules::SuspiciousTelnetUsage,
+    rules::flake8_bandit::rules::SuspiciousURLOpenUsage,
+    rules::flake8_bandit::rules::SuspiciousUnverifiedContextUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLCElementTreeUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLETreeUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLElementTreeUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLExpatBuilderUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLExpatReaderUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLMiniDOMUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLPullDOMUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLSaxUsage,
+    rules::flake8_bandit::rules::TryExceptContinue,
+    rules::flake8_bandit::rules::TryExceptPass,
+    rules::flake8_bandit::rules::UnsafeYAMLLoad,
     // flake8-boolean-trap
     rules::flake8_boolean_trap::rules::BooleanPositionalArgInFunctionDefinition,
     rules::flake8_boolean_trap::rules::BooleanDefaultValueInFunctionDefinition,
@@ -889,7 +911,7 @@ impl Rule {
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
-            #[cfg(feature = "logical_lines")]
+            #[cfg(debug_assertions)]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
             | Rule::MissingWhitespace

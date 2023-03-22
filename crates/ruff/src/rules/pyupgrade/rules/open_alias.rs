@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -8,16 +8,21 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct OpenAlias;
+pub struct OpenAlias {
+    pub fixable: bool,
+}
 
-impl AlwaysAutofixableViolation for OpenAlias {
+impl Violation for OpenAlias {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Use builtin `open`")
     }
 
-    fn autofix_title(&self) -> String {
-        "Replace with builtin `open`".to_string()
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        self.fixable
+            .then_some(|_| format!("Replace with builtin `open`"))
     }
 }
 
@@ -28,8 +33,12 @@ pub fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
         .resolve_call_path(func)
         .map_or(false, |call_path| call_path.as_slice() == ["io", "open"])
     {
-        let mut diagnostic = Diagnostic::new(OpenAlias, Range::from(expr));
-        if checker.patch(diagnostic.kind.rule()) {
+        let fixable = checker
+            .ctx
+            .find_binding("open")
+            .map_or(true, |binding| binding.kind.is_builtin());
+        let mut diagnostic = Diagnostic::new(OpenAlias { fixable }, Range::from(expr));
+        if fixable && checker.patch(diagnostic.kind.rule()) {
             diagnostic.amend(Fix::replacement(
                 "open".to_string(),
                 func.location,

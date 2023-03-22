@@ -139,7 +139,7 @@ impl Violation for MultipleLeadingHashesForBlockComment {
 }
 
 /// E261, E262, E265, E266
-#[cfg(feature = "logical_lines")]
+#[cfg(debug_assertions)]
 pub fn whitespace_before_comment(
     tokens: &[(Location, &Tok, Location)],
     locator: &Locator,
@@ -199,7 +199,7 @@ pub fn whitespace_before_comment(
     diagnostics
 }
 
-#[cfg(not(feature = "logical_lines"))]
+#[cfg(not(debug_assertions))]
 pub fn whitespace_before_comment(
     _tokens: &[(Location, &Tok, Location)],
     _locator: &Locator,

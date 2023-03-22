@@ -2,7 +2,7 @@ use log::error;
 use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::{AutofixKind, Availability, Violation};
+use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -32,6 +32,7 @@ use super::helpers;
 ///
 /// This rule also applies to `map` calls within `list`, `set`, and `dict`
 /// calls. For example:
+///
 /// - Instead of `list(map(lambda num: num * 2, nums))`, use
 ///   `[num * 2 for num in nums]`.
 /// - Instead of `set(map(lambda num: num % 2 == 0, nums))`, use
@@ -44,7 +45,7 @@ pub struct UnnecessaryMap {
 }
 
 impl Violation for UnnecessaryMap {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

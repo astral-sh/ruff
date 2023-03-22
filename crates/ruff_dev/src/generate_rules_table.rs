@@ -2,6 +2,7 @@
 
 use itertools::Itertools;
 use ruff::registry::{Linter, Rule, RuleNamespace, UpstreamCategory};
+use ruff_diagnostics::AutofixKind;
 use strum::IntoEnumIterator;
 
 const FIX_SYMBOL: &str = "🛠";
@@ -13,8 +14,8 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
     table_out.push('\n');
     for rule in rules {
         let fix_token = match rule.autofixable() {
-            None => "",
-            Some(_) => FIX_SYMBOL,
+            AutofixKind::None => "",
+            AutofixKind::Always | AutofixKind::Sometimes => FIX_SYMBOL,
         };
 
         let rule_name = rule.as_ref();

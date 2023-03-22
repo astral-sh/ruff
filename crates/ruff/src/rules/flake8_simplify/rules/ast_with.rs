@@ -2,7 +2,7 @@ use log::error;
 use rustpython_parser::ast::{Located, Stmt, StmtKind, Withitem};
 
 use ruff_diagnostics::Diagnostic;
-use ruff_diagnostics::{AutofixKind, Availability, Violation};
+use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
 use ruff_python_ast::newlines::StrExt;
@@ -46,7 +46,7 @@ pub struct MultipleWithStatements {
 }
 
 impl Violation for MultipleWithStatements {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {

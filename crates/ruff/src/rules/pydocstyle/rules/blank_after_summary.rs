@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Availability, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::Range;
@@ -17,7 +17,7 @@ fn fmt_blank_line_after_summary_autofix_msg(_: &BlankLineAfterSummary) -> String
     "Insert single blank line".to_string()
 }
 impl Violation for BlankLineAfterSummary {
-    const AUTOFIX: Option<AutofixKind> = Some(AutofixKind::new(Availability::Sometimes));
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
