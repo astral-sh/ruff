@@ -187,7 +187,7 @@ jobs:
         uses: taiki-e/install-action@cargo-udeps
       - name: "Run cargo-udeps"
         run: |
-          unused_dependencies=$(cargo +nightly udeps | tee /dev/tty | cut -d $'\n' -f 2-)
+          unused_dependencies=$(cargo +nightly udeps > unused.txt && cat unused.txt | cut -d $'\n' -f 2-)
           if [ -z "$unused_dependencies" ]; then
             echo "No unused dependencies found" > $GITHUB_STEP_SUMMARY
             exit 0
