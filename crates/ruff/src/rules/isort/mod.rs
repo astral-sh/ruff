@@ -665,6 +665,7 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     force_sort_within_sections: true,
+                    force_to_top: BTreeSet::from(["z".to_string()]),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
