@@ -17,8 +17,9 @@ use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers::{binding_range, extract_handled_exceptions, to_module_path};
 use ruff_python_ast::operations::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::scope::{
-    Binding, BindingId, BindingKind, ClassDef, Exceptions, ExecutionContext, FunctionDef, Lambda,
-    Scope, ScopeId, ScopeKind, ScopeStack,
+    Binding, BindingId, BindingKind, ClassDef, Exceptions, ExecutionContext, Export,
+    FromImportation, FunctionDef, Importation, Lambda, Scope, ScopeId, ScopeKind, ScopeStack,
+    StarImportation, SubmoduleImportation,
 };
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::types::{Node, Range, RefEquality};
@@ -870,7 +871,10 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::SubmoduleImportation(name, full_name),
+                                kind: BindingKind::SubmoduleImportation(SubmoduleImportation {
+                                    name,
+                                    full_name,
+                                }),
                                 runtime_usage: None,
                                 synthetic_usage: None,
                                 typing_usage: None,
@@ -889,15 +893,12 @@ where
                             .as_ref()
                             .map_or(false, |asname| asname == &alias.node.name);
 
-                        // Given `import foo`, `name` and `full_name` would both be `foo`.
-                        // Given `import foo as bar`, `name` would be `bar` and `full_name` would
-                        // be `foo`.
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
                         let full_name = &alias.node.name;
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::Importation(name, full_name),
+                                kind: BindingKind::Importation(Importation { name, full_name }),
                                 runtime_usage: None,
                                 synthetic_usage: if is_explicit_reexport {
                                     Some((self.ctx.scope_id(), Range::from(alias)))
@@ -1191,7 +1192,10 @@ where
                         self.add_binding(
                             "*",
                             Binding {
-                                kind: BindingKind::StarImportation(*level, module.clone()),
+                                kind: BindingKind::StarImportation(StarImportation {
+                                    level: *level,
+                                    module: module.clone(),
+                                }),
                                 runtime_usage: None,
                                 synthetic_usage: None,
                                 typing_usage: None,
@@ -1264,7 +1268,10 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::FromImportation(name, full_name),
+                                kind: BindingKind::FromImportation(FromImportation {
+                                    name,
+                                    full_name,
+                                }),
                                 runtime_usage: None,
                                 synthetic_usage: if is_explicit_reexport {
                                     Some((self.ctx.scope_id(), Range::from(alias)))
@@ -4163,8 +4170,9 @@ impl<'a> Checker<'a> {
                 //   import pyarrow.csv
                 //   print(pa.csv.read_csv("test.csv"))
                 match &self.ctx.bindings[*index].kind {
-                    BindingKind::Importation(name, full_name)
-                    | BindingKind::SubmoduleImportation(name, full_name) => {
+                    BindingKind::Importation(Importation { name, full_name })
+                    | BindingKind::SubmoduleImportation(SubmoduleImportation { name, full_name }) =>
+                    {
                         let has_alias = full_name
                             .split('.')
                             .last()
@@ -4181,7 +4189,7 @@ impl<'a> Checker<'a> {
                             }
                         }
                     }
-                    BindingKind::FromImportation(name, full_name) => {
+                    BindingKind::FromImportation(FromImportation { name, full_name }) => {
                         let has_alias = full_name
                             .split('.')
                             .last()
@@ -4219,7 +4227,9 @@ impl<'a> Checker<'a> {
                 for scope_index in self.ctx.scope_stack.iter() {
                     let scope = &self.ctx.scopes[*scope_index];
                     for binding in scope.binding_ids().map(|index| &self.ctx.bindings[*index]) {
-                        if let BindingKind::StarImportation(level, module) = &binding.kind {
+                        if let BindingKind::StarImportation(StarImportation { level, module }) =
+                            &binding.kind
+                        {
                             from_list.push(helpers::format_import_from(
                                 level.as_ref(),
                                 module.as_deref(),
@@ -4437,7 +4447,7 @@ impl<'a> Checker<'a> {
                 self.add_binding(
                     id,
                     Binding {
-                        kind: BindingKind::Export(all_names),
+                        kind: BindingKind::Export(Export { names: all_names }),
                         runtime_usage: None,
                         synthetic_usage: None,
                         typing_usage: None,
@@ -4700,7 +4710,7 @@ impl<'a> Checker<'a> {
                 .get("__all__")
                 .map(|index| &self.ctx.bindings[*index])
                 .and_then(|binding| match &binding.kind {
-                    BindingKind::Export(names) => Some((names, binding.range)),
+                    BindingKind::Export(Export { names }) => Some((names, binding.range)),
                     _ => None,
                 });
 
@@ -4732,7 +4742,7 @@ impl<'a> Checker<'a> {
             .get("__all__")
             .map(|index| &self.ctx.bindings[*index])
             .and_then(|binding| match &binding.kind {
-                BindingKind::Export(names) => {
+                BindingKind::Export(Export { names }) => {
                     Some((names.iter().map(String::as_str).collect(), binding.range))
                 }
                 _ => None,
@@ -4854,7 +4864,9 @@ impl<'a> Checker<'a> {
                     if let Some((names, range)) = &all_names {
                         let mut from_list = vec![];
                         for binding in scope.binding_ids().map(|index| &self.ctx.bindings[*index]) {
-                            if let BindingKind::StarImportation(level, module) = &binding.kind {
+                            if let BindingKind::StarImportation(StarImportation { level, module }) =
+                                &binding.kind
+                            {
                                 from_list.push(helpers::format_import_from(
                                     level.as_ref(),
                                     module.as_deref(),
@@ -4933,9 +4945,14 @@ impl<'a> Checker<'a> {
                     let binding = &self.ctx.bindings[*index];
 
                     let full_name = match &binding.kind {
-                        BindingKind::Importation(.., full_name) => full_name,
-                        BindingKind::FromImportation(.., full_name) => full_name.as_str(),
-                        BindingKind::SubmoduleImportation(.., full_name) => full_name,
+                        BindingKind::Importation(Importation { full_name, .. }) => full_name,
+                        BindingKind::FromImportation(FromImportation { full_name, .. }) => {
+                            full_name.as_str()
+                        }
+                        BindingKind::SubmoduleImportation(SubmoduleImportation {
+                            full_name,
+                            ..
+                        }) => full_name,
                         _ => continue,
                     };
 
