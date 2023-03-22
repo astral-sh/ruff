@@ -23,7 +23,7 @@ use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
 use crate::message::{Message, Source};
-use crate::noqa::{add_noqa, rule_is_ignored};
+use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
 use crate::settings::{flags, Settings};
@@ -159,20 +159,13 @@ pub fn check_path(
                 }
             }
             Err(parse_error) => {
-                if settings.rules.enabled(Rule::SyntaxError) {
-                    pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error);
-                }
-
-                // If the syntax error is ignored, suppress it (regardless of whether
-                // `Rule::SyntaxError` is enabled).
-                if !rule_is_ignored(
-                    Rule::SyntaxError,
-                    parse_error.location.row(),
-                    &directives.noqa_line_for,
-                    locator,
-                ) {
-                    error = Some(parse_error);
-                }
+                // Always add a diagnostic for the syntax error, regardless of whether
+                // `Rule::SyntaxError` is enabled. We avoid propagating the syntax error
+                // if it's disabled via any of the usual mechanisms (e.g., `noqa`,
+                // `per-file-ignores`), and the easiest way to detect that suppression is
+                // to see if the diagnostic persists to the end of the function.
+                pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error);
+                error = Some(parse_error);
             }
         }
     }
@@ -227,6 +220,23 @@ pub fn check_path(
             for index in ignored.iter().rev() {
                 diagnostics.swap_remove(*index);
             }
+        }
+    }
+
+    // If there was a syntax error, check if it should be discarded.
+    if error.is_some() {
+        // If the syntax error was removed by _any_ of the above disablement methods (e.g., a
+        // `noqa` directive, or a `per-file-ignore`), discard it.
+        if !diagnostics
+            .iter()
+            .any(|diagnostic| diagnostic.kind.rule() == Rule::SyntaxError)
+        {
+            error = None;
+        }
+
+        // If the syntax error _diagnostic_ is disabled, discard the _diagnostic_.
+        if !settings.rules.enabled(Rule::SyntaxError) {
+            diagnostics.retain(|diagnostic| diagnostic.kind.rule() != Rule::SyntaxError);
         }
     }
 
