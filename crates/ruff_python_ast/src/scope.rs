@@ -1,4 +1,5 @@
 use crate::types::{Range, RefEquality};
+use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arguments, Expr, Keyword, Stmt};
 use std::num::TryFromIntError;
@@ -222,6 +223,14 @@ impl Default for ScopeStack {
     }
 }
 
+bitflags! {
+    pub struct Exceptions: u32 {
+        const NAME_ERROR = 0b0000_0001;
+        const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
+        const IMPORT_ERROR = 0b0000_0100;
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
@@ -241,6 +250,8 @@ pub struct Binding<'a> {
     /// (e.g.) `__future__` imports, explicit re-exports, and other bindings
     /// that should be considered used even if they're never referenced.
     pub synthetic_usage: Option<(ScopeId, Range)>,
+    /// The exceptions that were handled when the binding was defined.
+    pub exceptions: Exceptions,
 }
 
 impl<'a> Binding<'a> {

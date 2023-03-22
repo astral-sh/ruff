@@ -2,5 +2,37 @@
 source: crates/ruff/src/rules/pyflakes/mod.rs
 expression: diagnostics
 ---
-[]
+- kind:
+    name: UnusedImport
+    body: "`orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 6
+    column: 15
+  end_location:
+    row: 6
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    name: UnusedImport
+    body: "`orjson` imported but unused"
+    suggestion: "Remove unused import: `orjson`"
+    fixable: true
+  location:
+    row: 15
+    column: 15
+  end_location:
+    row: 15
+    column: 21
+  fix:
+    content: ""
+    location:
+      row: 15
+      column: 0
+    end_location:
+      row: 16
+      column: 0
+  parent: ~
 
