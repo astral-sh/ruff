@@ -708,6 +708,13 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::DjangoUnorderedBodyContentInModel)
+                {
+                    flake8_django::rules::unordered_body_content_in_model(self, bases, body);
+                }
                 if self.settings.rules.enabled(Rule::GlobalStatement) {
                     pylint::rules::global_statement(self, name);
                 }

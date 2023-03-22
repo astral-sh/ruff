@@ -642,6 +642,7 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::DjangoExcludeWithModelForm,
     rules::flake8_django::rules::DjangoAllWithModelForm,
     rules::flake8_django::rules::DjangoModelWithoutDunderStr,
+    rules::flake8_django::rules::DjangoUnorderedBodyContentInModel,
     rules::flake8_django::rules::DjangoNonLeadingReceiverDecorator,
 );
 
