@@ -1,5 +1,5 @@
 i = 1
-while i < 6:  # [while-used]b
+while i < 6:  # [while-used]
     print(i)
     i = i + 1
 

@@ -39,7 +39,7 @@ pub use use_prior_to_global_declaration::{
 pub use useless_else_on_loop::{useless_else_on_loop, UselessElseOnLoop};
 pub use useless_import_alias::{useless_import_alias, UselessImportAlias};
 pub use useless_return::{useless_return, UselessReturn};
-pub use while_used::{while_used, WhileUsed};
+pub use while_used::{while_loop_used, WhileLoopUsed};
 pub use yield_in_init::{yield_in_init, YieldInInit};
 
 mod assert_on_string_literal;
@@ -76,5 +76,5 @@ mod use_prior_to_global_declaration;
 mod useless_else_on_loop;
 mod useless_import_alias;
 mod useless_return;
-mod while_used;
+mod while_loop_used;
 mod yield_in_init;
