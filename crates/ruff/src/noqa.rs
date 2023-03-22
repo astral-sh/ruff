@@ -29,49 +29,6 @@ static NOQA_LINE_REGEX: Lazy<Regex> = Lazy::new(|| {
 static SPLIT_COMMA_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[,\s]").unwrap());
 
 #[derive(Debug)]
-pub enum Exemption<'a> {
-    None,
-    All,
-    Codes(Vec<&'a str>),
-}
-
-/// Return `true` if a file is exempt from checking based on the contents of the
-/// given line.
-pub fn extract_file_exemption(line: &str) -> Exemption {
-    let line = line.trim_start();
-
-    if line.starts_with("# flake8: noqa")
-        || line.starts_with("# flake8: NOQA")
-        || line.starts_with("# flake8: NoQA")
-    {
-        return Exemption::All;
-    }
-
-    if let Some(remainder) = line
-        .strip_prefix("# ruff: noqa")
-        .or_else(|| line.strip_prefix("# ruff: NOQA"))
-        .or_else(|| line.strip_prefix("# ruff: NoQA"))
-    {
-        if remainder.is_empty() {
-            return Exemption::All;
-        } else if let Some(codes) = remainder.strip_prefix(':') {
-            let codes: Vec<&str> = SPLIT_COMMA_REGEX
-                .split(codes.trim())
-                .map(str::trim)
-                .filter(|code| !code.is_empty())
-                .collect();
-            if codes.is_empty() {
-                warn!("Expected rule codes on `noqa` directive: \"{line}\"");
-            }
-            return Exemption::Codes(codes);
-        }
-        warn!("Unexpected suffix on `noqa` directive: \"{line}\"");
-    }
-
-    Exemption::None
-}
-
-#[derive(Debug)]
 pub enum Directive<'a> {
     None,
     All(usize, usize, usize, usize),
@@ -119,6 +76,47 @@ pub fn extract_noqa_directive(line: &str) -> Directive {
     }
 }
 
+enum ParsedExemption<'a> {
+    None,
+    All,
+    Codes(Vec<&'a str>),
+}
+
+/// Return a [`ParsedExemption`] for a given comment line.
+fn parse_file_exemption(line: &str) -> ParsedExemption {
+    let line = line.trim_start();
+
+    if line.starts_with("# flake8: noqa")
+        || line.starts_with("# flake8: NOQA")
+        || line.starts_with("# flake8: NoQA")
+    {
+        return ParsedExemption::All;
+    }
+
+    if let Some(remainder) = line
+        .strip_prefix("# ruff: noqa")
+        .or_else(|| line.strip_prefix("# ruff: NOQA"))
+        .or_else(|| line.strip_prefix("# ruff: NoQA"))
+    {
+        if remainder.is_empty() {
+            return ParsedExemption::All;
+        } else if let Some(codes) = remainder.strip_prefix(':') {
+            let codes: Vec<&str> = SPLIT_COMMA_REGEX
+                .split(codes.trim())
+                .map(str::trim)
+                .filter(|code| !code.is_empty())
+                .collect();
+            if codes.is_empty() {
+                warn!("Expected rule codes on `noqa` directive: \"{line}\"");
+            }
+            return ParsedExemption::Codes(codes);
+        }
+        warn!("Unexpected suffix on `noqa` directive: \"{line}\"");
+    }
+
+    ParsedExemption::None
+}
+
 /// Returns `true` if the string list of `codes` includes `code` (or an alias
 /// thereof).
 pub fn includes(needle: Rule, haystack: &[&str]) -> bool {
@@ -144,6 +142,43 @@ pub fn rule_is_ignored(
         Directive::None => false,
         Directive::All(..) => true,
         Directive::Codes(.., codes, _) => includes(code, &codes),
+    }
+}
+
+pub enum FileExemption {
+    None,
+    All,
+    Codes(Vec<NoqaCode>),
+}
+
+/// Extract the [`FileExemption`] for a given Python source file, enumerating any rules that are
+/// globally ignored within the file.
+pub fn file_exemption(lines: &[&str], commented_lines: &[usize]) -> FileExemption {
+    let mut exempt_codes: Vec<NoqaCode> = vec![];
+
+    for lineno in commented_lines {
+        match parse_file_exemption(lines[lineno - 1]) {
+            ParsedExemption::All => {
+                return FileExemption::All;
+            }
+            ParsedExemption::Codes(codes) => {
+                exempt_codes.extend(codes.into_iter().filter_map(|code| {
+                    if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code)) {
+                        Some(rule.noqa_code())
+                    } else {
+                        warn!("Invalid code provided to `# ruff: noqa`: {}", code);
+                        None
+                    }
+                }));
+            }
+            ParsedExemption::None => {}
+        }
+    }
+
+    if exempt_codes.is_empty() {
+        FileExemption::None
+    } else {
+        FileExemption::Codes(exempt_codes)
     }
 }
 
@@ -176,44 +211,26 @@ fn add_noqa_inner(
     // Map of line number to set of (non-ignored) diagnostic codes that are triggered on that line.
     let mut matches_by_line: FxHashMap<usize, RuleSet> = FxHashMap::default();
 
-    // Whether the file is exempted from all checks.
-    let mut file_exempted = false;
-
-    // Codes that are globally exempted (within the current file).
-    let mut file_exemptions: Vec<NoqaCode> = vec![];
-
     let lines: Vec<&str> = contents.universal_newlines().collect();
-    for lineno in commented_lines {
-        match extract_file_exemption(lines[lineno - 1]) {
-            Exemption::All => {
-                file_exempted = true;
-            }
-            Exemption::Codes(codes) => {
-                file_exemptions.extend(codes.into_iter().filter_map(|code| {
-                    if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code)) {
-                        Some(rule.noqa_code())
-                    } else {
-                        warn!("Invalid code provided to `# ruff: noqa`: {}", code);
-                        None
-                    }
-                }));
-            }
-            Exemption::None => {}
-        }
-    }
+
+    // Whether the file is exempted from all checks.
+    // Codes that are globally exempted (within the current file).
+    let exemption = file_exemption(&lines, commented_lines);
 
     // Mark any non-ignored diagnostics.
     for diagnostic in diagnostics {
-        // If the file is exempted, don't add any noqa directives.
-        if file_exempted {
-            continue;
-        }
-
-        // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
-        if !file_exemptions.is_empty() {
-            if file_exemptions.contains(&diagnostic.kind.rule().noqa_code()) {
+        match &exemption {
+            FileExemption::All => {
+                // If the file is exempted, don't add any noqa directives.
                 continue;
             }
+            FileExemption::Codes(codes) => {
+                // If the diagnostic is ignored by a global exemption, don't add a noqa directive.
+                if codes.contains(&diagnostic.kind.rule().noqa_code()) {
+                    continue;
+                }
+            }
+            FileExemption::None => {}
         }
 
         // Is the violation ignored by a `noqa` directive on the parent line?
