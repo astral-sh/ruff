@@ -145,41 +145,62 @@ expression: diagnostics
 - kind:
     name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
-    suggestion: ~
-    fixable: false
+    suggestion: "Convert to `X | Y`"
+    fixable: true
   location:
     row: 30
-    column: 9
+    column: 10
   end_location:
     row: 30
-    column: 47
-  fix: ~
+    column: 46
+  fix:
+    content: "str | int | Union[float, bytes]"
+    location:
+      row: 30
+      column: 10
+    end_location:
+      row: 30
+      column: 46
   parent: ~
 - kind:
     name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
-    suggestion: ~
-    fixable: false
+    suggestion: "Convert to `X | Y`"
+    fixable: true
   location:
     row: 30
-    column: 9
+    column: 26
   end_location:
     row: 30
-    column: 47
-  fix: ~
+    column: 45
+  fix:
+    content: float | bytes
+    location:
+      row: 30
+      column: 26
+    end_location:
+      row: 30
+      column: 45
   parent: ~
 - kind:
     name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
-    suggestion: ~
-    fixable: false
+    suggestion: "Convert to `X | Y`"
+    fixable: true
   location:
     row: 34
-    column: 9
+    column: 10
   end_location:
     row: 34
-    column: 33
-  fix: ~
+    column: 32
+  fix:
+    content: str | int
+    location:
+      row: 34
+      column: 10
+    end_location:
+      row: 34
+      column: 32
   parent: ~
 - kind:
     name: NonPEP604Annotation

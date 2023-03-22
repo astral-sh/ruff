@@ -30,8 +30,17 @@ def f(x: "List[str]") -> None:
     ...
 
 
-list = "abc"
+def f(x: r"List[str]") -> None:
+    ...
 
 
-def f(x: List[str]) -> None:
+def f(x: "List[str]") -> None:
+    ...
+
+
+def f(x: """List[str]""") -> None:
+    ...
+
+
+def f(x: "Li" "st[str]") -> None:
     ...

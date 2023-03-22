@@ -14,6 +14,7 @@ use crate::scope::{
     ScopeStack, Scopes,
 };
 use crate::types::{CallPath, RefEquality};
+use crate::typing::AnnotationKind;
 use crate::visibility::{module_visibility, Modifier, VisibleScope};
 
 #[allow(clippy::struct_excessive_bools)]
@@ -41,7 +42,7 @@ pub struct Context<'a> {
     pub visible_scope: VisibleScope,
     pub in_annotation: bool,
     pub in_type_definition: bool,
-    pub in_deferred_string_type_definition: bool,
+    pub in_deferred_string_type_definition: Option<AnnotationKind>,
     pub in_deferred_type_definition: bool,
     pub in_exception_handler: bool,
     pub in_literal: bool,
@@ -79,7 +80,7 @@ impl<'a> Context<'a> {
             },
             in_annotation: false,
             in_type_definition: false,
-            in_deferred_string_type_definition: false,
+            in_deferred_string_type_definition: None,
             in_deferred_type_definition: false,
             in_exception_handler: false,
             in_literal: false,
@@ -311,7 +312,7 @@ impl<'a> Context<'a> {
     pub const fn execution_context(&self) -> ExecutionContext {
         if self.in_type_checking_block
             || self.in_annotation
-            || self.in_deferred_string_type_definition
+            || self.in_deferred_string_type_definition.is_some()
         {
             ExecutionContext::Typing
         } else {

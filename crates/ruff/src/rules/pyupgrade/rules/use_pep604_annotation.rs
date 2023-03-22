@@ -4,6 +4,7 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
+use ruff_python_ast::typing::AnnotationKind;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -99,7 +100,11 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
     };
 
     // Avoid fixing forward references.
-    let fixable = !checker.ctx.in_deferred_string_type_definition;
+    let fixable = checker
+        .ctx
+        .in_deferred_string_type_definition
+        .as_ref()
+        .map_or(true, AnnotationKind::is_simple);
 
     match typing_member {
         TypingMember::Optional => {
