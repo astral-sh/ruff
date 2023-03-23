@@ -1,17 +1,13 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 
+use itertools::Itertools;
 use rustpython_parser::ast::Location;
-use rustpython_parser::Tok;
 
-use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Fix;
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
-
-use crate::registry::AsRule;
-use crate::rules::pycodestyle::helpers::{is_keyword_token, is_singleton_token};
 
 #[violation]
 pub struct MissingWhitespace {
@@ -40,21 +36,26 @@ pub fn missing_whitespace(
     indent_level: usize,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
-    for (idx, char) in line.chars().enumerate() {
-        if idx + 1 == line.len() {
-            break;
-        }
-        let next_char = line.chars().nth(idx + 1).unwrap();
 
-        if ",;:".contains(char) && !char::is_whitespace(next_char) {
-            let before = &line[..idx];
-            if char == ':'
-                && before.matches('[').count() > before.matches(']').count()
-                && before.rfind('{') < before.rfind('[')
-            {
+    let mut num_lsqb = 0;
+    let mut num_rsqb = 0;
+    let mut prev_lsqb = None;
+    let mut prev_lbrace = None;
+    for (idx, (char, next_char)) in line.chars().tuple_windows().enumerate() {
+        if char == '[' {
+            num_lsqb += 1;
+            prev_lsqb = Some(idx);
+        } else if char == ']' {
+            num_rsqb += 1;
+        } else if char == '{' {
+            prev_lbrace = Some(idx);
+        }
+
+        if (char == ',' || char == ';' || char == ':') && !char::is_whitespace(next_char) {
+            if char == ':' && num_lsqb > num_rsqb && prev_lsqb > prev_lbrace {
                 continue; // Slice syntax, no space required
             }
-            if char == ',' && ")]".contains(next_char) {
+            if char == ',' && (next_char == ')' || next_char == ']') {
                 continue; // Allow tuple with only one element: (3,)
             }
             if char == ':' && next_char == '=' {
