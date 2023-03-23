@@ -71,9 +71,9 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match &stmt.node {
-            StmtKind::For { .. } => {
+            StmtKind::For { body, .. } => {
                 self.nested = true;
-                visitor::walk_stmt(self, stmt);
+                visitor::walk_body(self, body);
                 self.nested = false;
             }
             _ => visitor::walk_stmt(self, stmt),

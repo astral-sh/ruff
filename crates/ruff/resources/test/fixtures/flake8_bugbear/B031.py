@@ -1,7 +1,3 @@
-"""
-Should emit:
-B031 - on lines 31, 35, 44
-"""
 import itertools
 from itertools import groupby
 
@@ -24,16 +20,29 @@ def collect_shop_items(shopper, items):
     carts[shopper] += items
 
 
+unique_items = set()
+
+
+def collect_shop_item(item):
+    unique_items.add(item)
+
+
 # Group by shopping section
 for _section, section_items in groupby(items, key=lambda p: p[1]):
     for shopper in shoppers:
         shopper = shopper.title()
+        # B031
         collect_shop_items(shopper, section_items)
 
 for _section, section_items in groupby(items, key=lambda p: p[1]):
     collect_shop_items("Jane", section_items)
+    # B031
     collect_shop_items("Joe", section_items)
 
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    # For nested loops, it should not flag the usage of the name
+    for item in section_items:
+        collect_shop_item(item)
 
 for _section, section_items in groupby(items, key=lambda p: p[1]):
     # This is ok

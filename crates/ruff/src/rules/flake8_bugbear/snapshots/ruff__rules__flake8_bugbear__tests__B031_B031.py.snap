@@ -8,10 +8,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 31
+    row: 35
     column: 36
   end_location:
-    row: 31
+    row: 35
     column: 49
   fix: ~
   parent: ~
@@ -21,10 +21,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 35
+    row: 40
     column: 30
   end_location:
-    row: 35
+    row: 40
     column: 43
   fix: ~
   parent: ~
@@ -34,10 +34,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 44
+    row: 53
     column: 36
   end_location:
-    row: 44
+    row: 53
     column: 49
   fix: ~
   parent: ~
