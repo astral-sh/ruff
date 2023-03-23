@@ -98,3 +98,15 @@ for (_key1, _key2), (_value1, _value2) in groupby(
 ):
     collect_shop_items("Jane", group[1])
     collect_shop_items("Joe", group[1])
+
+
+# Let's redefine the `groupby` function to make sure we pick up the correct one.
+# NOTE: This should always be at the end of the file.
+def groupby(data, key=None):
+    pass
+
+
+for name, group in groupby(items):
+    collect_shop_items("Jane", items)
+    # This shouldn't be flagged as the `groupby` function is different
+    collect_shop_items("Joe", items)
