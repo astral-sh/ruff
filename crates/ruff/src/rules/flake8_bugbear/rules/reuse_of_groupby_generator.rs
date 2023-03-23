@@ -1,8 +1,9 @@
+use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::{self, Visitor};
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use crate::checkers::ast::Checker;
 
@@ -38,7 +39,7 @@ pub struct ReuseOfGroupbyGenerator;
 impl Violation for ReuseOfGroupbyGenerator {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage. Save the result to a list, if the result is needed multiple times.")
+        format!("Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage")
     }
 }
 
@@ -54,7 +55,7 @@ struct GroupNameFinder<'a> {
     /// A flag indicating that the `group_name` variable has been overridden
     /// during the visit.
     overridden: bool,
-
+    /// A list of reused expressions.
     exprs: Vec<&'a Expr>,
 }
 
@@ -170,16 +171,6 @@ pub fn reuse_of_groupby_generator(
     let ExprKind::Call { func, .. } = &iter.node else {
         return;
     };
-    // Check if the function call is `itertools.groupby`
-    if !checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["itertools", "groupby"]
-        })
-    {
-        return;
-    }
     let ExprKind::Tuple { elts, .. } = &target.node else {
         // Ignore any `groupby()` invocation that isn't unpacked
         return;
@@ -191,6 +182,16 @@ pub fn reuse_of_groupby_generator(
     let ExprKind::Name { id: group_name, .. } = &elts[1].node else {
         return;
     };
+    // Check if the function call is `itertools.groupby`
+    if !checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["itertools", "groupby"]
+        })
+    {
+        return;
+    }
     let mut finder = GroupNameFinder::new(group_name);
     for stmt in body.iter() {
         finder.visit_stmt(stmt);
