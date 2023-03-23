@@ -51,6 +51,10 @@ struct GroupNameFinder<'a> {
     usage_count: u8,
     /// A flag indicating that the visitor is inside a nested `for` loop.
     nested: bool,
+    /// A flag indicating that the `group_name` variable has been overriden
+    /// during the visit.
+    overridden: bool,
+
     exprs: Vec<&'a Expr>,
 }
 
@@ -60,7 +64,16 @@ impl<'a> GroupNameFinder<'a> {
             group_name,
             usage_count: 0,
             nested: false,
+            overridden: false,
             exprs: Vec::new(),
+        }
+    }
+
+    fn name_matches(&self, expr: &Expr) -> bool {
+        if let ExprKind::Name { id, .. } = &expr.node {
+            id == self.group_name
+        } else {
+            false
         }
     }
 }
@@ -70,33 +83,80 @@ where
     'b: 'a,
 {
     fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        if self.overridden {
+            return;
+        }
         match &stmt.node {
-            StmtKind::For { body, .. } => {
+            StmtKind::For {
+                target, iter, body, ..
+            } => {
+                if self.name_matches(target) {
+                    self.overridden = true;
+                } else {
+                    if self.name_matches(iter) {
+                        self.usage_count += 1;
+                        // This could happen when the group is being looped
+                        // over multiple times:
+                        //      for item in group:
+                        //          ...
+                        //
+                        //      # Group is being reused here
+                        //      for item in group:
+                        //          ...
+                        if self.usage_count > 1 {
+                            self.exprs.push(iter);
+                        }
+                    }
+                    self.nested = true;
+                    visitor::walk_body(self, body);
+                    self.nested = false;
+                }
+            }
+            StmtKind::While { body, .. } => {
                 self.nested = true;
                 visitor::walk_body(self, body);
                 self.nested = false;
+            }
+            StmtKind::Assign { targets, .. } => {
+                if targets.iter().any(|target| self.name_matches(target)) {
+                    self.overridden = true;
+                }
+            }
+            StmtKind::AnnAssign { target, .. } => {
+                if self.name_matches(target) {
+                    self.overridden = true;
+                }
             }
             _ => visitor::walk_stmt(self, stmt),
         }
     }
 
     fn visit_expr(&mut self, expr: &'a Expr) {
-        if let ExprKind::Name { id, .. } = &expr.node {
-            if id == self.group_name {
-                if self.nested {
-                    // For nested loops, the count should not be checked as
-                    // the variable usage could be once but the loop makes it
-                    // being used multiple times.
-                    self.exprs.push(expr);
-                } else {
-                    self.usage_count += 1;
-                    if self.usage_count > 1 {
-                        self.exprs.push(expr);
-                    }
-                }
+        if let ExprKind::NamedExpr { target, .. } = &expr.node {
+            if self.name_matches(target) {
+                self.overridden = true;
             }
         }
-        visitor::walk_expr(self, expr);
+        if self.overridden {
+            return;
+        }
+        if matches!(
+            &expr.node,
+            ExprKind::ListComp { .. } | ExprKind::DictComp { .. } | ExprKind::SetComp { .. }
+        ) {
+            self.nested = true;
+            visitor::walk_expr(self, expr);
+            self.nested = false;
+        } else if self.name_matches(expr) {
+            self.usage_count += 1;
+            // For nested loops, the variable usage could be once but the
+            // loop makes it being used multiple times.
+            if self.nested || self.usage_count > 1 {
+                self.exprs.push(expr);
+            }
+        } else {
+            visitor::walk_expr(self, expr);
+        }
     }
 }
 

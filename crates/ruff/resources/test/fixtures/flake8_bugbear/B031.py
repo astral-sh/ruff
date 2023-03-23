@@ -20,37 +20,63 @@ def collect_shop_items(shopper, items):
     carts[shopper] += items
 
 
-unique_items = set()
-
-
-def collect_shop_item(item):
-    unique_items.add(item)
-
-
-# Group by shopping section
+# Invoking the `groupby` function directly
 for _section, section_items in groupby(items, key=lambda p: p[1]):
     for shopper in shoppers:
         shopper = shopper.title()
-        # B031
-        collect_shop_items(shopper, section_items)
+        collect_shop_items(shopper, section_items)  # B031
+    # We're outside the nested loop and used the group again.
+    collect_shop_items(shopper, section_items)  # B031
 
 for _section, section_items in groupby(items, key=lambda p: p[1]):
     collect_shop_items("Jane", section_items)
-    # B031
-    collect_shop_items("Joe", section_items)
+    collect_shop_items("Joe", section_items)  # B031
 
+
+# Make sure to detect in other loop constructs as well - `while` loop
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    countdown = 3
+    while countdown > 0:
+        collect_shop_items(shopper, section_items)  # B031
+        countdown -= 1
+
+# Make sure to detect in other loop constructs as well - `list` comprehension
+collection = []
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    collection.append([list(section_items) for _ in range(3)])  # B031
+
+unique_items = set()
+another_set = set()
 for _section, section_items in groupby(items, key=lambda p: p[1]):
     # For nested loops, it should not flag the usage of the name
     for item in section_items:
-        collect_shop_item(item)
+        unique_items.add(item)
+
+    # But it should be detected when used again
+    for item in section_items:  # B031
+        another_set.add(item)
+
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    # Variable has been overriden, skip checking
+    section_items = list(unique_items)
+    collect_shop_items("Jane", section_items)
+    collect_shop_items("Jane", section_items)
+
+for _section, section_items in groupby(items, key=lambda p: p[1]):
+    # Variable has been overriden, skip checking
+    # Not a realistic situation, just for testing purpose
+    (section_items := list(unique_items))
+    collect_shop_items("Jane", section_items)
+    collect_shop_items("Jane", section_items)
 
 for _section, section_items in groupby(items, key=lambda p: p[1]):
     # This is ok
     collect_shop_items("Jane", section_items)
 
+# Invocation via the `itertools` module
 for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
     for shopper in shoppers:
-        collect_shop_items(shopper, section_items)
+        collect_shop_items(shopper, section_items)  # B031
 
 for group in groupby(items, key=lambda p: p[1]):
     # This is bad, but not detected currently
