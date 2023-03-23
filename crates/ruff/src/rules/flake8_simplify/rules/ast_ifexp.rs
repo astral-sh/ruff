@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 use ruff_python_ast::types::Range;
@@ -101,13 +101,13 @@ pub fn explicit_true_false_in_ifexpr(
     );
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.amend(Edit::replacement(
                 unparse_expr(&test.clone(), checker.stylist),
                 expr.location,
                 expr.end_location.unwrap(),
             ));
         } else if checker.ctx.is_builtin("bool") {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.amend(Edit::replacement(
                 unparse_expr(
                     &create_expr(ExprKind::Call {
                         func: Box::new(create_expr(ExprKind::Name {
@@ -155,7 +155,7 @@ pub fn explicit_false_true_in_ifexpr(
         Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Fix::replacement(
+        diagnostic.amend(Edit::replacement(
             unparse_expr(
                 &create_expr(ExprKind::UnaryOp {
                     op: Unaryop::Not,
@@ -204,7 +204,7 @@ pub fn twisted_arms_in_ifexpr(
         Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Fix::replacement(
+        diagnostic.amend(Edit::replacement(
             unparse_expr(
                 &create_expr(ExprKind::IfExp {
                     test: Box::new(create_expr(orelse.node.clone())),

@@ -4,7 +4,7 @@ use anyhow::{anyhow, Result};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
@@ -115,7 +115,7 @@ fn create_check(
     );
     if patch {
         if let Some(content) = replacement_value {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.amend(Edit::replacement(
                 content,
                 mode_param.location,
                 mode_param.end_location.unwrap(),
@@ -127,7 +127,7 @@ fn create_check(
     diagnostic
 }
 
-fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) -> Result<Fix> {
+fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) -> Result<Edit> {
     let content = locator.slice(Range::new(expr.location, expr.end_location.unwrap()));
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
@@ -160,7 +160,7 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
         }
     }
     match (fix_start, fix_end) {
-        (Some(start), Some(end)) => Ok(Fix::deletion(start, end)),
+        (Some(start), Some(end)) => Ok(Edit::deletion(start, end)),
         _ => Err(anyhow::anyhow!(
             "Failed to locate start and end parentheses"
         )),

@@ -4,13 +4,16 @@ use serde::{Deserialize, Serialize};
 
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
-pub struct Fix {
+pub struct Edit {
+    /// The replacement content to insert between the start and end locations.
     pub content: String,
+    /// The start location of the edit.
     pub location: Location,
+    /// The end location of the edit.
     pub end_location: Location,
 }
 
-impl Fix {
+impl Edit {
     pub const fn deletion(start: Location, end: Location) -> Self {
         Self {
             content: String::new(),

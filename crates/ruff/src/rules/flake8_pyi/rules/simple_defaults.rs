@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -217,7 +217,7 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                             Diagnostic::new(TypedArgumentDefaultInStub, Range::from(default));
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.amend(Fix::replacement(
+                            diagnostic.amend(Edit::replacement(
                                 "...".to_string(),
                                 default.location,
                                 default.end_location.unwrap(),
@@ -244,7 +244,7 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                             Diagnostic::new(TypedArgumentDefaultInStub, Range::from(default));
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.amend(Fix::replacement(
+                            diagnostic.amend(Edit::replacement(
                                 "...".to_string(),
                                 default.location,
                                 default.end_location.unwrap(),

@@ -3,7 +3,7 @@
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -56,7 +56,7 @@ pub fn whitespace_before_parameters(
             let mut diagnostic = Diagnostic::new(kind, Range::new(start, end));
 
             if autofix {
-                diagnostic.amend(Fix::deletion(start, end));
+                diagnostic.amend(Edit::deletion(start, end));
             }
             diagnostics.push(diagnostic);
         }

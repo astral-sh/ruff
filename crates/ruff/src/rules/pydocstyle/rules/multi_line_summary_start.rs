@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{NewlineWithTrailingNewline, StrExt};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
@@ -69,7 +69,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                         let start =
                             Location::new(location.row(), location.column() + first_line.len());
                         let end = Location::new(end_row, end_column);
-                        diagnostic.amend(Fix::deletion(start, end));
+                        diagnostic.amend(Edit::deletion(start, end));
                         break;
                     }
                     end_row += 1;
@@ -123,7 +123,7 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                         indentation,
                         first_line.strip_prefix(prefix).unwrap().trim_start()
                     );
-                    diagnostic.amend(Fix::replacement(
+                    diagnostic.amend(Edit::replacement(
                         repl,
                         Location::new(location.row(), location.column() + prefix.len()),
                         Location::new(location.row(), location.column() + first_line.len()),

@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -61,13 +61,13 @@ fn extract_middle(contents: &str) -> Option<MiddleContent> {
     })
 }
 
-/// Generate a [`Fix`] for a `stdout` and `stderr` [`Keyword`] pair.
+/// Generate a [`Edit`] for a `stdout` and `stderr` [`Keyword`] pair.
 fn generate_fix(
     stylist: &Stylist,
     locator: &Locator,
     stdout: &Keyword,
     stderr: &Keyword,
-) -> Option<Fix> {
+) -> Option<Edit> {
     let line_end = stylist.line_ending().as_str();
     let first = if stdout.location < stderr.location {
         stdout
@@ -96,7 +96,7 @@ fn generate_fix(
         }
         contents.push_str(middle.contents);
     }
-    Some(Fix::replacement(
+    Some(Edit::replacement(
         contents,
         first.location,
         last.end_location.unwrap(),

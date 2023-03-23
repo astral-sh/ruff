@@ -3,14 +3,13 @@ use libcst_native::{
     Codegen, CodegenState, CompoundStatement, Expression, ParenthesizableWhitespace,
     SmallStatement, Statement, Suite,
 };
-use rustpython_parser::ast::{Expr, Keyword, Location};
+use rustpython_parser::ast::{Expr, Location};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
-use crate::autofix::helpers::remove_argument;
 use crate::cst::matchers::match_module;
 
 /// Safely adjust the indentation of the indented block at [`Range`].
@@ -50,20 +49,8 @@ pub fn adjust_indentation(
     Ok(module_text)
 }
 
-/// Generate a fix to remove a base from a `ClassDef` statement.
-pub fn remove_class_def_base(
-    locator: &Locator,
-    stmt_at: Location,
-    expr_at: Location,
-    expr_end: Location,
-    bases: &[Expr],
-    keywords: &[Keyword],
-) -> Result<Fix> {
-    remove_argument(locator, stmt_at, expr_at, expr_end, bases, keywords, true)
-}
-
 /// Generate a fix to remove arguments from a `super` call.
-pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr) -> Option<Fix> {
+pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr) -> Option<Edit> {
     let range = Range::from(expr);
     let contents = locator.slice(range);
 
@@ -90,7 +77,7 @@ pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr)
     };
     tree.codegen(&mut state);
 
-    Some(Fix::replacement(
+    Some(Edit::replacement(
         state.to_string(),
         range.location,
         range.end_location,

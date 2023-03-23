@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Location, Stmt, StmtKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{match_leading_content, match_trailing_content, unparse_stmt};
 use ruff_python_ast::newlines::StrExt;
@@ -99,7 +99,7 @@ pub fn lambda_assignment(checker: &mut Checker, target: &Expr, value: &Expr, stm
                         indented.push_str(line);
                     }
                 }
-                diagnostic.amend(Fix::replacement(
+                diagnostic.amend(Edit::replacement(
                     indented,
                     stmt.location,
                     stmt.end_location.unwrap(),

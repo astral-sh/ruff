@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Location;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -36,7 +36,7 @@ pub fn shebang_whitespace(
                 ),
             );
             if autofix {
-                diagnostic.amend(Fix::deletion(
+                diagnostic.amend(Edit::deletion(
                     Location::new(lineno + 1, 0),
                     Location::new(lineno + 1, *n_spaces),
                 ));

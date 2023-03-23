@@ -9,7 +9,7 @@ use rustpython_parser::ast::{
 };
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{create_expr, match_trailing_comment, unparse_expr};
@@ -184,7 +184,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                 let mut diagnostic = Diagnostic::new(UnnecessaryPass, Range::from(pass_stmt));
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(index) = match_trailing_comment(pass_stmt, checker.locator) {
-                        diagnostic.amend(Fix::deletion(
+                        diagnostic.amend(Edit::deletion(
                             pass_stmt.location,
                             Location::new(
                                 pass_stmt.end_location.unwrap().row(),
@@ -498,7 +498,7 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                         .collect(),
                 });
 
-                diagnostic.amend(Fix::replacement(
+                diagnostic.amend(Edit::replacement(
                     unparse_expr(&bool_op, checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),
@@ -524,7 +524,7 @@ pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.amend(Fix::replacement(
+                    diagnostic.amend(Edit::replacement(
                         "list".to_string(),
                         expr.location,
                         expr.end_location.unwrap(),

@@ -3,7 +3,7 @@ use rustpython_parser::ast::{
 };
 use unicode_width::UnicodeWidthStr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
@@ -223,7 +223,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     Range::from(stmt),
                 );
                 if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("any") {
-                    diagnostic.amend(Fix::replacement(
+                    diagnostic.amend(Edit::replacement(
                         contents,
                         stmt.location,
                         loop_info.terminal,
@@ -300,7 +300,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     Range::from(stmt),
                 );
                 if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("all") {
-                    diagnostic.amend(Fix::replacement(
+                    diagnostic.amend(Edit::replacement(
                         contents,
                         stmt.location,
                         loop_info.terminal,

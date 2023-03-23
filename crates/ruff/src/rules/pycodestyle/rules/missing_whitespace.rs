@@ -3,7 +3,7 @@
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
 
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::Edit;
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -75,7 +75,7 @@ pub fn missing_whitespace(
             );
 
             if autofix {
-                diagnostic.amend(Fix::insertion(
+                diagnostic.amend(Edit::insertion(
                     " ".to_string(),
                     Location::new(row, indent_level + idx + 1),
                 ));

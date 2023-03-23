@@ -6,7 +6,7 @@ use libcst_native::{
 use log::error;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::collect_call_path;
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -256,7 +256,7 @@ pub fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 Range::from(value),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Fix::replacement(
+                diagnostic.amend(Edit::replacement(
                     "mock".to_string(),
                     value.location,
                     value.end_location.unwrap(),
@@ -303,7 +303,7 @@ pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             Range::from(name),
                         );
                         if let Some(content) = content.as_ref() {
-                            diagnostic.amend(Fix::replacement(
+                            diagnostic.amend(Edit::replacement(
                                 content.clone(),
                                 stmt.location,
                                 stmt.end_location.unwrap(),
@@ -335,7 +335,7 @@ pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                         diagnostic.try_amend(|| {
                             format_import_from(stmt, indent, checker.locator, checker.stylist).map(
                                 |content| {
-                                    Fix::replacement(
+                                    Edit::replacement(
                                         content,
                                         stmt.location,
                                         stmt.end_location.unwrap(),

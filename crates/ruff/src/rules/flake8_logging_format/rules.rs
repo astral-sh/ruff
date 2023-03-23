@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location, Operator};
 
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_python_ast::helpers::{find_keyword, is_logger_candidate, SimpleCallArgs};
 use ruff_python_ast::logging::LoggingLevel;
 use ruff_python_ast::types::Range;
@@ -156,7 +156,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.amend(Fix::replacement(
+                    diagnostic.amend(Edit::replacement(
                         "warning".to_string(),
                         level_call_range.location,
                         level_call_range.end_location,

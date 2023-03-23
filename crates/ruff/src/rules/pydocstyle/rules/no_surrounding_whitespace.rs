@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::str::leading_quote;
@@ -49,7 +49,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
                 && !trimmed.starts_with(pattern.chars().last().unwrap())
                 && !ends_with_backslash(trimmed)
             {
-                diagnostic.amend(Fix::replacement(
+                diagnostic.amend(Edit::replacement(
                     trimmed.to_string(),
                     Location::new(
                         docstring.expr.location.row(),

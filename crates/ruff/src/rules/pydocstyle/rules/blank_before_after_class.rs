@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::Range;
@@ -88,7 +88,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Delete the blank line before the class.
-                    diagnostic.amend(Fix::deletion(
+                    diagnostic.amend(Edit::deletion(
                         Location::new(docstring.expr.location.row() - blank_lines_before, 0),
                         Location::new(docstring.expr.location.row(), 0),
                     ));
@@ -110,7 +110,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Insert one blank line before the class.
-                    diagnostic.amend(Fix::replacement(
+                    diagnostic.amend(Edit::replacement(
                         checker.stylist.line_ending().to_string(),
                         Location::new(docstring.expr.location.row() - blank_lines_before, 0),
                         Location::new(docstring.expr.location.row(), 0),
@@ -149,7 +149,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Insert a blank line before the class (replacing any existing lines).
-                diagnostic.amend(Fix::replacement(
+                diagnostic.amend(Edit::replacement(
                     checker.stylist.line_ending().to_string(),
                     Location::new(docstring.expr.end_location.unwrap().row() + 1, 0),
                     Location::new(

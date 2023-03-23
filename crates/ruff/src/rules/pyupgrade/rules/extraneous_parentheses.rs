@@ -1,7 +1,7 @@
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
@@ -139,7 +139,7 @@ pub fn extraneous_parentheses(
                     Diagnostic::new(ExtraneousParentheses, Range::new(*start, *end));
                 if autofix.into() && settings.rules.should_fix(Rule::ExtraneousParentheses) {
                     let contents = locator.slice(Range::new(*start, *end));
-                    diagnostic.amend(Fix::replacement(
+                    diagnostic.amend(Edit::replacement(
                         contents[1..contents.len() - 1].to_string(),
                         *start,
                         *end,
