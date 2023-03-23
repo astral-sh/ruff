@@ -5216,7 +5216,8 @@ impl<'a> Checker<'a> {
                     continue;
                 }
 
-                let body = str::raw_contents(contents);
+                // SAFETY: Safe for docstrings that pass `should_ignore_docstring`.
+                let body = str::raw_contents(contents).unwrap();
                 let docstring = Docstring {
                     kind: definition.kind,
                     expr,

@@ -93,15 +93,14 @@ pub fn parse_type_annotation(
     locator: &Locator,
 ) -> Result<(Expr, AnnotationKind)> {
     let expression = locator.slice(range);
-    let body = str::raw_contents(expression);
-    if body == value {
+    if str::raw_contents(expression).map_or(false, |body| body == value) {
         // The annotation is considered "simple" if and only if the raw representation (e.g.,
         // `List[int]` within "List[int]") exactly matches the parsed representation. This
         // isn't the case, e.g., for implicit concatenations, or for annotations that contain
         // escaped quotes.
         let leading_quote = str::leading_quote(expression).unwrap();
         let expr = parser::parse_expression_located(
-            body,
+            value,
             "<filename>",
             Location::new(
                 range.location.row(),
