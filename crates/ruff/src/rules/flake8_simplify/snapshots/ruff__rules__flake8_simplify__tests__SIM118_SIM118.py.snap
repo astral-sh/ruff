@@ -182,4 +182,24 @@ expression: diagnostics
       row: 22
       column: 22
   parent: ~
+- kind:
+    name: InDictKeys
+    body: "Use `key in (obj or {})` instead of `key in (obj or {}).keys()`"
+    suggestion: "Convert to `key in (obj or {})`"
+    fixable: true
+  location:
+    row: 24
+    column: 0
+  end_location:
+    row: 24
+    column: 25
+  fix:
+    content: "(obj or {})"
+    location:
+      row: 24
+      column: 7
+    end_location:
+      row: 24
+      column: 25
+  parent: ~
 
