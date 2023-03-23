@@ -17,25 +17,13 @@ pub const SINGLE_QUOTE_BYTE_PREFIXES: &[&str] = &[
 const TRIPLE_QUOTE_SUFFIXES: &[&str] = &["\"\"\"", "'''"];
 const SINGLE_QUOTE_SUFFIXES: &[&str] = &["\"", "'"];
 
-/// Strip the leading and trailing quotes from a docstring.
-pub fn raw_contents(contents: &str) -> &str {
-    for pattern in TRIPLE_QUOTE_STR_PREFIXES
-        .iter()
-        .chain(TRIPLE_QUOTE_BYTE_PREFIXES)
-    {
-        if contents.starts_with(pattern) {
-            return &contents[pattern.len()..contents.len() - 3];
-        }
-    }
-    for pattern in SINGLE_QUOTE_STR_PREFIXES
-        .iter()
-        .chain(SINGLE_QUOTE_BYTE_PREFIXES)
-    {
-        if contents.starts_with(pattern) {
-            return &contents[pattern.len()..contents.len() - 1];
-        }
-    }
-    unreachable!("Expected docstring to start with a valid triple- or single-quote prefix")
+/// Strip the leading and trailing quotes from a string.
+/// Assumes that the string is a valid string literal, but does not verify that the string
+/// is a "simple" string literal (i.e., that it does not contain any implicit concatenations).
+pub fn raw_contents(contents: &str) -> Option<&str> {
+    let leading_quote_str = leading_quote(contents)?;
+    let trailing_quote_str = trailing_quote(contents)?;
+    Some(&contents[leading_quote_str.len()..contents.len() - trailing_quote_str.len()])
 }
 
 /// Return the leading quote for a string or byte literal (e.g., `"""`).

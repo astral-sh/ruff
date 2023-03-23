@@ -15,4 +15,17 @@ expression: diagnostics
     column: 16
   fix: ~
   parent: ~
+- kind:
+    name: ForwardAnnotationSyntaxError
+    body: "Syntax error in forward annotation: `List[int]☃`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 13
+    column: 3
+  end_location:
+    row: 13
+    column: 21
+  fix: ~
+  parent: ~
 

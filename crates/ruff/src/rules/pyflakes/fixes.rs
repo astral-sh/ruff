@@ -30,7 +30,7 @@ pub fn remove_unused_format_arguments_from_dict(
         !matches!(e, DictElement::Simple {
             key: Expression::SimpleString(name),
             ..
-        } if unused_arguments.contains(&raw_contents(name.value)))
+        } if raw_contents(name.value).map_or(false, |name| unused_arguments.contains(&name)))
     });
 
     let mut state = CodegenState {
