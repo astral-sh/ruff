@@ -1,0 +1,44 @@
+---
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage. Save the result to a list, if the result is needed multiple times."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 31
+    column: 36
+  end_location:
+    row: 31
+    column: 49
+  fix: ~
+  parent: ~
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage. Save the result to a list, if the result is needed multiple times."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 35
+    column: 30
+  end_location:
+    row: 35
+    column: 43
+  fix: ~
+  parent: ~
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage. Save the result to a list, if the result is needed multiple times."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 44
+    column: 36
+  end_location:
+    row: 44
+    column: 49
+  fix: ~
+  parent: ~
+

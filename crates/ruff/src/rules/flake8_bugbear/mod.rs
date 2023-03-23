@@ -44,6 +44,7 @@ mod tests {
     #[test_case(Rule::NoExplicitStacklevel, Path::new("B028.py"); "B028")]
     #[test_case(Rule::ExceptWithEmptyTuple, Path::new("B029.py"); "B029")]
     #[test_case(Rule::ExceptWithNonExceptionClasses, Path::new("B030.py"); "B030")]
+    #[test_case(Rule::ReuseOfGroupbyGenerator, Path::new("B031.py"); "B031")]
     #[test_case(Rule::UnintentionalTypeAnnotation, Path::new("B032.py"); "B032")]
     #[test_case(Rule::RaiseWithoutFromInsideExcept, Path::new("B904.py"); "B904")]
     #[test_case(Rule::ZipWithoutExplicitStrict, Path::new("B905.py"); "B905")]

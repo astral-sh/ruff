@@ -1657,6 +1657,9 @@ where
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Stmt(stmt));
                 }
+                if self.settings.rules.enabled(Rule::ReuseOfGroupbyGenerator) {
+                    flake8_bugbear::rules::reuse_of_groupby_generator(self, target, body, iter);
+                }
                 if self.settings.rules.enabled(Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
