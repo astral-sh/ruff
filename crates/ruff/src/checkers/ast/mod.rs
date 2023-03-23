@@ -3421,9 +3421,7 @@ where
                 keywords,
             } => {
                 let callable = self.ctx.resolve_call_path(func).and_then(|call_path| {
-                    if self.ctx.match_typing_call_path(&call_path, "ForwardRef") {
-                        Some(Callable::ForwardRef)
-                    } else if self.ctx.match_typing_call_path(&call_path, "cast") {
+                    if self.ctx.match_typing_call_path(&call_path, "cast") {
                         Some(Callable::Cast)
                     } else if self.ctx.match_typing_call_path(&call_path, "NewType") {
                         Some(Callable::NewType)
@@ -3450,12 +3448,6 @@ where
                     }
                 });
                 match callable {
-                    Some(Callable::ForwardRef) => {
-                        self.visit_expr(func);
-                        for expr in args {
-                            visit_type_definition!(self, expr);
-                        }
-                    }
                     Some(Callable::Cast) => {
                         self.visit_expr(func);
                         if !args.is_empty() {

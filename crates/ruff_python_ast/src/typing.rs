@@ -11,7 +11,6 @@ use crate::str;
 use crate::types::Range;
 
 pub enum Callable {
-    ForwardRef,
     Cast,
     NewType,
     TypeVar,
