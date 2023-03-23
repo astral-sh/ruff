@@ -351,6 +351,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Simplify, "300") => Rule::YodaConditions,
         (Flake8Simplify, "401") => Rule::IfElseBlockInsteadOfDictGet,
 
+        //flake8-newspaper-style
+        (Flake8NewspaperStyle, "100") => Rule::FuncDefinedAbove,
+
         // pyupgrade
         (Pyupgrade, "001") => Rule::UselessMetaclassType,
         (Pyupgrade, "003") => Rule::TypeOfPrimitive,

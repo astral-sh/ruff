@@ -43,10 +43,11 @@ use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
     flake8_django, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
-    flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise,
-    flake8_return, flake8_self, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, flake8_use_pathlib, mccabe, numpy, pandas_vet, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_logging_format, flake8_newspaper_style, flake8_pie, flake8_print, flake8_pyi,
+    flake8_pytest_style, flake8_raise, flake8_return, flake8_self, flake8_simplify,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, flake8_use_pathlib, mccabe,
+    numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint,
+    pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -2805,6 +2806,11 @@ where
                 }
                 if self.settings.rules.enabled(Rule::CallDateFromtimestamp) {
                     flake8_datetimez::rules::call_date_fromtimestamp(self, func, Range::from(expr));
+                }
+
+                // flake8-newspaper-style
+                if self.settings.rules.enabled(Rule::FuncDefinedAbove) {
+                    flake8_newspaper_style::rules::check_function_calls(self, func);
                 }
 
                 // pygrep-hooks

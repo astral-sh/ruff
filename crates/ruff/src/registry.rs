@@ -243,6 +243,8 @@ ruff_macros::register_rules!(
     rules::flake8_comprehensions::rules::UnnecessarySubscriptReversal,
     rules::flake8_comprehensions::rules::UnnecessaryComprehension,
     rules::flake8_comprehensions::rules::UnnecessaryMap,
+    // flake8-newpaper-style
+    rules::flake8_newspaper_style::rules::FuncDefinedAbove,
     // flake8-debugger
     rules::flake8_debugger::rules::Debugger,
     // mccabe
@@ -781,6 +783,9 @@ pub enum Linter {
     /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
     #[prefix = "PTH"]
     Flake8UsePathlib,
+    /// [flake8-newspaper-style](https://pypi.org/project/flake8-newspaper-style/)
+    #[prefix = "NEW"]
+    Flake8NewspaperStyle,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,

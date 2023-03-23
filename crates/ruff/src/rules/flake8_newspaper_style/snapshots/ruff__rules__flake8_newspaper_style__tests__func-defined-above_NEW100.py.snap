@@ -1,0 +1,135 @@
+---
+source: crates/ruff/src/rules/flake8_newspaper_style/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: FuncDefinedAbove
+    body: "newspaper style: function foo defined in line 2 should be moved down."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 6
+    column: 8
+  end_location:
+    row: 6
+    column: 16
+  fix: ~
+  parent: ~
+- kind:
+    name: FuncDefinedAbove
+    body: "newspaper style: function foo defined in line 2 should be moved down."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 7
+    column: 12
+  end_location:
+    row: 7
+    column: 20
+  fix: ~
+  parent: ~
+- kind:
+    name: FuncDefinedAbove
+    body: "newspaper style: function bar defined in line 15 should be moved down."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 19
+    column: 15
+  end_location:
+    row: 19
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    name: FuncDefinedAbove
+    body: "newspaper style: function bar defined in line 15 should be moved down."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 22
+    column: 15
+  end_location:
+    row: 22
+    column: 23
+  fix: ~
+  parent: ~
+- kind:
+    name: FuncDefinedAbove
+    body: "newspaper style: function baz defined in line 68 should be moved down."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 77
+    column: 11
+  end_location:
+    row: 77
+    column: 14
+  fix: ~
+  parent: ~
+- kind:
+    name: FuncDefinedAbove
+    body: "newspaper style: function foo defined in line 72 should be moved down."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 85
+    column: 15
+  end_location:
+    row: 85
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    name: FuncDefinedAbove
+    body: "newspaper style: function baz defined in line 99 should be moved down."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 105
+    column: 19
+  end_location:
+    row: 105
+    column: 27
+  fix: ~
+  parent: ~
+- kind:
+    name: FuncDefinedAbove
+    body: "newspaper style: function bar defined in line 135 should be moved down."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 140
+    column: 12
+  end_location:
+    row: 140
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    name: FuncDefinedAbove
+    body: "newspaper style: function baz defined in line 68 should be moved down."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 141
+    column: 12
+  end_location:
+    row: 141
+    column: 15
+  fix: ~
+  parent: ~
+- kind:
+    name: FuncDefinedAbove
+    body: "newspaper style: function fool defined in line 129 should be moved down."
+    suggestion: ~
+    fixable: false
+  location:
+    row: 142
+    column: 12
+  end_location:
+    row: 142
+    column: 16
+  fix: ~
+  parent: ~
+
