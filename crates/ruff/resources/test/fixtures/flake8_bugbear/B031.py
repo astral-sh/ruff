@@ -57,13 +57,13 @@ for _section, section_items in groupby(items, key=lambda p: p[1]):
         another_set.add(item)
 
 for _section, section_items in groupby(items, key=lambda p: p[1]):
-    # Variable has been overriden, skip checking
+    # Variable has been overridden, skip checking
     section_items = list(unique_items)
     collect_shop_items("Jane", section_items)
     collect_shop_items("Jane", section_items)
 
 for _section, section_items in groupby(items, key=lambda p: p[1]):
-    # Variable has been overriden, skip checking
+    # Variable has been overridden, skip checking
     # Not a realistic situation, just for testing purpose
     (section_items := list(unique_items))
     collect_shop_items("Jane", section_items)

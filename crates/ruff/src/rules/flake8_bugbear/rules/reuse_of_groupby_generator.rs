@@ -51,7 +51,7 @@ struct GroupNameFinder<'a> {
     usage_count: u8,
     /// A flag indicating that the visitor is inside a nested `for` loop.
     nested: bool,
-    /// A flag indicating that the `group_name` variable has been overriden
+    /// A flag indicating that the `group_name` variable has been overridden
     /// during the visit.
     overridden: bool,
 
