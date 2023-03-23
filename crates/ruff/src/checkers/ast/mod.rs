@@ -2130,7 +2130,8 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
-        if !self.ctx.in_deferred_type_definition
+        if !self.ctx.in_f_string
+            && !self.ctx.in_deferred_type_definition
             && self.ctx.in_deferred_string_type_definition.is_none()
             && self.ctx.in_type_definition
             && self.ctx.annotations_future_enabled
@@ -3283,7 +3284,7 @@ where
                 value: Constant::Str(value),
                 kind,
             } => {
-                if self.ctx.in_type_definition && !self.ctx.in_literal {
+                if self.ctx.in_type_definition && !self.ctx.in_literal && !self.ctx.in_f_string {
                     self.deferred.string_type_definitions.push((
                         Range::from(expr),
                         value,
@@ -3624,7 +3625,10 @@ where
                 self.ctx.in_subscript = prev_in_subscript;
             }
             ExprKind::JoinedStr { .. } => {
+                let prev_in_f_string = self.ctx.in_f_string;
+                self.ctx.in_f_string = true;
                 visitor::walk_expr(self, expr);
+                self.ctx.in_f_string = prev_in_f_string;
             }
             _ => visitor::walk_expr(self, expr),
         }
