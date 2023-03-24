@@ -9,7 +9,7 @@ use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
-#[cfg(debug_assertions)]
+#[cfg(feature = "logical_lines")]
 use crate::rules::pycodestyle::helpers::is_op_token;
 
 #[violation]
@@ -36,7 +36,7 @@ static STARTSWITH_DEF_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(async\s+def|def)\b").unwrap());
 
 /// E251, E252
-#[cfg(debug_assertions)]
+#[cfg(feature = "logical_lines")]
 pub fn whitespace_around_named_parameter_equals(
     tokens: &[(Location, &Tok, Location)],
     line: &str,
@@ -104,7 +104,7 @@ pub fn whitespace_around_named_parameter_equals(
     diagnostics
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "logical_lines"))]
 pub fn whitespace_around_named_parameter_equals(
     _tokens: &[(Location, &Tok, Location)],
     _line: &str,

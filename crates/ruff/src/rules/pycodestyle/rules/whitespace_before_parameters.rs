@@ -29,7 +29,7 @@ impl AlwaysAutofixableViolation for WhitespaceBeforeParameters {
 }
 
 /// E211
-#[cfg(debug_assertions)]
+#[cfg(feature = "logical_lines")]
 pub fn whitespace_before_parameters(
     tokens: &[(Location, &Tok, Location)],
     autofix: bool,
@@ -66,7 +66,7 @@ pub fn whitespace_before_parameters(
     diagnostics
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "logical_lines"))]
 pub fn whitespace_before_parameters(
     _tokens: &[(Location, &Tok, Location)],
     _autofix: bool,

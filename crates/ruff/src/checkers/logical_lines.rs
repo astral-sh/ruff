@@ -165,10 +165,10 @@ pub fn check_logical_lines(
                 }
             }
 
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "logical_lines")]
             let should_fix = autofix.into() && settings.rules.should_fix(Rule::MissingWhitespace);
 
-            #[cfg(not(debug_assertions))]
+            #[cfg(not(feature = "logical_lines"))]
             let should_fix = false;
 
             for diagnostic in
@@ -181,11 +181,11 @@ pub fn check_logical_lines(
         }
 
         if line.flags.contains(TokenFlags::BRACKET) {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "logical_lines")]
             let should_fix =
                 autofix.into() && settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
 
-            #[cfg(not(debug_assertions))]
+            #[cfg(not(feature = "logical_lines"))]
             let should_fix = false;
 
             for diagnostic in whitespace_before_parameters(&line.tokens, should_fix) {
