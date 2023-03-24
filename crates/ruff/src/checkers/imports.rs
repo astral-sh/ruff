@@ -4,6 +4,7 @@ use std::path::Path;
 use rustpython_parser::ast::{StmtKind, Suite};
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::helpers::to_module_path;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::types::{Import, Imports};
 use ruff_python_ast::visitor::Visitor;
@@ -83,28 +84,43 @@ pub fn check_imports(
         block.imports.iter().for_each(|&stmt| match &stmt.node {
             StmtKind::Import { names } => {
                 // from testing, seems this should only have one entry
-                imports_vec.push(Import {
-                    name: names[0].node.name.clone(),
-                    location: stmt.location,
-                    end_location: stmt.end_location.unwrap(),
-                });
+                imports_vec.push(Import::new(
+                    names[0].node.name.clone(),
+                    stmt.location,
+                    stmt.end_location.unwrap(),
+                ));
             }
             StmtKind::ImportFrom {
                 module,
                 names,
                 level,
             } => {
-                imports_vec.extend(names.iter().map(|name| Import {
-                    name: Imports::expand_relative(&modules, module, &name.node.name, level),
-                    location: name.location,
-                    end_location: name.end_location.unwrap(),
+                imports_vec.extend(names.iter().map(|name| {
+                    Import::new(
+                        Imports::expand_relative(&modules, module, &name.node.name, level),
+                        name.location,
+                        name.end_location.unwrap(),
+                    )
                 }));
             }
             // ImportTracker guarantees that we will only have import statements
             _ => unreachable!("Should only have import statements"),
         });
     }
+    let module_path = if let Some(package) = package {
+        if let Some(module_path) = to_module_path(package, path) {
+            module_path.join(".")
+        } else {
+            String::new()
+        }
+    } else {
+        String::new()
+    };
 
-    imports.insert(path.to_owned(), imports_vec);
+    if !imports_vec.is_empty() {
+        imports.insert(&module_path, imports_vec);
+        imports.insert_new_module(&module_path, path);
+    }
+
     (diagnostics, imports)
 }

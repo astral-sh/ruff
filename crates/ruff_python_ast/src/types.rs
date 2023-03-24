@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::ops::Deref;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::{collections::hash_map::Iter as HashMapIter, ops::Deref};
 
 use rustpython_parser::ast::{Expr, Located, Location, Stmt};
 
@@ -80,25 +80,50 @@ impl<'a> From<&RefEquality<'a, Expr>> for &'a Expr {
 
 pub type CallPath<'a> = smallvec::SmallVec<[&'a str; 8]>;
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Import {
     pub name: String,
-    pub location: Location,
-    pub end_location: Location,
+    location: Location,
+    end_location: Location,
 }
 
-#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
+impl Import {
+    pub fn new(name: String, location: Location, end_location: Location) -> Self {
+        Self {
+            name,
+            location,
+            end_location,
+        }
+    }
+}
+
+impl From<&Import> for Range {
+    fn from(import: &Import) -> Range {
+        Range::new(import.location, import.end_location)
+    }
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Imports {
-    inner: FxHashMap<PathBuf, Vec<Import>>,
+    pub imports_per_module: FxHashMap<String, Vec<Import>>,
+    pub module_to_path_mapping: FxHashMap<String, PathBuf>,
 }
 
 impl Imports {
-    pub fn insert(&mut self, module: PathBuf, imports_vec: Vec<Import>) {
-        self.inner.insert(module, imports_vec);
+    pub fn insert(&mut self, module_path: &str, imports_vec: Vec<Import>) {
+        self.imports_per_module
+            .insert(module_path.to_owned(), imports_vec);
+    }
+
+    pub fn insert_new_module(&mut self, module: &str, module_path: &Path) {
+        self.module_to_path_mapping
+            .insert(module.to_owned(), module_path.to_owned());
     }
 
     pub fn extend(&mut self, other: Self) {
-        self.inner.extend(other.inner);
+        self.imports_per_module.extend(other.imports_per_module);
+        self.module_to_path_mapping
+            .extend(other.module_to_path_mapping);
     }
 
     pub fn expand_relative(
@@ -135,5 +160,14 @@ impl Imports {
             }
             None => format!("{}.{}", module.as_ref().unwrap_or(&String::new()), name),
         }
+    }
+}
+
+impl<'a> IntoIterator for &'a Imports {
+    type Item = (&'a String, &'a Vec<Import>);
+    type IntoIter = HashMapIter<'a, String, Vec<Import>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.imports_per_module.iter()
     }
 }

@@ -185,6 +185,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "E2515") => Rule::InvalidCharacterZeroWidthSpace,
         (Pylint, "R0133") => Rule::ComparisonOfConstant,
         (Pylint, "R0206") => Rule::PropertyWithParameters,
+        (Pylint, "R0401") => Rule::CyclicImport,
         (Pylint, "R0402") => Rule::ManualFromImport,
         (Pylint, "R0911") => Rule::TooManyReturnStatements,
         (Pylint, "R0912") => Rule::TooManyBranches,
