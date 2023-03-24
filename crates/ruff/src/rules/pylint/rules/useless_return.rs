@@ -53,10 +53,8 @@ pub fn useless_return<'a>(
     returns: Option<&'a Expr>,
 ) {
     // Skip functions that have a return annotation that is not `None`.
-    if let Some(returns) = returns {
-        if !is_const_none(returns) {
-            return;
-        }
+    if !returns.map_or(true, is_const_none) {
+        return;
     }
 
     // Skip empty functions.

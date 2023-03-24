@@ -537,7 +537,7 @@ pub fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
     if !result_exists(&stack.returns) {
         if checker.settings.rules.enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
-            if returns.is_none() || is_const_none(returns.as_ref().unwrap()) {
+            if returns.map_or(true, is_const_none) {
                 unnecessary_return_none(checker, &stack);
             }
         }
