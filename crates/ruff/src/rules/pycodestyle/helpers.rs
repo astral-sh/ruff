@@ -58,7 +58,7 @@ pub fn is_overlong(
     true
 }
 
-pub fn is_keyword_token(token: &Tok) -> bool {
+pub const fn is_keyword_token(token: &Tok) -> bool {
     matches!(
         token,
         Tok::False
@@ -98,14 +98,14 @@ pub fn is_keyword_token(token: &Tok) -> bool {
     )
 }
 
-pub fn is_singleton_token(token: &Tok) -> bool {
+pub const fn is_singleton_token(token: &Tok) -> bool {
     matches!(
         token,
         Tok::False { .. } | Tok::True { .. } | Tok::None { .. },
     )
 }
 
-pub fn is_op_token(token: &Tok) -> bool {
+pub const fn is_op_token(token: &Tok) -> bool {
     matches!(
         token,
         Tok::Lpar
@@ -157,25 +157,25 @@ pub fn is_op_token(token: &Tok) -> bool {
     )
 }
 
-pub fn is_skip_comment_token(token: &Tok) -> bool {
+pub const fn is_skip_comment_token(token: &Tok) -> bool {
     matches!(
         token,
         Tok::Newline | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline | Tok::Comment { .. }
     )
 }
 
-pub fn is_soft_keyword_token(token: &Tok) -> bool {
+pub const fn is_soft_keyword_token(token: &Tok) -> bool {
     matches!(token, Tok::Match | Tok::Case)
 }
 
-pub fn is_arithmetic_token(token: &Tok) -> bool {
+pub const fn is_arithmetic_token(token: &Tok) -> bool {
     matches!(
         token,
         Tok::DoubleStar | Tok::Star | Tok::Plus | Tok::Minus | Tok::Slash | Tok::At
     )
 }
 
-pub fn is_ws_optional_token(token: &Tok) -> bool {
+pub const fn is_ws_optional_token(token: &Tok) -> bool {
     is_arithmetic_token(token)
         || matches!(
             token,
@@ -188,7 +188,7 @@ pub fn is_ws_optional_token(token: &Tok) -> bool {
         )
 }
 
-pub fn is_ws_needed_token(token: &Tok) -> bool {
+pub const fn is_ws_needed_token(token: &Tok) -> bool {
     matches!(
         token,
         Tok::DoubleStarEqual
@@ -218,7 +218,7 @@ pub fn is_ws_needed_token(token: &Tok) -> bool {
     )
 }
 
-pub fn is_unary_token(token: &Tok) -> bool {
+pub const fn is_unary_token(token: &Tok) -> bool {
     matches!(
         token,
         Tok::Plus | Tok::Minus | Tok::Star | Tok::DoubleStar | Tok::RightShift
