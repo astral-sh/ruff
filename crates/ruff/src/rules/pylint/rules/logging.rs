@@ -100,7 +100,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
         return;
     }
 
-    if !is_logger_candidate(func) {
+    if !is_logger_candidate(&checker.ctx, func) {
         return;
     }
 
