@@ -178,7 +178,7 @@ async def main(*, ruff1: Path, ruff2: Path) -> None:
         return_exceptions=True,
     )
 
-    diffs = {name: result for name, result in zip(REPOSITORIES, results, strict=True)}
+    diffs = dict(zip(REPOSITORIES, results, strict=True))
 
     total_removed = total_added = 0
     errors = 0
