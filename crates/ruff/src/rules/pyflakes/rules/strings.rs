@@ -1,6 +1,5 @@
 use std::string::ToString;
 
-use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, KeywordData};
 
@@ -312,17 +311,14 @@ pub(crate) fn percent_format_extra_named_arguments(
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        match remove_unused_format_arguments_from_dict(
-            &missing,
-            right,
-            checker.locator,
-            checker.stylist,
-        ) {
-            Ok(fix) => {
-                diagnostic.amend(fix);
-            }
-            Err(e) => error!("Failed to remove unused format arguments: {e}"),
-        }
+        diagnostic.try_amend(|| {
+            remove_unused_format_arguments_from_dict(
+                &missing,
+                right,
+                checker.locator,
+                checker.stylist,
+            )
+        });
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -478,17 +474,14 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        match remove_unused_keyword_arguments_from_format_call(
-            &missing,
-            location,
-            checker.locator,
-            checker.stylist,
-        ) {
-            Ok(fix) => {
-                diagnostic.amend(fix);
-            }
-            Err(e) => error!("Failed to remove unused keyword arguments: {e}"),
-        }
+        diagnostic.try_amend(|| {
+            remove_unused_keyword_arguments_from_format_call(
+                &missing,
+                location,
+                checker.locator,
+                checker.stylist,
+            )
+        });
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -522,18 +515,15 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        match remove_unused_positional_arguments_from_format_call(
-            &missing,
-            location,
-            checker.locator,
-            checker.stylist,
-            &summary.format_string,
-        ) {
-            Ok(fix) => {
-                diagnostic.amend(fix);
-            }
-            Err(e) => error!("Failed to remove unused positional arguments: {e}"),
-        }
+        diagnostic.try_amend(|| {
+            remove_unused_positional_arguments_from_format_call(
+                &missing,
+                location,
+                checker.locator,
+                checker.stylist,
+                &summary.format_string,
+            )
+        });
     }
     checker.diagnostics.push(diagnostic);
 }

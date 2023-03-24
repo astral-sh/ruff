@@ -1,4 +1,3 @@
-use log::error;
 use rustpython_parser::ast::{Expr, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
@@ -91,12 +90,9 @@ pub fn unnecessary_collection_call(
         Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        match fixes::fix_unnecessary_collection_call(checker.locator, checker.stylist, expr) {
-            Ok(fix) => {
-                diagnostic.amend(fix);
-            }
-            Err(e) => error!("Failed to generate fix: {e}"),
-        }
+        diagnostic.try_amend(|| {
+            fixes::fix_unnecessary_collection_call(checker.locator, checker.stylist, expr)
+        });
     }
     checker.diagnostics.push(diagnostic);
 }

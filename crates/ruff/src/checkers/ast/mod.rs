@@ -3797,21 +3797,12 @@ where
                                         name_range,
                                     );
                                     if self.patch(Rule::UnusedVariable) {
-                                        match pyflakes::fixes::remove_exception_handler_assignment(
-                                            excepthandler,
-                                            self.locator,
-                                        ) {
-                                            Ok(fix) => {
-                                                diagnostic.amend(fix);
-                                            }
-                                            Err(e) => {
-                                                error!(
-                                                    "Failed to remove exception handler \
-                                                     assignment: {}",
-                                                    e
-                                                );
-                                            }
-                                        }
+                                        diagnostic.try_amend(|| {
+                                            pyflakes::fixes::remove_exception_handler_assignment(
+                                                excepthandler,
+                                                self.locator,
+                                            )
+                                        });
                                     }
                                     self.diagnostics.push(diagnostic);
                                 }

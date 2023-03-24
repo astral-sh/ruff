@@ -63,20 +63,21 @@ pub fn useless_object_inheritance(
     bases: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(mut diagnostic) = rule(name, bases, checker.ctx.scope(), &checker.ctx.bindings) else {
-        return;
-    };
-    if checker.patch(diagnostic.kind.rule()) {
-        if let Some(fix) = fixes::remove_class_def_base(
-            checker.locator,
-            stmt.location,
-            diagnostic.location,
-            diagnostic.end_location,
-            bases,
-            keywords,
-        ) {
-            diagnostic.amend(fix);
+    if let Some(mut diagnostic) = rule(name, bases, checker.ctx.scope(), &checker.ctx.bindings) {
+        if checker.patch(diagnostic.kind.rule()) {
+            let location = diagnostic.location;
+            let end_location = diagnostic.end_location;
+            diagnostic.try_amend(|| {
+                fixes::remove_class_def_base(
+                    checker.locator,
+                    stmt.location,
+                    location,
+                    end_location,
+                    bases,
+                    keywords,
+                )
+            });
         }
+        checker.diagnostics.push(diagnostic);
     }
-    checker.diagnostics.push(diagnostic);
 }

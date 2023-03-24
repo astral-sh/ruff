@@ -192,21 +192,16 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                             ),
                         ));
                     } else {
-                        match delete_stmt(
-                            pass_stmt,
-                            None,
-                            &[],
-                            checker.locator,
-                            checker.indexer,
-                            checker.stylist,
-                        ) {
-                            Ok(fix) => {
-                                diagnostic.amend(fix);
-                            }
-                            Err(e) => {
-                                error!("Failed to delete `pass` statement: {}", e);
-                            }
-                        }
+                        diagnostic.try_amend(|| {
+                            delete_stmt(
+                                pass_stmt,
+                                None,
+                                &[],
+                                checker.locator,
+                                checker.indexer,
+                                checker.stylist,
+                            )
+                        });
                     }
                 }
                 checker.diagnostics.push(diagnostic);
@@ -353,16 +348,13 @@ pub fn unnecessary_comprehension_any_all(
                 let mut diagnostic =
                     Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from(&args[0]));
                 if checker.patch(diagnostic.kind.rule()) {
-                    match fixes::fix_unnecessary_comprehension_any_all(
-                        checker.locator,
-                        checker.stylist,
-                        expr,
-                    ) {
-                        Ok(fix) => {
-                            diagnostic.amend(fix);
-                        }
-                        Err(e) => error!("Failed to generate fix: {e}"),
-                    }
+                    diagnostic.try_amend(|| {
+                        fixes::fix_unnecessary_comprehension_any_all(
+                            checker.locator,
+                            checker.stylist,
+                            expr,
+                        )
+                    });
                 }
                 checker.diagnostics.push(diagnostic);
             }

@@ -1,7 +1,6 @@
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
-use log::error;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location};
 use rustpython_parser::{lexer, Mode, Tok};
 
@@ -122,12 +121,7 @@ fn create_check(
                 mode_param.end_location.unwrap(),
             ));
         } else {
-            match create_remove_param_fix(locator, expr, mode_param) {
-                Ok(fix) => {
-                    diagnostic.amend(fix);
-                }
-                Err(e) => error!("Failed to remove parameter: {e}"),
-            }
+            diagnostic.try_amend(|| create_remove_param_fix(locator, expr, mode_param));
         }
     }
     diagnostic

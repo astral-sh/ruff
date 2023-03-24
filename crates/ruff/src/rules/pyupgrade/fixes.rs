@@ -58,12 +58,8 @@ pub fn remove_class_def_base(
     expr_end: Location,
     bases: &[Expr],
     keywords: &[Keyword],
-) -> Option<Fix> {
-    if let Ok(fix) = remove_argument(locator, stmt_at, expr_at, expr_end, bases, keywords, true) {
-        Some(fix)
-    } else {
-        None
-    }
+) -> Result<Fix> {
+    remove_argument(locator, stmt_at, expr_at, expr_end, bases, keywords, true)
 }
 
 /// Generate a fix to remove arguments from a `super` call.

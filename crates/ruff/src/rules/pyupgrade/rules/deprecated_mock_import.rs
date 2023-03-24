@@ -332,16 +332,17 @@ pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
-                        match format_import_from(stmt, indent, checker.locator, checker.stylist) {
-                            Ok(content) => {
-                                diagnostic.amend(Fix::replacement(
-                                    content,
-                                    stmt.location,
-                                    stmt.end_location.unwrap(),
-                                ));
-                            }
-                            Err(e) => error!("Failed to rewrite `mock` import: {e}"),
-                        }
+                        diagnostic.try_amend(|| {
+                            format_import_from(stmt, indent, checker.locator, checker.stylist).map(
+                                |content| {
+                                    Fix::replacement(
+                                        content,
+                                        stmt.location,
+                                        stmt.end_location.unwrap(),
+                                    )
+                                },
+                            )
+                        });
                     }
                 }
                 checker.diagnostics.push(diagnostic);

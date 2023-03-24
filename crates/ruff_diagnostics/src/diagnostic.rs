@@ -1,3 +1,5 @@
+use anyhow::Result;
+use log::error;
 use rustpython_parser::ast::Location;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -42,6 +44,14 @@ impl Diagnostic {
 
     pub fn amend(&mut self, fix: Fix) -> &mut Self {
         self.fix = Some(fix);
+        self
+    }
+
+    pub fn try_amend(&mut self, func: impl FnOnce() -> Result<Fix>) -> &mut Self {
+        match func() {
+            Ok(fix) => self.fix = Some(fix),
+            Err(err) => error!("Failed to create fix: {}", err),
+        }
         self
     }
 
