@@ -50,7 +50,8 @@ struct GroupNameFinder<'a> {
     group_name: &'a str,
     /// Number of times the `group_name` variable was seen during the visit.
     usage_count: u8,
-    /// A flag indicating that the visitor is inside a nested `for` loop.
+    /// A flag indicating that the visitor is inside a nested `for` or `while`
+    /// loop or inside a `dict`, `list` or `set` comprehension.
     nested: bool,
     /// A flag indicating that the `group_name` variable has been overridden
     /// during the visit.

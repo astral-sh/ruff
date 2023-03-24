@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     name: ReuseOfGroupbyGenerator
-    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage. Save the result to a list, if the result is needed multiple times."
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
     suggestion: ~
     fixable: false
   location:
@@ -17,7 +17,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ReuseOfGroupbyGenerator
-    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage. Save the result to a list, if the result is needed multiple times."
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
     suggestion: ~
     fixable: false
   location:
@@ -30,7 +30,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ReuseOfGroupbyGenerator
-    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage. Save the result to a list, if the result is needed multiple times."
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
     suggestion: ~
     fixable: false
   location:
@@ -43,7 +43,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ReuseOfGroupbyGenerator
-    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage. Save the result to a list, if the result is needed multiple times."
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
     suggestion: ~
     fixable: false
   location:
@@ -56,7 +56,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ReuseOfGroupbyGenerator
-    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage. Save the result to a list, if the result is needed multiple times."
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
     suggestion: ~
     fixable: false
   location:
@@ -69,7 +69,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ReuseOfGroupbyGenerator
-    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage. Save the result to a list, if the result is needed multiple times."
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
     suggestion: ~
     fixable: false
   location:
@@ -82,7 +82,7 @@ expression: diagnostics
   parent: ~
 - kind:
     name: ReuseOfGroupbyGenerator
-    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage. Save the result to a list, if the result is needed multiple times."
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
     suggestion: ~
     fixable: false
   location:
