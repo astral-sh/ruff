@@ -198,3 +198,16 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
+
+  pre-commit:
+    name: "pre-commit"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - run: pip install pre-commit
+      - run: SKIP=cargo-fmt,clippy,dev-generate-all pre-commit run --all-files
