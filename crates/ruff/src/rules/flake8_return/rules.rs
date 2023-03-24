@@ -485,7 +485,7 @@ fn superfluous_else(checker: &mut Checker, stack: &Stack) -> bool {
 }
 
 /// Run all checks from the `flake8-return` plugin.
-pub fn function(checker: &mut Checker, body: &[Stmt], returns: &Option<Box<Expr>>) {
+pub fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
     // Skip empty functions.
     if body.is_empty() {
         return;

@@ -50,7 +50,7 @@ pub fn useless_return<'a>(
     checker: &mut Checker<'a>,
     stmt: &'a Stmt,
     body: &'a [Stmt],
-    returns: &Option<Box<Expr>>,
+    returns: Option<&'a Expr>,
 ) {
     // Skip functions that have a return annotation that is not `None`.
     if let Some(returns) = returns {

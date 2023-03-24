@@ -434,11 +434,20 @@ where
                     Rule::SuperfluousElseContinue,
                     Rule::SuperfluousElseBreak,
                 ]) {
-                    flake8_return::rules::function(self, body, returns);
+                    flake8_return::rules::function(
+                        self,
+                        body,
+                        returns.as_ref().map(|expr| &**expr),
+                    );
                 }
 
                 if self.settings.rules.enabled(Rule::UselessReturn) {
-                    pylint::rules::useless_return(self, stmt, body, returns);
+                    pylint::rules::useless_return(
+                        self,
+                        stmt,
+                        body,
+                        returns.as_ref().map(|expr| &**expr),
+                    );
                 }
 
                 if self.settings.rules.enabled(Rule::ComplexStructure) {
