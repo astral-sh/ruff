@@ -44,26 +44,6 @@ expression: diagnostics
   parent: ~
 - kind:
     name: IfElseBlockInsteadOfDictGet
-    body: "Use `var = a_dict.get(key, val1 + val2)` instead of an `if` block"
-    suggestion: "Replace with `var = a_dict.get(key, val1 + val2)`"
-    fixable: true
-  location:
-    row: 18
-    column: 0
-  end_location:
-    row: 21
-    column: 21
-  fix:
-    content: "var = a_dict.get(key, val1 + val2)"
-    location:
-      row: 18
-      column: 0
-    end_location:
-      row: 21
-      column: 21
-  parent: ~
-- kind:
-    name: IfElseBlockInsteadOfDictGet
     body: "Use `var = a_dict.get(keys[idx], \"default\")` instead of an `if` block"
     suggestion: "Replace with `var = a_dict.get(keys[idx], \"default\")`"
     fixable: true

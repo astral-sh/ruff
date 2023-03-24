@@ -1,4 +1,5 @@
 use crate::types::{Range, RefEquality};
+use bitflags::bitflags;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Arguments, Expr, Keyword, Stmt};
 use std::num::TryFromIntError;
@@ -222,6 +223,14 @@ impl Default for ScopeStack {
     }
 }
 
+bitflags! {
+    pub struct Exceptions: u32 {
+        const NAME_ERROR = 0b0000_0001;
+        const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
+        const IMPORT_ERROR = 0b0000_0100;
+    }
+}
+
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {
     pub kind: BindingKind<'a>,
@@ -241,6 +250,8 @@ pub struct Binding<'a> {
     /// (e.g.) `__future__` imports, explicit re-exports, and other bindings
     /// that should be considered used even if they're never referenced.
     pub synthetic_usage: Option<(ScopeId, Range)>,
+    /// The exceptions that were handled when the binding was defined.
+    pub exceptions: Exceptions,
 }
 
 impl<'a> Binding<'a> {
@@ -273,26 +284,45 @@ impl<'a> Binding<'a> {
 
     pub fn redefines(&self, existing: &'a Binding) -> bool {
         match &self.kind {
-            BindingKind::Importation(.., full_name) => {
-                if let BindingKind::SubmoduleImportation(.., existing) = &existing.kind {
+            BindingKind::Importation(Importation { full_name, .. }) => {
+                if let BindingKind::SubmoduleImportation(SubmoduleImportation {
+                    full_name: existing,
+                    ..
+                }) = &existing.kind
+                {
                     return full_name == existing;
                 }
             }
-            BindingKind::FromImportation(.., full_name) => {
-                if let BindingKind::SubmoduleImportation(.., existing) = &existing.kind {
+            BindingKind::FromImportation(FromImportation { full_name, .. }) => {
+                if let BindingKind::SubmoduleImportation(SubmoduleImportation {
+                    full_name: existing,
+                    ..
+                }) = &existing.kind
+                {
                     return full_name == existing;
                 }
             }
-            BindingKind::SubmoduleImportation(.., full_name) => match &existing.kind {
-                BindingKind::Importation(.., existing)
-                | BindingKind::SubmoduleImportation(.., existing) => {
-                    return full_name == existing;
+            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => {
+                match &existing.kind {
+                    BindingKind::Importation(Importation {
+                        full_name: existing,
+                        ..
+                    })
+                    | BindingKind::SubmoduleImportation(SubmoduleImportation {
+                        full_name: existing,
+                        ..
+                    }) => {
+                        return full_name == existing;
+                    }
+                    BindingKind::FromImportation(FromImportation {
+                        full_name: existing,
+                        ..
+                    }) => {
+                        return full_name == existing;
+                    }
+                    _ => {}
                 }
-                BindingKind::FromImportation(.., existing) => {
-                    return full_name == existing;
-                }
-                _ => {}
-            },
+            }
             BindingKind::Annotation => {
                 return false;
             }
@@ -355,6 +385,54 @@ impl nohash_hasher::IsEnabled for BindingId {}
 //        StarImportation
 //        FutureImportation
 
+#[derive(Clone, Debug)]
+pub struct Export {
+    /// The names of the bindings exported via `__all__`.
+    pub names: Vec<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct StarImportation {
+    /// The level of the import. `None` or `Some(0)` indicate an absolute import.
+    pub level: Option<usize>,
+    /// The module being imported. `None` indicates a wildcard import.
+    pub module: Option<String>,
+}
+
+#[derive(Clone, Debug)]
+pub struct Importation<'a> {
+    /// The name to which the import is bound.
+    /// Given `import foo`, `name` would be "foo".
+    /// Given `import foo as bar`, `name` would be "bar".
+    pub name: &'a str,
+    /// The full name of the module being imported.
+    /// Given `import foo`, `full_name` would be "foo".
+    /// Given `import foo as bar`, `full_name` would be "foo".
+    pub full_name: &'a str,
+}
+
+#[derive(Clone, Debug)]
+pub struct FromImportation<'a> {
+    /// The name to which the import is bound.
+    /// Given `from foo import bar`, `name` would be "bar".
+    /// Given `from foo import bar as baz`, `name` would be "baz".
+    pub name: &'a str,
+    /// The full name of the module being imported.
+    /// Given `from foo import bar`, `full_name` would be "foo.bar".
+    /// Given `from foo import bar as baz`, `full_name` would be "foo.bar".
+    pub full_name: String,
+}
+
+#[derive(Clone, Debug)]
+pub struct SubmoduleImportation<'a> {
+    /// The parent module imported by the submodule import.
+    /// Given `import foo.bar`, `module` would be "foo".
+    pub name: &'a str,
+    /// The full name of the submodule being imported.
+    /// Given `import foo.bar`, `full_name` would be "foo.bar".
+    pub full_name: &'a str,
+}
+
 #[derive(Clone, Debug, is_macro::Is)]
 pub enum BindingKind<'a> {
     Annotation,
@@ -367,12 +445,12 @@ pub enum BindingKind<'a> {
     Builtin,
     ClassDefinition,
     FunctionDefinition,
-    Export(Vec<String>),
+    Export(Export),
     FutureImportation,
-    StarImportation(Option<usize>, Option<String>),
-    Importation(&'a str, &'a str),
-    FromImportation(&'a str, String),
-    SubmoduleImportation(&'a str, &'a str),
+    StarImportation(StarImportation),
+    Importation(Importation<'a>),
+    FromImportation(FromImportation<'a>),
+    SubmoduleImportation(SubmoduleImportation<'a>),
 }
 
 /// The bindings in a program.

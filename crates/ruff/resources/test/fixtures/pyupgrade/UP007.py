@@ -46,3 +46,8 @@ def f(x: Union[("str", "int"), float]) -> None:
 def f() -> None:
     x: Optional[str]
     x = Optional[str]
+
+    x = Union[str, int]
+    x = Union["str", "int"]
+    x: Union[str, int]
+    x: Union["str", "int"]

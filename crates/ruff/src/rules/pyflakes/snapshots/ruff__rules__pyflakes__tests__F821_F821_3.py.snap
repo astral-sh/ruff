@@ -9,10 +9,10 @@ expression: diagnostics
     fixable: false
   location:
     row: 11
-    column: 8
+    column: 9
   end_location:
     row: 11
-    column: 13
+    column: 12
   fix: ~
   parent: ~
 - kind:
@@ -22,10 +22,10 @@ expression: diagnostics
     fixable: false
   location:
     row: 11
-    column: 15
+    column: 16
   end_location:
     row: 11
-    column: 22
+    column: 21
   fix: ~
   parent: ~
 

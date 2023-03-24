@@ -6,7 +6,6 @@ use log::error;
 use nohash_hasher::IntMap;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_common::cformat::{CFormatError, CFormatErrorType};
-use rustpython_parser as parser;
 use rustpython_parser::ast::{
     Arg, Arguments, Comprehension, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprContext,
     ExprKind, KeywordData, Located, Location, Operator, Pattern, PatternKind, Stmt, StmtKind,
@@ -15,18 +14,18 @@ use rustpython_parser::ast::{
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::context::Context;
-use ruff_python_ast::helpers::{
-    binding_range, extract_handled_exceptions, to_module_path, Exceptions,
-};
+use ruff_python_ast::helpers::{binding_range, extract_handled_exceptions, to_module_path};
 use ruff_python_ast::operations::{extract_all_names, AllNamesFlags};
-use ruff_python_ast::relocate::relocate_expr;
 use ruff_python_ast::scope::{
-    Binding, BindingId, BindingKind, ClassDef, ExecutionContext, FunctionDef, Lambda, Scope,
-    ScopeId, ScopeKind, ScopeStack,
+    Binding, BindingId, BindingKind, ClassDef, Exceptions, ExecutionContext, Export,
+    FromImportation, FunctionDef, Importation, Lambda, Scope, ScopeId, ScopeKind, ScopeStack,
+    StarImportation, SubmoduleImportation,
 };
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::types::{Node, Range, RefEquality};
-use ruff_python_ast::typing::{match_annotated_subscript, Callable, SubscriptKind};
+use ruff_python_ast::typing::{
+    match_annotated_subscript, parse_type_annotation, Callable, SubscriptKind,
+};
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
 use ruff_python_ast::{
     branch_detection, cast, helpers, operations, str, typing, visibility, visitor,
@@ -198,6 +197,7 @@ where
                 if !scope_index.is_global() {
                     // Add the binding to the current scope.
                     let context = self.ctx.execution_context();
+                    let exceptions = self.ctx.exceptions();
                     let scope = &mut self.ctx.scopes[scope_index];
                     let usage = Some((scope.id, Range::from(stmt)));
                     for (name, range) in names.iter().zip(ranges.iter()) {
@@ -209,6 +209,7 @@ where
                             range: *range,
                             source: Some(RefEquality(stmt)),
                             context,
+                            exceptions,
                         });
                         scope.add(name, id);
                     }
@@ -226,6 +227,7 @@ where
                 let ranges: Vec<Range> = helpers::find_names(stmt, self.locator).collect();
                 if !scope_index.is_global() {
                     let context = self.ctx.execution_context();
+                    let exceptions = self.ctx.exceptions();
                     let scope = &mut self.ctx.scopes[scope_index];
                     let usage = Some((scope.id, Range::from(stmt)));
                     for (name, range) in names.iter().zip(ranges.iter()) {
@@ -238,6 +240,7 @@ where
                             range: *range,
                             source: Some(RefEquality(stmt)),
                             context,
+                            exceptions,
                         });
                         scope.add(name, id);
                     }
@@ -415,10 +418,6 @@ where
                     && self.settings.target_version >= PythonVersion::Py39
                 {
                     pyupgrade::rules::lru_cache_with_maxsize_none(self, decorator_list);
-                }
-
-                if self.settings.rules.enabled(Rule::UselessExpression) {
-                    flake8_bugbear::rules::useless_expression(self, body);
                 }
 
                 if self.settings.rules.enabled(Rule::CachedInstanceMethod) {
@@ -639,7 +638,6 @@ where
                     self.visit_expr(expr);
                 }
 
-                let context = self.ctx.execution_context();
                 self.add_binding(
                     name,
                     Binding {
@@ -649,7 +647,8 @@ where
                         typing_usage: None,
                         range: Range::from(stmt),
                         source: Some(self.ctx.current_stmt().clone()),
-                        context,
+                        context: self.ctx.execution_context(),
+                        exceptions: self.ctx.exceptions(),
                     },
                 );
             }
@@ -708,6 +707,13 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::DjangoUnorderedBodyContentInModel)
+                {
+                    flake8_django::rules::unordered_body_content_in_model(self, bases, body);
+                }
                 if self.settings.rules.enabled(Rule::GlobalStatement) {
                     pylint::rules::global_statement(self, name);
                 }
@@ -744,10 +750,6 @@ where
                     ) {
                         self.diagnostics.push(diagnostic);
                     }
-                }
-
-                if self.settings.rules.enabled(Rule::UselessExpression) {
-                    flake8_bugbear::rules::useless_expression(self, body);
                 }
 
                 if !self.is_stub {
@@ -827,14 +829,6 @@ where
                     pyupgrade::rules::deprecated_mock_import(self, stmt);
                 }
 
-                // If a module is imported within a `ModuleNotFoundError` body, treat that as a
-                // synthetic usage.
-                let is_handled = self
-                    .ctx
-                    .handled_exceptions
-                    .iter()
-                    .any(|exceptions| exceptions.contains(Exceptions::MODULE_NOT_FOUND_ERROR));
-
                 for alias in names {
                     if alias.node.name == "__future__" {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
@@ -849,6 +843,7 @@ where
                                 range: Range::from(alias),
                                 source: Some(self.ctx.current_stmt().clone()),
                                 context: self.ctx.execution_context(),
+                                exceptions: self.ctx.exceptions(),
                             },
                         );
 
@@ -868,17 +863,17 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::SubmoduleImportation(name, full_name),
+                                kind: BindingKind::SubmoduleImportation(SubmoduleImportation {
+                                    name,
+                                    full_name,
+                                }),
                                 runtime_usage: None,
-                                synthetic_usage: if is_handled {
-                                    Some((self.ctx.scope_id(), Range::from(alias)))
-                                } else {
-                                    None
-                                },
+                                synthetic_usage: None,
                                 typing_usage: None,
                                 range: Range::from(alias),
                                 source: Some(self.ctx.current_stmt().clone()),
                                 context: self.ctx.execution_context(),
+                                exceptions: self.ctx.exceptions(),
                             },
                         );
                     } else {
@@ -890,17 +885,14 @@ where
                             .as_ref()
                             .map_or(false, |asname| asname == &alias.node.name);
 
-                        // Given `import foo`, `name` and `full_name` would both be `foo`.
-                        // Given `import foo as bar`, `name` would be `bar` and `full_name` would
-                        // be `foo`.
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
                         let full_name = &alias.node.name;
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::Importation(name, full_name),
+                                kind: BindingKind::Importation(Importation { name, full_name }),
                                 runtime_usage: None,
-                                synthetic_usage: if is_handled || is_explicit_reexport {
+                                synthetic_usage: if is_explicit_reexport {
                                     Some((self.ctx.scope_id(), Range::from(alias)))
                                 } else {
                                     None
@@ -909,6 +901,7 @@ where
                                 range: Range::from(alias),
                                 source: Some(self.ctx.current_stmt().clone()),
                                 context: self.ctx.execution_context(),
+                                exceptions: self.ctx.exceptions(),
                             },
                         );
 
@@ -1153,14 +1146,6 @@ where
                     }
                 }
 
-                // If a module is imported within a `ModuleNotFoundError` body, treat that as a
-                // synthetic usage.
-                let is_handled = self
-                    .ctx
-                    .handled_exceptions
-                    .iter()
-                    .any(|exceptions| exceptions.contains(Exceptions::MODULE_NOT_FOUND_ERROR));
-
                 for alias in names {
                     if let Some("__future__") = module.as_deref() {
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
@@ -1175,6 +1160,7 @@ where
                                 range: Range::from(alias),
                                 source: Some(self.ctx.current_stmt().clone()),
                                 context: self.ctx.execution_context(),
+                                exceptions: self.ctx.exceptions(),
                             },
                         );
 
@@ -1198,17 +1184,17 @@ where
                         self.add_binding(
                             "*",
                             Binding {
-                                kind: BindingKind::StarImportation(*level, module.clone()),
+                                kind: BindingKind::StarImportation(StarImportation {
+                                    level: *level,
+                                    module: module.clone(),
+                                }),
                                 runtime_usage: None,
-                                synthetic_usage: if is_handled {
-                                    Some((self.ctx.scope_id(), Range::from(alias)))
-                                } else {
-                                    None
-                                },
+                                synthetic_usage: None,
                                 typing_usage: None,
                                 range: Range::from(stmt),
                                 source: Some(self.ctx.current_stmt().clone()),
                                 context: self.ctx.execution_context(),
+                                exceptions: self.ctx.exceptions(),
                             },
                         );
 
@@ -1274,18 +1260,21 @@ where
                         self.add_binding(
                             name,
                             Binding {
-                                kind: BindingKind::FromImportation(name, full_name),
+                                kind: BindingKind::FromImportation(FromImportation {
+                                    name,
+                                    full_name,
+                                }),
                                 runtime_usage: None,
-                                synthetic_usage: if is_handled || is_explicit_reexport {
+                                synthetic_usage: if is_explicit_reexport {
                                     Some((self.ctx.scope_id(), Range::from(alias)))
                                 } else {
                                     None
                                 },
                                 typing_usage: None,
                                 range: Range::from(alias),
-
                                 source: Some(self.ctx.current_stmt().clone()),
                                 context: self.ctx.execution_context(),
+                                exceptions: self.ctx.exceptions(),
                             },
                         );
                     }
@@ -1711,8 +1700,8 @@ where
                         flake8_pytest_style::rules::assert_in_exception_handler(handlers),
                     );
                 }
-                if self.settings.rules.enabled(Rule::UseContextlibSuppress) {
-                    flake8_simplify::rules::use_contextlib_suppress(
+                if self.settings.rules.enabled(Rule::SuppressibleException) {
+                    flake8_simplify::rules::suppressible_exception(
                         self, stmt, body, handlers, orelse, finalbody,
                     );
                 }
@@ -1833,6 +1822,9 @@ where
                 if self.settings.rules.enabled(Rule::UselessComparison) {
                     flake8_bugbear::rules::useless_comparison(self, value);
                 }
+                if self.settings.rules.enabled(Rule::UselessExpression) {
+                    flake8_bugbear::rules::useless_expression(self, value);
+                }
                 if self
                     .settings
                     .rules
@@ -1907,6 +1899,7 @@ where
                             range: Range::from(stmt),
                             source: Some(RefEquality(stmt)),
                             context: self.ctx.execution_context(),
+                            exceptions: self.ctx.exceptions(),
                         });
                         self.ctx.global_scope_mut().add(name, id);
                     }
@@ -1969,6 +1962,7 @@ where
                             range: Range::from(*stmt),
                             source: Some(RefEquality(stmt)),
                             context: self.ctx.execution_context(),
+                            exceptions: self.ctx.exceptions(),
                         });
                         self.ctx.global_scope_mut().add(name, id);
                     }
@@ -2118,6 +2112,7 @@ where
                         range: Range::from(stmt),
                         source: Some(self.ctx.current_stmt().clone()),
                         context: self.ctx.execution_context(),
+                        exceptions: self.ctx.exceptions(),
                     },
                 );
             }
@@ -2135,7 +2130,9 @@ where
     }
 
     fn visit_expr(&mut self, expr: &'b Expr) {
-        if !(self.ctx.in_deferred_type_definition || self.ctx.in_deferred_string_type_definition)
+        if !self.ctx.in_f_string
+            && !self.ctx.in_deferred_type_definition
+            && self.ctx.in_deferred_string_type_definition.is_none()
             && self.ctx.in_type_definition
             && self.ctx.annotations_future_enabled
         {
@@ -2260,9 +2257,9 @@ where
                 if self
                     .settings
                     .rules
-                    .enabled(Rule::UsePriorToGlobalDeclaration)
+                    .enabled(Rule::LoadBeforeGlobalDeclaration)
                 {
-                    pylint::rules::use_prior_to_global_declaration(self, id, expr);
+                    pylint::rules::load_before_global_declaration(self, id, expr);
                 }
             }
             ExprKind::Attribute {
@@ -2446,6 +2443,33 @@ where
                     .any_enabled(&[Rule::Print, Rule::PPrint])
                 {
                     flake8_print::rules::print_call(self, func, keywords);
+                }
+
+                // flake8-bandit
+                if self.settings.rules.any_enabled(&[
+                    Rule::SuspiciousPickleUsage,
+                    Rule::SuspiciousMarshalUsage,
+                    Rule::SuspiciousInsecureHashUsage,
+                    Rule::SuspiciousInsecureCipherUsage,
+                    Rule::SuspiciousInsecureCipherModeUsage,
+                    Rule::SuspiciousMktempUsage,
+                    Rule::SuspiciousEvalUsage,
+                    Rule::SuspiciousMarkSafeUsage,
+                    Rule::SuspiciousURLOpenUsage,
+                    Rule::SuspiciousNonCryptographicRandomUsage,
+                    Rule::SuspiciousXMLCElementTreeUsage,
+                    Rule::SuspiciousXMLElementTreeUsage,
+                    Rule::SuspiciousXMLExpatReaderUsage,
+                    Rule::SuspiciousXMLExpatBuilderUsage,
+                    Rule::SuspiciousXMLSaxUsage,
+                    Rule::SuspiciousXMLMiniDOMUsage,
+                    Rule::SuspiciousXMLPullDOMUsage,
+                    Rule::SuspiciousXMLETreeUsage,
+                    Rule::SuspiciousUnverifiedContextUsage,
+                    Rule::SuspiciousTelnetUsage,
+                    Rule::SuspiciousFTPLibUsage,
+                ]) {
+                    flake8_bandit::rules::suspicious_function_call(self, expr);
                 }
 
                 // flake8-bugbear
@@ -2856,30 +2880,30 @@ where
 
                 // flake8-use-pathlib
                 if self.settings.rules.any_enabled(&[
-                    Rule::PathlibAbspath,
-                    Rule::PathlibChmod,
-                    Rule::PathlibMkdir,
-                    Rule::PathlibMakedirs,
-                    Rule::PathlibRename,
+                    Rule::OsPathAbspath,
+                    Rule::OsChmod,
+                    Rule::OsMkdir,
+                    Rule::OsMakedirs,
+                    Rule::OsRename,
                     Rule::PathlibReplace,
-                    Rule::PathlibRmdir,
-                    Rule::PathlibRemove,
-                    Rule::PathlibUnlink,
-                    Rule::PathlibGetcwd,
-                    Rule::PathlibExists,
-                    Rule::PathlibExpanduser,
-                    Rule::PathlibIsDir,
-                    Rule::PathlibIsFile,
-                    Rule::PathlibIsLink,
-                    Rule::PathlibReadlink,
-                    Rule::PathlibStat,
-                    Rule::PathlibIsAbs,
-                    Rule::PathlibJoin,
-                    Rule::PathlibBasename,
-                    Rule::PathlibSamefile,
-                    Rule::PathlibSplitext,
-                    Rule::PathlibOpen,
-                    Rule::PathlibPyPath,
+                    Rule::OsRmdir,
+                    Rule::OsRemove,
+                    Rule::OsUnlink,
+                    Rule::OsGetcwd,
+                    Rule::OsPathExists,
+                    Rule::OsPathExpanduser,
+                    Rule::OsPathIsdir,
+                    Rule::OsPathIsfile,
+                    Rule::OsPathIslink,
+                    Rule::OsReadlink,
+                    Rule::OsStat,
+                    Rule::OsPathIsabs,
+                    Rule::OsPathJoin,
+                    Rule::OsPathBasename,
+                    Rule::OsPathSamefile,
+                    Rule::OsPathSplitext,
+                    Rule::BuiltinOpen,
+                    Rule::PyPath,
                 ]) {
                     flake8_use_pathlib::helpers::replaceable_by_pathlib(self, func);
                 }
@@ -3264,7 +3288,7 @@ where
                 value: Constant::Str(value),
                 kind,
             } => {
-                if self.ctx.in_type_definition && !self.ctx.in_literal {
+                if self.ctx.in_type_definition && !self.ctx.in_literal && !self.ctx.in_f_string {
                     self.deferred.string_type_definitions.push((
                         Range::from(expr),
                         value,
@@ -3402,9 +3426,7 @@ where
                 keywords,
             } => {
                 let callable = self.ctx.resolve_call_path(func).and_then(|call_path| {
-                    if self.ctx.match_typing_call_path(&call_path, "ForwardRef") {
-                        Some(Callable::ForwardRef)
-                    } else if self.ctx.match_typing_call_path(&call_path, "cast") {
+                    if self.ctx.match_typing_call_path(&call_path, "cast") {
                         Some(Callable::Cast)
                     } else if self.ctx.match_typing_call_path(&call_path, "NewType") {
                         Some(Callable::NewType)
@@ -3431,12 +3453,6 @@ where
                     }
                 });
                 match callable {
-                    Some(Callable::ForwardRef) => {
-                        self.visit_expr(func);
-                        for expr in args {
-                            visit_type_definition!(self, expr);
-                        }
-                    }
                     Some(Callable::Cast) => {
                         self.visit_expr(func);
                         if !args.is_empty() {
@@ -3613,7 +3629,10 @@ where
                 self.ctx.in_subscript = prev_in_subscript;
             }
             ExprKind::JoinedStr { .. } => {
+                let prev_in_f_string = self.ctx.in_f_string;
+                self.ctx.in_f_string = true;
                 visitor::walk_expr(self, expr);
+                self.ctx.in_f_string = prev_in_f_string;
             }
             _ => visitor::walk_expr(self, expr),
         }
@@ -3709,6 +3728,10 @@ where
                 }
                 if self.settings.rules.enabled(Rule::ReraiseNoCause) {
                     tryceratops::rules::reraise_no_cause(self, body);
+                }
+
+                if self.settings.rules.enabled(Rule::BinaryOpException) {
+                    pylint::rules::binary_op_exception(self, excepthandler);
                 }
                 match name {
                     Some(name) => {
@@ -3871,6 +3894,7 @@ where
                 range: Range::from(arg),
                 source: Some(self.ctx.current_stmt().clone()),
                 context: self.ctx.execution_context(),
+                exceptions: self.ctx.exceptions(),
             },
         );
 
@@ -3914,6 +3938,7 @@ where
                     range: Range::from(pattern),
                     source: Some(self.ctx.current_stmt().clone()),
                     context: self.ctx.execution_context(),
+                    exceptions: self.ctx.exceptions(),
                 },
             );
         }
@@ -4092,6 +4117,7 @@ impl<'a> Checker<'a> {
                 typing_usage: None,
                 source: None,
                 context: ExecutionContext::Runtime,
+                exceptions: Exceptions::empty(),
             });
             scope.add(builtin, id);
         }
@@ -4124,7 +4150,7 @@ impl<'a> Checker<'a> {
                 self.ctx.bindings[*index].mark_used(scope_id, Range::from(expr), context);
 
                 if self.ctx.bindings[*index].kind.is_annotation()
-                    && !self.ctx.in_deferred_string_type_definition
+                    && self.ctx.in_deferred_string_type_definition.is_none()
                     && !self.ctx.in_deferred_type_definition
                 {
                     continue;
@@ -4139,8 +4165,9 @@ impl<'a> Checker<'a> {
                 //   import pyarrow.csv
                 //   print(pa.csv.read_csv("test.csv"))
                 match &self.ctx.bindings[*index].kind {
-                    BindingKind::Importation(name, full_name)
-                    | BindingKind::SubmoduleImportation(name, full_name) => {
+                    BindingKind::Importation(Importation { name, full_name })
+                    | BindingKind::SubmoduleImportation(SubmoduleImportation { name, full_name }) =>
+                    {
                         let has_alias = full_name
                             .split('.')
                             .last()
@@ -4157,7 +4184,7 @@ impl<'a> Checker<'a> {
                             }
                         }
                     }
-                    BindingKind::FromImportation(name, full_name) => {
+                    BindingKind::FromImportation(FromImportation { name, full_name }) => {
                         let has_alias = full_name
                             .split('.')
                             .last()
@@ -4195,7 +4222,9 @@ impl<'a> Checker<'a> {
                 for scope_index in self.ctx.scope_stack.iter() {
                     let scope = &self.ctx.scopes[*scope_index];
                     for binding in scope.binding_ids().map(|index| &self.ctx.bindings[*index]) {
-                        if let BindingKind::StarImportation(level, module) = &binding.kind {
+                        if let BindingKind::StarImportation(StarImportation { level, module }) =
+                            &binding.kind
+                        {
                             from_list.push(helpers::format_import_from(
                                 level.as_ref(),
                                 module.as_deref(),
@@ -4316,6 +4345,7 @@ impl<'a> Checker<'a> {
                     range: Range::from(expr),
                     source: Some(self.ctx.current_stmt().clone()),
                     context: self.ctx.execution_context(),
+                    exceptions: self.ctx.exceptions(),
                 },
             );
             return;
@@ -4336,6 +4366,7 @@ impl<'a> Checker<'a> {
                     range: Range::from(expr),
                     source: Some(self.ctx.current_stmt().clone()),
                     context: self.ctx.execution_context(),
+                    exceptions: self.ctx.exceptions(),
                 },
             );
             return;
@@ -4352,6 +4383,7 @@ impl<'a> Checker<'a> {
                     range: Range::from(expr),
                     source: Some(self.ctx.current_stmt().clone()),
                     context: self.ctx.execution_context(),
+                    exceptions: self.ctx.exceptions(),
                 },
             );
             return;
@@ -4410,13 +4442,14 @@ impl<'a> Checker<'a> {
                 self.add_binding(
                     id,
                     Binding {
-                        kind: BindingKind::Export(all_names),
+                        kind: BindingKind::Export(Export { names: all_names }),
                         runtime_usage: None,
                         synthetic_usage: None,
                         typing_usage: None,
                         range: Range::from(expr),
                         source: Some(self.ctx.current_stmt().clone()),
                         context: self.ctx.execution_context(),
+                        exceptions: self.ctx.exceptions(),
                     },
                 );
                 return;
@@ -4433,6 +4466,7 @@ impl<'a> Checker<'a> {
                 range: Range::from(expr),
                 source: Some(self.ctx.current_stmt().clone()),
                 context: self.ctx.execution_context(),
+                exceptions: self.ctx.exceptions(),
             },
         );
     }
@@ -4508,20 +4542,19 @@ impl<'a> Checker<'a> {
     where
         'b: 'a,
     {
-        let mut stacks = vec![];
+        let mut stacks = Vec::with_capacity(self.deferred.string_type_definitions.len());
         self.deferred.string_type_definitions.reverse();
-        while let Some((range, expression, (in_annotation, in_type_checking_block), deferral)) =
+        while let Some((range, value, (in_annotation, in_type_checking_block), deferral)) =
             self.deferred.string_type_definitions.pop()
         {
-            if let Ok(mut expr) = parser::parse_expression(expression, "<filename>") {
+            if let Ok((expr, kind)) = parse_type_annotation(value, range, self.locator) {
                 if in_annotation && self.ctx.annotations_future_enabled {
                     if self.settings.rules.enabled(Rule::QuotedAnnotation) {
-                        pyupgrade::rules::quoted_annotation(self, expression, range);
+                        pyupgrade::rules::quoted_annotation(self, value, range);
                     }
                 }
-                relocate_expr(&mut expr, range);
                 allocator.push(expr);
-                stacks.push(((in_annotation, in_type_checking_block), deferral));
+                stacks.push((kind, (in_annotation, in_type_checking_block), deferral));
             } else {
                 if self
                     .settings
@@ -4530,14 +4563,14 @@ impl<'a> Checker<'a> {
                 {
                     self.diagnostics.push(Diagnostic::new(
                         pyflakes::rules::ForwardAnnotationSyntaxError {
-                            body: expression.to_string(),
+                            body: value.to_string(),
                         },
                         range,
                     ));
                 }
             }
         }
-        for (expr, ((in_annotation, in_type_checking_block), (scopes, parents))) in
+        for (expr, (kind, (in_annotation, in_type_checking_block), (scopes, parents))) in
             allocator.iter().zip(stacks)
         {
             self.ctx.scope_stack = scopes;
@@ -4545,9 +4578,9 @@ impl<'a> Checker<'a> {
             self.ctx.in_annotation = in_annotation;
             self.ctx.in_type_checking_block = in_type_checking_block;
             self.ctx.in_type_definition = true;
-            self.ctx.in_deferred_string_type_definition = true;
+            self.ctx.in_deferred_string_type_definition = Some(kind);
             self.visit_expr(expr);
-            self.ctx.in_deferred_string_type_definition = false;
+            self.ctx.in_deferred_string_type_definition = None;
             self.ctx.in_type_definition = false;
         }
     }
@@ -4672,7 +4705,7 @@ impl<'a> Checker<'a> {
                 .get("__all__")
                 .map(|index| &self.ctx.bindings[*index])
                 .and_then(|binding| match &binding.kind {
-                    BindingKind::Export(names) => Some((names, binding.range)),
+                    BindingKind::Export(Export { names }) => Some((names, binding.range)),
                     _ => None,
                 });
 
@@ -4704,7 +4737,7 @@ impl<'a> Checker<'a> {
             .get("__all__")
             .map(|index| &self.ctx.bindings[*index])
             .and_then(|binding| match &binding.kind {
-                BindingKind::Export(names) => {
+                BindingKind::Export(Export { names }) => {
                     Some((names.iter().map(String::as_str).collect(), binding.range))
                 }
                 _ => None,
@@ -4826,7 +4859,9 @@ impl<'a> Checker<'a> {
                     if let Some((names, range)) = &all_names {
                         let mut from_list = vec![];
                         for binding in scope.binding_ids().map(|index| &self.ctx.bindings[*index]) {
-                            if let BindingKind::StarImportation(level, module) = &binding.kind {
+                            if let BindingKind::StarImportation(StarImportation { level, module }) =
+                                &binding.kind
+                            {
                                 from_list.push(helpers::format_import_from(
                                     level.as_ref(),
                                     module.as_deref(),
@@ -4891,8 +4926,11 @@ impl<'a> Checker<'a> {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
                 type UnusedImport<'a> = (&'a str, &'a Range);
-                type BindingContext<'a, 'b> =
-                    (&'a RefEquality<'b, Stmt>, Option<&'a RefEquality<'b, Stmt>>);
+                type BindingContext<'a, 'b> = (
+                    &'a RefEquality<'b, Stmt>,
+                    Option<&'a RefEquality<'b, Stmt>>,
+                    Exceptions,
+                );
 
                 let mut unused: FxHashMap<BindingContext, Vec<UnusedImport>> = FxHashMap::default();
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
@@ -4902,9 +4940,14 @@ impl<'a> Checker<'a> {
                     let binding = &self.ctx.bindings[*index];
 
                     let full_name = match &binding.kind {
-                        BindingKind::Importation(.., full_name) => full_name,
-                        BindingKind::FromImportation(.., full_name) => full_name.as_str(),
-                        BindingKind::SubmoduleImportation(.., full_name) => full_name,
+                        BindingKind::Importation(Importation { full_name, .. }) => full_name,
+                        BindingKind::FromImportation(FromImportation { full_name, .. }) => {
+                            full_name.as_str()
+                        }
+                        BindingKind::SubmoduleImportation(SubmoduleImportation {
+                            full_name,
+                            ..
+                        }) => full_name,
                         _ => continue,
                     };
 
@@ -4914,6 +4957,7 @@ impl<'a> Checker<'a> {
 
                     let defined_by = binding.source.as_ref().unwrap();
                     let defined_in = self.ctx.child_to_parent.get(defined_by);
+                    let exceptions = binding.exceptions;
                     let child: &Stmt = defined_by.into();
 
                     let diagnostic_lineno = binding.range.location.row();
@@ -4931,27 +4975,30 @@ impl<'a> Checker<'a> {
                         })
                     {
                         ignored
-                            .entry((defined_by, defined_in))
+                            .entry((defined_by, defined_in, exceptions))
                             .or_default()
                             .push((full_name, &binding.range));
                     } else {
                         unused
-                            .entry((defined_by, defined_in))
+                            .entry((defined_by, defined_in, exceptions))
                             .or_default()
                             .push((full_name, &binding.range));
                     }
                 }
 
-                let ignore_init =
+                let in_init =
                     self.settings.ignore_init_module_imports && self.path.ends_with("__init__.py");
-                for ((defined_by, defined_in), unused_imports) in unused
+                for ((defined_by, defined_in, exceptions), unused_imports) in unused
                     .into_iter()
-                    .sorted_by_key(|((defined_by, _), _)| defined_by.location)
+                    .sorted_by_key(|((defined_by, ..), ..)| defined_by.location)
                 {
                     let child: &Stmt = defined_by.into();
                     let parent: Option<&Stmt> = defined_in.map(Into::into);
+                    let multiple = unused_imports.len() > 1;
+                    let in_except_handler = exceptions
+                        .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
 
-                    let fix = if !ignore_init && self.patch(Rule::UnusedImport) {
+                    let fix = if !in_init && !in_except_handler && self.patch(Rule::UnusedImport) {
                         let deleted: Vec<&Stmt> = self.deletions.iter().map(Into::into).collect();
                         match autofix::helpers::remove_unused_imports(
                             unused_imports.iter().map(|(full_name, _)| *full_name),
@@ -4977,12 +5024,17 @@ impl<'a> Checker<'a> {
                         None
                     };
 
-                    let multiple = unused_imports.len() > 1;
                     for (full_name, range) in unused_imports {
                         let mut diagnostic = Diagnostic::new(
                             pyflakes::rules::UnusedImport {
                                 name: full_name.to_string(),
-                                ignore_init,
+                                context: if in_except_handler {
+                                    Some(pyflakes::rules::UnusedImportContext::ExceptHandler)
+                                } else if in_init {
+                                    Some(pyflakes::rules::UnusedImportContext::Init)
+                                } else {
+                                    None
+                                },
                                 multiple,
                             },
                             *range,
@@ -4998,17 +5050,25 @@ impl<'a> Checker<'a> {
                         diagnostics.push(diagnostic);
                     }
                 }
-                for ((defined_by, ..), unused_imports) in ignored
+                for ((defined_by, .., exceptions), unused_imports) in ignored
                     .into_iter()
-                    .sorted_by_key(|((defined_by, _), _)| defined_by.location)
+                    .sorted_by_key(|((defined_by, ..), ..)| defined_by.location)
                 {
                     let child: &Stmt = defined_by.into();
                     let multiple = unused_imports.len() > 1;
+                    let in_except_handler = exceptions
+                        .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
                     for (full_name, range) in unused_imports {
                         let mut diagnostic = Diagnostic::new(
                             pyflakes::rules::UnusedImport {
                                 name: full_name.to_string(),
-                                ignore_init,
+                                context: if in_except_handler {
+                                    Some(pyflakes::rules::UnusedImportContext::ExceptHandler)
+                                } else if in_init {
+                                    Some(pyflakes::rules::UnusedImportContext::Init)
+                                } else {
+                                    None
+                                },
                                 multiple,
                             },
                             *range,
@@ -5160,7 +5220,8 @@ impl<'a> Checker<'a> {
                     continue;
                 }
 
-                let body = str::raw_contents(contents);
+                // SAFETY: Safe for docstrings that pass `should_ignore_docstring`.
+                let body = str::raw_contents(contents).unwrap();
                 let docstring = Docstring {
                     kind: definition.kind,
                     expr,

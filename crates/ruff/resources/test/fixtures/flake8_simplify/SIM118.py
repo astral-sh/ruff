@@ -20,3 +20,5 @@ for key in list(obj.keys()):
 {k: k for k in obj.keys()}  # SIM118
 
 (k for k in obj.keys())  # SIM118
+
+key in (obj or {}).keys()  # SIM118

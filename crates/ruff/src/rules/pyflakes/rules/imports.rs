@@ -9,46 +9,52 @@ use ruff_python_stdlib::future::ALL_FEATURE_NAMES;
 
 use crate::checkers::ast::Checker;
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum UnusedImportContext {
+    ExceptHandler,
+    Init,
+}
+
 #[violation]
 pub struct UnusedImport {
     pub name: String,
-    pub ignore_init: bool,
+    pub context: Option<UnusedImportContext>,
     pub multiple: bool,
 }
 
-fn fmt_unused_import_autofix_msg(unused_import: &UnusedImport) -> String {
-    let UnusedImport { name, multiple, .. } = unused_import;
-    if *multiple {
-        "Remove unused import".to_string()
-    } else {
-        format!("Remove unused import: `{name}`")
-    }
-}
 impl Violation for UnusedImport {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnusedImport {
-            name, ignore_init, ..
-        } = self;
-        if *ignore_init {
-            format!(
-                "`{name}` imported but unused; consider adding to `__all__` or using a redundant \
-                 alias"
-            )
-        } else {
-            format!("`{name}` imported but unused")
+        let UnusedImport { name, context, .. } = self;
+        match context {
+            Some(UnusedImportContext::ExceptHandler) => {
+                format!(
+                    "`{name}` imported but unused; consider using `importlib.util.find_spec` to test for availability"
+                )
+            }
+            Some(UnusedImportContext::Init) => {
+                format!(
+                    "`{name}` imported but unused; consider adding to `__all__` or using a redundant \
+                     alias"
+                )
+            }
+            None => format!("`{name}` imported but unused"),
         }
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UnusedImport { ignore_init, .. } = self;
-        if *ignore_init {
-            None
-        } else {
-            Some(fmt_unused_import_autofix_msg)
-        }
+        let UnusedImport { context, .. } = self;
+        context
+            .is_none()
+            .then_some(|UnusedImport { name, multiple, .. }| {
+                if *multiple {
+                    "Remove unused import".to_string()
+                } else {
+                    format!("Remove unused import: `{name}`")
+                }
+            })
     }
 }
 #[violation]

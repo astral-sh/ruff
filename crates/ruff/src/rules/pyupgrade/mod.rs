@@ -38,6 +38,7 @@ mod tests {
     #[test_case(Rule::RedundantOpenModes, Path::new("UP015.py"); "UP015")]
     #[test_case(Rule::NativeLiterals, Path::new("UP018.py"); "UP018")]
     #[test_case(Rule::TypingTextStrAlias, Path::new("UP019.py"); "UP019")]
+    #[test_case(Rule::OpenAlias, Path::new("UP020.py"); "UP020")]
     #[test_case(Rule::ReplaceUniversalNewlines, Path::new("UP021.py"); "UP021")]
     #[test_case(Rule::ReplaceStdoutStderr, Path::new("UP022.py"); "UP022")]
     #[test_case(Rule::DeprecatedCElementTree, Path::new("UP023.py"); "UP023")]

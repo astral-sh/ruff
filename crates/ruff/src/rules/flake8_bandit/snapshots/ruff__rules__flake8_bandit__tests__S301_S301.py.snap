@@ -1,0 +1,18 @@
+---
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: SuspiciousPickleUsage
+    body: "`pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 14
+  fix: ~
+  parent: ~
+

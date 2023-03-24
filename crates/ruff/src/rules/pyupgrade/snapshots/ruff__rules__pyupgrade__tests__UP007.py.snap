@@ -145,67 +145,62 @@ expression: diagnostics
 - kind:
     name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
-    suggestion: ~
-    fixable: false
+    suggestion: "Convert to `X | Y`"
+    fixable: true
   location:
     row: 30
-    column: 9
+    column: 10
   end_location:
     row: 30
-    column: 47
-  fix: ~
+    column: 46
+  fix:
+    content: "str | int | Union[float, bytes]"
+    location:
+      row: 30
+      column: 10
+    end_location:
+      row: 30
+      column: 46
   parent: ~
 - kind:
     name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
-    suggestion: ~
-    fixable: false
+    suggestion: "Convert to `X | Y`"
+    fixable: true
   location:
     row: 30
-    column: 9
-  end_location:
-    row: 30
-    column: 47
-  fix: ~
-  parent: ~
-- kind:
-    name: NonPEP604Annotation
-    body: "Use `X | Y` for type annotations"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 34
-    column: 9
-  end_location:
-    row: 34
-    column: 33
-  fix: ~
-  parent: ~
-- kind:
-    name: NonPEP604Annotation
-    body: "Use `X | Y` for type annotations"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 9
-  end_location:
-    row: 38
     column: 26
-  fix: ~
+  end_location:
+    row: 30
+    column: 45
+  fix:
+    content: float | bytes
+    location:
+      row: 30
+      column: 26
+    end_location:
+      row: 30
+      column: 45
   parent: ~
 - kind:
     name: NonPEP604Annotation
     body: "Use `X | Y` for type annotations"
-    suggestion: ~
-    fixable: false
+    suggestion: "Convert to `X | Y`"
+    fixable: true
   location:
-    row: 42
-    column: 9
+    row: 34
+    column: 10
   end_location:
-    row: 42
-    column: 37
-  fix: ~
+    row: 34
+    column: 32
+  fix:
+    content: str | int
+    location:
+      row: 34
+      column: 10
+    end_location:
+      row: 34
+      column: 32
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -226,5 +221,25 @@ expression: diagnostics
     end_location:
       row: 47
       column: 20
+  parent: ~
+- kind:
+    name: NonPEP604Annotation
+    body: "Use `X | Y` for type annotations"
+    suggestion: "Convert to `X | Y`"
+    fixable: true
+  location:
+    row: 52
+    column: 7
+  end_location:
+    row: 52
+    column: 22
+  fix:
+    content: str | int
+    location:
+      row: 52
+      column: 7
+    end_location:
+      row: 52
+      column: 22
   parent: ~
 

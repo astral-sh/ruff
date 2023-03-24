@@ -93,9 +93,18 @@ pub fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
         return;
     };
 
-    if !(args.len() > 1 && id == "zip" && checker.ctx.is_builtin(id)) {
+    // Require exactly two positional arguments.
+    if args.len() != 2 {
         return;
-    };
+    }
+
+    // Require the function to be the builtin `zip`.
+    if id != "zip" {
+        return;
+    }
+    if !checker.ctx.is_builtin(id) {
+        return;
+    }
 
     // Allow the first argument to be a `Name` or `Subscript`.
     let Some(first_arg_info) = ({

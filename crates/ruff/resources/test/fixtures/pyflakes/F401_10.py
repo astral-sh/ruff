@@ -1,10 +1,19 @@
-"""Test: imports within `ModuleNotFoundError` handlers."""
+"""Test: imports within `ModuleNotFoundError` and `ImportError` handlers."""
 
 
-def check_orjson():
+def module_not_found_error():
     try:
         import orjson
 
         return True
     except ModuleNotFoundError:
+        return False
+
+
+def import_error():
+    try:
+        import orjson
+
+        return True
+    except ImportError:
         return False

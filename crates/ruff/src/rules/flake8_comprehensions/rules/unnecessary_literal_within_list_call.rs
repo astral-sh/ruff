@@ -11,6 +11,29 @@ use crate::rules::flake8_comprehensions::fixes;
 
 use super::helpers;
 
+/// ## What it does
+/// Checks for `list` calls that take unnecessary list or tuple literals as
+/// arguments.
+///
+/// ## Why is it bad?
+/// It's unnecessary to use a list or tuple literal within a `list()` call,
+/// since there is a literal syntax for these types.
+///
+/// If a list literal is passed in, then the outer call to `list()` should be
+/// removed. Otherwise, if a tuple literal is passed in, then it should be
+/// rewritten as a `list` literal.
+///
+/// ## Examples
+/// ```python
+/// list([1, 2])
+/// list((1, 2))
+/// ```
+///
+/// Use instead:
+/// ```python
+/// [1, 2]
+/// [1, 2]
+/// ```
 #[violation]
 pub struct UnnecessaryLiteralWithinListCall {
     pub literal: String,

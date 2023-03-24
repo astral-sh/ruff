@@ -3,9 +3,9 @@ use ruff_macros::{derive_message_formats, violation};
 
 // PTH100
 #[violation]
-pub struct PathlibAbspath;
+pub struct OsPathAbspath;
 
-impl Violation for PathlibAbspath {
+impl Violation for OsPathAbspath {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.abspath()` should be replaced by `Path.resolve()`")
@@ -14,9 +14,9 @@ impl Violation for PathlibAbspath {
 
 // PTH101
 #[violation]
-pub struct PathlibChmod;
+pub struct OsChmod;
 
-impl Violation for PathlibChmod {
+impl Violation for OsChmod {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.chmod()` should be replaced by `Path.chmod()`")
@@ -25,9 +25,9 @@ impl Violation for PathlibChmod {
 
 // PTH102
 #[violation]
-pub struct PathlibMakedirs;
+pub struct OsMakedirs;
 
-impl Violation for PathlibMakedirs {
+impl Violation for OsMakedirs {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.makedirs()` should be replaced by `Path.mkdir(parents=True)`")
@@ -36,9 +36,9 @@ impl Violation for PathlibMakedirs {
 
 // PTH103
 #[violation]
-pub struct PathlibMkdir;
+pub struct OsMkdir;
 
-impl Violation for PathlibMkdir {
+impl Violation for OsMkdir {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.mkdir()` should be replaced by `Path.mkdir()`")
@@ -47,9 +47,9 @@ impl Violation for PathlibMkdir {
 
 // PTH104
 #[violation]
-pub struct PathlibRename;
+pub struct OsRename;
 
-impl Violation for PathlibRename {
+impl Violation for OsRename {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.rename()` should be replaced by `Path.rename()`")
@@ -69,9 +69,9 @@ impl Violation for PathlibReplace {
 
 // PTH106
 #[violation]
-pub struct PathlibRmdir;
+pub struct OsRmdir;
 
-impl Violation for PathlibRmdir {
+impl Violation for OsRmdir {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.rmdir()` should be replaced by `Path.rmdir()`")
@@ -80,9 +80,9 @@ impl Violation for PathlibRmdir {
 
 // PTH107
 #[violation]
-pub struct PathlibRemove;
+pub struct OsRemove;
 
-impl Violation for PathlibRemove {
+impl Violation for OsRemove {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.remove()` should be replaced by `Path.unlink()`")
@@ -91,9 +91,9 @@ impl Violation for PathlibRemove {
 
 // PTH108
 #[violation]
-pub struct PathlibUnlink;
+pub struct OsUnlink;
 
-impl Violation for PathlibUnlink {
+impl Violation for OsUnlink {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.unlink()` should be replaced by `Path.unlink()`")
@@ -102,9 +102,9 @@ impl Violation for PathlibUnlink {
 
 // PTH109
 #[violation]
-pub struct PathlibGetcwd;
+pub struct OsGetcwd;
 
-impl Violation for PathlibGetcwd {
+impl Violation for OsGetcwd {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.getcwd()` should be replaced by `Path.cwd()`")
@@ -113,9 +113,9 @@ impl Violation for PathlibGetcwd {
 
 // PTH110
 #[violation]
-pub struct PathlibExists;
+pub struct OsPathExists;
 
-impl Violation for PathlibExists {
+impl Violation for OsPathExists {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.exists()` should be replaced by `Path.exists()`")
@@ -124,9 +124,9 @@ impl Violation for PathlibExists {
 
 // PTH111
 #[violation]
-pub struct PathlibExpanduser;
+pub struct OsPathExpanduser;
 
-impl Violation for PathlibExpanduser {
+impl Violation for OsPathExpanduser {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.expanduser()` should be replaced by `Path.expanduser()`")
@@ -135,9 +135,9 @@ impl Violation for PathlibExpanduser {
 
 // PTH112
 #[violation]
-pub struct PathlibIsDir;
+pub struct OsPathIsdir;
 
-impl Violation for PathlibIsDir {
+impl Violation for OsPathIsdir {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.isdir()` should be replaced by `Path.is_dir()`")
@@ -146,9 +146,9 @@ impl Violation for PathlibIsDir {
 
 // PTH113
 #[violation]
-pub struct PathlibIsFile;
+pub struct OsPathIsfile;
 
-impl Violation for PathlibIsFile {
+impl Violation for OsPathIsfile {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.isfile()` should be replaced by `Path.is_file()`")
@@ -157,9 +157,9 @@ impl Violation for PathlibIsFile {
 
 // PTH114
 #[violation]
-pub struct PathlibIsLink;
+pub struct OsPathIslink;
 
-impl Violation for PathlibIsLink {
+impl Violation for OsPathIslink {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.islink()` should be replaced by `Path.is_symlink()`")
@@ -168,9 +168,9 @@ impl Violation for PathlibIsLink {
 
 // PTH115
 #[violation]
-pub struct PathlibReadlink;
+pub struct OsReadlink;
 
-impl Violation for PathlibReadlink {
+impl Violation for OsReadlink {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.readlink()` should be replaced by `Path.readlink()`")
@@ -179,9 +179,9 @@ impl Violation for PathlibReadlink {
 
 // PTH116
 #[violation]
-pub struct PathlibStat;
+pub struct OsStat;
 
-impl Violation for PathlibStat {
+impl Violation for OsStat {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(
@@ -192,9 +192,9 @@ impl Violation for PathlibStat {
 
 // PTH117
 #[violation]
-pub struct PathlibIsAbs;
+pub struct OsPathIsabs;
 
-impl Violation for PathlibIsAbs {
+impl Violation for OsPathIsabs {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.isabs()` should be replaced by `Path.is_absolute()`")
@@ -203,9 +203,9 @@ impl Violation for PathlibIsAbs {
 
 // PTH118
 #[violation]
-pub struct PathlibJoin;
+pub struct OsPathJoin;
 
-impl Violation for PathlibJoin {
+impl Violation for OsPathJoin {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.join()` should be replaced by `Path` with `/` operator")
@@ -214,9 +214,9 @@ impl Violation for PathlibJoin {
 
 // PTH119
 #[violation]
-pub struct PathlibBasename;
+pub struct OsPathBasename;
 
-impl Violation for PathlibBasename {
+impl Violation for OsPathBasename {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.basename()` should be replaced by `Path.name`")
@@ -225,9 +225,9 @@ impl Violation for PathlibBasename {
 
 // PTH120
 #[violation]
-pub struct PathlibDirname;
+pub struct OsPathDirname;
 
-impl Violation for PathlibDirname {
+impl Violation for OsPathDirname {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.dirname()` should be replaced by `Path.parent`")
@@ -236,9 +236,9 @@ impl Violation for PathlibDirname {
 
 // PTH121
 #[violation]
-pub struct PathlibSamefile;
+pub struct OsPathSamefile;
 
-impl Violation for PathlibSamefile {
+impl Violation for OsPathSamefile {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.samefile()` should be replaced by `Path.samefile()`")
@@ -247,9 +247,9 @@ impl Violation for PathlibSamefile {
 
 // PTH122
 #[violation]
-pub struct PathlibSplitext;
+pub struct OsPathSplitext;
 
-impl Violation for PathlibSplitext {
+impl Violation for OsPathSplitext {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`os.path.splitext()` should be replaced by `Path.suffix`")
@@ -258,9 +258,9 @@ impl Violation for PathlibSplitext {
 
 // PTH123
 #[violation]
-pub struct PathlibOpen;
+pub struct BuiltinOpen;
 
-impl Violation for PathlibOpen {
+impl Violation for BuiltinOpen {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`open()` should be replaced by `Path.open()`")
@@ -269,9 +269,9 @@ impl Violation for PathlibOpen {
 
 // PTH124
 #[violation]
-pub struct PathlibPyPath;
+pub struct PyPath;
 
-impl Violation for PathlibPyPath {
+impl Violation for PyPath {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("`py.path` is in maintenance mode, use `pathlib` instead")

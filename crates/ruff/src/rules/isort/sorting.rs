@@ -44,29 +44,28 @@ fn prefix(
     }
 }
 
+/// Compare two module names' by their `force-to-top`ness.
+fn cmp_force_to_top(name1: &str, name2: &str, force_to_top: &BTreeSet<String>) -> Ordering {
+    let force_to_top1 = force_to_top.contains(name1);
+    let force_to_top2 = force_to_top.contains(name2);
+    force_to_top1.cmp(&force_to_top2).reverse()
+}
+
 /// Compare two top-level modules.
 pub fn cmp_modules(
     alias1: &AliasData,
     alias2: &AliasData,
     force_to_top: &BTreeSet<String>,
 ) -> Ordering {
-    (match (
-        force_to_top.contains(alias1.name),
-        force_to_top.contains(alias2.name),
-    ) {
-        (true, true) => Ordering::Equal,
-        (false, false) => Ordering::Equal,
-        (true, false) => Ordering::Less,
-        (false, true) => Ordering::Greater,
-    })
-    .then_with(|| natord::compare_ignore_case(alias1.name, alias2.name))
-    .then_with(|| natord::compare(alias1.name, alias2.name))
-    .then_with(|| match (alias1.asname, alias2.asname) {
-        (None, None) => Ordering::Equal,
-        (None, Some(_)) => Ordering::Less,
-        (Some(_), None) => Ordering::Greater,
-        (Some(asname1), Some(asname2)) => natord::compare(asname1, asname2),
-    })
+    cmp_force_to_top(alias1.name, alias2.name, force_to_top)
+        .then_with(|| natord::compare_ignore_case(alias1.name, alias2.name))
+        .then_with(|| natord::compare(alias1.name, alias2.name))
+        .then_with(|| match (alias1.asname, alias2.asname) {
+            (None, None) => Ordering::Equal,
+            (None, Some(_)) => Ordering::Less,
+            (Some(_), None) => Ordering::Greater,
+            (Some(asname1), Some(asname2)) => natord::compare(asname1, asname2),
+        })
 }
 
 /// Compare two member imports within `StmtKind::ImportFrom` blocks.
@@ -124,15 +123,11 @@ pub fn cmp_import_from(
         relative_imports_order,
     )
     .then_with(|| {
-        match (
-            force_to_top.contains(&import_from1.module_name()),
-            force_to_top.contains(&import_from2.module_name()),
-        ) {
-            (true, true) => Ordering::Equal,
-            (false, false) => Ordering::Equal,
-            (true, false) => Ordering::Less,
-            (false, true) => Ordering::Greater,
-        }
+        cmp_force_to_top(
+            &import_from1.module_name(),
+            &import_from2.module_name(),
+            force_to_top,
+        )
     })
     .then_with(|| match (&import_from1.module, import_from2.module) {
         (None, None) => Ordering::Equal,
@@ -140,6 +135,17 @@ pub fn cmp_import_from(
         (Some(_), None) => Ordering::Greater,
         (Some(module1), Some(module2)) => natord::compare_ignore_case(module1, module2)
             .then_with(|| natord::compare(module1, module2)),
+    })
+}
+
+/// Compare an import to an import-from.
+fn cmp_import_import_from(
+    import: &AliasData,
+    import_from: &ImportFromData,
+    force_to_top: &BTreeSet<String>,
+) -> Ordering {
+    cmp_force_to_top(import.name, &import_from.module_name(), force_to_top).then_with(|| {
+        natord::compare_ignore_case(import.name, import_from.module.unwrap_or_default())
     })
 }
 
@@ -154,10 +160,10 @@ pub fn cmp_either_import(
     match (a, b) {
         (Import((alias1, _)), Import((alias2, _))) => cmp_modules(alias1, alias2, force_to_top),
         (ImportFrom((import_from, ..)), Import((alias, _))) => {
-            natord::compare_ignore_case(import_from.module.unwrap_or_default(), alias.name)
+            cmp_import_import_from(alias, import_from, force_to_top).reverse()
         }
         (Import((alias, _)), ImportFrom((import_from, ..))) => {
-            natord::compare_ignore_case(alias.name, import_from.module.unwrap_or_default())
+            cmp_import_import_from(alias, import_from, force_to_top)
         }
         (ImportFrom((import_from1, ..)), ImportFrom((import_from2, ..))) => cmp_import_from(
             import_from1,

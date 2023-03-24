@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use bitflags::bitflags;
 use itertools::Itertools;
 use log::error;
 use once_cell::sync::Lazy;
@@ -130,6 +129,39 @@ pub fn contains_effect(ctx: &Context, expr: &Expr) -> bool {
                     return !is_empty_initializer;
                 }
             }
+        }
+
+        // Avoid false positive for overloaded operators.
+        if let ExprKind::BinOp { left, right, .. } = &expr.node {
+            if !matches!(
+                left.node,
+                ExprKind::Constant { .. }
+                    | ExprKind::JoinedStr { .. }
+                    | ExprKind::List { .. }
+                    | ExprKind::Tuple { .. }
+                    | ExprKind::Set { .. }
+                    | ExprKind::Dict { .. }
+                    | ExprKind::ListComp { .. }
+                    | ExprKind::SetComp { .. }
+                    | ExprKind::DictComp { .. }
+            ) {
+                return true;
+            }
+            if !matches!(
+                right.node,
+                ExprKind::Constant { .. }
+                    | ExprKind::JoinedStr { .. }
+                    | ExprKind::List { .. }
+                    | ExprKind::Tuple { .. }
+                    | ExprKind::Set { .. }
+                    | ExprKind::Dict { .. }
+                    | ExprKind::ListComp { .. }
+                    | ExprKind::SetComp { .. }
+                    | ExprKind::DictComp { .. }
+            ) {
+                return true;
+            }
+            return false;
         }
 
         // Otherwise, avoid all complex expressions.
@@ -575,13 +607,6 @@ pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
         let KeywordData { value, .. } = &keyword.node;
         !is_const_none(value)
     })
-}
-
-bitflags! {
-    pub struct Exceptions: u32 {
-        const NAME_ERROR = 0b0000_0001;
-        const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
-    }
 }
 
 /// Extract the names of all handled exceptions.

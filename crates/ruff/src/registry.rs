@@ -14,67 +14,67 @@ pub use rule_set::{RuleSet, RuleSetIterator};
 ruff_macros::register_rules!(
     // pycodestyle errors
     rules::pycodestyle::rules::MixedSpacesAndTabs,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::IndentationWithInvalidMultiple,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::NoIndentedBlock,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::UnexpectedIndentation,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::IndentationWithInvalidMultipleComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::NoIndentedBlockComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::UnexpectedIndentationComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::OverIndented,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::WhitespaceAfterOpenBracket,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::WhitespaceBeforeCloseBracket,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::WhitespaceBeforePunctuation,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MultipleSpacesBeforeOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MultipleSpacesAfterOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::TabBeforeOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::TabAfterOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::TooFewSpacesBeforeInlineComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::NoSpaceAfterInlineComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::NoSpaceAfterBlockComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MultipleLeadingHashesForBlockComment,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespace,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespaceAfterKeyword,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespaceAroundOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespaceAroundArithmeticOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespaceAroundBitwiseOrShiftOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespaceAroundModuloOperator,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::TabAfterKeyword,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::UnexpectedSpacesAroundKeywordParameterEquals,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::MissingWhitespaceAroundParameterEquals,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::WhitespaceBeforeParameters,
-    #[cfg(feature = "logical_lines")]
+    #[cfg(debug_assertions)]
     rules::pycodestyle::rules::TabBeforeKeyword,
     rules::pycodestyle::rules::MultipleImportsOnOneLine,
     rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
@@ -156,6 +156,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
     rules::pylint::rules::CyclicImport,
+    rules::pylint::rules::BinaryOpException,
     rules::pylint::rules::InvalidCharacterBackspace,
     rules::pylint::rules::InvalidCharacterSub,
     rules::pylint::rules::InvalidCharacterEsc,
@@ -167,7 +168,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::UselessImportAlias,
     rules::pylint::rules::UnnecessaryDirectLambdaCall,
     rules::pylint::rules::NonlocalWithoutBinding,
-    rules::pylint::rules::UsePriorToGlobalDeclaration,
+    rules::pylint::rules::LoadBeforeGlobalDeclaration,
     rules::pylint::rules::AwaitOutsideAsync,
     rules::pylint::rules::PropertyWithParameters,
     rules::pylint::rules::ReturnInInit,
@@ -299,7 +300,7 @@ ruff_macros::register_rules!(
     rules::flake8_simplify::rules::DuplicateIsinstanceCall,
     rules::flake8_simplify::rules::CollapsibleIf,
     rules::flake8_simplify::rules::NeedlessBool,
-    rules::flake8_simplify::rules::UseContextlibSuppress,
+    rules::flake8_simplify::rules::SuppressibleException,
     rules::flake8_simplify::rules::ReturnInTryExceptFinally,
     rules::flake8_simplify::rules::IfElseBlockInsteadOfIfExp,
     rules::flake8_simplify::rules::CompareWithTuple,
@@ -429,24 +430,45 @@ ruff_macros::register_rules!(
     rules::eradicate::rules::CommentedOutCode,
     // flake8-bandit
     rules::flake8_bandit::rules::Assert,
-    rules::flake8_bandit::rules::ExecBuiltin,
     rules::flake8_bandit::rules::BadFilePermissions,
+    rules::flake8_bandit::rules::ExecBuiltin,
     rules::flake8_bandit::rules::HardcodedBindAllInterfaces,
-    rules::flake8_bandit::rules::HardcodedPasswordString,
-    rules::flake8_bandit::rules::HardcodedPasswordFuncArg,
     rules::flake8_bandit::rules::HardcodedPasswordDefault,
+    rules::flake8_bandit::rules::HardcodedPasswordFuncArg,
+    rules::flake8_bandit::rules::HardcodedPasswordString,
     rules::flake8_bandit::rules::HardcodedSQLExpression,
     rules::flake8_bandit::rules::HardcodedTempFile,
-    rules::flake8_bandit::rules::TryExceptPass,
-    rules::flake8_bandit::rules::TryExceptContinue,
-    rules::flake8_bandit::rules::RequestWithoutTimeout,
     rules::flake8_bandit::rules::HashlibInsecureHashFunction,
+    rules::flake8_bandit::rules::Jinja2AutoescapeFalse,
+    rules::flake8_bandit::rules::LoggingConfigInsecureListen,
     rules::flake8_bandit::rules::RequestWithNoCertValidation,
-    rules::flake8_bandit::rules::UnsafeYAMLLoad,
+    rules::flake8_bandit::rules::RequestWithoutTimeout,
     rules::flake8_bandit::rules::SnmpInsecureVersion,
     rules::flake8_bandit::rules::SnmpWeakCryptography,
-    rules::flake8_bandit::rules::LoggingConfigInsecureListen,
-    rules::flake8_bandit::rules::Jinja2AutoescapeFalse,
+    rules::flake8_bandit::rules::SuspiciousEvalUsage,
+    rules::flake8_bandit::rules::SuspiciousFTPLibUsage,
+    rules::flake8_bandit::rules::SuspiciousInsecureCipherUsage,
+    rules::flake8_bandit::rules::SuspiciousInsecureCipherModeUsage,
+    rules::flake8_bandit::rules::SuspiciousInsecureHashUsage,
+    rules::flake8_bandit::rules::SuspiciousMarkSafeUsage,
+    rules::flake8_bandit::rules::SuspiciousMarshalUsage,
+    rules::flake8_bandit::rules::SuspiciousMktempUsage,
+    rules::flake8_bandit::rules::SuspiciousNonCryptographicRandomUsage,
+    rules::flake8_bandit::rules::SuspiciousPickleUsage,
+    rules::flake8_bandit::rules::SuspiciousTelnetUsage,
+    rules::flake8_bandit::rules::SuspiciousURLOpenUsage,
+    rules::flake8_bandit::rules::SuspiciousUnverifiedContextUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLCElementTreeUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLETreeUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLElementTreeUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLExpatBuilderUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLExpatReaderUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLMiniDOMUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLPullDOMUsage,
+    rules::flake8_bandit::rules::SuspiciousXMLSaxUsage,
+    rules::flake8_bandit::rules::TryExceptContinue,
+    rules::flake8_bandit::rules::TryExceptPass,
+    rules::flake8_bandit::rules::UnsafeYAMLLoad,
     // flake8-boolean-trap
     rules::flake8_boolean_trap::rules::BooleanPositionalArgInFunctionDefinition,
     rules::flake8_boolean_trap::rules::BooleanDefaultValueInFunctionDefinition,
@@ -566,31 +588,31 @@ ruff_macros::register_rules!(
     rules::tryceratops::rules::ErrorInsteadOfException,
     rules::tryceratops::rules::VerboseLogMessage,
     // flake8-use-pathlib
-    rules::flake8_use_pathlib::violations::PathlibAbspath,
-    rules::flake8_use_pathlib::violations::PathlibChmod,
-    rules::flake8_use_pathlib::violations::PathlibMkdir,
-    rules::flake8_use_pathlib::violations::PathlibMakedirs,
-    rules::flake8_use_pathlib::violations::PathlibRename,
+    rules::flake8_use_pathlib::violations::OsPathAbspath,
+    rules::flake8_use_pathlib::violations::OsChmod,
+    rules::flake8_use_pathlib::violations::OsMkdir,
+    rules::flake8_use_pathlib::violations::OsMakedirs,
+    rules::flake8_use_pathlib::violations::OsRename,
     rules::flake8_use_pathlib::violations::PathlibReplace,
-    rules::flake8_use_pathlib::violations::PathlibRmdir,
-    rules::flake8_use_pathlib::violations::PathlibRemove,
-    rules::flake8_use_pathlib::violations::PathlibUnlink,
-    rules::flake8_use_pathlib::violations::PathlibGetcwd,
-    rules::flake8_use_pathlib::violations::PathlibExists,
-    rules::flake8_use_pathlib::violations::PathlibExpanduser,
-    rules::flake8_use_pathlib::violations::PathlibIsDir,
-    rules::flake8_use_pathlib::violations::PathlibIsFile,
-    rules::flake8_use_pathlib::violations::PathlibIsLink,
-    rules::flake8_use_pathlib::violations::PathlibReadlink,
-    rules::flake8_use_pathlib::violations::PathlibStat,
-    rules::flake8_use_pathlib::violations::PathlibIsAbs,
-    rules::flake8_use_pathlib::violations::PathlibJoin,
-    rules::flake8_use_pathlib::violations::PathlibBasename,
-    rules::flake8_use_pathlib::violations::PathlibDirname,
-    rules::flake8_use_pathlib::violations::PathlibSamefile,
-    rules::flake8_use_pathlib::violations::PathlibSplitext,
-    rules::flake8_use_pathlib::violations::PathlibOpen,
-    rules::flake8_use_pathlib::violations::PathlibPyPath,
+    rules::flake8_use_pathlib::violations::OsRmdir,
+    rules::flake8_use_pathlib::violations::OsRemove,
+    rules::flake8_use_pathlib::violations::OsUnlink,
+    rules::flake8_use_pathlib::violations::OsGetcwd,
+    rules::flake8_use_pathlib::violations::OsPathExists,
+    rules::flake8_use_pathlib::violations::OsPathExpanduser,
+    rules::flake8_use_pathlib::violations::OsPathIsdir,
+    rules::flake8_use_pathlib::violations::OsPathIsfile,
+    rules::flake8_use_pathlib::violations::OsPathIslink,
+    rules::flake8_use_pathlib::violations::OsReadlink,
+    rules::flake8_use_pathlib::violations::OsStat,
+    rules::flake8_use_pathlib::violations::OsPathIsabs,
+    rules::flake8_use_pathlib::violations::OsPathJoin,
+    rules::flake8_use_pathlib::violations::OsPathBasename,
+    rules::flake8_use_pathlib::violations::OsPathDirname,
+    rules::flake8_use_pathlib::violations::OsPathSamefile,
+    rules::flake8_use_pathlib::violations::OsPathSplitext,
+    rules::flake8_use_pathlib::violations::BuiltinOpen,
+    rules::flake8_use_pathlib::violations::PyPath,
     // flake8-logging-format
     rules::flake8_logging_format::violations::LoggingStringFormat,
     rules::flake8_logging_format::violations::LoggingPercentFormat,
@@ -621,6 +643,7 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::DjangoExcludeWithModelForm,
     rules::flake8_django::rules::DjangoAllWithModelForm,
     rules::flake8_django::rules::DjangoModelWithoutDunderStr,
+    rules::flake8_django::rules::DjangoUnorderedBodyContentInModel,
     rules::flake8_django::rules::DjangoNonLeadingReceiverDecorator,
 );
 
@@ -884,7 +907,7 @@ impl Rule {
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
-            #[cfg(feature = "logical_lines")]
+            #[cfg(debug_assertions)]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
             | Rule::MissingWhitespace

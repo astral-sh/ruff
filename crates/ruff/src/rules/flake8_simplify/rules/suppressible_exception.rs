@@ -9,19 +9,19 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 
 #[violation]
-pub struct UseContextlibSuppress {
+pub struct SuppressibleException {
     pub exception: String,
 }
 
-impl Violation for UseContextlibSuppress {
+impl Violation for SuppressibleException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UseContextlibSuppress { exception } = self;
+        let SuppressibleException { exception } = self;
         format!("Use `contextlib.suppress({exception})` instead of try-except-pass")
     }
 }
 /// SIM105
-pub fn use_contextlib_suppress(
+pub fn suppressible_exception(
     checker: &mut Checker,
     stmt: &Stmt,
     body: &[Stmt],
@@ -63,7 +63,7 @@ pub fn use_contextlib_suppress(
                 handler_names.join(", ")
             };
             checker.diagnostics.push(Diagnostic::new(
-                UseContextlibSuppress { exception },
+                SuppressibleException { exception },
                 Range::from(stmt),
             ));
         }

@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: UseContextlibSuppress
+    name: SuppressibleException
     body: "Use `contextlib.suppress(ValueError)` instead of try-except-pass"
     suggestion: ~
     fixable: false
@@ -16,7 +16,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UseContextlibSuppress
+    name: SuppressibleException
     body: "Use `contextlib.suppress(ValueError, OSError)` instead of try-except-pass"
     suggestion: ~
     fixable: false
@@ -29,7 +29,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UseContextlibSuppress
+    name: SuppressibleException
     body: "Use `contextlib.suppress(Exception)` instead of try-except-pass"
     suggestion: ~
     fixable: false
@@ -42,7 +42,7 @@ expression: diagnostics
   fix: ~
   parent: ~
 - kind:
-    name: UseContextlibSuppress
+    name: SuppressibleException
     body: "Use `contextlib.suppress(a.Error, b.Error)` instead of try-except-pass"
     suggestion: ~
     fixable: false

@@ -442,4 +442,64 @@ expression: diagnostics
       row: 47
       column: 24
   parent: ~
+- kind:
+    name: FString
+    body: "Use f-string instead of `format` call"
+    suggestion: Convert to f-string
+    fixable: true
+  location:
+    row: 92
+    column: 10
+  end_location:
+    row: 92
+    column: 53
+  fix:
+    content: " f\"{osname}-{version}.{release}\""
+    location:
+      row: 92
+      column: 10
+    end_location:
+      row: 92
+      column: 53
+  parent: ~
+- kind:
+    name: FString
+    body: "Use f-string instead of `format` call"
+    suggestion: Convert to f-string
+    fixable: true
+  location:
+    row: 96
+    column: 9
+  end_location:
+    row: 96
+    column: 23
+  fix:
+    content: " f\"{1}\""
+    location:
+      row: 96
+      column: 9
+    end_location:
+      row: 96
+      column: 23
+  parent: ~
+- kind:
+    name: FString
+    body: "Use f-string instead of `format` call"
+    suggestion: Convert to f-string
+    fixable: true
+  location:
+    row: 99
+    column: 6
+  end_location:
+    row: 99
+    column: 20
+  fix:
+    content: " f\"{1}\""
+    location:
+      row: 99
+      column: 6
+    end_location:
+      row: 99
+      column: 20
+  parent: ~
 

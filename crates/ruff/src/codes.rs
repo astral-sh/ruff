@@ -26,67 +26,67 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
     Some(match (linter, code) {
         // pycodestyle errors
         (Pycodestyle, "E101") => Rule::MixedSpacesAndTabs,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E111") => Rule::IndentationWithInvalidMultiple,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E112") => Rule::NoIndentedBlock,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E113") => Rule::UnexpectedIndentation,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E114") => Rule::IndentationWithInvalidMultipleComment,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E115") => Rule::NoIndentedBlockComment,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E116") => Rule::UnexpectedIndentationComment,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E117") => Rule::OverIndented,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E201") => Rule::WhitespaceAfterOpenBracket,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E202") => Rule::WhitespaceBeforeCloseBracket,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E203") => Rule::WhitespaceBeforePunctuation,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E211") => Rule::WhitespaceBeforeParameters,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E221") => Rule::MultipleSpacesBeforeOperator,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E222") => Rule::MultipleSpacesAfterOperator,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E223") => Rule::TabBeforeOperator,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E224") => Rule::TabAfterOperator,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E225") => Rule::MissingWhitespaceAroundOperator,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E226") => Rule::MissingWhitespaceAroundArithmeticOperator,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E227") => Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E228") => Rule::MissingWhitespaceAroundModuloOperator,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E231") => Rule::MissingWhitespace,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E251") => Rule::UnexpectedSpacesAroundKeywordParameterEquals,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E252") => Rule::MissingWhitespaceAroundParameterEquals,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E261") => Rule::TooFewSpacesBeforeInlineComment,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E262") => Rule::NoSpaceAfterInlineComment,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E265") => Rule::NoSpaceAfterBlockComment,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E266") => Rule::MultipleLeadingHashesForBlockComment,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E271") => Rule::MultipleSpacesAfterKeyword,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E272") => Rule::MultipleSpacesBeforeKeyword,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E273") => Rule::TabAfterKeyword,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E274") => Rule::TabBeforeKeyword,
-        #[cfg(feature = "logical_lines")]
+        #[cfg(debug_assertions)]
         (Pycodestyle, "E275") => Rule::MissingWhitespaceAfterKeyword,
         (Pycodestyle, "E401") => Rule::MultipleImportsOnOneLine,
         (Pycodestyle, "E402") => Rule::ModuleImportNotAtTopOfFile,
@@ -168,7 +168,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "E0101") => Rule::ReturnInInit,
         (Pylint, "E0116") => Rule::ContinueInFinally,
         (Pylint, "E0117") => Rule::NonlocalWithoutBinding,
-        (Pylint, "E0118") => Rule::UsePriorToGlobalDeclaration,
+        (Pylint, "E0118") => Rule::LoadBeforeGlobalDeclaration,
         (Pylint, "E0604") => Rule::InvalidAllObject,
         (Pylint, "E0605") => Rule::InvalidAllFormat,
         (Pylint, "E1142") => Rule::AwaitOutsideAsync,
@@ -200,6 +200,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "W0129") => Rule::AssertOnStringLiteral,
         (Pylint, "W0602") => Rule::GlobalVariableNotAssigned,
         (Pylint, "W0603") => Rule::GlobalStatement,
+        (Pylint, "W0711") => Rule::BinaryOpException,
         (Pylint, "W1508") => Rule::InvalidEnvvarDefault,
         (Pylint, "W2901") => Rule::RedefinedLoopName,
 
@@ -327,7 +328,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Simplify, "101") => Rule::DuplicateIsinstanceCall,
         (Flake8Simplify, "102") => Rule::CollapsibleIf,
         (Flake8Simplify, "103") => Rule::NeedlessBool,
-        (Flake8Simplify, "105") => Rule::UseContextlibSuppress,
+        (Flake8Simplify, "105") => Rule::SuppressibleException,
         (Flake8Simplify, "107") => Rule::ReturnInTryExceptFinally,
         (Flake8Simplify, "108") => Rule::IfElseBlockInsteadOfIfExp,
         (Flake8Simplify, "109") => Rule::CompareWithTuple,
@@ -470,16 +471,37 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bandit, "105") => Rule::HardcodedPasswordString,
         (Flake8Bandit, "106") => Rule::HardcodedPasswordFuncArg,
         (Flake8Bandit, "107") => Rule::HardcodedPasswordDefault,
-        (Flake8Bandit, "608") => Rule::HardcodedSQLExpression,
         (Flake8Bandit, "108") => Rule::HardcodedTempFile,
         (Flake8Bandit, "110") => Rule::TryExceptPass,
         (Flake8Bandit, "112") => Rule::TryExceptContinue,
         (Flake8Bandit, "113") => Rule::RequestWithoutTimeout,
+        (Flake8Bandit, "301") => Rule::SuspiciousPickleUsage,
+        (Flake8Bandit, "302") => Rule::SuspiciousMarshalUsage,
+        (Flake8Bandit, "303") => Rule::SuspiciousInsecureHashUsage,
+        (Flake8Bandit, "304") => Rule::SuspiciousInsecureCipherUsage,
+        (Flake8Bandit, "305") => Rule::SuspiciousInsecureCipherModeUsage,
+        (Flake8Bandit, "306") => Rule::SuspiciousMktempUsage,
+        (Flake8Bandit, "307") => Rule::SuspiciousEvalUsage,
+        (Flake8Bandit, "308") => Rule::SuspiciousMarkSafeUsage,
+        (Flake8Bandit, "310") => Rule::SuspiciousURLOpenUsage,
+        (Flake8Bandit, "311") => Rule::SuspiciousNonCryptographicRandomUsage,
+        (Flake8Bandit, "312") => Rule::SuspiciousTelnetUsage,
+        (Flake8Bandit, "313") => Rule::SuspiciousXMLCElementTreeUsage,
+        (Flake8Bandit, "314") => Rule::SuspiciousXMLElementTreeUsage,
+        (Flake8Bandit, "315") => Rule::SuspiciousXMLExpatReaderUsage,
+        (Flake8Bandit, "316") => Rule::SuspiciousXMLExpatBuilderUsage,
+        (Flake8Bandit, "317") => Rule::SuspiciousXMLSaxUsage,
+        (Flake8Bandit, "318") => Rule::SuspiciousXMLMiniDOMUsage,
+        (Flake8Bandit, "319") => Rule::SuspiciousXMLPullDOMUsage,
+        (Flake8Bandit, "320") => Rule::SuspiciousXMLETreeUsage,
+        (Flake8Bandit, "321") => Rule::SuspiciousFTPLibUsage,
+        (Flake8Bandit, "323") => Rule::SuspiciousUnverifiedContextUsage,
         (Flake8Bandit, "324") => Rule::HashlibInsecureHashFunction,
         (Flake8Bandit, "501") => Rule::RequestWithNoCertValidation,
         (Flake8Bandit, "506") => Rule::UnsafeYAMLLoad,
         (Flake8Bandit, "508") => Rule::SnmpInsecureVersion,
         (Flake8Bandit, "509") => Rule::SnmpWeakCryptography,
+        (Flake8Bandit, "608") => Rule::HardcodedSQLExpression,
         (Flake8Bandit, "612") => Rule::LoggingConfigInsecureListen,
         (Flake8Bandit, "701") => Rule::Jinja2AutoescapeFalse,
 
@@ -617,31 +639,31 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Tryceratops, "401") => Rule::VerboseLogMessage,
 
         // flake8-use-pathlib
-        (Flake8UsePathlib, "100") => Rule::PathlibAbspath,
-        (Flake8UsePathlib, "101") => Rule::PathlibChmod,
-        (Flake8UsePathlib, "102") => Rule::PathlibMkdir,
-        (Flake8UsePathlib, "103") => Rule::PathlibMakedirs,
-        (Flake8UsePathlib, "104") => Rule::PathlibRename,
+        (Flake8UsePathlib, "100") => Rule::OsPathAbspath,
+        (Flake8UsePathlib, "101") => Rule::OsChmod,
+        (Flake8UsePathlib, "102") => Rule::OsMkdir,
+        (Flake8UsePathlib, "103") => Rule::OsMakedirs,
+        (Flake8UsePathlib, "104") => Rule::OsRename,
         (Flake8UsePathlib, "105") => Rule::PathlibReplace,
-        (Flake8UsePathlib, "106") => Rule::PathlibRmdir,
-        (Flake8UsePathlib, "107") => Rule::PathlibRemove,
-        (Flake8UsePathlib, "108") => Rule::PathlibUnlink,
-        (Flake8UsePathlib, "109") => Rule::PathlibGetcwd,
-        (Flake8UsePathlib, "110") => Rule::PathlibExists,
-        (Flake8UsePathlib, "111") => Rule::PathlibExpanduser,
-        (Flake8UsePathlib, "112") => Rule::PathlibIsDir,
-        (Flake8UsePathlib, "113") => Rule::PathlibIsFile,
-        (Flake8UsePathlib, "114") => Rule::PathlibIsLink,
-        (Flake8UsePathlib, "115") => Rule::PathlibReadlink,
-        (Flake8UsePathlib, "116") => Rule::PathlibStat,
-        (Flake8UsePathlib, "117") => Rule::PathlibIsAbs,
-        (Flake8UsePathlib, "118") => Rule::PathlibJoin,
-        (Flake8UsePathlib, "119") => Rule::PathlibBasename,
-        (Flake8UsePathlib, "120") => Rule::PathlibDirname,
-        (Flake8UsePathlib, "121") => Rule::PathlibSamefile,
-        (Flake8UsePathlib, "122") => Rule::PathlibSplitext,
-        (Flake8UsePathlib, "123") => Rule::PathlibOpen,
-        (Flake8UsePathlib, "124") => Rule::PathlibPyPath,
+        (Flake8UsePathlib, "106") => Rule::OsRmdir,
+        (Flake8UsePathlib, "107") => Rule::OsRemove,
+        (Flake8UsePathlib, "108") => Rule::OsUnlink,
+        (Flake8UsePathlib, "109") => Rule::OsGetcwd,
+        (Flake8UsePathlib, "110") => Rule::OsPathExists,
+        (Flake8UsePathlib, "111") => Rule::OsPathExpanduser,
+        (Flake8UsePathlib, "112") => Rule::OsPathIsdir,
+        (Flake8UsePathlib, "113") => Rule::OsPathIsfile,
+        (Flake8UsePathlib, "114") => Rule::OsPathIslink,
+        (Flake8UsePathlib, "115") => Rule::OsReadlink,
+        (Flake8UsePathlib, "116") => Rule::OsStat,
+        (Flake8UsePathlib, "117") => Rule::OsPathIsabs,
+        (Flake8UsePathlib, "118") => Rule::OsPathJoin,
+        (Flake8UsePathlib, "119") => Rule::OsPathBasename,
+        (Flake8UsePathlib, "120") => Rule::OsPathDirname,
+        (Flake8UsePathlib, "121") => Rule::OsPathSamefile,
+        (Flake8UsePathlib, "122") => Rule::OsPathSplitext,
+        (Flake8UsePathlib, "123") => Rule::BuiltinOpen,
+        (Flake8UsePathlib, "124") => Rule::PyPath,
 
         // flake8-logging-format
         (Flake8LoggingFormat, "001") => Rule::LoggingStringFormat,
@@ -678,6 +700,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Django, "006") => Rule::DjangoExcludeWithModelForm,
         (Flake8Django, "007") => Rule::DjangoAllWithModelForm,
         (Flake8Django, "008") => Rule::DjangoModelWithoutDunderStr,
+        (Flake8Django, "012") => Rule::DjangoUnorderedBodyContentInModel,
         (Flake8Django, "013") => Rule::DjangoNonLeadingReceiverDecorator,
 
         _ => return None,

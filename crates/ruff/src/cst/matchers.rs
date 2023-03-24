@@ -1,6 +1,7 @@
 use anyhow::{bail, Result};
 use libcst_native::{
-    Call, Comparison, Expr, Expression, Import, ImportFrom, Module, SmallStatement, Statement,
+    Attribute, Call, Comparison, Dict, Expr, Expression, Import, ImportFrom, Module, SimpleString,
+    SmallStatement, Statement,
 };
 
 pub fn match_module(module_text: &str) -> Result<Module> {
@@ -68,5 +69,33 @@ pub fn match_comparison<'a, 'b>(
         Ok(comparison)
     } else {
         bail!("Expected Expression::Comparison")
+    }
+}
+
+pub fn match_dict<'a, 'b>(expression: &'a mut Expression<'b>) -> Result<&'a mut Dict<'b>> {
+    if let Expression::Dict(dict) = expression {
+        Ok(dict)
+    } else {
+        bail!("Expected Expression::Dict")
+    }
+}
+
+pub fn match_attribute<'a, 'b>(
+    expression: &'a mut Expression<'b>,
+) -> Result<&'a mut Attribute<'b>> {
+    if let Expression::Attribute(attribute) = expression {
+        Ok(attribute)
+    } else {
+        bail!("Expected Expression::Attribute")
+    }
+}
+
+pub fn match_simple_string<'a, 'b>(
+    expression: &'a mut Expression<'b>,
+) -> Result<&'a mut SimpleString<'b>> {
+    if let Expression::SimpleString(simple_string) = expression {
+        Ok(simple_string)
+    } else {
+        bail!("Expected Expression::SimpleString")
     }
 }
