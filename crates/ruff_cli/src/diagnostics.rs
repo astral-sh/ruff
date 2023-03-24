@@ -62,7 +62,7 @@ impl AddAssign for Diagnostics {
 }
 
 /// Returns either an indexed python jupyter notebook or a diagnostic (which is empty if we skip)
-fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Diagnostics> {
+fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Box<Diagnostics>> {
     let notebook = match JupyterNotebook::read(path) {
         Ok(notebook) => {
             if !notebook
@@ -76,13 +76,13 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Diagnost
                     "Skipping {} because it's not a Python notebook",
                     path.display()
                 );
-                return Err(Diagnostics::default());
+                return Err(Box::default());
             }
             notebook
         }
         Err(diagnostic) => {
             // Failed to read the jupyter notebook
-            return Err(Diagnostics {
+            return Err(Box::new(Diagnostics {
                 messages: vec![Message::from_diagnostic(
                     *diagnostic,
                     path.to_string_lossy().to_string(),
@@ -90,7 +90,7 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Diagnost
                     1,
                 )],
                 ..Diagnostics::default()
-            });
+            }));
         }
     };
 
@@ -134,7 +134,7 @@ pub fn lint_path(
     let (contents, jupyter_index) = if is_jupyter_notebook(path) {
         match load_jupyter_notebook(path) {
             Ok((contents, jupyter_index)) => (contents, Some(jupyter_index)),
-            Err(diagnostics) => return Ok(diagnostics),
+            Err(diagnostics) => return Ok(*diagnostics),
         }
     } else {
         (std::fs::read_to_string(path)?, None)
@@ -348,7 +348,7 @@ mod test {
         // No diagnostics is used as skip signal
         assert_eq!(
             load_jupyter_notebook(path).unwrap_err(),
-            Diagnostics::default()
+            Box::<Diagnostics>::default()
         );
     }
 }
