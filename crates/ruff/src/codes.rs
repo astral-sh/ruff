@@ -238,6 +238,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bugbear, "028") => Rule::NoExplicitStacklevel,
         (Flake8Bugbear, "029") => Rule::ExceptWithEmptyTuple,
         (Flake8Bugbear, "030") => Rule::ExceptWithNonExceptionClasses,
+        (Flake8Bugbear, "031") => Rule::ReuseOfGroupbyGenerator,
         (Flake8Bugbear, "032") => Rule::UnintentionalTypeAnnotation,
         (Flake8Bugbear, "904") => Rule::RaiseWithoutFromInsideExcept,
         (Flake8Bugbear, "905") => Rule::ZipWithoutExplicitStrict,
