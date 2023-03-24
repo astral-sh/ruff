@@ -37,50 +37,55 @@ pub fn missing_whitespace(
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    let mut num_lsqb = 0;
-    let mut num_rsqb = 0;
+    let mut num_lsqb = 0u32;
+    let mut num_rsqb = 0u32;
     let mut prev_lsqb = None;
     let mut prev_lbrace = None;
     for (idx, (char, next_char)) in line.chars().tuple_windows().enumerate() {
-        if char == '[' {
-            num_lsqb += 1;
-            prev_lsqb = Some(idx);
-        } else if char == ']' {
-            num_rsqb += 1;
-        } else if char == '{' {
-            prev_lbrace = Some(idx);
-        }
-
-        if (char == ',' || char == ';' || char == ':') && !char::is_whitespace(next_char) {
-            if char == ':' && num_lsqb > num_rsqb && prev_lsqb > prev_lbrace {
-                continue; // Slice syntax, no space required
+        match char {
+            '[' => {
+                num_lsqb += 1;
+                prev_lsqb = Some(idx);
             }
-            if char == ',' && (next_char == ')' || next_char == ']') {
-                continue; // Allow tuple with only one element: (3,)
+            ']' => {
+                num_rsqb += 1;
             }
-            if char == ':' && next_char == '=' {
-                continue; // Allow assignment expression
+            '{' => {
+                prev_lbrace = Some(idx);
             }
 
-            let kind: MissingWhitespace = MissingWhitespace {
-                token: char.to_string(),
-            };
+            ',' | ';' | ':' if !next_char.is_whitespace() => {
+                if char == ':' && num_lsqb > num_rsqb && prev_lsqb > prev_lbrace {
+                    continue; // Slice syntax, no space required
+                }
+                if char == ',' && matches!(next_char, ')' | ']') {
+                    continue; // Allow tuple with only one element: (3,)
+                }
+                if char == ':' && next_char == '=' {
+                    continue; // Allow assignment expression
+                }
 
-            let mut diagnostic = Diagnostic::new(
-                kind,
-                Range::new(
-                    Location::new(row, indent_level + idx),
-                    Location::new(row, indent_level + idx),
-                ),
-            );
+                let kind = MissingWhitespace {
+                    token: char.to_string(),
+                };
 
-            if autofix {
-                diagnostic.amend(Edit::insertion(
-                    " ".to_string(),
-                    Location::new(row, indent_level + idx + 1),
-                ));
+                let mut diagnostic = Diagnostic::new(
+                    kind,
+                    Range::new(
+                        Location::new(row, indent_level + idx),
+                        Location::new(row, indent_level + idx),
+                    ),
+                );
+
+                if autofix {
+                    diagnostic.amend(Edit::insertion(
+                        " ".to_string(),
+                        Location::new(row, indent_level + idx + 1),
+                    ));
+                }
+                diagnostics.push(diagnostic);
             }
-            diagnostics.push(diagnostic);
+            _ => {}
         }
     }
     diagnostics
