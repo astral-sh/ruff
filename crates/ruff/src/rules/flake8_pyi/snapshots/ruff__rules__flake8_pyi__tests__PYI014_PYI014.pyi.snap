@@ -21,45 +21,6 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 7
-    column: 6
-  end_location:
-    row: 11
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: ArgumentDefaultInStub
-    body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 6
-  end_location:
-    row: 18
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: ArgumentDefaultInStub
-    body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 6
-  end_location:
-    row: 25
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: ArgumentDefaultInStub
-    body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
-  location:
     row: 27
     column: 10
   end_location:

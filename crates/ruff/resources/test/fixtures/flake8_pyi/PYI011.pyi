@@ -13,7 +13,7 @@ def f11(*, x: str = "x") -> None: ...  # OK
 def f13(
     x: list[
         str
-    ] = [  # Error PYI011 Only simple default values allowed for typed arguments
+    ] = [  # OK
         "foo",
         "bar",
         "baz",
@@ -22,7 +22,7 @@ def f13(
 def f14(
     x: tuple[
         str, ...
-    ] = (  # Error PYI011 Only simple default values allowed for typed arguments
+    ] = (  # OK
         "foo",
         "bar",
         "baz",
@@ -31,7 +31,7 @@ def f14(
 def f15(
     x: set[
         str
-    ] = {  # Error PYI011 Only simple default values allowed for typed arguments
+    ] = {  # OK
         "foo",
         "bar",
         "baz",

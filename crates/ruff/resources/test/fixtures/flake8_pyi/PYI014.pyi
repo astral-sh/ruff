@@ -4,21 +4,21 @@ def f12(
 ) -> None: ...
 def f11(*, x="x") -> None: ...  # OK
 def f13(
-    x=[  # Error PYI014
+    x=[  # OK
         "foo",
         "bar",
         "baz",
     ]
 ) -> None: ...
 def f14(
-    x=(  # Error PYI014
+    x=(  # OK
         "foo",
         "bar",
         "baz",
     )
 ) -> None: ...
 def f15(
-    x={  # Error PYI014
+    x={  # OK
         "foo",
         "bar",
         "baz",

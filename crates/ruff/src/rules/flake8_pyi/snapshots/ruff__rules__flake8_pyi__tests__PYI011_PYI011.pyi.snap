@@ -28,66 +28,6 @@ expression: diagnostics
     suggestion: "Replace default value by `...`"
     fixable: true
   location:
-    row: 16
-    column: 8
-  end_location:
-    row: 20
-    column: 5
-  fix:
-    content: "..."
-    location:
-      row: 16
-      column: 8
-    end_location:
-      row: 20
-      column: 5
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
-    fixable: true
-  location:
-    row: 25
-    column: 8
-  end_location:
-    row: 29
-    column: 5
-  fix:
-    content: "..."
-    location:
-      row: 25
-      column: 8
-    end_location:
-      row: 29
-      column: 5
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
-    fixable: true
-  location:
-    row: 34
-    column: 8
-  end_location:
-    row: 38
-    column: 5
-  fix:
-    content: "..."
-    location:
-      row: 34
-      column: 8
-    end_location:
-      row: 38
-      column: 5
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
-    fixable: true
-  location:
     row: 43
     column: 8
   end_location:
