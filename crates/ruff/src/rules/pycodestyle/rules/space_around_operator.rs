@@ -127,7 +127,7 @@ static OPERATOR_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"[^,\s](\s*)(?:[-+*/|!<=>%&^]+|:=)(\s*)").unwrap());
 
 /// E221, E222, E223, E224
-#[cfg(debug_assertions)]
+#[cfg(feature = "logical_lines")]
 pub fn space_around_operator(line: &str) -> Vec<(usize, DiagnosticKind)> {
     let mut diagnostics = vec![];
     for line_match in OPERATOR_REGEX.captures_iter(line) {
@@ -149,7 +149,7 @@ pub fn space_around_operator(line: &str) -> Vec<(usize, DiagnosticKind)> {
     diagnostics
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "logical_lines"))]
 pub fn space_around_operator(_line: &str) -> Vec<(usize, DiagnosticKind)> {
     vec![]
 }

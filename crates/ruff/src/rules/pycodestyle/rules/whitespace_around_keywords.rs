@@ -115,7 +115,7 @@ static KEYWORD_REGEX: Lazy<Regex> = Lazy::new(|| {
 });
 
 /// E271, E272, E273, E274
-#[cfg(debug_assertions)]
+#[cfg(feature = "logical_lines")]
 pub fn whitespace_around_keywords(line: &str) -> Vec<(usize, DiagnosticKind)> {
     let mut diagnostics = vec![];
     for line_match in KEYWORD_REGEX.captures_iter(line) {
@@ -137,7 +137,7 @@ pub fn whitespace_around_keywords(line: &str) -> Vec<(usize, DiagnosticKind)> {
     diagnostics
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "logical_lines"))]
 pub fn whitespace_around_keywords(_line: &str) -> Vec<(usize, DiagnosticKind)> {
     vec![]
 }

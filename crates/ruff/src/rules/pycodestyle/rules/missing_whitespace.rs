@@ -28,7 +28,7 @@ impl AlwaysAutofixableViolation for MissingWhitespace {
 }
 
 /// E231
-#[cfg(debug_assertions)]
+#[cfg(feature = "logical_lines")]
 pub fn missing_whitespace(
     line: &str,
     row: usize,
@@ -86,7 +86,7 @@ pub fn missing_whitespace(
     diagnostics
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "logical_lines"))]
 pub fn missing_whitespace(
     _line: &str,
     _row: usize,
