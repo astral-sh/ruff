@@ -4,7 +4,7 @@ use log::error;
 use rustpython_parser as parser;
 use rustpython_parser::ast::{Location, StmtKind, Suite};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -194,7 +194,7 @@ fn add_required_import(
         }
 
         // Construct the fix.
-        diagnostic.amend(Fix::insertion(contents, splice));
+        diagnostic.amend(Edit::insertion(contents, splice));
     }
     Some(diagnostic)
 }

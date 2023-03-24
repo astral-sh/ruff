@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -70,7 +70,7 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
         Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Fix::replacement(
+        diagnostic.amend(Edit::replacement(
             format!("self.{target}"),
             expr.location,
             expr.end_location.unwrap(),

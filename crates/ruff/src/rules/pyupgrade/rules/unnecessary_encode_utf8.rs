@@ -1,7 +1,7 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
@@ -67,7 +67,7 @@ fn is_default_encode(args: &[Expr], kwargs: &[Keyword]) -> bool {
     }
 }
 
-/// Return a [`Fix`] for a default `encode` call removing the encoding argument,
+/// Return a [`Edit`] for a default `encode` call removing the encoding argument,
 /// keyword, or positional.
 fn delete_default_encode_arg_or_kwarg(
     expr: &Expr,
@@ -78,13 +78,13 @@ fn delete_default_encode_arg_or_kwarg(
     if let Some(arg) = args.get(0) {
         let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from(expr));
         if patch {
-            diagnostic.amend(Fix::deletion(arg.location, arg.end_location.unwrap()));
+            diagnostic.amend(Edit::deletion(arg.location, arg.end_location.unwrap()));
         }
         Some(diagnostic)
     } else if let Some(kwarg) = kwargs.get(0) {
         let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from(expr));
         if patch {
-            diagnostic.amend(Fix::deletion(kwarg.location, kwarg.end_location.unwrap()));
+            diagnostic.amend(Edit::deletion(kwarg.location, kwarg.end_location.unwrap()));
         }
         Some(diagnostic)
     } else {
@@ -92,7 +92,7 @@ fn delete_default_encode_arg_or_kwarg(
     }
 }
 
-/// Return a [`Fix`] replacing the call to encode by a `"b"` prefix on the string.
+/// Return a [`Edit`] replacing the call to encode by a `"b"` prefix on the string.
 fn replace_with_bytes_literal(
     expr: &Expr,
     constant: &Expr,
@@ -127,7 +127,7 @@ fn replace_with_bytes_literal(
             }
             prev = Some(end);
         }
-        diagnostic.amend(Fix::replacement(
+        diagnostic.amend(Edit::replacement(
             replacement,
             expr.location,
             expr.end_location.unwrap(),

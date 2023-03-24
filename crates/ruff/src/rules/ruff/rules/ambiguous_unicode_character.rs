@@ -1,7 +1,7 @@
 use once_cell::sync::Lazy;
 use rustc_hash::FxHashMap;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, DiagnosticKind, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, DiagnosticKind, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
@@ -1730,7 +1730,7 @@ pub fn ambiguous_unicode_character(
                 );
                 if settings.rules.enabled(diagnostic.kind.rule()) {
                     if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-                        diagnostic.amend(Fix::replacement(
+                        diagnostic.amend(Edit::replacement(
                             (*representant as char).to_string(),
                             location,
                             end_location,

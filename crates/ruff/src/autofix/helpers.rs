@@ -6,7 +6,7 @@ use libcst_native::{
 use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Location, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::to_absolute;
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
@@ -178,7 +178,7 @@ pub fn delete_stmt(
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,
-) -> Result<Fix> {
+) -> Result<Edit> {
     if parent
         .map(|parent| is_lone_child(stmt, parent, deleted))
         .map_or(Ok(None), |v| v.map(Some))?
@@ -186,7 +186,7 @@ pub fn delete_stmt(
     {
         // If removing this node would lead to an invalid syntax tree, replace
         // it with a `pass`.
-        Ok(Fix::replacement(
+        Ok(Edit::replacement(
             "pass".to_string(),
             stmt.location,
             stmt.end_location.unwrap(),
@@ -194,22 +194,22 @@ pub fn delete_stmt(
     } else {
         Ok(if let Some(semicolon) = trailing_semicolon(stmt, locator) {
             let next = next_stmt_break(semicolon, locator);
-            Fix::deletion(stmt.location, next)
+            Edit::deletion(stmt.location, next)
         } else if helpers::match_leading_content(stmt, locator) {
-            Fix::deletion(stmt.location, stmt.end_location.unwrap())
+            Edit::deletion(stmt.location, stmt.end_location.unwrap())
         } else if helpers::preceded_by_continuation(stmt, indexer) {
             if is_end_of_file(stmt, locator) && stmt.location.column() == 0 {
                 // Special-case: a file can't end in a continuation.
-                Fix::replacement(
+                Edit::replacement(
                     stylist.line_ending().to_string(),
                     stmt.location,
                     stmt.end_location.unwrap(),
                 )
             } else {
-                Fix::deletion(stmt.location, stmt.end_location.unwrap())
+                Edit::deletion(stmt.location, stmt.end_location.unwrap())
             }
         } else {
-            Fix::deletion(
+            Edit::deletion(
                 Location::new(stmt.location.row(), 0),
                 Location::new(stmt.end_location.unwrap().row() + 1, 0),
             )
@@ -226,7 +226,7 @@ pub fn remove_unused_imports<'a>(
     locator: &Locator,
     indexer: &Indexer,
     stylist: &Stylist,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let module_text = locator.slice(stmt);
     let mut tree = match_module(module_text)?;
 
@@ -333,7 +333,7 @@ pub fn remove_unused_imports<'a>(
         };
         tree.codegen(&mut state);
 
-        Ok(Fix::replacement(
+        Ok(Edit::replacement(
             state.to_string(),
             stmt.location,
             stmt.end_location.unwrap(),
@@ -355,7 +355,7 @@ pub fn remove_argument(
     args: &[Expr],
     keywords: &[Keyword],
     remove_parentheses: bool,
-) -> Result<Fix> {
+) -> Result<Edit> {
     // TODO(sbrugman): Preserve trailing comments.
     let contents = locator.skip(stmt_at);
 
@@ -437,7 +437,7 @@ pub fn remove_argument(
     }
 
     match (fix_start, fix_end) {
-        (Some(start), Some(end)) => Ok(Fix::deletion(start, end)),
+        (Some(start), Some(end)) => Ok(Edit::deletion(start, end)),
         _ => {
             bail!("No fix could be constructed")
         }

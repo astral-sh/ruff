@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation, CacheKey};
 use ruff_python_ast::helpers::{create_stmt, from_relative_import, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
@@ -90,7 +90,7 @@ fn fix_banned_relative_import(
     module: Option<&str>,
     module_path: Option<&Vec<String>>,
     stylist: &Stylist,
-) -> Option<Fix> {
+) -> Option<Edit> {
     // Only fix is the module path is known.
     if let Some(mut parts) = module_path.cloned() {
         if *level? >= parts.len() {
@@ -140,7 +140,7 @@ fn fix_banned_relative_import(
             stylist,
         );
 
-        Some(Fix::replacement(
+        Some(Edit::replacement(
             content,
             stmt.location,
             stmt.end_location.unwrap(),

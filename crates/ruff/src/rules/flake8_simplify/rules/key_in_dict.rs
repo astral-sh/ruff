@@ -3,7 +3,7 @@ use libcst_native::{Codegen, CodegenState};
 use log::error;
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -91,7 +91,7 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
         range,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Fix::replacement(
+        diagnostic.amend(Edit::replacement(
             value_content,
             right.location,
             right.end_location.unwrap(),

@@ -3,7 +3,7 @@
 use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::Range;
 
@@ -223,7 +223,7 @@ pub fn check_noqa(
                                     trailing_spaces,
                                 ));
                             } else {
-                                diagnostic.amend(Fix::replacement(
+                                diagnostic.amend(Edit::replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),
                                     Location::new(row + 1, start_char),
                                     Location::new(row + 1, end_char),
@@ -242,7 +242,7 @@ pub fn check_noqa(
     ignored_diagnostics
 }
 
-/// Generate a [`Fix`] to delete a `noqa` directive.
+/// Generate a [`Edit`] to delete a `noqa` directive.
 fn delete_noqa(
     row: usize,
     line: &str,
@@ -250,15 +250,15 @@ fn delete_noqa(
     start_byte: usize,
     end_byte: usize,
     trailing_spaces: usize,
-) -> Fix {
+) -> Edit {
     if start_byte - leading_spaces == 0 && end_byte == line.len() {
         // Ex) `# noqa`
-        Fix::deletion(Location::new(row + 1, 0), Location::new(row + 2, 0))
+        Edit::deletion(Location::new(row + 1, 0), Location::new(row + 2, 0))
     } else if end_byte == line.len() {
         // Ex) `x = 1  # noqa`
         let start_char = line[..start_byte].chars().count();
         let end_char = start_char + line[start_byte..end_byte].chars().count();
-        Fix::deletion(
+        Edit::deletion(
             Location::new(row + 1, start_char - leading_spaces),
             Location::new(row + 1, end_char + trailing_spaces),
         )
@@ -266,7 +266,7 @@ fn delete_noqa(
         // Ex) `x = 1  # noqa  # type: ignore`
         let start_char = line[..start_byte].chars().count();
         let end_char = start_char + line[start_byte..end_byte].chars().count();
-        Fix::deletion(
+        Edit::deletion(
             Location::new(row + 1, start_char),
             Location::new(row + 1, end_char + trailing_spaces),
         )
@@ -274,7 +274,7 @@ fn delete_noqa(
         // Ex) `x = 1  # noqa here`
         let start_char = line[..start_byte].chars().count();
         let end_char = start_char + line[start_byte..end_byte].chars().count();
-        Fix::deletion(
+        Edit::deletion(
             Location::new(row + 1, start_char + 1 + 1),
             Location::new(row + 1, end_char + trailing_spaces),
         )

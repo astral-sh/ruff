@@ -2,7 +2,7 @@ use anyhow::Result;
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Keyword, Location, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{collect_arg_names, collect_call_path};
 use ruff_python_ast::source_code::Locator;
@@ -236,7 +236,7 @@ fn has_abstractmethod_decorator(decorators: &[Expr], checker: &Checker) -> bool 
 fn pytest_fixture_parentheses(
     checker: &mut Checker,
     decorator: &Expr,
-    fix: Fix,
+    fix: Edit,
     preferred: &str,
     actual: &str,
 ) {
@@ -260,7 +260,7 @@ pub fn fix_extraneous_scope_function(
     expr_end: Location,
     args: &[Expr],
     keywords: &[Keyword],
-) -> Result<Fix> {
+) -> Result<Edit> {
     remove_argument(locator, stmt_at, expr_at, expr_end, args, keywords, false)
 }
 
@@ -282,7 +282,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 && keywords.is_empty()
             {
                 let fix =
-                    Fix::deletion(func.end_location.unwrap(), decorator.end_location.unwrap());
+                    Edit::deletion(func.end_location.unwrap(), decorator.end_location.unwrap());
                 pytest_fixture_parentheses(checker, decorator, fix, "", "()");
             }
 
@@ -341,7 +341,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                 .enabled(Rule::PytestFixtureIncorrectParenthesesStyle)
                 && checker.settings.flake8_pytest_style.fixture_parentheses
             {
-                let fix = Fix::insertion("()".to_string(), decorator.end_location.unwrap());
+                let fix = Edit::insertion("()".to_string(), decorator.end_location.unwrap());
                 pytest_fixture_parentheses(checker, decorator, fix, "()", "");
             }
         }
@@ -401,7 +401,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
                             Range::from(stmt),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.amend(Fix::replacement(
+                            diagnostic.amend(Edit::replacement(
                                 "return".to_string(),
                                 stmt.location,
                                 Location::new(
@@ -479,7 +479,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                 if checker.patch(diagnostic.kind.rule()) {
                     let start = Location::new(mark.location.row(), 0);
                     let end = Location::new(mark.end_location.unwrap().row() + 1, 0);
-                    diagnostic.amend(Fix::deletion(start, end));
+                    diagnostic.amend(Edit::deletion(start, end));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -496,7 +496,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                 if checker.patch(diagnostic.kind.rule()) {
                     let start = Location::new(mark.location.row(), 0);
                     let end = Location::new(mark.end_location.unwrap().row() + 1, 0);
-                    diagnostic.amend(Fix::deletion(start, end));
+                    diagnostic.amend(Edit::deletion(start, end));
                 }
                 checker.diagnostics.push(diagnostic);
             }
