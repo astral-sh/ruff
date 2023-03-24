@@ -3966,10 +3966,7 @@ where
 }
 
 impl<'a> Checker<'a> {
-    fn add_binding<'b>(&mut self, name: &'b str, binding: Binding<'a>)
-    where
-        'b: 'a,
-    {
+    fn add_binding(&mut self, name: &'a str, binding: Binding<'a>) {
         let binding_id = self.ctx.bindings.next_id();
         if let Some((stack_index, existing_binding_index)) = self
             .ctx
@@ -4274,10 +4271,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn handle_node_store<'b>(&mut self, id: &'b str, expr: &Expr)
-    where
-        'b: 'a,
-    {
+    fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
         let parent = self.ctx.current_stmt().0;
 
         if self.settings.rules.enabled(Rule::UndefinedLocal) {
@@ -4470,10 +4464,7 @@ impl<'a> Checker<'a> {
         );
     }
 
-    fn handle_node_delete<'b>(&mut self, expr: &'b Expr)
-    where
-        'b: 'a,
-    {
+    fn handle_node_delete(&mut self, expr: &'a Expr) {
         let ExprKind::Name { id, .. } = &expr.node else {
             return;
         };
@@ -4497,10 +4488,7 @@ impl<'a> Checker<'a> {
         ));
     }
 
-    fn visit_docstring<'b>(&mut self, python_ast: &'b Suite) -> bool
-    where
-        'b: 'a,
-    {
+    fn visit_docstring(&mut self, python_ast: &'a Suite) -> bool {
         if self.settings.rules.enabled(Rule::FStringDocstring) {
             flake8_bugbear::rules::f_string_docstring(self, python_ast);
         }
@@ -4537,10 +4525,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn check_deferred_string_type_definitions<'b>(&mut self, allocator: &'b mut Vec<Expr>)
-    where
-        'b: 'a,
-    {
+    fn check_deferred_string_type_definitions(&mut self, allocator: &'a mut Vec<Expr>) {
         let mut stacks = Vec::with_capacity(self.deferred.string_type_definitions.len());
         self.deferred.string_type_definitions.reverse();
         while let Some((range, value, (in_annotation, in_type_checking_block), deferral)) =
