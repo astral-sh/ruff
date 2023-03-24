@@ -209,6 +209,7 @@ jobs:
           python-version: "3.11"
       - name: "Install Rust toolchain"
         run: rustup show
+      - uses: Swatinem/rust-cache@v2
       - name: "Install pre-commit"
         run: pip install pre-commit
       - name: "Cache pre-commit"
