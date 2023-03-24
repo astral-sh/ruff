@@ -1,5 +1,4 @@
 use anyhow::Result;
-use log::error;
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Keyword, Location, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -317,19 +316,18 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                             Range::from(scope_keyword),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            match fix_extraneous_scope_function(
-                                checker.locator,
-                                decorator.location,
-                                diagnostic.location,
-                                diagnostic.end_location,
-                                args,
-                                keywords,
-                            ) {
-                                Ok(fix) => {
-                                    diagnostic.amend(fix);
-                                }
-                                Err(e) => error!("Failed to generate fix: {e}"),
-                            }
+                            let location = diagnostic.location;
+                            let end_location = diagnostic.end_location;
+                            diagnostic.try_amend(|| {
+                                fix_extraneous_scope_function(
+                                    checker.locator,
+                                    decorator.location,
+                                    location,
+                                    end_location,
+                                    args,
+                                    keywords,
+                                )
+                            });
                         }
                         checker.diagnostics.push(diagnostic);
                     }

@@ -2131,6 +2131,8 @@ dependencies = [
 name = "ruff_diagnostics"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
+ "log",
  "ruff_python_ast",
  "rustpython-parser",
  "serde",

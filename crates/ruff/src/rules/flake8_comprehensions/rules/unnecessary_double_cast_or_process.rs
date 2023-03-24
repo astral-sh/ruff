@@ -115,13 +115,13 @@ pub fn unnecessary_double_cast_or_process(
     {
         let mut diagnostic = create_diagnostic(inner, outer, Range::from(expr));
         if checker.patch(diagnostic.kind.rule()) {
-            if let Ok(fix) = fixes::fix_unnecessary_double_cast_or_process(
-                checker.locator,
-                checker.stylist,
-                expr,
-            ) {
-                diagnostic.amend(fix);
-            }
+            diagnostic.try_amend(|| {
+                fixes::fix_unnecessary_double_cast_or_process(
+                    checker.locator,
+                    checker.stylist,
+                    expr,
+                )
+            });
         }
         checker.diagnostics.push(diagnostic);
     }
