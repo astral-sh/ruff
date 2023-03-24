@@ -25,12 +25,12 @@ static URL_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^https?://\S+$").unwra
 
 pub fn is_overlong(
     line: &str,
-    line_length: usize,
+    line_width: usize,
     limit: usize,
     ignore_overlong_task_comments: bool,
     task_tags: &[String],
 ) -> bool {
-    if line_length <= limit {
+    if line_width <= limit {
         return false;
     }
 

@@ -32,3 +32,6 @@ mimalloc = "0.1.34"
 
 [target.'cfg(all(not(target_os = "windows"), not(target_os = "openbsd"), any(target_arch = "x86_64", target_arch = "aarch64", target_arch = "powerpc64")))'.dev-dependencies]
 tikv-jemallocator = "0.5.0"
+
+[features]
+logical_lines = [ "ruff/logical_lines" ]
