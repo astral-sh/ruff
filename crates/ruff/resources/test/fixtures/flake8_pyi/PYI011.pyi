@@ -11,31 +11,73 @@ def f12(
 ) -> None: ...
 def f11(*, x: str = "x") -> None: ...  # OK
 def f13(
-    x: list[
-        str
-    ] = [  # OK
+    x: list[str] = [  # OK
         "foo",
         "bar",
         "baz",
     ]
 ) -> None: ...
 def f14(
-    x: tuple[
-        str, ...
-    ] = (  # OK
+    x: tuple[str, ...] = (  # OK
         "foo",
         "bar",
         "baz",
     )
 ) -> None: ...
 def f15(
-    x: set[
-        str
-    ] = {  # OK
+    x: set[str] = {  # OK
         "foo",
         "bar",
         "baz",
     }
+) -> None: ...
+def f151(x: dict[int, int] = {1: 2}) -> None: ...  # Ok
+def f152(
+    x: dict[
+        int, int
+    ] = {  # Error PYI011 Only simple default values allowed for typed arguments
+        1: 2,
+        **{3: 4},
+    }
+) -> None: ...
+def f153(
+    x: list[
+        int
+    ] = [  # Error PYI011 Only simple default values allowed for typed arguments
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+    ]
+) -> None: ...
+def f154(
+    x: tuple[
+        str, tuple[str, ...]
+    ] = (  # Error PYI011 Only simple default values allowed for typed arguments
+        "foo",
+        ("bar", "baz"),
+    )
+) -> None: ...
+def f141(
+    x: list[
+        int
+    ] = [  # Error PYI011 Only simple default values allowed for typed arguments
+        *range(10)
+    ],
+) -> None: ...
+def f142(
+    x: list[
+        int
+    ] = list(  # Error PYI011 Only simple default values allowed for typed arguments
+        range(10)
+    ),
 ) -> None: ...
 def f16(
     x: frozenset[
@@ -109,8 +151,11 @@ def f35(
     + 1j,
 ) -> None: ...
 def f36(
-    *, x: str = sys.version,  # OK
+    *,
+    x: str = sys.version,  # OK
 ) -> None: ...
 def f37(
-    *, x: str = "" + "",  # Error PYI011 Only simple default values allowed for typed arguments
+    *,
+    x: str = ""  # Error PYI011 Only simple default values allowed for typed arguments
+    + "",
 ) -> None: ...
