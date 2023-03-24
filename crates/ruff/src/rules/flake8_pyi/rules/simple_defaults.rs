@@ -58,8 +58,28 @@ const ALLOWED_ATTRIBUTES_IN_DEFAULTS: &[&[&str]] = &[
     &["sys", "winver"],
 ];
 
-fn is_valid_default_value_with_annotation(default: &Expr, checker: &Checker) -> bool {
+fn is_valid_default_value_with_annotation(
+    default: &Expr,
+    checker: &Checker,
+    allow_container: bool,
+) -> bool {
     match &default.node {
+        ExprKind::List { elts, .. } | ExprKind::Tuple { elts, .. } | ExprKind::Set { elts, .. } => {
+            return allow_container
+                && elts.len() <= 10
+                && elts
+                    .iter()
+                    .all(|e| is_valid_default_value_with_annotation(e, checker, false));
+        }
+        ExprKind::Dict { keys, values, .. } => {
+            return allow_container
+                && keys.len() <= 10
+                && keys.iter().zip(values).all(|(k, v)| {
+                    k.as_ref().map_or(false, |k| {
+                        is_valid_default_value_with_annotation(k, checker, false)
+                    }) && is_valid_default_value_with_annotation(v, checker, false)
+                });
+        }
         ExprKind::Constant {
             value: Constant::Ellipsis | Constant::None,
             ..
@@ -192,7 +212,7 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 .and_then(|i| args.defaults.get(i))
             {
                 if arg.node.annotation.is_some() {
-                    if !is_valid_default_value_with_annotation(default, checker) {
+                    if !is_valid_default_value_with_annotation(default, checker, true) {
                         let mut diagnostic =
                             Diagnostic::new(TypedArgumentDefaultInStub, Range::from(default));
 
@@ -219,7 +239,7 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 .and_then(|i| args.kw_defaults.get(i))
             {
                 if kwarg.node.annotation.is_some() {
-                    if !is_valid_default_value_with_annotation(default, checker) {
+                    if !is_valid_default_value_with_annotation(default, checker, true) {
                         let mut diagnostic =
                             Diagnostic::new(TypedArgumentDefaultInStub, Range::from(default));
 
@@ -249,7 +269,7 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 .and_then(|i| args.defaults.get(i))
             {
                 if arg.node.annotation.is_none() {
-                    if !is_valid_default_value_with_annotation(default, checker) {
+                    if !is_valid_default_value_with_annotation(default, checker, true) {
                         checker
                             .diagnostics
                             .push(Diagnostic::new(ArgumentDefaultInStub, Range::from(default)));
@@ -267,7 +287,7 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 .and_then(|i| args.kw_defaults.get(i))
             {
                 if kwarg.node.annotation.is_none() {
-                    if !is_valid_default_value_with_annotation(default, checker) {
+                    if !is_valid_default_value_with_annotation(default, checker, true) {
                         checker
                             .diagnostics
                             .push(Diagnostic::new(ArgumentDefaultInStub, Range::from(default)));

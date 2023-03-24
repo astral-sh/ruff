@@ -21,63 +21,11 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 7
-    column: 6
-  end_location:
-    row: 11
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: ArgumentDefaultInStub
-    body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 6
-  end_location:
-    row: 18
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: ArgumentDefaultInStub
-    body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 6
-  end_location:
-    row: 25
-    column: 5
-  fix: ~
-  parent: ~
-- kind:
-    name: ArgumentDefaultInStub
-    body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
-  location:
-    row: 27
-    column: 10
-  end_location:
-    row: 27
-    column: 45
-  fix: ~
-  parent: ~
-- kind:
-    name: ArgumentDefaultInStub
-    body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
-  location:
     row: 29
     column: 6
   end_location:
-    row: 29
-    column: 19
+    row: 32
+    column: 5
   fix: ~
   parent: ~
 - kind:
@@ -86,10 +34,49 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 32
+    row: 35
     column: 6
   end_location:
-    row: 32
+    row: 47
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: ArgumentDefaultInStub
+    body: Only simple default values allowed for arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 50
+    column: 6
+  end_location:
+    row: 53
+    column: 5
+  fix: ~
+  parent: ~
+- kind:
+    name: ArgumentDefaultInStub
+    body: Only simple default values allowed for arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 56
+    column: 6
+  end_location:
+    row: 56
+    column: 18
+  fix: ~
+  parent: ~
+- kind:
+    name: ArgumentDefaultInStub
+    body: Only simple default values allowed for arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 59
+    column: 6
+  end_location:
+    row: 59
     column: 21
   fix: ~
   parent: ~
@@ -99,10 +86,49 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 35
+    row: 61
+    column: 10
+  end_location:
+    row: 61
+    column: 45
+  fix: ~
+  parent: ~
+- kind:
+    name: ArgumentDefaultInStub
+    body: Only simple default values allowed for arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 63
     column: 6
   end_location:
-    row: 35
+    row: 63
+    column: 19
+  fix: ~
+  parent: ~
+- kind:
+    name: ArgumentDefaultInStub
+    body: Only simple default values allowed for arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 66
+    column: 6
+  end_location:
+    row: 66
+    column: 21
+  fix: ~
+  parent: ~
+- kind:
+    name: ArgumentDefaultInStub
+    body: Only simple default values allowed for arguments
+    suggestion: ~
+    fixable: false
+  location:
+    row: 69
+    column: 6
+  end_location:
+    row: 69
     column: 15
   fix: ~
   parent: ~
@@ -112,10 +138,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 38
+    row: 72
     column: 6
   end_location:
-    row: 38
+    row: 72
     column: 11
   fix: ~
   parent: ~
@@ -125,10 +151,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 41
+    row: 75
     column: 6
   end_location:
-    row: 41
+    row: 75
     column: 13
   fix: ~
   parent: ~
@@ -138,10 +164,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 44
+    row: 78
     column: 6
   end_location:
-    row: 44
+    row: 78
     column: 19
   fix: ~
   parent: ~
