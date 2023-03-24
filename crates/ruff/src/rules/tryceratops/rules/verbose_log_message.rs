@@ -73,7 +73,7 @@ pub fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandler]) {
 
         // Find all calls to `logging.exception`.
         let calls = {
-            let mut visitor = LoggerCandidateVisitor::default();
+            let mut visitor = LoggerCandidateVisitor::new(&checker.ctx);
             visitor.visit_body(body);
             visitor.calls
         };

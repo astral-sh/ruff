@@ -8,11 +8,24 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 3
+    row: 4
     column: 13
   end_location:
-    row: 3
+    row: 4
     column: 40
+  fix: ~
+  parent: ~
+- kind:
+    name: LoggingStringFormat
+    body: "Logging statement uses `string.format()`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 5
+    column: 9
+  end_location:
+    row: 5
+    column: 36
   fix: ~
   parent: ~
 

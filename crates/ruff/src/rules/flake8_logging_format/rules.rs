@@ -127,7 +127,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
 
 /// Check logging calls for violations.
 pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    if !is_logger_candidate(func) {
+    if !is_logger_candidate(&checker.ctx, func) {
         return;
     }
 
