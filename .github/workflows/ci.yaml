@@ -217,4 +217,9 @@ jobs:
             path: ~/.cache/pre-commit
             key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
       - name: "Run pre-commit"
-        run: SKIP=cargo-fmt,clippy,dev-generate-all pre-commit run --all-files --show-diff-on-failure --color=always >> $GITHUB_STEP_SUMMARY
+        run: |
+          echo '```console' > $GITHUB_STEP_SUMMARY
+          # Enable color output for pre-commit and remove it for the summary
+          SKIP=cargo-fmt,clippy,dev-generate-all pre-commit run --all-files --show-diff-on-failure --color=always | \
+            tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> $GITHUB_STEP_SUMMARY) >&1
+          echo '```' >> $GITHUB_STEP_SUMMARY
