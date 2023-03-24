@@ -2033,6 +2033,7 @@ dependencies = [
  "textwrap",
  "thiserror",
  "toml",
+ "unicode-width",
 ]
 
 [[package]]

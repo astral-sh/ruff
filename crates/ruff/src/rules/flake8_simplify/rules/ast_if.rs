@@ -1,6 +1,7 @@
 use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
+use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -287,7 +288,7 @@ pub fn nested_if_statements(
                 if fix
                     .content
                     .universal_newlines()
-                    .all(|line| line.len() <= checker.settings.line_length)
+                    .all(|line| line.width() <= checker.settings.line_length)
                 {
                     diagnostic.amend(fix);
                 }
@@ -490,7 +491,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     let contents = unparse_stmt(&ternary, checker.stylist);
 
     // Don't flag if the resulting expression would exceed the maximum line length.
-    if stmt.location.column() + contents.len() > checker.settings.line_length {
+    if stmt.location.column() + contents.width() > checker.settings.line_length {
         return;
     }
 
@@ -839,7 +840,7 @@ pub fn use_dict_get_with_default(
     );
 
     // Don't flag if the resulting expression would exceed the maximum line length.
-    if stmt.location.column() + contents.len() > checker.settings.line_length {
+    if stmt.location.column() + contents.width() > checker.settings.line_length {
         return;
     }
 

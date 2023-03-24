@@ -1,6 +1,7 @@
 use rustpython_parser::ast::{
     Cmpop, Comprehension, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Unaryop,
 };
+use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -211,7 +212,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                 );
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
-                if stmt.location.column() + contents.len() > checker.settings.line_length {
+                if stmt.location.column() + contents.width() > checker.settings.line_length {
                     return;
                 }
 
@@ -288,7 +289,7 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                 );
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
-                if stmt.location.column() + contents.len() > checker.settings.line_length {
+                if stmt.location.column() + contents.width() > checker.settings.line_length {
                     return;
                 }
 

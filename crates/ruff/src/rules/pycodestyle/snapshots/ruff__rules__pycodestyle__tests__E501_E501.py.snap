@@ -17,6 +17,19 @@ expression: diagnostics
   parent: ~
 - kind:
     name: LineTooLong
+    body: Line too long (95 > 88 characters)
+    suggestion: ~
+    fixable: false
+  location:
+    row: 16
+    column: 88
+  end_location:
+    row: 16
+    column: 88
+  fix: ~
+  parent: ~
+- kind:
+    name: LineTooLong
     body: Line too long (127 > 88 characters)
     suggestion: ~
     fixable: false
