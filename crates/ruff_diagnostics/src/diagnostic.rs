@@ -6,7 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use ruff_python_ast::types::Range;
 
-use crate::edit::Edit;
+use crate::Fix;
 
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -27,31 +27,31 @@ pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub location: Location,
     pub end_location: Location,
-    pub fix: Option<Edit>,
+    pub fix: Fix,
     pub parent: Option<Location>,
 }
 
 impl Diagnostic {
-    pub fn new<K: Into<DiagnosticKind>>(kind: K, range: Range) -> Self {
+    pub fn new<T: Into<DiagnosticKind>>(kind: T, range: Range) -> Self {
         Self {
             kind: kind.into(),
             location: range.location,
             end_location: range.end_location,
-            fix: None,
+            fix: Fix::empty(),
             parent: None,
         }
     }
 
-    /// Set the [`Edit`] used to fix the diagnostic.
-    pub fn set_fix(&mut self, fix: Edit) {
-        self.fix = Some(fix);
+    /// Set the [`Fix`] used to fix the diagnostic.
+    pub fn set_fix<T: Into<Fix>>(&mut self, fix: T) {
+        self.fix = fix.into();
     }
 
-    /// Set the [`Edit`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
     /// Otherwise, log the error.
-    pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Edit>) {
+    pub fn try_set_fix<T: Into<Fix>>(&mut self, func: impl FnOnce() -> Result<T>) {
         match func() {
-            Ok(fix) => self.fix = Some(fix),
+            Ok(fix) => self.fix = fix.into(),
             Err(err) => error!("Failed to create fix: {}", err),
         }
     }

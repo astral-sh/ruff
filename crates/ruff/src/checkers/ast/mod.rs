@@ -2455,7 +2455,7 @@ where
                     pyupgrade::rules::replace_universal_newlines(self, func, keywords);
                 }
                 if self.settings.rules.enabled(Rule::ReplaceStdoutStderr) {
-                    pyupgrade::rules::replace_stdout_stderr(self, expr, func, keywords);
+                    pyupgrade::rules::replace_stdout_stderr(self, expr, func, args, keywords);
                 }
                 if self.settings.rules.enabled(Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias_call(self, func);

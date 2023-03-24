@@ -17,6 +17,7 @@ use ruff::rules::{
 use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
+use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -50,20 +51,18 @@ export interface Diagnostic {
 "#;
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedFix {
+    message: Option<String>,
+    edits: Vec<Edit>,
+}
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
     pub location: Location,
     pub end_location: Location,
     pub fix: Option<ExpandedFix>,
-}
-
-#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
-pub struct ExpandedFix {
-    content: String,
-    message: Option<String>,
-    location: Location,
-    end_location: Location,
 }
 
 #[wasm_bindgen(start)]
@@ -204,12 +203,14 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
             message: message.kind.body,
             location: message.location,
             end_location: message.end_location,
-            fix: message.fix.map(|fix| ExpandedFix {
-                content: fix.content,
-                message: message.kind.suggestion,
-                location: fix.location,
-                end_location: fix.end_location,
-            }),
+            fix: if message.fix.is_empty() {
+                None
+            } else {
+                Some(ExpandedFix {
+                    message: message.kind.suggestion,
+                    edits: message.fix.edits().to_vec(),
+                })
+            },
         })
         .collect();
 

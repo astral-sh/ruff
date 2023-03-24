@@ -1,12 +1,13 @@
+use anyhow::Result;
 use rustpython_parser::ast::{Expr, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
-use ruff_python_ast::whitespace::indentation;
 
+use crate::autofix::helpers::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -24,87 +25,46 @@ impl AlwaysAutofixableViolation for ReplaceStdoutStderr {
     }
 }
 
-#[derive(Debug)]
-struct MiddleContent<'a> {
-    contents: &'a str,
-    multi_line: bool,
-}
-
-/// Return the number of "dirty" characters.
-fn dirty_count(iter: impl Iterator<Item = char>) -> usize {
-    let mut the_count = 0;
-    for current_char in iter {
-        if current_char == ' '
-            || current_char == ','
-            || current_char == '\n'
-            || current_char == '\r'
-        {
-            the_count += 1;
-        } else {
-            break;
-        }
-    }
-    the_count
-}
-
-/// Extract the `Middle` content between two arguments.
-fn extract_middle(contents: &str) -> Option<MiddleContent> {
-    let multi_line = contents.contains('\n');
-    let start_gap = dirty_count(contents.chars());
-    if contents.len() == start_gap {
-        return None;
-    }
-    let end_gap = dirty_count(contents.chars().rev());
-    Some(MiddleContent {
-        contents: &contents[start_gap..contents.len() - end_gap],
-        multi_line,
-    })
-}
-
 /// Generate a [`Edit`] for a `stdout` and `stderr` [`Keyword`] pair.
 fn generate_fix(
-    stylist: &Stylist,
     locator: &Locator,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
     stdout: &Keyword,
     stderr: &Keyword,
-) -> Option<Edit> {
-    let line_end = stylist.line_ending().as_str();
-    let first = if stdout.location < stderr.location {
-        stdout
+) -> Result<Fix> {
+    let (first, second) = if stdout.location < stderr.location {
+        (stdout, stderr)
     } else {
-        stderr
+        (stderr, stdout)
     };
-    let last = if stdout.location > stderr.location {
-        stdout
-    } else {
-        stderr
-    };
-    let mut contents = String::from("capture_output=True");
-    if let Some(middle) =
-        extract_middle(locator.slice(Range::new(first.end_location.unwrap(), last.location)))
-    {
-        if middle.multi_line {
-            let Some(indent) = indentation(locator, first) else {
-                return None;
-            };
-            contents.push(',');
-            contents.push_str(line_end);
-            contents.push_str(indent);
-        } else {
-            contents.push(',');
-            contents.push(' ');
-        }
-        contents.push_str(middle.contents);
-    }
-    Some(Edit::replacement(
-        contents,
-        first.location,
-        last.end_location.unwrap(),
-    ))
+    Ok(Fix::new(vec![
+        Edit::replacement(
+            "capture_output=True".to_string(),
+            first.location,
+            first.end_location.unwrap(),
+        ),
+        remove_argument(
+            locator,
+            func.location,
+            second.location,
+            second.end_location.unwrap(),
+            args,
+            keywords,
+            false,
+        )?,
+    ]))
 }
 
 /// UP022
-pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, func: &Expr, kwargs: &[Keyword]) {
+pub fn replace_stdout_stderr(
+    checker: &mut Checker,
+    expr: &Expr,
+    func: &Expr,
+    args: &[Expr],
+    keywords: &[Keyword],
+) {
     if checker
         .ctx
         .resolve_call_path(func)
@@ -113,10 +73,10 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, func: &Expr, kw
         })
     {
         // Find `stdout` and `stderr` kwargs.
-        let Some(stdout) = find_keyword(kwargs, "stdout") else {
+        let Some(stdout) = find_keyword(keywords, "stdout") else {
             return;
         };
-        let Some(stderr) = find_keyword(kwargs, "stderr") else {
+        let Some(stderr) = find_keyword(keywords, "stderr") else {
             return;
         };
 
@@ -139,9 +99,9 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, func: &Expr, kw
 
         let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, Range::from(expr));
         if checker.patch(diagnostic.kind.rule()) {
-            if let Some(fix) = generate_fix(checker.stylist, checker.locator, stdout, stderr) {
-                diagnostic.set_fix(fix);
-            };
+            diagnostic.try_set_fix(|| {
+                generate_fix(checker.locator, func, args, keywords, stdout, stderr)
+            });
         }
         checker.diagnostics.push(diagnostic);
     }
