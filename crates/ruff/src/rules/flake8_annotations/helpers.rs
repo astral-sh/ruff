@@ -21,7 +21,7 @@ pub(super) fn match_function_def(stmt: &Stmt) -> (&str, &Arguments, Option<&Expr
             returns,
             body,
             ..
-        } => (name, args, returns.as_ref().map(|x| &**x), body),
+        } => (name, args, returns.as_ref().map(|expr| &**expr), body),
         _ => panic!("Found non-FunctionDef in match_name"),
     }
 }
