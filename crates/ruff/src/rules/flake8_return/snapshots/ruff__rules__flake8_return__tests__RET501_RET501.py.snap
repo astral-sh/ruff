@@ -22,4 +22,24 @@ expression: diagnostics
       row: 4
       column: 15
   parent: ~
+- kind:
+    name: UnnecessaryReturnNone
+    body: "Do not explicitly `return None` in function if it is the only possible return value"
+    suggestion: "Remove explicit `return None`"
+    fixable: true
+  location:
+    row: 14
+    column: 8
+  end_location:
+    row: 14
+    column: 19
+  fix:
+    content: return
+    location:
+      row: 14
+      column: 8
+    end_location:
+      row: 14
+      column: 19
+  parent: ~
 
