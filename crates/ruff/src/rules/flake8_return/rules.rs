@@ -4,6 +4,7 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind}
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::helpers::{elif_else_range, end_of_statement};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::Visitor;
@@ -484,7 +485,7 @@ fn superfluous_else(checker: &mut Checker, stack: &Stack) -> bool {
 }
 
 /// Run all checks from the `flake8-return` plugin.
-pub fn function(checker: &mut Checker, body: &[Stmt]) {
+pub fn function(checker: &mut Checker, body: &[Stmt], returns: &Option<Box<Expr>>) {
     // Skip empty functions.
     if body.is_empty() {
         return;
@@ -535,7 +536,10 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
 
     if !result_exists(&stack.returns) {
         if checker.settings.rules.enabled(Rule::UnnecessaryReturnNone) {
-            unnecessary_return_none(checker, &stack);
+            // Skip functions that have a return annotation that is not `None`.
+            if returns.is_none() || is_const_none(returns.as_ref().unwrap()) {
+                unnecessary_return_none(checker, &stack);
+            }
         }
         return;
     }

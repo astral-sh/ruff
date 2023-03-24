@@ -102,4 +102,24 @@ expression: diagnostics
       row: 51
       column: 0
   parent: ~
+- kind:
+    name: UselessReturn
+    body: "Useless `return` statement at end of function"
+    suggestion: "Remove useless `return` statement"
+    fixable: true
+  location:
+    row: 60
+    column: 8
+  end_location:
+    row: 60
+    column: 19
+  fix:
+    content: ""
+    location:
+      row: 60
+      column: 0
+    end_location:
+      row: 61
+      column: 0
+  parent: ~
 

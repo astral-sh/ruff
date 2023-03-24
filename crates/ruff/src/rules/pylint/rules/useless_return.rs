@@ -1,5 +1,5 @@
 use log::error;
-use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -46,7 +46,19 @@ impl AlwaysAutofixableViolation for UselessReturn {
 }
 
 /// PLR1711
-pub fn useless_return<'a>(checker: &mut Checker<'a>, stmt: &'a Stmt, body: &'a [Stmt]) {
+pub fn useless_return<'a>(
+    checker: &mut Checker<'a>,
+    stmt: &'a Stmt,
+    body: &'a [Stmt],
+    returns: &Option<Box<Expr>>,
+) {
+    // Skip functions that have a return annotation that is not `None`.
+    if let Some(returns) = returns {
+        if !is_const_none(returns) {
+            return;
+        }
+    }
+
     // Skip empty functions.
     if body.is_empty() {
         return;
