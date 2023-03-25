@@ -5,170 +5,261 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 3
     column: 6
   end_location:
     row: 3
     column: 16
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 3
+      column: 6
+    end_location:
+      row: 3
+      column: 16
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 29
     column: 6
   end_location:
     row: 32
     column: 5
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 29
+      column: 6
+    end_location:
+      row: 32
+      column: 5
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 35
     column: 6
   end_location:
     row: 47
     column: 5
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 35
+      column: 6
+    end_location:
+      row: 47
+      column: 5
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 50
     column: 6
   end_location:
     row: 53
     column: 5
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 50
+      column: 6
+    end_location:
+      row: 53
+      column: 5
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 56
     column: 6
   end_location:
     row: 56
     column: 18
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 56
+      column: 6
+    end_location:
+      row: 56
+      column: 18
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 59
     column: 6
   end_location:
     row: 59
     column: 21
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 59
+      column: 6
+    end_location:
+      row: 59
+      column: 21
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 61
     column: 10
   end_location:
     row: 61
     column: 45
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 61
+      column: 10
+    end_location:
+      row: 61
+      column: 45
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 63
     column: 6
   end_location:
     row: 63
     column: 19
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 63
+      column: 6
+    end_location:
+      row: 63
+      column: 19
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 66
     column: 6
   end_location:
     row: 66
     column: 21
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 66
+      column: 6
+    end_location:
+      row: 66
+      column: 21
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 69
     column: 6
   end_location:
     row: 69
     column: 15
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 69
+      column: 6
+    end_location:
+      row: 69
+      column: 15
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 72
     column: 6
   end_location:
     row: 72
     column: 11
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 72
+      column: 6
+    end_location:
+      row: 72
+      column: 11
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 75
     column: 6
   end_location:
     row: 75
     column: 13
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 75
+      column: 6
+    end_location:
+      row: 75
+      column: 13
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: ~
-    fixable: false
+    suggestion: "Replace default value with `...`"
+    fixable: true
   location:
     row: 78
     column: 6
   end_location:
     row: 78
     column: 19
-  fix: ~
+  fix:
+    content: "..."
+    location:
+      row: 78
+      column: 6
+    end_location:
+      row: 78
+      column: 19
   parent: ~
 
