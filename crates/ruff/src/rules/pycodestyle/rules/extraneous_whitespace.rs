@@ -2,10 +2,14 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
+use rustpython_parser::ast::Location;
+use rustpython_parser::Tok;
 
+use crate::rules::pycodestyle::rules::Whitespace;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
 /// Checks for the use of extraneous whitespace after "(".
@@ -101,32 +105,62 @@ impl Violation for WhitespaceBeforePunctuation {
     }
 }
 
-// TODO(charlie): Pycodestyle has a negative lookahead on the end.
-static EXTRANEOUS_WHITESPACE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"[\[({][ \t]|[ \t][]}),;:]").unwrap());
-
 /// E201, E202, E203
 #[cfg(feature = "logical_lines")]
-pub fn extraneous_whitespace(line: &str) -> Vec<(usize, DiagnosticKind)> {
+pub fn extraneous_whitespace(
+    tokens: &[(Location, &Tok, Location)],
+    locator: &Locator,
+) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
-    for line_match in EXTRANEOUS_WHITESPACE_REGEX.find_iter(line) {
-        let text = &line[line_match.range()];
-        let char = text.trim();
-        let found = line_match.start();
-        if text.chars().last().unwrap().is_ascii_whitespace() {
-            diagnostics.push((found + 1, WhitespaceAfterOpenBracket.into()));
-        } else if line.chars().nth(found - 1).map_or(false, |c| c != ',') {
-            if char == "}" || char == "]" || char == ")" {
-                diagnostics.push((found, WhitespaceBeforeCloseBracket.into()));
-            } else {
-                diagnostics.push((found, WhitespaceBeforePunctuation.into()));
+    let mut last_token: Option<&Tok> = None;
+
+    for (start, token, end) in tokens {
+        match token {
+            Tok::Lbrace | Tok::Lpar | Tok::Lsqb => {
+                let after = &locator.contents()[locator.offset(*end)..];
+
+                if !matches!(Whitespace::leading(after), Whitespace::None) {
+                    diagnostics.push((
+                        Location::new(end.row(), end.column()),
+                        WhitespaceAfterOpenBracket.into(),
+                    ));
+                }
             }
+            Tok::Rbrace | Tok::Rpar | Tok::Rsqb | Tok::Comma | Tok::Semi | Tok::Colon => {
+                let before = &locator.contents()[..locator.offset(*start)];
+
+                let diagnostic_kind = if matches!(token, Tok::Comma | Tok::Semi | Tok::Colon) {
+                    DiagnosticKind::from(WhitespaceBeforePunctuation)
+                } else {
+                    DiagnosticKind::from(WhitespaceBeforeCloseBracket)
+                };
+
+                match Whitespace::trailing(before) {
+                    (Whitespace::None, _) => {}
+                    (_, offset) => {
+                        if !matches!(last_token, Some(Tok::Comma)) {
+                            diagnostics.push((
+                                Location::new(start.row(), start.column() - offset),
+                                diagnostic_kind,
+                            ));
+                        }
+                    }
+                }
+            }
+
+            _ => {}
         }
+
+        last_token = Some(token);
     }
+
     diagnostics
 }
 
 #[cfg(not(feature = "logical_lines"))]
-pub fn extraneous_whitespace(_line: &str) -> Vec<(usize, DiagnosticKind)> {
+pub fn extraneous_whitespace(
+    _tokens: &[(Location, &Tok, Location)],
+    _locator: &Locator,
+) -> Vec<(Location, DiagnosticKind)> {
     vec![]
 }

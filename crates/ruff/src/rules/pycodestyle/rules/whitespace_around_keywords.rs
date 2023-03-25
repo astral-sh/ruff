@@ -2,11 +2,15 @@
 
 use once_cell::sync::Lazy;
 use regex::Regex;
+use rustpython_parser::ast::Location;
+use rustpython_parser::Tok;
 
+use crate::rules::pycodestyle::helpers::is_keyword_token;
 use crate::rules::pycodestyle::rules::Whitespace;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
 /// Checks for extraneous whitespace after keywords.
@@ -111,47 +115,50 @@ impl Violation for TabBeforeKeyword {
     }
 }
 
-static KEYWORD_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"\b(False|None|True|and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield)\b").unwrap()
-});
-
 /// E271, E272, E273, E274
 #[cfg(feature = "logical_lines")]
-pub fn whitespace_around_keywords(line: &str) -> Vec<(usize, DiagnosticKind)> {
+pub fn whitespace_around_keywords(
+    tokens: &[(Location, &Tok, Location)],
+    locator: &Locator,
+) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
-    let mut last_end = None;
 
-    for line_match in KEYWORD_REGEX.find_iter(line) {
-        if last_end != Some(line_match.start()) {
-            let before = &line[..line_match.start()];
+    for (start, token, end) in tokens {
+        if is_keyword_token(token) {
+            let start_offset = locator.offset(*start);
+            let before = &locator.contents()[..start_offset];
+
             match Whitespace::trailing(before) {
-                (Whitespace::Tab, offset) => {
-                    diagnostics.push((line_match.start() - offset, TabBeforeKeyword.into()));
-                }
+                (Whitespace::Tab, offset) => diagnostics.push((
+                    Location::new(start.row(), start.column() - offset),
+                    TabBeforeKeyword.into(),
+                )),
                 (Whitespace::Many, offset) => diagnostics.push((
-                    line_match.start() - offset,
+                    Location::new(start.row(), start.column() - offset),
                     MultipleSpacesBeforeKeyword.into(),
                 )),
                 _ => {}
             }
-        }
 
-        let after = &line[line_match.end()..];
-        let (leading_offset, leading_kind) = Whitespace::leading(after);
-        match leading_kind {
-            Whitespace::Tab => diagnostics.push((line_match.end(), TabAfterKeyword.into())),
-            Whitespace::Many => {
-                diagnostics.push((line_match.end(), MultipleSpacesAfterKeyword.into()));
+            let end_offset = locator.offset(*end);
+            let after = &locator.contents()[end_offset..];
+            match Whitespace::leading(after) {
+                Whitespace::Tab => diagnostics.push((*end, TabAfterKeyword.into())),
+                Whitespace::Many => diagnostics.push((*end, MultipleSpacesAfterKeyword.into())),
+                _ => {}
             }
-            _ => {}
         }
 
         last_end = Some(line_match.end() + leading_offset);
     }
+
     diagnostics
 }
 
 #[cfg(not(feature = "logical_lines"))]
-pub fn whitespace_around_keywords(_line: &str) -> Vec<(usize, DiagnosticKind)> {
+pub fn whitespace_around_keywords(
+    _tokens: &[(Location, &Tok, Location)],
+    _locator: &Locator,
+) -> Vec<(Location, DiagnosticKind)> {
     vec![]
 }

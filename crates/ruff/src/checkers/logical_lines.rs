@@ -68,10 +68,8 @@ pub fn check_logical_lines(
         let indent_size = 4;
 
         if line.flags().contains(TokenFlags::OPERATOR) {
-            for (index, kind) in space_around_operator(line.text()) {
+            for (location, kind) in space_around_operator(line.tokens(), locator) {
                 if settings.rules.enabled(kind.rule()) {
-                    let (token_offset, pos) = line.mapping(index);
-                    let location = Location::new(pos.row(), pos.column() + index - token_offset);
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
@@ -86,10 +84,8 @@ pub fn check_logical_lines(
             .flags()
             .contains(TokenFlags::OPERATOR | TokenFlags::PUNCTUATION)
         {
-            for (index, kind) in extraneous_whitespace(line.text()) {
+            for (location, kind) in extraneous_whitespace(line.tokens(), locator) {
                 if settings.rules.enabled(kind.rule()) {
-                    let (token_offset, pos) = line.mapping(index);
-                    let location = Location::new(pos.row(), pos.column() + index - token_offset);
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
@@ -101,10 +97,8 @@ pub fn check_logical_lines(
             }
         }
         if line.flags().contains(TokenFlags::KEYWORD) {
-            for (index, kind) in whitespace_around_keywords(line.text()) {
+            for (location, kind) in whitespace_around_keywords(line.tokens(), locator) {
                 if settings.rules.enabled(kind.rule()) {
-                    let (token_offset, pos) = line.mapping(index);
-                    let location = Location::new(pos.row(), pos.column() + index - token_offset);
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
@@ -141,9 +135,7 @@ pub fn check_logical_lines(
             }
         }
         if line.flags().contains(TokenFlags::OPERATOR) {
-            for (location, kind) in
-                whitespace_around_named_parameter_equals(line.tokens(), line.text())
-            {
+            for (location, kind) in whitespace_around_named_parameter_equals(line.tokens()) {
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
