@@ -1,17 +1,32 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::str::leading_quote;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
+use crate::registry::AsRule;
 
 #[violation]
-pub struct FirstLineCapitalized;
+pub struct FirstLineCapitalized {
+    pub first_word: String,
+    pub capitalized_word: String,
+}
 
-impl Violation for FirstLineCapitalized {
+impl AlwaysAutofixableViolation for FirstLineCapitalized {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("First word of the first line should be properly capitalized")
+        format!(
+            "First word of the first line should be capitalized: `{}` -> `{}`",
+            self.first_word, self.capitalized_word
+        )
+    }
+
+    fn autofix_title(&self) -> String {
+        format!(
+            "Capitalize `{}` to `{}`",
+            self.first_word, self.capitalized_word
+        )
     }
 }
 
@@ -43,8 +58,28 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     if first_char.is_uppercase() {
         return;
     };
-    checker.diagnostics.push(Diagnostic::new(
-        FirstLineCapitalized,
+    let capitalized_word = first_char.to_uppercase().to_string() + &first_word[1..];
+
+    let mut diagnostic = Diagnostic::new(
+        FirstLineCapitalized {
+            first_word: first_word.to_string(),
+            capitalized_word: capitalized_word.clone(),
+        },
         Range::from(docstring.expr),
-    ));
+    );
+
+    if checker.patch(diagnostic.kind.rule()) {
+        if let Some(pattern) = leading_quote(docstring.contents) {
+            diagnostic.amend(Edit::replacement(
+                capitalized_word,
+                docstring.expr.location.with_col_offset(pattern.len()),
+                docstring
+                    .expr
+                    .location
+                    .with_col_offset(pattern.len() + first_word.len()),
+            ));
+        }
+    }
+
+    checker.diagnostics.push(diagnostic);
 }
