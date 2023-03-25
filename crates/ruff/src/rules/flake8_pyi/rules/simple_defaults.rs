@@ -33,6 +33,21 @@ impl Violation for ArgumentDefaultInStub {
     }
 }
 
+#[violation]
+pub struct AssignmentDefaultInStub;
+
+/// PYI015
+impl AlwaysAutofixableViolation for AssignmentDefaultInStub {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Only simple default values allowed for assignments")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace default value by `...`".to_string()
+    }
+}
+
 const ALLOWED_MATH_ATTRIBUTES_IN_DEFAULTS: &[&[&str]] = &[
     &["math", "inf"],
     &["math", "nan"],
@@ -295,5 +310,27 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 }
             }
         }
+    }
+}
+
+/// PYI015
+pub fn assignment_default_in_stub(checker: &mut Checker, value: &Expr, annotation: Option<&Expr>) {
+    if annotation.map_or(false, |annotation| {
+        checker.ctx.match_typing_expr(annotation, "TypeAlias")
+    }) {
+        return;
+    }
+    if !is_valid_default_value_with_annotation(value, checker, true) {
+        let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, Range::from(value));
+
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.amend(Edit::replacement(
+                "...".to_string(),
+                value.location,
+                value.end_location.unwrap(),
+            ));
+        }
+
+        checker.diagnostics.push(diagnostic);
     }
 }
