@@ -88,6 +88,7 @@ mod whitespace_before_comment;
 mod whitespace_before_parameters;
 
 #[allow(unused)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 enum Whitespace {
     None,
     Single,

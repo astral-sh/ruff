@@ -6,11 +6,13 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
 use crate::rules::pycodestyle::helpers::{is_op_token, is_ws_needed_token};
+use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens};
 use crate::rules::pycodestyle::rules::Whitespace;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::token_kind::TokenKind;
 use ruff_python_ast::types::Range;
 
 /// ## What it does
@@ -131,16 +133,13 @@ impl Violation for MultipleSpacesAfterOperator {
 
 /// E221, E222, E223, E224
 #[cfg(feature = "logical_lines")]
-pub fn space_around_operator(
-    tokens: &[(Location, &Tok, Location)],
-    locator: &Locator,
-) -> Vec<(Location, DiagnosticKind)> {
+pub fn space_around_operator(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
 
-    for (start, token, end) in tokens {
-        if is_operator_token(token) {
-            let start_offset = locator.offset(*start);
-            let before = &locator.contents()[..start_offset];
+    for token in line.tokens() {
+        if token.kind().is_operator() {
+            let (start, end) = token.range();
+            let before = line.text_before(&token);
 
             match Whitespace::trailing(before) {
                 (Whitespace::Tab, offset) => diagnostics.push((
@@ -154,11 +153,10 @@ pub fn space_around_operator(
                 _ => {}
             }
 
-            let end_offset = locator.offset(*end);
-            let after = &locator.contents()[end_offset..];
+            let after = line.text_after(&token);
             match Whitespace::leading(after) {
-                Whitespace::Tab => diagnostics.push((*end, TabAfterOperator.into())),
-                Whitespace::Many => diagnostics.push((*end, MultipleSpacesAfterOperator.into())),
+                Whitespace::Tab => diagnostics.push((end, TabAfterOperator.into())),
+                Whitespace::Many => diagnostics.push((end, MultipleSpacesAfterOperator.into())),
                 _ => {}
             }
         }
@@ -167,47 +165,44 @@ pub fn space_around_operator(
     diagnostics
 }
 
-const fn is_operator_token(token: &Tok) -> bool {
+const fn is_operator_token(token: TokenKind) -> bool {
     matches!(
         token,
-        Tok::Plus
-            | Tok::Minus
-            | Tok::Star
-            | Tok::Slash
-            | Tok::Vbar
-            | Tok::Amper
-            | Tok::Less
-            | Tok::Greater
-            | Tok::Equal
-            | Tok::Percent
-            | Tok::NotEqual
-            | Tok::LessEqual
-            | Tok::GreaterEqual
-            | Tok::CircumFlex
-            | Tok::LeftShift
-            | Tok::RightShift
-            | Tok::DoubleStar
-            | Tok::PlusEqual
-            | Tok::MinusEqual
-            | Tok::StarEqual
-            | Tok::SlashEqual
-            | Tok::PercentEqual
-            | Tok::AmperEqual
-            | Tok::VbarEqual
-            | Tok::CircumflexEqual
-            | Tok::LeftShiftEqual
-            | Tok::RightShiftEqual
-            | Tok::DoubleStarEqual
-            | Tok::DoubleSlash
-            | Tok::DoubleSlashEqual
-            | Tok::ColonEqual
+        TokenKind::Plus
+            | TokenKind::Minus
+            | TokenKind::Star
+            | TokenKind::Slash
+            | TokenKind::Vbar
+            | TokenKind::Amper
+            | TokenKind::Less
+            | TokenKind::Greater
+            | TokenKind::Equal
+            | TokenKind::Percent
+            | TokenKind::NotEqual
+            | TokenKind::LessEqual
+            | TokenKind::GreaterEqual
+            | TokenKind::CircumFlex
+            | TokenKind::LeftShift
+            | TokenKind::RightShift
+            | TokenKind::DoubleStar
+            | TokenKind::PlusEqual
+            | TokenKind::MinusEqual
+            | TokenKind::StarEqual
+            | TokenKind::SlashEqual
+            | TokenKind::PercentEqual
+            | TokenKind::AmperEqual
+            | TokenKind::VbarEqual
+            | TokenKind::CircumflexEqual
+            | TokenKind::LeftShiftEqual
+            | TokenKind::RightShiftEqual
+            | TokenKind::DoubleStarEqual
+            | TokenKind::DoubleSlash
+            | TokenKind::DoubleSlashEqual
+            | TokenKind::ColonEqual
     )
 }
 
 #[cfg(not(feature = "logical_lines"))]
-pub fn space_around_operator(
-    _tokens: &[(Location, &Tok, Location)],
-    _locator: &Locator,
-) -> Vec<(Location, DiagnosticKind)> {
+pub fn space_around_operator(_line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     vec![]
 }

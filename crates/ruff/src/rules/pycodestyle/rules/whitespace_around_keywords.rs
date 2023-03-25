@@ -6,11 +6,13 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
 use crate::rules::pycodestyle::helpers::is_keyword_token;
+use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens};
 use crate::rules::pycodestyle::rules::Whitespace;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::token_kind::TokenKind;
 
 /// ## What it does
 /// Checks for extraneous whitespace after keywords.
@@ -117,16 +119,13 @@ impl Violation for TabBeforeKeyword {
 
 /// E271, E272, E273, E274
 #[cfg(feature = "logical_lines")]
-pub fn whitespace_around_keywords(
-    tokens: &[(Location, &Tok, Location)],
-    locator: &Locator,
-) -> Vec<(Location, DiagnosticKind)> {
+pub fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
 
-    for (start, token, end) in tokens {
-        if is_keyword_token(token) {
-            let start_offset = locator.offset(*start);
-            let before = &locator.contents()[..start_offset];
+    for token in line.tokens() {
+        if token.kind().is_keyword() {
+            let (start, end) = token.range();
+            let before = line.text_before(&token);
 
             match Whitespace::trailing(before) {
                 (Whitespace::Tab, offset) => diagnostics.push((
@@ -140,11 +139,10 @@ pub fn whitespace_around_keywords(
                 _ => {}
             }
 
-            let end_offset = locator.offset(*end);
-            let after = &locator.contents()[end_offset..];
+            let after = line.text_after(&token);
             match Whitespace::leading(after) {
-                Whitespace::Tab => diagnostics.push((*end, TabAfterKeyword.into())),
-                Whitespace::Many => diagnostics.push((*end, MultipleSpacesAfterKeyword.into())),
+                Whitespace::Tab => diagnostics.push((end, TabAfterKeyword.into())),
+                Whitespace::Many => diagnostics.push((end, MultipleSpacesAfterKeyword.into())),
                 _ => {}
             }
         }
@@ -154,9 +152,6 @@ pub fn whitespace_around_keywords(
 }
 
 #[cfg(not(feature = "logical_lines"))]
-pub fn whitespace_around_keywords(
-    _tokens: &[(Location, &Tok, Location)],
-    _locator: &Locator,
-) -> Vec<(Location, DiagnosticKind)> {
+pub fn whitespace_around_keywords(_line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     vec![]
 }

@@ -5,11 +5,13 @@ use regex::Regex;
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
+use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens};
 use crate::rules::pycodestyle::rules::Whitespace;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::token_kind::TokenKind;
 
 /// ## What it does
 /// Checks for the use of extraneous whitespace after "(".
@@ -107,17 +109,16 @@ impl Violation for WhitespaceBeforePunctuation {
 
 /// E201, E202, E203
 #[cfg(feature = "logical_lines")]
-pub fn extraneous_whitespace(
-    tokens: &[(Location, &Tok, Location)],
-    locator: &Locator,
-) -> Vec<(Location, DiagnosticKind)> {
+pub fn extraneous_whitespace(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
-    let mut last_token: Option<&Tok> = None;
+    let mut last_token: Option<TokenKind> = None;
 
-    for (start, token, end) in tokens {
-        match token {
-            Tok::Lbrace | Tok::Lpar | Tok::Lsqb => {
-                let after = &locator.contents()[locator.offset(*end)..];
+    for token in line.tokens() {
+        let kind = token.kind();
+        match kind {
+            TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
+                let end = token.end();
+                let after = line.text_after(&token);
 
                 if !matches!(Whitespace::leading(after), Whitespace::None) {
                     diagnostics.push((
@@ -126,19 +127,26 @@ pub fn extraneous_whitespace(
                     ));
                 }
             }
-            Tok::Rbrace | Tok::Rpar | Tok::Rsqb | Tok::Comma | Tok::Semi | Tok::Colon => {
-                let before = &locator.contents()[..locator.offset(*start)];
+            TokenKind::Rbrace
+            | TokenKind::Rpar
+            | TokenKind::Rsqb
+            | TokenKind::Comma
+            | TokenKind::Semi
+            | TokenKind::Colon => {
+                let start = token.start();
+                let before = line.text_before(&token);
 
-                let diagnostic_kind = if matches!(token, Tok::Comma | Tok::Semi | Tok::Colon) {
-                    DiagnosticKind::from(WhitespaceBeforePunctuation)
-                } else {
-                    DiagnosticKind::from(WhitespaceBeforeCloseBracket)
-                };
+                let diagnostic_kind =
+                    if matches!(kind, TokenKind::Comma | TokenKind::Semi | TokenKind::Colon) {
+                        DiagnosticKind::from(WhitespaceBeforePunctuation)
+                    } else {
+                        DiagnosticKind::from(WhitespaceBeforeCloseBracket)
+                    };
 
                 match Whitespace::trailing(before) {
                     (Whitespace::None, _) => {}
                     (_, offset) => {
-                        if !matches!(last_token, Some(Tok::Comma)) {
+                        if !matches!(last_token, Some(TokenKind::Comma)) {
                             diagnostics.push((
                                 Location::new(start.row(), start.column() - offset),
                                 diagnostic_kind,
@@ -151,16 +159,13 @@ pub fn extraneous_whitespace(
             _ => {}
         }
 
-        last_token = Some(token);
+        last_token = Some(kind);
     }
 
     diagnostics
 }
 
 #[cfg(not(feature = "logical_lines"))]
-pub fn extraneous_whitespace(
-    _tokens: &[(Location, &Tok, Location)],
-    _locator: &Locator,
-) -> Vec<(Location, DiagnosticKind)> {
+pub fn extraneous_whitespace(_line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     vec![]
 }

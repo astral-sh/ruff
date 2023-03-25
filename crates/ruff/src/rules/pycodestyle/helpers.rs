@@ -5,6 +5,7 @@ use rustpython_parser::Tok;
 
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 use ruff_python_ast::source_code::Stylist;
+use ruff_python_ast::token_kind::TokenKind;
 
 pub fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
@@ -59,168 +60,37 @@ pub fn is_overlong(
 }
 
 pub const fn is_keyword_token(token: &Tok) -> bool {
-    matches!(
-        token,
-        Tok::False
-            | Tok::True
-            | Tok::None
-            | Tok::And
-            | Tok::As
-            | Tok::Assert
-            | Tok::Await
-            | Tok::Break
-            | Tok::Class
-            | Tok::Continue
-            | Tok::Def
-            | Tok::Del
-            | Tok::Elif
-            | Tok::Else
-            | Tok::Except
-            | Tok::Finally
-            | Tok::For
-            | Tok::From
-            | Tok::Global
-            | Tok::If
-            | Tok::Import
-            | Tok::In
-            | Tok::Is
-            | Tok::Lambda
-            | Tok::Nonlocal
-            | Tok::Not
-            | Tok::Or
-            | Tok::Pass
-            | Tok::Raise
-            | Tok::Return
-            | Tok::Try
-            | Tok::While
-            | Tok::With
-            | Tok::Yield
-    )
+    TokenKind::from_token(token).is_keyword()
 }
 
 pub const fn is_singleton_token(token: &Tok) -> bool {
-    matches!(
-        token,
-        Tok::False { .. } | Tok::True { .. } | Tok::None { .. },
-    )
+    TokenKind::from_token(token).is_singleton()
 }
 
 pub const fn is_op_token(token: &Tok) -> bool {
-    matches!(
-        token,
-        Tok::Lpar
-            | Tok::Rpar
-            | Tok::Lsqb
-            | Tok::Rsqb
-            | Tok::Comma
-            | Tok::Semi
-            | Tok::Plus
-            | Tok::Minus
-            | Tok::Star
-            | Tok::Slash
-            | Tok::Vbar
-            | Tok::Amper
-            | Tok::Less
-            | Tok::Greater
-            | Tok::Equal
-            | Tok::Dot
-            | Tok::Percent
-            | Tok::Lbrace
-            | Tok::Rbrace
-            | Tok::NotEqual
-            | Tok::LessEqual
-            | Tok::GreaterEqual
-            | Tok::Tilde
-            | Tok::CircumFlex
-            | Tok::LeftShift
-            | Tok::RightShift
-            | Tok::DoubleStar
-            | Tok::PlusEqual
-            | Tok::MinusEqual
-            | Tok::StarEqual
-            | Tok::SlashEqual
-            | Tok::PercentEqual
-            | Tok::AmperEqual
-            | Tok::VbarEqual
-            | Tok::CircumflexEqual
-            | Tok::LeftShiftEqual
-            | Tok::RightShiftEqual
-            | Tok::DoubleStarEqual
-            | Tok::DoubleSlash
-            | Tok::DoubleSlashEqual
-            | Tok::At
-            | Tok::AtEqual
-            | Tok::Rarrow
-            | Tok::Ellipsis
-            | Tok::ColonEqual
-            | Tok::Colon
-    )
+    TokenKind::from_token(token).is_operator()
 }
 
 pub const fn is_skip_comment_token(token: &Tok) -> bool {
-    matches!(
-        token,
-        Tok::Newline | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline | Tok::Comment { .. }
-    )
+    TokenKind::from_token(token).is_skip_comment()
 }
 
 pub const fn is_soft_keyword_token(token: &Tok) -> bool {
-    matches!(token, Tok::Match | Tok::Case)
+    TokenKind::from_token(token).is_soft_keyword()
 }
 
 pub const fn is_arithmetic_token(token: &Tok) -> bool {
-    matches!(
-        token,
-        Tok::DoubleStar | Tok::Star | Tok::Plus | Tok::Minus | Tok::Slash | Tok::At
-    )
+    TokenKind::from_token(token).is_arithmetic()
 }
 
 pub const fn is_ws_optional_token(token: &Tok) -> bool {
-    is_arithmetic_token(token)
-        || matches!(
-            token,
-            Tok::CircumFlex
-                | Tok::Amper
-                | Tok::Vbar
-                | Tok::LeftShift
-                | Tok::RightShift
-                | Tok::Percent
-        )
+    TokenKind::from_token(token).is_whitespace_optional()
 }
 
 pub const fn is_ws_needed_token(token: &Tok) -> bool {
-    matches!(
-        token,
-        Tok::DoubleStarEqual
-            | Tok::StarEqual
-            | Tok::SlashEqual
-            | Tok::DoubleSlashEqual
-            | Tok::PlusEqual
-            | Tok::MinusEqual
-            | Tok::NotEqual
-            | Tok::Less
-            | Tok::Greater
-            | Tok::PercentEqual
-            | Tok::CircumflexEqual
-            | Tok::AmperEqual
-            | Tok::VbarEqual
-            | Tok::EqEqual
-            | Tok::LessEqual
-            | Tok::GreaterEqual
-            | Tok::LeftShiftEqual
-            | Tok::RightShiftEqual
-            | Tok::Equal
-            | Tok::And
-            | Tok::Or
-            | Tok::In
-            | Tok::Is
-            | Tok::Rarrow
-    )
+    TokenKind::from_token(token).is_whitespace_needed()
 }
 
 pub const fn is_unary_token(token: &Tok) -> bool {
-    matches!(
-        token,
-        Tok::Plus | Tok::Minus | Tok::Star | Tok::DoubleStar | Tok::RightShift
-    )
+    TokenKind::from_token(token).is_unary()
 }
