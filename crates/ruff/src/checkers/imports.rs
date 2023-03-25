@@ -1,6 +1,7 @@
 //! Lint rules based on import analysis.
 use std::path::Path;
 
+use log::debug;
 use rustpython_parser::ast::{StmtKind, Suite};
 
 use ruff_diagnostics::Diagnostic;
@@ -56,70 +57,71 @@ pub fn check_imports(
         ));
     }
     let mut imports = Imports::default();
-    let mut imports_vec = vec![];
-    // find the difference between the current path and the package root (inc root)
-    let modules: Vec<&str> = match package {
-        Some(package) => {
-            let mut modules: Vec<&str> = vec![package.iter().last().unwrap().to_str().unwrap()];
-            modules.extend(
-                path.strip_prefix(package)
-                    .iter()
-                    .rev()
-                    // we don't want the end module as it is the current one
-                    .skip(1)
-                    .map(|p| p.to_str().unwrap())
-                    .rev(),
-            );
-            modules
+    if let Some(package) = package {
+        let mut imports_vec = vec![];
+        let modules: Vec<String> = to_module_path(package, path).unwrap();
+        debug!("modules {:?}", modules);
+        for &block in &blocks {
+            block.imports.iter().for_each(|&stmt| match &stmt.node {
+                StmtKind::Import { names } => {
+                    imports_vec.extend(names.iter().map(|name| {
+                        Import::new(
+                            name.node.name.clone(),
+                            stmt.location,
+                            stmt.end_location.unwrap(),
+                        )
+                    }));
+                }
+                StmtKind::ImportFrom {
+                    module,
+                    names,
+                    level,
+                } => {
+                    // case where module is None with level
+                    // case where module isn't None with level
+                    // think of more potential relatives
+                    let modules = if let Some(module) = module {
+                        let level = level.unwrap();
+                        if level > 0 {
+                            format!("{}.{}.", modules[0..level].join("."), module)
+                        } else {
+                            format!("{module}.")
+                        }
+                    } else {
+                        // relative import
+                        format!(
+                            "{}.",
+                            modules[..(modules.len() - level.unwrap_or(0))].join(".")
+                        )
+                    };
+                    // let module = if let Some(module) = module { module.clone() } else { "".to_string() };
+                    // let modules = modules[..(modules.len()-level.unwrap_or(0))].join(".");
+                    // let modules = modules[..level.unwrap_or(0)].join(".");
+                    imports_vec.extend(names.iter().map(|name| {
+                        Import::new(
+                            format!("{}{}", modules, name.node.name),
+                            name.location,
+                            name.end_location.unwrap(),
+                        )
+                    }));
+                }
+                // ImportTracker guarantees that we will only have import statements
+                _ => unreachable!("Should only have import statements"),
+            });
         }
-        None => path
-            .iter()
-            .rev()
-            .skip(1)
-            .take(1)
-            .map(|p| p.to_str().unwrap())
-            .collect::<Vec<_>>(),
-    };
-    for &block in &blocks {
-        block.imports.iter().for_each(|&stmt| match &stmt.node {
-            StmtKind::Import { names } => {
-                // from testing, seems this should only have one entry
-                imports_vec.push(Import::new(
-                    names[0].node.name.clone(),
-                    stmt.location,
-                    stmt.end_location.unwrap(),
-                ));
-            }
-            StmtKind::ImportFrom {
-                module,
-                names,
-                level,
-            } => {
-                imports_vec.extend(names.iter().map(|name| {
-                    Import::new(
-                        Imports::expand_relative(&modules, module, &name.node.name, level),
-                        name.location,
-                        name.end_location.unwrap(),
-                    )
-                }));
-            }
-            // ImportTracker guarantees that we will only have import statements
-            _ => unreachable!("Should only have import statements"),
-        });
-    }
-    let module_path = if let Some(package) = package {
-        if let Some(module_path) = to_module_path(package, path) {
+        let module_path = if let Some(module_path) = to_module_path(package, path) {
             module_path.join(".")
         } else {
             String::new()
-        }
-    } else {
-        String::new()
-    };
+        };
 
-    if !imports_vec.is_empty() {
-        imports.insert(&module_path, imports_vec);
-        imports.insert_new_module(&module_path, path);
+        debug!("{module_path} {blocks:#?}");
+        debug!("{imports_vec:#?}");
+
+        if !imports_vec.is_empty() {
+            imports.insert(&module_path, imports_vec);
+            imports.insert_new_module(&module_path, path);
+        }
     }
 
     (diagnostics, imports)

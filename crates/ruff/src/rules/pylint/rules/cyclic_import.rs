@@ -1,3 +1,5 @@
+use itertools::Itertools;
+
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -25,43 +27,39 @@ impl CyclicImportChecker<'_> {
         let mut cycles: Vec<Vec<&str>> = Vec::new();
         for (name, vec) in self.imports.iter() {
             if !vec.is_empty() {
-                let mut visited: Vec<&str> = Vec::new();
-                visited.push(name);
-                if let Some(cycle) = self.has_cycles_helper(name, &mut visited) {
-                    cycles.push(cycle);
-                }
+                let mut stack: Vec<&str> = vec![name];
+                self.has_cycles_helper(name, &mut stack, &mut cycles, 0);
             }
         }
         if cycles.is_empty() {
             None
         } else {
-            Some(cycles)
+            Some(cycles.into_iter().unique().collect())
         }
     }
 
     fn has_cycles_helper<'a>(
         &'a self,
         name: &str,
-        visited: &mut Vec<&'a str>,
-    ) -> Option<Vec<&'a str>> {
+        stack: &mut Vec<&'a str>,
+        cycles: &mut Vec<Vec<&'a str>>,
+        level: usize,
+    ) {
         if let Some(imports) = self.imports.get(name) {
+            let tabs = "\t".repeat(level);
+            log::debug!("{tabs}check {name}");
             for import in imports.iter() {
-                if visited.contains(&(&import.name as &str)) {
-                    let (idx, _) = visited
-                        .iter()
-                        .enumerate()
-                        .find(|(_, &s)| s == import.name)
-                        .unwrap();
-                    return Some(visited[idx..].to_vec());
+                log::debug!("{tabs}\timport {}", import.name);
+                if let Some((idx, _)) = stack.iter().enumerate().find(|(_, &s)| s == import.name) {
+                    log::debug!("{tabs}\t\tcycle {:?}", &stack[idx..]);
+                    cycles.push(stack[idx..].to_vec());
+                } else {
+                    stack.push(&import.name);
+                    self.has_cycles_helper(&import.name, stack, cycles, level + 1);
+                    stack.pop();
                 }
-                visited.push(&import.name);
-                if let Some(cycle) = self.has_cycles_helper(&import.name, visited) {
-                    return Some(cycle);
-                }
-                visited.pop();
             }
         }
-        None
     }
 }
 

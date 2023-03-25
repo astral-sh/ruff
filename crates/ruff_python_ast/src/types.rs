@@ -127,7 +127,7 @@ impl Imports {
     }
 
     pub fn expand_relative(
-        modules: &[&str],
+        modules: &[String],
         module: &Option<String>,
         name: &str,
         level: &Option<usize>,

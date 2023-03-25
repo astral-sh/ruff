@@ -145,7 +145,6 @@ pub fn run(
     // TODO(chris): actually check the imports?
     debug!("{:#?}", diagnostics.imports);
     if let Some(outputs) = pylint_cyclic_import(&diagnostics.imports) {
-        debug!("{outputs:#?}");
         diagnostics += Diagnostics::new(
             outputs
                 .into_iter()
