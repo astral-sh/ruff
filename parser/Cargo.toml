@@ -14,7 +14,7 @@ serde = ["dep:serde", "rustpython-compiler-core/serde"]
 
 [build-dependencies]
 anyhow = { workspace = true }
-lalrpop = { version = "0.19.8", optional = true }
+lalrpop = { version = "0.19.9", optional = true }
 phf_codegen = "0.11.1"
 tiny-keccak = { version = "2", features = ["sha3"] }
 
