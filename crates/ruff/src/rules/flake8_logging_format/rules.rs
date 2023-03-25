@@ -137,8 +137,7 @@ impl LoggingCallType {
         if attr == "log" {
             Some(LoggingCallType::LogCall)
         } else {
-            LoggingLevel::from_attribute(attr)
-                .and_then(|level| Some(LoggingCallType::LevelCall(level)))
+            LoggingLevel::from_attribute(attr).map(LoggingCallType::LevelCall)
         }
     }
 }
@@ -164,11 +163,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             );
 
             // G001 - G004
-            let msg_pos = if matches!(logging_call_type, LoggingCallType::LogCall) {
-                1
-            } else {
-                0
-            };
+            let msg_pos = usize::from(matches!(logging_call_type, LoggingCallType::LogCall));
             if let Some(format_arg) = call_args.argument("msg", msg_pos) {
                 check_msg(checker, format_arg);
             }
