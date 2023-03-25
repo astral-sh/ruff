@@ -39,10 +39,8 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
         has_added_testcase = False
         lines = []
         for line in content.splitlines():
-            if (
-                not has_added_testcase
-                and line.strip()
-                == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {"
+            if not has_added_testcase and (
+                line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {"
             ):
                 indent = get_indent(line)
                 filestem = f"{prefix}{code}" if linter != "pylint" else snake_case(name)
@@ -217,8 +215,10 @@ if __name__ == "__main__":
         "--name",
         type=str,
         required=True,
-        help="The name of the check to generate, in PascalCase "
-        "(e.g., 'PreferListBuiltin').",
+        help=(
+            "The name of the check to generate, in PascalCase "
+            "(e.g., 'PreferListBuiltin')."
+        ),
     )
     parser.add_argument(
         "--prefix",
