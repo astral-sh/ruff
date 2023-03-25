@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 10
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 38
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 46
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 63
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 71
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 78
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 85
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 90
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 94
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 98
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 102
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 106
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 110
@@ -265,7 +265,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 138
@@ -285,7 +285,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 141
@@ -305,7 +305,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 147
@@ -325,7 +325,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 150
@@ -345,7 +345,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 159
