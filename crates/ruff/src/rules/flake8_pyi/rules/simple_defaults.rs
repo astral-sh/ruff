@@ -18,7 +18,7 @@ impl AlwaysAutofixableViolation for TypedArgumentDefaultInStub {
     }
 
     fn autofix_title(&self) -> String {
-        "Replace default value by `...`".to_string()
+        "Replace default value with `...`".to_string()
     }
 }
 
@@ -33,7 +33,7 @@ impl AlwaysAutofixableViolation for ArgumentDefaultInStub {
     }
 
     fn autofix_title(&self) -> String {
-        "Replace default value by `...`".to_string()
+        "Replace default value with `...`".to_string()
     }
 }
 

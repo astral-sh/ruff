@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 3
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 29
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 35
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 50
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 56
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 59
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 61
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 63
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 66
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 69
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 72
@@ -225,7 +225,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 75
@@ -245,7 +245,7 @@ expression: diagnostics
 - kind:
     name: ArgumentDefaultInStub
     body: Only simple default values allowed for arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 78
