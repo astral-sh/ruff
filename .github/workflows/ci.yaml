@@ -116,7 +116,7 @@ jobs:
       - run: cargo check
       - run: |
           ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
-          ./scripts/add_rule.py --name FirstRule --code TST001 --linter test
+          ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test
       - run: cargo check
 
   typos:

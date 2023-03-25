@@ -5,12 +5,12 @@ Example usage:
 
     python scripts/add_rule.py \
         --name PreferListBuiltin \
-        --code PIE807 \
+        --prefix PIE \
+        --code 807 \
         --linter flake8-pie
 """
 
 import argparse
-import re
 
 from _utils import ROOT_DIR, dir_name, get_indent, pascal_case
 
@@ -22,14 +22,14 @@ def snake_case(name: str) -> str:
     ).lstrip("_")
 
 
-def main(*, name: str, code: str, linter: str) -> None:
+def main(*, name: str, prefix: str, code: str, linter: str) -> None:
     """Generate boilerplate for a new rule."""
     # Create a test fixture.
     with (
         ROOT_DIR
         / "crates/ruff/resources/test/fixtures"
         / dir_name(linter)
-        / f"{code}.py"
+        / f"{prefix}{code}.py"
     ).open(
         "a",
     ):
@@ -49,8 +49,8 @@ def main(*, name: str, code: str, linter: str) -> None:
             if line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {":
                 indent = get_indent(line)
                 lines.append(
-                    f'{indent}#[test_case(Rule::{name}, Path::new("{code}.py"); '
-                    f'"{code}")]',
+                    f'{indent}#[test_case(Rule::{name}, Path::new("{prefix}{code}.py");'
+                    f' "{prefix}{code}")]',
                 )
                 lines.sort(key=lambda line: line.split('Path::new("')[1])
                 fp.write("\n".join(lines))
@@ -73,15 +73,17 @@ def main(*, name: str, code: str, linter: str) -> None:
 
     contents = rules_mod.read_text()
     parts = contents.split("\n\n")
+
+    new_pub_use = f"pub use {rule_name_snake}::{{{rule_name_snake}, {name}}}"
+    new_mod = f"mod {rule_name_snake};"
+
     if len(parts) == 2:
         pub_use_contents = parts[0].split(";\n")
-        pub_use_contents.append(
-            f"pub use {rule_name_snake}::{{{rule_name_snake}, {name}}}",
-        )
+        pub_use_contents.append(new_pub_use)
         pub_use_contents.sort()
 
         mod_contents = parts[1].splitlines()
-        mod_contents.append(f"mod {rule_name_snake};")
+        mod_contents.append(new_mod)
         mod_contents.sort()
 
         new_contents = ";\n".join(pub_use_contents)
@@ -92,9 +94,9 @@ def main(*, name: str, code: str, linter: str) -> None:
         rules_mod.write_text(new_contents)
     else:
         with rules_mod.open("a") as fp:
-            fp.write(f"pub use {rule_name_snake}::{{{rule_name_snake}, {name}}};")
-            fp.write("\n")
-            fp.write(f"mod {rule_name_snake};")
+            fp.write(f"{new_pub_use};")
+            fp.write("\n\n")
+            fp.write(f"{new_mod}")
             fp.write("\n")
 
     # Add the relevant rule function.
@@ -120,7 +122,7 @@ impl Violation for %s {
         )
         fp.write(
             f"""
-/// {code}
+/// {prefix}{code}
 pub fn {rule_name_snake}(checker: &mut Checker) {{}}
 """,
         )
@@ -186,10 +188,8 @@ pub fn {rule_name_snake}(checker: &mut Checker) {{}}
             lines.append(line)
 
         linter_variant = pascal_case(linter)
-        code_numeric_part = re.sub("[^0-9]", "", code)
         lines.append(
-            " " * 8
-            + f"""({linter_variant}, "{code_numeric_part}") => Rule::{name},\n""",
+            " " * 8 + f"""({linter_variant}, "{code}") => Rule::{name},\n""",
         )
         lines.sort()
 
@@ -214,20 +214,27 @@ if __name__ == "__main__":
         "--name",
         type=str,
         required=True,
-        help="The name of the check to generate, in PascalCase (e.g., 'LineTooLong').",
+        help="The name of the check to generate, in PascalCase "
+        "(e.g., 'PreferListBuiltin').",
+    )
+    parser.add_argument(
+        "--prefix",
+        type=str,
+        required=True,
+        help="Prefix code for the plugin (e.g. 'PIE').",
     )
     parser.add_argument(
         "--code",
         type=str,
         required=True,
-        help="The code of the check to generate (e.g., 'A001').",
+        help="The code of the check to generate (e.g., '807').",
     )
     parser.add_argument(
         "--linter",
         type=str,
         required=True,
-        help="The source with which the check originated (e.g., 'flake8-builtins').",
+        help="The source with which the check originated (e.g., 'flake8-pie').",
     )
     args = parser.parse_args()
 
-    main(name=args.name, code=args.code, linter=args.linter)
+    main(name=args.name, prefix=args.prefix, code=args.code, linter=args.linter)
