@@ -2,6 +2,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::leading_quote;
 use ruff_python_ast::types::Range;
+use unicode_width::UnicodeWidthStr;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
@@ -52,18 +53,20 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
             return;
         }
     }
-    let Some(first_char) = first_word.chars().next() else {
+    let mut first_word_chars = first_word.chars();
+    let Some(first_char) = first_word_chars.next() else {
         return;
     };
     if first_char.is_uppercase() {
         return;
     };
-    let capitalized_word = first_char.to_uppercase().to_string() + &first_word[1..];
+
+    let capitalized_word = first_char.to_uppercase().to_string() + first_word_chars.as_str();
 
     let mut diagnostic = Diagnostic::new(
         FirstLineCapitalized {
             first_word: first_word.to_string(),
-            capitalized_word: capitalized_word.clone(),
+            capitalized_word: capitalized_word.to_string(),
         },
         Range::from(docstring.expr),
     );
@@ -71,12 +74,12 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     if checker.patch(diagnostic.kind.rule()) {
         if let Some(pattern) = leading_quote(docstring.contents) {
             diagnostic.amend(Edit::replacement(
-                capitalized_word,
-                docstring.expr.location.with_col_offset(pattern.len()),
+                capitalized_word.to_string(),
+                docstring.expr.location.with_col_offset(pattern.width()),
                 docstring
                     .expr
                     .location
-                    .with_col_offset(pattern.len() + first_word.len()),
+                    .with_col_offset(pattern.width() + first_word.width()),
             ));
         }
     }
