@@ -103,17 +103,16 @@ impl Violation for WhitespaceBeforePunctuation {
 
 // TODO(charlie): Pycodestyle has a negative lookahead on the end.
 static EXTRANEOUS_WHITESPACE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"([\[({][ \t]|[ \t][]}),;:])").unwrap());
+    Lazy::new(|| Regex::new(r"[\[({][ \t]|[ \t][]}),;:]").unwrap());
 
 /// E201, E202, E203
 #[cfg(feature = "logical_lines")]
 pub fn extraneous_whitespace(line: &str) -> Vec<(usize, DiagnosticKind)> {
     let mut diagnostics = vec![];
-    for line_match in EXTRANEOUS_WHITESPACE_REGEX.captures_iter(line) {
-        let match_ = line_match.get(1).unwrap();
-        let text = match_.as_str();
+    for line_match in EXTRANEOUS_WHITESPACE_REGEX.find_iter(line) {
+        let text = &line[line_match.range()];
         let char = text.trim();
-        let found = match_.start();
+        let found = line_match.start();
         if text.chars().last().unwrap().is_ascii_whitespace() {
             diagnostics.push((found + 1, WhitespaceAfterOpenBracket.into()));
         } else if line.chars().nth(found - 1).map_or(false, |c| c != ',') {

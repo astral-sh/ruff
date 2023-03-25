@@ -43,6 +43,20 @@ pub fn check_logical_lines(
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
+    #[cfg(feature = "logical_lines")]
+    let should_fix_missing_whitespace =
+        autofix.into() && settings.rules.should_fix(Rule::MissingWhitespace);
+
+    #[cfg(not(feature = "logical_lines"))]
+    let should_fix_missing_whitespace = false;
+
+    #[cfg(feature = "logical_lines")]
+    let should_fix_whitespace_before_parameters =
+        autofix.into() && settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
+
+    #[cfg(not(feature = "logical_lines"))]
+    let should_fix_whitespace_before_parameters = false;
+
     let indent_char = stylist.indentation().as_char();
     let mut prev_line = None;
     let mut prev_indent_level = None;
@@ -152,15 +166,12 @@ pub fn check_logical_lines(
                 }
             }
 
-            #[cfg(feature = "logical_lines")]
-            let should_fix = autofix.into() && settings.rules.should_fix(Rule::MissingWhitespace);
-
-            #[cfg(not(feature = "logical_lines"))]
-            let should_fix = false;
-
-            for diagnostic in
-                missing_whitespace(line.text(), start_loc.row(), should_fix, indent_level)
-            {
+            for diagnostic in missing_whitespace(
+                line.text(),
+                start_loc.row(),
+                should_fix_missing_whitespace,
+                indent_level,
+            ) {
                 if settings.rules.enabled(diagnostic.kind.rule()) {
                     diagnostics.push(diagnostic);
                 }
@@ -168,14 +179,9 @@ pub fn check_logical_lines(
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
-            #[cfg(feature = "logical_lines")]
-            let should_fix =
-                autofix.into() && settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
-
-            #[cfg(not(feature = "logical_lines"))]
-            let should_fix = false;
-
-            for diagnostic in whitespace_before_parameters(line.tokens(), should_fix) {
+            for diagnostic in
+                whitespace_before_parameters(line.tokens(), should_fix_whitespace_before_parameters)
+            {
                 if settings.rules.enabled(diagnostic.kind.rule()) {
                     diagnostics.push(diagnostic);
                 }
