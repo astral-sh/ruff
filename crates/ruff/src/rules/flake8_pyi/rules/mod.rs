@@ -1,4 +1,3 @@
-pub use assignment_default_in_stub::{assignment_default_in_stub, AssignmentDefaultInStub};
 pub use bad_version_info_comparison::{bad_version_info_comparison, BadVersionInfoComparison};
 pub use docstring_in_stubs::{docstring_in_stubs, DocstringInStub};
 pub use non_empty_stub_body::{non_empty_stub_body, NonEmptyStubBody};
@@ -13,7 +12,6 @@ pub use unrecognized_platform::{
     unrecognized_platform, UnrecognizedPlatformCheck, UnrecognizedPlatformName,
 };
 
-mod assignment_default_in_stub;
 mod bad_version_info_comparison;
 mod docstring_in_stubs;
 mod non_empty_stub_body;
