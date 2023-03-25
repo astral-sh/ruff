@@ -1801,8 +1801,19 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+
+                if self.is_stub {
+                    if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
+                        flake8_pyi::rules::assignment_default_in_stub(self, value, None);
+                    }
+                }
             }
-            StmtKind::AnnAssign { target, value, .. } => {
+            StmtKind::AnnAssign {
+                target,
+                value,
+                annotation,
+                ..
+            } => {
                 if self.settings.rules.enabled(Rule::LambdaAssignment) {
                     if let Some(value) = value {
                         pycodestyle::rules::lambda_assignment(self, target, value, stmt);
@@ -1819,6 +1830,17 @@ where
                         value.as_deref(),
                         stmt,
                     );
+                }
+                if self.is_stub {
+                    if let Some(value) = value {
+                        if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
+                            flake8_pyi::rules::assignment_default_in_stub(
+                                self,
+                                value,
+                                Some(annotation),
+                            );
+                        }
+                    }
                 }
             }
             StmtKind::Delete { targets } => {
