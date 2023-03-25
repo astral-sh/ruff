@@ -125,6 +125,24 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     }
 }
 
+enum LoggingCallType {
+    /// Logging call with a level method i.e., `logging.info`
+    LevelCall(LoggingLevel),
+    /// Logging call with an integer level as an argument i.e., `logger.log(level, ...)`
+    LogCall,
+}
+
+impl LoggingCallType {
+    fn from_attribute(attr: &str) -> Option<Self> {
+        if attr == "log" {
+            Some(LoggingCallType::LogCall)
+        } else {
+            LoggingLevel::from_attribute(attr)
+                .and_then(|level| Some(LoggingCallType::LevelCall(level)))
+        }
+    }
+}
+
 /// Check logging calls for violations.
 pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
     if !is_logger_candidate(&checker.ctx, func) {
@@ -132,7 +150,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
     }
 
     if let ExprKind::Attribute { value, attr, .. } = &func.node {
-        if let Some(logging_level) = LoggingLevel::from_attribute(attr.as_str()) {
+        if let Some(logging_call_type) = LoggingCallType::from_attribute(attr.as_str()) {
             let call_args = SimpleCallArgs::new(args, keywords);
             let level_call_range = Range::new(
                 Location::new(
@@ -146,13 +164,21 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             );
 
             // G001 - G004
-            if let Some(format_arg) = call_args.argument("msg", 0) {
+            let msg_pos = if matches!(logging_call_type, LoggingCallType::LogCall) {
+                1
+            } else {
+                0
+            };
+            if let Some(format_arg) = call_args.argument("msg", msg_pos) {
                 check_msg(checker, format_arg);
             }
 
             // G010
             if checker.settings.rules.enabled(Rule::LoggingWarn)
-                && matches!(logging_level, LoggingLevel::Warn)
+                && matches!(
+                    logging_call_type,
+                    LoggingCallType::LevelCall(LoggingLevel::Warn)
+                )
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
                 if checker.patch(diagnostic.kind.rule()) {
@@ -204,27 +230,29 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
                         return;
                     }
 
-                    match logging_level {
-                        LoggingLevel::Error => {
-                            if checker.settings.rules.enabled(Rule::LoggingExcInfo) {
-                                checker
-                                    .diagnostics
-                                    .push(Diagnostic::new(LoggingExcInfo, level_call_range));
+                    if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
+                        match logging_level {
+                            LoggingLevel::Error => {
+                                if checker.settings.rules.enabled(Rule::LoggingExcInfo) {
+                                    checker
+                                        .diagnostics
+                                        .push(Diagnostic::new(LoggingExcInfo, level_call_range));
+                                }
                             }
-                        }
-                        LoggingLevel::Exception => {
-                            if checker
-                                .settings
-                                .rules
-                                .enabled(Rule::LoggingRedundantExcInfo)
-                            {
-                                checker.diagnostics.push(Diagnostic::new(
-                                    LoggingRedundantExcInfo,
-                                    Range::from(exc_info),
-                                ));
+                            LoggingLevel::Exception => {
+                                if checker
+                                    .settings
+                                    .rules
+                                    .enabled(Rule::LoggingRedundantExcInfo)
+                                {
+                                    checker.diagnostics.push(Diagnostic::new(
+                                        LoggingRedundantExcInfo,
+                                        Range::from(exc_info),
+                                    ));
+                                }
                             }
+                            _ => {}
                         }
-                        _ => {}
                     }
                 }
             }

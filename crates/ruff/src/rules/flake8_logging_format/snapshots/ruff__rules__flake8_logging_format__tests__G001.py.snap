@@ -22,9 +22,22 @@ expression: diagnostics
     fixable: false
   location:
     row: 5
-    column: 9
+    column: 26
   end_location:
     row: 5
+    column: 53
+  fix: ~
+  parent: ~
+- kind:
+    name: LoggingStringFormat
+    body: "Logging statement uses `string.format()`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 6
+    column: 9
+  end_location:
+    row: 6
     column: 36
   fix: ~
   parent: ~

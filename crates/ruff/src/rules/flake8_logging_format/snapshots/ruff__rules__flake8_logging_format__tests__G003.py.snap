@@ -15,4 +15,17 @@ expression: diagnostics
     column: 37
   fix: ~
   parent: ~
+- kind:
+    name: LoggingStringConcat
+    body: "Logging statement uses `+`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 4
+    column: 26
+  end_location:
+    row: 4
+    column: 50
+  fix: ~
+  parent: ~
 
