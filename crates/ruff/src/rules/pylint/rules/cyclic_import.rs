@@ -1,5 +1,3 @@
-use itertools::Itertools;
-
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -34,7 +32,7 @@ impl CyclicImportChecker<'_> {
         if cycles.is_empty() {
             None
         } else {
-            Some(cycles.into_iter().unique().collect())
+            Some(cycles)
         }
     }
 
@@ -47,12 +45,12 @@ impl CyclicImportChecker<'_> {
     ) {
         if let Some(imports) = self.imports.get(name) {
             let tabs = "\t".repeat(level);
-            log::debug!("{tabs}check {name}");
             for import in imports.iter() {
                 log::debug!("{tabs}\timport {}", import.name);
                 if let Some((idx, _)) = stack.iter().enumerate().find(|(_, &s)| s == import.name) {
-                    log::debug!("{tabs}\t\tcycle {:?}", &stack[idx..]);
-                    cycles.push(stack[idx..].to_vec());
+                    if idx == 0 {
+                        cycles.push(stack.clone());
+                    }
                 } else {
                     stack.push(&import.name);
                     self.has_cycles_helper(&import.name, stack, cycles, level + 1);
