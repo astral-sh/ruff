@@ -58,16 +58,12 @@ pub fn check_imports(
     let mut imports = Imports::default();
     if let Some(package) = package {
         let mut imports_vec = vec![];
-        let modules_vec: Vec<String> = to_module_path(package, path).unwrap();
+        let modules_vec: Vec<String> = to_module_path(package, path).unwrap_or_default();
         for &block in &blocks {
             block.imports.iter().for_each(|&stmt| match &stmt.node {
                 StmtKind::Import { names } => {
                     imports_vec.extend(names.iter().map(|name| {
-                        Import::new(
-                            name.node.name.clone(),
-                            stmt.location,
-                            stmt.end_location.unwrap(),
-                        )
+                        Import::new(name.node.name.clone(), stmt.location, stmt.end_location.unwrap())
                     }));
                 }
                 StmtKind::ImportFrom {
@@ -76,15 +72,12 @@ pub fn check_imports(
                     level,
                 } => {
                     let modules = if let Some(module) = module {
-                        let level = level.unwrap();
-                        if level > 0 {
-                            format!(
+                        match level.unwrap() {
+                            0 => format!("{module}."),
+                            l @ _ => format!(
                                 "{}.{}.",
-                                modules_vec[0..(modules_vec.len() - level)].join("."),
-                                module
-                            )
-                        } else {
-                            format!("{module}.")
+                                modules_vec[..(modules_vec.len() - l)].join("."),
+                                module),
                         }
                     } else {
                         // relative import only
@@ -105,11 +98,7 @@ pub fn check_imports(
                 _ => unreachable!("Should only have import statements"),
             });
         }
-        let module_path = if let Some(module_path) = to_module_path(package, path) {
-            module_path.join(".")
-        } else {
-            String::new()
-        };
+        let module_path = modules_vec.join(".");
 
         if !imports_vec.is_empty() {
             imports.insert(&module_path, imports_vec);

@@ -125,42 +125,6 @@ impl Imports {
         self.module_to_path_mapping
             .extend(other.module_to_path_mapping);
     }
-
-    pub fn expand_relative(
-        modules: &[String],
-        module: &Option<String>,
-        name: &str,
-        level: &Option<usize>,
-    ) -> String {
-        match level {
-            Some(level) => {
-                // last part of path is always the module itself
-                let resolved_module = if *level > 0 {
-                    format!(
-                        "{}.",
-                        modules
-                            .iter()
-                            .rev()
-                            .take(*level)
-                            .collect::<Vec<_>>()
-                            .iter()
-                            .rev()
-                            .map(|s| (**s).to_string())
-                            .collect::<Vec<String>>()
-                            .join(".")
-                    )
-                } else {
-                    String::new()
-                };
-                if let Some(module_name) = module.as_ref() {
-                    format!("{resolved_module}{module_name}.{name}")
-                } else {
-                    format!("{resolved_module}{name}")
-                }
-            }
-            None => format!("{}.{}", module.as_ref().unwrap_or(&String::new()), name),
-        }
-    }
 }
 
 impl<'a> IntoIterator for &'a Imports {
