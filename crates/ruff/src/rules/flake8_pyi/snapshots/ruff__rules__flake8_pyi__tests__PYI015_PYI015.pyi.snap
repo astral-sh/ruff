@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: AssignmentDefaultInStub
     body: Only simple default values allowed for assignments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 40
@@ -25,7 +25,7 @@ expression: diagnostics
 - kind:
     name: AssignmentDefaultInStub
     body: Only simple default values allowed for assignments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 41
@@ -45,7 +45,7 @@ expression: diagnostics
 - kind:
     name: AssignmentDefaultInStub
     body: Only simple default values allowed for assignments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 42
@@ -65,7 +65,7 @@ expression: diagnostics
 - kind:
     name: AssignmentDefaultInStub
     body: Only simple default values allowed for assignments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 43
@@ -85,7 +85,7 @@ expression: diagnostics
 - kind:
     name: AssignmentDefaultInStub
     body: Only simple default values allowed for assignments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 44
@@ -105,7 +105,7 @@ expression: diagnostics
 - kind:
     name: AssignmentDefaultInStub
     body: Only simple default values allowed for assignments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 45
@@ -125,7 +125,7 @@ expression: diagnostics
 - kind:
     name: AssignmentDefaultInStub
     body: Only simple default values allowed for assignments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 46
@@ -145,7 +145,7 @@ expression: diagnostics
 - kind:
     name: AssignmentDefaultInStub
     body: Only simple default values allowed for assignments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 48
@@ -165,7 +165,7 @@ expression: diagnostics
 - kind:
     name: AssignmentDefaultInStub
     body: Only simple default values allowed for assignments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 49
@@ -185,7 +185,7 @@ expression: diagnostics
 - kind:
     name: AssignmentDefaultInStub
     body: Only simple default values allowed for assignments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 50
@@ -205,7 +205,7 @@ expression: diagnostics
 - kind:
     name: AssignmentDefaultInStub
     body: Only simple default values allowed for assignments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 51
