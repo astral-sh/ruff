@@ -88,6 +88,7 @@ mod whitespace_before_comment;
 mod whitespace_before_parameters;
 
 #[allow(unused)]
+#[derive(Copy, Clone, Eq, PartialEq)]
 enum Whitespace {
     None,
     Single,
@@ -97,9 +98,8 @@ enum Whitespace {
 
 impl Whitespace {
     #[allow(dead_code)]
-    fn leading(content: &str) -> (usize, Self) {
-        let mut offset = 0;
-        let mut kind = Self::None;
+    fn leading(content: &str) -> Self {
+        let mut count = 0u32;
 
         for c in content.chars() {
             if c == '\t' {
@@ -107,18 +107,17 @@ impl Whitespace {
             } else if matches!(c, '\n' | '\r') {
                 break;
             } else if c.is_whitespace() {
-                kind = match kind {
-                    Whitespace::None => Whitespace::Single,
-                    Whitespace::Single | Whitespace::Many => Whitespace::Many,
-                    Whitespace::Tab => Whitespace::Tab,
-                };
-                offset += c.len_utf8();
+                count += 1;
             } else {
                 break;
             }
         }
 
-        (offset, kind)
+        match count {
+            0 => Whitespace::None,
+            1 => Whitespace::Single,
+            _ => Whitespace::Many,
+        }
     }
 
     #[allow(dead_code)]

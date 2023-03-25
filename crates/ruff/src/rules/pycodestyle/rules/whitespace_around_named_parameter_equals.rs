@@ -11,6 +11,7 @@ use ruff_macros::{derive_message_formats, violation};
 
 #[cfg(feature = "logical_lines")]
 use crate::rules::pycodestyle::helpers::is_op_token;
+use crate::rules::pycodestyle::logical_lines::LogicalLineTokens;
 
 #[violation]
 pub struct UnexpectedSpacesAroundKeywordParameterEquals;
@@ -32,9 +33,9 @@ impl Violation for MissingWhitespaceAroundParameterEquals {
     }
 }
 
-fn is_in_def(tokens: &[(Location, &Tok, Location)]) -> bool {
-    for (_, tok, _) in tokens {
-        match tok {
+fn is_in_def(tokens: &LogicalLineTokens) -> bool {
+    for token in tokens {
+        match token.kind() {
             Tok::Async | Tok::Indent | Tok::Dedent => continue,
             Tok::Def => return true,
             _ => return false,
@@ -47,74 +48,87 @@ fn is_in_def(tokens: &[(Location, &Tok, Location)]) -> bool {
 /// E251, E252
 #[cfg(feature = "logical_lines")]
 pub fn whitespace_around_named_parameter_equals(
-    tokens: &[(Location, &Tok, Location)],
+    tokens: &LogicalLineTokens,
 ) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut parens = 0;
     let mut require_space = false;
     let mut no_space = false;
     let mut annotated_func_arg = false;
-    let mut prev_end: Option<&Location> = None;
+    let mut prev_end: Option<Location> = None;
 
     let in_def = is_in_def(tokens);
 
-    for (start, token, end) in tokens {
-        if **token == Tok::NonLogicalNewline {
+    for token in tokens {
+        let kind = token.kind();
+
+        if kind == &Tok::NonLogicalNewline {
             continue;
         }
         if no_space {
             no_space = false;
-            if Some(start) != prev_end {
+            if Some(token.start()) != prev_end {
                 diagnostics.push((
-                    *(prev_end.unwrap()),
+                    prev_end.unwrap(),
                     UnexpectedSpacesAroundKeywordParameterEquals.into(),
                 ));
             }
         }
         if require_space {
             require_space = false;
+            let start = token.start();
             if Some(start) == prev_end {
-                diagnostics.push((*start, MissingWhitespaceAroundParameterEquals.into()));
+                diagnostics.push((start, MissingWhitespaceAroundParameterEquals.into()));
             }
         }
-        if is_op_token(token) {
-            if **token == Tok::Lpar || **token == Tok::Lsqb {
-                parens += 1;
-            } else if **token == Tok::Rpar || **token == Tok::Rsqb {
-                parens -= 1;
-            } else if in_def && **token == Tok::Colon && parens == 1 {
-                annotated_func_arg = true;
-            } else if parens == 1 && **token == Tok::Comma {
-                annotated_func_arg = false;
-            } else if parens > 0 && **token == Tok::Equal {
-                if annotated_func_arg && parens == 1 {
-                    require_space = true;
-                    if Some(start) == prev_end {
-                        diagnostics.push((*start, MissingWhitespaceAroundParameterEquals.into()));
-                    }
-                } else {
-                    no_space = true;
-                    if Some(start) != prev_end {
-                        diagnostics.push((
-                            *(prev_end.unwrap()),
-                            UnexpectedSpacesAroundKeywordParameterEquals.into(),
-                        ));
+        if is_op_token(kind) {
+            match kind {
+                Tok::Lpar | Tok::Lsqb => {
+                    parens += 1;
+                }
+                Tok::Rpar | Tok::Rsqb => {
+                    parens -= 1;
+                }
+
+                Tok::Colon if parens == 1 && in_def => {
+                    annotated_func_arg = true;
+                }
+                Tok::Comma if parens == 1 => {
+                    annotated_func_arg = false;
+                }
+                Tok::Equal if parens > 0 => {
+                    if annotated_func_arg && parens == 1 {
+                        require_space = true;
+                        let start = token.start();
+                        if Some(start) == prev_end {
+                            diagnostics
+                                .push((start, MissingWhitespaceAroundParameterEquals.into()));
+                        }
+                    } else {
+                        no_space = true;
+                        if Some(token.start()) != prev_end {
+                            diagnostics.push((
+                                prev_end.unwrap(),
+                                UnexpectedSpacesAroundKeywordParameterEquals.into(),
+                            ));
+                        }
                     }
                 }
+                _ => {}
             }
 
             if parens < 1 {
                 annotated_func_arg = false;
             }
         }
-        prev_end = Some(end);
+        prev_end = Some(token.end());
     }
     diagnostics
 }
 
 #[cfg(not(feature = "logical_lines"))]
 pub fn whitespace_around_named_parameter_equals(
-    _tokens: &[(Location, &Tok, Location)],
+    _tokens: &LogicalLineTokens,
 ) -> Vec<(Location, DiagnosticKind)> {
     vec![]
 }

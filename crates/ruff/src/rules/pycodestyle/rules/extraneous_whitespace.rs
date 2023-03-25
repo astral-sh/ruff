@@ -5,6 +5,7 @@ use regex::Regex;
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
+use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens};
 use crate::rules::pycodestyle::rules::Whitespace;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
@@ -107,17 +108,16 @@ impl Violation for WhitespaceBeforePunctuation {
 
 /// E201, E202, E203
 #[cfg(feature = "logical_lines")]
-pub fn extraneous_whitespace(
-    tokens: &[(Location, &Tok, Location)],
-    locator: &Locator,
-) -> Vec<(Location, DiagnosticKind)> {
+pub fn extraneous_whitespace(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut last_token: Option<&Tok> = None;
 
-    for (start, token, end) in tokens {
-        match token {
+    for token in line.tokens() {
+        let kind = token.kind();
+        match kind {
             Tok::Lbrace | Tok::Lpar | Tok::Lsqb => {
-                let after = &locator.contents()[locator.offset(*end)..];
+                let end = token.end();
+                let after = line.text_after(&token);
 
                 if !matches!(Whitespace::leading(after), Whitespace::None) {
                     diagnostics.push((
@@ -127,9 +127,10 @@ pub fn extraneous_whitespace(
                 }
             }
             Tok::Rbrace | Tok::Rpar | Tok::Rsqb | Tok::Comma | Tok::Semi | Tok::Colon => {
-                let before = &locator.contents()[..locator.offset(*start)];
+                let start = token.start();
+                let before = line.text_before(&token);
 
-                let diagnostic_kind = if matches!(token, Tok::Comma | Tok::Semi | Tok::Colon) {
+                let diagnostic_kind = if matches!(kind, Tok::Comma | Tok::Semi | Tok::Colon) {
                     DiagnosticKind::from(WhitespaceBeforePunctuation)
                 } else {
                     DiagnosticKind::from(WhitespaceBeforeCloseBracket)
@@ -151,16 +152,13 @@ pub fn extraneous_whitespace(
             _ => {}
         }
 
-        last_token = Some(token);
+        last_token = Some(kind);
     }
 
     diagnostics
 }
 
 #[cfg(not(feature = "logical_lines"))]
-pub fn extraneous_whitespace(
-    _tokens: &[(Location, &Tok, Location)],
-    _locator: &Locator,
-) -> Vec<(Location, DiagnosticKind)> {
+pub fn extraneous_whitespace(_line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     vec![]
 }

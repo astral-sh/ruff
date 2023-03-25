@@ -3,6 +3,8 @@
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use rustpython_parser::ast::Location;
+use rustpython_parser::Tok;
 
 use crate::rules::pycodestyle::logical_lines::LogicalLine;
 
@@ -238,25 +240,29 @@ pub fn indentation(
     indent_level: usize,
     prev_indent_level: Option<usize>,
     indent_size: usize,
-) -> Vec<(usize, DiagnosticKind)> {
+) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
+
+    let location = logical_line.first_token_location().unwrap();
+
     if indent_level % indent_size != 0 {
         diagnostics.push((
-            0,
-            if logical_line.is_comment() {
+            location,
+            if logical_line.is_comment_only() {
                 IndentationWithInvalidMultipleComment { indent_size }.into()
             } else {
                 IndentationWithInvalidMultiple { indent_size }.into()
             },
         ));
     }
-    let indent_expect = prev_logical_line.map_or(false, |prev_logical_line| {
-        prev_logical_line.text().ends_with(':')
-    });
+    let indent_expect = prev_logical_line
+        .and_then(|prev_logical_line| prev_logical_line.tokens().trimmed().last())
+        .map_or(false, |t| t.kind() == &Tok::Colon);
+
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         diagnostics.push((
-            0,
-            if logical_line.is_comment() {
+            location,
+            if logical_line.is_comment_only() {
                 NoIndentedBlockComment.into()
             } else {
                 NoIndentedBlock.into()
@@ -266,8 +272,8 @@ pub fn indentation(
         && prev_indent_level.map_or(false, |prev_indent_level| indent_level > prev_indent_level)
     {
         diagnostics.push((
-            0,
-            if logical_line.is_comment() {
+            location,
+            if logical_line.is_comment_only() {
                 UnexpectedIndentationComment.into()
             } else {
                 UnexpectedIndentation.into()
@@ -278,9 +284,10 @@ pub fn indentation(
         let expected_indent_amount = if indent_char == '\t' { 8 } else { 4 };
         let expected_indent_level = prev_indent_level.unwrap_or(0) + expected_indent_amount;
         if indent_level > expected_indent_level {
-            diagnostics.push((0, OverIndented.into()));
+            diagnostics.push((location, OverIndented.into()));
         }
     }
+
     diagnostics
 }
 
@@ -292,6 +299,6 @@ pub fn indentation(
     _indent_level: usize,
     _prev_indent_level: Option<usize>,
     _indent_size: usize,
-) -> Vec<(usize, DiagnosticKind)> {
+) -> Vec<(Location, DiagnosticKind)> {
     vec![]
 }

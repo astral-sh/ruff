@@ -1,5 +1,6 @@
 #![allow(dead_code, unused_imports, unused_variables)]
 
+use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
@@ -8,6 +9,7 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::rules::pycodestyle::helpers::{is_keyword_token, is_singleton_token};
+use crate::rules::pycodestyle::logical_lines::LogicalLineTokens;
 
 #[violation]
 pub struct MissingWhitespaceAfterKeyword;
@@ -22,22 +24,23 @@ impl Violation for MissingWhitespaceAfterKeyword {
 /// E275
 #[cfg(feature = "logical_lines")]
 pub fn missing_whitespace_after_keyword(
-    tokens: &[(Location, &Tok, Location)],
+    tokens: &LogicalLineTokens,
 ) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
 
-    for (tok0, tok1) in tokens.iter().zip(&tokens[1..]) {
-        if tok0.2 == tok1.0
-            && is_keyword_token(tok0.1)
-            && !is_singleton_token(tok0.1)
-            && *tok0.1 != Tok::Async
-            && *tok0.1 != Tok::Await
-            && !(*tok0.1 == Tok::Except && *tok1.1 == Tok::Star)
-            && !(*tok0.1 == Tok::Yield && *tok1.1 == Tok::Rpar)
-            && *tok1.1 != Tok::Colon
-            && *tok1.1 != Tok::Newline
+    for (tok0, tok1) in tokens.iter().tuple_windows() {
+        let tok0_kind = tok0.kind();
+        let tok1_kind = tok1.kind();
+
+        if is_keyword_token(tok0_kind)
+            && !(is_singleton_token(tok0_kind)
+                || matches!(tok0_kind, Tok::Async | Tok::Await)
+                || tok0_kind == &Tok::Except && tok1_kind == &Tok::Star
+                || tok0_kind == &Tok::Yield && tok1_kind == &Tok::Rpar
+                || matches!(tok1_kind, Tok::Colon | Tok::Newline))
+            && tok0.end() == tok1.start()
         {
-            diagnostics.push((tok0.2, MissingWhitespaceAfterKeyword.into()));
+            diagnostics.push((tok0.end(), MissingWhitespaceAfterKeyword.into()));
         }
     }
     diagnostics
@@ -45,7 +48,7 @@ pub fn missing_whitespace_after_keyword(
 
 #[cfg(not(feature = "logical_lines"))]
 pub fn missing_whitespace_after_keyword(
-    _tokens: &[(Location, &Tok, Location)],
+    _tokens: &LogicalLineTokens,
 ) -> Vec<(Location, DiagnosticKind)> {
     vec![]
 }

@@ -6,6 +6,7 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
 use crate::rules::pycodestyle::helpers::{is_op_token, is_ws_needed_token};
+use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens};
 use crate::rules::pycodestyle::rules::Whitespace;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
@@ -131,39 +132,41 @@ impl Violation for MultipleSpacesAfterOperator {
 
 /// E221, E222, E223, E224
 #[cfg(feature = "logical_lines")]
-pub fn space_around_operator(
-    tokens: &[(Location, &Tok, Location)],
-    locator: &Locator,
-) -> Vec<(Location, DiagnosticKind)> {
+pub fn space_around_operator(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
+    let mut after_operator = false;
 
-    for (start, token, end) in tokens {
-        if is_operator_token(token) {
-            let start_offset = locator.offset(*start);
-            let before = &locator.contents()[..start_offset];
+    for token in line.tokens() {
+        let is_operator = is_operator_token(token.kind());
 
-            match Whitespace::trailing(before) {
-                (Whitespace::Tab, offset) => diagnostics.push((
-                    Location::new(start.row(), start.column() - offset),
-                    TabBeforeOperator.into(),
-                )),
-                (Whitespace::Many, offset) => diagnostics.push((
-                    Location::new(start.row(), start.column() - offset),
-                    MultipleSpacesBeforeOperator.into(),
-                )),
-                _ => {}
+        if is_operator {
+            let (start, end) = token.range();
+
+            if !after_operator {
+                let before = line.text_before(&token);
+
+                match Whitespace::trailing(before) {
+                    (Whitespace::Tab, offset) => diagnostics.push((
+                        Location::new(start.row(), start.column() - offset),
+                        TabBeforeOperator.into(),
+                    )),
+                    (Whitespace::Many, offset) => diagnostics.push((
+                        Location::new(start.row(), start.column() - offset),
+                        MultipleSpacesBeforeOperator.into(),
+                    )),
+                    _ => {}
+                }
             }
 
-            let end_offset = locator.offset(*end);
-            let after = &locator.contents()[end_offset..];
+            let after = line.text_after(&token);
             match Whitespace::leading(after) {
-                Whitespace::Tab => diagnostics.push((*end, TabAfterOperator.into())),
-                Whitespace::Many => diagnostics.push((*end, MultipleSpacesAfterOperator.into())),
+                Whitespace::Tab => diagnostics.push((end, TabAfterOperator.into())),
+                Whitespace::Many => diagnostics.push((end, MultipleSpacesAfterOperator.into())),
                 _ => {}
             }
         }
 
-        last_end = Some(line_match.end() + leading_offset);
+        after_operator = is_operator;
     }
 
     diagnostics
@@ -207,9 +210,6 @@ const fn is_operator_token(token: &Tok) -> bool {
 }
 
 #[cfg(not(feature = "logical_lines"))]
-pub fn space_around_operator(
-    _tokens: &[(Location, &Tok, Location)],
-    _locator: &Locator,
-) -> Vec<(Location, DiagnosticKind)> {
+pub fn space_around_operator(_line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     vec![]
 }
