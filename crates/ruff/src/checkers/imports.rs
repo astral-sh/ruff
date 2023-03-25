@@ -1,7 +1,6 @@
 //! Lint rules based on import analysis.
 use std::path::Path;
 
-use log::debug;
 use rustpython_parser::ast::{StmtKind, Suite};
 
 use ruff_diagnostics::Diagnostic;
@@ -59,8 +58,7 @@ pub fn check_imports(
     let mut imports = Imports::default();
     if let Some(package) = package {
         let mut imports_vec = vec![];
-        let modules: Vec<String> = to_module_path(package, path).unwrap();
-        debug!("modules {:?}", modules);
+        let modules_vec: Vec<String> = to_module_path(package, path).unwrap();
         for &block in &blocks {
             block.imports.iter().for_each(|&stmt| match &stmt.node {
                 StmtKind::Import { names } => {
@@ -77,26 +75,24 @@ pub fn check_imports(
                     names,
                     level,
                 } => {
-                    // case where module is None with level
-                    // case where module isn't None with level
-                    // think of more potential relatives
                     let modules = if let Some(module) = module {
                         let level = level.unwrap();
                         if level > 0 {
-                            format!("{}.{}.", modules[0..level].join("."), module)
+                            format!(
+                                "{}.{}.",
+                                modules_vec[0..(modules_vec.len() - level)].join("."),
+                                module
+                            )
                         } else {
                             format!("{module}.")
                         }
                     } else {
-                        // relative import
+                        // relative import only
                         format!(
                             "{}.",
-                            modules[..(modules.len() - level.unwrap_or(0))].join(".")
+                            modules_vec[..(modules_vec.len() - level.unwrap_or(0))].join(".")
                         )
                     };
-                    // let module = if let Some(module) = module { module.clone() } else { "".to_string() };
-                    // let modules = modules[..(modules.len()-level.unwrap_or(0))].join(".");
-                    // let modules = modules[..level.unwrap_or(0)].join(".");
                     imports_vec.extend(names.iter().map(|name| {
                         Import::new(
                             format!("{}{}", modules, name.node.name),
@@ -114,9 +110,6 @@ pub fn check_imports(
         } else {
             String::new()
         };
-
-        debug!("{module_path} {blocks:#?}");
-        debug!("{imports_vec:#?}");
 
         if !imports_vec.is_empty() {
             imports.insert(&module_path, imports_vec);
