@@ -32,14 +32,22 @@ impl Violation for MissingWhitespaceAroundParameterEquals {
     }
 }
 
-static STARTSWITH_DEF_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^(async\s+def|def)\b").unwrap());
+fn is_in_def(tokens: &[(Location, &Tok, Location)]) -> bool {
+    for (_, tok, _) in tokens {
+        match tok {
+            Tok::Async | Tok::Indent | Tok::Dedent => continue,
+            Tok::Def => return true,
+            _ => return false,
+        }
+    }
+
+    false
+}
 
 /// E251, E252
 #[cfg(feature = "logical_lines")]
 pub fn whitespace_around_named_parameter_equals(
     tokens: &[(Location, &Tok, Location)],
-    line: &str,
 ) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut parens = 0;
@@ -48,7 +56,7 @@ pub fn whitespace_around_named_parameter_equals(
     let mut annotated_func_arg = false;
     let mut prev_end: Option<&Location> = None;
 
-    let in_def = STARTSWITH_DEF_REGEX.is_match(line);
+    let in_def = is_in_def(tokens);
 
     for (start, token, end) in tokens {
         if **token == Tok::NonLogicalNewline {
@@ -107,7 +115,6 @@ pub fn whitespace_around_named_parameter_equals(
 #[cfg(not(feature = "logical_lines"))]
 pub fn whitespace_around_named_parameter_equals(
     _tokens: &[(Location, &Tok, Location)],
-    _line: &str,
 ) -> Vec<(Location, DiagnosticKind)> {
     vec![]
 }

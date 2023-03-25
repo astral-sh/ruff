@@ -103,6 +103,8 @@ impl Whitespace {
         for c in content.chars() {
             if c == '\t' {
                 return Self::Tab;
+            } else if matches!(c, '\n' | '\r') {
+                break;
             } else if c.is_whitespace() {
                 count += 1;
             } else {
@@ -119,15 +121,16 @@ impl Whitespace {
 
     #[allow(dead_code)]
     fn trailing(content: &str) -> (Self, usize) {
-        let mut count = 0u32;
-        let mut offset = 0;
+        let mut count = 0;
 
         for c in content.chars().rev() {
             if c == '\t' {
-                return (Self::Tab, offset + 1);
+                return (Self::Tab, count + 1);
+            } else if matches!(c, '\n' | '\r') {
+                // Indent
+                return (Self::None, 0);
             } else if c.is_whitespace() {
                 count += 1;
-                offset += c.len_utf8();
             } else {
                 break;
             }
@@ -135,8 +138,8 @@ impl Whitespace {
 
         match count {
             0 => (Self::None, 0),
-            1 => (Self::Single, offset),
-            _ => (Self::Many, offset),
+            1 => (Self::Single, count),
+            _ => (Self::Many, count),
         }
     }
 }
