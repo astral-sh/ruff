@@ -106,4 +106,30 @@ expression: diagnostics
     column: 13
   fix: ~
   parent: ~
+- kind:
+    name: MultipleSpacesBeforeOperator
+    body: Multiple spaces before operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 31
+    column: 3
+  end_location:
+    row: 31
+    column: 3
+  fix: ~
+  parent: ~
+- kind:
+    name: MultipleSpacesBeforeOperator
+    body: Multiple spaces before operator
+    suggestion: ~
+    fixable: false
+  location:
+    row: 32
+    column: 3
+  end_location:
+    row: 32
+    column: 3
+  fix: ~
+  parent: ~
 

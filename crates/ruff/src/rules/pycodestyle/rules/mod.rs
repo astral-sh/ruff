@@ -86,3 +86,57 @@ mod whitespace_around_keywords;
 mod whitespace_around_named_parameter_equals;
 mod whitespace_before_comment;
 mod whitespace_before_parameters;
+
+#[allow(unused)]
+enum Whitespace {
+    None,
+    Single,
+    Many,
+    Tab,
+}
+
+impl Whitespace {
+    #[allow(dead_code)]
+    fn leading(content: &str) -> Self {
+        let mut count = 0u32;
+
+        for c in content.chars() {
+            if c == '\t' {
+                return Self::Tab;
+            } else if c.is_whitespace() {
+                count += 1;
+            } else {
+                break;
+            }
+        }
+
+        match count {
+            0 => Self::None,
+            1 => Self::Single,
+            _ => Self::Many,
+        }
+    }
+
+    #[allow(dead_code)]
+    fn trailing(content: &str) -> (Self, usize) {
+        let mut count = 0u32;
+        let mut offset = 0;
+
+        for c in content.chars().rev() {
+            if c == '\t' {
+                return (Self::Tab, offset + 1);
+            } else if c.is_whitespace() {
+                count += 1;
+                offset += c.len_utf8();
+            } else {
+                break;
+            }
+        }
+
+        match count {
+            0 => (Self::None, 0),
+            1 => (Self::Single, offset),
+            _ => (Self::Many, offset),
+        }
+    }
+}
