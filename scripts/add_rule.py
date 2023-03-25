@@ -12,14 +12,7 @@ Example usage:
 
 import argparse
 
-from _utils import ROOT_DIR, dir_name, get_indent, pascal_case
-
-
-def snake_case(name: str) -> str:
-    """Convert from PascalCase to snake_case."""
-    return "".join(
-        f"_{word.lower()}" if word.isupper() else word for word in name
-    ).lstrip("_")
+from _utils import ROOT_DIR, dir_name, get_indent, pascal_case, snake_case
 
 
 def main(*, name: str, prefix: str, code: str, linter: str) -> None:
@@ -46,24 +39,34 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
         has_added_testcase = False
         lines = []
         for line in content.splitlines():
-            if line.strip() == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {":
+            if (
+                not has_added_testcase
+                and line.strip()
+                == "fn rules(rule_code: Rule, path: &Path) -> Result<()> {"
+            ):
                 indent = get_indent(line)
+                filestem = f"{prefix}{code}" if linter != "pylint" else snake_case(name)
                 lines.append(
-                    f'{indent}#[test_case(Rule::{name}, Path::new("{prefix}{code}.py");'
+                    f'{indent}#[test_case(Rule::{name}, Path::new("{filestem}.py");'
                     f' "{prefix}{code}")]',
                 )
-                lines.sort(key=lambda line: line.split('Path::new("')[1])
+                lines.sort(
+                    key=lambda line: line.split('Path::new("')[1]
+                    if linter != "pylint"
+                    else line.split(");")[1],
+                )
                 fp.write("\n".join(lines))
                 fp.write("\n")
+                lines.clear()
                 has_added_testcase = True
 
-            if line.strip() == "":
+            if has_added_testcase:
+                fp.write(line)
+                fp.write("\n")
+            elif line.strip() == "":
                 fp.write("\n".join(lines))
                 fp.write("\n\n")
                 lines.clear()
-            elif has_added_testcase:
-                fp.write(line)
-                fp.write("\n")
             else:
                 lines.append(line)
 
