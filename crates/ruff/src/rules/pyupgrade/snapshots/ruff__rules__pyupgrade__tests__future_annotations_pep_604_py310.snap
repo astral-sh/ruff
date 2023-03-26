@@ -14,13 +14,14 @@ expression: diagnostics
     row: 40
     column: 16
   fix:
-    content: int | None
-    location:
-      row: 40
-      column: 3
-    end_location:
-      row: 40
-      column: 16
+    edits:
+      - content: int | None
+        location:
+          row: 40
+          column: 3
+        end_location:
+          row: 40
+          column: 16
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 42
     column: 47
   fix:
-    content: "List[int] | List[str]"
-    location:
-      row: 42
-      column: 20
-    end_location:
-      row: 42
-      column: 47
+    edits:
+      - content: "List[int] | List[str]"
+        location:
+          row: 42
+          column: 20
+        end_location:
+          row: 42
+          column: 47
   parent: ~
 

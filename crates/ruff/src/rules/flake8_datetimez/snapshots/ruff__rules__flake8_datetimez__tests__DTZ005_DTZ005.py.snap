@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: CallDatetimeNowWithoutTzinfo
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 48
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: CallDatetimeNowWithoutTzinfo
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: CallDatetimeNowWithoutTzinfo
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: CallDatetimeNowWithoutTzinfo
@@ -65,6 +69,7 @@ expression: diagnostics
   end_location:
     row: 18
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

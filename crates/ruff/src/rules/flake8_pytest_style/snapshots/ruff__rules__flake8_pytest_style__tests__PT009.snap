@@ -14,13 +14,14 @@ expression: diagnostics
     row: 11
     column: 23
   fix:
-    content: assert expr
-    location:
-      row: 11
-      column: 8
-    end_location:
-      row: 11
-      column: 29
+    edits:
+      - content: assert expr
+        location:
+          row: 11
+          column: 8
+        end_location:
+          row: 11
+          column: 29
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 12
     column: 23
   fix:
-    content: assert expr
-    location:
-      row: 12
-      column: 8
-    end_location:
-      row: 12
-      column: 34
+    edits:
+      - content: assert expr
+        location:
+          row: 12
+          column: 8
+        end_location:
+          row: 12
+          column: 34
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 13
     column: 23
   fix:
-    content: "assert expr, msg"
-    location:
-      row: 13
-      column: 8
-    end_location:
-      row: 13
-      column: 34
+    edits:
+      - content: "assert expr, msg"
+        location:
+          row: 13
+          column: 8
+        end_location:
+          row: 13
+          column: 34
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 14
     column: 23
   fix:
-    content: "assert expr, msg"
-    location:
-      row: 14
-      column: 8
-    end_location:
-      row: 14
-      column: 43
+    edits:
+      - content: "assert expr, msg"
+        location:
+          row: 14
+          column: 8
+        end_location:
+          row: 14
+          column: 43
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 15
     column: 23
   fix:
-    content: "assert expr, msg"
-    location:
-      row: 15
-      column: 8
-    end_location:
-      row: 15
-      column: 43
+    edits:
+      - content: "assert expr, msg"
+        location:
+          row: 15
+          column: 8
+        end_location:
+          row: 15
+          column: 43
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -113,7 +118,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -126,7 +132,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -139,7 +146,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -152,7 +160,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -165,7 +174,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 32
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -178,7 +188,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 34
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -191,7 +202,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 31
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -205,13 +217,14 @@ expression: diagnostics
     row: 28
     column: 24
   fix:
-    content: assert not True
-    location:
-      row: 28
-      column: 8
-    end_location:
-      row: 28
-      column: 30
+    edits:
+      - content: assert not True
+        location:
+          row: 28
+          column: 8
+        end_location:
+          row: 28
+          column: 30
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -225,13 +238,14 @@ expression: diagnostics
     row: 31
     column: 24
   fix:
-    content: assert 1 == 2
-    location:
-      row: 31
-      column: 8
-    end_location:
-      row: 31
-      column: 30
+    edits:
+      - content: assert 1 == 2
+        location:
+          row: 31
+          column: 8
+        end_location:
+          row: 31
+          column: 30
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -245,13 +259,14 @@ expression: diagnostics
     row: 34
     column: 27
   fix:
-    content: assert 1 != 1
-    location:
-      row: 34
-      column: 8
-    end_location:
-      row: 34
-      column: 33
+    edits:
+      - content: assert 1 != 1
+        location:
+          row: 34
+          column: 8
+        end_location:
+          row: 34
+          column: 33
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -265,13 +280,14 @@ expression: diagnostics
     row: 37
     column: 26
   fix:
-    content: assert 1 > 2
-    location:
-      row: 37
-      column: 8
-    end_location:
-      row: 37
-      column: 32
+    edits:
+      - content: assert 1 > 2
+        location:
+          row: 37
+          column: 8
+        end_location:
+          row: 37
+          column: 32
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -285,13 +301,14 @@ expression: diagnostics
     row: 40
     column: 31
   fix:
-    content: assert 1 >= 2
-    location:
-      row: 40
-      column: 8
-    end_location:
-      row: 40
-      column: 37
+    edits:
+      - content: assert 1 >= 2
+        location:
+          row: 40
+          column: 8
+        end_location:
+          row: 40
+          column: 37
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -305,13 +322,14 @@ expression: diagnostics
     row: 43
     column: 23
   fix:
-    content: assert 2 < 1
-    location:
-      row: 43
-      column: 8
-    end_location:
-      row: 43
-      column: 29
+    edits:
+      - content: assert 2 < 1
+        location:
+          row: 43
+          column: 8
+        end_location:
+          row: 43
+          column: 29
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -325,13 +343,14 @@ expression: diagnostics
     row: 46
     column: 28
   fix:
-    content: assert 1 <= 2
-    location:
-      row: 46
-      column: 8
-    end_location:
-      row: 46
-      column: 34
+    edits:
+      - content: assert 1 <= 2
+        location:
+          row: 46
+          column: 8
+        end_location:
+          row: 46
+          column: 34
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -345,13 +364,14 @@ expression: diagnostics
     row: 49
     column: 21
   fix:
-    content: "assert 1 in [2, 3]"
-    location:
-      row: 49
-      column: 8
-    end_location:
-      row: 49
-      column: 32
+    edits:
+      - content: "assert 1 in [2, 3]"
+        location:
+          row: 49
+          column: 8
+        end_location:
+          row: 49
+          column: 32
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -365,13 +385,14 @@ expression: diagnostics
     row: 52
     column: 24
   fix:
-    content: "assert 2 not in [2, 3]"
-    location:
-      row: 52
-      column: 8
-    end_location:
-      row: 52
-      column: 35
+    edits:
+      - content: "assert 2 not in [2, 3]"
+        location:
+          row: 52
+          column: 8
+        end_location:
+          row: 52
+          column: 35
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -385,13 +406,14 @@ expression: diagnostics
     row: 55
     column: 25
   fix:
-    content: assert 0 is None
-    location:
-      row: 55
-      column: 8
-    end_location:
-      row: 55
-      column: 28
+    edits:
+      - content: assert 0 is None
+        location:
+          row: 55
+          column: 8
+        end_location:
+          row: 55
+          column: 28
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -405,13 +427,14 @@ expression: diagnostics
     row: 58
     column: 28
   fix:
-    content: assert 0 is not None
-    location:
-      row: 58
-      column: 8
-    end_location:
-      row: 58
-      column: 31
+    edits:
+      - content: assert 0 is not None
+        location:
+          row: 58
+          column: 8
+        end_location:
+          row: 58
+          column: 31
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -425,13 +448,14 @@ expression: diagnostics
     row: 61
     column: 21
   fix:
-    content: "assert [] is []"
-    location:
-      row: 61
-      column: 8
-    end_location:
-      row: 61
-      column: 29
+    edits:
+      - content: "assert [] is []"
+        location:
+          row: 61
+          column: 8
+        end_location:
+          row: 61
+          column: 29
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -445,13 +469,14 @@ expression: diagnostics
     row: 64
     column: 24
   fix:
-    content: assert 1 is not 1
-    location:
-      row: 64
-      column: 8
-    end_location:
-      row: 64
-      column: 30
+    edits:
+      - content: assert 1 is not 1
+        location:
+          row: 64
+          column: 8
+        end_location:
+          row: 64
+          column: 30
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -465,13 +490,14 @@ expression: diagnostics
     row: 67
     column: 29
   fix:
-    content: "assert isinstance(1, str)"
-    location:
-      row: 67
-      column: 8
-    end_location:
-      row: 67
-      column: 37
+    edits:
+      - content: "assert isinstance(1, str)"
+        location:
+          row: 67
+          column: 8
+        end_location:
+          row: 67
+          column: 37
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -485,13 +511,14 @@ expression: diagnostics
     row: 70
     column: 32
   fix:
-    content: "assert not isinstance(1, int)"
-    location:
-      row: 70
-      column: 8
-    end_location:
-      row: 70
-      column: 40
+    edits:
+      - content: "assert not isinstance(1, int)"
+        location:
+          row: 70
+          column: 8
+        end_location:
+          row: 70
+          column: 40
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -505,13 +532,14 @@ expression: diagnostics
     row: 73
     column: 24
   fix:
-    content: "assert re.search(\"def\", \"abc\")"
-    location:
-      row: 73
-      column: 8
-    end_location:
-      row: 73
-      column: 39
+    edits:
+      - content: "assert re.search(\"def\", \"abc\")"
+        location:
+          row: 73
+          column: 8
+        end_location:
+          row: 73
+          column: 39
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -525,13 +553,14 @@ expression: diagnostics
     row: 76
     column: 27
   fix:
-    content: "assert not re.search(\"abc\", \"abc\")"
-    location:
-      row: 76
-      column: 8
-    end_location:
-      row: 76
-      column: 42
+    edits:
+      - content: "assert not re.search(\"abc\", \"abc\")"
+        location:
+          row: 76
+          column: 8
+        end_location:
+          row: 76
+          column: 42
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -545,13 +574,14 @@ expression: diagnostics
     row: 79
     column: 32
   fix:
-    content: "assert re.search(\"def\", \"abc\")"
-    location:
-      row: 79
-      column: 8
-    end_location:
-      row: 79
-      column: 47
+    edits:
+      - content: "assert re.search(\"def\", \"abc\")"
+        location:
+          row: 79
+          column: 8
+        end_location:
+          row: 79
+          column: 47
   parent: ~
 - kind:
     name: PytestUnittestAssertion
@@ -565,12 +595,13 @@ expression: diagnostics
     row: 82
     column: 27
   fix:
-    content: "assert not re.search(\"abc\", \"abc\")"
-    location:
-      row: 82
-      column: 8
-    end_location:
-      row: 82
-      column: 42
+    edits:
+      - content: "assert not re.search(\"abc\", \"abc\")"
+        location:
+          row: 82
+          column: 8
+        end_location:
+          row: 82
+          column: 42
   parent: ~
 

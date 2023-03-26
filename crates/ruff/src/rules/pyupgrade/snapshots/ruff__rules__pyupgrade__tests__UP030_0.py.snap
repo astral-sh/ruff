@@ -14,13 +14,14 @@ expression: diagnostics
     row: 3
     column: 33
   fix:
-    content: "\"{}\" \"{}\" \"{}\".format(1, 2, 3)"
-    location:
-      row: 3
-      column: 0
-    end_location:
-      row: 3
-      column: 33
+    edits:
+      - content: "\"{}\" \"{}\" \"{}\".format(1, 2, 3)"
+        location:
+          row: 3
+          column: 0
+        end_location:
+          row: 3
+          column: 33
   parent: ~
 - kind:
     name: FormatLiterals
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 7
     column: 1
   fix:
-    content: "\"a {} complicated {} string with {} {}\".format(\n    \"fourth\", \"second\", \"first\", \"third\"\n)"
-    location:
-      row: 5
-      column: 0
-    end_location:
-      row: 7
-      column: 1
+    edits:
+      - content: "\"a {} complicated {} string with {} {}\".format(\n    \"fourth\", \"second\", \"first\", \"third\"\n)"
+        location:
+          row: 5
+          column: 0
+        end_location:
+          row: 7
+          column: 1
   parent: ~
 - kind:
     name: FormatLiterals
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 9
     column: 15
   fix:
-    content: "'{}'.format(1)"
-    location:
-      row: 9
-      column: 0
-    end_location:
-      row: 9
-      column: 15
+    edits:
+      - content: "'{}'.format(1)"
+        location:
+          row: 9
+          column: 0
+        end_location:
+          row: 9
+          column: 15
   parent: ~
 - kind:
     name: FormatLiterals
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 11
     column: 18
   fix:
-    content: "'{:x}'.format(30)"
-    location:
-      row: 11
-      column: 0
-    end_location:
-      row: 11
-      column: 18
+    edits:
+      - content: "'{:x}'.format(30)"
+        location:
+          row: 11
+          column: 0
+        end_location:
+          row: 11
+          column: 18
   parent: ~
 - kind:
     name: FormatLiterals
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 13
     column: 19
   fix:
-    content: "'{}'.format(1)"
-    location:
-      row: 13
-      column: 4
-    end_location:
-      row: 13
-      column: 19
+    edits:
+      - content: "'{}'.format(1)"
+        location:
+          row: 13
+          column: 4
+        end_location:
+          row: 13
+          column: 19
   parent: ~
 - kind:
     name: FormatLiterals
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 15
     column: 29
   fix:
-    content: "'''{}\\n{}\\n'''.format(1, 2)"
-    location:
-      row: 15
-      column: 0
-    end_location:
-      row: 15
-      column: 29
+    edits:
+      - content: "'''{}\\n{}\\n'''.format(1, 2)"
+        location:
+          row: 15
+          column: 0
+        end_location:
+          row: 15
+          column: 29
   parent: ~
 - kind:
     name: FormatLiterals
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 18
     column: 26
   fix:
-    content: "\"foo {}\" \\\n    \"bar {}\".format(1, 2)"
-    location:
-      row: 17
-      column: 4
-    end_location:
-      row: 18
-      column: 26
+    edits:
+      - content: "\"foo {}\" \\\n    \"bar {}\".format(1, 2)"
+        location:
+          row: 17
+          column: 4
+        end_location:
+          row: 18
+          column: 26
   parent: ~
 - kind:
     name: FormatLiterals
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 20
     column: 17
   fix:
-    content: "(\"{}\").format(1)"
-    location:
-      row: 20
-      column: 0
-    end_location:
-      row: 20
-      column: 17
+    edits:
+      - content: "(\"{}\").format(1)"
+        location:
+          row: 20
+          column: 0
+        end_location:
+          row: 20
+          column: 17
   parent: ~
 - kind:
     name: FormatLiterals
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 22
     column: 27
   fix:
-    content: "\"\\N{snowman} {}\".format(1)"
-    location:
-      row: 22
-      column: 0
-    end_location:
-      row: 22
-      column: 27
+    edits:
+      - content: "\"\\N{snowman} {}\".format(1)"
+        location:
+          row: 22
+          column: 0
+        end_location:
+          row: 22
+          column: 27
   parent: ~
 - kind:
     name: FormatLiterals
@@ -193,7 +202,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FormatLiterals
@@ -206,7 +216,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FormatLiterals
@@ -219,6 +230,7 @@ expression: diagnostics
   end_location:
     row: 35
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

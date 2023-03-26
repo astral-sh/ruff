@@ -14,13 +14,14 @@ expression: diagnostics
     row: 2
     column: 24
   fix:
-    content: NotImplementedError
-    location:
-      row: 2
-      column: 10
-    end_location:
-      row: 2
-      column: 24
+    edits:
+      - content: NotImplementedError
+        location:
+          row: 2
+          column: 10
+        end_location:
+          row: 2
+          column: 24
   parent: ~
 - kind:
     name: RaiseNotImplemented
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 6
     column: 24
   fix:
-    content: NotImplementedError
-    location:
-      row: 6
-      column: 10
-    end_location:
-      row: 6
-      column: 24
+    edits:
+      - content: NotImplementedError
+        location:
+          row: 6
+          column: 10
+        end_location:
+          row: 6
+          column: 24
   parent: ~
 

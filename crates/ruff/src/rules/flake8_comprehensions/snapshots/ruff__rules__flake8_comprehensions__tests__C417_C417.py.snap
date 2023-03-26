@@ -14,13 +14,14 @@ expression: diagnostics
     row: 3
     column: 26
   fix:
-    content: (x + 1 for x in nums)
-    location:
-      row: 3
-      column: 0
-    end_location:
-      row: 3
-      column: 26
+    edits:
+      - content: (x + 1 for x in nums)
+        location:
+          row: 3
+          column: 0
+        end_location:
+          row: 3
+          column: 26
   parent: ~
 - kind:
     name: UnnecessaryMap
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 4
     column: 27
   fix:
-    content: (str(x) for x in nums)
-    location:
-      row: 4
-      column: 0
-    end_location:
-      row: 4
-      column: 27
+    edits:
+      - content: (str(x) for x in nums)
+        location:
+          row: 4
+          column: 0
+        end_location:
+          row: 4
+          column: 27
   parent: ~
 - kind:
     name: UnnecessaryMap
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 5
     column: 32
   fix:
-    content: "[x * 2 for x in nums]"
-    location:
-      row: 5
-      column: 0
-    end_location:
-      row: 5
-      column: 32
+    edits:
+      - content: "[x * 2 for x in nums]"
+        location:
+          row: 5
+          column: 0
+        end_location:
+          row: 5
+          column: 32
   parent: ~
 - kind:
     name: UnnecessaryMap
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 6
     column: 36
   fix:
-    content: "{x % 2 == 0 for x in nums}"
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 36
+    edits:
+      - content: "{x % 2 == 0 for x in nums}"
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 6
+          column: 36
   parent: ~
 - kind:
     name: UnnecessaryMap
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 7
     column: 36
   fix:
-    content: "{v: v**2 for v in nums}"
-    location:
-      row: 7
-      column: 0
-    end_location:
-      row: 7
-      column: 36
+    edits:
+      - content: "{v: v**2 for v in nums}"
+        location:
+          row: 7
+          column: 0
+        end_location:
+          row: 7
+          column: 36
   parent: ~
 - kind:
     name: UnnecessaryMap
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 8
     column: 26
   fix:
-    content: "(\"const\" for _ in nums)"
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 8
-      column: 26
+    edits:
+      - content: "(\"const\" for _ in nums)"
+        location:
+          row: 8
+          column: 0
+        end_location:
+          row: 8
+          column: 26
   parent: ~
 - kind:
     name: UnnecessaryMap
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 9
     column: 24
   fix:
-    content: (3.0 for _ in nums)
-    location:
-      row: 9
-      column: 0
-    end_location:
-      row: 9
-      column: 24
+    edits:
+      - content: (3.0 for _ in nums)
+        location:
+          row: 9
+          column: 0
+        end_location:
+          row: 9
+          column: 24
   parent: ~
 - kind:
     name: UnnecessaryMap
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 10
     column: 63
   fix:
-    content: "(x in nums and \"1\" or \"0\" for x in range(123))"
-    location:
-      row: 10
-      column: 12
-    end_location:
-      row: 10
-      column: 63
+    edits:
+      - content: "(x in nums and \"1\" or \"0\" for x in range(123))"
+        location:
+          row: 10
+          column: 12
+        end_location:
+          row: 10
+          column: 63
   parent: ~
 - kind:
     name: UnnecessaryMap
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 11
     column: 44
   fix:
-    content: "(isinstance(v, dict) for v in nums)"
-    location:
-      row: 11
-      column: 4
-    end_location:
-      row: 11
-      column: 44
+    edits:
+      - content: "(isinstance(v, dict) for v in nums)"
+        location:
+          row: 11
+          column: 4
+        end_location:
+          row: 11
+          column: 44
   parent: ~
 - kind:
     name: UnnecessaryMap
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 12
     column: 35
   fix:
-    content: (v for v in nums)
-    location:
-      row: 12
-      column: 13
-    end_location:
-      row: 12
-      column: 35
+    edits:
+      - content: (v for v in nums)
+        location:
+          row: 12
+          column: 13
+        end_location:
+          row: 12
+          column: 35
   parent: ~
 - kind:
     name: UnnecessaryMap
@@ -214,13 +224,14 @@ expression: diagnostics
     row: 15
     column: 43
   fix:
-    content: " {x % 2 == 0 for x in nums} "
-    location:
-      row: 15
-      column: 7
-    end_location:
-      row: 15
-      column: 43
+    edits:
+      - content: " {x % 2 == 0 for x in nums} "
+        location:
+          row: 15
+          column: 7
+        end_location:
+          row: 15
+          column: 43
   parent: ~
 - kind:
     name: UnnecessaryMap
@@ -234,13 +245,14 @@ expression: diagnostics
     row: 16
     column: 43
   fix:
-    content: " {v: v**2 for v in nums} "
-    location:
-      row: 16
-      column: 7
-    end_location:
-      row: 16
-      column: 43
+    edits:
+      - content: " {v: v**2 for v in nums} "
+        location:
+          row: 16
+          column: 7
+        end_location:
+          row: 16
+          column: 43
   parent: ~
 - kind:
     name: UnnecessaryMap
@@ -253,6 +265,7 @@ expression: diagnostics
   end_location:
     row: 21
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

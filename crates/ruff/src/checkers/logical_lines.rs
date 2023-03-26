@@ -5,7 +5,7 @@ use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
@@ -75,7 +75,7 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -93,7 +93,7 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -108,7 +108,7 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -120,7 +120,7 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -133,7 +133,7 @@ pub fn check_logical_lines(
                         kind,
                         location: range.location,
                         end_location: range.end_location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -148,7 +148,7 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -159,7 +159,7 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -210,7 +210,7 @@ pub fn check_logical_lines(
                     kind,
                     location,
                     end_location: location,
-                    fix: None,
+                    fix: Fix::empty(),
                     parent: None,
                 });
             }

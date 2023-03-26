@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 0
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NoIndentedBlockComment
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 31
     column: 0
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NoIndentedBlockComment
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 32
     column: 0
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NoIndentedBlockComment
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 33
     column: 0
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NoIndentedBlockComment
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 34
     column: 0
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NoIndentedBlockComment
@@ -78,6 +83,7 @@ expression: diagnostics
   end_location:
     row: 35
     column: 0
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

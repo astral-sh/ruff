@@ -57,27 +57,27 @@ export default function SourceEditor({
             .filter((check) => check.fix)
             .map((check) => ({
               title: check.fix
-                ? `${check.code}: ${check.fix.message}` ?? `Fix ${check.code}`
+                ? check.fix.message
+                  ? `${check.code}: ${check.fix.message}`
+                  : `Fix ${check.code}`
                 : "Autofix",
               id: `fix-${check.code}`,
               kind: "quickfix",
               edit: check.fix
                 ? {
-                    edits: [
-                      {
-                        resource: model.uri,
-                        versionId: model.getVersionId(),
-                        edit: {
-                          range: {
-                            startLineNumber: check.fix.location.row,
-                            startColumn: check.fix.location.column + 1,
-                            endLineNumber: check.fix.end_location.row,
-                            endColumn: check.fix.end_location.column + 1,
-                          },
-                          text: check.fix.content,
+                    edits: check.fix.edits.map((edit) => ({
+                      resource: model.uri,
+                      versionId: model.getVersionId(),
+                      edit: {
+                        range: {
+                          startLineNumber: edit.location.row,
+                          startColumn: edit.location.column + 1,
+                          endLineNumber: edit.end_location.row,
+                          endColumn: edit.end_location.column + 1,
                         },
+                        text: edit.content,
                       },
-                    ],
+                    })),
                   }
                 : undefined,
             }));

@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SuperfluousElseReturn
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SuperfluousElseReturn
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 41
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SuperfluousElseReturn
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 53
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SuperfluousElseReturn
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 64
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SuperfluousElseReturn
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 79
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SuperfluousElseReturn
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 89
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SuperfluousElseReturn
@@ -104,6 +111,7 @@ expression: diagnostics
   end_location:
     row: 99
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

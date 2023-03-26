@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: InvalidFirstArgumentNameForClassMethod
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 38
     column: 59
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: InvalidFirstArgumentNameForClassMethod
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 43
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

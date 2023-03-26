@@ -2259,6 +2259,7 @@ dependencies = [
  "js-sys",
  "log",
  "ruff",
+ "ruff_diagnostics",
  "ruff_python_ast",
  "ruff_rustpython",
  "rustpython-parser",

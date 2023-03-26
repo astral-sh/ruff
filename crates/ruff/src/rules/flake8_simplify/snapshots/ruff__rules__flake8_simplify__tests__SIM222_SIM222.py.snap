@@ -14,13 +14,14 @@ expression: diagnostics
     row: 1
     column: 12
   fix:
-    content: "True"
-    location:
-      row: 1
-      column: 3
-    end_location:
-      row: 1
-      column: 12
+    edits:
+      - content: "True"
+        location:
+          row: 1
+          column: 3
+        end_location:
+          row: 1
+          column: 12
   parent: ~
 - kind:
     name: ExprOrTrue
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 4
     column: 19
   fix:
-    content: "True"
-    location:
-      row: 4
-      column: 3
-    end_location:
-      row: 4
-      column: 19
+    edits:
+      - content: "True"
+        location:
+          row: 4
+          column: 3
+        end_location:
+          row: 4
+          column: 19
   parent: ~
 - kind:
     name: ExprOrTrue
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 7
     column: 18
   fix:
-    content: "True"
-    location:
-      row: 7
-      column: 9
-    end_location:
-      row: 7
-      column: 18
+    edits:
+      - content: "True"
+        location:
+          row: 7
+          column: 9
+        end_location:
+          row: 7
+          column: 18
   parent: ~
 - kind:
     name: ExprOrTrue
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 24
     column: 31
   fix:
-    content: "True"
-    location:
-      row: 24
-      column: 15
-    end_location:
-      row: 24
-      column: 31
+    edits:
+      - content: "True"
+        location:
+          row: 24
+          column: 15
+        end_location:
+          row: 24
+          column: 31
   parent: ~
 - kind:
     name: ExprOrTrue
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 27
     column: 31
   fix:
-    content: "True"
-    location:
-      row: 27
-      column: 3
-    end_location:
-      row: 27
-      column: 31
+    edits:
+      - content: "True"
+        location:
+          row: 27
+          column: 3
+        end_location:
+          row: 27
+          column: 31
   parent: ~
 - kind:
     name: ExprOrTrue
@@ -114,12 +119,13 @@ expression: diagnostics
     row: 30
     column: 31
   fix:
-    content: "True"
-    location:
-      row: 30
-      column: 3
-    end_location:
-      row: 30
-      column: 31
+    edits:
+      - content: "True"
+        location:
+          row: 30
+          column: 3
+        end_location:
+          row: 30
+          column: 31
   parent: ~
 

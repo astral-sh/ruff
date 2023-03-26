@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 26
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 32
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 38
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 51
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 61
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 64
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadStrStripCall
@@ -208,6 +223,7 @@ expression: diagnostics
   end_location:
     row: 67
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

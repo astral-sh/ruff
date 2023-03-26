@@ -14,13 +14,14 @@ expression: diagnostics
     row: 5
     column: 67
   fix:
-    content: "class MyType(NamedTuple):\n    a: int\n    b: tuple[str, ...]"
-    location:
-      row: 5
-      column: 0
-    end_location:
-      row: 5
-      column: 67
+    edits:
+      - content: "class MyType(NamedTuple):\n    a: int\n    b: tuple[str, ...]"
+        location:
+          row: 5
+          column: 0
+        end_location:
+          row: 5
+          column: 67
   parent: ~
 - kind:
     name: ConvertNamedTupleFunctionalToClass
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 12
     column: 1
   fix:
-    content: "class MyType(NamedTuple):\n    a: int\n    b: str = \"foo\"\n    c: list[bool] = [True]"
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 12
-      column: 1
+    edits:
+      - content: "class MyType(NamedTuple):\n    a: int\n    b: str = \"foo\"\n    c: list[bool] = [True]"
+        location:
+          row: 8
+          column: 0
+        end_location:
+          row: 12
+          column: 1
   parent: ~
 - kind:
     name: ConvertNamedTupleFunctionalToClass
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 15
     column: 62
   fix:
-    content: "class MyType(typing.NamedTuple):\n    a: int\n    b: str"
-    location:
-      row: 15
-      column: 0
-    end_location:
-      row: 15
-      column: 62
+    edits:
+      - content: "class MyType(typing.NamedTuple):\n    a: int\n    b: str"
+        location:
+          row: 15
+          column: 0
+        end_location:
+          row: 15
+          column: 62
   parent: ~
 - kind:
     name: ConvertNamedTupleFunctionalToClass
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 28
     column: 36
   fix:
-    content: "class MyType(typing.NamedTuple):\n    pass"
-    location:
-      row: 28
-      column: 0
-    end_location:
-      row: 28
-      column: 36
+    edits:
+      - content: "class MyType(typing.NamedTuple):\n    pass"
+        location:
+          row: 28
+          column: 0
+        end_location:
+          row: 28
+          column: 36
   parent: ~
 - kind:
     name: ConvertNamedTupleFunctionalToClass
@@ -94,12 +98,13 @@ expression: diagnostics
     row: 31
     column: 40
   fix:
-    content: "class MyType(typing.NamedTuple):\n    pass"
-    location:
-      row: 31
-      column: 0
-    end_location:
-      row: 31
-      column: 40
+    edits:
+      - content: "class MyType(typing.NamedTuple):\n    pass"
+        location:
+          row: 31
+          column: 0
+        end_location:
+          row: 31
+          column: 40
   parent: ~
 

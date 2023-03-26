@@ -14,13 +14,14 @@ expression: diagnostics
     row: 37
     column: 13
   fix:
-    content: "from typing import (\n        Mapping,  # noqa: F401\n        )"
-    location:
-      row: 35
-      column: 4
-    end_location:
-      row: 38
-      column: 5
+    edits:
+      - content: "from typing import (\n        Mapping,  # noqa: F401\n        )"
+        location:
+          row: 35
+          column: 4
+        end_location:
+          row: 38
+          column: 5
   parent:
     row: 35
     column: 4
@@ -36,13 +37,14 @@ expression: diagnostics
     row: 52
     column: 31
   fix:
-    content: ""
-    location:
-      row: 52
-      column: 17
-    end_location:
-      row: 52
-      column: 31
+    edits:
+      - content: ""
+        location:
+          row: 52
+          column: 17
+        end_location:
+          row: 52
+          column: 31
   parent: ~
 - kind:
     name: UnusedNOQA
@@ -56,13 +58,14 @@ expression: diagnostics
     row: 59
     column: 31
   fix:
-    content: ""
-    location:
-      row: 59
-      column: 17
-    end_location:
-      row: 59
-      column: 31
+    edits:
+      - content: ""
+        location:
+          row: 59
+          column: 17
+        end_location:
+          row: 59
+          column: 31
   parent: ~
 - kind:
     name: UnusedNOQA
@@ -76,13 +79,14 @@ expression: diagnostics
     row: 66
     column: 27
   fix:
-    content: ""
-    location:
-      row: 66
-      column: 13
-    end_location:
-      row: 66
-      column: 27
+    edits:
+      - content: ""
+        location:
+          row: 66
+          column: 13
+        end_location:
+          row: 66
+          column: 27
   parent: ~
 - kind:
     name: UnusedNOQA
@@ -96,13 +100,14 @@ expression: diagnostics
     row: 72
     column: 38
   fix:
-    content: ""
-    location:
-      row: 72
-      column: 24
-    end_location:
-      row: 72
-      column: 38
+    edits:
+      - content: ""
+        location:
+          row: 72
+          column: 24
+        end_location:
+          row: 72
+          column: 38
   parent: ~
 - kind:
     name: UnusedImport
@@ -116,13 +121,14 @@ expression: diagnostics
     row: 89
     column: 32
   fix:
-    content: pass
-    location:
-      row: 89
-      column: 4
-    end_location:
-      row: 89
-      column: 52
+    edits:
+      - content: pass
+        location:
+          row: 89
+          column: 4
+        end_location:
+          row: 89
+          column: 52
   parent: ~
 - kind:
     name: UnusedImport
@@ -136,13 +142,14 @@ expression: diagnostics
     row: 89
     column: 52
   fix:
-    content: pass
-    location:
-      row: 89
-      column: 4
-    end_location:
-      row: 89
-      column: 52
+    edits:
+      - content: pass
+        location:
+          row: 89
+          column: 4
+        end_location:
+          row: 89
+          column: 52
   parent: ~
 - kind:
     name: UnusedNOQA
@@ -156,12 +163,13 @@ expression: diagnostics
     row: 89
     column: 66
   fix:
-    content: ""
-    location:
-      row: 89
-      column: 52
-    end_location:
-      row: 89
-      column: 66
+    edits:
+      - content: ""
+        location:
+          row: 89
+          column: 52
+        end_location:
+          row: 89
+          column: 66
   parent: ~
 

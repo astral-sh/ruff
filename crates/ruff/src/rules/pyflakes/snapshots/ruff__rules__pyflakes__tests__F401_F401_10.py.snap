@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedImport
@@ -27,12 +28,13 @@ expression: diagnostics
     row: 15
     column: 21
   fix:
-    content: ""
-    location:
-      row: 15
-      column: 0
-    end_location:
-      row: 16
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 15
+          column: 0
+        end_location:
+          row: 16
+          column: 0
   parent: ~
 

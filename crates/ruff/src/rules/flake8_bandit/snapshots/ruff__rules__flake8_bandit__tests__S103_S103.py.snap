@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadFilePermissions
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadFilePermissions
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadFilePermissions
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadFilePermissions
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadFilePermissions
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadFilePermissions
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadFilePermissions
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadFilePermissions
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadFilePermissions
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 36
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadFilePermissions
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 60
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadFilePermissions
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 38
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BadFilePermissions
@@ -169,6 +181,7 @@ expression: diagnostics
   end_location:
     row: 22
     column: 36
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

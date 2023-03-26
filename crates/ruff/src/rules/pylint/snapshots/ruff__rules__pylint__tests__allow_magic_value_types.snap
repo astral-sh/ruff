@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 59
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MagicValueComparison
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 65
     column: 40
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MagicValueComparison
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 74
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

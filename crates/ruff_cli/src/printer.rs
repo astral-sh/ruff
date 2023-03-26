@@ -38,11 +38,16 @@ bitflags! {
 }
 
 #[derive(Serialize)]
-struct ExpandedFix<'a> {
+struct ExpandedEdit<'a> {
     content: &'a str,
-    message: Option<&'a str>,
     location: &'a Location,
     end_location: &'a Location,
+}
+
+#[derive(Serialize)]
+struct ExpandedFix<'a> {
+    message: Option<&'a str>,
+    edits: Vec<ExpandedEdit<'a>>,
 }
 
 #[derive(Serialize)]
@@ -197,12 +202,23 @@ impl Printer {
                             .map(|message| ExpandedMessage {
                                 code: message.kind.rule().into(),
                                 message: message.kind.body.clone(),
-                                fix: message.fix.as_ref().map(|fix| ExpandedFix {
-                                    content: &fix.content,
-                                    location: &fix.location,
-                                    end_location: &fix.end_location,
-                                    message: message.kind.suggestion.as_deref(),
-                                }),
+                                fix: if message.fix.is_empty() {
+                                    None
+                                } else {
+                                    Some(ExpandedFix {
+                                        message: message.kind.suggestion.as_deref(),
+                                        edits: message
+                                            .fix
+                                            .edits()
+                                            .iter()
+                                            .map(|edit| ExpandedEdit {
+                                                content: &edit.content,
+                                                location: &edit.location,
+                                                end_location: &edit.end_location,
+                                            })
+                                            .collect(),
+                                    })
+                                },
                                 location: message.location,
                                 end_location: message.end_location,
                                 filename: &message.filename,

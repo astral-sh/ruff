@@ -14,13 +14,14 @@ expression: diagnostics
     row: 4
     column: 24
   fix:
-    content: ""
-    location:
-      row: 4
-      column: 0
-    end_location:
-      row: 5
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 4
+          column: 0
+        end_location:
+          row: 5
+          column: 0
   parent: ~
 - kind:
     name: DuplicateClassFieldDefinition
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 13
     column: 24
   fix:
-    content: ""
-    location:
-      row: 13
-      column: 0
-    end_location:
-      row: 14
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 13
+          column: 0
+        end_location:
+          row: 14
+          column: 0
   parent: ~
 - kind:
     name: DuplicateClassFieldDefinition
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 23
     column: 23
   fix:
-    content: ""
-    location:
-      row: 23
-      column: 0
-    end_location:
-      row: 24
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 23
+          column: 0
+        end_location:
+          row: 24
+          column: 0
   parent: ~
 - kind:
     name: DuplicateClassFieldDefinition
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 40
     column: 23
   fix:
-    content: ""
-    location:
-      row: 40
-      column: 0
-    end_location:
-      row: 41
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 40
+          column: 0
+        end_location:
+          row: 41
+          column: 0
   parent: ~
 

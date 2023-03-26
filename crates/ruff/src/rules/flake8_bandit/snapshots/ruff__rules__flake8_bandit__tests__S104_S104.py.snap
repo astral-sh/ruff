@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedBindAllInterfaces
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedBindAllInterfaces
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedBindAllInterfaces
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 18
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

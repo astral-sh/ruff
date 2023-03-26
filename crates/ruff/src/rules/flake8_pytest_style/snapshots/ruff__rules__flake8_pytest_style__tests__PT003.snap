@@ -14,13 +14,14 @@ expression: diagnostics
     row: 14
     column: 32
   fix:
-    content: ""
-    location:
-      row: 14
-      column: 16
-    end_location:
-      row: 14
-      column: 32
+    edits:
+      - content: ""
+        location:
+          row: 14
+          column: 16
+        end_location:
+          row: 14
+          column: 32
   parent: ~
 - kind:
     name: PytestExtraneousScopeFunction
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 19
     column: 32
   fix:
-    content: ""
-    location:
-      row: 19
-      column: 16
-    end_location:
-      row: 19
-      column: 34
+    edits:
+      - content: ""
+        location:
+          row: 19
+          column: 16
+        end_location:
+          row: 19
+          column: 34
   parent: ~
 - kind:
     name: PytestExtraneousScopeFunction
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 24
     column: 51
   fix:
-    content: ""
-    location:
-      row: 24
-      column: 33
-    end_location:
-      row: 24
-      column: 51
+    edits:
+      - content: ""
+        location:
+          row: 24
+          column: 33
+        end_location:
+          row: 24
+          column: 51
   parent: ~
 - kind:
     name: PytestExtraneousScopeFunction
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 29
     column: 51
   fix:
-    content: ""
-    location:
-      row: 29
-      column: 35
-    end_location:
-      row: 29
-      column: 53
+    edits:
+      - content: ""
+        location:
+          row: 29
+          column: 35
+        end_location:
+          row: 29
+          column: 53
   parent: ~
 - kind:
     name: PytestExtraneousScopeFunction
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 37
     column: 46
   fix:
-    content: ""
-    location:
-      row: 37
-      column: 28
-    end_location:
-      row: 37
-      column: 46
+    edits:
+      - content: ""
+        location:
+          row: 37
+          column: 28
+        end_location:
+          row: 37
+          column: 46
   parent: ~
 - kind:
     name: PytestExtraneousScopeFunction
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 43
     column: 20
   fix:
-    content: ""
-    location:
-      row: 43
-      column: 4
-    end_location:
-      row: 44
-      column: 4
+    edits:
+      - content: ""
+        location:
+          row: 43
+          column: 4
+        end_location:
+          row: 44
+          column: 4
   parent: ~
 - kind:
     name: PytestExtraneousScopeFunction
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 52
     column: 20
   fix:
-    content: ""
-    location:
-      row: 51
-      column: 21
-    end_location:
-      row: 52
-      column: 20
+    edits:
+      - content: ""
+        location:
+          row: 51
+          column: 21
+        end_location:
+          row: 52
+          column: 20
   parent: ~
 - kind:
     name: PytestExtraneousScopeFunction
@@ -154,12 +161,13 @@ expression: diagnostics
     row: 67
     column: 18
   fix:
-    content: ""
-    location:
-      row: 66
-      column: 4
-    end_location:
-      row: 70
-      column: 4
+    edits:
+      - content: ""
+        location:
+          row: 66
+          column: 4
+        end_location:
+          row: 70
+          column: 4
   parent: ~
 

@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnconventionalImportAlias
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnconventionalImportAlias
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnconventionalImportAlias
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnconventionalImportAlias
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnconventionalImportAlias
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 32
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnconventionalImportAlias
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnconventionalImportAlias
@@ -104,6 +111,7 @@ expression: diagnostics
   end_location:
     row: 13
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

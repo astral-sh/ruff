@@ -14,13 +14,14 @@ expression: diagnostics
     row: 6
     column: 42
   fix:
-    content: text
-    location:
-      row: 6
-      column: 24
-    end_location:
-      row: 6
-      column: 42
+    edits:
+      - content: text
+        location:
+          row: 6
+          column: 24
+        end_location:
+          row: 6
+          column: 42
   parent: ~
 - kind:
     name: ReplaceUniversalNewlines
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 7
     column: 40
   fix:
-    content: text
-    location:
-      row: 7
-      column: 22
-    end_location:
-      row: 7
-      column: 40
+    edits:
+      - content: text
+        location:
+          row: 7
+          column: 22
+        end_location:
+          row: 7
+          column: 40
   parent: ~
 - kind:
     name: ReplaceUniversalNewlines
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 9
     column: 31
   fix:
-    content: text
-    location:
-      row: 9
-      column: 13
-    end_location:
-      row: 9
-      column: 31
+    edits:
+      - content: text
+        location:
+          row: 9
+          column: 13
+        end_location:
+          row: 9
+          column: 31
   parent: ~
 - kind:
     name: ReplaceUniversalNewlines
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 10
     column: 39
   fix:
-    content: text
-    location:
-      row: 10
-      column: 21
-    end_location:
-      row: 10
-      column: 39
+    edits:
+      - content: text
+        location:
+          row: 10
+          column: 21
+        end_location:
+          row: 10
+          column: 39
   parent: ~
 

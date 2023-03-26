@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 26
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 32
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 38
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 45
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 54
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 58
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 61
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 62
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 63
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 64
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -208,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 65
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -221,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 66
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -234,7 +251,8 @@ expression: diagnostics
   end_location:
     row: 73
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -247,7 +265,8 @@ expression: diagnostics
   end_location:
     row: 78
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -260,7 +279,8 @@ expression: diagnostics
   end_location:
     row: 83
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -273,7 +293,8 @@ expression: diagnostics
   end_location:
     row: 88
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -286,7 +307,8 @@ expression: diagnostics
   end_location:
     row: 91
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -299,7 +321,8 @@ expression: diagnostics
   end_location:
     row: 92
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -312,7 +335,8 @@ expression: diagnostics
   end_location:
     row: 98
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -325,7 +349,8 @@ expression: diagnostics
   end_location:
     row: 99
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -338,7 +363,8 @@ expression: diagnostics
   end_location:
     row: 102
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -351,7 +377,8 @@ expression: diagnostics
   end_location:
     row: 105
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -364,7 +391,8 @@ expression: diagnostics
   end_location:
     row: 110
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -377,7 +405,8 @@ expression: diagnostics
   end_location:
     row: 125
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -390,7 +419,8 @@ expression: diagnostics
   end_location:
     row: 131
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -403,7 +433,8 @@ expression: diagnostics
   end_location:
     row: 132
     column: 2
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -416,7 +447,8 @@ expression: diagnostics
   end_location:
     row: 133
     column: 2
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -429,7 +461,8 @@ expression: diagnostics
   end_location:
     row: 136
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -442,7 +475,8 @@ expression: diagnostics
   end_location:
     row: 137
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -455,7 +489,8 @@ expression: diagnostics
   end_location:
     row: 138
     column: 2
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -468,7 +503,8 @@ expression: diagnostics
   end_location:
     row: 139
     column: 2
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -481,7 +517,8 @@ expression: diagnostics
   end_location:
     row: 140
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TabIndentation
@@ -494,6 +531,7 @@ expression: diagnostics
   end_location:
     row: 143
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

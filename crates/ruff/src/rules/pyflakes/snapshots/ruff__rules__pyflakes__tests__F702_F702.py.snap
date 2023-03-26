@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ContinueOutsideLoop
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ContinueOutsideLoop
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ContinueOutsideLoop
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 23
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

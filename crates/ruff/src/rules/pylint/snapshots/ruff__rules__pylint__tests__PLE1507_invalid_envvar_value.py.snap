@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: InvalidEnvvarValue
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: InvalidEnvvarValue
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: InvalidEnvvarValue
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 12
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

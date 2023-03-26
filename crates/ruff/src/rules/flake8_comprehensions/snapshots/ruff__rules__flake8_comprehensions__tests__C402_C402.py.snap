@@ -14,13 +14,14 @@ expression: diagnostics
     row: 1
     column: 30
   fix:
-    content: "{x: x for x in range(3)}"
-    location:
-      row: 1
-      column: 0
-    end_location:
-      row: 1
-      column: 30
+    edits:
+      - content: "{x: x for x in range(3)}"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 30
   parent: ~
 - kind:
     name: UnnecessaryGeneratorDict
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 4
     column: 1
   fix:
-    content: "{\n    x: x for x in range(3)\n}"
-    location:
-      row: 2
-      column: 0
-    end_location:
-      row: 4
-      column: 1
+    edits:
+      - content: "{\n    x: x for x in range(3)\n}"
+        location:
+          row: 2
+          column: 0
+        end_location:
+          row: 4
+          column: 1
   parent: ~
 - kind:
     name: UnnecessaryGeneratorDict
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 6
     column: 37
   fix:
-    content: " {x: x for x in range(3)} "
-    location:
-      row: 6
-      column: 7
-    end_location:
-      row: 6
-      column: 37
+    edits:
+      - content: " {x: x for x in range(3)} "
+        location:
+          row: 6
+          column: 7
+        end_location:
+          row: 6
+          column: 37
   parent: ~
 - kind:
     name: UnnecessaryGeneratorDict
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 7
     column: 45
   fix:
-    content: " {x: x for x in range(3)} "
-    location:
-      row: 7
-      column: 15
-    end_location:
-      row: 7
-      column: 45
+    edits:
+      - content: " {x: x for x in range(3)} "
+        location:
+          row: 7
+          column: 15
+        end_location:
+          row: 7
+          column: 45
   parent: ~
 

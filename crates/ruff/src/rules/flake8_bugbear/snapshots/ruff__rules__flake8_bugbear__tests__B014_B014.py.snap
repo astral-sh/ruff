@@ -14,13 +14,14 @@ expression: diagnostics
     row: 17
     column: 25
   fix:
-    content: OSError
-    location:
-      row: 17
-      column: 7
-    end_location:
-      row: 17
-      column: 25
+    edits:
+      - content: OSError
+        location:
+          row: 17
+          column: 7
+        end_location:
+          row: 17
+          column: 25
   parent: ~
 - kind:
     name: DuplicateHandlerException
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 28
     column: 25
   fix:
-    content: MyError
-    location:
-      row: 28
-      column: 7
-    end_location:
-      row: 28
-      column: 25
+    edits:
+      - content: MyError
+        location:
+          row: 28
+          column: 7
+        end_location:
+          row: 28
+          column: 25
   parent: ~
 - kind:
     name: DuplicateHandlerException
@@ -54,12 +56,13 @@ expression: diagnostics
     row: 49
     column: 27
   fix:
-    content: re.error
-    location:
-      row: 49
-      column: 7
-    end_location:
-      row: 49
-      column: 27
+    edits:
+      - content: re.error
+        location:
+          row: 49
+          column: 7
+        end_location:
+          row: 49
+          column: 27
   parent: ~
 

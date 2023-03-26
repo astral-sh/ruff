@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MixedCaseVariableInGlobalScope
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MixedCaseVariableInGlobalScope
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 9
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 
