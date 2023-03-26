@@ -73,7 +73,7 @@ impl AlwaysAutofixableViolation for CompareWithTuple {
     }
 
     fn autofix_title(&self) -> String {
-        let CompareWithTuple { replacement, .. } = self;
+        let CompareWithTuple { replacement } = self;
         format!("Replace with `{replacement}`")
     }
 }
