@@ -54,7 +54,7 @@ pub fn manual_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, nam
         Range::from(alias),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Edit::replacement(
+        diagnostic.set_fix(Edit::replacement(
             unparse_stmt(
                 &create_stmt(StmtKind::ImportFrom {
                     module: Some(module.to_string()),

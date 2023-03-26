@@ -76,7 +76,7 @@ pub fn inplace_argument(
                         args,
                         keywords,
                     ) {
-                        diagnostic.amend(fix);
+                        diagnostic.set_fix(fix);
                     }
                 }
                 return Some(diagnostic);

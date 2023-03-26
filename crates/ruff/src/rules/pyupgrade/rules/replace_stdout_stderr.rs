@@ -140,7 +140,7 @@ pub fn replace_stdout_stderr(checker: &mut Checker, expr: &Expr, func: &Expr, kw
         let mut diagnostic = Diagnostic::new(ReplaceStdoutStderr, Range::from(expr));
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(fix) = generate_fix(checker.stylist, checker.locator, stdout, stderr) {
-                diagnostic.amend(fix);
+                diagnostic.set_fix(fix);
             };
         }
         checker.diagnostics.push(diagnostic);

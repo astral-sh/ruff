@@ -82,7 +82,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Delete the blank line before the docstring.
-                diagnostic.amend(Edit::deletion(
+                diagnostic.set_fix(Edit::deletion(
                     Location::new(docstring.expr.location.row() - blank_lines_before, 0),
                     Location::new(docstring.expr.location.row(), 0),
                 ));
@@ -137,7 +137,7 @@ pub fn blank_before_after_function(checker: &mut Checker, docstring: &Docstring)
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Delete the blank line after the docstring.
-                diagnostic.amend(Edit::deletion(
+                diagnostic.set_fix(Edit::deletion(
                     Location::new(docstring.expr.end_location.unwrap().row() + 1, 0),
                     Location::new(
                         docstring.expr.end_location.unwrap().row() + 1 + blank_lines_after,

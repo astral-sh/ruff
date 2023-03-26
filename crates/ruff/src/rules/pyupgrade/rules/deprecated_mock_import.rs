@@ -256,7 +256,7 @@ pub fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 Range::from(value),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Edit::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     "mock".to_string(),
                     value.location,
                     value.end_location.unwrap(),
@@ -303,7 +303,7 @@ pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             Range::from(name),
                         );
                         if let Some(content) = content.as_ref() {
-                            diagnostic.amend(Edit::replacement(
+                            diagnostic.set_fix(Edit::replacement(
                                 content.clone(),
                                 stmt.location,
                                 stmt.end_location.unwrap(),
@@ -332,7 +332,7 @@ pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
-                        diagnostic.try_amend(|| {
+                        diagnostic.try_set_fix(|| {
                             format_import_from(stmt, indent, checker.locator, checker.stylist).map(
                                 |content| {
                                     Edit::replacement(

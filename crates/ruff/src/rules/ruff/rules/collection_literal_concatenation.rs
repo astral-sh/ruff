@@ -112,7 +112,7 @@ pub fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
     );
     if checker.patch(diagnostic.kind.rule()) {
         if fixable {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 contents,
                 expr.location,
                 expr.end_location.unwrap(),

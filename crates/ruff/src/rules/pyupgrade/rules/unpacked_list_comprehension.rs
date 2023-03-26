@@ -102,7 +102,7 @@ pub fn unpacked_list_comprehension(checker: &mut Checker, targets: &[Expr], valu
                 content.push('(');
                 content.push_str(&existing[1..existing.len() - 1]);
                 content.push(')');
-                diagnostic.amend(Edit::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     content,
                     value.location,
                     value.end_location.unwrap(),

@@ -73,7 +73,7 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
 
     if checker.patch(diagnostic.kind.rule()) {
         if let Some(pattern) = leading_quote(docstring.contents) {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 capitalized_word,
                 docstring.expr.location.with_col_offset(pattern.width()),
                 docstring

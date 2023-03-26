@@ -248,7 +248,7 @@ fn pytest_fixture_parentheses(
         Range::from(decorator),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(fix);
+        diagnostic.set_fix(fix);
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -318,7 +318,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                         if checker.patch(diagnostic.kind.rule()) {
                             let location = diagnostic.location;
                             let end_location = diagnostic.end_location;
-                            diagnostic.try_amend(|| {
+                            diagnostic.try_set_fix(|| {
                                 fix_extraneous_scope_function(
                                     checker.locator,
                                     decorator.location,
@@ -401,7 +401,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
                             Range::from(stmt),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.amend(Edit::replacement(
+                            diagnostic.set_fix(Edit::replacement(
                                 "return".to_string(),
                                 stmt.location,
                                 Location::new(
@@ -479,7 +479,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                 if checker.patch(diagnostic.kind.rule()) {
                     let start = Location::new(mark.location.row(), 0);
                     let end = Location::new(mark.end_location.unwrap().row() + 1, 0);
-                    diagnostic.amend(Edit::deletion(start, end));
+                    diagnostic.set_fix(Edit::deletion(start, end));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -496,7 +496,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                 if checker.patch(diagnostic.kind.rule()) {
                     let start = Location::new(mark.location.row(), 0);
                     let end = Location::new(mark.end_location.unwrap().row() + 1, 0);
-                    diagnostic.amend(Edit::deletion(start, end));
+                    diagnostic.set_fix(Edit::deletion(start, end));
                 }
                 checker.diagnostics.push(diagnostic);
             }

@@ -52,7 +52,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
                             checker.stylist.line_ending().as_str(),
                             whitespace::clean(docstring.indentation)
                         );
-                        diagnostic.amend(Edit::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             content,
                             Location::new(
                                 docstring.expr.end_location.unwrap().row(),
