@@ -129,3 +129,8 @@ if a:
         print("baz")
 else:
     print("bar")
+
+# https://github.com/charliermarsh/ruff/issues/2919
+if False:
+    if self._requestid2response_queue:
+        pass

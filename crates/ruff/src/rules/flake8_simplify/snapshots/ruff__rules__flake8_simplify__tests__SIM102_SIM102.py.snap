@@ -195,4 +195,17 @@ expression: diagnostics
       row: 120
       column: 0
   parent: ~
+- kind:
+    name: CollapsibleIf
+    body: "Use a single `if` statement instead of nested `if` statements"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 134
+    column: 0
+  end_location:
+    row: 135
+    column: 38
+  fix: ~
+  parent: ~
 

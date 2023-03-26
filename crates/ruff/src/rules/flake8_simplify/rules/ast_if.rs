@@ -257,6 +257,15 @@ pub fn nested_if_statements(
         return;
     }
 
+    // If test is False, do not fix.
+    let mut fixable = !matches!(
+        &test.node,
+        ExprKind::Constant {
+            value: Constant::Bool(false),
+            ..
+        }
+    );
+
     // Find the deepest nested if-statement, to inform the range.
     let Some((test, first_stmt)) = find_last_nested_if(body) else {
         return;
@@ -270,10 +279,11 @@ pub fn nested_if_statements(
     // The fixer preserves comments in the nested body, but removes comments between
     // the outer and inner if statements.
     let nested_if = &body[0];
-    let fixable = !has_comments_in(
-        Range::new(stmt.location, nested_if.location),
-        checker.locator,
-    );
+    fixable = fixable
+        && !has_comments_in(
+            Range::new(stmt.location, nested_if.location),
+            checker.locator,
+        );
 
     let mut diagnostic = Diagnostic::new(
         CollapsibleIf { fixable },
