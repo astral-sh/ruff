@@ -27,6 +27,8 @@ mod tests {
     #[test_case(Rule::NonEmptyStubBody, Path::new("PYI010.pyi"))]
     #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.py"))]
     #[test_case(Rule::TypedArgumentDefaultInStub, Path::new("PYI011.pyi"))]
+    #[test_case(Rule::PassInClassBody, Path::new("PYI012.py"))]
+    #[test_case(Rule::PassInClassBody, Path::new("PYI012.pyi"))]
     #[test_case(Rule::ArgumentDefaultInStub, Path::new("PYI014.py"))]
     #[test_case(Rule::ArgumentDefaultInStub, Path::new("PYI014.pyi"))]
     #[test_case(Rule::AssignmentDefaultInStub, Path::new("PYI015.py"))]
