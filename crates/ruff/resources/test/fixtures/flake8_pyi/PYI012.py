@@ -1,62 +1,57 @@
-# Violations
+# Violations of PYI012
 
-class Foo:  # PYI012
-    pass
-
-class Foo:  # PYI012
-    """buzz"""
-
-    pass
-
-class Bar: pass  # PYI012
-
-class Baz:  # PYI012
-    """
-    My body only contains pass.
-    """
-    pass
-
-
-class Error(Exception):  # PYI012
-    pass
-
-
-class BadWithInit:  # PYI012 
+class OneAttributeClass:
     value: int
-    pass
+    pass  # PYI012 Class body must not contain `pass`
+
+class OneAttributeClassRev:
+    pass  # PYI012 Class body must not contain `pass`
+    value: int
+
+class DocstringClass:
+    """
+    My body only contains pass and I.
+    """
+
+    pass  # PYI012 Class body must not contain `pass`
+
+class NonEmptyChild(Exception):
+    value: int
+    pass  # PYI012 Class body must not contain `pass`
+
+class NonEmptyChild2(Exception):
+    pass  # PYI012 Class body must not contain `pass`
+    value: int
+
+class NonEmptyWithInit:
+    value: int
+    pass  # PYI012 Class body must not contain `pass`
     def __init__():
-        prop: str = "property"
+        pass
 
-class OneAttr:  # PYI012
-    value: int
-    pass
+# Not violations (of PYI012)
 
-class OneAttrRev:  # PYI012
-    pass
-    value: int
+class EmptyClass:
+    pass  # Y009 Empty body should contain `...`, not `pass`
 
+class EmptyOneLine:
+    pass  # Y009 Empty body should contain `...`, not `pass`
 
-
-
-# Not violations
-
-class Dog: 
+class Dog:
     eyes: int = 2
 
+class EmptyEllipsis: ...
 
-class Pass: 
-    ...
+class NonEmptyEllipsis:
+    value: int
+    ...  # Y013 Non-empty class body must not contain `...`
 
-class Pazz: ...
-
-class WithInit:  
+class WithInit:
     value: int = 0
     def __init__():
-        prop: str = "property"
         pass
 
 def function():
     pass
 
 pass
-
