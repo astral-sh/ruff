@@ -25,7 +25,7 @@ impl AlwaysAutofixableViolation for PassInClassBody {
 /// PYI012
 pub fn pass_in_class_body(checker: &mut Checker, body: &[Stmt]) {
     // pass is required in these situations
-    if body.len() < 2 {
+    if body.len() == 1 {
         return;
     }
 
