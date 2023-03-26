@@ -194,7 +194,7 @@ fn add_required_import(
         }
 
         // Construct the fix.
-        diagnostic.amend(Edit::insertion(contents, splice));
+        diagnostic.set_fix(Edit::insertion(contents, splice));
     }
     Some(diagnostic)
 }

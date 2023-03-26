@@ -41,7 +41,7 @@ pub fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[
         );
         let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, range);
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 "text".to_string(),
                 range.location,
                 range.end_location,

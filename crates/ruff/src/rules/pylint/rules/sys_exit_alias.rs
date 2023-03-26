@@ -122,7 +122,7 @@ pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
         );
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(content) = get_member_import_name_alias(checker, "sys", "exit") {
-                diagnostic.amend(Edit::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     content,
                     func.location,
                     func.end_location.unwrap(),

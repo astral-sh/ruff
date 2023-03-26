@@ -56,7 +56,7 @@ pub fn whitespace_before_parameters(
             let mut diagnostic = Diagnostic::new(kind, Range::new(start, end));
 
             if autofix {
-                diagnostic.amend(Edit::deletion(start, end));
+                diagnostic.set_fix(Edit::deletion(start, end));
             }
             diagnostics.push(diagnostic);
         }

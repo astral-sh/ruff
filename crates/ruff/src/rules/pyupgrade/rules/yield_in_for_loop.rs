@@ -176,7 +176,7 @@ pub fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
             if checker.patch(diagnostic.kind.rule()) {
                 let contents = checker.locator.slice(item.iter);
                 let contents = format!("yield from {contents}");
-                diagnostic.amend(Edit::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     contents,
                     item.stmt.location,
                     item.stmt.end_location.unwrap(),

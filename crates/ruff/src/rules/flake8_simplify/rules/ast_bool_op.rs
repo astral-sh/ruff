@@ -258,7 +258,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 
                 // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
                 // multiple duplicates, the fixes will conflict.
-                diagnostic.amend(Edit::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     unparse_expr(&bool_op, checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),
@@ -361,7 +361,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
                     values: iter::once(in_expr).chain(unmatched).collect(),
                 })
             };
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 unparse_expr(&in_expr, checker.stylist),
                 expr.location,
                 expr.end_location.unwrap(),
@@ -413,7 +413,7 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
                     Range::from(expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.amend(Edit::replacement(
+                    diagnostic.set_fix(Edit::replacement(
                         "False".to_string(),
                         expr.location,
                         expr.end_location.unwrap(),
@@ -467,7 +467,7 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
                     Range::from(expr),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.amend(Edit::replacement(
+                    diagnostic.set_fix(Edit::replacement(
                         "True".to_string(),
                         expr.location,
                         expr.end_location.unwrap(),
@@ -530,7 +530,7 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
         },
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Edit::replacement(
+        diagnostic.set_fix(Edit::replacement(
             "True".to_string(),
             location,
             end_location,
@@ -552,7 +552,7 @@ pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
         },
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Edit::replacement(
+        diagnostic.set_fix(Edit::replacement(
             "False".to_string(),
             location,
             end_location,

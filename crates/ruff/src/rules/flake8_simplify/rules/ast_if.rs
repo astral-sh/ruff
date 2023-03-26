@@ -290,7 +290,7 @@ pub fn nested_if_statements(
                     .universal_newlines()
                     .all(|line| line.width() <= checker.settings.line_length)
                 {
-                    diagnostic.amend(fix);
+                    diagnostic.set_fix(fix);
                 }
             }
             Err(err) => error!("Failed to fix nested if: {err}"),
@@ -356,7 +356,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     if fixable && checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
             // If the condition is a comparison, we can replace it with the condition.
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
                         value: Some(test.clone()),
@@ -369,7 +369,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         } else {
             // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
             // verified, above, that `bool` is a builtin.)
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
                         value: Some(Box::new(create_expr(ExprKind::Call {
@@ -504,7 +504,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         Range::from(stmt),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Edit::replacement(
+        diagnostic.set_fix(Edit::replacement(
             contents,
             stmt.location,
             stmt.end_location.unwrap(),
@@ -853,7 +853,7 @@ pub fn use_dict_get_with_default(
         Range::from(stmt),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Edit::replacement(
+        diagnostic.set_fix(Edit::replacement(
             contents,
             stmt.location,
             stmt.end_location.unwrap(),

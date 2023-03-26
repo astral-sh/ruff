@@ -206,7 +206,7 @@ pub fn unittest_assertion(
                 );
                 if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                        diagnostic.amend(Edit::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             unparse_stmt(&stmt, checker.stylist),
                             expr.location,
                             expr.end_location.unwrap(),
@@ -436,7 +436,7 @@ pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
             Diagnostic::new(PytestCompositeAssertion { fixable }, Range::from(stmt));
         if fixable && checker.patch(diagnostic.kind.rule()) {
             diagnostic
-                .try_amend(|| fix_composite_condition(stmt, checker.locator, checker.stylist));
+                .try_set_fix(|| fix_composite_condition(stmt, checker.locator, checker.stylist));
         }
         checker.diagnostics.push(diagnostic);
     }

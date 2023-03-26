@@ -174,7 +174,7 @@ pub fn banned_relative_import(
             if let Some(fix) =
                 fix_banned_relative_import(stmt, level, module, module_path, checker.stylist)
             {
-                diagnostic.amend(fix);
+                diagnostic.set_fix(fix);
             };
         }
         Some(diagnostic)
