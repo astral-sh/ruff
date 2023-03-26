@@ -14,7 +14,21 @@ expression: diagnostics
     row: 4
     column: 24
   fix:
-    edits: []
+    edits:
+      - content: "from functools import lru_cache, cache"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 31
+      - content: cache
+        location:
+          row: 4
+          column: 1
+        end_location:
+          row: 4
+          column: 24
   parent: ~
 - kind:
     name: LRUCacheWithMaxsizeNone
@@ -28,7 +42,21 @@ expression: diagnostics
     row: 10
     column: 24
   fix:
-    edits: []
+    edits:
+      - content: "from functools import lru_cache, cache"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 31
+      - content: cache
+        location:
+          row: 10
+          column: 1
+        end_location:
+          row: 10
+          column: 24
   parent: ~
 - kind:
     name: LRUCacheWithMaxsizeNone
@@ -42,6 +70,20 @@ expression: diagnostics
     row: 15
     column: 24
   fix:
-    edits: []
+    edits:
+      - content: "from functools import lru_cache, cache"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 31
+      - content: cache
+        location:
+          row: 15
+          column: 1
+        end_location:
+          row: 15
+          column: 24
   parent: ~
 

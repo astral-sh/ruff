@@ -7,13 +7,16 @@ use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Location, Stmt, S
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
+use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::to_absolute;
+use ruff_python_ast::imports::{AnyImport, Import};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_module;
+use crate::importer::Importer;
 
 /// Determine if a body contains only a single statement, taking into account
 /// deleted.
@@ -440,6 +443,66 @@ pub fn remove_argument(
         (Some(start), Some(end)) => Ok(Edit::deletion(start, end)),
         _ => {
             bail!("No fix could be constructed")
+        }
+    }
+}
+
+/// Generate an [`Edit`] to reference the given symbol. Returns the [`Edit`] necessary to make the
+/// symbol available in the current scope along with the bound name of the symbol.
+///
+/// For example, assuming `module` is `"functools"` and `member` is `"lru_cache"`, this function
+/// could return an [`Edit`] to add `import functools` to the top of the file, alongside with the
+/// name on which the `lru_cache` symbol would be made available (`"functools.lru_cache"`).
+///
+/// Attempts to reuse existing imports when possible.
+pub fn get_or_import_symbol(
+    module: &str,
+    member: &str,
+    context: &Context,
+    importer: &Importer,
+    locator: &Locator,
+) -> Result<(Edit, String)> {
+    if let Some((source, binding)) = context.resolve_qualified_import_name(module, member) {
+        // If the symbol is already available in the current scope, use it, and add a no-nop edit to
+        // force conflicts with any other fixes that might try to remove the import.
+        let import_edit = Edit::replacement(
+            locator.slice(source).to_string(),
+            source.location,
+            source.end_location.unwrap(),
+        );
+        Ok((import_edit, binding))
+    } else {
+        if let Some(stmt) = importer.get_import_from(module) {
+            // Case 1: `from functools import lru_cache` is in scope, and we're trying to reference
+            // `functools.cache`; thus, we add `cache` to the import, and return `"cache"` as the
+            // bound name.
+            if context
+                .find_binding(member)
+                .map_or(true, |binding| binding.kind.is_builtin())
+            {
+                let import_edit = importer.add_member(stmt, member)?;
+                Ok((import_edit, member.to_string()))
+            } else {
+                bail!(
+                    "Unable to insert `{}` into scope due to name conflict",
+                    member
+                )
+            }
+        } else {
+            // Case 2: No `functools` import is in scope; thus, we add `import functools`, and
+            // return `"functools.lru_cache"` as the bound name.
+            if context
+                .find_binding(module)
+                .map_or(true, |binding| binding.kind.is_builtin())
+            {
+                let import_edit = importer.add_import(&AnyImport::Import(Import::module(module)));
+                Ok((import_edit, format!("{module}.{member}")))
+            } else {
+                bail!(
+                    "Unable to insert `{}` into scope due to name conflict",
+                    module
+                )
+            }
         }
     }
 }

@@ -1,9 +1,10 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
+use crate::autofix::helpers::get_or_import_symbol;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -45,13 +46,18 @@ pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
             Range::from(func),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            if let Some(binding) = checker.ctx.resolve_qualified_import_name("sys", "exit") {
-                diagnostic.set_fix(Edit::replacement(
-                    binding,
-                    func.location,
-                    func.end_location.unwrap(),
-                ));
-            }
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = get_or_import_symbol(
+                    "sys",
+                    "exit",
+                    &checker.ctx,
+                    &checker.importer,
+                    checker.locator,
+                )?;
+                let reference_edit =
+                    Edit::replacement(binding, func.location, func.end_location.unwrap());
+                Ok(Fix::from_iter([import_edit, reference_edit]))
+            });
         }
         checker.diagnostics.push(diagnostic);
     }

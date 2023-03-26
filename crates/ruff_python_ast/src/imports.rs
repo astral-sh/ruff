@@ -27,6 +27,17 @@ pub struct Alias<'a> {
     pub as_name: Option<&'a str>,
 }
 
+impl<'a> Import<'a> {
+    pub fn module(name: &'a str) -> Self {
+        Self {
+            name: Alias {
+                name,
+                as_name: None,
+            },
+        }
+    }
+}
+
 impl fmt::Display for AnyImport<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match self {
