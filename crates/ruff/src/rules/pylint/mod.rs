@@ -1,7 +1,6 @@
 //! Rules from [Pylint](https://pypi.org/project/pylint/).
 mod helpers;
 pub(crate) mod rules;
-pub use rules::cyclic_import as pylint_cyclic_import;
 pub mod settings;
 
 #[cfg(test)]

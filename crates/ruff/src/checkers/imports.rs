@@ -63,7 +63,11 @@ pub fn check_imports(
             block.imports.iter().for_each(|&stmt| match &stmt.node {
                 StmtKind::Import { names } => {
                     imports_vec.extend(names.iter().map(|name| {
-                        Import::new(name.node.name.clone(), stmt.location, stmt.end_location.unwrap())
+                        Import::new(
+                            name.node.name.clone(),
+                            stmt.location,
+                            stmt.end_location.unwrap(),
+                        )
                     }));
                 }
                 StmtKind::ImportFrom {
@@ -74,10 +78,11 @@ pub fn check_imports(
                     let modules = if let Some(module) = module {
                         match level.unwrap() {
                             0 => format!("{module}."),
-                            l @ _ => format!(
+                            l => format!(
                                 "{}.{}.",
                                 modules_vec[..(modules_vec.len() - l)].join("."),
-                                module),
+                                module
+                            ),
                         }
                     } else {
                         // relative import only

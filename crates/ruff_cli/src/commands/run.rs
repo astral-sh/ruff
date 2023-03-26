@@ -13,7 +13,6 @@ use crate::panic::catch_unwind;
 use ruff::message::{Location, Message};
 use ruff::registry::Rule;
 use ruff::resolver::PyprojectDiscovery;
-use ruff::rules::pylint::pylint_cyclic_import;
 use ruff::settings::{flags, AllSettings};
 use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError, Range};
 use ruff_diagnostics::Diagnostic;
@@ -144,15 +143,6 @@ pub fn run(
         });
     // TODO(chris): actually check the imports?
     debug!("{:#?}", diagnostics.imports);
-    if let Some(outputs) = pylint_cyclic_import(&diagnostics.imports) {
-        diagnostics += Diagnostics::new(
-            outputs
-                .into_iter()
-                .map(|output| Message::from_diagnostic(output.1, output.0, None, 0))
-                .collect::<Vec<_>>(),
-            Imports::default(),
-        );
-    }
     diagnostics.messages.sort_unstable();
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);
