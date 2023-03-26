@@ -9,7 +9,7 @@ expression: diagnostics
     fixable: true
   location:
     row: 1
-    column: 9
+    column: 3
   end_location:
     row: 1
     column: 14
@@ -29,7 +29,7 @@ expression: diagnostics
     fixable: true
   location:
     row: 4
-    column: 16
+    column: 3
   end_location:
     row: 4
     column: 21
@@ -49,7 +49,7 @@ expression: diagnostics
     fixable: true
   location:
     row: 7
-    column: 15
+    column: 9
   end_location:
     row: 7
     column: 20
@@ -61,5 +61,65 @@ expression: diagnostics
     end_location:
       row: 7
       column: 20
+  parent: ~
+- kind:
+    name: ExprAndFalse
+    body: "Use `False` instead of `... and False`"
+    suggestion: "Replace with `False`"
+    fixable: true
+  location:
+    row: 19
+    column: 17
+  end_location:
+    row: 19
+    column: 36
+  fix:
+    content: "False"
+    location:
+      row: 19
+      column: 17
+    end_location:
+      row: 19
+      column: 36
+  parent: ~
+- kind:
+    name: ExprAndFalse
+    body: "Use `False` instead of `... and False`"
+    suggestion: "Replace with `False`"
+    fixable: true
+  location:
+    row: 22
+    column: 3
+  end_location:
+    row: 22
+    column: 36
+  fix:
+    content: "False"
+    location:
+      row: 22
+      column: 3
+    end_location:
+      row: 22
+      column: 36
+  parent: ~
+- kind:
+    name: ExprAndFalse
+    body: "Use `False` instead of `... and False`"
+    suggestion: "Replace with `False`"
+    fixable: true
+  location:
+    row: 25
+    column: 3
+  end_location:
+    row: 25
+    column: 36
+  fix:
+    content: "False"
+    location:
+      row: 25
+      column: 3
+    end_location:
+      row: 25
+      column: 36
   parent: ~
 

@@ -2,7 +2,11 @@ use std::collections::BTreeMap;
 use std::iter;
 
 use itertools::Either::{Left, Right};
-use rustpython_parser::ast::{Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Unaryop};
+use itertools::Itertools;
+use ruff_python_ast::context::Context;
+use rustpython_parser::ast::{
+    Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Location, Unaryop,
+};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
@@ -475,56 +479,84 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-/// SIM222
-pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BoolOp { op: Boolop::Or, values, } = &expr.node else {
-        return;
+pub fn is_short_circuit(ctx: &Context, expr: &Expr) -> Option<(Location, Location)> {
+    let ExprKind::BoolOp { op, values, } = &expr.node else {
+        return None;
     };
-    if contains_effect(&checker.ctx, expr) {
-        return;
-    }
-    for value in values {
-        if let ExprKind::Constant {
-            value: Constant::Bool(true),
-            ..
-        } = &value.node
-        {
-            let mut diagnostic = Diagnostic::new(ExprOrTrue, Range::from(value));
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Edit::replacement(
-                    "True".to_string(),
-                    expr.location,
-                    expr.end_location.unwrap(),
-                ));
+    let short_circuit_value = match op {
+        Boolop::And => false,
+        Boolop::Or => true,
+    };
+    let mut location = expr.location;
+
+    for (first_value, second_value) in values.iter().tuple_windows() {
+        if contains_effect(ctx, first_value) {
+            location = second_value.location;
+            continue;
+        }
+        match (&first_value.node, &second_value.node) {
+            (
+                ExprKind::Constant {
+                    value: Constant::Bool(b),
+                    ..
+                },
+                _,
+            )
+            | (
+                _,
+                ExprKind::Constant {
+                    value: Constant::Bool(b),
+                    ..
+                },
+            ) if b == &short_circuit_value => {
+                return Some((location, expr.end_location.unwrap()));
             }
-            checker.diagnostics.push(diagnostic);
+            _ => {}
         }
     }
+    None
+}
+
+/// SIM222
+pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
+    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr) else {
+        return;
+    };
+    let mut diagnostic = Diagnostic::new(
+        ExprOrTrue,
+        Range {
+            location,
+            end_location,
+        },
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.amend(Edit::replacement(
+            "True".to_string(),
+            location,
+            end_location,
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
 }
 
 /// SIM223
 pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BoolOp { op: Boolop::And, values, } = &expr.node else {
+    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr) else {
         return;
     };
-    if contains_effect(&checker.ctx, expr) {
-        return;
+    let mut diagnostic = Diagnostic::new(
+        ExprAndFalse,
+        Range {
+            location,
+            end_location,
+        },
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.amend(Edit::replacement(
+            "False".to_string(),
+            location,
+            end_location,
+        ));
     }
-    for value in values {
-        if let ExprKind::Constant {
-            value: Constant::Bool(false),
-            ..
-        } = &value.node
-        {
-            let mut diagnostic = Diagnostic::new(ExprAndFalse, Range::from(value));
-            if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Edit::replacement(
-                    "False".to_string(),
-                    expr.location,
-                    expr.end_location.unwrap(),
-                ));
-            }
-            checker.diagnostics.push(diagnostic);
-        }
-    }
+    checker.diagnostics.push(diagnostic);
 }
