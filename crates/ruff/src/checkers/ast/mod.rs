@@ -4547,47 +4547,49 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn check_deferred_string_type_definitions(&mut self, allocator: &'a mut Vec<Expr>) {
-        let mut stacks = Vec::with_capacity(self.deferred.string_type_definitions.len());
-        self.deferred.string_type_definitions.reverse();
-        while let Some((range, value, (in_annotation, in_type_checking_block), deferral)) =
-            self.deferred.string_type_definitions.pop()
-        {
-            if let Ok((expr, kind)) = parse_type_annotation(value, range, self.locator) {
-                if in_annotation && self.ctx.annotations_future_enabled {
-                    if self.settings.rules.enabled(Rule::QuotedAnnotation) {
-                        pyupgrade::rules::quoted_annotation(self, value, range);
+    fn check_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
+        let mut type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
+        loop {
+            for (range, value, (in_annotation, in_type_checking_block), (scopes, parents)) in
+                type_definitions.into_iter().rev()
+            {
+                if let Ok((expr, kind)) = parse_type_annotation(value, range, self.locator) {
+                    if in_annotation && self.ctx.annotations_future_enabled {
+                        if self.settings.rules.enabled(Rule::QuotedAnnotation) {
+                            pyupgrade::rules::quoted_annotation(self, value, range);
+                        }
+                    }
+
+                    let expr = allocator.alloc(expr);
+
+                    self.ctx.scope_stack = scopes;
+                    self.ctx.parents = parents;
+                    self.ctx.in_annotation = in_annotation;
+                    self.ctx.in_type_checking_block = in_type_checking_block;
+                    self.ctx.in_type_definition = true;
+                    self.ctx.in_deferred_string_type_definition = Some(kind);
+                    self.visit_expr(expr);
+                    self.ctx.in_deferred_string_type_definition = None;
+                    self.ctx.in_type_definition = false;
+                } else {
+                    if self
+                        .settings
+                        .rules
+                        .enabled(Rule::ForwardAnnotationSyntaxError)
+                    {
+                        self.diagnostics.push(Diagnostic::new(
+                            pyflakes::rules::ForwardAnnotationSyntaxError {
+                                body: value.to_string(),
+                            },
+                            range,
+                        ));
                     }
                 }
-                allocator.push(expr);
-                stacks.push((kind, (in_annotation, in_type_checking_block), deferral));
-            } else {
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::ForwardAnnotationSyntaxError)
-                {
-                    self.diagnostics.push(Diagnostic::new(
-                        pyflakes::rules::ForwardAnnotationSyntaxError {
-                            body: value.to_string(),
-                        },
-                        range,
-                    ));
-                }
             }
-        }
-        for (expr, (kind, (in_annotation, in_type_checking_block), (scopes, parents))) in
-            allocator.iter().zip(stacks)
-        {
-            self.ctx.scope_stack = scopes;
-            self.ctx.parents = parents;
-            self.ctx.in_annotation = in_annotation;
-            self.ctx.in_type_checking_block = in_type_checking_block;
-            self.ctx.in_type_definition = true;
-            self.ctx.in_deferred_string_type_definition = Some(kind);
-            self.visit_expr(expr);
-            self.ctx.in_deferred_string_type_definition = None;
-            self.ctx.in_type_definition = false;
+            if self.deferred.string_type_definitions.is_empty() {
+                break;
+            }
+            type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
         }
     }
 
@@ -5416,8 +5418,8 @@ pub fn check_ast(
     checker.check_deferred_functions();
     checker.check_deferred_lambdas();
     checker.check_deferred_type_definitions();
-    let mut allocator = vec![];
-    checker.check_deferred_string_type_definitions(&mut allocator);
+    let allocator = typed_arena::Arena::new();
+    checker.check_deferred_string_type_definitions(&allocator);
     checker.check_deferred_assignments();
     checker.check_deferred_for_loops();
 

@@ -175,4 +175,103 @@ expression: diagnostics
     column: 23
   fix: ~
   parent: ~
+- kind:
+    name: NonPEP585Annotation
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: "Replace `List` with `list`"
+    fixable: true
+  location:
+    row: 49
+    column: 10
+  end_location:
+    row: 49
+    column: 14
+  fix:
+    content: list
+    location:
+      row: 49
+      column: 10
+    end_location:
+      row: 49
+      column: 14
+  parent: ~
+- kind:
+    name: NonPEP585Annotation
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: "Replace `List` with `list`"
+    fixable: true
+  location:
+    row: 49
+    column: 16
+  end_location:
+    row: 49
+    column: 20
+  fix:
+    content: list
+    location:
+      row: 49
+      column: 16
+    end_location:
+      row: 49
+      column: 20
+  parent: ~
+- kind:
+    name: NonPEP585Annotation
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: "Replace `List` with `list`"
+    fixable: true
+  location:
+    row: 53
+    column: 10
+  end_location:
+    row: 53
+    column: 14
+  fix:
+    content: list
+    location:
+      row: 53
+      column: 10
+    end_location:
+      row: 53
+      column: 14
+  parent: ~
+- kind:
+    name: NonPEP585Annotation
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 53
+    column: 15
+  end_location:
+    row: 53
+    column: 29
+  fix: ~
+  parent: ~
+- kind:
+    name: NonPEP585Annotation
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 57
+    column: 9
+  end_location:
+    row: 57
+    column: 31
+  fix: ~
+  parent: ~
+- kind:
+    name: NonPEP585Annotation
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 57
+    column: 9
+  end_location:
+    row: 57
+    column: 31
+  fix: ~
+  parent: ~
 
