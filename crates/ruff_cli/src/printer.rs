@@ -471,41 +471,40 @@ impl Printer {
     }
 
     pub fn write_statistics(&self, diagnostics: &Diagnostics) -> Result<()> {
-        let violations: Vec<Rule> = diagnostics
+        let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
-            .map(|message| message.kind.rule())
+            .map(|message| {
+                (
+                    message.kind.rule().noqa_code(),
+                    message.kind.body.clone(),
+                    message.kind.fixable,
+                )
+            })
             .sorted()
-            .dedup()
-            .collect();
-        if violations.is_empty() {
-            return Ok(());
-        }
-
-        let statistics = violations
+            .fold(vec![], |mut acc, (code, body, fixable)| {
+                if let Some((last_code, _, _, count)) = acc.last_mut() {
+                    if *last_code == code {
+                        *count += 1;
+                        return acc;
+                    }
+                }
+                acc.push((code, body, fixable, 1));
+                acc
+            })
             .iter()
-            .map(|rule| ExpandedStatistics {
-                code: rule.noqa_code().to_string(),
-                count: diagnostics
-                    .messages
-                    .iter()
-                    .filter(|message| message.kind.rule() == *rule)
-                    .count(),
-                message: diagnostics
-                    .messages
-                    .iter()
-                    .find(|message| message.kind.rule() == *rule)
-                    .map(|message| message.kind.body.clone())
-                    .unwrap(),
-                fixable: diagnostics
-                    .messages
-                    .iter()
-                    .find(|message| message.kind.rule() == *rule)
-                    .iter()
-                    .any(|message| message.kind.fixable),
+            .map(|(code, body, fixable, count)| ExpandedStatistics {
+                code: code.to_string(),
+                count: *count,
+                message: body.clone(),
+                fixable: *fixable,
             })
             .sorted_by_key(|statistic| Reverse(statistic.count))
-            .collect::<Vec<_>>();
+            .collect();
+
+        if statistics.is_empty() {
+            return Ok(());
+        }
 
         let mut stdout = BufWriter::new(io::stdout().lock());
         match self.format {
