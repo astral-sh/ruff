@@ -1,4 +1,4 @@
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{Diagnostic, AlwaysAutofixableViolation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -9,10 +9,15 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 #[violation]
 pub struct PassInClassBody;
 
-impl Violation for PassInClassBody {
+impl AlwaysAutofixableViolation for PassInClassBody {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(r#"Class body must not contain "pass""#)
+        format!("Class body must not contain `pass`")
+    }
+
+    fn autofix_title(&self) -> String {
+        format!("Remove `pass` from the class body")
+
     }
 }
 
