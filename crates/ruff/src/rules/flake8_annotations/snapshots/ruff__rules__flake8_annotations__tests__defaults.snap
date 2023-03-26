@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingTypeFunctionArgument
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingTypeFunctionArgument
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingReturnTypeUndocumentedPublicFunction
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingTypeFunctionArgument
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingTypeFunctionArgument
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingReturnTypeUndocumentedPublicFunction
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingReturnTypeUndocumentedPublicFunction
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AnyType
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AnyType
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 49
     column: 49
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AnyType
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 54
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AnyType
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 54
     column: 41
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AnyType
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 59
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AnyType
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 64
     column: 41
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingTypeSelf
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 74
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AnyType
@@ -208,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 78
     column: 31
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AnyType
@@ -221,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 82
     column: 69
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AnyType
@@ -234,7 +251,8 @@ expression: diagnostics
   end_location:
     row: 86
     column: 45
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AnyType
@@ -247,7 +265,8 @@ expression: diagnostics
   end_location:
     row: 86
     column: 61
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AnyType
@@ -260,7 +279,8 @@ expression: diagnostics
   end_location:
     row: 90
     column: 45
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AnyType
@@ -273,7 +293,8 @@ expression: diagnostics
   end_location:
     row: 94
     column: 61
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingTypeCls
@@ -286,7 +307,8 @@ expression: diagnostics
   end_location:
     row: 104
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingTypeSelf
@@ -299,6 +321,7 @@ expression: diagnostics
   end_location:
     row: 108
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

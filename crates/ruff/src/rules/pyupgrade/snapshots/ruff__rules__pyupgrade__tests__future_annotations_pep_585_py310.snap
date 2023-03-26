@@ -14,13 +14,14 @@ expression: diagnostics
     row: 34
     column: 21
   fix:
-    content: list
-    location:
-      row: 34
-      column: 17
-    end_location:
-      row: 34
-      column: 21
+    edits:
+      - content: list
+        location:
+          row: 34
+          column: 17
+        end_location:
+          row: 34
+          column: 21
   parent: ~
 - kind:
     name: NonPEP585Annotation
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 35
     column: 12
   fix:
-    content: list
-    location:
-      row: 35
-      column: 8
-    end_location:
-      row: 35
-      column: 12
+    edits:
+      - content: list
+        location:
+          row: 35
+          column: 8
+        end_location:
+          row: 35
+          column: 12
   parent: ~
 - kind:
     name: NonPEP585Annotation
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 42
     column: 30
   fix:
-    content: list
-    location:
-      row: 42
-      column: 26
-    end_location:
-      row: 42
-      column: 30
+    edits:
+      - content: list
+        location:
+          row: 42
+          column: 26
+        end_location:
+          row: 42
+          column: 30
   parent: ~
 - kind:
     name: NonPEP585Annotation
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 42
     column: 41
   fix:
-    content: list
-    location:
-      row: 42
-      column: 37
-    end_location:
-      row: 42
-      column: 41
+    edits:
+      - content: list
+        location:
+          row: 42
+          column: 37
+        end_location:
+          row: 42
+          column: 41
   parent: ~
 

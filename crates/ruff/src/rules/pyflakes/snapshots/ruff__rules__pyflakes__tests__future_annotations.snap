@@ -14,13 +14,14 @@ expression: diagnostics
     row: 8
     column: 7
   fix:
-    content: "from models import (\n    Fruit,\n)"
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 9
-      column: 1
+    edits:
+      - content: "from models import (\n    Fruit,\n)"
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 9
+          column: 1
   parent:
     row: 6
     column: 0
@@ -35,6 +36,7 @@ expression: diagnostics
   end_location:
     row: 26
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

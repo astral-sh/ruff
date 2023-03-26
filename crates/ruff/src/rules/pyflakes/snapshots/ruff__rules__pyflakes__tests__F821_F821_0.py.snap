@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 58
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 83
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 87
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 90
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 92
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 93
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 115
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 123
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -169,6 +181,7 @@ expression: diagnostics
   end_location:
     row: 123
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

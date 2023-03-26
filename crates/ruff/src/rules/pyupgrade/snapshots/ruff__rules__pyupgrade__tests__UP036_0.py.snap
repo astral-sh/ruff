@@ -14,13 +14,14 @@ expression: diagnostics
     row: 6
     column: 16
   fix:
-    content: "print(\"py3\")"
-    location:
-      row: 3
-      column: 0
-    end_location:
-      row: 6
-      column: 16
+    edits:
+      - content: "print(\"py3\")"
+        location:
+          row: 3
+          column: 0
+        end_location:
+          row: 6
+          column: 16
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 14
     column: 16
   fix:
-    content: "print(\"py3\")"
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 14
-      column: 16
+    edits:
+      - content: "print(\"py3\")"
+        location:
+          row: 8
+          column: 0
+        end_location:
+          row: 14
+          column: 16
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 17
     column: 19
   fix:
-    content: "print(\"PY3!\")"
-    location:
-      row: 16
-      column: 0
-    end_location:
-      row: 17
-      column: 19
+    edits:
+      - content: "print(\"PY3!\")"
+        location:
+          row: 16
+          column: 0
+        end_location:
+          row: 17
+          column: 19
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 23
     column: 20
   fix:
-    content: "    print(\"PY3\")"
-    location:
-      row: 20
-      column: 0
-    end_location:
-      row: 23
-      column: 20
+    edits:
+      - content: "    print(\"PY3\")"
+        location:
+          row: 20
+          column: 0
+        end_location:
+          row: 23
+          column: 20
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 27
     column: 16
   fix:
-    content: "print(\"py3\")"
-    location:
-      row: 25
-      column: 0
-    end_location:
-      row: 27
-      column: 16
+    edits:
+      - content: "print(\"py3\")"
+        location:
+          row: 25
+          column: 0
+        end_location:
+          row: 27
+          column: 16
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 35
     column: 30
   fix:
-    content: "def f():\n    print(\"py3\")\n    print(\"This the next\")"
-    location:
-      row: 29
-      column: 0
-    end_location:
-      row: 35
-      column: 30
+    edits:
+      - content: "def f():\n    print(\"py3\")\n    print(\"This the next\")"
+        location:
+          row: 29
+          column: 0
+        end_location:
+          row: 35
+          column: 30
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 40
     column: 16
   fix:
-    content: "print(\"py3\")"
-    location:
-      row: 37
-      column: 0
-    end_location:
-      row: 40
-      column: 16
+    edits:
+      - content: "print(\"py3\")"
+        location:
+          row: 37
+          column: 0
+        end_location:
+          row: 40
+          column: 16
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 48
     column: 16
   fix:
-    content: "print(\"py3\")"
-    location:
-      row: 45
-      column: 0
-    end_location:
-      row: 48
-      column: 16
+    edits:
+      - content: "print(\"py3\")"
+        location:
+          row: 45
+          column: 0
+        end_location:
+          row: 48
+          column: 16
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 54
     column: 18
   fix:
-    content: "print(\"py3\")"
-    location:
-      row: 53
-      column: 0
-    end_location:
-      row: 54
-      column: 18
+    edits:
+      - content: "print(\"py3\")"
+        location:
+          row: 53
+          column: 0
+        end_location:
+          row: 54
+          column: 18
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 59
     column: 16
   fix:
-    content: "print(\"py3\")"
-    location:
-      row: 56
-      column: 0
-    end_location:
-      row: 59
-      column: 16
+    edits:
+      - content: "print(\"py3\")"
+        location:
+          row: 56
+          column: 0
+        end_location:
+          row: 59
+          column: 16
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -214,13 +224,14 @@ expression: diagnostics
     row: 65
     column: 20
   fix:
-    content: "    print(\"py3\")"
-    location:
-      row: 62
-      column: 0
-    end_location:
-      row: 65
-      column: 20
+    edits:
+      - content: "    print(\"py3\")"
+        location:
+          row: 62
+          column: 0
+        end_location:
+          row: 65
+          column: 20
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -234,13 +245,14 @@ expression: diagnostics
     row: 70
     column: 16
   fix:
-    content: "print(\"py3\")"
-    location:
-      row: 67
-      column: 0
-    end_location:
-      row: 70
-      column: 16
+    edits:
+      - content: "print(\"py3\")"
+        location:
+          row: 67
+          column: 0
+        end_location:
+          row: 70
+          column: 16
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -254,13 +266,14 @@ expression: diagnostics
     row: 79
     column: 13
   fix:
-    content: "    yield"
-    location:
-      row: 73
-      column: 0
-    end_location:
-      row: 79
-      column: 13
+    edits:
+      - content: "    yield"
+        location:
+          row: 73
+          column: 0
+        end_location:
+          row: 79
+          column: 13
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -274,13 +287,14 @@ expression: diagnostics
     row: 91
     column: 16
   fix:
-    content: "    def f(py3):\n        pass"
-    location:
-      row: 86
-      column: 0
-    end_location:
-      row: 91
-      column: 16
+    edits:
+      - content: "    def f(py3):\n        pass"
+        location:
+          row: 86
+          column: 0
+        end_location:
+          row: 91
+          column: 16
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -294,13 +308,14 @@ expression: diagnostics
     row: 100
     column: 9
   fix:
-    content: "    3"
-    location:
-      row: 97
-      column: 0
-    end_location:
-      row: 100
-      column: 9
+    edits:
+      - content: "    3"
+        location:
+          row: 97
+          column: 0
+        end_location:
+          row: 100
+          column: 9
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -314,13 +329,14 @@ expression: diagnostics
     row: 113
     column: 20
   fix:
-    content: "def f():\n    print(\"py3\")\ndef g():\n    print(\"py3\")"
-    location:
-      row: 104
-      column: 0
-    end_location:
-      row: 113
-      column: 20
+    edits:
+      - content: "def f():\n    print(\"py3\")\ndef g():\n    print(\"py3\")"
+        location:
+          row: 104
+          column: 0
+        end_location:
+          row: 113
+          column: 20
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -334,13 +350,14 @@ expression: diagnostics
     row: 117
     column: 16
   fix:
-    content: "    print(3)"
-    location:
-      row: 116
-      column: 0
-    end_location:
-      row: 117
-      column: 16
+    edits:
+      - content: "    print(3)"
+        location:
+          row: 116
+          column: 0
+        end_location:
+          row: 117
+          column: 16
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -354,13 +371,14 @@ expression: diagnostics
     row: 122
     column: 40
   fix:
-    content: print(3)
-    location:
-      row: 122
-      column: 4
-    end_location:
-      row: 122
-      column: 40
+    edits:
+      - content: print(3)
+        location:
+          row: 122
+          column: 4
+        end_location:
+          row: 122
+          column: 40
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -374,13 +392,14 @@ expression: diagnostics
     row: 126
     column: 16
   fix:
-    content: "    print(3)"
-    location:
-      row: 125
-      column: 0
-    end_location:
-      row: 126
-      column: 16
+    edits:
+      - content: "    print(3)"
+        location:
+          row: 125
+          column: 0
+        end_location:
+          row: 126
+          column: 16
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -394,13 +413,14 @@ expression: diagnostics
     row: 137
     column: 9
   fix:
-    content: "    expected_error = [\n\"<stdin>:1:5: Generator expression must be parenthesized\",\n\"max(1 for i in range(10), key=lambda x: x+1)\",\n\"    ^\",\n    ]"
-    location:
-      row: 130
-      column: 0
-    end_location:
-      row: 137
-      column: 9
+    edits:
+      - content: "    expected_error = [\n\"<stdin>:1:5: Generator expression must be parenthesized\",\n\"max(1 for i in range(10), key=lambda x: x+1)\",\n\"    ^\",\n    ]"
+        location:
+          row: 130
+          column: 0
+        end_location:
+          row: 137
+          column: 9
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -414,13 +434,14 @@ expression: diagnostics
     row: 147
     column: 5
   fix:
-    content: "expected_error = [\n\"<stdin>:1:5: Generator expression must be parenthesized\",\n\"max(1 for i in range(10), key=lambda x: x+1)\",\n\"    ^\",\n]"
-    location:
-      row: 140
-      column: 0
-    end_location:
-      row: 147
-      column: 5
+    edits:
+      - content: "expected_error = [\n\"<stdin>:1:5: Generator expression must be parenthesized\",\n\"max(1 for i in range(10), key=lambda x: x+1)\",\n\"    ^\",\n]"
+        location:
+          row: 140
+          column: 0
+        end_location:
+          row: 147
+          column: 5
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -434,13 +455,14 @@ expression: diagnostics
     row: 161
     column: 28
   fix:
-    content: "\"\"\"this\nis valid\"\"\"\n\n\"\"\"the indentation on\n    this line is significant\"\"\"\n\n\"this is\" \\\n    \"allowed too\"\n\n(\"so is\"\n \"this for some reason\")"
-    location:
-      row: 150
-      column: 0
-    end_location:
-      row: 161
-      column: 28
+    edits:
+      - content: "\"\"\"this\nis valid\"\"\"\n\n\"\"\"the indentation on\n    this line is significant\"\"\"\n\n\"this is\" \\\n    \"allowed too\"\n\n(\"so is\"\n \"this for some reason\")"
+        location:
+          row: 150
+          column: 0
+        end_location:
+          row: 161
+          column: 28
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -454,13 +476,14 @@ expression: diagnostics
     row: 164
     column: 6
   fix:
-    content: "expected_error = \\\n    []"
-    location:
-      row: 163
-      column: 0
-    end_location:
-      row: 164
-      column: 6
+    edits:
+      - content: "expected_error = \\\n    []"
+        location:
+          row: 163
+          column: 0
+        end_location:
+          row: 164
+          column: 6
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -474,13 +497,14 @@ expression: diagnostics
     row: 166
     column: 49
   fix:
-    content: "expected_error = []"
-    location:
-      row: 166
-      column: 0
-    end_location:
-      row: 166
-      column: 49
+    edits:
+      - content: "expected_error = []"
+        location:
+          row: 166
+          column: 0
+        end_location:
+          row: 166
+          column: 49
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -494,13 +518,14 @@ expression: diagnostics
     row: 169
     column: 23
   fix:
-    content: "expected_error = []"
-    location:
-      row: 168
-      column: 0
-    end_location:
-      row: 169
-      column: 23
+    edits:
+      - content: "expected_error = []"
+        location:
+          row: 168
+          column: 0
+        end_location:
+          row: 169
+          column: 23
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -514,13 +539,14 @@ expression: diagnostics
     row: 173
     column: 6
   fix:
-    content: "expected_error = \\\n    []"
-    location:
-      row: 172
-      column: 4
-    end_location:
-      row: 173
-      column: 6
+    edits:
+      - content: "expected_error = \\\n    []"
+        location:
+          row: 172
+          column: 4
+        end_location:
+          row: 173
+          column: 6
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -534,13 +560,14 @@ expression: diagnostics
     row: 176
     column: 53
   fix:
-    content: "expected_error = []"
-    location:
-      row: 176
-      column: 4
-    end_location:
-      row: 176
-      column: 53
+    edits:
+      - content: "expected_error = []"
+        location:
+          row: 176
+          column: 4
+        end_location:
+          row: 176
+          column: 53
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -554,12 +581,13 @@ expression: diagnostics
     row: 180
     column: 23
   fix:
-    content: "    expected_error = []"
-    location:
-      row: 179
-      column: 0
-    end_location:
-      row: 180
-      column: 23
+    edits:
+      - content: "    expected_error = []"
+        location:
+          row: 179
+          column: 0
+        end_location:
+          row: 180
+          column: 23
   parent: ~
 

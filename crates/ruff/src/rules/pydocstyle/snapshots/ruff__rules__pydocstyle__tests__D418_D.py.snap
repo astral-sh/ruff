@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 34
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OverloadWithDocstring
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 90
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OverloadWithDocstring
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 110
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

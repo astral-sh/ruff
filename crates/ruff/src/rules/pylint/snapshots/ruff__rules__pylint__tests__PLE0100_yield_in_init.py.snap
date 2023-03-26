@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: YieldInInit
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 14
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

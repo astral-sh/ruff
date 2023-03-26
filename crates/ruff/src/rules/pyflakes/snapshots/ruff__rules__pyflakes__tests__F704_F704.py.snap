@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: YieldOutsideFunction
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: YieldOutsideFunction
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: YieldOutsideFunction
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 11
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

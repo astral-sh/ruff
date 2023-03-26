@@ -14,12 +14,13 @@ expression: diagnostics
     row: 3
     column: 20
   fix:
-    content: ValueError
-    location:
-      row: 3
-      column: 7
-    end_location:
-      row: 3
-      column: 20
+    edits:
+      - content: ValueError
+        location:
+          row: 3
+          column: 7
+        end_location:
+          row: 3
+          column: 20
   parent: ~
 

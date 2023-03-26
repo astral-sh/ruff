@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinAttributeShadowing
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 6
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinAttributeShadowing
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinAttributeShadowing
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 12
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

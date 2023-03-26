@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -79,13 +84,14 @@ expression: diagnostics
     row: 18
     column: 7
   fix:
-    content: ""
-    location:
-      row: 17
-      column: 10
-    end_location:
-      row: 18
-      column: 10
+    edits:
+      - content: ""
+        location:
+          row: 17
+          column: 10
+        end_location:
+          row: 18
+          column: 10
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -98,7 +104,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -111,7 +118,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -125,13 +133,14 @@ expression: diagnostics
     row: 25
     column: 7
   fix:
-    content: ""
-    location:
-      row: 24
-      column: 10
-    end_location:
-      row: 25
-      column: 10
+    edits:
+      - content: ""
+        location:
+          row: 24
+          column: 10
+        end_location:
+          row: 25
+          column: 10
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -144,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 26
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -158,13 +168,14 @@ expression: diagnostics
     row: 31
     column: 7
   fix:
-    content: ""
-    location:
-      row: 30
-      column: 10
-    end_location:
-      row: 31
-      column: 10
+    edits:
+      - content: ""
+        location:
+          row: 30
+          column: 10
+        end_location:
+          row: 31
+          column: 10
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -177,7 +188,8 @@ expression: diagnostics
   end_location:
     row: 32
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -190,7 +202,8 @@ expression: diagnostics
   end_location:
     row: 33
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -203,7 +216,8 @@ expression: diagnostics
   end_location:
     row: 34
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -216,7 +230,8 @@ expression: diagnostics
   end_location:
     row: 41
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -229,7 +244,8 @@ expression: diagnostics
   end_location:
     row: 43
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -243,13 +259,14 @@ expression: diagnostics
     row: 45
     column: 7
   fix:
-    content: ""
-    location:
-      row: 44
-      column: 8
-    end_location:
-      row: 45
-      column: 10
+    edits:
+      - content: ""
+        location:
+          row: 44
+          column: 8
+        end_location:
+          row: 45
+          column: 10
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -263,13 +280,14 @@ expression: diagnostics
     row: 49
     column: 16
   fix:
-    content: ""
-    location:
-      row: 49
-      column: 11
-    end_location:
-      row: 49
-      column: 19
+    edits:
+      - content: ""
+        location:
+          row: 49
+          column: 11
+        end_location:
+          row: 49
+          column: 19
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -283,12 +301,13 @@ expression: diagnostics
     row: 50
     column: 24
   fix:
-    content: ""
-    location:
-      row: 50
-      column: 19
-    end_location:
-      row: 50
-      column: 27
+    edits:
+      - content: ""
+        location:
+          row: 50
+          column: 19
+        end_location:
+          row: 50
+          column: 27
   parent: ~
 

@@ -14,13 +14,14 @@ expression: diagnostics
     row: 4
     column: 6
   fix:
-    content: ""
-    location:
-      row: 4
-      column: 5
-    end_location:
-      row: 4
-      column: 6
+    edits:
+      - content: ""
+        location:
+          row: 4
+          column: 5
+        end_location:
+          row: 4
+          column: 6
   parent: ~
 - kind:
     name: TrailingWhitespace
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 11
     column: 37
   fix:
-    content: ""
-    location:
-      row: 11
-      column: 34
-    end_location:
-      row: 11
-      column: 37
+    edits:
+      - content: ""
+        location:
+          row: 11
+          column: 34
+        end_location:
+          row: 11
+          column: 37
   parent: ~
 - kind:
     name: TrailingWhitespace
@@ -54,12 +56,13 @@ expression: diagnostics
     row: 13
     column: 8
   fix:
-    content: ""
-    location:
-      row: 13
-      column: 5
-    end_location:
-      row: 13
-      column: 8
+    edits:
+      - content: ""
+        location:
+          row: 13
+          column: 5
+        end_location:
+          row: 13
+          column: 8
   parent: ~
 

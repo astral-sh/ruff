@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DuplicateTryBlockException
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 28
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DuplicateTryBlockException
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 35
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DuplicateTryBlockException
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 37
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

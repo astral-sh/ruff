@@ -14,13 +14,14 @@ expression: diagnostics
     row: 10
     column: 13
   fix:
-    content: ""
-    location:
-      row: 10
-      column: 12
-    end_location:
-      row: 10
-      column: 13
+    edits:
+      - content: ""
+        location:
+          row: 10
+          column: 12
+        end_location:
+          row: 10
+          column: 13
   parent: ~
 - kind:
     name: UselessSemicolon
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 12
     column: 23
   fix:
-    content: ""
-    location:
-      row: 12
-      column: 22
-    end_location:
-      row: 12
-      column: 23
+    edits:
+      - content: ""
+        location:
+          row: 12
+          column: 22
+        end_location:
+          row: 12
+          column: 23
   parent: ~
 - kind:
     name: UselessSemicolon
@@ -54,12 +56,13 @@ expression: diagnostics
     row: 25
     column: 14
   fix:
-    content: ""
-    location:
-      row: 25
-      column: 13
-    end_location:
-      row: 25
-      column: 14
+    edits:
+      - content: ""
+        location:
+          row: 25
+          column: 13
+        end_location:
+          row: 25
+          column: 14
   parent: ~
 

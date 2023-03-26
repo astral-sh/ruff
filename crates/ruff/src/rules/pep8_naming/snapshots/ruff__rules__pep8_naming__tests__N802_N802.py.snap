@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: InvalidFunctionName
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: InvalidFunctionName
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: InvalidFunctionName
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: InvalidFunctionName
@@ -65,6 +69,7 @@ expression: diagnostics
   end_location:
     row: 40
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

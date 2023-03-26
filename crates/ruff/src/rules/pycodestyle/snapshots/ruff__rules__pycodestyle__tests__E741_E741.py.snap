@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 1
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 4
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 26
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 33
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 34
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -208,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 40
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -221,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 40
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -234,7 +251,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -247,7 +265,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -260,7 +279,8 @@ expression: diagnostics
   end_location:
     row: 48
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -273,7 +293,8 @@ expression: diagnostics
   end_location:
     row: 48
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -286,7 +307,8 @@ expression: diagnostics
   end_location:
     row: 57
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -299,7 +321,8 @@ expression: diagnostics
   end_location:
     row: 66
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -312,7 +335,8 @@ expression: diagnostics
   end_location:
     row: 71
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousVariableName
@@ -325,6 +349,7 @@ expression: diagnostics
   end_location:
     row: 74
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

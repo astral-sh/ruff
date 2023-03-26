@@ -14,13 +14,14 @@ expression: diagnostics
     row: 2
     column: 15
   fix:
-    content: " -> str"
-    location:
-      row: 2
-      column: 21
-    end_location:
-      row: 2
-      column: 21
+    edits:
+      - content: " -> str"
+        location:
+          row: 2
+          column: 21
+        end_location:
+          row: 2
+          column: 21
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 5
     column: 16
   fix:
-    content: " -> str"
-    location:
-      row: 5
-      column: 22
-    end_location:
-      row: 5
-      column: 22
+    edits:
+      - content: " -> str"
+        location:
+          row: 5
+          column: 22
+        end_location:
+          row: 5
+          column: 22
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 8
     column: 15
   fix:
-    content: " -> int"
-    location:
-      row: 8
-      column: 21
-    end_location:
-      row: 8
-      column: 21
+    edits:
+      - content: " -> int"
+        location:
+          row: 8
+          column: 21
+        end_location:
+          row: 8
+          column: 21
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 11
     column: 23
   fix:
-    content: " -> int"
-    location:
-      row: 11
-      column: 29
-    end_location:
-      row: 11
-      column: 29
+    edits:
+      - content: " -> int"
+        location:
+          row: 11
+          column: 29
+        end_location:
+          row: 11
+          column: 29
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 14
     column: 16
   fix:
-    content: " -> None"
-    location:
-      row: 14
-      column: 22
-    end_location:
-      row: 14
-      column: 22
+    edits:
+      - content: " -> None"
+        location:
+          row: 14
+          column: 22
+        end_location:
+          row: 14
+          column: 22
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 17
     column: 15
   fix:
-    content: " -> None"
-    location:
-      row: 17
-      column: 21
-    end_location:
-      row: 17
-      column: 21
+    edits:
+      - content: " -> None"
+        location:
+          row: 17
+          column: 21
+        end_location:
+          row: 17
+          column: 21
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 20
     column: 16
   fix:
-    content: " -> bool"
-    location:
-      row: 20
-      column: 22
-    end_location:
-      row: 20
-      column: 22
+    edits:
+      - content: " -> bool"
+        location:
+          row: 20
+          column: 22
+        end_location:
+          row: 20
+          column: 22
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 23
     column: 17
   fix:
-    content: " -> bytes"
-    location:
-      row: 23
-      column: 23
-    end_location:
-      row: 23
-      column: 23
+    edits:
+      - content: " -> bytes"
+        location:
+          row: 23
+          column: 23
+        end_location:
+          row: 23
+          column: 23
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 26
     column: 18
   fix:
-    content: " -> str"
-    location:
-      row: 26
-      column: 37
-    end_location:
-      row: 26
-      column: 37
+    edits:
+      - content: " -> str"
+        location:
+          row: 26
+          column: 37
+        end_location:
+          row: 26
+          column: 37
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 29
     column: 20
   fix:
-    content: " -> bool"
-    location:
-      row: 29
-      column: 32
-    end_location:
-      row: 29
-      column: 32
+    edits:
+      - content: " -> bool"
+        location:
+          row: 29
+          column: 32
+        end_location:
+          row: 29
+          column: 32
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -214,13 +224,14 @@ expression: diagnostics
     row: 32
     column: 19
   fix:
-    content: " -> complex"
-    location:
-      row: 32
-      column: 25
-    end_location:
-      row: 32
-      column: 25
+    edits:
+      - content: " -> complex"
+        location:
+          row: 32
+          column: 25
+        end_location:
+          row: 32
+          column: 25
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -234,13 +245,14 @@ expression: diagnostics
     row: 35
     column: 15
   fix:
-    content: " -> int"
-    location:
-      row: 35
-      column: 21
-    end_location:
-      row: 35
-      column: 21
+    edits:
+      - content: " -> int"
+        location:
+          row: 35
+          column: 21
+        end_location:
+          row: 35
+          column: 21
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -254,13 +266,14 @@ expression: diagnostics
     row: 38
     column: 17
   fix:
-    content: " -> float"
-    location:
-      row: 38
-      column: 23
-    end_location:
-      row: 38
-      column: 23
+    edits:
+      - content: " -> float"
+        location:
+          row: 38
+          column: 23
+        end_location:
+          row: 38
+          column: 23
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -274,12 +287,13 @@ expression: diagnostics
     row: 41
     column: 17
   fix:
-    content: " -> int"
-    location:
-      row: 41
-      column: 23
-    end_location:
-      row: 41
-      column: 23
+    edits:
+      - content: " -> int"
+        location:
+          row: 41
+          column: 23
+        end_location:
+          row: 41
+          column: 23
   parent: ~
 

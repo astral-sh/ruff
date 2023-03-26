@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiLineImplicitStringConcatenation
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiLineImplicitStringConcatenation
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiLineImplicitStringConcatenation
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 35
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

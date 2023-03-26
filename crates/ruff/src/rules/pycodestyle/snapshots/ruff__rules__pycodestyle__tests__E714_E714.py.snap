@@ -14,13 +14,14 @@ expression: diagnostics
     row: 2
     column: 13
   fix:
-    content: X is not Y
-    location:
-      row: 2
-      column: 3
-    end_location:
-      row: 2
-      column: 13
+    edits:
+      - content: X is not Y
+        location:
+          row: 2
+          column: 3
+        end_location:
+          row: 2
+          column: 13
   parent: ~
 - kind:
     name: NotIsTest
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 5
     column: 15
   fix:
-    content: X.B is not Y
-    location:
-      row: 5
-      column: 3
-    end_location:
-      row: 5
-      column: 15
+    edits:
+      - content: X.B is not Y
+        location:
+          row: 5
+          column: 3
+        end_location:
+          row: 5
+          column: 15
   parent: ~
 - kind:
     name: NotIsTest
@@ -53,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 8
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

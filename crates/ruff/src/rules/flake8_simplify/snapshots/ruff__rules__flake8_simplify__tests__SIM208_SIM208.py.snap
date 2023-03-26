@@ -14,13 +14,14 @@ expression: diagnostics
     row: 1
     column: 14
   fix:
-    content: a
-    location:
-      row: 1
-      column: 3
-    end_location:
-      row: 1
-      column: 14
+    edits:
+      - content: a
+        location:
+          row: 1
+          column: 3
+        end_location:
+          row: 1
+          column: 14
   parent: ~
 - kind:
     name: DoubleNegation
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 4
     column: 21
   fix:
-    content: a == b
-    location:
-      row: 4
-      column: 3
-    end_location:
-      row: 4
-      column: 21
+    edits:
+      - content: a == b
+        location:
+          row: 4
+          column: 3
+        end_location:
+          row: 4
+          column: 21
   parent: ~
 

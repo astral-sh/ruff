@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PercentFormatMixedPositionalAndNamed
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PercentFormatMixedPositionalAndNamed
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 11
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

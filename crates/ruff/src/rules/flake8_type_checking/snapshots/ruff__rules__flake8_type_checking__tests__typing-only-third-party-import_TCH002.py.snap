@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypingOnlyThirdPartyImport
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 32
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypingOnlyThirdPartyImport
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 38
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypingOnlyThirdPartyImport
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypingOnlyThirdPartyImport
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 29
     column: 32
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypingOnlyThirdPartyImport
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 35
     column: 38
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypingOnlyThirdPartyImport
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 41
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypingOnlyThirdPartyImport
@@ -104,6 +111,7 @@ expression: diagnostics
   end_location:
     row: 47
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

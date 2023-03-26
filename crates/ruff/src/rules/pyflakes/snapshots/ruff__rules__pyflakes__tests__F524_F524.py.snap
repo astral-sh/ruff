@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 1
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StringDotFormatMissingArguments
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StringDotFormatMissingArguments
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StringDotFormatMissingArguments
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StringDotFormatMissingArguments
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StringDotFormatMissingArguments
@@ -78,6 +83,7 @@ expression: diagnostics
   end_location:
     row: 6
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

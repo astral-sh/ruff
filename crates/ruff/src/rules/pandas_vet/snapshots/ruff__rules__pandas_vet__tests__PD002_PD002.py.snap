@@ -14,13 +14,14 @@ expression: diagnostics
     row: 5
     column: 34
   fix:
-    content: "x = x.drop([\"a\"], axis=1)"
-    location:
-      row: 5
-      column: 0
-    end_location:
-      row: 5
-      column: 35
+    edits:
+      - content: "x = x.drop([\"a\"], axis=1)"
+        location:
+          row: 5
+          column: 0
+        end_location:
+          row: 5
+          column: 35
   parent: ~
 - kind:
     name: PandasUseOfInplaceArgument
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 7
     column: 34
   fix:
-    content: "x = x.drop([\"a\"], axis=1)"
-    location:
-      row: 7
-      column: 0
-    end_location:
-      row: 7
-      column: 35
+    edits:
+      - content: "x = x.drop([\"a\"], axis=1)"
+        location:
+          row: 7
+          column: 0
+        end_location:
+          row: 7
+          column: 35
   parent: ~
 - kind:
     name: PandasUseOfInplaceArgument
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 10
     column: 16
   fix:
-    content: "x = x.drop(\n    columns=[\"a\"],\n    axis=1,\n)"
-    location:
-      row: 9
-      column: 0
-    end_location:
-      row: 13
-      column: 1
+    edits:
+      - content: "x = x.drop(\n    columns=[\"a\"],\n    axis=1,\n)"
+        location:
+          row: 9
+          column: 0
+        end_location:
+          row: 13
+          column: 1
   parent: ~
 - kind:
     name: PandasUseOfInplaceArgument
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 17
     column: 20
   fix:
-    content: "x = x.drop(\n        columns=[\"a\"],\n        axis=1,\n    )"
-    location:
-      row: 16
-      column: 4
-    end_location:
-      row: 20
-      column: 5
+    edits:
+      - content: "x = x.drop(\n        columns=[\"a\"],\n        axis=1,\n    )"
+        location:
+          row: 16
+          column: 4
+        end_location:
+          row: 20
+          column: 5
   parent: ~
 

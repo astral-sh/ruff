@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 203
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BlankLineAfterSummary
@@ -27,12 +28,13 @@ expression: diagnostics
     row: 215
     column: 7
   fix:
-    content: "\n"
-    location:
-      row: 211
-      column: 0
-    end_location:
-      row: 213
-      column: 0
+    edits:
+      - content: "\n"
+        location:
+          row: 211
+          column: 0
+        end_location:
+          row: 213
+          column: 0
   parent: ~
 

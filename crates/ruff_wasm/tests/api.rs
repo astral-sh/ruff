@@ -5,7 +5,6 @@ use rustpython_parser::ast::Location;
 use wasm_bindgen_test::*;
 
 use ruff::registry::Rule;
-use ruff_diagnostics::Fix;
 use ruff_wasm::*;
 
 macro_rules! check {
@@ -31,7 +30,7 @@ fn empty_config() {
             message: "If test is a tuple, which is always `True`".to_string(),
             location: Location::new(1, 0),
             end_location: Location::new(2, 8),
-            fix: Fix::empty(),
+            fix: None,
         }]
     );
 }

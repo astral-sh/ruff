@@ -14,13 +14,14 @@ expression: diagnostics
     row: 40
     column: 57
   fix:
-    content: "..."
-    location:
-      row: 40
-      column: 22
-    end_location:
-      row: 40
-      column: 57
+    edits:
+      - content: "..."
+        location:
+          row: 40
+          column: 22
+        end_location:
+          row: 40
+          column: 57
   parent: ~
 - kind:
     name: AssignmentDefaultInStub
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 41
     column: 34
   fix:
-    content: "..."
-    location:
-      row: 41
-      column: 22
-    end_location:
-      row: 41
-      column: 34
+    edits:
+      - content: "..."
+        location:
+          row: 41
+          column: 22
+        end_location:
+          row: 41
+          column: 34
   parent: ~
 - kind:
     name: AssignmentDefaultInStub
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 42
     column: 37
   fix:
-    content: "..."
-    location:
-      row: 42
-      column: 22
-    end_location:
-      row: 42
-      column: 37
+    edits:
+      - content: "..."
+        location:
+          row: 42
+          column: 22
+        end_location:
+          row: 42
+          column: 37
   parent: ~
 - kind:
     name: AssignmentDefaultInStub
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 43
     column: 35
   fix:
-    content: "..."
-    location:
-      row: 43
-      column: 25
-    end_location:
-      row: 43
-      column: 35
+    edits:
+      - content: "..."
+        location:
+          row: 43
+          column: 25
+        end_location:
+          row: 43
+          column: 35
   parent: ~
 - kind:
     name: AssignmentDefaultInStub
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 44
     column: 69
   fix:
-    content: "..."
-    location:
-      row: 44
-      column: 46
-    end_location:
-      row: 44
-      column: 69
+    edits:
+      - content: "..."
+        location:
+          row: 44
+          column: 46
+        end_location:
+          row: 44
+          column: 69
   parent: ~
 - kind:
     name: AssignmentDefaultInStub
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 45
     column: 53
   fix:
-    content: "..."
-    location:
-      row: 45
-      column: 30
-    end_location:
-      row: 45
-      column: 53
+    edits:
+      - content: "..."
+        location:
+          row: 45
+          column: 30
+        end_location:
+          row: 45
+          column: 53
   parent: ~
 - kind:
     name: AssignmentDefaultInStub
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 46
     column: 47
   fix:
-    content: "..."
-    location:
-      row: 46
-      column: 36
-    end_location:
-      row: 46
-      column: 47
+    edits:
+      - content: "..."
+        location:
+          row: 46
+          column: 36
+        end_location:
+          row: 46
+          column: 47
   parent: ~
 - kind:
     name: AssignmentDefaultInStub
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 48
     column: 43
   fix:
-    content: "..."
-    location:
-      row: 48
-      column: 27
-    end_location:
-      row: 48
-      column: 43
+    edits:
+      - content: "..."
+        location:
+          row: 48
+          column: 27
+        end_location:
+          row: 48
+          column: 43
   parent: ~
 - kind:
     name: AssignmentDefaultInStub
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 49
     column: 23
   fix:
-    content: "..."
-    location:
-      row: 49
-      column: 10
-    end_location:
-      row: 49
-      column: 23
+    edits:
+      - content: "..."
+        location:
+          row: 49
+          column: 10
+        end_location:
+          row: 49
+          column: 23
   parent: ~
 - kind:
     name: AssignmentDefaultInStub
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 50
     column: 25
   fix:
-    content: "..."
-    location:
-      row: 50
-      column: 10
-    end_location:
-      row: 50
-      column: 25
+    edits:
+      - content: "..."
+        location:
+          row: 50
+          column: 10
+        end_location:
+          row: 50
+          column: 25
   parent: ~
 - kind:
     name: AssignmentDefaultInStub
@@ -214,12 +224,13 @@ expression: diagnostics
     row: 51
     column: 15
   fix:
-    content: "..."
-    location:
-      row: 51
-      column: 10
-    end_location:
-      row: 51
-      column: 15
+    edits:
+      - content: "..."
+        location:
+          row: 51
+          column: 10
+        end_location:
+          row: 51
+          column: 15
   parent: ~
 

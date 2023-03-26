@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OverIndented
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 39
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OverIndented
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 42
     column: 2
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

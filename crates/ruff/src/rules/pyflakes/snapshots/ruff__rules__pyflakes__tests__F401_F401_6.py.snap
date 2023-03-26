@@ -14,13 +14,14 @@ expression: diagnostics
     row: 7
     column: 39
   fix:
-    content: ""
-    location:
-      row: 7
-      column: 0
-    end_location:
-      row: 8
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 7
+          column: 0
+        end_location:
+          row: 8
+          column: 0
   parent: ~
 - kind:
     name: UnusedImport
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 10
     column: 52
   fix:
-    content: ""
-    location:
-      row: 10
-      column: 0
-    end_location:
-      row: 11
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 10
+          column: 0
+        end_location:
+          row: 11
+          column: 0
   parent: ~
 - kind:
     name: UnusedImport
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 16
     column: 17
   fix:
-    content: ""
-    location:
-      row: 16
-      column: 0
-    end_location:
-      row: 17
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 16
+          column: 0
+        end_location:
+          row: 17
+          column: 0
   parent: ~
 - kind:
     name: UnusedImport
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 19
     column: 35
   fix:
-    content: ""
-    location:
-      row: 19
-      column: 0
-    end_location:
-      row: 20
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 19
+          column: 0
+        end_location:
+          row: 20
+          column: 0
   parent: ~
 

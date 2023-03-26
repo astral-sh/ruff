@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 1
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Debugger
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Debugger
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 31
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Debugger
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 31
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Debugger
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 40
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Debugger
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Debugger
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Debugger
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 4
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Debugger
@@ -117,6 +125,7 @@ expression: diagnostics
   end_location:
     row: 13
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

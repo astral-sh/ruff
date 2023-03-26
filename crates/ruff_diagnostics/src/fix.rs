@@ -32,6 +32,11 @@ impl Fix {
         self.edits.iter().map(|edit| edit.location).min()
     }
 
+    /// Return the [`Location`] of the last [`Edit`] in the [`Fix`].
+    pub fn end_location(&self) -> Option<Location> {
+        self.edits.iter().map(|edit| edit.end_location).max()
+    }
+
     /// Return a slice of the [`Edit`] elements in the [`Fix`].
     pub fn edits(&self) -> &[Edit] {
         &self.edits

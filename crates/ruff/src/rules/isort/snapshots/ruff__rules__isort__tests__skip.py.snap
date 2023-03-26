@@ -14,13 +14,14 @@ expression: diagnostics
     row: 22
     column: 0
   fix:
-    content: "    import abc\n    import collections\n"
-    location:
-      row: 20
-      column: 0
-    end_location:
-      row: 22
-      column: 0
+    edits:
+      - content: "    import abc\n    import collections\n"
+        location:
+          row: 20
+          column: 0
+        end_location:
+          row: 22
+          column: 0
   parent: ~
 - kind:
     name: UnsortedImports
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 29
     column: 0
   fix:
-    content: "    import abc\n    import collections\n"
-    location:
-      row: 27
-      column: 0
-    end_location:
-      row: 29
-      column: 0
+    edits:
+      - content: "    import abc\n    import collections\n"
+        location:
+          row: 27
+          column: 0
+        end_location:
+          row: 29
+          column: 0
   parent: ~
 

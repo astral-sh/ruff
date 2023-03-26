@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -53,13 +56,14 @@ expression: diagnostics
     row: 13
     column: 5
   fix:
-    content: ""
-    location:
-      row: 12
-      column: 8
-    end_location:
-      row: 13
-      column: 8
+    edits:
+      - content: ""
+        location:
+          row: 12
+          column: 8
+        end_location:
+          row: 13
+          column: 8
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -72,7 +76,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -85,7 +90,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -99,13 +105,14 @@ expression: diagnostics
     row: 20
     column: 5
   fix:
-    content: ""
-    location:
-      row: 19
-      column: 8
-    end_location:
-      row: 20
-      column: 8
+    edits:
+      - content: ""
+        location:
+          row: 19
+          column: 8
+        end_location:
+          row: 20
+          column: 8
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -118,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -132,13 +140,14 @@ expression: diagnostics
     row: 26
     column: 5
   fix:
-    content: ""
-    location:
-      row: 25
-      column: 8
-    end_location:
-      row: 26
-      column: 8
+    edits:
+      - content: ""
+        location:
+          row: 25
+          column: 8
+        end_location:
+          row: 26
+          column: 8
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -151,7 +160,8 @@ expression: diagnostics
   end_location:
     row: 27
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -164,7 +174,8 @@ expression: diagnostics
   end_location:
     row: 28
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -177,7 +188,8 @@ expression: diagnostics
   end_location:
     row: 29
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -191,13 +203,14 @@ expression: diagnostics
     row: 35
     column: 5
   fix:
-    content: ""
-    location:
-      row: 34
-      column: 10
-    end_location:
-      row: 35
-      column: 8
+    edits:
+      - content: ""
+        location:
+          row: 34
+          column: 10
+        end_location:
+          row: 35
+          column: 8
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -210,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 37
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -223,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 39
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -236,7 +251,8 @@ expression: diagnostics
   end_location:
     row: 41
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -250,13 +266,14 @@ expression: diagnostics
     row: 44
     column: 12
   fix:
-    content: ""
-    location:
-      row: 44
-      column: 9
-    end_location:
-      row: 44
-      column: 15
+    edits:
+      - content: ""
+        location:
+          row: 44
+          column: 9
+        end_location:
+          row: 44
+          column: 15
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -270,12 +287,13 @@ expression: diagnostics
     row: 45
     column: 18
   fix:
-    content: ""
-    location:
-      row: 45
-      column: 15
-    end_location:
-      row: 45
-      column: 21
+    edits:
+      - content: ""
+        location:
+          row: 45
+          column: 15
+        end_location:
+          row: 45
+          column: 21
   parent: ~
 

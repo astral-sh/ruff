@@ -14,13 +14,14 @@ expression: diagnostics
     row: 2
     column: 36
   fix:
-    content: "."
-    location:
-      row: 2
-      column: 35
-    end_location:
-      row: 2
-      column: 35
+    edits:
+      - content: "."
+        location:
+          row: 2
+          column: 35
+        end_location:
+          row: 2
+          column: 35
   parent: ~
 - kind:
     name: EndsInPeriod
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 7
     column: 40
   fix:
-    content: "."
-    location:
-      row: 7
-      column: 37
-    end_location:
-      row: 7
-      column: 37
+    edits:
+      - content: "."
+        location:
+          row: 7
+          column: 37
+        end_location:
+          row: 7
+          column: 37
   parent: ~
 - kind:
     name: EndsInPeriod
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 15
     column: 7
   fix:
-    content: "."
-    location:
-      row: 14
-      column: 28
-    end_location:
-      row: 14
-      column: 28
+    edits:
+      - content: "."
+        location:
+          row: 14
+          column: 28
+        end_location:
+          row: 14
+          column: 28
   parent: ~
 - kind:
     name: EndsInPeriod
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 20
     column: 40
   fix:
-    content: "."
-    location:
-      row: 20
-      column: 37
-    end_location:
-      row: 20
-      column: 37
+    edits:
+      - content: "."
+        location:
+          row: 20
+          column: 37
+        end_location:
+          row: 20
+          column: 37
   parent: ~
 - kind:
     name: EndsInPeriod
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 27
     column: 31
   fix:
-    content: "."
-    location:
-      row: 27
-      column: 28
-    end_location:
-      row: 27
-      column: 28
+    edits:
+      - content: "."
+        location:
+          row: 27
+          column: 28
+        end_location:
+          row: 27
+          column: 28
   parent: ~
 - kind:
     name: EndsInPeriod
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 34
     column: 52
   fix:
-    content: "."
-    location:
-      row: 34
-      column: 48
-    end_location:
-      row: 34
-      column: 48
+    edits:
+      - content: "."
+        location:
+          row: 34
+          column: 48
+        end_location:
+          row: 34
+          column: 48
   parent: ~
 - kind:
     name: EndsInPeriod
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 39
     column: 37
   fix:
-    content: "."
-    location:
-      row: 39
-      column: 36
-    end_location:
-      row: 39
-      column: 36
+    edits:
+      - content: "."
+        location:
+          row: 39
+          column: 36
+        end_location:
+          row: 39
+          column: 36
   parent: ~
 - kind:
     name: EndsInPeriod
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 44
     column: 41
   fix:
-    content: "."
-    location:
-      row: 44
-      column: 38
-    end_location:
-      row: 44
-      column: 38
+    edits:
+      - content: "."
+        location:
+          row: 44
+          column: 38
+        end_location:
+          row: 44
+          column: 38
   parent: ~
 - kind:
     name: EndsInPeriod
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 52
     column: 7
   fix:
-    content: "."
-    location:
-      row: 51
-      column: 28
-    end_location:
-      row: 51
-      column: 28
+    edits:
+      - content: "."
+        location:
+          row: 51
+          column: 28
+        end_location:
+          row: 51
+          column: 28
   parent: ~
 - kind:
     name: EndsInPeriod
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 57
     column: 41
   fix:
-    content: "."
-    location:
-      row: 57
-      column: 38
-    end_location:
-      row: 57
-      column: 38
+    edits:
+      - content: "."
+        location:
+          row: 57
+          column: 38
+        end_location:
+          row: 57
+          column: 38
   parent: ~
 - kind:
     name: EndsInPeriod
@@ -214,13 +224,14 @@ expression: diagnostics
     row: 64
     column: 31
   fix:
-    content: "."
-    location:
-      row: 64
-      column: 28
-    end_location:
-      row: 64
-      column: 28
+    edits:
+      - content: "."
+        location:
+          row: 64
+          column: 28
+        end_location:
+          row: 64
+          column: 28
   parent: ~
 - kind:
     name: EndsInPeriod
@@ -234,12 +245,13 @@ expression: diagnostics
     row: 71
     column: 52
   fix:
-    content: "."
-    location:
-      row: 71
-      column: 48
-    end_location:
-      row: 71
-      column: 48
+    edits:
+      - content: "."
+        location:
+          row: 71
+          column: 48
+        end_location:
+          row: 71
+          column: 48
   parent: ~
 
