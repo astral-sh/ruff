@@ -68,18 +68,18 @@ expression: diagnostics
     suggestion: "Replace with `True`"
     fixable: true
   location:
-    row: 23
+    row: 24
     column: 15
   end_location:
-    row: 23
+    row: 24
     column: 31
   fix:
     content: "True"
     location:
-      row: 23
+      row: 24
       column: 15
     end_location:
-      row: 23
+      row: 24
       column: 31
   parent: ~
 - kind:
@@ -88,18 +88,18 @@ expression: diagnostics
     suggestion: "Replace with `True`"
     fixable: true
   location:
-    row: 26
+    row: 27
     column: 3
   end_location:
-    row: 26
+    row: 27
     column: 31
   fix:
     content: "True"
     location:
-      row: 26
+      row: 27
       column: 3
     end_location:
-      row: 26
+      row: 27
       column: 31
   parent: ~
 - kind:
@@ -108,18 +108,18 @@ expression: diagnostics
     suggestion: "Replace with `True`"
     fixable: true
   location:
-    row: 29
+    row: 30
     column: 3
   end_location:
-    row: 29
+    row: 30
     column: 31
   fix:
     content: "True"
     location:
-      row: 29
+      row: 30
       column: 3
     end_location:
-      row: 29
+      row: 30
       column: 31
   parent: ~
 

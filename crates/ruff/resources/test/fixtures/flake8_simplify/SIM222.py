@@ -17,6 +17,7 @@ if True:  # OK
 def validate(self, value):
     return json.loads(value) or True  # OK
 
+
 if a or f() or b or g() or True:  # OK
     pass
 

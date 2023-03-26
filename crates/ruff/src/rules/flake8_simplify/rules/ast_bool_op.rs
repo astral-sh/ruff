@@ -487,31 +487,39 @@ pub fn is_short_circuit(ctx: &Context, expr: &Expr) -> Option<(Location, Locatio
         Boolop::And => false,
         Boolop::Or => true,
     };
-    let mut location = expr.location;
 
-    for (first_value, second_value) in values.iter().tuple_windows() {
-        if contains_effect(ctx, first_value) {
-            location = second_value.location;
+    let mut location = expr.location;
+    for (value, next_value) in values.iter().tuple_windows() {
+        // Keep track of the location of the furthest-right, non-effectful expression.
+        if contains_effect(ctx, value) {
+            location = next_value.location;
             continue;
         }
-        match (&first_value.node, &second_value.node) {
-            (
-                ExprKind::Constant {
-                    value: Constant::Bool(b),
-                    ..
-                },
-                _,
-            )
-            | (
-                _,
-                ExprKind::Constant {
-                    value: Constant::Bool(b),
-                    ..
-                },
-            ) if b == &short_circuit_value => {
+
+        // If the current expression is a constant, and it matches the short-circuit value, then
+        // we can return the location of the expression. This should only trigger if the
+        // short-circuit expression is the first expression in the list; otherwise, we'll see it
+        // as `next_value` before we see it as `value`.
+        if let ExprKind::Constant {
+            value: Constant::Bool(bool),
+            ..
+        } = &value.node
+        {
+            if bool == &short_circuit_value {
                 return Some((location, expr.end_location.unwrap()));
             }
-            _ => {}
+        }
+
+        // If the next expression is a constant, and it matches the short-circuit value, then
+        // we can return the location of the expression.
+        if let ExprKind::Constant {
+            value: Constant::Bool(bool),
+            ..
+        } = &next_value.node
+        {
+            if bool == &short_circuit_value {
+                return Some((location, expr.end_location.unwrap()));
+            }
         }
     }
     None
