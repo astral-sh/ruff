@@ -57,6 +57,7 @@ pub fn check_physical_lines(
 
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
+    let mut in_quote = false;
     for (index, line) in locator.contents().universal_newlines().enumerate() {
         while commented_lines_iter
             .next_if(|lineno| &(index + 1) == *lineno)
@@ -155,10 +156,15 @@ pub fn check_physical_lines(
         }
 
         if enforce_tab_indentation {
-            if let Some(diagnostic) = tab_indentation(index, line) {
+            // Update in_quote with the state of `line`
+            let (diagnostic_opt, in_quote_found) = tab_indentation(index, line, in_quote);
+            // in_quote = in_quote_found;
+            if let Some(diagnostic) = diagnostic_opt {
                 diagnostics.push(diagnostic);
             }
         }
+
+        in_quote = switch_in_quote(line, in_quote);
     }
 
     if enforce_no_newline_at_end_of_file {
@@ -178,6 +184,18 @@ pub fn check_physical_lines(
     }
 
     diagnostics
+}
+
+// fn switch_in_quote(line: &str, currently_in_quote: bool, quote_delimiter: &str) -> bool {
+fn switch_in_quote(line: &str, currently_in_quote: bool) -> bool {
+    let mut in_quote_int = if currently_in_quote { 1 } else { -1 };
+    let quote_delimiter = "\"\"\"";
+
+    // -1 * (-1 * number of times that delimiter in string)
+    let delimiter_count = line.matches(quote_delimiter).count() as i32;
+    in_quote_int = in_quote_int * (-1 * delimiter_count);
+
+    in_quote_int == 1
 }
 
 #[cfg(test)]
