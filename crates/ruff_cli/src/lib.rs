@@ -1,18 +1,19 @@
-use anyhow::Result;
-use clap::CommandFactory;
-use notify::{recommended_watcher, RecursiveMode, Watcher};
 use std::io::{self, BufWriter};
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::sync::mpsc::channel;
 
-use crate::args::{Args, CheckArgs, Command};
-use crate::printer::{Flags as PrinterFlags, Printer};
+use anyhow::Result;
+use clap::CommandFactory;
+use notify::{recommended_watcher, RecursiveMode, Watcher};
 
 use ruff::logging::{set_up_logging, LogLevel};
 use ruff::settings::types::SerializationFormat;
-use ruff::settings::CliSettings;
-use ruff::{fix, fs, warn_user_once};
+use ruff::settings::{flags, CliSettings};
+use ruff::{fs, warn_user_once};
+
+use crate::args::{Args, CheckArgs, Command};
+use crate::printer::{Flags as PrinterFlags, Printer};
 
 pub mod args;
 mod cache;
@@ -133,13 +134,13 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     // but not apply fixes. That would allow us to avoid special-casing JSON
     // here.
     let autofix = if cli.diff {
-        fix::FixMode::Diff
+        flags::FixMode::Diff
     } else if fix || fix_only {
-        fix::FixMode::Apply
+        flags::FixMode::Apply
     } else if matches!(format, SerializationFormat::Json) {
-        fix::FixMode::Generate
+        flags::FixMode::Generate
     } else {
-        fix::FixMode::None
+        flags::FixMode::None
     };
     let cache = !cli.no_cache;
     let noqa = !cli.ignore_noqa;
@@ -159,7 +160,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     }
 
     if cli.add_noqa {
-        if !matches!(autofix, fix::FixMode::None) {
+        if !matches!(autofix, flags::FixMode::None) {
             warn_user_once!("--fix is incompatible with --add-noqa.");
         }
         let modifications =
@@ -177,7 +178,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     let printer = Printer::new(format, log_level, autofix, printer_flags);
 
     if cli.watch {
-        if !matches!(autofix, fix::FixMode::None) {
+        if !matches!(autofix, flags::FixMode::None) {
             warn_user_once!("--fix is unsupported in watch mode.");
         }
         if format != SerializationFormat::Text {
@@ -194,7 +195,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             &overrides,
             cache.into(),
             noqa.into(),
-            fix::FixMode::None,
+            flags::FixMode::None,
         )?;
         printer.write_continuously(&messages)?;
 
@@ -224,7 +225,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                             &overrides,
                             cache.into(),
                             noqa.into(),
-                            fix::FixMode::None,
+                            flags::FixMode::None,
                         )?;
                         printer.write_continuously(&messages)?;
                     }
@@ -258,7 +259,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         // Always try to print violations (the printer itself may suppress output),
         // unless we're writing fixes via stdin (in which case, the transformed
         // source code goes to stdout).
-        if !(is_stdin && matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff)) {
+        if !(is_stdin && matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff)) {
             if cli.statistics {
                 printer.write_statistics(&diagnostics)?;
             } else {

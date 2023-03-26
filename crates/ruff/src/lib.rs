@@ -17,7 +17,6 @@ mod cst;
 pub mod directives;
 mod doc_lines;
 mod docstrings;
-pub mod fix;
 pub mod flake8_to_ruff;
 pub mod fs;
 pub mod jupyter;
