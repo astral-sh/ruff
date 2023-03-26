@@ -9,7 +9,7 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 #[violation]
 pub struct PassInClassBody;
 
-impl Violation for PassInClassBody{
+impl Violation for PassInClassBody {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!(r#"Class body must not contain "pass""#)
@@ -22,10 +22,9 @@ pub fn pass_in_class_body(checker: &mut Checker, body: &[Stmt]) {
     // any nodes to be of StmtKind::Pass
     for located in body {
         if matches!(located.node, StmtKind::Pass) {
-            checker.diagnostics.push(Diagnostic::new(
-                 PassInClassBody,
-                Range::from(located),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(PassInClassBody, Range::from(located)));
         }
     }
 }
