@@ -1,12 +1,10 @@
-use rustpython_parser::ast::Location;
-use rustpython_parser::Tok;
-
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::token_kind::TokenKind;
+use rustpython_parser::ast::Location;
 
 use super::LogicalLineTokens;
-use crate::rules::pycodestyle::helpers::is_op_token;
 
 #[violation]
 pub struct UnexpectedSpacesAroundKeywordParameterEquals;
@@ -31,8 +29,8 @@ impl Violation for MissingWhitespaceAroundParameterEquals {
 fn is_in_def(tokens: &LogicalLineTokens) -> bool {
     for token in tokens {
         match token.kind() {
-            Tok::Async | Tok::Indent | Tok::Dedent => continue,
-            Tok::Def => return true,
+            TokenKind::Async | TokenKind::Indent | TokenKind::Dedent => continue,
+            TokenKind::Def => return true,
             _ => return false,
         }
     }
@@ -45,76 +43,86 @@ pub(crate) fn whitespace_around_named_parameter_equals(
     tokens: &LogicalLineTokens,
 ) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
-    let mut parens = 0;
-    let mut require_space = false;
-    let mut no_space = false;
+    let mut parens = 0u32;
     let mut annotated_func_arg = false;
     let mut prev_end: Option<Location> = None;
 
     let in_def = is_in_def(tokens);
+    let mut iter = tokens.iter().peekable();
 
-    for token in tokens {
+    while let Some(token) = iter.next() {
         let kind = token.kind();
 
-        if kind == &Tok::NonLogicalNewline {
+        if kind == TokenKind::NonLogicalNewline {
             continue;
         }
-        if no_space {
-            no_space = false;
-            if Some(token.start()) != prev_end {
-                diagnostics.push((
-                    prev_end.unwrap(),
-                    UnexpectedSpacesAroundKeywordParameterEquals.into(),
-                ));
-            }
-        }
-        if require_space {
-            require_space = false;
-            let start = token.start();
-            if Some(start) == prev_end {
-                diagnostics.push((start, MissingWhitespaceAroundParameterEquals.into()));
-            }
-        }
-        if is_op_token(kind) {
-            match kind {
-                Tok::Lpar | Tok::Lsqb => {
-                    parens += 1;
-                }
-                Tok::Rpar | Tok::Rsqb => {
-                    parens -= 1;
-                }
 
-                Tok::Colon if parens == 1 && in_def => {
-                    annotated_func_arg = true;
-                }
-                Tok::Comma if parens == 1 => {
+        match kind {
+            TokenKind::Lpar | TokenKind::Lsqb => {
+                parens += 1;
+            }
+            TokenKind::Rpar | TokenKind::Rsqb => {
+                parens -= 1;
+
+                if parens == 0 {
                     annotated_func_arg = false;
                 }
-                Tok::Equal if parens > 0 => {
-                    if annotated_func_arg && parens == 1 {
-                        require_space = true;
-                        let start = token.start();
-                        if Some(start) == prev_end {
-                            diagnostics
-                                .push((start, MissingWhitespaceAroundParameterEquals.into()));
+            }
+
+            TokenKind::Colon if parens == 1 && in_def => {
+                annotated_func_arg = true;
+            }
+            TokenKind::Comma if parens == 1 => {
+                annotated_func_arg = false;
+            }
+            TokenKind::Equal if parens > 0 => {
+                if annotated_func_arg && parens == 1 {
+                    let start = token.start();
+                    if Some(start) == prev_end {
+                        diagnostics.push((start, MissingWhitespaceAroundParameterEquals.into()));
+                    }
+
+                    while let Some(next) = iter.peek() {
+                        if next.kind() == TokenKind::NonLogicalNewline {
+                            iter.next();
+                        } else {
+                            let next_start = next.start();
+
+                            if next_start == token.end() {
+                                diagnostics.push((
+                                    next_start,
+                                    MissingWhitespaceAroundParameterEquals.into(),
+                                ));
+                            }
+                            break;
                         }
-                    } else {
-                        no_space = true;
-                        if Some(token.start()) != prev_end {
-                            diagnostics.push((
-                                prev_end.unwrap(),
-                                UnexpectedSpacesAroundKeywordParameterEquals.into(),
-                            ));
+                    }
+                } else {
+                    if Some(token.start()) != prev_end {
+                        diagnostics.push((
+                            prev_end.unwrap(),
+                            UnexpectedSpacesAroundKeywordParameterEquals.into(),
+                        ));
+                    }
+
+                    while let Some(next) = iter.peek() {
+                        if next.kind() == TokenKind::NonLogicalNewline {
+                            iter.next();
+                        } else {
+                            if next.start() != token.end() {
+                                diagnostics.push((
+                                    token.end(),
+                                    UnexpectedSpacesAroundKeywordParameterEquals.into(),
+                                ));
+                            }
+                            break;
                         }
                     }
                 }
-                _ => {}
             }
-
-            if parens < 1 {
-                annotated_func_arg = false;
-            }
+            _ => {}
         }
+
         prev_end = Some(token.end());
     }
     diagnostics

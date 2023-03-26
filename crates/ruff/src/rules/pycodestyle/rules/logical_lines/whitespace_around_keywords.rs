@@ -1,7 +1,6 @@
 use rustpython_parser::ast::Location;
 
 use super::{LogicalLine, Whitespace};
-use crate::rules::pycodestyle::helpers::is_keyword_token;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -115,32 +114,40 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(Location, D
     let mut after_keyword = false;
 
     for token in line.tokens() {
-        let is_keyword = is_keyword_token(token.kind());
-
+        let is_keyword = token.kind().is_keyword();
         if is_keyword {
-            let (start, end) = token.range();
-
             if !after_keyword {
                 match line.leading_whitespace(&token) {
-                    (Whitespace::Tab, offset) => diagnostics.push((
-                        Location::new(start.row(), start.column() - offset),
-                        TabBeforeKeyword.into(),
-                    )),
-                    (Whitespace::Many, offset) => diagnostics.push((
-                        Location::new(start.row(), start.column() - offset),
-                        MultipleSpacesBeforeKeyword.into(),
-                    )),
+                    (Whitespace::Tab, offset) => {
+                        let start = token.start();
+                        diagnostics.push((
+                            Location::new(start.row(), start.column() - offset),
+                            TabBeforeKeyword.into(),
+                        ));
+                    }
+                    (Whitespace::Many, offset) => {
+                        let start = token.start();
+                        diagnostics.push((
+                            Location::new(start.row(), start.column() - offset),
+                            MultipleSpacesBeforeKeyword.into(),
+                        ));
+                    }
                     _ => {}
                 }
             }
 
             match line.trailing_whitespace(&token) {
-                Whitespace::Tab => diagnostics.push((end, TabAfterKeyword.into())),
-                Whitespace::Many => diagnostics.push((end, MultipleSpacesAfterKeyword.into())),
+                Whitespace::Tab => {
+                    let end = token.end();
+                    diagnostics.push((end, TabAfterKeyword.into()));
+                }
+                Whitespace::Many => {
+                    let end = token.end();
+                    diagnostics.push((end, MultipleSpacesAfterKeyword.into()));
+                }
                 _ => {}
             }
         }
-
         after_keyword = is_keyword;
     }
 
