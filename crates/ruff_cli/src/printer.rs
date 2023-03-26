@@ -62,10 +62,10 @@ struct ExpandedMessage<'a> {
 }
 
 #[derive(Serialize)]
-struct ExpandedStatistics {
+struct ExpandedStatistics<'a> {
+    code: SerializeRuleAsCode,
+    message: &'a str,
     count: usize,
-    code: String,
-    message: String,
     fixable: bool,
 }
 
@@ -77,6 +77,12 @@ impl Serialize for SerializeRuleAsCode {
         S: serde::Serializer,
     {
         serializer.serialize_str(&self.0.noqa_code().to_string())
+    }
+}
+
+impl Display for SerializeRuleAsCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.noqa_code())
     }
 }
 
@@ -476,27 +482,27 @@ impl Printer {
             .iter()
             .map(|message| {
                 (
-                    message.kind.rule().noqa_code(),
-                    message.kind.body.clone(),
+                    message.kind.rule(),
+                    &message.kind.body,
                     message.kind.fixable,
                 )
             })
             .sorted()
-            .fold(vec![], |mut acc, (code, body, fixable)| {
-                if let Some((last_code, _, _, count)) = acc.last_mut() {
-                    if *last_code == code {
+            .fold(vec![], |mut acc, (rule, body, fixable)| {
+                if let Some((prev_rule, _, _, count)) = acc.last_mut() {
+                    if *prev_rule == rule {
                         *count += 1;
                         return acc;
                     }
                 }
-                acc.push((code, body, fixable, 1));
+                acc.push((rule, body, fixable, 1));
                 acc
             })
             .iter()
-            .map(|(code, body, fixable, count)| ExpandedStatistics {
-                code: code.to_string(),
+            .map(|(rule, message, fixable, count)| ExpandedStatistics {
+                code: (*rule).into(),
                 count: *count,
-                message: body.clone(),
+                message,
                 fixable: *fixable,
             })
             .sorted_by_key(|statistic| Reverse(statistic.count))
@@ -520,7 +526,7 @@ impl Printer {
                 );
                 let code_width = statistics
                     .iter()
-                    .map(|statistic| statistic.code.len())
+                    .map(|statistic| statistic.code.to_string().len())
                     .max()
                     .unwrap();
                 let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
@@ -534,7 +540,7 @@ impl Printer {
                         stdout,
                         "{:>count_width$}\t{:<code_width$}\t{}{}",
                         statistic.count.to_string().bold(),
-                        statistic.code.red().bold(),
+                        statistic.code.to_string().red().bold(),
                         if any_fixable {
                             if statistic.fixable {
                                 &fixable
