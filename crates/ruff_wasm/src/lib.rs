@@ -36,16 +36,18 @@ export interface Diagnostic {
         column: number;
     };
     fix: {
-        content: string;
         message: string | null;
-        location: {
-            row: number;
-            column: number;
-        };
-        end_location: {
-            row: number;
-            column: number;
-        };
+        edits: {
+            content: string;
+            location: {
+                row: number;
+                column: number;
+            };
+            end_location: {
+                row: number;
+                column: number;
+            };
+        }[];
     } | null;
 };
 "#;
