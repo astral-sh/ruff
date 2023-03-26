@@ -775,6 +775,9 @@ where
                     if self.settings.rules.enabled(Rule::PassStatementStubBody) {
                         flake8_pyi::rules::pass_statement_stub_body(self, body);
                     }
+                    if self.settings.rules.enabled(Rule::UnnecessaryPassInClass) {
+                        flake8_pyi::rules::unnecessary_pass_in_class(self, body);
+                    }
                 }
 
                 if self

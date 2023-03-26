@@ -11,6 +11,7 @@ pub use type_comment_in_stub::{type_comment_in_stub, TypeCommentInStub};
 pub use unrecognized_platform::{
     unrecognized_platform, UnrecognizedPlatformCheck, UnrecognizedPlatformName,
 };
+pub use unnecessary_pass_in_class::{unnecessary_pass_in_class, UnnecessaryPassInClass};
 
 mod bad_version_info_comparison;
 mod docstring_in_stubs;
@@ -20,3 +21,4 @@ mod prefix_type_params;
 mod simple_defaults;
 mod type_comment_in_stub;
 mod unrecognized_platform;
+mod unnecessary_pass_in_class;
