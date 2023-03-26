@@ -178,7 +178,7 @@ pub fn unused_loop_control_variable(
                 if let Some(binding) = binding {
                     if binding.kind.is_loop_var() {
                         if !binding.used() {
-                            diagnostic.amend(Edit::replacement(
+                            diagnostic.set_fix(Edit::replacement(
                                 rename,
                                 expr.location,
                                 expr.end_location.unwrap(),

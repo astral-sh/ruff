@@ -107,7 +107,7 @@ pub fn unnecessary_map(
             if args.len() == 2 && matches!(&args[0].node, ExprKind::Lambda { .. }) {
                 let mut diagnostic = create_diagnostic("generator", Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.try_amend(|| {
+                    diagnostic.try_set_fix(|| {
                         fixes::fix_unnecessary_map(
                             checker.locator,
                             checker.stylist,
@@ -136,7 +136,7 @@ pub fn unnecessary_map(
                     if let ExprKind::Lambda { .. } = argument {
                         let mut diagnostic = create_diagnostic(id, Range::from(expr));
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.try_amend(|| {
+                            diagnostic.try_set_fix(|| {
                                 fixes::fix_unnecessary_map(
                                     checker.locator,
                                     checker.stylist,
@@ -166,7 +166,7 @@ pub fn unnecessary_map(
                         {
                             let mut diagnostic = create_diagnostic(id, Range::from(expr));
                             if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.try_amend(|| {
+                                diagnostic.try_set_fix(|| {
                                     fixes::fix_unnecessary_map(
                                         checker.locator,
                                         checker.stylist,

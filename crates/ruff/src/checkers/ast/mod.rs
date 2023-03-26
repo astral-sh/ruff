@@ -3822,7 +3822,7 @@ where
                                         name_range,
                                     );
                                     if self.patch(Rule::UnusedVariable) {
-                                        diagnostic.try_amend(|| {
+                                        diagnostic.try_set_fix(|| {
                                             pyflakes::fixes::remove_exception_handler_assignment(
                                                 excepthandler,
                                                 self.locator,
@@ -4055,7 +4055,7 @@ impl<'a> Checker<'a> {
                                 if matches!(parent.node, StmtKind::ImportFrom { .. })
                                     && parent.location.row() != binding.range.location.row()
                                 {
-                                    diagnostic.parent(parent.location);
+                                    diagnostic.set_parent(parent.location);
                                 }
                             }
                             self.diagnostics.push(diagnostic);
@@ -4848,7 +4848,7 @@ impl<'a> Checker<'a> {
                                     if matches!(parent.node, StmtKind::ImportFrom { .. })
                                         && parent.location.row() != rebound.range.location.row()
                                     {
-                                        diagnostic.parent(parent.location);
+                                        diagnostic.set_parent(parent.location);
                                     }
                                 };
                                 diagnostics.push(diagnostic);
@@ -5050,10 +5050,10 @@ impl<'a> Checker<'a> {
                         if matches!(child.node, StmtKind::ImportFrom { .. })
                             && child.location.row() != range.location.row()
                         {
-                            diagnostic.parent(child.location);
+                            diagnostic.set_parent(child.location);
                         }
                         if let Some(fix) = fix.as_ref() {
-                            diagnostic.amend(fix.clone());
+                            diagnostic.set_fix(fix.clone());
                         }
                         diagnostics.push(diagnostic);
                     }
@@ -5084,7 +5084,7 @@ impl<'a> Checker<'a> {
                         if matches!(child.node, StmtKind::ImportFrom { .. })
                             && child.location.row() != range.location.row()
                         {
-                            diagnostic.parent(child.location);
+                            diagnostic.set_parent(child.location);
                         }
                         diagnostics.push(diagnostic);
                     }

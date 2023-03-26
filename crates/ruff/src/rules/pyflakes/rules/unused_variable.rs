@@ -343,7 +343,7 @@ pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
                         if matches!(kind, DeletionKind::Whole) {
                             checker.deletions.insert(RefEquality(stmt));
                         }
-                        diagnostic.amend(fix);
+                        diagnostic.set_fix(fix);
                     }
                 }
             }

@@ -94,7 +94,7 @@ pub fn trailing_whitespace(
                 if matches!(autofix, flags::Autofix::Enabled)
                     && settings.rules.should_fix(Rule::BlankLineWithWhitespace)
                 {
-                    diagnostic.amend(Edit::deletion(start, end));
+                    diagnostic.set_fix(Edit::deletion(start, end));
                 }
                 return Some(diagnostic);
             }
@@ -103,7 +103,7 @@ pub fn trailing_whitespace(
             if matches!(autofix, flags::Autofix::Enabled)
                 && settings.rules.should_fix(Rule::TrailingWhitespace)
             {
-                diagnostic.amend(Edit::deletion(start, end));
+                diagnostic.set_fix(Edit::deletion(start, end));
             }
             return Some(diagnostic);
         }

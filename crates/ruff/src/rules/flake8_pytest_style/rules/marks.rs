@@ -65,7 +65,7 @@ fn pytest_mark_parentheses(
         Range::from(decorator),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(fix);
+        diagnostic.set_fix(fix);
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -114,7 +114,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
             Diagnostic::new(PytestUseFixturesWithoutParameters, Range::from(decorator));
         if checker.patch(diagnostic.kind.rule()) {
             let at_start = Location::new(decorator.location.row(), decorator.location.column() - 1);
-            diagnostic.amend(Edit::deletion(at_start, decorator.end_location.unwrap()));
+            diagnostic.set_fix(Edit::deletion(at_start, decorator.end_location.unwrap()));
         }
         checker.diagnostics.push(diagnostic);
     }

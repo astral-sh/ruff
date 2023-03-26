@@ -114,7 +114,7 @@ pub fn invalid_escape_sequence(
                     Range::new(location, end_location),
                 );
                 if autofix {
-                    diagnostic.amend(Edit::insertion(
+                    diagnostic.set_fix(Edit::insertion(
                         r"\".to_string(),
                         Location::new(location.row(), location.column() + 1),
                     ));

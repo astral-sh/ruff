@@ -140,7 +140,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, Range::from(*stmt));
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 "return".to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
@@ -158,7 +158,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic = Diagnostic::new(ImplicitReturnValue, Range::from(*stmt));
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 "return None".to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
@@ -220,7 +220,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.amend(Edit::insertion(
+                        diagnostic.set_fix(Edit::insertion(
                             content,
                             end_of_statement(stmt, checker.locator),
                         ));
@@ -258,7 +258,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.amend(Edit::insertion(
+                        diagnostic.set_fix(Edit::insertion(
                             content,
                             end_of_statement(stmt, checker.locator),
                         ));
@@ -297,7 +297,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                     content.push_str(checker.stylist.line_ending().as_str());
                     content.push_str(indent);
                     content.push_str("return None");
-                    diagnostic.amend(Edit::insertion(
+                    diagnostic.set_fix(Edit::insertion(
                         content,
                         end_of_statement(stmt, checker.locator),
                     ));

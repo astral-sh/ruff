@@ -353,7 +353,7 @@ pub fn outdated_version_block(
                                 if let Some(fix) =
                                     fix_py2_block(checker, stmt, body, orelse, &block)
                                 {
-                                    diagnostic.amend(fix);
+                                    diagnostic.set_fix(fix);
                                 }
                             }
                         }
@@ -367,7 +367,7 @@ pub fn outdated_version_block(
                             if let Some(block) = metadata(checker.locator, stmt) {
                                 if let Some(fix) = fix_py3_block(checker, stmt, test, body, &block)
                                 {
-                                    diagnostic.amend(fix);
+                                    diagnostic.set_fix(fix);
                                 }
                             }
                         }
@@ -385,7 +385,7 @@ pub fn outdated_version_block(
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(block) = metadata(checker.locator, stmt) {
                             if let Some(fix) = fix_py2_block(checker, stmt, body, orelse, &block) {
-                                diagnostic.amend(fix);
+                                diagnostic.set_fix(fix);
                             }
                         }
                     }
@@ -395,7 +395,7 @@ pub fn outdated_version_block(
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(block) = metadata(checker.locator, stmt) {
                             if let Some(fix) = fix_py3_block(checker, stmt, test, body, &block) {
-                                diagnostic.amend(fix);
+                                diagnostic.set_fix(fix);
                             }
                         }
                     }

@@ -42,21 +42,22 @@ impl Diagnostic {
         }
     }
 
-    pub fn amend(&mut self, fix: Edit) -> &mut Self {
+    /// Set the [`Edit`] used to fix the diagnostic.
+    pub fn set_fix(&mut self, fix: Edit) {
         self.fix = Some(fix);
-        self
     }
 
-    pub fn try_amend(&mut self, func: impl FnOnce() -> Result<Edit>) -> &mut Self {
+    /// Set the [`Edit`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    pub fn try_set_fix(&mut self, func: impl FnOnce() -> Result<Edit>) {
         match func() {
             Ok(fix) => self.fix = Some(fix),
             Err(err) => error!("Failed to create fix: {}", err),
         }
-        self
     }
 
-    pub fn parent(&mut self, parent: Location) -> &mut Self {
+    /// Set the location of the diagnostic's parent node.
+    pub fn set_parent(&mut self, parent: Location) {
         self.parent = Some(parent);
-        self
     }
 }

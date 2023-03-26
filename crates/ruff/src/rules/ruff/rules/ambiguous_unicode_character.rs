@@ -1730,7 +1730,7 @@ pub fn ambiguous_unicode_character(
                 );
                 if settings.rules.enabled(diagnostic.kind.rule()) {
                     if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-                        diagnostic.amend(Edit::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             (*representant as char).to_string(),
                             location,
                             end_location,
