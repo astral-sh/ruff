@@ -14,7 +14,7 @@ use ruff::message::{Location, Message};
 use ruff::registry::Rule;
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::{flags, AllSettings};
-use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError, Range};
+use ruff::{fs, packaging, resolver, warn_user_once, IOError, Range};
 use ruff_diagnostics::Diagnostic;
 
 use crate::args::Overrides;
@@ -28,7 +28,7 @@ pub fn run(
     overrides: &Overrides,
     cache: flags::Cache,
     noqa: flags::Noqa,
-    autofix: fix::FixMode,
+    autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
@@ -153,7 +153,7 @@ fn lint_path(
     settings: &AllSettings,
     cache: flags::Cache,
     noqa: flags::Noqa,
-    autofix: fix::FixMode,
+    autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
     let result = catch_unwind(|| {
         crate::diagnostics::lint_path(path, package, settings, cache, noqa, autofix)
@@ -190,10 +190,10 @@ mod test {
     use anyhow::Result;
     use path_absolutize::Absolutize;
 
-    use ruff::fix::FixMode;
     use ruff::logging::LogLevel;
     use ruff::resolver::PyprojectDiscovery;
     use ruff::settings::configuration::{Configuration, RuleSelection};
+    use ruff::settings::flags::FixMode;
     use ruff::settings::flags::{Cache, Noqa};
     use ruff::settings::types::SerializationFormat;
     use ruff::settings::AllSettings;

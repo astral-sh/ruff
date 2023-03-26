@@ -23,9 +23,10 @@ use ruff::jupyter::JupyterIndex;
 use ruff::linter::FixTable;
 use ruff::logging::LogLevel;
 use ruff::message::{Location, Message};
+use ruff::notify_user;
 use ruff::registry::{AsRule, Rule};
+use ruff::settings::flags;
 use ruff::settings::types::SerializationFormat;
-use ruff::{fix, notify_user};
 
 use crate::diagnostics::Diagnostics;
 
@@ -89,7 +90,7 @@ impl From<Rule> for SerializeRuleAsCode {
 pub struct Printer {
     format: SerializationFormat,
     log_level: LogLevel,
-    autofix_level: fix::FixMode,
+    autofix_level: flags::FixMode,
     flags: Flags,
 }
 
@@ -97,7 +98,7 @@ impl Printer {
     pub const fn new(
         format: SerializationFormat,
         log_level: LogLevel,
-        autofix_level: fix::FixMode,
+        autofix_level: flags::FixMode,
         flags: Flags,
     ) -> Self {
         Self {
@@ -157,9 +158,9 @@ impl Printer {
                     .sum::<usize>();
                 if fixed > 0 {
                     let s = if fixed == 1 { "" } else { "s" };
-                    if matches!(self.autofix_level, fix::FixMode::Apply) {
+                    if matches!(self.autofix_level, flags::FixMode::Apply) {
                         writeln!(stdout, "Fixed {fixed} error{s}.")?;
-                    } else if matches!(self.autofix_level, fix::FixMode::Diff) {
+                    } else if matches!(self.autofix_level, flags::FixMode::Diff) {
                         writeln!(stdout, "Would fix {fixed} error{s}.")?;
                     }
                 }
@@ -639,7 +640,7 @@ fn fingerprint(message: &Message) -> String {
     format!("{:x}", hasher.finish())
 }
 
-struct CodeAndBody<'a>(&'a Message, fix::FixMode);
+struct CodeAndBody<'a>(&'a Message, flags::FixMode);
 
 impl Display for CodeAndBody<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -663,20 +664,20 @@ impl Display for CodeAndBody<'_> {
 }
 
 /// Return `true` if the [`Printer`] should indicate that a rule is fixable.
-fn show_fix_status(autofix_level: fix::FixMode) -> bool {
+fn show_fix_status(autofix_level: flags::FixMode) -> bool {
     // If we're in application mode, avoid indicating that a rule is fixable.
     // If the specific violation were truly fixable, it would've been fixed in
     // this pass! (We're occasionally unable to determine whether a specific
     // violation is fixable without trying to fix it, so if autofix is not
     // enabled, we may inadvertently indicate that a rule is fixable.)
-    !matches!(autofix_level, fix::FixMode::Apply)
+    !matches!(autofix_level, flags::FixMode::Apply)
 }
 
 /// Print a single `Message` with full details.
 fn print_message<T: Write>(
     stdout: &mut T,
     message: &Message,
-    autofix_level: fix::FixMode,
+    autofix_level: flags::FixMode,
     jupyter_index: &FxHashMap<String, JupyterIndex>,
 ) -> Result<()> {
     // Check if we're working on a jupyter notebook and translate positions with cell accordingly
@@ -796,7 +797,7 @@ fn print_fixed<T: Write>(stdout: &mut T, fixed: &FxHashMap<String, FixTable>) ->
 fn print_grouped_message<T: Write>(
     stdout: &mut T,
     message: &Message,
-    autofix_level: fix::FixMode,
+    autofix_level: flags::FixMode,
     row_length: usize,
     column_length: usize,
     jupyter_index: Option<&JupyterIndex>,
