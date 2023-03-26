@@ -504,6 +504,7 @@ impl Printer {
                     .iter()
                     .any(|message| message.kind.fixable),
             })
+            .sorted_by_key(|statistic| Reverse(statistic.count))
             .collect::<Vec<_>>();
 
         let mut stdout = BufWriter::new(io::stdout().lock());
