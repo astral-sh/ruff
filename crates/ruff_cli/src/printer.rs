@@ -63,10 +63,10 @@ struct ExpandedMessage<'a> {
 }
 
 #[derive(Serialize)]
-struct ExpandedStatistics {
+struct ExpandedStatistics<'a> {
+    code: SerializeRuleAsCode,
+    message: &'a str,
     count: usize,
-    code: String,
-    message: String,
     fixable: bool,
 }
 
@@ -78,6 +78,12 @@ impl Serialize for SerializeRuleAsCode {
         S: serde::Serializer,
     {
         serializer.serialize_str(&self.0.noqa_code().to_string())
+    }
+}
+
+impl Display for SerializeRuleAsCode {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0.noqa_code())
     }
 }
 
@@ -472,41 +478,40 @@ impl Printer {
     }
 
     pub fn write_statistics(&self, diagnostics: &Diagnostics) -> Result<()> {
-        let violations: Vec<Rule> = diagnostics
+        let statistics: Vec<ExpandedStatistics> = diagnostics
             .messages
             .iter()
-            .map(|message| message.kind.rule())
+            .map(|message| {
+                (
+                    message.kind.rule(),
+                    &message.kind.body,
+                    message.kind.fixable,
+                )
+            })
             .sorted()
-            .dedup()
-            .collect();
-        if violations.is_empty() {
-            return Ok(());
-        }
-
-        let statistics = violations
+            .fold(vec![], |mut acc, (rule, body, fixable)| {
+                if let Some((prev_rule, _, _, count)) = acc.last_mut() {
+                    if *prev_rule == rule {
+                        *count += 1;
+                        return acc;
+                    }
+                }
+                acc.push((rule, body, fixable, 1));
+                acc
+            })
             .iter()
-            .map(|rule| ExpandedStatistics {
-                code: rule.noqa_code().to_string(),
-                count: diagnostics
-                    .messages
-                    .iter()
-                    .filter(|message| message.kind.rule() == *rule)
-                    .count(),
-                message: diagnostics
-                    .messages
-                    .iter()
-                    .find(|message| message.kind.rule() == *rule)
-                    .map(|message| message.kind.body.clone())
-                    .unwrap(),
-                fixable: diagnostics
-                    .messages
-                    .iter()
-                    .find(|message| message.kind.rule() == *rule)
-                    .iter()
-                    .any(|message| message.kind.fixable),
+            .map(|(rule, message, fixable, count)| ExpandedStatistics {
+                code: (*rule).into(),
+                count: *count,
+                message,
+                fixable: *fixable,
             })
             .sorted_by_key(|statistic| Reverse(statistic.count))
-            .collect::<Vec<_>>();
+            .collect();
+
+        if statistics.is_empty() {
+            return Ok(());
+        }
 
         let mut stdout = BufWriter::new(io::stdout().lock());
         match self.format {
@@ -522,7 +527,7 @@ impl Printer {
                 );
                 let code_width = statistics
                     .iter()
-                    .map(|statistic| statistic.code.len())
+                    .map(|statistic| statistic.code.to_string().len())
                     .max()
                     .unwrap();
                 let any_fixable = statistics.iter().any(|statistic| statistic.fixable);
@@ -536,7 +541,7 @@ impl Printer {
                         stdout,
                         "{:>count_width$}\t{:<code_width$}\t{}{}",
                         statistic.count.to_string().bold(),
-                        statistic.code.red().bold(),
+                        statistic.code.to_string().red().bold(),
                         if any_fixable {
                             if statistic.fixable {
                                 &fixable
