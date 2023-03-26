@@ -9,7 +9,7 @@ expression: diagnostics
     fixable: true
   location:
     row: 1
-    column: 8
+    column: 3
   end_location:
     row: 1
     column: 12
@@ -29,7 +29,7 @@ expression: diagnostics
     fixable: true
   location:
     row: 4
-    column: 15
+    column: 3
   end_location:
     row: 4
     column: 19
@@ -49,7 +49,7 @@ expression: diagnostics
     fixable: true
   location:
     row: 7
-    column: 14
+    column: 9
   end_location:
     row: 7
     column: 18
@@ -61,5 +61,65 @@ expression: diagnostics
     end_location:
       row: 7
       column: 18
+  parent: ~
+- kind:
+    name: ExprOrTrue
+    body: "Use `True` instead of `... or True`"
+    suggestion: "Replace with `True`"
+    fixable: true
+  location:
+    row: 24
+    column: 15
+  end_location:
+    row: 24
+    column: 31
+  fix:
+    content: "True"
+    location:
+      row: 24
+      column: 15
+    end_location:
+      row: 24
+      column: 31
+  parent: ~
+- kind:
+    name: ExprOrTrue
+    body: "Use `True` instead of `... or True`"
+    suggestion: "Replace with `True`"
+    fixable: true
+  location:
+    row: 27
+    column: 3
+  end_location:
+    row: 27
+    column: 31
+  fix:
+    content: "True"
+    location:
+      row: 27
+      column: 3
+    end_location:
+      row: 27
+      column: 31
+  parent: ~
+- kind:
+    name: ExprOrTrue
+    body: "Use `True` instead of `... or True`"
+    suggestion: "Replace with `True`"
+    fixable: true
+  location:
+    row: 30
+    column: 3
+  end_location:
+    row: 30
+    column: 31
+  fix:
+    content: "True"
+    location:
+      row: 30
+      column: 3
+    end_location:
+      row: 30
+      column: 31
   parent: ~
 
