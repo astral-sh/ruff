@@ -98,8 +98,12 @@ if os.path.exists(os.path.join(path, PEP8_BIN)):
 	cmd = ([os.path.join(path, PEP8_BIN)] +
 	       self._pep8_options(targetfile))
 #: W191
+# '''     multiline string with tab in it, same lines'''
 '''
-	multiline string with tab in it'''
+	multiline string with tab in it, one quote on same line'''
+'''
+	multiline string with tab in it, different lines
+'''
 #: E101 W191
 '''multiline string
 	with tabs
