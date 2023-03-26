@@ -22,8 +22,6 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
-// use wild::args() instead of std::env::args() to support wildcard expansion on Windows terminals
-// from https://gitlab.com/kornelski/wild
 pub fn main() -> ExitCode {
     let mut args: Vec<_> = wild::args().collect();
 
