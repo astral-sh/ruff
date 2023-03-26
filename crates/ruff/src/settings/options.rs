@@ -8,9 +8,10 @@ use serde::{Deserialize, Serialize};
 use crate::rule_selector::RuleSelector;
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
-    flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
-    isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
+    flake8_errmsg, flake8_i18n, flake8_implicit_str_concat, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
+    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
+    pyupgrade,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
@@ -455,6 +456,9 @@ pub struct Options {
     #[option_group]
     /// Options for the `flake8-type-checking` plugin.
     pub flake8_type_checking: Option<flake8_type_checking::settings::Options>,
+    #[option_group]
+    /// Options for the `flake8-i18n` plugin.
+    pub flake8_i18n: Option<flake8_i18n::settings::Options>,
     #[option_group]
     /// Options for the `flake8-implicit-str-concat` plugin.
     pub flake8_implicit_str_concat: Option<flake8_implicit_str_concat::settings::Options>,

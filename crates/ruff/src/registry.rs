@@ -627,6 +627,10 @@ ruff_macros::register_rules!(
     rules::flake8_raise::rules::UnnecessaryParenOnRaiseException,
     // flake8-self
     rules::flake8_self::rules::PrivateMemberAccess,
+    // flake8-i18n
+    rules::flake8_i18n::rules::FStringInI18NFuncCall,
+    rules::flake8_i18n::rules::FormatInI18NFuncCall,
+    rules::flake8_i18n::rules::PrintFInI18NFuncCall,
     // numpy
     rules::numpy::rules::NumpyDeprecatedTypeAlias,
     rules::numpy::rules::NumpyLegacyRandom,
@@ -777,6 +781,9 @@ pub enum Linter {
     /// [flake8-type-checking](https://pypi.org/project/flake8-type-checking/)
     #[prefix = "TCH"]
     Flake8TypeChecking,
+    /// [flake8-i18n](https://pypi.org/project/flake8-i18n/)
+    #[prefix = "INT"]
+    Flake8I18N,
     /// [flake8-unused-arguments](https://pypi.org/project/flake8-unused-arguments/)
     #[prefix = "ARG"]
     Flake8UnusedArguments,
