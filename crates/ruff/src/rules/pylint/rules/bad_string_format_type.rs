@@ -172,7 +172,7 @@ fn is_valid_constant(formats: &[CFormatStrOrBytes<String>], value: &Expr) -> boo
     if formats.len() != 1 {
         return true;
     }
-    let format = formats.get(0).unwrap();
+    let format = formats[0];
     equivalent(format, value)
 }
 

@@ -56,7 +56,6 @@ mod deferred;
 
 type AnnotationContext = (bool, bool);
 
-#[allow(clippy::struct_excessive_bools)]
 pub struct Checker<'a> {
     // Settings, static metadata, etc.
     pub path: &'a Path,
@@ -3582,7 +3581,7 @@ where
                         } else {
                             // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
                             for keyword in keywords {
-                                let KeywordData { value, arg, .. } = &keyword.node;
+                                let KeywordData { value, arg } = &keyword.node;
                                 if arg.as_ref().map_or(false, |arg| arg == "type") {
                                     visit_type_definition!(self, value);
                                 } else {

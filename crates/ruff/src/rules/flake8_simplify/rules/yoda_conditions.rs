@@ -31,7 +31,7 @@ impl Violation for YodaConditions {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let YodaConditions { suggestion, .. } = self;
+        let YodaConditions { suggestion } = self;
         if suggestion.is_some() {
             Some(|YodaConditions { suggestion }| {
                 let suggestion = suggestion.as_ref().unwrap();
