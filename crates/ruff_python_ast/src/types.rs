@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use std::{collections::hash_map::Iter as HashMapIter, ops::Deref};
 
 use rustpython_parser::ast::{Expr, Located, Location, Stmt};
