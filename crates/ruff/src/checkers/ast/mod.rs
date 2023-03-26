@@ -2900,35 +2900,33 @@ where
                 }
 
                 // flake8-i18n
-                if self.settings.rules.enabled(Rule::FStringInI18NFuncCall) {
-                    if let Some(diagnostic) = flake8_i18n::rules::f_string_in_i18n_func_call(
-                        self,
-                        func,
-                        args,
-                        &self.settings.flake8_i18n.functions_names,
-                    ) {
-                        self.diagnostics.push(diagnostic);
+                if self.settings.rules.any_enabled(&[
+                    Rule::FStringInI18NFuncCall,
+                    Rule::FormatInI18NFuncCall,
+                    Rule::PrintFInI18NFuncCall,
+                ]) && flake8_i18n::rules::function_needs_check(
+                    func,
+                    &self.settings.flake8_i18n.functions_names,
+                ) {
+                    if self.settings.rules.enabled(Rule::FStringInI18NFuncCall) {
+                        if let Some(diagnostic) =
+                            flake8_i18n::rules::f_string_in_i18n_func_call(args)
+                        {
+                            self.diagnostics.push(diagnostic);
+                        }
                     }
-                }
 
-                if self.settings.rules.enabled(Rule::FormatInI18NFuncCall) {
-                    if let Some(diagnostic) = flake8_i18n::rules::format_in_i18n_func_call(
-                        self,
-                        func,
-                        args,
-                        &self.settings.flake8_i18n.functions_names,
-                    ) {
-                        self.diagnostics.push(diagnostic);
+                    if self.settings.rules.enabled(Rule::FormatInI18NFuncCall) {
+                        if let Some(diagnostic) = flake8_i18n::rules::format_in_i18n_func_call(args)
+                        {
+                            self.diagnostics.push(diagnostic);
+                        }
                     }
-                }
-                if self.settings.rules.enabled(Rule::PrintFInI18NFuncCall) {
-                    if let Some(diagnostic) = flake8_i18n::rules::printf_in_i18n_func_call(
-                        self,
-                        func,
-                        args,
-                        &self.settings.flake8_i18n.functions_names,
-                    ) {
-                        self.diagnostics.push(diagnostic);
+                    if self.settings.rules.enabled(Rule::PrintFInI18NFuncCall) {
+                        if let Some(diagnostic) = flake8_i18n::rules::printf_in_i18n_func_call(args)
+                        {
+                            self.diagnostics.push(diagnostic);
+                        }
                     }
                 }
 
