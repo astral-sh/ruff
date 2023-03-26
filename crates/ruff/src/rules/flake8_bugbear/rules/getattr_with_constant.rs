@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
@@ -65,7 +65,7 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     let mut diagnostic = Diagnostic::new(GetAttrWithConstant, Range::from(expr));
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Fix::replacement(
+        diagnostic.amend(Edit::replacement(
             unparse_expr(&attribute(obj, value), checker.stylist),
             expr.location,
             expr.end_location.unwrap(),

@@ -110,14 +110,16 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: "Install Rust toolchain"
-        run: rustup show
+        run: rustup component add rustfmt
       - uses: Swatinem/rust-cache@v2
-      - run: ./scripts/add_rule.py --name DoTheThing --code PLC999 --linter pylint
+      - run: ./scripts/add_rule.py --name DoTheThing --prefix PL --code C0999 --linter pylint
       - run: cargo check
+      - run: cargo fmt --all --check
       - run: |
           ./scripts/add_plugin.py test --url https://pypi.org/project/-test/0.1.0/ --prefix TST
-          ./scripts/add_rule.py --name FirstRule --code TST001 --linter test
+          ./scripts/add_rule.py --name FirstRule --prefix TST --code 001 --linter test
       - run: cargo check
+      - run: cargo fmt --all --check
 
   typos:
     name: "spell check"
@@ -198,3 +200,29 @@ jobs:
             echo '```' >> $GITHUB_STEP_SUMMARY
             exit 1
           fi
+
+  pre-commit:
+    name: "pre-commit"
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: actions/setup-python@v4
+        with:
+          python-version: "3.11"
+      - name: "Install Rust toolchain"
+        run: rustup show
+      - uses: Swatinem/rust-cache@v2
+      - name: "Install pre-commit"
+        run: pip install pre-commit
+      - name: "Cache pre-commit"
+        uses: actions/cache@v3
+        with:
+            path: ~/.cache/pre-commit
+            key: pre-commit-${{ hashFiles('.pre-commit-config.yaml') }}
+      - name: "Run pre-commit"
+        run: |
+          echo '```console' > $GITHUB_STEP_SUMMARY
+          # Enable color output for pre-commit and remove it for the summary
+          SKIP=cargo-fmt,clippy,dev-generate-all pre-commit run --all-files --show-diff-on-failure --color=always | \
+            tee >(sed -E 's/\x1B\[([0-9]{1,2}(;[0-9]{1,2})*)?[mGK]//g' >> $GITHUB_STEP_SUMMARY) >&1
+          echo '```' >> $GITHUB_STEP_SUMMARY

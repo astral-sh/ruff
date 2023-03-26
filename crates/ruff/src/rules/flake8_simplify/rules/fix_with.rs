@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use libcst_native::{Codegen, CodegenState, CompoundStatement, Statement, Suite, With};
 use rustpython_parser::ast::Location;
 
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace;
@@ -14,7 +14,7 @@ pub(crate) fn fix_multiple_with_statements(
     locator: &Locator,
     stylist: &Stylist,
     stmt: &rustpython_parser::ast::Stmt,
-) -> Result<Fix> {
+) -> Result<Edit> {
     // Infer the indentation of the outer block.
     let Some(outer_indent) = whitespace::indentation(locator, stmt) else {
         bail!("Unable to fix multiline statement");
@@ -95,7 +95,7 @@ pub(crate) fn fix_multiple_with_statements(
             .to_string()
     };
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         contents,
         Location::new(stmt.location.row(), 0),
         Location::new(stmt.end_location.unwrap().row() + 1, 0),

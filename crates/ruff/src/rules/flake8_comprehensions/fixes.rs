@@ -7,7 +7,7 @@ use libcst_native::{
     RightParen, RightSquareBracket, Set, SetComp, SimpleString, SimpleWhitespace, Tuple,
 };
 
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::cst::matchers::{match_expr, match_module};
@@ -33,7 +33,7 @@ pub fn fix_unnecessary_generator_list(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Fix> {
+) -> Result<Edit> {
     // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
@@ -67,7 +67,7 @@ pub fn fix_unnecessary_generator_list(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         expr.location,
         expr.end_location.unwrap(),
@@ -80,7 +80,7 @@ pub fn fix_unnecessary_generator_set(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
     parent: Option<&rustpython_parser::ast::Expr>,
-) -> Result<Fix> {
+) -> Result<Edit> {
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
@@ -124,7 +124,7 @@ pub fn fix_unnecessary_generator_set(
         }
     }
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         content,
         expr.location,
         expr.end_location.unwrap(),
@@ -138,7 +138,7 @@ pub fn fix_unnecessary_generator_dict(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
     parent: Option<&rustpython_parser::ast::Expr>,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
@@ -198,7 +198,7 @@ pub fn fix_unnecessary_generator_dict(
         }
     }
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         content,
         expr.location,
         expr.end_location.unwrap(),
@@ -210,7 +210,7 @@ pub fn fix_unnecessary_list_comprehension_set(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Fix> {
+) -> Result<Edit> {
     // Expr(Call(ListComp)))) ->
     // Expr(SetComp)))
     let module_text = locator.slice(expr);
@@ -243,7 +243,7 @@ pub fn fix_unnecessary_list_comprehension_set(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         expr.location,
         expr.end_location.unwrap(),
@@ -256,7 +256,7 @@ pub fn fix_unnecessary_list_comprehension_dict(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
@@ -299,7 +299,7 @@ pub fn fix_unnecessary_list_comprehension_dict(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         expr.location,
         expr.end_location.unwrap(),
@@ -354,7 +354,7 @@ pub fn fix_unnecessary_literal_set(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Fix> {
+) -> Result<Edit> {
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
@@ -393,7 +393,7 @@ pub fn fix_unnecessary_literal_set(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         expr.location,
         expr.end_location.unwrap(),
@@ -405,7 +405,7 @@ pub fn fix_unnecessary_literal_dict(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Fix> {
+) -> Result<Edit> {
     // Expr(Call(List|Tuple)))) -> Expr(Dict)))
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
@@ -466,7 +466,7 @@ pub fn fix_unnecessary_literal_dict(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         expr.location,
         expr.end_location.unwrap(),
@@ -478,7 +478,7 @@ pub fn fix_unnecessary_collection_call(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Fix> {
+) -> Result<Edit> {
     // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
@@ -582,7 +582,7 @@ pub fn fix_unnecessary_collection_call(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         expr.location,
         expr.end_location.unwrap(),
@@ -594,7 +594,7 @@ pub fn fix_unnecessary_literal_within_tuple_call(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
@@ -641,7 +641,7 @@ pub fn fix_unnecessary_literal_within_tuple_call(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         expr.location,
         expr.end_location.unwrap(),
@@ -653,7 +653,7 @@ pub fn fix_unnecessary_literal_within_list_call(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
@@ -702,7 +702,7 @@ pub fn fix_unnecessary_literal_within_list_call(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         expr.location,
         expr.end_location.unwrap(),
@@ -714,7 +714,7 @@ pub fn fix_unnecessary_list_call(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Fix> {
+) -> Result<Edit> {
     // Expr(Call(List|Tuple)))) -> Expr(List|Tuple)))
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
@@ -731,7 +731,7 @@ pub fn fix_unnecessary_list_call(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         expr.location,
         expr.end_location.unwrap(),
@@ -745,7 +745,7 @@ pub fn fix_unnecessary_call_around_sorted(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
@@ -860,7 +860,7 @@ pub fn fix_unnecessary_call_around_sorted(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         expr.location,
         expr.end_location.unwrap(),
@@ -872,7 +872,7 @@ pub fn fix_unnecessary_double_cast_or_process(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let body = match_expr(&mut tree)?;
@@ -899,7 +899,7 @@ pub fn fix_unnecessary_double_cast_or_process(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         expr.location,
         expr.end_location.unwrap(),
@@ -911,7 +911,7 @@ pub fn fix_unnecessary_comprehension(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
@@ -995,7 +995,7 @@ pub fn fix_unnecessary_comprehension(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         expr.location,
         expr.end_location.unwrap(),
@@ -1009,7 +1009,7 @@ pub fn fix_unnecessary_map(
     expr: &rustpython_parser::ast::Expr,
     parent: Option<&rustpython_parser::ast::Expr>,
     kind: &str,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
@@ -1162,7 +1162,7 @@ pub fn fix_unnecessary_map(
             }
         }
 
-        Ok(Fix::replacement(
+        Ok(Edit::replacement(
             content,
             expr.location,
             expr.end_location.unwrap(),

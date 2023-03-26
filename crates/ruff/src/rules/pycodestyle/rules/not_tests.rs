@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -98,7 +98,7 @@ pub fn not_tests(
                         if check_not_in {
                             let mut diagnostic = Diagnostic::new(NotInTest, Range::from(operand));
                             if checker.patch(diagnostic.kind.rule()) && should_fix {
-                                diagnostic.amend(Fix::replacement(
+                                diagnostic.amend(Edit::replacement(
                                     compare(left, &[Cmpop::NotIn], comparators, checker.stylist),
                                     expr.location,
                                     expr.end_location.unwrap(),
@@ -111,7 +111,7 @@ pub fn not_tests(
                         if check_not_is {
                             let mut diagnostic = Diagnostic::new(NotIsTest, Range::from(operand));
                             if checker.patch(diagnostic.kind.rule()) && should_fix {
-                                diagnostic.amend(Fix::replacement(
+                                diagnostic.amend(Edit::replacement(
                                     compare(left, &[Cmpop::IsNot], comparators, checker.stylist),
                                     expr.location,
                                     expr.end_location.unwrap(),

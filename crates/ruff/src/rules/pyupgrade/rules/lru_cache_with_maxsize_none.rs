@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 use ruff_python_ast::types::Range;
@@ -59,7 +59,7 @@ pub fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Expr
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let ExprKind::Attribute { value, ctx, .. } = &func.node {
-                        diagnostic.amend(Fix::replacement(
+                        diagnostic.amend(Edit::replacement(
                             unparse_expr(
                                 &create_expr(ExprKind::Attribute {
                                     value: value.clone(),

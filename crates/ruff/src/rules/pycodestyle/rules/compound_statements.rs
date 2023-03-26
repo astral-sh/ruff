@@ -2,7 +2,7 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -163,7 +163,7 @@ pub fn compound_statements(
                 if let Some((start, end)) = semi {
                     let mut diagnostic = Diagnostic::new(UselessSemicolon, Range::new(start, end));
                     if autofix.into() && settings.rules.should_fix(Rule::UselessSemicolon) {
-                        diagnostic.amend(Fix::deletion(start, end));
+                        diagnostic.amend(Edit::deletion(start, end));
                     };
                     diagnostics.push(diagnostic);
                 }

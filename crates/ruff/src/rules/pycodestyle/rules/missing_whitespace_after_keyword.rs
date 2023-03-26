@@ -20,7 +20,7 @@ impl Violation for MissingWhitespaceAfterKeyword {
 }
 
 /// E275
-#[cfg(debug_assertions)]
+#[cfg(feature = "logical_lines")]
 pub fn missing_whitespace_after_keyword(
     tokens: &[(Location, &Tok, Location)],
 ) -> Vec<(Location, DiagnosticKind)> {
@@ -43,7 +43,7 @@ pub fn missing_whitespace_after_keyword(
     diagnostics
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "logical_lines"))]
 pub fn missing_whitespace_after_keyword(
     _tokens: &[(Location, &Tok, Location)],
 ) -> Vec<(Location, DiagnosticKind)> {

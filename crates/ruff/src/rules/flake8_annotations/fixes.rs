@@ -2,12 +2,12 @@ use anyhow::{bail, Result};
 use rustpython_parser::ast::Stmt;
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
 /// ANN204
-pub fn add_return_annotation(locator: &Locator, stmt: &Stmt, annotation: &str) -> Result<Fix> {
+pub fn add_return_annotation(locator: &Locator, stmt: &Stmt, annotation: &str) -> Result<Edit> {
     let range = Range::from(stmt);
     let contents = locator.slice(range);
 
@@ -18,7 +18,7 @@ pub fn add_return_annotation(locator: &Locator, stmt: &Stmt, annotation: &str) -
     for (start, tok, ..) in lexer::lex_located(contents, Mode::Module, range.location).flatten() {
         if seen_lpar && seen_rpar {
             if matches!(tok, Tok::Colon) {
-                return Ok(Fix::insertion(format!(" -> {annotation}"), start));
+                return Ok(Edit::insertion(format!(" -> {annotation}"), start));
             }
         }
 

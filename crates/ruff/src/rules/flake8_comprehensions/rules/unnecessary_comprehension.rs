@@ -1,4 +1,3 @@
-use log::error;
 use rustpython_parser::ast::{Comprehension, Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
@@ -68,12 +67,9 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        match fixes::fix_unnecessary_comprehension(checker.locator, checker.stylist, expr) {
-            Ok(fix) => {
-                diagnostic.amend(fix);
-            }
-            Err(e) => error!("Failed to generate fix: {e}"),
-        }
+        diagnostic.try_amend(|| {
+            fixes::fix_unnecessary_comprehension(checker.locator, checker.stylist, expr)
+        });
     }
     checker.diagnostics.push(diagnostic);
 }

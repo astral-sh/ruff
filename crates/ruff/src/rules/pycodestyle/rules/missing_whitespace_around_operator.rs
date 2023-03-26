@@ -57,7 +57,7 @@ impl Violation for MissingWhitespaceAroundModuloOperator {
 }
 
 /// E225, E226, E227, E228
-#[cfg(debug_assertions)]
+#[cfg(feature = "logical_lines")]
 #[allow(clippy::if_same_then_else)]
 pub fn missing_whitespace_around_operator(
     tokens: &[(Location, &Tok, Location)],
@@ -188,7 +188,7 @@ pub fn missing_whitespace_around_operator(
     diagnostics
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "logical_lines"))]
 pub fn missing_whitespace_around_operator(
     _tokens: &[(Location, &Tok, Location)],
 ) -> Vec<(Location, DiagnosticKind)> {

@@ -44,3 +44,15 @@ def f(x: """List[str]""") -> None:
 
 def f(x: "Li" "st[str]") -> None:
     ...
+
+
+def f(x: "List['List[str]']") -> None:
+    ...
+
+
+def f(x: "List['Li' 'st[str]']") -> None:
+    ...
+
+
+def f(x: "Li" "st['List[str]']") -> None:
+    ...

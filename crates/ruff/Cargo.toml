@@ -58,6 +58,7 @@ rustpython-parser = { workspace = true }
 schemars = { workspace = true }
 semver = { version = "1.0.16" }
 serde = { workspace = true }
+serde_json = { workspace = true }
 shellexpand = { workspace = true }
 smallvec = { version = "1.10.0" }
 strum = { workspace = true }
@@ -65,7 +66,8 @@ strum_macros = { workspace = true }
 textwrap = { workspace = true }
 thiserror = { version = "1.0.38" }
 toml = { workspace = true }
-serde_json = { workspace = true }
+typed-arena = { version = "2.0.2" }
+unicode-width = {version ="0.1.10"}
 
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml", "redactions"] }
@@ -74,4 +76,5 @@ test-case = { workspace = true }
 
 [features]
 default = []
+logical_lines = []
 jupyter_notebook = []

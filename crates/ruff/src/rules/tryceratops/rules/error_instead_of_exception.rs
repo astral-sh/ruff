@@ -23,7 +23,7 @@ pub fn error_instead_of_exception(checker: &mut Checker, handlers: &[Excepthandl
     for handler in handlers {
         let ExcepthandlerKind::ExceptHandler { body, .. } = &handler.node;
         let calls = {
-            let mut visitor = LoggerCandidateVisitor::default();
+            let mut visitor = LoggerCandidateVisitor::new(&checker.ctx);
             visitor.visit_body(body);
             visitor.calls
         };

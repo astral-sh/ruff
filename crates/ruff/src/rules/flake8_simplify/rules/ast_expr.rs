@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 use ruff_python_ast::types::Range;
@@ -73,7 +73,7 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
             value: capital_env_var.into(),
             kind: kind.clone(),
         });
-        diagnostic.amend(Fix::replacement(
+        diagnostic.amend(Edit::replacement(
             unparse_expr(&new_env_var, checker.stylist),
             arg.location,
             arg.end_location.unwrap(),
@@ -115,7 +115,7 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
             value: capital_env_var.into(),
             kind: kind.clone(),
         });
-        diagnostic.amend(Fix::replacement(
+        diagnostic.amend(Edit::replacement(
             unparse_expr(&new_env_var, checker.stylist),
             slice.location,
             slice.end_location.unwrap(),

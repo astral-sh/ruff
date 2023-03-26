@@ -4,7 +4,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
@@ -29,7 +29,7 @@ fn apply_fixes<'a>(
 ) -> (String, FixTable) {
     let mut output = String::with_capacity(locator.len());
     let mut last_pos: Option<Location> = None;
-    let mut applied: BTreeSet<&Fix> = BTreeSet::default();
+    let mut applied: BTreeSet<&Edit> = BTreeSet::default();
     let mut fixed = FxHashMap::default();
 
     for (rule, fix) in diagnostics
@@ -75,7 +75,7 @@ fn apply_fixes<'a>(
 }
 
 /// Apply a single fix.
-pub(crate) fn apply_fix(fix: &Fix, locator: &Locator) -> String {
+pub(crate) fn apply_fix(fix: &Edit, locator: &Locator) -> String {
     let mut output = String::with_capacity(locator.len());
 
     // Add all contents from `last_pos` to `fix.location`.
@@ -93,7 +93,7 @@ pub(crate) fn apply_fix(fix: &Fix, locator: &Locator) -> String {
 }
 
 /// Compare two fixes.
-fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
+fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Edit, fix2: &Edit) -> std::cmp::Ordering {
     fix1.location
         .cmp(&fix2.location)
         .then_with(|| match (&rule1, &rule2) {
@@ -109,13 +109,13 @@ mod tests {
     use rustpython_parser::ast::Location;
 
     use ruff_diagnostics::Diagnostic;
-    use ruff_diagnostics::Fix;
+    use ruff_diagnostics::Edit;
     use ruff_python_ast::source_code::Locator;
 
     use crate::autofix::{apply_fix, apply_fixes};
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
-    fn create_diagnostics(fixes: impl IntoIterator<Item = Fix>) -> Vec<Diagnostic> {
+    fn create_diagnostics(fixes: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {
         fixes
             .into_iter()
             .map(|fix| Diagnostic {
@@ -147,7 +147,7 @@ class A(object):
 "#
             .trim(),
         );
-        let diagnostics = create_diagnostics([Fix {
+        let diagnostics = create_diagnostics([Edit {
             content: "Bar".to_string(),
             location: Location::new(1, 8),
             end_location: Location::new(1, 14),
@@ -173,7 +173,7 @@ class A(object):
 "#
             .trim(),
         );
-        let diagnostics = create_diagnostics([Fix {
+        let diagnostics = create_diagnostics([Edit {
             content: String::new(),
             location: Location::new(1, 7),
             end_location: Location::new(1, 15),
@@ -200,12 +200,12 @@ class A(object, object, object):
             .trim(),
         );
         let diagnostics = create_diagnostics([
-            Fix {
+            Edit {
                 content: String::new(),
                 location: Location::new(1, 8),
                 end_location: Location::new(1, 16),
             },
-            Fix {
+            Edit {
                 content: String::new(),
                 location: Location::new(1, 22),
                 end_location: Location::new(1, 30),
@@ -234,12 +234,12 @@ class A(object):
             .trim(),
         );
         let diagnostics = create_diagnostics([
-            Fix {
+            Edit {
                 content: String::new(),
                 location: Location::new(1, 7),
                 end_location: Location::new(1, 15),
             },
-            Fix {
+            Edit {
                 content: "ignored".to_string(),
                 location: Location::new(1, 9),
                 end_location: Location::new(1, 11),
@@ -267,7 +267,7 @@ class A(object):
             .trim(),
         );
         let contents = apply_fix(
-            &Fix {
+            &Edit {
                 content: String::new(),
                 location: Location::new(1, 7),
                 end_location: Location::new(1, 15),

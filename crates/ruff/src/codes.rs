@@ -26,67 +26,67 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
     Some(match (linter, code) {
         // pycodestyle errors
         (Pycodestyle, "E101") => Rule::MixedSpacesAndTabs,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E111") => Rule::IndentationWithInvalidMultiple,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E112") => Rule::NoIndentedBlock,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E113") => Rule::UnexpectedIndentation,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E114") => Rule::IndentationWithInvalidMultipleComment,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E115") => Rule::NoIndentedBlockComment,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E116") => Rule::UnexpectedIndentationComment,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E117") => Rule::OverIndented,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E201") => Rule::WhitespaceAfterOpenBracket,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E202") => Rule::WhitespaceBeforeCloseBracket,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E203") => Rule::WhitespaceBeforePunctuation,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E211") => Rule::WhitespaceBeforeParameters,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E221") => Rule::MultipleSpacesBeforeOperator,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E222") => Rule::MultipleSpacesAfterOperator,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E223") => Rule::TabBeforeOperator,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E224") => Rule::TabAfterOperator,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E225") => Rule::MissingWhitespaceAroundOperator,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E226") => Rule::MissingWhitespaceAroundArithmeticOperator,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E227") => Rule::MissingWhitespaceAroundBitwiseOrShiftOperator,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E228") => Rule::MissingWhitespaceAroundModuloOperator,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E231") => Rule::MissingWhitespace,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E251") => Rule::UnexpectedSpacesAroundKeywordParameterEquals,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E252") => Rule::MissingWhitespaceAroundParameterEquals,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E261") => Rule::TooFewSpacesBeforeInlineComment,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E262") => Rule::NoSpaceAfterInlineComment,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E265") => Rule::NoSpaceAfterBlockComment,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E266") => Rule::MultipleLeadingHashesForBlockComment,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E271") => Rule::MultipleSpacesAfterKeyword,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E272") => Rule::MultipleSpacesBeforeKeyword,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E273") => Rule::TabAfterKeyword,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E274") => Rule::TabBeforeKeyword,
-        #[cfg(debug_assertions)]
+        #[cfg(feature = "logical_lines")]
         (Pycodestyle, "E275") => Rule::MissingWhitespaceAfterKeyword,
         (Pycodestyle, "E401") => Rule::MultipleImportsOnOneLine,
         (Pycodestyle, "E402") => Rule::ModuleImportNotAtTopOfFile,
@@ -239,6 +239,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bugbear, "028") => Rule::NoExplicitStacklevel,
         (Flake8Bugbear, "029") => Rule::ExceptWithEmptyTuple,
         (Flake8Bugbear, "030") => Rule::ExceptWithNonExceptionClasses,
+        (Flake8Bugbear, "031") => Rule::ReuseOfGroupbyGenerator,
         (Flake8Bugbear, "032") => Rule::UnintentionalTypeAnnotation,
         (Flake8Bugbear, "904") => Rule::RaiseWithoutFromInsideExcept,
         (Flake8Bugbear, "905") => Rule::ZipWithoutExplicitStrict,
@@ -565,6 +566,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "010") => Rule::NonEmptyStubBody,
         (Flake8Pyi, "011") => Rule::TypedArgumentDefaultInStub,
         (Flake8Pyi, "014") => Rule::ArgumentDefaultInStub,
+        (Flake8Pyi, "015") => Rule::AssignmentDefaultInStub,
         (Flake8Pyi, "021") => Rule::DocstringInStub,
         (Flake8Pyi, "033") => Rule::TypeCommentInStub,
 

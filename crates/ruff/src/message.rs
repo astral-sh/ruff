@@ -3,7 +3,7 @@ use std::cmp::Ordering;
 pub use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
-use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Edit};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
@@ -12,7 +12,7 @@ pub struct Message {
     pub kind: DiagnosticKind,
     pub location: Location,
     pub end_location: Location,
-    pub fix: Option<Fix>,
+    pub fix: Option<Edit>,
     pub filename: String,
     pub source: Option<Source>,
     pub noqa_row: usize,

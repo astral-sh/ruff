@@ -1,4 +1,3 @@
-use log::error;
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
@@ -60,17 +59,14 @@ pub fn unnecessary_generator_dict(
             ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
                 let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
-                    match fixes::fix_unnecessary_generator_dict(
-                        checker.locator,
-                        checker.stylist,
-                        expr,
-                        parent,
-                    ) {
-                        Ok(fix) => {
-                            diagnostic.amend(fix);
-                        }
-                        Err(e) => error!("Failed to generate fix: {e}"),
-                    }
+                    diagnostic.try_amend(|| {
+                        fixes::fix_unnecessary_generator_dict(
+                            checker.locator,
+                            checker.stylist,
+                            expr,
+                            parent,
+                        )
+                    });
                 }
                 checker.diagnostics.push(diagnostic);
             }

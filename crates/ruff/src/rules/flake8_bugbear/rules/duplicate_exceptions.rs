@@ -5,7 +5,7 @@ use rustpython_parser::ast::{
 };
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::unparse_expr;
@@ -98,7 +98,7 @@ fn duplicate_handler_exceptions<'a>(
                 Range::from(expr),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Fix::replacement(
+                diagnostic.amend(Edit::replacement(
                     if unique_elts.len() == 1 {
                         unparse_expr(unique_elts[0], checker.stylist)
                     } else {

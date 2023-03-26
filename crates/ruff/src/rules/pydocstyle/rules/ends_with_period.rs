@@ -1,6 +1,6 @@
 use strum::IntoEnumIterator;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::str::leading_quote;
@@ -81,7 +81,7 @@ pub fn ends_with_period(checker: &mut Checker, docstring: &Docstring) {
                         trimmed.chars().count(),
                     ))
                 } {
-                    diagnostic.amend(Fix::insertion(".".to_string(), Location::new(row, column)));
+                    diagnostic.amend(Edit::insertion(".".to_string(), Location::new(row, column)));
                 }
             }
             checker.diagnostics.push(diagnostic);

@@ -216,6 +216,8 @@ select = [
     # isort
     "I001"
 ]
+
+# Note: Ruff supports a top-level `src` option in lieu of isort's `src_paths` setting.
 src = ["src", "tests"]
 
 [tool.ruff.isort]

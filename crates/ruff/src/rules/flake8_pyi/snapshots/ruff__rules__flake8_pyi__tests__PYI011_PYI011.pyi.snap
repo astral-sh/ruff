@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 10
@@ -25,301 +25,341 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 16
-    column: 8
-  end_location:
-    row: 20
-    column: 5
-  fix:
-    content: "..."
-    location:
-      row: 16
-      column: 8
-    end_location:
-      row: 20
-      column: 5
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
-    fixable: true
-  location:
-    row: 25
-    column: 8
-  end_location:
-    row: 29
-    column: 5
-  fix:
-    content: "..."
-    location:
-      row: 25
-      column: 8
-    end_location:
-      row: 29
-      column: 5
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
-    fixable: true
-  location:
-    row: 34
-    column: 8
-  end_location:
     row: 38
-    column: 5
-  fix:
-    content: "..."
-    location:
-      row: 34
-      column: 8
-    end_location:
-      row: 38
-      column: 5
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
-    fixable: true
-  location:
-    row: 43
     column: 8
   end_location:
-    row: 45
+    row: 41
     column: 5
   fix:
     content: "..."
     location:
-      row: 43
+      row: 38
       column: 8
     end_location:
-      row: 45
+      row: 41
       column: 5
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 48
+    row: 46
+    column: 8
+  end_location:
+    row: 58
+    column: 5
+  fix:
+    content: "..."
+    location:
+      row: 46
+      column: 8
+    end_location:
+      row: 58
+      column: 5
+  parent: ~
+- kind:
+    name: TypedArgumentDefaultInStub
+    body: Only simple default values allowed for typed arguments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 63
+    column: 8
+  end_location:
+    row: 66
+    column: 5
+  fix:
+    content: "..."
+    location:
+      row: 63
+      column: 8
+    end_location:
+      row: 66
+      column: 5
+  parent: ~
+- kind:
+    name: TypedArgumentDefaultInStub
+    body: Only simple default values allowed for typed arguments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 71
+    column: 8
+  end_location:
+    row: 73
+    column: 5
+  fix:
+    content: "..."
+    location:
+      row: 71
+      column: 8
+    end_location:
+      row: 73
+      column: 5
+  parent: ~
+- kind:
+    name: TypedArgumentDefaultInStub
+    body: Only simple default values allowed for typed arguments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 78
+    column: 8
+  end_location:
+    row: 80
+    column: 5
+  fix:
+    content: "..."
+    location:
+      row: 78
+      column: 8
+    end_location:
+      row: 80
+      column: 5
+  parent: ~
+- kind:
+    name: TypedArgumentDefaultInStub
+    body: Only simple default values allowed for typed arguments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 85
+    column: 8
+  end_location:
+    row: 87
+    column: 5
+  fix:
+    content: "..."
+    location:
+      row: 85
+      column: 8
+    end_location:
+      row: 87
+      column: 5
+  parent: ~
+- kind:
+    name: TypedArgumentDefaultInStub
+    body: Only simple default values allowed for typed arguments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 90
     column: 13
   end_location:
-    row: 49
+    row: 91
     column: 11
   fix:
     content: "..."
     location:
-      row: 48
+      row: 90
       column: 13
     end_location:
-      row: 49
+      row: 91
       column: 11
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 52
+    row: 94
     column: 13
   end_location:
-    row: 53
+    row: 95
     column: 12
   fix:
     content: "..."
     location:
-      row: 52
+      row: 94
       column: 13
     end_location:
-      row: 53
+      row: 95
       column: 12
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 56
+    row: 98
     column: 16
   end_location:
-    row: 57
+    row: 99
     column: 7
   fix:
     content: "..."
     location:
-      row: 56
+      row: 98
       column: 16
     end_location:
-      row: 57
+      row: 99
       column: 7
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 60
+    row: 102
     column: 13
   end_location:
-    row: 61
+    row: 103
     column: 7
   fix:
     content: "..."
     location:
-      row: 60
+      row: 102
       column: 13
     end_location:
-      row: 61
+      row: 103
       column: 7
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 64
+    row: 106
     column: 17
   end_location:
-    row: 65
+    row: 107
     column: 8
   fix:
     content: "..."
     location:
-      row: 64
+      row: 106
       column: 17
     end_location:
-      row: 65
+      row: 107
       column: 8
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 68
+    row: 110
     column: 17
   end_location:
-    row: 69
+    row: 111
     column: 10
   fix:
     content: "..."
     location:
-      row: 68
+      row: 110
       column: 17
     end_location:
-      row: 69
+      row: 111
       column: 10
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 96
+    row: 138
     column: 15
   end_location:
-    row: 96
+    row: 138
     column: 18
   fix:
     content: "..."
     location:
-      row: 96
+      row: 138
       column: 15
     end_location:
-      row: 96
+      row: 138
       column: 18
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 99
+    row: 141
     column: 15
   end_location:
-    row: 99
+    row: 141
     column: 21
   fix:
     content: "..."
     location:
-      row: 99
+      row: 141
       column: 15
     end_location:
-      row: 99
+      row: 141
       column: 21
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 105
+    row: 147
     column: 15
   end_location:
-    row: 105
+    row: 147
     column: 24
   fix:
     content: "..."
     location:
-      row: 105
+      row: 147
       column: 15
     end_location:
-      row: 105
+      row: 147
       column: 24
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 108
+    row: 150
     column: 17
   end_location:
-    row: 109
+    row: 151
     column: 8
   fix:
     content: "..."
     location:
-      row: 108
+      row: 150
       column: 17
     end_location:
-      row: 109
+      row: 151
       column: 8
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 115
-    column: 16
+    row: 159
+    column: 13
   end_location:
-    row: 115
-    column: 23
+    row: 160
+    column: 8
   fix:
     content: "..."
     location:
-      row: 115
-      column: 16
+      row: 159
+      column: 13
     end_location:
-      row: 115
-      column: 23
+      row: 160
+      column: 8
   parent: ~
 

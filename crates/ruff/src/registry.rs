@@ -14,67 +14,67 @@ pub use rule_set::{RuleSet, RuleSetIterator};
 ruff_macros::register_rules!(
     // pycodestyle errors
     rules::pycodestyle::rules::MixedSpacesAndTabs,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::IndentationWithInvalidMultiple,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::NoIndentedBlock,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::UnexpectedIndentation,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::IndentationWithInvalidMultipleComment,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::NoIndentedBlockComment,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::UnexpectedIndentationComment,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::OverIndented,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::WhitespaceAfterOpenBracket,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::WhitespaceBeforeCloseBracket,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::WhitespaceBeforePunctuation,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesBeforeOperator,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesAfterOperator,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabBeforeOperator,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabAfterOperator,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TooFewSpacesBeforeInlineComment,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::NoSpaceAfterInlineComment,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::NoSpaceAfterBlockComment,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleLeadingHashesForBlockComment,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespace,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespaceAfterKeyword,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespaceAroundOperator,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespaceAroundArithmeticOperator,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespaceAroundBitwiseOrShiftOperator,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespaceAroundModuloOperator,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabAfterKeyword,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::UnexpectedSpacesAroundKeywordParameterEquals,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::MissingWhitespaceAroundParameterEquals,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::WhitespaceBeforeParameters,
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     rules::pycodestyle::rules::TabBeforeKeyword,
     rules::pycodestyle::rules::MultipleImportsOnOneLine,
     rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
@@ -224,6 +224,7 @@ ruff_macros::register_rules!(
     rules::flake8_bugbear::rules::ZipWithoutExplicitStrict,
     rules::flake8_bugbear::rules::ExceptWithEmptyTuple,
     rules::flake8_bugbear::rules::ExceptWithNonExceptionClasses,
+    rules::flake8_bugbear::rules::ReuseOfGroupbyGenerator,
     rules::flake8_bugbear::rules::UnintentionalTypeAnnotation,
     // flake8-blind-except
     rules::flake8_blind_except::rules::BlindExcept,
@@ -514,16 +515,17 @@ ruff_macros::register_rules!(
     rules::flake8_errmsg::rules::FStringInException,
     rules::flake8_errmsg::rules::DotFormatInException,
     // flake8-pyi
-    rules::flake8_pyi::rules::UnprefixedTypeParam,
+    rules::flake8_pyi::rules::ArgumentDefaultInStub,
+    rules::flake8_pyi::rules::AssignmentDefaultInStub,
     rules::flake8_pyi::rules::BadVersionInfoComparison,
+    rules::flake8_pyi::rules::DocstringInStub,
+    rules::flake8_pyi::rules::NonEmptyStubBody,
+    rules::flake8_pyi::rules::PassStatementStubBody,
+    rules::flake8_pyi::rules::TypeCommentInStub,
+    rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
+    rules::flake8_pyi::rules::UnprefixedTypeParam,
     rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
     rules::flake8_pyi::rules::UnrecognizedPlatformName,
-    rules::flake8_pyi::rules::PassStatementStubBody,
-    rules::flake8_pyi::rules::NonEmptyStubBody,
-    rules::flake8_pyi::rules::DocstringInStub,
-    rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
-    rules::flake8_pyi::rules::ArgumentDefaultInStub,
-    rules::flake8_pyi::rules::TypeCommentInStub,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle,
     rules::flake8_pytest_style::rules::PytestFixturePositionalArgs,
@@ -907,7 +909,7 @@ impl Rule {
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple
             | Rule::IndentationWithInvalidMultipleComment
             | Rule::MissingWhitespace

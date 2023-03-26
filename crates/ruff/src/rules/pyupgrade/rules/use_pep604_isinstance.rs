@@ -2,7 +2,7 @@ use std::fmt;
 
 use rustpython_parser::ast::{Expr, ExprKind, Location, Operator};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
@@ -94,7 +94,7 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                 let mut diagnostic =
                     Diagnostic::new(NonPEP604Isinstance { kind }, Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.amend(Fix::replacement(
+                    diagnostic.amend(Edit::replacement(
                         unparse_expr(&union(elts), checker.stylist),
                         types.location,
                         types.end_location.unwrap(),

@@ -32,6 +32,7 @@ pub use raise_without_from_inside_except::{
 pub use redundant_tuple_in_exception_handler::{
     redundant_tuple_in_exception_handler, RedundantTupleInExceptionHandler,
 };
+pub use reuse_of_groupby_generator::{reuse_of_groupby_generator, ReuseOfGroupbyGenerator};
 pub use setattr_with_constant::{setattr_with_constant, SetAttrWithConstant};
 pub use star_arg_unpacking_after_keyword_arg::{
     star_arg_unpacking_after_keyword_arg, StarArgUnpackingAfterKeywordArg,
@@ -67,6 +68,7 @@ mod mutable_argument_default;
 mod no_explicit_stacklevel;
 mod raise_without_from_inside_except;
 mod redundant_tuple_in_exception_handler;
+mod reuse_of_groupby_generator;
 mod setattr_with_constant;
 mod star_arg_unpacking_after_keyword_arg;
 mod strip_with_multi_characters;

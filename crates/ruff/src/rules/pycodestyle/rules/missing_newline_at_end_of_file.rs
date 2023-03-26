@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Location;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -51,7 +51,7 @@ pub fn no_newline_at_end_of_file(
             let mut diagnostic =
                 Diagnostic::new(MissingNewlineAtEndOfFile, Range::new(location, location));
             if autofix {
-                diagnostic.amend(Fix::insertion(stylist.line_ending().to_string(), location));
+                diagnostic.amend(Edit::insertion(stylist.line_ending().to_string(), location));
             }
             return Some(diagnostic);
         }

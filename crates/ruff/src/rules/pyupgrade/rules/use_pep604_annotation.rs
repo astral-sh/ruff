@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Operator};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
@@ -111,7 +111,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             let mut diagnostic =
                 Diagnostic::new(NonPEP604Annotation { fixable }, Range::from(expr));
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Fix::replacement(
+                diagnostic.amend(Edit::replacement(
                     unparse_expr(&optional(slice), checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),
@@ -128,7 +128,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                         // Invalid type annotation.
                     }
                     ExprKind::Tuple { elts, .. } => {
-                        diagnostic.amend(Fix::replacement(
+                        diagnostic.amend(Edit::replacement(
                             unparse_expr(&union(elts), checker.stylist),
                             expr.location,
                             expr.end_location.unwrap(),
@@ -136,7 +136,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                     }
                     _ => {
                         // Single argument.
-                        diagnostic.amend(Fix::replacement(
+                        diagnostic.amend(Edit::replacement(
                             unparse_expr(slice, checker.stylist),
                             expr.location,
                             expr.end_location.unwrap(),

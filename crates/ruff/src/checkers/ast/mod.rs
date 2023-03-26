@@ -434,11 +434,20 @@ where
                     Rule::SuperfluousElseContinue,
                     Rule::SuperfluousElseBreak,
                 ]) {
-                    flake8_return::rules::function(self, body);
+                    flake8_return::rules::function(
+                        self,
+                        body,
+                        returns.as_ref().map(|expr| &**expr),
+                    );
                 }
 
                 if self.settings.rules.enabled(Rule::UselessReturn) {
-                    pylint::rules::useless_return(self, stmt, body);
+                    pylint::rules::useless_return(
+                        self,
+                        stmt,
+                        body,
+                        returns.as_ref().map(|expr| &**expr),
+                    );
                 }
 
                 if self.settings.rules.enabled(Rule::ComplexStructure) {
@@ -1639,6 +1648,9 @@ where
                 if self.settings.rules.enabled(Rule::FunctionUsesLoopVariable) {
                     flake8_bugbear::rules::function_uses_loop_variable(self, &Node::Stmt(stmt));
                 }
+                if self.settings.rules.enabled(Rule::ReuseOfGroupbyGenerator) {
+                    flake8_bugbear::rules::reuse_of_groupby_generator(self, target, body, iter);
+                }
                 if self.settings.rules.enabled(Rule::UselessElseOnLoop) {
                     pylint::rules::useless_else_on_loop(self, stmt, body, orelse);
                 }
@@ -1789,8 +1801,19 @@ where
                         self.diagnostics.push(diagnostic);
                     }
                 }
+
+                if self.is_stub {
+                    if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
+                        flake8_pyi::rules::assignment_default_in_stub(self, value, None);
+                    }
+                }
             }
-            StmtKind::AnnAssign { target, value, .. } => {
+            StmtKind::AnnAssign {
+                target,
+                value,
+                annotation,
+                ..
+            } => {
                 if self.settings.rules.enabled(Rule::LambdaAssignment) {
                     if let Some(value) = value {
                         pycodestyle::rules::lambda_assignment(self, target, value, stmt);
@@ -1807,6 +1830,17 @@ where
                         value.as_deref(),
                         stmt,
                     );
+                }
+                if self.is_stub {
+                    if let Some(value) = value {
+                        if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
+                            flake8_pyi::rules::assignment_default_in_stub(
+                                self,
+                                value,
+                                Some(annotation),
+                            );
+                        }
+                    }
                 }
             }
             StmtKind::Delete { targets } => {
@@ -3792,21 +3826,12 @@ where
                                         name_range,
                                     );
                                     if self.patch(Rule::UnusedVariable) {
-                                        match pyflakes::fixes::remove_exception_handler_assignment(
-                                            excepthandler,
-                                            self.locator,
-                                        ) {
-                                            Ok(fix) => {
-                                                diagnostic.amend(fix);
-                                            }
-                                            Err(e) => {
-                                                error!(
-                                                    "Failed to remove exception handler \
-                                                     assignment: {}",
-                                                    e
-                                                );
-                                            }
-                                        }
+                                        diagnostic.try_amend(|| {
+                                            pyflakes::fixes::remove_exception_handler_assignment(
+                                                excepthandler,
+                                                self.locator,
+                                            )
+                                        });
                                     }
                                     self.diagnostics.push(diagnostic);
                                 }
@@ -3967,10 +3992,7 @@ where
 }
 
 impl<'a> Checker<'a> {
-    fn add_binding<'b>(&mut self, name: &'b str, binding: Binding<'a>)
-    where
-        'b: 'a,
-    {
+    fn add_binding(&mut self, name: &'a str, binding: Binding<'a>) {
         let binding_id = self.ctx.bindings.next_id();
         if let Some((stack_index, existing_binding_index)) = self
             .ctx
@@ -4275,10 +4297,7 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn handle_node_store<'b>(&mut self, id: &'b str, expr: &Expr)
-    where
-        'b: 'a,
-    {
+    fn handle_node_store(&mut self, id: &'a str, expr: &Expr) {
         let parent = self.ctx.current_stmt().0;
 
         if self.settings.rules.enabled(Rule::UndefinedLocal) {
@@ -4471,10 +4490,7 @@ impl<'a> Checker<'a> {
         );
     }
 
-    fn handle_node_delete<'b>(&mut self, expr: &'b Expr)
-    where
-        'b: 'a,
-    {
+    fn handle_node_delete(&mut self, expr: &'a Expr) {
         let ExprKind::Name { id, .. } = &expr.node else {
             return;
         };
@@ -4498,10 +4514,7 @@ impl<'a> Checker<'a> {
         ));
     }
 
-    fn visit_docstring<'b>(&mut self, python_ast: &'b Suite) -> bool
-    where
-        'b: 'a,
-    {
+    fn visit_docstring(&mut self, python_ast: &'a Suite) -> bool {
         if self.settings.rules.enabled(Rule::FStringDocstring) {
             flake8_bugbear::rules::f_string_docstring(self, python_ast);
         }
@@ -4538,50 +4551,49 @@ impl<'a> Checker<'a> {
         }
     }
 
-    fn check_deferred_string_type_definitions<'b>(&mut self, allocator: &'b mut Vec<Expr>)
-    where
-        'b: 'a,
-    {
-        let mut stacks = Vec::with_capacity(self.deferred.string_type_definitions.len());
-        self.deferred.string_type_definitions.reverse();
-        while let Some((range, value, (in_annotation, in_type_checking_block), deferral)) =
-            self.deferred.string_type_definitions.pop()
-        {
-            if let Ok((expr, kind)) = parse_type_annotation(value, range, self.locator) {
-                if in_annotation && self.ctx.annotations_future_enabled {
-                    if self.settings.rules.enabled(Rule::QuotedAnnotation) {
-                        pyupgrade::rules::quoted_annotation(self, value, range);
+    fn check_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
+        let mut type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
+        loop {
+            for (range, value, (in_annotation, in_type_checking_block), (scopes, parents)) in
+                type_definitions.into_iter().rev()
+            {
+                if let Ok((expr, kind)) = parse_type_annotation(value, range, self.locator) {
+                    if in_annotation && self.ctx.annotations_future_enabled {
+                        if self.settings.rules.enabled(Rule::QuotedAnnotation) {
+                            pyupgrade::rules::quoted_annotation(self, value, range);
+                        }
+                    }
+
+                    let expr = allocator.alloc(expr);
+
+                    self.ctx.scope_stack = scopes;
+                    self.ctx.parents = parents;
+                    self.ctx.in_annotation = in_annotation;
+                    self.ctx.in_type_checking_block = in_type_checking_block;
+                    self.ctx.in_type_definition = true;
+                    self.ctx.in_deferred_string_type_definition = Some(kind);
+                    self.visit_expr(expr);
+                    self.ctx.in_deferred_string_type_definition = None;
+                    self.ctx.in_type_definition = false;
+                } else {
+                    if self
+                        .settings
+                        .rules
+                        .enabled(Rule::ForwardAnnotationSyntaxError)
+                    {
+                        self.diagnostics.push(Diagnostic::new(
+                            pyflakes::rules::ForwardAnnotationSyntaxError {
+                                body: value.to_string(),
+                            },
+                            range,
+                        ));
                     }
                 }
-                allocator.push(expr);
-                stacks.push((kind, (in_annotation, in_type_checking_block), deferral));
-            } else {
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::ForwardAnnotationSyntaxError)
-                {
-                    self.diagnostics.push(Diagnostic::new(
-                        pyflakes::rules::ForwardAnnotationSyntaxError {
-                            body: value.to_string(),
-                        },
-                        range,
-                    ));
-                }
             }
-        }
-        for (expr, (kind, (in_annotation, in_type_checking_block), (scopes, parents))) in
-            allocator.iter().zip(stacks)
-        {
-            self.ctx.scope_stack = scopes;
-            self.ctx.parents = parents;
-            self.ctx.in_annotation = in_annotation;
-            self.ctx.in_type_checking_block = in_type_checking_block;
-            self.ctx.in_type_definition = true;
-            self.ctx.in_deferred_string_type_definition = Some(kind);
-            self.visit_expr(expr);
-            self.ctx.in_deferred_string_type_definition = None;
-            self.ctx.in_type_definition = false;
+            if self.deferred.string_type_definitions.is_empty() {
+                break;
+            }
+            type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
         }
     }
 
@@ -5410,8 +5422,8 @@ pub fn check_ast(
     checker.check_deferred_functions();
     checker.check_deferred_lambdas();
     checker.check_deferred_type_definitions();
-    let mut allocator = vec![];
-    checker.check_deferred_string_type_definitions(&mut allocator);
+    let allocator = typed_arena::Arena::new();
+    checker.check_deferred_string_type_definitions(&allocator);
     checker.check_deferred_assignments();
     checker.check_deferred_for_loops();
 

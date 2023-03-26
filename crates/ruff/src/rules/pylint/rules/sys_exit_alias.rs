@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::scope::{
     BindingKind, FromImportation, Importation, StarImportation, SubmoduleImportation,
@@ -122,7 +122,7 @@ pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
         );
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(content) = get_member_import_name_alias(checker, "sys", "exit") {
-                diagnostic.amend(Fix::replacement(
+                diagnostic.amend(Edit::replacement(
                     content,
                     func.location,
                     func.end_location.unwrap(),

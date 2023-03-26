@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -39,7 +39,7 @@ pub fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
             .map_or(true, |binding| binding.kind.is_builtin());
         let mut diagnostic = Diagnostic::new(OpenAlias { fixable }, Range::from(expr));
         if fixable && checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.amend(Edit::replacement(
                 "open".to_string(),
                 func.location,
                 func.end_location.unwrap(),
