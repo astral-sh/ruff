@@ -4,106 +4,122 @@ expression: diagnostics
 ---
 - kind:
     name: PassInClassBody
-    body: "Class body must not contain \"pass\""
-    suggestion: ~
-    fixable: false
+    body: "Class body must not contain `pass`"
+    suggestion: "Remove `pass` from the class body"
+    fixable: true
   location:
-    row: 4
+    row: 5
     column: 4
   end_location:
-    row: 4
+    row: 5
     column: 8
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 5
+      column: 0
+    end_location:
+      row: 6
+      column: 0
   parent: ~
 - kind:
     name: PassInClassBody
-    body: "Class body must not contain \"pass\""
-    suggestion: ~
-    fixable: false
+    body: "Class body must not contain `pass`"
+    suggestion: "Remove `pass` from the class body"
+    fixable: true
   location:
-    row: 9
+    row: 8
     column: 4
   end_location:
-    row: 9
+    row: 8
     column: 8
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 8
+      column: 0
+    end_location:
+      row: 9
+      column: 0
   parent: ~
 - kind:
     name: PassInClassBody
-    body: "Class body must not contain \"pass\""
-    suggestion: ~
-    fixable: false
+    body: "Class body must not contain `pass`"
+    suggestion: "Remove `pass` from the class body"
+    fixable: true
   location:
-    row: 11
-    column: 11
+    row: 16
+    column: 4
   end_location:
-    row: 11
-    column: 15
-  fix: ~
+    row: 16
+    column: 8
+  fix:
+    content: ""
+    location:
+      row: 16
+      column: 0
+    end_location:
+      row: 17
+      column: 0
   parent: ~
 - kind:
     name: PassInClassBody
-    body: "Class body must not contain \"pass\""
-    suggestion: ~
-    fixable: false
+    body: "Class body must not contain `pass`"
+    suggestion: "Remove `pass` from the class body"
+    fixable: true
   location:
-    row: 17
+    row: 20
     column: 4
   end_location:
-    row: 17
+    row: 20
     column: 8
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 20
+      column: 0
+    end_location:
+      row: 21
+      column: 0
   parent: ~
 - kind:
     name: PassInClassBody
-    body: "Class body must not contain \"pass\""
-    suggestion: ~
-    fixable: false
+    body: "Class body must not contain `pass`"
+    suggestion: "Remove `pass` from the class body"
+    fixable: true
   location:
-    row: 21
+    row: 23
     column: 4
   end_location:
-    row: 21
+    row: 23
     column: 8
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 23
+      column: 0
+    end_location:
+      row: 24
+      column: 0
   parent: ~
 - kind:
     name: PassInClassBody
-    body: "Class body must not contain \"pass\""
-    suggestion: ~
-    fixable: false
+    body: "Class body must not contain `pass`"
+    suggestion: "Remove `pass` from the class body"
+    fixable: true
   location:
-    row: 26
+    row: 28
     column: 4
   end_location:
-    row: 26
+    row: 28
     column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: PassInClassBody
-    body: "Class body must not contain \"pass\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 4
-  end_location:
-    row: 32
-    column: 8
-  fix: ~
-  parent: ~
-- kind:
-    name: PassInClassBody
-    body: "Class body must not contain \"pass\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 35
-    column: 4
-  end_location:
-    row: 35
-    column: 8
-  fix: ~
+  fix:
+    content: ""
+    location:
+      row: 28
+      column: 0
+    end_location:
+      row: 29
+      column: 0
   parent: ~
 
