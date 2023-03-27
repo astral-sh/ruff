@@ -5,7 +5,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 #[violation]
-pub struct FStringInI18NFuncCall {}
+pub struct FStringInI18NFuncCall;
 
 impl Violation for FStringInI18NFuncCall {
     #[derive_message_formats]
@@ -15,7 +15,7 @@ impl Violation for FStringInI18NFuncCall {
 }
 
 #[violation]
-pub struct FormatInI18NFuncCall {}
+pub struct FormatInI18NFuncCall;
 
 impl Violation for FormatInI18NFuncCall {
     #[derive_message_formats]
@@ -24,7 +24,7 @@ impl Violation for FormatInI18NFuncCall {
     }
 }
 #[violation]
-pub struct PrintFInI18NFuncCall {}
+pub struct PrintFInI18NFuncCall;
 
 impl Violation for PrintFInI18NFuncCall {
     #[derive_message_formats]

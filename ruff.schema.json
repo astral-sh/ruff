@@ -710,10 +710,8 @@
       "properties": {
         "extend-function-names": {
           "description": "This will be appended to the function_names (or to the default values if that field is missing)",
-          "type": [
-            "array",
-            "null"
-          ],
+          "default": [],
+          "type": "array",
           "items": {
             "type": "string"
           }

@@ -28,13 +28,14 @@ pub struct Options {
     pub function_names: Option<Vec<String>>,
 
     #[option(
-        default = r#"["_", "gettext", "ngettext"]"#,
+        default = r#"[]"#,
         value_type = "list[str]",
         example = r#"
             [tool.ruff.flake8-i18n]
             extend-function-names = ["ugettetxt"]
         "#
     )]
+    #[serde(default)]
     /// This will be appended to the function_names
     /// (or to the default values if that field is missing)
     pub extend_function_names: Vec<String>,
