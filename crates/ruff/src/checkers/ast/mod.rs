@@ -942,8 +942,10 @@ where
                     }
 
                     // pylint
-                    if self.settings.rules.enabled(Rule::UselessImportAlias) {
-                        pylint::rules::useless_import_alias(self, alias);
+                    if !self.is_stub {
+                        if self.settings.rules.enabled(Rule::UselessImportAlias) {
+                            pylint::rules::useless_import_alias(self, alias);
+                        }
                     }
                     if self.settings.rules.enabled(Rule::ManualFromImport) {
                         pylint::rules::manual_from_import(self, stmt, alias, names);
@@ -1419,8 +1421,10 @@ where
                         }
 
                         // pylint
-                        if self.settings.rules.enabled(Rule::UselessImportAlias) {
-                            pylint::rules::useless_import_alias(self, alias);
+                        if !self.is_stub {
+                            if self.settings.rules.enabled(Rule::UselessImportAlias) {
+                                pylint::rules::useless_import_alias(self, alias);
+                            }
                         }
                     }
                 }
