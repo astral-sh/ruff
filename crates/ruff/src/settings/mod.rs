@@ -17,10 +17,9 @@ use crate::registry::{Rule, RuleNamespace, RuleSet, INCOMPATIBLE_CODES};
 use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_errmsg, flake8_i18n, flake8_implicit_str_concat, flake8_import_conventions,
-    flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
+    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
+    flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
+    isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};
@@ -113,7 +112,6 @@ pub struct Settings {
     pub flake8_errmsg: flake8_errmsg::settings::Settings,
     pub flake8_implicit_str_concat: flake8_implicit_str_concat::settings::Settings,
     pub flake8_import_conventions: flake8_import_conventions::settings::Settings,
-    pub flake8_i18n: flake8_i18n::settings::Settings,
     pub flake8_pytest_style: flake8_pytest_style::settings::Settings,
     pub flake8_quotes: flake8_quotes::settings::Settings,
     pub flake8_self: flake8_self::settings::Settings,
@@ -218,7 +216,6 @@ impl Settings {
                 .flake8_unused_arguments
                 .map(Into::into)
                 .unwrap_or_default(),
-            flake8_i18n: config.flake8_i18n.map(Into::into).unwrap_or_default(),
             isort: config.isort.map(Into::into).unwrap_or_default(),
             mccabe: config.mccabe.map(Into::into).unwrap_or_default(),
             pep8_naming: config.pep8_naming.map(Into::into).unwrap_or_default(),
