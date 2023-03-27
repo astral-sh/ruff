@@ -157,9 +157,7 @@ pub fn check_physical_lines(
 
         if enforce_tab_indentation {
             // Update in_quote with the state of `line`
-            let (diagnostic_opt, in_quote_found) = tab_indentation(index, line, in_quote);
-            // in_quote = in_quote_found;
-            if let Some(diagnostic) = diagnostic_opt {
+            if let Some(diagnostic) = tab_indentation(index, line, in_quote) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -189,11 +187,14 @@ pub fn check_physical_lines(
 // fn switch_in_quote(line: &str, currently_in_quote: bool, quote_delimiter: &str) -> bool {
 fn switch_in_quote(line: &str, currently_in_quote: bool) -> bool {
     let mut in_quote_int = if currently_in_quote { 1 } else { -1 };
-    let quote_delimiter = "\"\"\"";
+    let quote_delimiters = vec!["\"\"\"", "'''"];
 
-    // -1 * (-1 * number of times that delimiter in string)
-    let delimiter_count = line.matches(quote_delimiter).count() as i32;
-    in_quote_int = in_quote_int * (-1 * delimiter_count);
+    for delimiter in quote_delimiters {
+        let delimiter_count = line.matches(delimiter).count() as i32;
+        if delimiter_count > 0 {
+            in_quote_int = in_quote_int * (-1 * delimiter_count);
+        }
+    }
 
     in_quote_int == 1
 }
