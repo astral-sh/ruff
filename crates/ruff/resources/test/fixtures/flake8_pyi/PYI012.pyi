@@ -10,7 +10,7 @@ class OneAttributeClassRev:
 
 class DocstringClass:
     """
-    My body only contains pass and I.
+    My body only contains pass.
     """
 
     pass  # PYI012 Class body must not contain `pass`
@@ -26,6 +26,7 @@ class NonEmptyChild2(Exception):
 class NonEmptyWithInit:
     value: int
     pass  # PYI012 Class body must not contain `pass`
+
     def __init__():
         pass
 
@@ -48,6 +49,7 @@ class NonEmptyEllipsis:
 
 class WithInit:
     value: int = 0
+
     def __init__():
         pass
 

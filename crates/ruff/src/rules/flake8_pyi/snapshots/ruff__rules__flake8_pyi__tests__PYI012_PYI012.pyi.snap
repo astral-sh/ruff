@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: PassInClassBody
     body: "Class body must not contain `pass`"
-    suggestion: "Remove `pass` from the class body"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 5
@@ -26,7 +26,7 @@ expression: diagnostics
 - kind:
     name: PassInClassBody
     body: "Class body must not contain `pass`"
-    suggestion: "Remove `pass` from the class body"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 8
@@ -47,7 +47,7 @@ expression: diagnostics
 - kind:
     name: PassInClassBody
     body: "Class body must not contain `pass`"
-    suggestion: "Remove `pass` from the class body"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 16
@@ -68,7 +68,7 @@ expression: diagnostics
 - kind:
     name: PassInClassBody
     body: "Class body must not contain `pass`"
-    suggestion: "Remove `pass` from the class body"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 20
@@ -89,7 +89,7 @@ expression: diagnostics
 - kind:
     name: PassInClassBody
     body: "Class body must not contain `pass`"
-    suggestion: "Remove `pass` from the class body"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 23
@@ -110,7 +110,7 @@ expression: diagnostics
 - kind:
     name: PassInClassBody
     body: "Class body must not contain `pass`"
-    suggestion: "Remove `pass` from the class body"
+    suggestion: "Remove unnecessary `pass`"
     fixable: true
   location:
     row: 28
