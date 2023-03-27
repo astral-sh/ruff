@@ -195,7 +195,7 @@ are:
     CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
   """
 
-- flake8-i18n , licensed as GNU General Public License v2
+- flake8-i18n, licensed as "GNU General Public License v2 (GPLv2)".
 
 - flake8-implicit-str-concat, licensed as follows:
   """
