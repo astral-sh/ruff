@@ -1,0 +1,131 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: PassInClassBody
+    body: "Class body must not contain `pass`"
+    suggestion: "Remove unnecessary `pass`"
+    fixable: true
+  location:
+    row: 5
+    column: 4
+  end_location:
+    row: 5
+    column: 8
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 5
+          column: 0
+        end_location:
+          row: 6
+          column: 0
+  parent: ~
+- kind:
+    name: PassInClassBody
+    body: "Class body must not contain `pass`"
+    suggestion: "Remove unnecessary `pass`"
+    fixable: true
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 8
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 8
+          column: 0
+        end_location:
+          row: 9
+          column: 0
+  parent: ~
+- kind:
+    name: PassInClassBody
+    body: "Class body must not contain `pass`"
+    suggestion: "Remove unnecessary `pass`"
+    fixable: true
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 8
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 16
+          column: 0
+        end_location:
+          row: 17
+          column: 0
+  parent: ~
+- kind:
+    name: PassInClassBody
+    body: "Class body must not contain `pass`"
+    suggestion: "Remove unnecessary `pass`"
+    fixable: true
+  location:
+    row: 20
+    column: 4
+  end_location:
+    row: 20
+    column: 8
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 20
+          column: 0
+        end_location:
+          row: 21
+          column: 0
+  parent: ~
+- kind:
+    name: PassInClassBody
+    body: "Class body must not contain `pass`"
+    suggestion: "Remove unnecessary `pass`"
+    fixable: true
+  location:
+    row: 23
+    column: 4
+  end_location:
+    row: 23
+    column: 8
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 23
+          column: 0
+        end_location:
+          row: 24
+          column: 0
+  parent: ~
+- kind:
+    name: PassInClassBody
+    body: "Class body must not contain `pass`"
+    suggestion: "Remove unnecessary `pass`"
+    fixable: true
+  location:
+    row: 28
+    column: 4
+  end_location:
+    row: 28
+    column: 8
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 28
+          column: 0
+        end_location:
+          row: 29
+          column: 0
+  parent: ~
+
