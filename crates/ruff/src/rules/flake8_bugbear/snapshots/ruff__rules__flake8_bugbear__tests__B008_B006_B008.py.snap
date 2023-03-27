@@ -74,20 +74,6 @@ expression: diagnostics
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
-    body: "Do not perform function call `dt.timedelta` in argument defaults"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 114
-    column: 31
-  end_location:
-    row: 114
-    column: 51
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: FunctionCallInDefaultArgument
     body: Do not perform function call in argument defaults
     suggestion: ~
     fixable: false
@@ -148,10 +134,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 176
+    row: 187
     column: 20
   end_location:
-    row: 176
+    row: 187
     column: 28
   fix:
     edits: []
@@ -162,10 +148,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 176
+    row: 187
     column: 30
   end_location:
-    row: 176
+    row: 187
     column: 47
   fix:
     edits: []
@@ -176,10 +162,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 182
+    row: 193
     column: 21
   end_location:
-    row: 182
+    row: 193
     column: 62
   fix:
     edits: []
@@ -190,10 +176,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 187
+    row: 198
     column: 18
   end_location:
-    row: 187
+    row: 198
     column: 59
   fix:
     edits: []
@@ -204,10 +190,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 187
+    row: 198
     column: 36
   end_location:
-    row: 187
+    row: 198
     column: 53
   fix:
     edits: []
