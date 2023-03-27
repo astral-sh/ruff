@@ -36,7 +36,7 @@ pub fn pass_in_class_body(checker: &mut Checker, body: &[Stmt]) {
             let mut diagnostic = Diagnostic::new(PassInClassBody, Range::from(located));
 
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.try_amend(|| {
+                diagnostic.try_set_fix(|| {
                     delete_stmt(
                         located,
                         None,
