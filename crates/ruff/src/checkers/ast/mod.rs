@@ -2909,24 +2909,16 @@ where
                     &self.settings.flake8_i18n.functions_names,
                 ) {
                     if self.settings.rules.enabled(Rule::FStringInI18NFuncCall) {
-                        if let Some(diagnostic) =
-                            flake8_i18n::rules::f_string_in_i18n_func_call(args)
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
+                        self.diagnostics
+                            .extend(flake8_i18n::rules::f_string_in_i18n_func_call(args));
                     }
-
                     if self.settings.rules.enabled(Rule::FormatInI18NFuncCall) {
-                        if let Some(diagnostic) = flake8_i18n::rules::format_in_i18n_func_call(args)
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
+                        self.diagnostics
+                            .extend(flake8_i18n::rules::format_in_i18n_func_call(args));
                     }
                     if self.settings.rules.enabled(Rule::PrintFInI18NFuncCall) {
-                        if let Some(diagnostic) = flake8_i18n::rules::printf_in_i18n_func_call(args)
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
+                        self.diagnostics
+                            .extend(flake8_i18n::rules::printf_in_i18n_func_call(args));
                     }
                 }
 
