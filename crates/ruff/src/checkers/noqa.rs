@@ -138,7 +138,7 @@ pub fn check_noqa(
                             ),
                         );
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-                            diagnostic.amend(delete_noqa(
+                            diagnostic.set_fix(delete_noqa(
                                 row,
                                 lines[row],
                                 leading_spaces,
@@ -214,7 +214,7 @@ pub fn check_noqa(
                         );
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
-                                diagnostic.amend(delete_noqa(
+                                diagnostic.set_fix(delete_noqa(
                                     row,
                                     lines[row],
                                     leading_spaces,
@@ -223,7 +223,7 @@ pub fn check_noqa(
                                     trailing_spaces,
                                 ));
                             } else {
-                                diagnostic.amend(Edit::replacement(
+                                diagnostic.set_fix(Edit::replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),
                                     Location::new(row + 1, start_char),
                                     Location::new(row + 1, end_char),

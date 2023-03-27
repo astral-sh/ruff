@@ -14,13 +14,14 @@ expression: diagnostics
     row: 283
     column: 19
   fix:
-    content: "\n    "
-    location:
-      row: 283
-      column: 16
-    end_location:
-      row: 283
-      column: 16
+    edits:
+      - content: "\n    "
+        location:
+          row: 283
+          column: 16
+        end_location:
+          row: 283
+          column: 16
   parent: ~
 - kind:
     name: NewLineAfterLastParagraph
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 590
     column: 21
   fix:
-    content: "\n    "
-    location:
-      row: 590
-      column: 16
-    end_location:
-      row: 590
-      column: 18
+    edits:
+      - content: "\n    "
+        location:
+          row: 590
+          column: 16
+        end_location:
+          row: 590
+          column: 18
   parent: ~
 

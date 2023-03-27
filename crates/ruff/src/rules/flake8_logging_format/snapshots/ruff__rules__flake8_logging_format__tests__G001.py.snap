@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 40
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LoggingStringFormat
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 53
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LoggingStringFormat
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 36
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LoggingStringFormat
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 57
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LoggingStringFormat
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 63
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LoggingStringFormat
@@ -78,6 +83,7 @@ expression: diagnostics
   end_location:
     row: 9
     column: 43
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

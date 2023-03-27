@@ -14,13 +14,14 @@ expression: diagnostics
     row: 3
     column: 4
   fix:
-    content: exit2
-    location:
-      row: 3
-      column: 0
-    end_location:
-      row: 3
-      column: 4
+    edits:
+      - content: exit2
+        location:
+          row: 3
+          column: 0
+        end_location:
+          row: 3
+          column: 4
   parent: ~
 - kind:
     name: SysExitAlias
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 4
     column: 4
   fix:
-    content: exit2
-    location:
-      row: 4
-      column: 0
-    end_location:
-      row: 4
-      column: 4
+    edits:
+      - content: exit2
+        location:
+          row: 4
+          column: 0
+        end_location:
+          row: 4
+          column: 4
   parent: ~
 - kind:
     name: SysExitAlias
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 8
     column: 8
   fix:
-    content: exit2
-    location:
-      row: 8
-      column: 4
-    end_location:
-      row: 8
-      column: 8
+    edits:
+      - content: exit2
+        location:
+          row: 8
+          column: 4
+        end_location:
+          row: 8
+          column: 8
   parent: ~
 - kind:
     name: SysExitAlias
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 9
     column: 8
   fix:
-    content: exit2
-    location:
-      row: 9
-      column: 4
-    end_location:
-      row: 9
-      column: 8
+    edits:
+      - content: exit2
+        location:
+          row: 9
+          column: 4
+        end_location:
+          row: 9
+          column: 8
   parent: ~
 

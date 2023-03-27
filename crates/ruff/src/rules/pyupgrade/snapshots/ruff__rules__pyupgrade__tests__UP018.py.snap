@@ -14,13 +14,14 @@ expression: diagnostics
     row: 20
     column: 5
   fix:
-    content: "\"\""
-    location:
-      row: 20
-      column: 0
-    end_location:
-      row: 20
-      column: 5
+    edits:
+      - content: "\"\""
+        location:
+          row: 20
+          column: 0
+        end_location:
+          row: 20
+          column: 5
   parent: ~
 - kind:
     name: NativeLiterals
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 21
     column: 10
   fix:
-    content: "\"foo\""
-    location:
-      row: 21
-      column: 0
-    end_location:
-      row: 21
-      column: 10
+    edits:
+      - content: "\"foo\""
+        location:
+          row: 21
+          column: 0
+        end_location:
+          row: 21
+          column: 10
   parent: ~
 - kind:
     name: NativeLiterals
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 23
     column: 7
   fix:
-    content: "\"\"\"\nfoo\"\"\""
-    location:
-      row: 22
-      column: 0
-    end_location:
-      row: 23
-      column: 7
+    edits:
+      - content: "\"\"\"\nfoo\"\"\""
+        location:
+          row: 22
+          column: 0
+        end_location:
+          row: 23
+          column: 7
   parent: ~
 - kind:
     name: NativeLiterals
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 24
     column: 7
   fix:
-    content: "b\"\""
-    location:
-      row: 24
-      column: 0
-    end_location:
-      row: 24
-      column: 7
+    edits:
+      - content: "b\"\""
+        location:
+          row: 24
+          column: 0
+        end_location:
+          row: 24
+          column: 7
   parent: ~
 - kind:
     name: NativeLiterals
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 25
     column: 13
   fix:
-    content: "b\"foo\""
-    location:
-      row: 25
-      column: 0
-    end_location:
-      row: 25
-      column: 13
+    edits:
+      - content: "b\"foo\""
+        location:
+          row: 25
+          column: 0
+        end_location:
+          row: 25
+          column: 13
   parent: ~
 - kind:
     name: NativeLiterals
@@ -114,12 +119,13 @@ expression: diagnostics
     row: 27
     column: 7
   fix:
-    content: "b\"\"\"\nfoo\"\"\""
-    location:
-      row: 26
-      column: 0
-    end_location:
-      row: 27
-      column: 7
+    edits:
+      - content: "b\"\"\"\nfoo\"\"\""
+        location:
+          row: 26
+          column: 0
+        end_location:
+          row: 27
+          column: 7
   parent: ~
 

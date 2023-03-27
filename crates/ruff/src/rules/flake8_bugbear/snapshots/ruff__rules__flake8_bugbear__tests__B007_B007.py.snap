@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -27,13 +28,14 @@ expression: diagnostics
     row: 18
     column: 13
   fix:
-    content: _k
-    location:
-      row: 18
-      column: 12
-    end_location:
-      row: 18
-      column: 13
+    edits:
+      - content: _k
+        location:
+          row: 18
+          column: 12
+        end_location:
+          row: 18
+          column: 13
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -46,7 +48,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -60,13 +63,14 @@ expression: diagnostics
     row: 30
     column: 13
   fix:
-    content: _k
-    location:
-      row: 30
-      column: 12
-    end_location:
-      row: 30
-      column: 13
+    edits:
+      - content: _k
+        location:
+          row: 30
+          column: 12
+        end_location:
+          row: 30
+          column: 13
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -79,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 34
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -92,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 38
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -105,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 42
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -118,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 46
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -132,13 +140,14 @@ expression: diagnostics
     row: 52
     column: 16
   fix:
-    content: _bar
-    location:
-      row: 52
-      column: 13
-    end_location:
-      row: 52
-      column: 16
+    edits:
+      - content: _bar
+        location:
+          row: 52
+          column: 13
+        end_location:
+          row: 52
+          column: 16
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -151,7 +160,8 @@ expression: diagnostics
   end_location:
     row: 59
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -165,13 +175,14 @@ expression: diagnostics
     row: 68
     column: 16
   fix:
-    content: _bar
-    location:
-      row: 68
-      column: 13
-    end_location:
-      row: 68
-      column: 16
+    edits:
+      - content: _bar
+        location:
+          row: 68
+          column: 13
+        end_location:
+          row: 68
+          column: 16
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -185,13 +196,14 @@ expression: diagnostics
     row: 77
     column: 16
   fix:
-    content: _bar
-    location:
-      row: 77
-      column: 13
-    end_location:
-      row: 77
-      column: 16
+    edits:
+      - content: _bar
+        location:
+          row: 77
+          column: 13
+        end_location:
+          row: 77
+          column: 16
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -204,6 +216,7 @@ expression: diagnostics
   end_location:
     row: 87
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

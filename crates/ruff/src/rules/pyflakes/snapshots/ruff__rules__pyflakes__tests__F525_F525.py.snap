@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 1
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StringDotFormatMixingAutomatic
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 2
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

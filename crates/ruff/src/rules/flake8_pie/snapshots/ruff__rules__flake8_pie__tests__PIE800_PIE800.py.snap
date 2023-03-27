@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 1
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnnecessarySpread
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnnecessarySpread
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnnecessarySpread
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 7
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

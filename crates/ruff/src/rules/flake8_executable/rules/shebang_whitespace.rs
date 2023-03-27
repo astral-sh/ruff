@@ -36,7 +36,7 @@ pub fn shebang_whitespace(
                 ),
             );
             if autofix {
-                diagnostic.amend(Edit::deletion(
+                diagnostic.set_fix(Edit::deletion(
                     Location::new(lineno + 1, 0),
                     Location::new(lineno + 1, *n_spaces),
                 ));

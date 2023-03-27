@@ -49,7 +49,7 @@ pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
                 if !trimmed.ends_with(trailing.chars().last().unwrap())
                     && !trimmed.starts_with(leading.chars().last().unwrap())
                 {
-                    diagnostic.amend(Edit::replacement(
+                    diagnostic.set_fix(Edit::replacement(
                         format!("{leading}{trimmed}{trailing}"),
                         docstring.expr.location,
                         docstring.expr.end_location.unwrap(),

@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 35
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedMethodArgument
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 38
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedMethodArgument
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 41
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedMethodArgument
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 190
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

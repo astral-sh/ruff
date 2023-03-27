@@ -5,7 +5,7 @@ use anyhow::Result;
 
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::flags;
-use ruff::{fix, packaging, resolver};
+use ruff::{packaging, resolver};
 
 use crate::args::Overrides;
 use crate::diagnostics::{lint_stdin, Diagnostics};
@@ -23,7 +23,7 @@ pub fn run_stdin(
     pyproject_strategy: &PyprojectDiscovery,
     overrides: &Overrides,
     noqa: flags::Noqa,
-    autofix: fix::FixMode,
+    autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
     if let Some(filename) = filename {
         if !resolver::python_file_at_path(filename, pyproject_strategy, overrides)? {

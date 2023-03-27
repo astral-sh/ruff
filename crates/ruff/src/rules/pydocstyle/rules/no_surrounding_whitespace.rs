@@ -49,7 +49,7 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
                 && !trimmed.starts_with(pattern.chars().last().unwrap())
                 && !ends_with_backslash(trimmed)
             {
-                diagnostic.amend(Edit::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     trimmed.to_string(),
                     Location::new(
                         docstring.expr.location.row(),

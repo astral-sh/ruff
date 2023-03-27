@@ -60,7 +60,7 @@ pub fn unnecessary_generator_set(
     if let ExprKind::GeneratorExp { .. } = argument {
         let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorSet, Range::from(expr));
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_amend(|| {
+            diagnostic.try_set_fix(|| {
                 fixes::fix_unnecessary_generator_set(checker.locator, checker.stylist, expr, parent)
             });
         }

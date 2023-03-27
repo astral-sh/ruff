@@ -79,7 +79,7 @@ pub fn invalid_literal_comparison(
                             None
                         }
                     } {
-                        diagnostic.amend(Edit::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             content,
                             helpers::to_absolute(located_op.location, location.location),
                             helpers::to_absolute(

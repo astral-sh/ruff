@@ -291,7 +291,7 @@ fn docstring(
         fixed_contents.push_str(&quote);
         fixed_contents.push_str(string_contents);
         fixed_contents.push_str(&quote);
-        diagnostic.amend(Edit::replacement(fixed_contents, start, end));
+        diagnostic.set_fix(Edit::replacement(fixed_contents, start, end));
     }
     Some(diagnostic)
 }
@@ -366,7 +366,7 @@ fn strings(
                 fixed_contents.push_str(quote);
                 fixed_contents.push_str(string_contents);
                 fixed_contents.push_str(quote);
-                diagnostic.amend(Edit::replacement(fixed_contents, *start, *end));
+                diagnostic.set_fix(Edit::replacement(fixed_contents, *start, *end));
             }
             diagnostics.push(diagnostic);
         } else {
@@ -430,7 +430,7 @@ fn strings(
 
                         fixed_contents.push(quote);
 
-                        diagnostic.amend(Edit::replacement(fixed_contents, *start, *end));
+                        diagnostic.set_fix(Edit::replacement(fixed_contents, *start, *end));
                     }
                     diagnostics.push(diagnostic);
                 }
@@ -453,7 +453,7 @@ fn strings(
                     fixed_contents.push(quote);
                     fixed_contents.push_str(string_contents);
                     fixed_contents.push(quote);
-                    diagnostic.amend(Edit::replacement(fixed_contents, *start, *end));
+                    diagnostic.set_fix(Edit::replacement(fixed_contents, *start, *end));
                 }
                 diagnostics.push(diagnostic);
             }

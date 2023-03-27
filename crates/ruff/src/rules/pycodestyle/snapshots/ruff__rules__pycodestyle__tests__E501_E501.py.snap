@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 123
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LineTooLong
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 88
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LineTooLong
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 127
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LineTooLong
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 40
     column: 132
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LineTooLong
@@ -65,19 +69,21 @@ expression: diagnostics
   end_location:
     row: 43
     column: 105
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LineTooLong
-    body: Line too long (129 > 88 characters)
+    body: Line too long (147 > 88 characters)
     suggestion: ~
     fixable: false
   location:
-    row: 61
+    row: 83
     column: 88
   end_location:
-    row: 61
-    column: 129
-  fix: ~
+    row: 83
+    column: 147
+  fix:
+    edits: []
   parent: ~
 

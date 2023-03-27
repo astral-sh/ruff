@@ -14,13 +14,14 @@ expression: diagnostics
     row: 1
     column: 0
   fix:
-    content: "\nfrom __future__ import annotations"
-    location:
-      row: 1
-      column: 19
-    end_location:
-      row: 1
-      column: 19
+    edits:
+      - content: "\nfrom __future__ import annotations"
+        location:
+          row: 1
+          column: 19
+        end_location:
+          row: 1
+          column: 19
   parent: ~
 - kind:
     name: MissingRequiredImport
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 1
     column: 0
   fix:
-    content: "\nfrom __future__ import generator_stop"
-    location:
-      row: 1
-      column: 19
-    end_location:
-      row: 1
-      column: 19
+    edits:
+      - content: "\nfrom __future__ import generator_stop"
+        location:
+          row: 1
+          column: 19
+        end_location:
+          row: 1
+          column: 19
   parent: ~
 

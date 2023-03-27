@@ -62,7 +62,7 @@ pub fn commented_out_code(
     if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
         let mut diagnostic = Diagnostic::new(CommentedOutCode, Range::new(start, end));
         if autofix.into() && settings.rules.should_fix(Rule::CommentedOutCode) {
-            diagnostic.amend(Edit::deletion(location, end_location));
+            diagnostic.set_fix(Edit::deletion(location, end_location));
         }
         Some(diagnostic)
     } else {

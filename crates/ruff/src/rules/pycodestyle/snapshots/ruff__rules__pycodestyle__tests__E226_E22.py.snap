@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 92
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 94
     column: 4
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 96
     column: 4
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 98
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 100
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 106
     column: 6
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 106
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 110
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 112
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 114
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 114
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundArithmeticOperator
@@ -156,6 +167,7 @@ expression: diagnostics
   end_location:
     row: 116
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

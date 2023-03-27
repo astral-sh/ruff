@@ -35,7 +35,7 @@ pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
 
     let mut diagnostic = Diagnostic::new(UselessImportAlias, Range::from(alias));
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Edit::replacement(
+        diagnostic.set_fix(Edit::replacement(
             asname.to_string(),
             alias.location,
             alias.end_location.unwrap(),

@@ -14,13 +14,14 @@ expression: diagnostics
     row: 3
     column: 26
   fix:
-    content: "''' not a docstring'''"
-    location:
-      row: 3
-      column: 4
-    end_location:
-      row: 3
-      column: 26
+    edits:
+      - content: "''' not a docstring'''"
+        location:
+          row: 3
+          column: 4
+        end_location:
+          row: 3
+          column: 26
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 11
     column: 26
   fix:
-    content: "''' not a docstring'''"
-    location:
-      row: 11
-      column: 4
-    end_location:
-      row: 11
-      column: 26
+    edits:
+      - content: "''' not a docstring'''"
+        location:
+          row: 11
+          column: 4
+        end_location:
+          row: 11
+          column: 26
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 17
     column: 3
   fix:
-    content: "'''\n    not a\n'''"
-    location:
-      row: 15
-      column: 38
-    end_location:
-      row: 17
-      column: 3
+    edits:
+      - content: "'''\n    not a\n'''"
+        location:
+          row: 15
+          column: 38
+        end_location:
+          row: 17
+          column: 3
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 17
     column: 19
   fix:
-    content: "'''docstring'''"
-    location:
-      row: 17
-      column: 4
-    end_location:
-      row: 17
-      column: 19
+    edits:
+      - content: "'''docstring'''"
+        location:
+          row: 17
+          column: 4
+        end_location:
+          row: 17
+          column: 19
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -94,12 +98,13 @@ expression: diagnostics
     row: 22
     column: 27
   fix:
-    content: "''' not a docstring '''"
-    location:
-      row: 22
-      column: 4
-    end_location:
-      row: 22
-      column: 27
+    edits:
+      - content: "''' not a docstring '''"
+        location:
+          row: 22
+          column: 4
+        end_location:
+          row: 22
+          column: 27
   parent: ~
 

@@ -92,7 +92,7 @@ pub fn unnecessary_literal_within_tuple_call(
         Range::from(expr),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_amend(|| {
+        diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_literal_within_tuple_call(checker.locator, checker.stylist, expr)
         });
     }

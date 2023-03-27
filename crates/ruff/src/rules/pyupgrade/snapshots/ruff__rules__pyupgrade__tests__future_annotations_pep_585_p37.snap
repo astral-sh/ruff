@@ -14,12 +14,13 @@ expression: diagnostics
     row: 34
     column: 21
   fix:
-    content: list
-    location:
-      row: 34
-      column: 17
-    end_location:
-      row: 34
-      column: 21
+    edits:
+      - content: list
+        location:
+          row: 34
+          column: 17
+        end_location:
+          row: 34
+          column: 21
   parent: ~
 

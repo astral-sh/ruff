@@ -163,7 +163,7 @@ pub fn compound_statements(
                 if let Some((start, end)) = semi {
                     let mut diagnostic = Diagnostic::new(UselessSemicolon, Range::new(start, end));
                     if autofix.into() && settings.rules.should_fix(Rule::UselessSemicolon) {
-                        diagnostic.amend(Edit::deletion(start, end));
+                        diagnostic.set_fix(Edit::deletion(start, end));
                     };
                     diagnostics.push(diagnostic);
                 }

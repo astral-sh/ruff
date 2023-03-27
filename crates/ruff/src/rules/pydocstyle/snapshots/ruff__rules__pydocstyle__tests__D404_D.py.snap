@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 631
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DocstringStartsWithThis
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 636
     column: 56
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

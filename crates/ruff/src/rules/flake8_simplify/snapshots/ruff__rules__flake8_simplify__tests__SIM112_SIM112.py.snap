@@ -14,13 +14,14 @@ expression: diagnostics
     row: 4
     column: 16
   fix:
-    content: "'FOO'"
-    location:
-      row: 4
-      column: 11
-    end_location:
-      row: 4
-      column: 16
+    edits:
+      - content: "'FOO'"
+        location:
+          row: 4
+          column: 11
+        end_location:
+          row: 4
+          column: 16
   parent: ~
 - kind:
     name: UncapitalizedEnvironmentVariables
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 6
     column: 20
   fix:
-    content: "'FOO'"
-    location:
-      row: 6
-      column: 15
-    end_location:
-      row: 6
-      column: 20
+    edits:
+      - content: "'FOO'"
+        location:
+          row: 6
+          column: 15
+        end_location:
+          row: 6
+          column: 20
   parent: ~
 - kind:
     name: UncapitalizedEnvironmentVariables
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 8
     column: 20
   fix:
-    content: "'FOO'"
-    location:
-      row: 8
-      column: 15
-    end_location:
-      row: 8
-      column: 20
+    edits:
+      - content: "'FOO'"
+        location:
+          row: 8
+          column: 15
+        end_location:
+          row: 8
+          column: 20
   parent: ~
 - kind:
     name: UncapitalizedEnvironmentVariables
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 10
     column: 15
   fix:
-    content: "'FOO'"
-    location:
-      row: 10
-      column: 10
-    end_location:
-      row: 10
-      column: 15
+    edits:
+      - content: "'FOO'"
+        location:
+          row: 10
+          column: 10
+        end_location:
+          row: 10
+          column: 15
   parent: ~
 

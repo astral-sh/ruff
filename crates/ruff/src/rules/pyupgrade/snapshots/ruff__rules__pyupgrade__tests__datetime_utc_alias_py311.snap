@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DatetimeTimezoneUTC
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DatetimeTimezoneUTC
@@ -40,13 +42,14 @@ expression: diagnostics
     row: 10
     column: 27
   fix:
-    content: datetime.UTC
-    location:
-      row: 10
-      column: 6
-    end_location:
-      row: 10
-      column: 27
+    edits:
+      - content: datetime.UTC
+        location:
+          row: 10
+          column: 6
+        end_location:
+          row: 10
+          column: 27
   parent: ~
 - kind:
     name: DatetimeTimezoneUTC
@@ -59,6 +62,7 @@ expression: diagnostics
   end_location:
     row: 11
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

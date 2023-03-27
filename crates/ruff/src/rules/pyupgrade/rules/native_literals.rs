@@ -65,7 +65,7 @@ pub fn native_literals(
                 LiteralType::Bytes
             }}, Range::from(expr));
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Edit::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     if id == "bytes" {
                         let mut content = String::with_capacity(3);
                         content.push('b');
@@ -129,7 +129,7 @@ pub fn native_literals(
             Range::from(expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 arg_code.to_string(),
                 expr.location,
                 expr.end_location.unwrap(),

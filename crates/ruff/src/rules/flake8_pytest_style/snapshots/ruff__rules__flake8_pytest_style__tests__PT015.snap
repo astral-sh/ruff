@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -208,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestAssertAlwaysFalse
@@ -221,6 +237,7 @@ expression: diagnostics
   end_location:
     row: 25
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

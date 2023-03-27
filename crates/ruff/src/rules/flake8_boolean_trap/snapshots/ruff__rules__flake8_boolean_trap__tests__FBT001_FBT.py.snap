@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 31
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 36
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 41
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 37
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 42
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 40
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 45
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BooleanPositionalArgInFunctionDefinition
@@ -117,6 +125,7 @@ expression: diagnostics
   end_location:
     row: 81
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

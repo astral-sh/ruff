@@ -14,13 +14,14 @@ expression: diagnostics
     row: 1
     column: 13
   fix:
-    content: "=="
-    location:
-      row: 1
-      column: 5
-    end_location:
-      row: 1
-      column: 7
+    edits:
+      - content: "=="
+        location:
+          row: 1
+          column: 5
+        end_location:
+          row: 1
+          column: 7
   parent: ~
 - kind:
     name: IsLiteral
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 4
     column: 15
   fix:
-    content: "!="
-    location:
-      row: 4
-      column: 7
-    end_location:
-      row: 4
-      column: 13
+    edits:
+      - content: "!="
+        location:
+          row: 4
+          column: 7
+        end_location:
+          row: 4
+          column: 13
   parent: ~
 - kind:
     name: IsLiteral
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 8
     column: 13
   fix:
-    content: "!="
-    location:
-      row: 7
-      column: 7
-    end_location:
-      row: 8
-      column: 11
+    edits:
+      - content: "!="
+        location:
+          row: 7
+          column: 7
+        end_location:
+          row: 8
+          column: 11
   parent: ~
 - kind:
     name: IsLiteral
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 11
     column: 17
   fix:
-    content: "=="
-    location:
-      row: 11
-      column: 9
-    end_location:
-      row: 11
-      column: 11
+    edits:
+      - content: "=="
+        location:
+          row: 11
+          column: 9
+        end_location:
+          row: 11
+          column: 11
   parent: ~
 - kind:
     name: IsLiteral
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 14
     column: 18
   fix:
-    content: "=="
-    location:
-      row: 14
-      column: 14
-    end_location:
-      row: 14
-      column: 16
+    edits:
+      - content: "=="
+        location:
+          row: 14
+          column: 14
+        end_location:
+          row: 14
+          column: 16
   parent: ~
 - kind:
     name: IsLiteral
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 17
     column: 20
   fix:
-    content: "=="
-    location:
-      row: 17
-      column: 16
-    end_location:
-      row: 17
-      column: 18
+    edits:
+      - content: "=="
+        location:
+          row: 17
+          column: 16
+        end_location:
+          row: 17
+          column: 18
   parent: ~
 - kind:
     name: IsLiteral
@@ -134,12 +140,13 @@ expression: diagnostics
     row: 20
     column: 19
   fix:
-    content: "=="
-    location:
-      row: 20
-      column: 15
-    end_location:
-      row: 20
-      column: 17
+    edits:
+      - content: "=="
+        location:
+          row: 20
+          column: 15
+        end_location:
+          row: 20
+          column: 17
   parent: ~
 

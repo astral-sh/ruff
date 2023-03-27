@@ -75,7 +75,7 @@ pub fn missing_whitespace(
             );
 
             if autofix {
-                diagnostic.amend(Edit::insertion(
+                diagnostic.set_fix(Edit::insertion(
                     " ".to_string(),
                     Location::new(row, indent_level + idx + 1),
                 ));

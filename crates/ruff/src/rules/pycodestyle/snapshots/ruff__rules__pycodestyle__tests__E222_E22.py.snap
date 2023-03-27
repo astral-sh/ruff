@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 28
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultipleSpacesAfterOperator
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 31
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultipleSpacesAfterOperator
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 32
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultipleSpacesAfterOperator
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 35
     column: 6
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultipleSpacesAfterOperator
@@ -65,6 +69,7 @@ expression: diagnostics
   end_location:
     row: 36
     column: 6
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

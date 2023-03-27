@@ -56,7 +56,6 @@ mod deferred;
 
 type AnnotationContext = (bool, bool);
 
-#[allow(clippy::struct_excessive_bools)]
 pub struct Checker<'a> {
     // Settings, static metadata, etc.
     pub path: &'a Path,
@@ -2458,7 +2457,7 @@ where
                     pyupgrade::rules::replace_universal_newlines(self, func, keywords);
                 }
                 if self.settings.rules.enabled(Rule::ReplaceStdoutStderr) {
-                    pyupgrade::rules::replace_stdout_stderr(self, expr, func, keywords);
+                    pyupgrade::rules::replace_stdout_stderr(self, expr, func, args, keywords);
                 }
                 if self.settings.rules.enabled(Rule::OSErrorAlias) {
                     pyupgrade::rules::os_error_alias_call(self, func);
@@ -3585,7 +3584,7 @@ where
                         } else {
                             // Ex) DefaultNamedArg(type="bool", name="some_prop_name")
                             for keyword in keywords {
-                                let KeywordData { value, arg, .. } = &keyword.node;
+                                let KeywordData { value, arg } = &keyword.node;
                                 if arg.as_ref().map_or(false, |arg| arg == "type") {
                                     visit_type_definition!(self, value);
                                 } else {
@@ -3825,7 +3824,7 @@ where
                                         name_range,
                                     );
                                     if self.patch(Rule::UnusedVariable) {
-                                        diagnostic.try_amend(|| {
+                                        diagnostic.try_set_fix(|| {
                                             pyflakes::fixes::remove_exception_handler_assignment(
                                                 excepthandler,
                                                 self.locator,
@@ -4058,7 +4057,7 @@ impl<'a> Checker<'a> {
                                 if matches!(parent.node, StmtKind::ImportFrom { .. })
                                     && parent.location.row() != binding.range.location.row()
                                 {
-                                    diagnostic.parent(parent.location);
+                                    diagnostic.set_parent(parent.location);
                                 }
                             }
                             self.diagnostics.push(diagnostic);
@@ -4851,7 +4850,7 @@ impl<'a> Checker<'a> {
                                     if matches!(parent.node, StmtKind::ImportFrom { .. })
                                         && parent.location.row() != rebound.range.location.row()
                                     {
-                                        diagnostic.parent(parent.location);
+                                        diagnostic.set_parent(parent.location);
                                     }
                                 };
                                 diagnostics.push(diagnostic);
@@ -5053,10 +5052,10 @@ impl<'a> Checker<'a> {
                         if matches!(child.node, StmtKind::ImportFrom { .. })
                             && child.location.row() != range.location.row()
                         {
-                            diagnostic.parent(child.location);
+                            diagnostic.set_parent(child.location);
                         }
                         if let Some(fix) = fix.as_ref() {
-                            diagnostic.amend(fix.clone());
+                            diagnostic.set_fix(fix.clone());
                         }
                         diagnostics.push(diagnostic);
                     }
@@ -5087,7 +5086,7 @@ impl<'a> Checker<'a> {
                         if matches!(child.node, StmtKind::ImportFrom { .. })
                             && child.location.row() != range.location.row()
                         {
-                            diagnostic.parent(child.location);
+                            diagnostic.set_parent(child.location);
                         }
                         diagnostics.push(diagnostic);
                     }

@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 51
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: WhitespaceBeforePunctuation
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 55
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: WhitespaceBeforePunctuation
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 60
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: WhitespaceBeforePunctuation
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 63
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: WhitespaceBeforePunctuation
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 67
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: WhitespaceBeforePunctuation
@@ -78,6 +83,7 @@ expression: diagnostics
   end_location:
     row: 71
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

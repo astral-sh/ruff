@@ -14,13 +14,14 @@ expression: diagnostics
     row: 2
     column: 24
   fix:
-    content: pass
-    location:
-      row: 2
-      column: 4
-    end_location:
-      row: 2
-      column: 24
+    edits:
+      - content: pass
+        location:
+          row: 2
+          column: 4
+        end_location:
+          row: 2
+          column: 24
   parent: ~
 - kind:
     name: UselessMetaclassType
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 6
     column: 24
   fix:
-    content: ""
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 7
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 7
+          column: 0
   parent: ~
 

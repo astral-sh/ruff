@@ -14,12 +14,13 @@ expression: diagnostics
     row: 4
     column: 34
   fix:
-    content: from pathlib import Path
-    location:
-      row: 4
-      column: 0
-    end_location:
-      row: 4
-      column: 34
+    edits:
+      - content: from pathlib import Path
+        location:
+          row: 4
+          column: 0
+        end_location:
+          row: 4
+          column: 34
   parent: ~
 

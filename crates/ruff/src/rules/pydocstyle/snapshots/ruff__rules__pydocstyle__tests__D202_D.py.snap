@@ -14,13 +14,14 @@ expression: diagnostics
     row: 142
     column: 24
   fix:
-    content: ""
-    location:
-      row: 143
-      column: 0
-    end_location:
-      row: 144
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 143
+          column: 0
+        end_location:
+          row: 144
+          column: 0
   parent: ~
 - kind:
     name: NoBlankLineAfterFunction
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 151
     column: 37
   fix:
-    content: ""
-    location:
-      row: 152
-      column: 0
-    end_location:
-      row: 153
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 152
+          column: 0
+        end_location:
+          row: 153
+          column: 0
   parent: ~
 - kind:
     name: NoBlankLineAfterFunction
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 558
     column: 7
   fix:
-    content: ""
-    location:
-      row: 559
-      column: 0
-    end_location:
-      row: 560
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 559
+          column: 0
+        end_location:
+          row: 560
+          column: 0
   parent: ~
 - kind:
     name: NoBlankLineAfterFunction
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 571
     column: 7
   fix:
-    content: ""
-    location:
-      row: 572
-      column: 0
-    end_location:
-      row: 573
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 572
+          column: 0
+        end_location:
+          row: 573
+          column: 0
   parent: ~
 

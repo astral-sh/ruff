@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LoggingExcInfo
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 13
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

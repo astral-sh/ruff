@@ -14,13 +14,14 @@ expression: diagnostics
     row: 3
     column: 55
   fix:
-    content: open
-    location:
-      row: 3
-      column: 5
-    end_location:
-      row: 3
-      column: 12
+    edits:
+      - content: open
+        location:
+          row: 3
+          column: 5
+        end_location:
+          row: 3
+          column: 12
   parent: ~
 - kind:
     name: OpenAlias
@@ -33,6 +34,7 @@ expression: diagnostics
   end_location:
     row: 8
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

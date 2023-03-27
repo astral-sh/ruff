@@ -13,6 +13,7 @@ expression: diagnostics
   end_location:
     row: 1
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

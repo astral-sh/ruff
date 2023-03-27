@@ -14,13 +14,14 @@ expression: diagnostics
     row: 6
     column: 20
   fix:
-    content: return bool(a)
-    location:
-      row: 3
-      column: 4
-    end_location:
-      row: 6
-      column: 20
+    edits:
+      - content: return bool(a)
+        location:
+          row: 3
+          column: 4
+        end_location:
+          row: 6
+          column: 20
   parent: ~
 - kind:
     name: NeedlessBool
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 14
     column: 20
   fix:
-    content: return a == b
-    location:
-      row: 11
-      column: 4
-    end_location:
-      row: 14
-      column: 20
+    edits:
+      - content: return a == b
+        location:
+          row: 11
+          column: 4
+        end_location:
+          row: 14
+          column: 20
   parent: ~
 - kind:
     name: NeedlessBool
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 24
     column: 20
   fix:
-    content: return bool(b)
-    location:
-      row: 21
-      column: 4
-    end_location:
-      row: 24
-      column: 20
+    edits:
+      - content: return bool(b)
+        location:
+          row: 21
+          column: 4
+        end_location:
+          row: 24
+          column: 20
   parent: ~
 - kind:
     name: NeedlessBool
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 35
     column: 24
   fix:
-    content: return bool(b)
-    location:
-      row: 32
-      column: 8
-    end_location:
-      row: 35
-      column: 24
+    edits:
+      - content: return bool(b)
+        location:
+          row: 32
+          column: 8
+        end_location:
+          row: 35
+          column: 24
   parent: ~
 - kind:
     name: NeedlessBool
@@ -93,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 60
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NeedlessBool
@@ -106,6 +111,7 @@ expression: diagnostics
   end_location:
     row: 86
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

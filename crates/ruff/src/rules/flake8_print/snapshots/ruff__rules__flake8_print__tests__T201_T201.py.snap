@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Print
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Print
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Print
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 7
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

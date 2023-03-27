@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 1
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedFunctionArgument
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 1
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedFunctionArgument
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedFunctionArgument
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedFunctionArgument
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedFunctionArgument
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedMethodArgument
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedMethodArgument
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedMethodArgument
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedMethodArgument
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedMethodArgument
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedMethodArgument
@@ -156,6 +167,7 @@ expression: diagnostics
   end_location:
     row: 13
     column: 37
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

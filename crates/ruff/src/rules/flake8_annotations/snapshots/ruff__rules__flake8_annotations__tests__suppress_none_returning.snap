@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 45
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingReturnTypeUndocumentedPublicFunction
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 50
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingTypeFunctionArgument
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 59
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

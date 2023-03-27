@@ -14,13 +14,14 @@ expression: diagnostics
     row: 87
     column: 7
   fix:
-    content: "\n"
-    location:
-      row: 79
-      column: 11
-    end_location:
-      row: 79
-      column: 11
+    edits:
+      - content: "\n"
+        location:
+          row: 79
+          column: 11
+        end_location:
+          row: 79
+          column: 11
   parent: ~
 - kind:
     name: NoBlankLineAfterSection
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 230
     column: 7
   fix:
-    content: "\n"
-    location:
-      row: 226
-      column: 31
-    end_location:
-      row: 226
-      column: 31
+    edits:
+      - content: "\n"
+        location:
+          row: 226
+          column: 31
+        end_location:
+          row: 226
+          column: 31
   parent: ~
 

@@ -14,13 +14,14 @@ expression: diagnostics
     row: 4
     column: 8
   fix:
-    content: ""
-    location:
-      row: 3
-      column: 0
-    end_location:
-      row: 5
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 3
+          column: 0
+        end_location:
+          row: 5
+          column: 0
   parent: ~
 - kind:
     name: EmptyTypeCheckingBlock
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 8
     column: 8
   fix:
-    content: ""
-    location:
-      row: 7
-      column: 0
-    end_location:
-      row: 9
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 7
+          column: 0
+        end_location:
+          row: 9
+          column: 0
   parent: ~
 - kind:
     name: EmptyTypeCheckingBlock
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 11
     column: 8
   fix:
-    content: ""
-    location:
-      row: 10
-      column: 0
-    end_location:
-      row: 12
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 10
+          column: 0
+        end_location:
+          row: 12
+          column: 0
   parent: ~
 - kind:
     name: EmptyTypeCheckingBlock
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 16
     column: 12
   fix:
-    content: ""
-    location:
-      row: 15
-      column: 0
-    end_location:
-      row: 17
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 15
+          column: 0
+        end_location:
+          row: 17
+          column: 0
   parent: ~
 - kind:
     name: EmptyTypeCheckingBlock
@@ -94,12 +98,13 @@ expression: diagnostics
     row: 22
     column: 12
   fix:
-    content: ""
-    location:
-      row: 21
-      column: 0
-    end_location:
-      row: 23
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 21
+          column: 0
+        end_location:
+          row: 23
+          column: 0
   parent: ~
 

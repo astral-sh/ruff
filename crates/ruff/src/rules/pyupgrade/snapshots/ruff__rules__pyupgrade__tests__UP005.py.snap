@@ -14,13 +14,14 @@ expression: diagnostics
     row: 6
     column: 25
   fix:
-    content: self.assertEqual
-    location:
-      row: 6
-      column: 8
-    end_location:
-      row: 6
-      column: 25
+    edits:
+      - content: self.assertEqual
+        location:
+          row: 6
+          column: 8
+        end_location:
+          row: 6
+          column: 25
   parent: ~
 - kind:
     name: DeprecatedUnittestAlias
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 7
     column: 25
   fix:
-    content: self.assertEqual
-    location:
-      row: 7
-      column: 8
-    end_location:
-      row: 7
-      column: 25
+    edits:
+      - content: self.assertEqual
+        location:
+          row: 7
+          column: 8
+        end_location:
+          row: 7
+          column: 25
   parent: ~
 - kind:
     name: DeprecatedUnittestAlias
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 9
     column: 34
   fix:
-    content: self.assertAlmostEqual
-    location:
-      row: 9
-      column: 8
-    end_location:
-      row: 9
-      column: 34
+    edits:
+      - content: self.assertAlmostEqual
+        location:
+          row: 9
+          column: 8
+        end_location:
+          row: 9
+          column: 34
   parent: ~
 - kind:
     name: DeprecatedUnittestAlias
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 10
     column: 35
   fix:
-    content: self.assertNotRegex
-    location:
-      row: 10
-      column: 8
-    end_location:
-      row: 10
-      column: 35
+    edits:
+      - content: self.assertNotRegex
+        location:
+          row: 10
+          column: 8
+        end_location:
+          row: 10
+          column: 35
   parent: ~
 

@@ -14,13 +14,14 @@ expression: diagnostics
     row: 12
     column: 16
   fix:
-    content: ()
-    location:
-      row: 12
-      column: 16
-    end_location:
-      row: 12
-      column: 16
+    edits:
+      - content: ()
+        location:
+          row: 12
+          column: 16
+        end_location:
+          row: 12
+          column: 16
   parent: ~
 - kind:
     name: PytestIncorrectMarkParenthesesStyle
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 17
     column: 16
   fix:
-    content: ()
-    location:
-      row: 17
-      column: 16
-    end_location:
-      row: 17
-      column: 16
+    edits:
+      - content: ()
+        location:
+          row: 17
+          column: 16
+        end_location:
+          row: 17
+          column: 16
   parent: ~
 - kind:
     name: PytestIncorrectMarkParenthesesStyle
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 24
     column: 20
   fix:
-    content: ()
-    location:
-      row: 24
-      column: 20
-    end_location:
-      row: 24
-      column: 20
+    edits:
+      - content: ()
+        location:
+          row: 24
+          column: 20
+        end_location:
+          row: 24
+          column: 20
   parent: ~
 - kind:
     name: PytestIncorrectMarkParenthesesStyle
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 30
     column: 20
   fix:
-    content: ()
-    location:
-      row: 30
-      column: 20
-    end_location:
-      row: 30
-      column: 20
+    edits:
+      - content: ()
+        location:
+          row: 30
+          column: 20
+        end_location:
+          row: 30
+          column: 20
   parent: ~
 - kind:
     name: PytestIncorrectMarkParenthesesStyle
@@ -94,12 +98,13 @@ expression: diagnostics
     row: 38
     column: 24
   fix:
-    content: ()
-    location:
-      row: 38
-      column: 24
-    end_location:
-      row: 38
-      column: 24
+    edits:
+      - content: ()
+        location:
+          row: 38
+          column: 24
+        end_location:
+          row: 38
+          column: 24
   parent: ~
 
