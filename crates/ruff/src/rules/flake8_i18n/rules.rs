@@ -36,7 +36,7 @@ impl Violation for PrintfInI18NFuncCall {
 /// Returns true if the [`Expr`] is an internationalization function call.
 pub fn is_i18n_func_call(func: &Expr, functions_names: &[String]) -> bool {
     if let ExprKind::Name { id, .. } = &func.node {
-        functions_names.contains(&id)
+        functions_names.contains(id)
     } else {
         false
     }

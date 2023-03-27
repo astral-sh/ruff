@@ -3,8 +3,6 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
-const I18_FUNCTIONS_NAMES: &[&str] = &["_", "gettext", "ngettext"];
-
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, JsonSchema,
 )]
@@ -17,27 +15,18 @@ pub struct Options {
     #[option(
         default = r#"["_", "gettext", "ngettext"]"#,
         value_type = "list[str]",
-        example = r#"
-            [tool.ruff.flake8-i18n]
-            # Declare the functions names to be checked
-            function-names = ["_", "gettext", "ngettext", "ugettetxt"]
-        "#
+        example = r#"function-names = ["_", "gettext", "ngettext", "ugettetxt"]"#
     )]
-    /// The function_names for to check. These can be extended by
-    /// the `extend_function_names` option.
+    /// The function names to consider as internationalization calls.
     pub function_names: Option<Vec<String>>,
-
     #[option(
         default = r#"[]"#,
         value_type = "list[str]",
-        example = r#"
-            [tool.ruff.flake8-i18n]
-            extend-function-names = ["ugettetxt"]
-        "#
+        example = r#"extend-function-names = ["ugettetxt"]"#
     )]
     #[serde(default)]
-    /// This will be appended to the function_names
-    /// (or to the default values if that field is missing)
+    /// Additional function names to consider as internationalization calls, in addition to those
+    /// included in `function-names`.
     pub extend_function_names: Vec<String>,
 }
 
@@ -47,7 +36,7 @@ pub struct Settings {
 }
 
 fn default_func_names() -> Vec<String> {
-    I18_FUNCTIONS_NAMES
+    ["_", "gettext", "ngettext"]
         .iter()
         .map(std::string::ToString::to_string)
         .collect()
@@ -64,16 +53,12 @@ impl Default for Settings {
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         Self {
-            functions_names: {
-                let mut res = {
-                    match options.function_names {
-                        Some(v) => v,
-                        None => default_func_names(),
-                    }
-                };
-                res.extend(options.extend_function_names);
-                res
-            },
+            functions_names: options
+                .function_names
+                .unwrap_or_else(default_func_names)
+                .into_iter()
+                .chain(options.extend_function_names)
+                .collect(),
         }
     }
 }
