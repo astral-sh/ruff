@@ -1,7 +1,8 @@
 use crate::autofix::helpers::delete_stmt;
+use log::error;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_python_ast::types::{Range, RefEquality};
 
 use crate::checkers::ast::Checker;
 
@@ -18,34 +19,41 @@ impl AlwaysAutofixableViolation for PassInClassBody {
     }
 
     fn autofix_title(&self) -> String {
-        format!("Remove `pass` from the class body")
+        format!("Remove unnecessary `pass`")
     }
 }
 
 /// PYI012
-pub fn pass_in_class_body(checker: &mut Checker, body: &[Stmt]) {
-    // pass is required in these situations
+pub fn pass_in_class_body<'a>(checker: &mut Checker<'a>, parent: &'a Stmt, body: &'a [Stmt]) {
+    // `pass` is required in these situations (or handled by `pass_statement_stub_body`).
     if body.len() < 2 {
         return;
     }
 
-    // Loops through all the Located in a ClassDef body and checks for
-    // nodes to match StmtKind::Pass
-    for located in body {
-        if matches!(located.node, StmtKind::Pass) {
-            let mut diagnostic = Diagnostic::new(PassInClassBody, Range::from(located));
+    for stmt in body {
+        if matches!(stmt.node, StmtKind::Pass) {
+            let mut diagnostic = Diagnostic::new(PassInClassBody, Range::from(stmt));
 
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.try_set_fix(|| {
-                    delete_stmt(
-                        located,
-                        None,
-                        &[],
-                        checker.locator,
-                        checker.indexer,
-                        checker.stylist,
-                    )
-                });
+                let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
+                match delete_stmt(
+                    stmt,
+                    Some(parent),
+                    &deleted,
+                    checker.locator,
+                    checker.indexer,
+                    checker.stylist,
+                ) {
+                    Ok(fix) => {
+                        if fix.content.is_empty() || fix.content == "pass" {
+                            checker.deletions.insert(RefEquality(stmt));
+                        }
+                        diagnostic.set_fix(fix);
+                    }
+                    Err(e) => {
+                        error!("Failed to delete `pass` statement: {}", e);
+                    }
+                };
             };
 
             checker.diagnostics.push(diagnostic);

@@ -775,7 +775,7 @@ where
                         flake8_pyi::rules::pass_statement_stub_body(self, body);
                     }
                     if self.settings.rules.enabled(Rule::PassInClassBody) {
-                        flake8_pyi::rules::pass_in_class_body(self, body);
+                        flake8_pyi::rules::pass_in_class_body(self, stmt, body);
                     }
                 }
 
