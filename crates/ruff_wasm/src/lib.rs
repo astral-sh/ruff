@@ -173,7 +173,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let locator = Locator::new(contents);
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_contents(contents, &locator);
+    let stylist = Stylist::from_tokens(&tokens, &locator);
 
     // Extra indices from the code.
     let indexer: Indexer = tokens.as_slice().into();

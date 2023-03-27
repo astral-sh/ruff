@@ -257,7 +257,7 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
     let locator = Locator::new(&contents);
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_contents(&contents, &locator);
+    let stylist = Stylist::from_tokens(&tokens, &locator);
 
     // Extra indices from the code.
     let indexer: Indexer = tokens.as_slice().into();
@@ -322,7 +322,7 @@ pub fn lint_only(
     let locator = Locator::new(contents);
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_contents(contents, &locator);
+    let stylist = Stylist::from_tokens(&tokens, &locator);
 
     // Extra indices from the code.
     let indexer: Indexer = tokens.as_slice().into();
@@ -394,7 +394,7 @@ pub fn lint_fix<'a>(
         let locator = Locator::new(&transformed);
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_contents(&transformed, &locator);
+        let stylist = Stylist::from_tokens(&tokens, &locator);
 
         // Extra indices from the code.
         let indexer: Indexer = tokens.as_slice().into();
