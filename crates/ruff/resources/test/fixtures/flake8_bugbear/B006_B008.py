@@ -1,5 +1,6 @@
 import collections
 import datetime as dt
+from decimal import Decimal
 import logging
 import operator
 import random
@@ -162,6 +163,11 @@ def float_int_is_wrong(value=float(3)):
 
 
 def float_str_not_inf_or_nan_is_wrong(value=float("3.14")):
+    pass
+
+
+# Allow decimals
+def decimal_okay(value=Decimal("0.1")):
     pass
 
 
