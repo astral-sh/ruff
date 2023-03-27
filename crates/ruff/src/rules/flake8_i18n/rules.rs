@@ -10,7 +10,7 @@ pub struct FStringInI18NFuncCall;
 impl Violation for FStringInI18NFuncCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("f-string is resolved before function call, consider using something like `_(\"string %s\") % arg`")
+        format!("f-string is resolved before function call; consider `_(\"string %s\") % arg`")
     }
 }
 
@@ -20,29 +20,32 @@ pub struct FormatInI18NFuncCall;
 impl Violation for FormatInI18NFuncCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`format` method argument is resolved before function call, consider using something like `_(\"string %s\") % arg`")
+        format!("`format` method argument is resolved before function call; consider `_(\"string %s\") % arg`")
     }
 }
 #[violation]
-pub struct PrintFInI18NFuncCall;
+pub struct PrintfInI18NFuncCall;
 
-impl Violation for PrintFInI18NFuncCall {
+impl Violation for PrintfInI18NFuncCall {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("printf-style format is resolved before function call, consider using something like `_(\"string %s\") % arg`")
+        format!("printf-style format is resolved before function call; consider `_(\"string %s\") % arg`")
     }
 }
 
-pub fn function_needs_check(func: &Expr, functions_names: &[String]) -> bool {
-    if let ExprKind::Name { id, ctx: _ } = &func.node {
-        return functions_names.iter().any(|x| x == id);
+/// Returns true if the [`Expr`] is an internationalization function call.
+pub fn is_i18n_func_call(func: &Expr, functions_names: &[String]) -> bool {
+    if let ExprKind::Name { id, .. } = &func.node {
+        functions_names.contains(&id)
+    } else {
+        false
     }
-    false
 }
 
+/// INT001
 pub fn f_string_in_i18n_func_call(args: &[Expr]) -> Option<Diagnostic> {
     if let Some(first) = args.first() {
-        if let ExprKind::JoinedStr { .. } = first.node {
+        if matches!(first.node, ExprKind::JoinedStr { .. }) {
             return Some(Diagnostic::new(
                 FStringInI18NFuncCall {},
                 Range::from(first),
@@ -52,20 +55,21 @@ pub fn f_string_in_i18n_func_call(args: &[Expr]) -> Option<Diagnostic> {
     None
 }
 
+/// INT002
 pub fn format_in_i18n_func_call(args: &[Expr]) -> Option<Diagnostic> {
     if let Some(first) = args.first() {
         if let ExprKind::Call { func, .. } = &first.node {
-            return match func.node {
-                ExprKind::Attribute { ref attr, .. } if attr == "format" => {
-                    Some(Diagnostic::new(FormatInI18NFuncCall {}, Range::from(first)))
+            if let ExprKind::Attribute { attr, .. } = &func.node {
+                if attr == "format" {
+                    return Some(Diagnostic::new(FormatInI18NFuncCall {}, Range::from(first)));
                 }
-                _ => None,
-            };
+            }
         }
     }
     None
 }
 
+/// INT003
 pub fn printf_in_i18n_func_call(args: &[Expr]) -> Option<Diagnostic> {
     if let Some(first) = args.first() {
         if let ExprKind::BinOp {
@@ -74,13 +78,13 @@ pub fn printf_in_i18n_func_call(args: &[Expr]) -> Option<Diagnostic> {
             ..
         } = &first.node
         {
-            return match left.node {
-                ExprKind::Constant {
-                    value: Constant::Str(_),
-                    ..
-                } => Some(Diagnostic::new(PrintFInI18NFuncCall {}, Range::from(first))),
-                _ => None,
-            };
+            if let ExprKind::Constant {
+                value: Constant::Str(_),
+                ..
+            } = left.node
+            {
+                return Some(Diagnostic::new(PrintfInI18NFuncCall {}, Range::from(first)));
+            }
         }
     }
     None

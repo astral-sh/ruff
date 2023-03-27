@@ -4,7 +4,7 @@ expression: diagnostics
 ---
 - kind:
     name: FStringInI18NFuncCall
-    body: "f-string is resolved before function call, consider using something like `_(\"string %s\") % arg`"
+    body: "f-string is resolved before function call; consider `_(\"string %s\") % arg`"
     suggestion: ~
     fixable: false
   location:

@@ -245,9 +245,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // flake8-blind-except
         (Flake8BlindExcept, "001") => Rule::BlindExcept,
-        (Flake8I18N, "001") => Rule::FStringInI18NFuncCall,
-        (Flake8I18N, "002") => Rule::FormatInI18NFuncCall,
-        (Flake8I18N, "003") => Rule::PrintFInI18NFuncCall,
 
         // flake8-comprehensions
         (Flake8Comprehensions, "00") => Rule::UnnecessaryGeneratorList,
@@ -286,6 +283,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Return, "506") => Rule::SuperfluousElseRaise,
         (Flake8Return, "507") => Rule::SuperfluousElseContinue,
         (Flake8Return, "508") => Rule::SuperfluousElseBreak,
+
+        // flake8-i18n
+        (Flake8I18N, "001") => Rule::FStringInI18NFuncCall,
+        (Flake8I18N, "002") => Rule::FormatInI18NFuncCall,
+        (Flake8I18N, "003") => Rule::PrintfInI18NFuncCall,
 
         // flake8-implicit-str-concat
         (Flake8ImplicitStrConcat, "001") => Rule::SingleLineImplicitStringConcatenation,

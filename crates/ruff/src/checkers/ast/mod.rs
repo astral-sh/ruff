@@ -2903,8 +2903,8 @@ where
                 if self.settings.rules.any_enabled(&[
                     Rule::FStringInI18NFuncCall,
                     Rule::FormatInI18NFuncCall,
-                    Rule::PrintFInI18NFuncCall,
-                ]) && flake8_i18n::rules::function_needs_check(
+                    Rule::PrintfInI18NFuncCall,
+                ]) && flake8_i18n::rules::is_i18n_func_call(
                     func,
                     &self.settings.flake8_i18n.functions_names,
                 ) {
@@ -2916,7 +2916,7 @@ where
                         self.diagnostics
                             .extend(flake8_i18n::rules::format_in_i18n_func_call(args));
                     }
-                    if self.settings.rules.enabled(Rule::PrintFInI18NFuncCall) {
+                    if self.settings.rules.enabled(Rule::PrintfInI18NFuncCall) {
                         self.diagnostics
                             .extend(flake8_i18n::rules::printf_in_i18n_func_call(args));
                     }

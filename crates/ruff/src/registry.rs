@@ -630,7 +630,7 @@ ruff_macros::register_rules!(
     // flake8-i18n
     rules::flake8_i18n::rules::FStringInI18NFuncCall,
     rules::flake8_i18n::rules::FormatInI18NFuncCall,
-    rules::flake8_i18n::rules::PrintFInI18NFuncCall,
+    rules::flake8_i18n::rules::PrintfInI18NFuncCall,
     // numpy
     rules::numpy::rules::NumpyDeprecatedTypeAlias,
     rules::numpy::rules::NumpyLegacyRandom,
