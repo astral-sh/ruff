@@ -14,13 +14,14 @@ expression: diagnostics
     row: 5
     column: 8
   fix:
-    content: ""
-    location:
-      row: 5
-      column: 0
-    end_location:
-      row: 6
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 5
+          column: 0
+        end_location:
+          row: 6
+          column: 0
   parent: ~
 - kind:
     name: PassInClassBody
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 8
     column: 8
   fix:
-    content: ""
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 9
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 8
+          column: 0
+        end_location:
+          row: 9
+          column: 0
   parent: ~
 - kind:
     name: PassInClassBody
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 16
     column: 8
   fix:
-    content: ""
-    location:
-      row: 16
-      column: 0
-    end_location:
-      row: 17
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 16
+          column: 0
+        end_location:
+          row: 17
+          column: 0
   parent: ~
 - kind:
     name: PassInClassBody
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 20
     column: 8
   fix:
-    content: ""
-    location:
-      row: 20
-      column: 0
-    end_location:
-      row: 21
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 20
+          column: 0
+        end_location:
+          row: 21
+          column: 0
   parent: ~
 - kind:
     name: PassInClassBody
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 23
     column: 8
   fix:
-    content: ""
-    location:
-      row: 23
-      column: 0
-    end_location:
-      row: 24
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 23
+          column: 0
+        end_location:
+          row: 24
+          column: 0
   parent: ~
 - kind:
     name: PassInClassBody
@@ -114,12 +119,13 @@ expression: diagnostics
     row: 28
     column: 8
   fix:
-    content: ""
-    location:
-      row: 28
-      column: 0
-    end_location:
-      row: 29
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 28
+          column: 0
+        end_location:
+          row: 29
+          column: 0
   parent: ~
 
