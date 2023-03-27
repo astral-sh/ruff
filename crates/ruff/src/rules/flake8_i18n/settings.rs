@@ -37,7 +37,7 @@ pub struct Options {
     )]
     /// This will be appended to the function_names
     /// (or to the default values if that field is missing)
-    pub extend_function_names: Option<Vec<String>>,
+    pub extend_function_names: Vec<String>,
 }
 
 #[derive(Debug, CacheKey)]
@@ -70,7 +70,7 @@ impl From<Options> for Settings {
                         None => default_func_names(),
                     }
                 };
-                res.extend(options.extend_function_names.unwrap_or(vec![]).into_iter());
+                res.extend(options.extend_function_names);
                 res
             },
         }
@@ -81,7 +81,7 @@ impl From<Settings> for Options {
     fn from(settings: Settings) -> Self {
         Self {
             function_names: Some(settings.functions_names),
-            extend_function_names: None,
+            extend_function_names: vec![],
         }
     }
 }
