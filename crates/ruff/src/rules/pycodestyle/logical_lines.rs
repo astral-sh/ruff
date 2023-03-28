@@ -45,7 +45,8 @@ impl<'a> LogicalLines<'a> {
         assert!(u32::try_from(tokens.len()).is_ok());
 
         let single_token = tokens.len() == 1;
-        let mut builder = LogicalLinesBuilder::with_token_capacity(tokens.len());
+        let mut builder =
+            LogicalLinesBuilder::with_capacity(tokens.len(), locator.contents().len());
         let mut parens: u32 = 0;
 
         for (start, token, end) in tokens.iter().flatten() {
@@ -280,10 +281,11 @@ pub struct LogicalLinesBuilder<'a> {
 }
 
 impl<'a> LogicalLinesBuilder<'a> {
-    fn with_token_capacity(capacity: usize) -> Self {
+    fn with_capacity(tokens: usize, string: usize) -> Self {
         Self {
-            tokens: Vec::with_capacity(capacity),
-            mappings: Mappings::with_capacity(capacity + 1),
+            tokens: Vec::with_capacity(tokens),
+            mappings: Mappings::with_capacity(tokens + 1),
+            text: String::with_capacity(string),
             ..Self::default()
         }
     }
@@ -340,6 +342,9 @@ impl<'a> LogicalLinesBuilder<'a> {
 
         // TODO(charlie): "Mute" strings.
         let text = if let Tok::String { value, .. } = token {
+            // Replace the content of strings with a non-whs sequence because some lints
+            // search for whitespace in the document and whitespace inside of the string
+            // would complicate the search.
             Cow::Owned(format!("\"{}\"", "x".repeat(value.width())))
         } else {
             Cow::Borrowed(locator.slice(Range {
