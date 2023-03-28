@@ -5,6 +5,7 @@ use std::collections::BTreeSet;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::rules::isort::categorize::KnownModules;
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
 use super::categorize::ImportType;
@@ -276,8 +277,7 @@ pub struct Settings {
     pub force_sort_within_sections: bool,
     pub force_wrap_aliases: bool,
     pub force_to_top: BTreeSet<String>,
-    pub known_first_party: BTreeSet<String>,
-    pub known_third_party: BTreeSet<String>,
+    pub known_modules: KnownModules,
     pub known_local_folder: BTreeSet<String>,
     pub order_by_type: bool,
     pub relative_imports_order: RelativeImportsOrder,
@@ -302,8 +302,7 @@ impl Default for Settings {
             force_sort_within_sections: false,
             force_wrap_aliases: false,
             force_to_top: BTreeSet::new(),
-            known_first_party: BTreeSet::new(),
-            known_third_party: BTreeSet::new(),
+            known_modules: KnownModules::default(),
             known_local_folder: BTreeSet::new(),
             order_by_type: true,
             relative_imports_order: RelativeImportsOrder::default(),
@@ -332,8 +331,10 @@ impl From<Options> for Settings {
             force_sort_within_sections: options.force_sort_within_sections.unwrap_or(false),
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
             force_to_top: BTreeSet::from_iter(options.force_to_top.unwrap_or_default()),
-            known_first_party: BTreeSet::from_iter(options.known_first_party.unwrap_or_default()),
-            known_third_party: BTreeSet::from_iter(options.known_third_party.unwrap_or_default()),
+            known_modules: KnownModules::new(
+                options.known_first_party.unwrap_or_default(),
+                options.known_third_party.unwrap_or_default(),
+            ),
             known_local_folder: BTreeSet::from_iter(options.known_local_folder.unwrap_or_default()),
             order_by_type: options.order_by_type.unwrap_or(true),
             relative_imports_order: options.relative_imports_order.unwrap_or_default(),
@@ -362,8 +363,8 @@ impl From<Settings> for Options {
             force_sort_within_sections: Some(settings.force_sort_within_sections),
             force_wrap_aliases: Some(settings.force_wrap_aliases),
             force_to_top: Some(settings.force_to_top.into_iter().collect()),
-            known_first_party: Some(settings.known_first_party.into_iter().collect()),
-            known_third_party: Some(settings.known_third_party.into_iter().collect()),
+            known_first_party: Some(settings.known_modules.first_party.into_iter().collect()),
+            known_third_party: Some(settings.known_modules.third_party.into_iter().collect()),
             known_local_folder: Some(settings.known_local_folder.into_iter().collect()),
             order_by_type: Some(settings.order_by_type),
             relative_imports_order: Some(settings.relative_imports_order),

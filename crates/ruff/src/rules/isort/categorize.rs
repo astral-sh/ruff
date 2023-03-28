@@ -52,23 +52,21 @@ enum Reason<'a> {
 
 #[allow(clippy::too_many_arguments)]
 pub fn categorize(
-    module_base: &str,
+    module_name: &str,
     level: Option<&usize>,
     src: &[PathBuf],
     package: Option<&Path>,
-    known_first_party: &BTreeSet<String>,
-    known_third_party: &BTreeSet<String>,
+    known_modules: &KnownModules,
     known_local_folder: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
     target_version: PythonVersion,
 ) -> ImportType {
+    let module_base = module_name.split('.').next().unwrap();
     let (import_type, reason) = {
         if level.map_or(false, |level| *level > 0) {
             (ImportType::LocalFolder, Reason::NonZeroLevel)
-        } else if known_first_party.contains(module_base) {
-            (ImportType::FirstParty, Reason::KnownFirstParty)
-        } else if known_third_party.contains(module_base) {
-            (ImportType::ThirdParty, Reason::KnownThirdParty)
+        } else if let Some(type_and_reason) = known_modules.get_category(module_name) {
+            type_and_reason
         } else if known_local_folder.contains(module_base) {
             (ImportType::LocalFolder, Reason::KnownLocalFolder)
         } else if extra_standard_library.contains(module_base) {
@@ -91,7 +89,7 @@ pub fn categorize(
     };
     debug!(
         "Categorized '{}' as {:?} ({:?})",
-        module_base, import_type, reason
+        module_name, import_type, reason
     );
     import_type
 }
@@ -121,8 +119,7 @@ pub fn categorize_imports<'a>(
     block: ImportBlock<'a>,
     src: &[PathBuf],
     package: Option<&Path>,
-    known_first_party: &BTreeSet<String>,
-    known_third_party: &BTreeSet<String>,
+    known_modules: &KnownModules,
     known_local_folder: &BTreeSet<String>,
     extra_standard_library: &BTreeSet<String>,
     target_version: PythonVersion,
@@ -131,12 +128,11 @@ pub fn categorize_imports<'a>(
     // Categorize `StmtKind::Import`.
     for (alias, comments) in block.import {
         let import_type = categorize(
-            &alias.module_base(),
+            &alias.module_name(),
             None,
             src,
             package,
-            known_first_party,
-            known_third_party,
+            known_modules,
             known_local_folder,
             extra_standard_library,
             target_version,
@@ -150,12 +146,11 @@ pub fn categorize_imports<'a>(
     // Categorize `StmtKind::ImportFrom` (without re-export).
     for (import_from, aliases) in block.import_from {
         let classification = categorize(
-            &import_from.module_base(),
+            &import_from.module_name(),
             import_from.level,
             src,
             package,
-            known_first_party,
-            known_third_party,
+            known_modules,
             known_local_folder,
             extra_standard_library,
             target_version,
@@ -169,12 +164,11 @@ pub fn categorize_imports<'a>(
     // Categorize `StmtKind::ImportFrom` (with re-export).
     for ((import_from, alias), aliases) in block.import_from_as {
         let classification = categorize(
-            &import_from.module_base(),
+            &import_from.module_name(),
             import_from.level,
             src,
             package,
-            known_first_party,
-            known_third_party,
+            known_modules,
             known_local_folder,
             extra_standard_library,
             target_version,
@@ -188,12 +182,11 @@ pub fn categorize_imports<'a>(
     // Categorize `StmtKind::ImportFrom` (with star).
     for (import_from, comments) in block.import_from_star {
         let classification = categorize(
-            &import_from.module_base(),
+            &import_from.module_name(),
             import_from.level,
             src,
             package,
-            known_first_party,
-            known_third_party,
+            known_modules,
             known_local_folder,
             extra_standard_library,
             target_version,
@@ -205,4 +198,61 @@ pub fn categorize_imports<'a>(
             .insert(import_from, comments);
     }
     block_by_type
+}
+
+#[derive(Debug, Default, CacheKey)]
+pub struct KnownModules {
+    pub first_party: BTreeSet<String>,
+    pub third_party: BTreeSet<String>,
+    has_submodules: bool,
+}
+
+impl KnownModules {
+    pub fn new<T: IntoIterator<Item = String>>(first_party: T, third_party: T) -> Self {
+        let first_party = BTreeSet::from_iter(first_party);
+        let third_party = BTreeSet::from_iter(third_party);
+        let fp_submodules = first_party.iter().filter(|m| m.contains('.')).count() != 0;
+        let tp_submodules = third_party.iter().filter(|m| m.contains('.')).count() != 0;
+        Self {
+            first_party,
+            third_party,
+            has_submodules: fp_submodules || tp_submodules,
+        }
+    }
+
+    fn get_category(&self, module_name: &str) -> Option<(ImportType, Reason)> {
+        // Shortcut for everyone that does not use submodules in KnownModules
+        if !self.has_submodules {
+            let module_base = module_name.split('.').next().unwrap();
+            if self.first_party.contains(module_base) {
+                return Some((ImportType::FirstParty, Reason::KnownFirstParty));
+            }
+            if self.third_party.contains(module_base) {
+                return Some((ImportType::ThirdParty, Reason::KnownThirdParty));
+            }
+        }
+
+        // Check all module prefixes from the longest to the shortest. The first one
+        // matching a value in either first_party or third_party modules defines
+        // the category.
+        let parts: Vec<usize> = module_name
+            .chars()
+            .enumerate()
+            .filter(|(_, c)| *c == '.')
+            .map(|(i, _)| i)
+            .chain([module_name.len()])
+            .collect();
+
+        for i in parts.iter().rev() {
+            let submodule = &module_name[0..*i];
+            if self.first_party.contains(submodule) {
+                return Some((ImportType::FirstParty, Reason::KnownFirstParty));
+            }
+            if self.third_party.contains(submodule) {
+                return Some((ImportType::ThirdParty, Reason::KnownThirdParty));
+            }
+        }
+
+        None
+    }
 }

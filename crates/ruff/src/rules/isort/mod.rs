@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use itertools::Either::{Left, Right};
 use strum::IntoEnumIterator;
 
+use crate::rules::isort::categorize::KnownModules;
 use annotate::annotate_imports;
 use categorize::categorize_imports;
 pub use categorize::{categorize, ImportType};
@@ -123,8 +124,7 @@ pub fn format_imports(
     force_sort_within_sections: bool,
     force_wrap_aliases: bool,
     force_to_top: &BTreeSet<String>,
-    known_first_party: &BTreeSet<String>,
-    known_third_party: &BTreeSet<String>,
+    known_modules: &KnownModules,
     known_local_folder: &BTreeSet<String>,
     order_by_type: bool,
     relative_imports_order: RelativeImportsOrder,
@@ -159,8 +159,7 @@ pub fn format_imports(
             force_sort_within_sections,
             force_wrap_aliases,
             force_to_top,
-            known_first_party,
-            known_third_party,
+            known_modules,
             known_local_folder,
             order_by_type,
             relative_imports_order,
@@ -219,8 +218,7 @@ fn format_import_block(
     force_sort_within_sections: bool,
     force_wrap_aliases: bool,
     force_to_top: &BTreeSet<String>,
-    known_first_party: &BTreeSet<String>,
-    known_third_party: &BTreeSet<String>,
+    known_modules: &KnownModules,
     known_local_folder: &BTreeSet<String>,
     order_by_type: bool,
     relative_imports_order: RelativeImportsOrder,
@@ -238,8 +236,7 @@ fn format_import_block(
         block,
         src,
         package,
-        known_first_party,
-        known_third_party,
+        known_modules,
         known_local_folder,
         extra_standard_library,
         target_version,
@@ -352,6 +349,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::rules::isort::categorize::KnownModules;
     use crate::settings::Settings;
     use crate::test::{test_path, test_resource_path};
 
@@ -408,6 +406,45 @@ mod tests {
         let diagnostics = test_path(
             Path::new("isort").join(path).as_path(),
             &Settings {
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
+    fn separate_modules(path: &Path) -> Result<()> {
+        let snapshot = format!("1_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        ["foo.bar".to_string(), "baz".to_string()],
+                        ["foo".to_string(), "__future__".to_string()],
+                    ),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
+    fn separate_modules_first_party(path: &Path) -> Result<()> {
+        let snapshot = format!("2_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(["foo".to_string()], ["foo.bar".to_string()]),
+                    ..super::settings::Settings::default()
+                },
                 src: vec![test_resource_path("fixtures/isort")],
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
