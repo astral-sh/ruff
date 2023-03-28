@@ -1,13 +1,12 @@
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
-use rustpython_parser::Tok;
 
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::token_kind::TokenKind;
 
 use super::LogicalLineTokens;
-use crate::rules::pycodestyle::helpers::{is_keyword_token, is_singleton_token};
 
 #[violation]
 pub struct MissingWhitespaceAfterKeyword;
@@ -29,12 +28,12 @@ pub(crate) fn missing_whitespace_after_keyword(
         let tok0_kind = tok0.kind();
         let tok1_kind = tok1.kind();
 
-        if is_keyword_token(tok0_kind)
-            && !(is_singleton_token(tok0_kind)
-                || matches!(tok0_kind, Tok::Async | Tok::Await)
-                || tok0_kind == &Tok::Except && tok1_kind == &Tok::Star
-                || tok0_kind == &Tok::Yield && tok1_kind == &Tok::Rpar
-                || matches!(tok1_kind, Tok::Colon | Tok::Newline))
+        if tok0_kind.is_keyword()
+            && !(tok0_kind.is_singleton()
+                || matches!(tok0_kind, TokenKind::Async | TokenKind::Await)
+                || tok0_kind == TokenKind::Except && tok1_kind == TokenKind::Star
+                || tok0_kind == TokenKind::Yield && tok1_kind == TokenKind::Rpar
+                || matches!(tok1_kind, TokenKind::Colon | TokenKind::Newline))
             && tok0.end() == tok1.start()
         {
             diagnostics.push((tok0.end(), MissingWhitespaceAfterKeyword.into()));

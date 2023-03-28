@@ -1,12 +1,11 @@
-use rustpython_parser::ast::Location;
-use rustpython_parser::Tok;
-
 use super::LogicalLineTokens;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::token_kind::TokenKind;
 use ruff_python_ast::types::Range;
+use rustpython_parser::ast::Location;
 
 /// ## What it does
 /// Checks if inline comments are separated by at least two spaces.
@@ -147,7 +146,7 @@ pub(crate) fn whitespace_before_comment(
     for token in tokens {
         let kind = token.kind();
 
-        if let Tok::Comment { .. } = kind {
+        if let TokenKind::Comment = kind {
             let (start, end) = token.range();
             let line = locator.slice(Range::new(
                 Location::new(start.row(), 0),
@@ -194,7 +193,7 @@ pub(crate) fn whitespace_before_comment(
                     }
                 }
             }
-        } else if !matches!(kind, Tok::NonLogicalNewline) {
+        } else if !matches!(kind, TokenKind::NonLogicalNewline) {
             prev_end = token.end();
         }
     }

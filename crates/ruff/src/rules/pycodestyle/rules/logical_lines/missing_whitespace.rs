@@ -1,27 +1,36 @@
-use itertools::Itertools;
-use rustpython_parser::Tok;
-
 use super::LogicalLine;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::token_kind::TokenKind;
 use ruff_python_ast::types::Range;
 
 #[violation]
 pub struct MissingWhitespace {
-    pub token: String,
+    pub token: TokenKind,
+}
+
+impl MissingWhitespace {
+    fn token_text(&self) -> char {
+        match self.token {
+            TokenKind::Colon => ':',
+            TokenKind::Semi => ';',
+            TokenKind::Comma => ',',
+            _ => unreachable!(),
+        }
+    }
 }
 
 impl AlwaysAutofixableViolation for MissingWhitespace {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let MissingWhitespace { token } = self;
-        format!("Missing whitespace after {token}")
+        let token = self.token_text();
+        format!("Missing whitespace after '{token}'")
     }
 
     fn autofix_title(&self) -> String {
-        let MissingWhitespace { token } = self;
-        format!("Added missing whitespace after {token}")
+        let token = self.token_text();
+        format!("Added missing whitespace after '{token}'")
     }
 }
 
@@ -29,45 +38,47 @@ impl AlwaysAutofixableViolation for MissingWhitespace {
 pub(crate) fn missing_whitespace(line: &LogicalLine, autofix: bool) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    let mut num_lsqb = 0u32;
-    let mut num_rsqb = 0u32;
+    let mut open_parentheses = 0u32;
     let mut prev_lsqb = None;
     let mut prev_lbrace = None;
+    let mut iter = line.tokens().iter().peekable();
 
-    for (token, next_token) in line.tokens().iter().tuple_windows() {
+    while let Some(token) = iter.next() {
         let kind = token.kind();
         match kind {
-            Tok::Lsqb => {
-                num_lsqb += 1;
+            TokenKind::Lsqb => {
+                open_parentheses += 1;
                 prev_lsqb = Some(token.start());
             }
-            Tok::Rsqb => {
-                num_rsqb += 1;
+            TokenKind::Rsqb => {
+                open_parentheses += 1;
             }
-            Tok::Lbrace => {
+            TokenKind::Lbrace => {
                 prev_lbrace = Some(token.start());
             }
 
-            Tok::Comma | Tok::Semi | Tok::Colon => {
+            TokenKind::Comma | TokenKind::Semi | TokenKind::Colon => {
                 let after = line.text_after(&token);
 
                 if !after.chars().next().map_or(false, char::is_whitespace) {
-                    match (kind, next_token.kind()) {
-                        (Tok::Colon, _) if num_lsqb > num_rsqb && prev_lsqb > prev_lbrace => {
-                            continue; // Slice syntax, no space required
+                    if let Some(next_token) = iter.peek() {
+                        match (kind, next_token.kind()) {
+                            (TokenKind::Colon, _)
+                                if open_parentheses > 0 && prev_lsqb > prev_lbrace =>
+                            {
+                                continue; // Slice syntax, no space required
+                            }
+                            (TokenKind::Comma, TokenKind::Rpar | TokenKind::Rsqb) => {
+                                continue; // Allow tuple with only one element: (3,)
+                            }
+                            (TokenKind::Colon, TokenKind::Equal) => {
+                                continue; // Allow assignment expression
+                            }
+                            _ => {}
                         }
-                        (Tok::Comma, Tok::Rpar | Tok::Rsqb) => {
-                            continue; // Allow tuple with only one element: (3,)
-                        }
-                        (Tok::Colon, Tok::Equal) => {
-                            continue; // Allow assignment expression
-                        }
-                        _ => {}
                     }
 
-                    let kind = MissingWhitespace {
-                        token: kind.to_string(),
-                    };
+                    let kind = MissingWhitespace { token: kind };
 
                     let (start, end) = token.range();
                     let mut diagnostic = Diagnostic::new(kind, Range::new(start, start));

@@ -1,14 +1,10 @@
 use rustpython_parser::ast::Location;
-use rustpython_parser::Tok;
 
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::token_kind::TokenKind;
 
-use crate::rules::pycodestyle::helpers::{
-    is_arithmetic_token, is_keyword_token, is_op_token, is_skip_comment_token,
-    is_soft_keyword_token, is_unary_token, is_ws_needed_token, is_ws_optional_token,
-};
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLineTokens;
 
 // E225
@@ -66,29 +62,27 @@ pub(crate) fn missing_whitespace_around_operator(
     let mut needs_space_aux: Option<bool> = None;
     let mut prev_end_aux: Option<Location> = None;
     let mut parens = 0u32;
-    let mut prev_type: Option<&Tok> = None;
+    let mut prev_type: Option<TokenKind> = None;
     let mut prev_end: Option<Location> = None;
 
     for token in tokens {
         let kind = token.kind();
 
-        if is_skip_comment_token(kind) {
+        if kind.is_skip_comment() {
             continue;
         }
+
         match kind {
-            Tok::Lpar | Tok::Lambda => parens += 1,
-            Tok::Rpar => parens -= 1,
+            TokenKind::Lpar | TokenKind::Lambda => parens += 1,
+            TokenKind::Rpar => parens -= 1,
             _ => {}
         };
 
-        let needs_space = (needs_space_main.is_some() && needs_space_main.unwrap())
-            || needs_space_aux.is_some()
-            || prev_end_aux.is_some();
+        let needs_space =
+            needs_space_main == Some(true) || needs_space_aux.is_some() || prev_end_aux.is_some();
         if needs_space {
             if Some(token.start()) != prev_end {
-                if !(needs_space_main.is_some() && needs_space_main.unwrap())
-                    && (needs_space_aux.is_none() || !needs_space_aux.unwrap())
-                {
+                if needs_space_main != Some(true) && needs_space_aux != Some(true) {
                     diagnostics.push((
                         prev_end_aux.unwrap(),
                         MissingWhitespaceAroundOperator.into(),
@@ -97,27 +91,27 @@ pub(crate) fn missing_whitespace_around_operator(
                 needs_space_main = Some(false);
                 needs_space_aux = None;
                 prev_end_aux = None;
-            } else if kind == &Tok::Greater && matches!(prev_type, Some(Tok::Less | Tok::Minus)) {
+            } else if kind == TokenKind::Greater
+                && matches!(prev_type, Some(TokenKind::Less | TokenKind::Minus))
+            {
                 // Tolerate the "<>" operator, even if running Python 3
                 // Deal with Python 3's annotated return value "->"
-            } else if prev_type == Some(&Tok::Slash)
-                && matches!(kind, Tok::Comma | Tok::Rpar | Tok::Colon)
-                || (prev_type == Some(&Tok::Rpar) && kind == &Tok::Colon)
+            } else if prev_type == Some(TokenKind::Slash)
+                && matches!(kind, TokenKind::Comma | TokenKind::Rpar | TokenKind::Colon)
+                || (prev_type == Some(TokenKind::Rpar) && kind == TokenKind::Colon)
             {
                 // Tolerate the "/" operator in function definition
                 // For more info see PEP570
             } else {
-                if (needs_space_main.is_some() && needs_space_main.unwrap())
-                    || (needs_space_aux.is_some() && needs_space_aux.unwrap())
-                {
+                if needs_space_main == Some(true) || needs_space_aux == Some(true) {
                     diagnostics.push((prev_end.unwrap(), MissingWhitespaceAroundOperator.into()));
-                } else if prev_type != Some(&Tok::DoubleStar) {
-                    if prev_type == Some(&Tok::Percent) {
+                } else if prev_type != Some(TokenKind::DoubleStar) {
+                    if prev_type == Some(TokenKind::Percent) {
                         diagnostics.push((
                             prev_end_aux.unwrap(),
                             MissingWhitespaceAroundModuloOperator.into(),
                         ));
-                    } else if !is_arithmetic_token(prev_type.unwrap()) {
+                    } else if !prev_type.unwrap().is_arithmetic() {
                         diagnostics.push((
                             prev_end_aux.unwrap(),
                             MissingWhitespaceAroundBitwiseOrShiftOperator.into(),
@@ -133,28 +127,30 @@ pub(crate) fn missing_whitespace_around_operator(
                 needs_space_aux = None;
                 prev_end_aux = None;
             }
-        } else if (is_op_token(kind) || matches!(kind, Tok::Name { .. })) && prev_end.is_some() {
-            if kind == &Tok::Equal && parens > 0 {
+        } else if (kind.is_operator() || matches!(kind, TokenKind::Name)) && prev_end.is_some() {
+            if kind == TokenKind::Equal && parens > 0 {
                 // Allow keyword args or defaults: foo(bar=None).
-            } else if is_ws_needed_token(kind) {
+            } else if kind.is_whitespace_needed() {
                 needs_space_main = Some(true);
                 needs_space_aux = None;
                 prev_end_aux = None;
-            } else if is_unary_token(kind) {
+            } else if kind.is_unary() {
                 // Check if the operator is used as a binary operator
                 // Allow unary operators: -123, -x, +1.
                 // Allow argument unpacking: foo(*args, **kwargs)
                 if let Some(prev_type) = prev_type {
-                    if (matches!(prev_type, Tok::Rpar | Tok::Rsqb | Tok::Rbrace))
-                        || (!is_op_token(prev_type) && !is_keyword_token(prev_type))
-                            && (!is_soft_keyword_token(prev_type))
+                    if (matches!(
+                        prev_type,
+                        TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
+                    )) || (!prev_type.is_operator() && !prev_type.is_keyword())
+                        && (!prev_type.is_soft_keyword())
                     {
                         needs_space_main = None;
                         needs_space_aux = None;
                         prev_end_aux = None;
                     }
                 }
-            } else if is_ws_optional_token(kind) {
+            } else if kind.is_whitespace_optional() {
                 needs_space_main = None;
                 needs_space_aux = None;
                 prev_end_aux = None;
@@ -163,13 +159,9 @@ pub(crate) fn missing_whitespace_around_operator(
             if needs_space_main.is_none() {
                 // Surrounding space is optional, but ensure that
                 // trailing space matches opening space
-                needs_space_main = None;
                 prev_end_aux = prev_end;
                 needs_space_aux = Some(Some(token.start()) != prev_end_aux);
-            } else if needs_space_main.is_some()
-                && needs_space_main.unwrap()
-                && Some(token.start()) == prev_end_aux
-            {
+            } else if needs_space_main == Some(true) && Some(token.start()) == prev_end_aux {
                 // A needed opening space was not found
                 diagnostics.push((prev_end.unwrap(), MissingWhitespaceAroundOperator.into()));
                 needs_space_main = Some(false);
