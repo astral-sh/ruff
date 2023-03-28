@@ -18,7 +18,7 @@ if VERSION != "":
 req = f"ruff{version_specifier}"
 
 pip_proc = run(
-    ["pipx", "install", "venv", req],
+    ["pipx", "install", req],
     stdout=PIPE,
     stderr=STDOUT,
     encoding="utf-8",
