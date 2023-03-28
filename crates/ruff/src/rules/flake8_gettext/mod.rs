@@ -1,4 +1,4 @@
-//! Rules from [flake8_gettext](https://pypi.org/project/flake8_gettext/).
+//! Rules from [flake8-gettext](https://pypi.org/project/flake8-gettext/).
 pub(crate) mod rules;
 pub mod settings;
 

@@ -284,7 +284,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Return, "507") => Rule::SuperfluousElseContinue,
         (Flake8Return, "508") => Rule::SuperfluousElseBreak,
 
-        // flake8_gettext
+        // flake8-gettext
         (Flake8GetText, "001") => Rule::FStringInGetTextFuncCall,
         (Flake8GetText, "002") => Rule::FormatInGetTextFuncCall,
         (Flake8GetText, "003") => Rule::PrintfInGetTextFuncCall,

@@ -2891,7 +2891,7 @@ where
                     }
                 }
 
-                // flake8_gettext
+                // flake8-gettext
                 if self.settings.rules.any_enabled(&[
                     Rule::FStringInGetTextFuncCall,
                     Rule::FormatInGetTextFuncCall,

@@ -177,7 +177,7 @@
       ]
     },
     "flake8-gettext": {
-      "description": "Options for the `flake8_gettext` plugin.",
+      "description": "Options for the `flake8-gettext` plugin.",
       "anyOf": [
         {
           "$ref": "#/definitions/Flake8GetTextOptions"

@@ -457,7 +457,7 @@ pub struct Options {
     /// Options for the `flake8-type-checking` plugin.
     pub flake8_type_checking: Option<flake8_type_checking::settings::Options>,
     #[option_group]
-    /// Options for the `flake8_gettext` plugin.
+    /// Options for the `flake8-gettext` plugin.
     pub flake8_gettext: Option<flake8_gettext::settings::Options>,
     #[option_group]
     /// Options for the `flake8-implicit-str-concat` plugin.
