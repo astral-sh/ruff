@@ -4960,9 +4960,7 @@ impl<'a> Checker<'a> {
                     let child: &Stmt = defined_by.into();
 
                     let diagnostic_lineno = binding.range.location.row();
-                    let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. })
-                        && child.location.row() != diagnostic_lineno
-                    {
+                    let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. }) {
                         Some(child.location.row())
                     } else {
                         None
@@ -5038,9 +5036,7 @@ impl<'a> Checker<'a> {
                             },
                             *range,
                         );
-                        if matches!(child.node, StmtKind::ImportFrom { .. })
-                            && child.location.row() != range.location.row()
-                        {
+                        if matches!(child.node, StmtKind::ImportFrom { .. }) {
                             diagnostic.set_parent(child.location);
                         }
                         if let Some(fix) = fix.as_ref() {
@@ -5072,9 +5068,7 @@ impl<'a> Checker<'a> {
                             },
                             *range,
                         );
-                        if matches!(child.node, StmtKind::ImportFrom { .. })
-                            && child.location.row() != range.location.row()
-                        {
+                        if matches!(child.node, StmtKind::ImportFrom { .. }) {
                             diagnostic.set_parent(child.location);
                         }
                         diagnostics.push(diagnostic);

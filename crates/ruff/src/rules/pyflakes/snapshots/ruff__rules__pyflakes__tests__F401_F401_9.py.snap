@@ -22,5 +22,7 @@ expression: diagnostics
         end_location:
           row: 4
           column: 24
-  parent: ~
+  parent:
+    row: 4
+    column: 0
 
