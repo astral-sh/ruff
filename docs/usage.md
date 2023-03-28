@@ -36,7 +36,10 @@ Or, to enable autofix:
       args: [--fix, --exit-non-zero-on-fix]
 ```
 
-Note that Ruff's pre-commit hook should run before Black, isort, and other formatting tools.
+Ruff's pre-commit hook should be placed after other formatting tools, such as Black and isort,
+_unless_ you enable autofix, in which case, Ruff's pre-commit hook should run _before_ Black, isort,
+and other formatting tools, as Ruff's autofix behavior can output code changes that require
+reformatting.
 
 Ruff can also be used as a [VS Code extension](https://github.com/charliermarsh/ruff-vscode) or
 alongside any other editor through the [Ruff LSP](https://github.com/charliermarsh/ruff-lsp).
