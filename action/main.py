@@ -1,4 +1,5 @@
 import os
+import re
 import shlex
 import sys
 from pathlib import Path
@@ -12,6 +13,9 @@ VERSION = os.getenv("INPUT_VERSION", default="")
 version_specifier=""
 # TODO: some form of validation for user input VERSION
 if VERSION != "":
+    if not re.match('[v?0-9\.]', VERSION):
+        print("VERSION is incorrect")
+        sys.exit(1)
     version_specifier = f"=={VERSION}"
 
 req = f"ruff{version_specifier}"
