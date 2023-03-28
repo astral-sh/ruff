@@ -12,7 +12,7 @@ use ruff_python_ast::types::Range;
 
 bitflags! {
     #[derive(Default)]
-    pub struct TokenFlags: u8 {
+    pub(crate) struct TokenFlags: u8 {
         /// Whether the logical line contains an operator.
         const OPERATOR = 0b0000_0001;
         /// Whether the logical line contains a bracket.
@@ -27,7 +27,7 @@ bitflags! {
 }
 
 #[derive(Clone)]
-pub struct LogicalLines<'a> {
+pub(crate) struct LogicalLines<'a> {
     tokens: Tokens<'a>,
     lines: Vec<Line>,
     locator: &'a Locator<'a>,
@@ -95,7 +95,7 @@ impl<'a> IntoIterator for &'a LogicalLines<'a> {
 /// ]
 /// ```
 #[derive(Debug)]
-pub struct LogicalLine<'a> {
+pub(crate) struct LogicalLine<'a> {
     lines: &'a LogicalLines<'a>,
     line: &'a Line,
 }
@@ -112,10 +112,17 @@ impl<'a> LogicalLine<'a> {
     }
 
     /// Returns the text without any leading or trailing newline, comment, indent, or dedent of this line
+    #[cfg(test)]
     pub fn text_trimmed(&self) -> &'a str {
-        self.tokens().trimmed().text()
+        self.tokens_trimmed().text()
     }
 
+    #[cfg(test)]
+    pub fn tokens_trimmed(&self) -> LogicalLineTokens<'a> {
+        self.tokens().trimmed()
+    }
+
+    /// Returns the text after `token`
     pub fn text_after(&self, token: &LogicalLineToken<'a>) -> &str {
         debug_assert!(
             (self.line.tokens_start..self.line.tokens_end).contains(&token.position),
@@ -129,6 +136,7 @@ impl<'a> LogicalLine<'a> {
             .slice(Range::new(token.end(), last_token.end()))
     }
 
+    /// Returns the text before `token`
     pub fn text_before(&self, token: &LogicalLineToken<'a>) -> &str {
         debug_assert!(
             (self.line.tokens_start..self.line.tokens_end).contains(&token.position),
@@ -142,8 +150,14 @@ impl<'a> LogicalLine<'a> {
             .slice(Range::new(first_token.start(), token.start()))
     }
 
-    pub fn tokens_trimmed(&self) -> LogicalLineTokens<'a> {
-        self.tokens().trimmed()
+    /// Returns the whitespace *after* the `token`
+    pub fn trailing_whitespace(&self, token: &LogicalLineToken<'a>) -> Whitespace {
+        Whitespace::leading(self.text_after(token))
+    }
+
+    /// Returns the whitespace and whitespace character-length *before* the `token`
+    pub fn leading_whitespace(&self, token: &LogicalLineToken<'a>) -> (Whitespace, usize) {
+        Whitespace::trailing(self.text_before(token))
     }
 
     /// Returns all tokens of the line, including comments and trailing new lines.
@@ -180,7 +194,7 @@ impl Debug for DebugLogicalLine<'_> {
 }
 
 /// Iterator over the logical lines of a document.
-pub struct LogicalLinesIter<'a> {
+pub(crate) struct LogicalLinesIter<'a> {
     lines: &'a LogicalLines<'a>,
     inner: std::slice::Iter<'a, Line>,
 }
@@ -218,7 +232,7 @@ impl ExactSizeIterator for LogicalLinesIter<'_> {}
 impl FusedIterator for LogicalLinesIter<'_> {}
 
 /// The tokens of a logical line
-pub struct LogicalLineTokens<'a> {
+pub(crate) struct LogicalLineTokens<'a> {
     lines: &'a LogicalLines<'a>,
     front: u32,
     back: u32,
@@ -329,7 +343,7 @@ impl Debug for LogicalLineTokens<'_> {
 }
 
 /// Iterator over the tokens of a [`LogicalLine`]
-pub struct LogicalLineTokensIter<'a> {
+pub(crate) struct LogicalLineTokensIter<'a> {
     tokens: &'a Tokens<'a>,
     front: u32,
     back: u32,
@@ -378,7 +392,7 @@ impl DoubleEndedIterator for LogicalLineTokensIter<'_> {
 
 /// A token of a [`LogicalLine`]
 #[derive(Clone)]
-pub struct LogicalLineToken<'a> {
+pub(crate) struct LogicalLineToken<'a> {
     tokens: &'a Tokens<'a>,
     position: u32,
 }
@@ -417,6 +431,61 @@ impl Debug for LogicalLineToken<'_> {
             .field("kind", &self.kind())
             .field("range", &self.range())
             .finish()
+    }
+}
+
+#[derive(Copy, Clone, Eq, PartialEq)]
+pub(crate) enum Whitespace {
+    None,
+    Single,
+    Many,
+    Tab,
+}
+
+impl Whitespace {
+    fn leading(content: &str) -> Self {
+        let mut count = 0u32;
+
+        for c in content.chars() {
+            if c == '\t' {
+                return Self::Tab;
+            } else if matches!(c, '\n' | '\r') {
+                break;
+            } else if c.is_whitespace() {
+                count += 1;
+            } else {
+                break;
+            }
+        }
+
+        match count {
+            0 => Whitespace::None,
+            1 => Whitespace::Single,
+            _ => Whitespace::Many,
+        }
+    }
+
+    fn trailing(content: &str) -> (Self, usize) {
+        let mut count = 0;
+
+        for c in content.chars().rev() {
+            if c == '\t' {
+                return (Self::Tab, count + 1);
+            } else if matches!(c, '\n' | '\r') {
+                // Indent
+                return (Self::None, 0);
+            } else if c.is_whitespace() {
+                count += 1;
+            } else {
+                break;
+            }
+        }
+
+        match count {
+            0 => (Self::None, 0),
+            1 => (Self::Single, count),
+            _ => (Self::Many, count),
+        }
     }
 }
 

@@ -31,7 +31,10 @@ impl AlwaysAutofixableViolation for WhitespaceBeforeParameters {
 
 /// E211
 #[cfg(feature = "logical_lines")]
-pub fn whitespace_before_parameters(tokens: &LogicalLineTokens, autofix: bool) -> Vec<Diagnostic> {
+pub(crate) fn whitespace_before_parameters(
+    tokens: &LogicalLineTokens,
+    autofix: bool,
+) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
     let previous = tokens.first().unwrap();
 

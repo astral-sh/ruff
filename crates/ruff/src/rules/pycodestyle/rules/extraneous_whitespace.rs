@@ -5,8 +5,7 @@ use regex::Regex;
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens};
-use crate::rules::pycodestyle::rules::Whitespace;
+use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens, Whitespace};
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -108,7 +107,7 @@ impl Violation for WhitespaceBeforePunctuation {
 
 /// E201, E202, E203
 #[cfg(feature = "logical_lines")]
-pub fn extraneous_whitespace(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
+pub(crate) fn extraneous_whitespace(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut last_token: Option<&Tok> = None;
 
@@ -116,10 +115,8 @@ pub fn extraneous_whitespace(line: &LogicalLine) -> Vec<(Location, DiagnosticKin
         let kind = token.kind();
         match kind {
             Tok::Lbrace | Tok::Lpar | Tok::Lsqb => {
-                let end = token.end();
-                let after = line.text_after(&token);
-
-                if !matches!(Whitespace::leading(after), Whitespace::None) {
+                if !matches!(line.trailing_whitespace(&token), Whitespace::None) {
+                    let end = token.end();
                     diagnostics.push((
                         Location::new(end.row(), end.column()),
                         WhitespaceAfterOpenBracket.into(),
@@ -127,18 +124,16 @@ pub fn extraneous_whitespace(line: &LogicalLine) -> Vec<(Location, DiagnosticKin
                 }
             }
             Tok::Rbrace | Tok::Rpar | Tok::Rsqb | Tok::Comma | Tok::Semi | Tok::Colon => {
-                let start = token.start();
-                let before = line.text_before(&token);
-
                 let diagnostic_kind = if matches!(kind, Tok::Comma | Tok::Semi | Tok::Colon) {
                     DiagnosticKind::from(WhitespaceBeforePunctuation)
                 } else {
                     DiagnosticKind::from(WhitespaceBeforeCloseBracket)
                 };
 
-                match Whitespace::trailing(before) {
+                match line.leading_whitespace(&token) {
                     (Whitespace::None, _) => {}
                     (_, offset) => {
+                        let start = token.start();
                         if !matches!(last_token, Some(Tok::Comma)) {
                             diagnostics.push((
                                 Location::new(start.row(), start.column() - offset),

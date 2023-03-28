@@ -5,7 +5,6 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
 use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens};
-use crate::rules::pycodestyle::rules::Whitespace;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
@@ -33,7 +32,7 @@ impl AlwaysAutofixableViolation for MissingWhitespace {
 
 /// E231
 #[cfg(feature = "logical_lines")]
-pub fn missing_whitespace(line: &LogicalLine, autofix: bool) -> Vec<Diagnostic> {
+pub(crate) fn missing_whitespace(line: &LogicalLine, autofix: bool) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     let mut num_lsqb = 0u32;

@@ -6,8 +6,7 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
 use crate::rules::pycodestyle::helpers::is_keyword_token;
-use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens};
-use crate::rules::pycodestyle::rules::Whitespace;
+use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens, Whitespace};
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -118,7 +117,7 @@ impl Violation for TabBeforeKeyword {
 
 /// E271, E272, E273, E274
 #[cfg(feature = "logical_lines")]
-pub fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
+pub(crate) fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut after_keyword = false;
 
@@ -127,10 +126,9 @@ pub fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(Location, Diagnost
 
         if is_keyword {
             let (start, end) = token.range();
-            let before = line.text_before(&token);
 
             if !after_keyword {
-                match Whitespace::trailing(before) {
+                match line.leading_whitespace(&token) {
                     (Whitespace::Tab, offset) => diagnostics.push((
                         Location::new(start.row(), start.column() - offset),
                         TabBeforeKeyword.into(),
@@ -143,8 +141,7 @@ pub fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(Location, Diagnost
                 }
             }
 
-            let after = line.text_after(&token);
-            match Whitespace::leading(after) {
+            match line.trailing_whitespace(&token) {
                 Whitespace::Tab => diagnostics.push((end, TabAfterKeyword.into())),
                 Whitespace::Many => diagnostics.push((end, MultipleSpacesAfterKeyword.into())),
                 _ => {}

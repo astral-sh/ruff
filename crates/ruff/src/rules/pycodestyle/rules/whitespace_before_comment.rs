@@ -141,7 +141,7 @@ impl Violation for MultipleLeadingHashesForBlockComment {
 
 /// E261, E262, E265, E266
 #[cfg(feature = "logical_lines")]
-pub fn whitespace_before_comment(
+pub(crate) fn whitespace_before_comment(
     tokens: &LogicalLineTokens,
     locator: &Locator,
 ) -> Vec<(Range, DiagnosticKind)> {

@@ -233,7 +233,7 @@ impl Violation for OverIndented {
 
 /// E111, E114, E112, E113, E115, E116, E117
 #[cfg(feature = "logical_lines")]
-pub fn indentation(
+pub(crate) fn indentation(
     logical_line: &LogicalLine,
     prev_logical_line: Option<&LogicalLine>,
     indent_char: char,

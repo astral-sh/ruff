@@ -6,8 +6,7 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
 use crate::rules::pycodestyle::helpers::{is_op_token, is_ws_needed_token};
-use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens};
-use crate::rules::pycodestyle::rules::Whitespace;
+use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens, Whitespace};
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -132,7 +131,7 @@ impl Violation for MultipleSpacesAfterOperator {
 
 /// E221, E222, E223, E224
 #[cfg(feature = "logical_lines")]
-pub fn space_around_operator(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
+pub(crate) fn space_around_operator(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut after_operator = false;
 
@@ -143,9 +142,7 @@ pub fn space_around_operator(line: &LogicalLine) -> Vec<(Location, DiagnosticKin
             let (start, end) = token.range();
 
             if !after_operator {
-                let before = line.text_before(&token);
-
-                match Whitespace::trailing(before) {
+                match line.leading_whitespace(&token) {
                     (Whitespace::Tab, offset) => diagnostics.push((
                         Location::new(start.row(), start.column() - offset),
                         TabBeforeOperator.into(),
@@ -158,8 +155,7 @@ pub fn space_around_operator(line: &LogicalLine) -> Vec<(Location, DiagnosticKin
                 }
             }
 
-            let after = line.text_after(&token);
-            match Whitespace::leading(after) {
+            match line.trailing_whitespace(&token) {
                 Whitespace::Tab => diagnostics.push((end, TabAfterOperator.into())),
                 Whitespace::Many => diagnostics.push((end, MultipleSpacesAfterOperator.into())),
                 _ => {}

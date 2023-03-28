@@ -23,7 +23,7 @@ impl Violation for MissingWhitespaceAfterKeyword {
 
 /// E275
 #[cfg(feature = "logical_lines")]
-pub fn missing_whitespace_after_keyword(
+pub(crate) fn missing_whitespace_after_keyword(
     tokens: &LogicalLineTokens,
 ) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];

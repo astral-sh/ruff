@@ -47,7 +47,7 @@ fn is_in_def(tokens: &LogicalLineTokens) -> bool {
 
 /// E251, E252
 #[cfg(feature = "logical_lines")]
-pub fn whitespace_around_named_parameter_equals(
+pub(crate) fn whitespace_around_named_parameter_equals(
     tokens: &LogicalLineTokens,
 ) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
