@@ -89,7 +89,7 @@ impl<'a> Checker<'a> {
         package: Option<&'a Path>,
         module_path: Option<Vec<String>>,
         locator: &'a Locator,
-        style: &'a Stylist,
+        stylist: &'a Stylist,
         indexer: &'a Indexer,
     ) -> Checker<'a> {
         Checker {
@@ -102,13 +102,13 @@ impl<'a> Checker<'a> {
             module_path: module_path.clone(),
             is_stub: is_python_stub_file(path),
             locator,
-            stylist: style,
+            stylist,
             indexer,
             ctx: Context::new(&settings.typing_modules, path, module_path),
             deferred: Deferred::default(),
-            diagnostics: vec![],
+            diagnostics: Vec::default(),
             deletions: FxHashSet::default(),
-            flake8_bugbear_seen: vec![],
+            flake8_bugbear_seen: Vec::default(),
         }
     }
 }
