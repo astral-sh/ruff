@@ -13,7 +13,7 @@ inputs:
     required: false
     default: "."
   version:
-    description: 'Python Version specifier (PEP440) - e.g. "v0.0.259"'
+    description: 'The version of ruff to use, e.g. "0.0.259"'
     required: false
     default: ""
 branding:
