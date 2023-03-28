@@ -107,6 +107,7 @@ impl From<&Import> for Range {
 pub struct Imports {
     pub imports_per_module: FxHashMap<String, Vec<Import>>,
     pub module_to_path_mapping: FxHashMap<String, PathBuf>,
+    pub path_to_module_mapping: FxHashMap<PathBuf, String>,
 }
 
 impl Imports {
@@ -118,6 +119,8 @@ impl Imports {
     pub fn insert_new_module(&mut self, module: &str, module_path: &Path) {
         self.module_to_path_mapping
             .insert(module.to_owned(), module_path.to_owned());
+        self.path_to_module_mapping
+            .insert(module_path.to_owned(), module.to_owned());
     }
 
     pub fn extend(&mut self, other: Self) {
