@@ -68,33 +68,36 @@ pub fn check_noqa(
             FileExemption::None => {}
         }
 
+        let diagnostic_lineno = diagnostic.location.row();
+
         // Is the violation ignored by a `noqa` directive on the parent line?
         if let Some(parent_lineno) = diagnostic.parent.map(|location| location.row()) {
-            let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
-            if commented_lines.contains(noqa_lineno) {
-                let noqa = noqa_directives.entry(noqa_lineno - 1).or_insert_with(|| {
-                    (noqa::extract_noqa_directive(lines[noqa_lineno - 1]), vec![])
-                });
-                match noqa {
-                    (Directive::All(..), matches) => {
-                        matches.push(diagnostic.kind.rule().noqa_code());
-                        ignored_diagnostics.push(index);
-                        continue;
-                    }
-                    (Directive::Codes(.., codes, _), matches) => {
-                        if noqa::includes(diagnostic.kind.rule(), codes) {
+            if parent_lineno != diagnostic_lineno {
+                let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
+                if commented_lines.contains(noqa_lineno) {
+                    let noqa = noqa_directives.entry(noqa_lineno - 1).or_insert_with(|| {
+                        (noqa::extract_noqa_directive(lines[noqa_lineno - 1]), vec![])
+                    });
+                    match noqa {
+                        (Directive::All(..), matches) => {
                             matches.push(diagnostic.kind.rule().noqa_code());
                             ignored_diagnostics.push(index);
                             continue;
                         }
+                        (Directive::Codes(.., codes, _), matches) => {
+                            if noqa::includes(diagnostic.kind.rule(), codes) {
+                                matches.push(diagnostic.kind.rule().noqa_code());
+                                ignored_diagnostics.push(index);
+                                continue;
+                            }
+                        }
+                        (Directive::None, ..) => {}
                     }
-                    (Directive::None, ..) => {}
                 }
             }
         }
 
         // Is the diagnostic ignored by a `noqa` directive on the same line?
-        let diagnostic_lineno = diagnostic.location.row();
         let noqa_lineno = noqa_line_for
             .get(&diagnostic_lineno)
             .unwrap_or(&diagnostic_lineno);
