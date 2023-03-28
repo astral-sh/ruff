@@ -564,6 +564,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "009") => Rule::PassStatementStubBody,
         (Flake8Pyi, "010") => Rule::NonEmptyStubBody,
         (Flake8Pyi, "011") => Rule::TypedArgumentDefaultInStub,
+        (Flake8Pyi, "012") => Rule::PassInClassBody,
         (Flake8Pyi, "014") => Rule::ArgumentDefaultInStub,
         (Flake8Pyi, "015") => Rule::AssignmentDefaultInStub,
         (Flake8Pyi, "021") => Rule::DocstringInStub,

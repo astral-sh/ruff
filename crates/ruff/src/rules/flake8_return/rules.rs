@@ -4,14 +4,15 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind}
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::elif_else_range;
 use ruff_python_ast::helpers::is_const_none;
-use ruff_python_ast::helpers::{elif_else_range, end_of_statement};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
+use crate::rules::flake8_return::helpers::end_of_last_statement;
 
 use super::branch::Branch;
 use super::helpers::result_exists;
@@ -222,7 +223,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str("return None");
                         diagnostic.set_fix(Edit::insertion(
                             content,
-                            end_of_statement(stmt, checker.locator),
+                            end_of_last_statement(stmt, checker.locator),
                         ));
                     }
                 }
@@ -260,7 +261,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str("return None");
                         diagnostic.set_fix(Edit::insertion(
                             content,
-                            end_of_statement(stmt, checker.locator),
+                            end_of_last_statement(stmt, checker.locator),
                         ));
                     }
                 }
@@ -299,7 +300,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                     content.push_str("return None");
                     diagnostic.set_fix(Edit::insertion(
                         content,
-                        end_of_statement(stmt, checker.locator),
+                        end_of_last_statement(stmt, checker.locator),
                     ));
                 }
             }

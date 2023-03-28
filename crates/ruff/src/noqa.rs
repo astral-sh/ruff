@@ -233,26 +233,29 @@ fn add_noqa_inner(
             FileExemption::None => {}
         }
 
+        let diagnostic_lineno = diagnostic.location.row();
+
         // Is the violation ignored by a `noqa` directive on the parent line?
         if let Some(parent_lineno) = diagnostic.parent.map(|location| location.row()) {
-            let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
-            if commented_lines.contains(noqa_lineno) {
-                match extract_noqa_directive(lines[noqa_lineno - 1]) {
-                    Directive::All(..) => {
-                        continue;
-                    }
-                    Directive::Codes(.., codes, _) => {
-                        if includes(diagnostic.kind.rule(), &codes) {
+            if parent_lineno != diagnostic_lineno {
+                let noqa_lineno = noqa_line_for.get(&parent_lineno).unwrap_or(&parent_lineno);
+                if commented_lines.contains(noqa_lineno) {
+                    match extract_noqa_directive(lines[noqa_lineno - 1]) {
+                        Directive::All(..) => {
                             continue;
                         }
+                        Directive::Codes(.., codes, _) => {
+                            if includes(diagnostic.kind.rule(), &codes) {
+                                continue;
+                            }
+                        }
+                        Directive::None => {}
                     }
-                    Directive::None => {}
                 }
             }
         }
 
         // Is the diagnostic ignored by a `noqa` directive on the same line?
-        let diagnostic_lineno = diagnostic.location.row();
         let noqa_lineno = noqa_line_for
             .get(&diagnostic_lineno)
             .unwrap_or(&diagnostic_lineno);

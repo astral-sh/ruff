@@ -129,7 +129,9 @@ expression: diagnostics
         end_location:
           row: 89
           column: 52
-  parent: ~
+  parent:
+    row: 89
+    column: 4
 - kind:
     name: UnusedImport
     body: "`typing.AwaitableGenerator` imported but unused"
@@ -150,7 +152,9 @@ expression: diagnostics
         end_location:
           row: 89
           column: 52
-  parent: ~
+  parent:
+    row: 89
+    column: 4
 - kind:
     name: UnusedNOQA
     body: "Unused `noqa` directive (non-enabled: `F501`)"

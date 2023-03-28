@@ -45,7 +45,9 @@ expression: diagnostics
         end_location:
           row: 67
           column: 0
-  parent: ~
+  parent:
+    row: 66
+    column: 0
 - kind:
     name: UnusedImport
     body: "`typing.AwaitableGenerator` imported but unused"
@@ -66,5 +68,7 @@ expression: diagnostics
         end_location:
           row: 67
           column: 0
-  parent: ~
+  parent:
+    row: 66
+    column: 0
 

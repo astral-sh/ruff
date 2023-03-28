@@ -12,6 +12,7 @@ pub mod relocate;
 pub mod scope;
 pub mod source_code;
 pub mod str;
+pub mod token_kind;
 pub mod types;
 pub mod typing;
 pub mod visibility;

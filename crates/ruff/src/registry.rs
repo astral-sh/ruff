@@ -15,67 +15,67 @@ ruff_macros::register_rules!(
     // pycodestyle errors
     rules::pycodestyle::rules::MixedSpacesAndTabs,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::IndentationWithInvalidMultiple,
+    rules::pycodestyle::rules::logical_lines::IndentationWithInvalidMultiple,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::NoIndentedBlock,
+    rules::pycodestyle::rules::logical_lines::NoIndentedBlock,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::UnexpectedIndentation,
+    rules::pycodestyle::rules::logical_lines::UnexpectedIndentation,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::IndentationWithInvalidMultipleComment,
+    rules::pycodestyle::rules::logical_lines::IndentationWithInvalidMultipleComment,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::NoIndentedBlockComment,
+    rules::pycodestyle::rules::logical_lines::NoIndentedBlockComment,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::UnexpectedIndentationComment,
+    rules::pycodestyle::rules::logical_lines::UnexpectedIndentationComment,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::OverIndented,
+    rules::pycodestyle::rules::logical_lines::OverIndented,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::WhitespaceAfterOpenBracket,
+    rules::pycodestyle::rules::logical_lines::WhitespaceAfterOpenBracket,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::WhitespaceBeforeCloseBracket,
+    rules::pycodestyle::rules::logical_lines::WhitespaceBeforeCloseBracket,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::WhitespaceBeforePunctuation,
+    rules::pycodestyle::rules::logical_lines::WhitespaceBeforePunctuation,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::MultipleSpacesBeforeOperator,
+    rules::pycodestyle::rules::logical_lines::MultipleSpacesBeforeOperator,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::MultipleSpacesAfterOperator,
+    rules::pycodestyle::rules::logical_lines::MultipleSpacesAfterOperator,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::TabBeforeOperator,
+    rules::pycodestyle::rules::logical_lines::TabBeforeOperator,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::TabAfterOperator,
+    rules::pycodestyle::rules::logical_lines::TabAfterOperator,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::TooFewSpacesBeforeInlineComment,
+    rules::pycodestyle::rules::logical_lines::TooFewSpacesBeforeInlineComment,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::NoSpaceAfterInlineComment,
+    rules::pycodestyle::rules::logical_lines::NoSpaceAfterInlineComment,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::NoSpaceAfterBlockComment,
+    rules::pycodestyle::rules::logical_lines::NoSpaceAfterBlockComment,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::MultipleLeadingHashesForBlockComment,
+    rules::pycodestyle::rules::logical_lines::MultipleLeadingHashesForBlockComment,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::MultipleSpacesAfterKeyword,
+    rules::pycodestyle::rules::logical_lines::MultipleSpacesAfterKeyword,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::MissingWhitespace,
+    rules::pycodestyle::rules::logical_lines::MissingWhitespace,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::MissingWhitespaceAfterKeyword,
+    rules::pycodestyle::rules::logical_lines::MissingWhitespaceAfterKeyword,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::MultipleSpacesBeforeKeyword,
+    rules::pycodestyle::rules::logical_lines::MultipleSpacesBeforeKeyword,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::MissingWhitespaceAroundOperator,
+    rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundOperator,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::MissingWhitespaceAroundArithmeticOperator,
+    rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundArithmeticOperator,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::MissingWhitespaceAroundBitwiseOrShiftOperator,
+    rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundBitwiseOrShiftOperator,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::MissingWhitespaceAroundModuloOperator,
+    rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundModuloOperator,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::TabAfterKeyword,
+    rules::pycodestyle::rules::logical_lines::TabAfterKeyword,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::UnexpectedSpacesAroundKeywordParameterEquals,
+    rules::pycodestyle::rules::logical_lines::UnexpectedSpacesAroundKeywordParameterEquals,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::MissingWhitespaceAroundParameterEquals,
+    rules::pycodestyle::rules::logical_lines::MissingWhitespaceAroundParameterEquals,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::WhitespaceBeforeParameters,
+    rules::pycodestyle::rules::logical_lines::WhitespaceBeforeParameters,
     #[cfg(feature = "logical_lines")]
-    rules::pycodestyle::rules::TabBeforeKeyword,
+    rules::pycodestyle::rules::logical_lines::TabBeforeKeyword,
     rules::pycodestyle::rules::MultipleImportsOnOneLine,
     rules::pycodestyle::rules::ModuleImportNotAtTopOfFile,
     rules::pycodestyle::rules::LineTooLong,
@@ -525,6 +525,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::UnprefixedTypeParam,
     rules::flake8_pyi::rules::UnrecognizedPlatformCheck,
     rules::flake8_pyi::rules::UnrecognizedPlatformName,
+    rules::flake8_pyi::rules::PassInClassBody,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle,
     rules::flake8_pytest_style::rules::PytestFixturePositionalArgs,
