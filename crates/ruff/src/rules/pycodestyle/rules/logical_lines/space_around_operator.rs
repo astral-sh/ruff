@@ -131,18 +131,22 @@ pub(crate) fn space_around_operator(line: &LogicalLine) -> Vec<(Location, Diagno
         let is_operator = is_operator_token(token.kind());
 
         if is_operator {
-            let start = token.start();
-
             if !after_operator {
                 match line.leading_whitespace(&token) {
-                    (Whitespace::Tab, offset) => diagnostics.push((
-                        Location::new(start.row(), start.column() - offset),
-                        TabBeforeOperator.into(),
-                    )),
-                    (Whitespace::Many, offset) => diagnostics.push((
-                        Location::new(start.row(), start.column() - offset),
-                        MultipleSpacesBeforeOperator.into(),
-                    )),
+                    (Whitespace::Tab, offset) => {
+                        let start = token.start();
+                        diagnostics.push((
+                            Location::new(start.row(), start.column() - offset),
+                            TabBeforeOperator.into(),
+                        ));
+                    }
+                    (Whitespace::Many, offset) => {
+                        let start = token.start();
+                        diagnostics.push((
+                            Location::new(start.row(), start.column() - offset),
+                            MultipleSpacesBeforeOperator.into(),
+                        ));
+                    }
                     _ => {}
                 }
             }

@@ -70,6 +70,35 @@ pub fn check_logical_lines(
                     });
                 }
             }
+
+            for (location, kind) in whitespace_around_named_parameter_equals(&line.tokens()) {
+                if settings.rules.enabled(kind.rule()) {
+                    diagnostics.push(Diagnostic {
+                        kind,
+                        location,
+                        end_location: location,
+                        fix: Fix::empty(),
+                        parent: None,
+                    });
+                }
+            }
+            for (location, kind) in missing_whitespace_around_operator(&line.tokens()) {
+                if settings.rules.enabled(kind.rule()) {
+                    diagnostics.push(Diagnostic {
+                        kind,
+                        location,
+                        end_location: location,
+                        fix: Fix::empty(),
+                        parent: None,
+                    });
+                }
+            }
+
+            for diagnostic in missing_whitespace(&line, should_fix_missing_whitespace) {
+                if settings.rules.enabled(diagnostic.kind.rule()) {
+                    diagnostics.push(diagnostic);
+                }
+            }
         }
         if line
             .flags()
@@ -122,36 +151,6 @@ pub fn check_logical_lines(
                         fix: Fix::empty(),
                         parent: None,
                     });
-                }
-            }
-        }
-        if line.flags().contains(TokenFlags::OPERATOR) {
-            for (location, kind) in whitespace_around_named_parameter_equals(&line.tokens()) {
-                if settings.rules.enabled(kind.rule()) {
-                    diagnostics.push(Diagnostic {
-                        kind,
-                        location,
-                        end_location: location,
-                        fix: Fix::empty(),
-                        parent: None,
-                    });
-                }
-            }
-            for (location, kind) in missing_whitespace_around_operator(&line.tokens()) {
-                if settings.rules.enabled(kind.rule()) {
-                    diagnostics.push(Diagnostic {
-                        kind,
-                        location,
-                        end_location: location,
-                        fix: Fix::empty(),
-                        parent: None,
-                    });
-                }
-            }
-
-            for diagnostic in missing_whitespace(&line, should_fix_missing_whitespace) {
-                if settings.rules.enabled(diagnostic.kind.rule()) {
-                    diagnostics.push(diagnostic);
                 }
             }
         }

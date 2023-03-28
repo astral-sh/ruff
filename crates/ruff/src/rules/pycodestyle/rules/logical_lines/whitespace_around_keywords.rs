@@ -148,6 +148,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(Location, D
                 _ => {}
             }
         }
+
         after_keyword = is_keyword;
     }
 
