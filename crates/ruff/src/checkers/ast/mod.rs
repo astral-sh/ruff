@@ -962,10 +962,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::constant_imported_as_non_constant(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -979,10 +976,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -996,10 +990,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1013,10 +1004,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1030,10 +1018,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1344,10 +1329,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::constant_imported_as_non_constant(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1361,10 +1346,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1378,10 +1363,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1395,10 +1380,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1412,10 +1397,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);

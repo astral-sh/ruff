@@ -9,13 +9,15 @@ expression: diagnostics
     fixable: false
   location:
     row: 1
-    column: 0
+    column: 7
   end_location:
     row: 1
     column: 25
   fix:
     edits: []
-  parent: ~
+  parent:
+    row: 1
+    column: 0
 - kind:
     name: CamelcaseImportedAsConstant
     body: "Camelcase `CamelCase` imported as constant `CAMELCASE`"
@@ -23,13 +25,15 @@ expression: diagnostics
     fixable: false
   location:
     row: 2
-    column: 0
+    column: 16
   end_location:
     row: 2
     column: 38
   fix:
     edits: []
-  parent: ~
+  parent:
+    row: 2
+    column: 0
 - kind:
     name: CamelcaseImportedAsConstant
     body: "Camelcase `AnotherCamelCase` imported as constant `ANOTHER_CAMELCASE`"
@@ -37,11 +41,13 @@ expression: diagnostics
     fixable: false
   location:
     row: 3
-    column: 0
+    column: 16
   end_location:
     row: 3
     column: 53
   fix:
     edits: []
-  parent: ~
+  parent:
+    row: 3
+    column: 0
 
