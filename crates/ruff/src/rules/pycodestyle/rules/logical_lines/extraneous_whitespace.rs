@@ -1,8 +1,7 @@
-#![allow(dead_code, unused_imports, unused_variables)]
+use rustpython_parser::ast::Location;
+use rustpython_parser::Tok;
 
-use once_cell::sync::Lazy;
-use regex::Regex;
-
+use super::{LogicalLine, Whitespace};
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -101,32 +100,48 @@ impl Violation for WhitespaceBeforePunctuation {
     }
 }
 
-// TODO(charlie): Pycodestyle has a negative lookahead on the end.
-static EXTRANEOUS_WHITESPACE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"[\[({][ \t]|[ \t][]}),;:]").unwrap());
-
 /// E201, E202, E203
-#[cfg(feature = "logical_lines")]
-pub fn extraneous_whitespace(line: &str) -> Vec<(usize, DiagnosticKind)> {
+pub(crate) fn extraneous_whitespace(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
-    for line_match in EXTRANEOUS_WHITESPACE_REGEX.find_iter(line) {
-        let text = &line[line_match.range()];
-        let char = text.trim();
-        let found = line_match.start();
-        if text.chars().last().unwrap().is_ascii_whitespace() {
-            diagnostics.push((found + 1, WhitespaceAfterOpenBracket.into()));
-        } else if line.chars().nth(found - 1).map_or(false, |c| c != ',') {
-            if char == "}" || char == "]" || char == ")" {
-                diagnostics.push((found, WhitespaceBeforeCloseBracket.into()));
-            } else {
-                diagnostics.push((found, WhitespaceBeforePunctuation.into()));
-            }
-        }
-    }
-    diagnostics
-}
+    let mut last_token: Option<&Tok> = None;
 
-#[cfg(not(feature = "logical_lines"))]
-pub fn extraneous_whitespace(_line: &str) -> Vec<(usize, DiagnosticKind)> {
-    vec![]
+    for token in line.tokens() {
+        let kind = token.kind();
+        match kind {
+            Tok::Lbrace | Tok::Lpar | Tok::Lsqb => {
+                if !matches!(line.trailing_whitespace(&token), Whitespace::None) {
+                    let end = token.end();
+                    diagnostics.push((
+                        Location::new(end.row(), end.column()),
+                        WhitespaceAfterOpenBracket.into(),
+                    ));
+                }
+            }
+            Tok::Rbrace | Tok::Rpar | Tok::Rsqb | Tok::Comma | Tok::Semi | Tok::Colon => {
+                let diagnostic_kind = if matches!(kind, Tok::Comma | Tok::Semi | Tok::Colon) {
+                    DiagnosticKind::from(WhitespaceBeforePunctuation)
+                } else {
+                    DiagnosticKind::from(WhitespaceBeforeCloseBracket)
+                };
+
+                if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
+                    line.leading_whitespace(&token)
+                {
+                    let start = token.start();
+                    if !matches!(last_token, Some(Tok::Comma)) {
+                        diagnostics.push((
+                            Location::new(start.row(), start.column() - offset),
+                            diagnostic_kind,
+                        ));
+                    }
+                }
+            }
+
+            _ => {}
+        }
+
+        last_token = Some(kind);
+    }
+
+    diagnostics
 }

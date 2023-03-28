@@ -1,6 +1,3 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
-use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 
@@ -9,12 +6,11 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
 use crate::registry::{AsRule, Rule};
-use crate::rules::pycodestyle::logical_lines::{LogicalLines, TokenFlags};
-use crate::rules::pycodestyle::rules::{
+use crate::rules::pycodestyle::rules::logical_lines::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
     missing_whitespace_around_operator, space_around_operator, whitespace_around_keywords,
     whitespace_around_named_parameter_equals, whitespace_before_comment,
-    whitespace_before_parameters,
+    whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::{flags, Settings};
 
@@ -57,21 +53,14 @@ pub fn check_logical_lines(
     #[cfg(not(feature = "logical_lines"))]
     let should_fix_whitespace_before_parameters = false;
 
-    let indent_char = stylist.indentation().as_char();
     let mut prev_line = None;
     let mut prev_indent_level = None;
-    for line in &LogicalLines::from_tokens(tokens, locator) {
-        // Extract the indentation level.
-        let Some(start_loc) = line.first_token_location() else { continue; };
-        let start_line = locator.slice(Range::new(Location::new(start_loc.row(), 0), *start_loc));
-        let indent_level = expand_indent(start_line);
-        let indent_size = 4;
+    let indent_char = stylist.indentation().as_char();
 
+    for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
-            for (index, kind) in space_around_operator(line.text()) {
+            for (location, kind) in space_around_operator(&line) {
                 if settings.rules.enabled(kind.rule()) {
-                    let (token_offset, pos) = line.mapping(index);
-                    let location = Location::new(pos.row(), pos.column() + index - token_offset);
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
@@ -86,10 +75,8 @@ pub fn check_logical_lines(
             .flags()
             .contains(TokenFlags::OPERATOR | TokenFlags::PUNCTUATION)
         {
-            for (index, kind) in extraneous_whitespace(line.text()) {
+            for (location, kind) in extraneous_whitespace(&line) {
                 if settings.rules.enabled(kind.rule()) {
-                    let (token_offset, pos) = line.mapping(index);
-                    let location = Location::new(pos.row(), pos.column() + index - token_offset);
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
@@ -101,10 +88,8 @@ pub fn check_logical_lines(
             }
         }
         if line.flags().contains(TokenFlags::KEYWORD) {
-            for (index, kind) in whitespace_around_keywords(line.text()) {
+            for (location, kind) in whitespace_around_keywords(&line) {
                 if settings.rules.enabled(kind.rule()) {
-                    let (token_offset, pos) = line.mapping(index);
-                    let location = Location::new(pos.row(), pos.column() + index - token_offset);
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
@@ -115,7 +100,7 @@ pub fn check_logical_lines(
                 }
             }
 
-            for (location, kind) in missing_whitespace_after_keyword(line.tokens()) {
+            for (location, kind) in missing_whitespace_after_keyword(&line.tokens()) {
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
@@ -128,7 +113,7 @@ pub fn check_logical_lines(
             }
         }
         if line.flags().contains(TokenFlags::COMMENT) {
-            for (range, kind) in whitespace_before_comment(line.tokens(), locator) {
+            for (range, kind) in whitespace_before_comment(&line.tokens(), locator) {
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
@@ -141,9 +126,7 @@ pub fn check_logical_lines(
             }
         }
         if line.flags().contains(TokenFlags::OPERATOR) {
-            for (location, kind) in
-                whitespace_around_named_parameter_equals(line.tokens(), line.text())
-            {
+            for (location, kind) in whitespace_around_named_parameter_equals(&line.tokens()) {
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
@@ -154,7 +137,7 @@ pub fn check_logical_lines(
                     });
                 }
             }
-            for (location, kind) in missing_whitespace_around_operator(line.tokens()) {
+            for (location, kind) in missing_whitespace_around_operator(&line.tokens()) {
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
@@ -166,12 +149,7 @@ pub fn check_logical_lines(
                 }
             }
 
-            for diagnostic in missing_whitespace(
-                line.text(),
-                start_loc.row(),
-                should_fix_missing_whitespace,
-                indent_level,
-            ) {
+            for diagnostic in missing_whitespace(&line, should_fix_missing_whitespace) {
                 if settings.rules.enabled(diagnostic.kind.rule()) {
                     diagnostics.push(diagnostic);
                 }
@@ -179,16 +157,23 @@ pub fn check_logical_lines(
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
-            for diagnostic in
-                whitespace_before_parameters(line.tokens(), should_fix_whitespace_before_parameters)
-            {
+            for diagnostic in whitespace_before_parameters(
+                &line.tokens(),
+                should_fix_whitespace_before_parameters,
+            ) {
                 if settings.rules.enabled(diagnostic.kind.rule()) {
                     diagnostics.push(diagnostic);
                 }
             }
         }
 
-        for (index, kind) in indentation(
+        // Extract the indentation level.
+        let Some(start_loc) = line.first_token_location() else { continue; };
+        let start_line = locator.slice(Range::new(Location::new(start_loc.row(), 0), start_loc));
+        let indent_level = expand_indent(start_line);
+        let indent_size = 4;
+
+        for (location, kind) in indentation(
             &line,
             prev_line.as_ref(),
             indent_char,
@@ -196,8 +181,6 @@ pub fn check_logical_lines(
             prev_indent_level,
             indent_size,
         ) {
-            let (token_offset, pos) = line.mapping(index);
-            let location = Location::new(pos.row(), pos.column() + index - token_offset);
             if settings.rules.enabled(kind.rule()) {
                 diagnostics.push(Diagnostic {
                     kind,
@@ -209,7 +192,7 @@ pub fn check_logical_lines(
             }
         }
 
-        if !line.is_comment() {
+        if !line.is_comment_only() {
             prev_line = Some(line);
             prev_indent_level = Some(indent_level);
         }
@@ -222,7 +205,7 @@ mod tests {
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
-    use crate::rules::pycodestyle::logical_lines::LogicalLines;
+    use crate::rules::pycodestyle::rules::logical_lines::LogicalLines;
     use ruff_python_ast::source_code::Locator;
 
     #[test]
@@ -235,7 +218,7 @@ z = x + 1"#;
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
-            .map(|line| line.text().to_string())
+            .map(|line| line.text_trimmed().to_string())
             .collect();
         let expected = vec![
             "x = 1".to_string(),
@@ -256,10 +239,10 @@ z = x + 1"#;
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
-            .map(|line| line.text().to_string())
+            .map(|line| line.text_trimmed().to_string())
             .collect();
         let expected = vec![
-            "x = [1, 2, 3, ]".to_string(),
+            "x = [\n  1,\n  2,\n  3,\n]".to_string(),
             "y = 2".to_string(),
             "z = x + 1".to_string(),
         ];
@@ -270,9 +253,9 @@ z = x + 1"#;
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
-            .map(|line| line.text().to_string())
+            .map(|line| line.text_trimmed().to_string())
             .collect();
-        let expected = vec!["x = \"xxx\"".to_string()];
+        let expected = vec!["x = 'abc'".to_string()];
         assert_eq!(actual, expected);
 
         let contents = r#"
@@ -283,7 +266,7 @@ f()"#;
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
-            .map(|line| line.text().to_string())
+            .map(|line| line.text_trimmed().to_string())
             .collect();
         let expected = vec!["def f():", "x = 1", "f()"];
         assert_eq!(actual, expected);
@@ -298,9 +281,15 @@ f()"#;
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
-            .map(|line| line.text().to_string())
+            .map(|line| line.text_trimmed().to_string())
             .collect();
-        let expected = vec!["def f():", "\"xxxxxxxxxxxxxxxxxxxx\"", "", "x = 1", "f()"];
+        let expected = vec![
+            "def f():",
+            "\"\"\"Docstring goes here.\"\"\"",
+            "",
+            "x = 1",
+            "f()",
+        ];
         assert_eq!(actual, expected);
     }
 }

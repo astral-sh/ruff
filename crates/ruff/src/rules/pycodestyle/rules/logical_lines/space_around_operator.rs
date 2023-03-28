@@ -1,16 +1,10 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
-use once_cell::sync::Lazy;
-use regex::Regex;
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use crate::rules::pycodestyle::helpers::is_op_token;
-use crate::rules::pycodestyle::rules::Whitespace;
+use super::{LogicalLine, Whitespace};
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
 /// Checks for extraneous tabs before an operator.
@@ -128,46 +122,77 @@ impl Violation for MultipleSpacesAfterOperator {
     }
 }
 
-static OPERATOR_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"[-+*/|!<=>%&^]+|:=").unwrap());
-
 /// E221, E222, E223, E224
-#[cfg(feature = "logical_lines")]
-pub fn space_around_operator(line: &str) -> Vec<(usize, DiagnosticKind)> {
+pub(crate) fn space_around_operator(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
-    let mut last_end = None;
+    let mut after_operator = false;
 
-    for line_match in OPERATOR_REGEX.find_iter(line) {
-        if last_end != Some(line_match.start()) {
-            let before = &line[..line_match.start()];
+    for token in line.tokens() {
+        let is_operator = is_operator_token(token.kind());
 
-            match Whitespace::trailing(before) {
-                (Whitespace::Tab, offset) => {
-                    diagnostics.push((line_match.start() - offset, TabBeforeOperator.into()));
+        if is_operator {
+            let (start, end) = token.range();
+
+            if !after_operator {
+                match line.leading_whitespace(&token) {
+                    (Whitespace::Tab, offset) => diagnostics.push((
+                        Location::new(start.row(), start.column() - offset),
+                        TabBeforeOperator.into(),
+                    )),
+                    (Whitespace::Many, offset) => diagnostics.push((
+                        Location::new(start.row(), start.column() - offset),
+                        MultipleSpacesBeforeOperator.into(),
+                    )),
+                    _ => {}
                 }
-                (Whitespace::Many, offset) => diagnostics.push((
-                    line_match.start() - offset,
-                    MultipleSpacesBeforeOperator.into(),
-                )),
+            }
+
+            match line.trailing_whitespace(&token) {
+                Whitespace::Tab => diagnostics.push((end, TabAfterOperator.into())),
+                Whitespace::Many => diagnostics.push((end, MultipleSpacesAfterOperator.into())),
                 _ => {}
             }
         }
 
-        let after = &line[line_match.end()..];
-        let (leading_offset, leading_kind) = Whitespace::leading(after);
-        match leading_kind {
-            Whitespace::Tab => diagnostics.push((line_match.end(), TabAfterOperator.into())),
-            Whitespace::Many => {
-                diagnostics.push((line_match.end(), MultipleSpacesAfterOperator.into()));
-            }
-            _ => {}
-        }
-
-        last_end = Some(line_match.end() + leading_offset);
+        after_operator = is_operator;
     }
+
     diagnostics
 }
 
-#[cfg(not(feature = "logical_lines"))]
-pub fn space_around_operator(_line: &str) -> Vec<(usize, DiagnosticKind)> {
-    vec![]
+const fn is_operator_token(token: &Tok) -> bool {
+    matches!(
+        token,
+        Tok::Plus
+            | Tok::Minus
+            | Tok::Star
+            | Tok::Slash
+            | Tok::Vbar
+            | Tok::Amper
+            | Tok::Less
+            | Tok::Greater
+            | Tok::Equal
+            | Tok::Percent
+            | Tok::NotEqual
+            | Tok::LessEqual
+            | Tok::GreaterEqual
+            | Tok::CircumFlex
+            | Tok::LeftShift
+            | Tok::RightShift
+            | Tok::DoubleStar
+            | Tok::PlusEqual
+            | Tok::MinusEqual
+            | Tok::StarEqual
+            | Tok::SlashEqual
+            | Tok::PercentEqual
+            | Tok::AmperEqual
+            | Tok::VbarEqual
+            | Tok::CircumflexEqual
+            | Tok::LeftShiftEqual
+            | Tok::RightShiftEqual
+            | Tok::DoubleStarEqual
+            | Tok::DoubleSlash
+            | Tok::DoubleSlashEqual
+            | Tok::ColonEqual
+    )
 }

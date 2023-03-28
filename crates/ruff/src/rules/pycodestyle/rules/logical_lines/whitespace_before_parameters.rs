@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
@@ -7,8 +5,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
-use crate::registry::AsRule;
-use crate::rules::pycodestyle::helpers::{is_keyword_token, is_op_token, is_soft_keyword_token};
+use super::LogicalLineTokens;
 
 #[violation]
 pub struct WhitespaceBeforeParameters {
@@ -29,28 +26,34 @@ impl AlwaysAutofixableViolation for WhitespaceBeforeParameters {
 }
 
 /// E211
-#[cfg(feature = "logical_lines")]
-pub fn whitespace_before_parameters(
-    tokens: &[(Location, &Tok, Location)],
+pub(crate) fn whitespace_before_parameters(
+    tokens: &LogicalLineTokens,
     autofix: bool,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
-    let (_, mut prev_token, mut prev_end) = tokens.first().unwrap();
-    for (idx, (start, tok, end)) in tokens.iter().enumerate() {
-        if is_op_token(tok)
-            && (**tok == Tok::Lpar || **tok == Tok::Lsqb)
-            && *start != prev_end
-            && (matches!(prev_token, Tok::Name { .. })
-                || matches!(prev_token, Tok::Rpar | Tok::Rsqb | Tok::Rbrace))
-            && (idx < 2 || *(tokens[idx - 2].1) != Tok::Class)
-            && !is_keyword_token(tok)
-            && !is_soft_keyword_token(tok)
+    let previous = tokens.first().unwrap();
+
+    let mut pre_pre_kind: Option<&Tok> = None;
+    let mut prev_token = previous.kind();
+    let mut prev_end = previous.end();
+
+    for token in tokens {
+        let kind = token.kind();
+
+        if matches!(kind, Tok::Lpar | Tok::Lsqb)
+            && token.start() != prev_end
+            && matches!(
+                prev_token,
+                Tok::Name { .. } | Tok::Rpar | Tok::Rsqb | Tok::Rbrace
+            )
+            && (pre_pre_kind != Some(&Tok::Class))
         {
             let start = Location::new(prev_end.row(), prev_end.column());
+            let end = token.end();
             let end = Location::new(end.row(), end.column() - 1);
 
             let kind: WhitespaceBeforeParameters = WhitespaceBeforeParameters {
-                bracket: tok.to_string(),
+                bracket: kind.to_string(),
             };
 
             let mut diagnostic = Diagnostic::new(kind, Range::new(start, end));
@@ -60,16 +63,9 @@ pub fn whitespace_before_parameters(
             }
             diagnostics.push(diagnostic);
         }
-        prev_token = *tok;
-        prev_end = *end;
+        pre_pre_kind = Some(prev_token);
+        prev_token = kind;
+        prev_end = token.end();
     }
     diagnostics
-}
-
-#[cfg(not(feature = "logical_lines"))]
-pub fn whitespace_before_parameters(
-    _tokens: &[(Location, &Tok, Location)],
-    _autofix: bool,
-) -> Vec<Diagnostic> {
-    vec![]
 }

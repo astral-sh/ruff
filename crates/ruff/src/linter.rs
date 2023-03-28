@@ -16,7 +16,6 @@ use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
-use crate::checkers::logical_lines::check_logical_lines;
 use crate::checkers::noqa::check_noqa;
 use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
@@ -105,7 +104,8 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
-        diagnostics.extend(check_logical_lines(
+        #[cfg(feature = "logical_lines")]
+        diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
             &tokens,
             locator,
             stylist,
