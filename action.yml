@@ -33,4 +33,5 @@ runs:
         INPUT_SRC: ${{ inputs.src }}
         INPUT_VERSION: ${{ inputs.version }}
         pythonioencoding: utf-8
+        RUFF_FORMAT: github
       shell: bash
