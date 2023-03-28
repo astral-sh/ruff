@@ -61,7 +61,10 @@ pub fn format_in_gettext_func_call(args: &[Expr]) -> Option<Diagnostic> {
         if let ExprKind::Call { func, .. } = &first.node {
             if let ExprKind::Attribute { attr, .. } = &func.node {
                 if attr == "format" {
-                    return Some(Diagnostic::new(FormatInGetTextFuncCall {}, Range::from(first)));
+                    return Some(Diagnostic::new(
+                        FormatInGetTextFuncCall {},
+                        Range::from(first),
+                    ));
                 }
             }
         }
@@ -83,7 +86,10 @@ pub fn printf_in_gettext_func_call(args: &[Expr]) -> Option<Diagnostic> {
                 ..
             } = left.node
             {
-                return Some(Diagnostic::new(PrintfInGetTextFuncCall {}, Range::from(first)));
+                return Some(Diagnostic::new(
+                    PrintfInGetTextFuncCall {},
+                    Range::from(first),
+                ));
             }
         }
     }
