@@ -29,9 +29,9 @@ runs:
           python3 $GITHUB_ACTION_PATH/action/main.py
         fi
       env:
+        RUFF_FORMAT: github
         INPUT_OPTIONS: ${{ inputs.options }}
         INPUT_SRC: ${{ inputs.src }}
         INPUT_VERSION: ${{ inputs.version }}
         pythonioencoding: utf-8
-        RUFF_FORMAT: github
       shell: bash

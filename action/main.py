@@ -2,7 +2,7 @@ import os
 import shlex
 import sys
 from pathlib import Path
-from subprocess import PIPE, STDOUT, run
+from subprocess import run
 
 ACTION_PATH = Path(os.environ["GITHUB_ACTION_PATH"])
 OPTIONS = os.getenv("INPUT_OPTIONS", default="")
@@ -16,17 +16,6 @@ if VERSION != "":
 
 req = f"ruff{version_specifier}"
 
-pip_proc = run(
-    ["pipx", "install", req],
-    stdout=PIPE,
-    stderr=STDOUT,
-    encoding="utf-8",
-)
-if pip_proc.returncode:
-    print(pip_proc.stdout)
-    print("::error::Failed to install Ruff.", flush=True)
-    sys.exit(pip_proc.returncode)
-
-proc = run(["ruff", *shlex.split(OPTIONS), *shlex.split(SRC), "--format github"])
+proc = run(["pipx", "run", req, *shlex.split(OPTIONS), *shlex.split(SRC)])
 
 sys.exit(proc.returncode)
