@@ -10,8 +10,7 @@ OPTIONS = os.getenv("INPUT_OPTIONS", default="")
 SRC = os.getenv("INPUT_SRC", default="")
 VERSION = os.getenv("INPUT_VERSION", default="")
 
-version_specifier=""
-# TODO: some form of validation for user input VERSION
+version_specifier = ""
 if VERSION != "":
     if not re.match('v?\d\.\d{1,3}\.\d{1,3}$', VERSION):
         print("VERSION does not match expected pattern")
