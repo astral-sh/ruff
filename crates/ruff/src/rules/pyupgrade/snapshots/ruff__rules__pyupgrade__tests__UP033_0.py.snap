@@ -8,19 +8,19 @@ expression: diagnostics
     suggestion: "Rewrite with `@functools.cache"
     fixable: true
   location:
-    row: 5
+    row: 4
     column: 20
   end_location:
-    row: 5
+    row: 4
     column: 34
   fix:
     edits:
       - content: functools.cache
         location:
-          row: 5
+          row: 4
           column: 1
         end_location:
-          row: 5
+          row: 4
           column: 34
   parent: ~
 - kind:
@@ -30,32 +30,18 @@ expression: diagnostics
     fixable: true
   location:
     row: 10
-    column: 10
-  end_location:
-    row: 10
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: LRUCacheWithMaxsizeNone
-    body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
-    suggestion: "Rewrite with `@functools.cache"
-    fixable: true
-  location:
-    row: 16
     column: 20
   end_location:
-    row: 16
+    row: 10
     column: 34
   fix:
     edits:
       - content: functools.cache
         location:
-          row: 16
+          row: 10
           column: 1
         end_location:
-          row: 16
+          row: 10
           column: 34
   parent: ~
 - kind:
@@ -64,19 +50,19 @@ expression: diagnostics
     suggestion: "Rewrite with `@functools.cache"
     fixable: true
   location:
-    row: 21
+    row: 15
     column: 20
   end_location:
-    row: 21
+    row: 15
     column: 34
   fix:
     edits:
       - content: functools.cache
         location:
-          row: 21
+          row: 15
           column: 1
         end_location:
-          row: 21
+          row: 15
           column: 34
   parent: ~
 

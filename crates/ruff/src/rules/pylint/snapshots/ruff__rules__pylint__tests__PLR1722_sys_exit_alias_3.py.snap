@@ -44,4 +44,18 @@ expression: diagnostics
           row: 9
           column: 8
   parent: ~
+- kind:
+    name: SysExitAlias
+    body: "Use `sys.exit()` instead of `quit`"
+    suggestion: "Replace `quit` with `sys.exit()`"
+    fixable: true
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 8
+  fix:
+    edits: []
+  parent: ~
 
