@@ -2,8 +2,9 @@ use itertools::Itertools;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::helpers::{elif_else_range, end_of_statement};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::Visitor;
@@ -139,7 +140,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, Range::from(*stmt));
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 "return".to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
@@ -157,7 +158,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic = Diagnostic::new(ImplicitReturnValue, Range::from(*stmt));
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 "return None".to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
@@ -219,7 +220,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.amend(Fix::insertion(
+                        diagnostic.set_fix(Edit::insertion(
                             content,
                             end_of_statement(stmt, checker.locator),
                         ));
@@ -257,7 +258,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.amend(Fix::insertion(
+                        diagnostic.set_fix(Edit::insertion(
                             content,
                             end_of_statement(stmt, checker.locator),
                         ));
@@ -296,7 +297,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                     content.push_str(checker.stylist.line_ending().as_str());
                     content.push_str(indent);
                     content.push_str("return None");
-                    diagnostic.amend(Fix::insertion(
+                    diagnostic.set_fix(Edit::insertion(
                         content,
                         end_of_statement(stmt, checker.locator),
                     ));
@@ -484,7 +485,7 @@ fn superfluous_else(checker: &mut Checker, stack: &Stack) -> bool {
 }
 
 /// Run all checks from the `flake8-return` plugin.
-pub fn function(checker: &mut Checker, body: &[Stmt]) {
+pub fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
     // Skip empty functions.
     if body.is_empty() {
         return;
@@ -535,7 +536,10 @@ pub fn function(checker: &mut Checker, body: &[Stmt]) {
 
     if !result_exists(&stack.returns) {
         if checker.settings.rules.enabled(Rule::UnnecessaryReturnNone) {
-            unnecessary_return_none(checker, &stack);
+            // Skip functions that have a return annotation that is not `None`.
+            if returns.map_or(true, is_const_none) {
+                unnecessary_return_none(checker, &stack);
+            }
         }
         return;
     }

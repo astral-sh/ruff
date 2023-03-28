@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::Range;
@@ -74,7 +74,7 @@ pub fn blank_after_summary(checker: &mut Checker, docstring: &Docstring) {
                 }
 
                 // Insert one blank line after the summary (replacing any existing lines).
-                diagnostic.amend(Fix::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     checker.stylist.line_ending().to_string(),
                     Location::new(docstring.expr.location.row() + summary_line + 1, 0),
                     Location::new(

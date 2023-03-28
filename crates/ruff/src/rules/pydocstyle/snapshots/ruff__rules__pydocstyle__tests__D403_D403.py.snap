@@ -1,0 +1,26 @@
+---
+source: crates/ruff/src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: FirstLineCapitalized
+    body: "First word of the first line should be capitalized: `this` -> `This`"
+    suggestion: "Capitalize `this` to `This`"
+    fixable: true
+  location:
+    row: 2
+    column: 4
+  end_location:
+    row: 2
+    column: 43
+  fix:
+    edits:
+      - content: This
+        location:
+          row: 2
+          column: 7
+        end_location:
+          row: 2
+          column: 11
+  parent: ~
+

@@ -1,6 +1,6 @@
 [package]
 name = "flake8-to-ruff"
-version = "0.0.257"
+version = "0.0.259"
 edition = { workspace = true }
 rust-version = { workspace = true }
 

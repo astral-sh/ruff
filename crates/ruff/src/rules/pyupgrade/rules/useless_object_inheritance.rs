@@ -5,10 +5,9 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::scope::{Binding, BindingKind, Bindings, Scope};
 use ruff_python_ast::types::Range;
 
+use crate::autofix::helpers::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
-
-use super::super::fixes;
 
 #[violation]
 pub struct UselessObjectInheritance {
@@ -63,20 +62,22 @@ pub fn useless_object_inheritance(
     bases: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(mut diagnostic) = rule(name, bases, checker.ctx.scope(), &checker.ctx.bindings) else {
-        return;
-    };
-    if checker.patch(diagnostic.kind.rule()) {
-        if let Some(fix) = fixes::remove_class_def_base(
-            checker.locator,
-            stmt.location,
-            diagnostic.location,
-            diagnostic.end_location,
-            bases,
-            keywords,
-        ) {
-            diagnostic.amend(fix);
+    if let Some(mut diagnostic) = rule(name, bases, checker.ctx.scope(), &checker.ctx.bindings) {
+        if checker.patch(diagnostic.kind.rule()) {
+            let location = diagnostic.location;
+            let end_location = diagnostic.end_location;
+            diagnostic.try_set_fix(|| {
+                remove_argument(
+                    checker.locator,
+                    stmt.location,
+                    location,
+                    end_location,
+                    bases,
+                    keywords,
+                    true,
+                )
+            });
         }
+        checker.diagnostics.push(diagnostic);
     }
-    checker.diagnostics.push(diagnostic);
 }

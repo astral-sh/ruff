@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::match_parens;
 
@@ -34,7 +34,7 @@ pub fn unnecessary_paren_on_raise_exception(checker: &mut Checker, expr: &Expr) 
                 .expect("Expected call to include parentheses");
             let mut diagnostic = Diagnostic::new(UnnecessaryParenOnRaiseException, range);
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Fix::deletion(
+                diagnostic.set_fix(Edit::deletion(
                     func.end_location.unwrap(),
                     range.end_location,
                 ));

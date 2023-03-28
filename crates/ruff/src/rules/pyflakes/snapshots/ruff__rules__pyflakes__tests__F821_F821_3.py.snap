@@ -9,11 +9,12 @@ expression: diagnostics
     fixable: false
   location:
     row: 11
-    column: 8
+    column: 9
   end_location:
     row: 11
-    column: 13
-  fix: ~
+    column: 12
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -22,10 +23,11 @@ expression: diagnostics
     fixable: false
   location:
     row: 11
-    column: 15
+    column: 16
   end_location:
     row: 11
-    column: 22
-  fix: ~
+    column: 21
+  fix:
+    edits: []
   parent: ~
 

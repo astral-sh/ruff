@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use log::error;
 use rustpython_parser::ast::Location;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Locator;
@@ -114,7 +114,7 @@ pub fn invalid_escape_sequence(
                     Range::new(location, end_location),
                 );
                 if autofix {
-                    diagnostic.amend(Fix::insertion(
+                    diagnostic.set_fix(Edit::insertion(
                         r"\".to_string(),
                         Location::new(location.row(), location.column() + 1),
                     ));

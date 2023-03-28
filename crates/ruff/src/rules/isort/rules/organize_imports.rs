@@ -4,7 +4,7 @@ use itertools::{EitherOrBoth, Itertools};
 use rustpython_parser::ast::{Location, Stmt};
 use textwrap::indent;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{
     count_trailing_lines, followed_by_multi_statement_line, preceded_by_multi_statement_line,
@@ -155,7 +155,7 @@ pub fn organize_imports(
     } else {
         let mut diagnostic = Diagnostic::new(UnsortedImports, range);
         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 indent(&expected, indentation),
                 range.location,
                 range.end_location,

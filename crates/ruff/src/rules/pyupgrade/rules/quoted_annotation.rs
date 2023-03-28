@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -23,7 +23,7 @@ impl AlwaysAutofixableViolation for QuotedAnnotation {
 pub fn quoted_annotation(checker: &mut Checker, annotation: &str, range: Range) {
     let mut diagnostic = Diagnostic::new(QuotedAnnotation, range);
     if checker.patch(Rule::QuotedAnnotation) {
-        diagnostic.amend(Fix::replacement(
+        diagnostic.set_fix(Edit::replacement(
             annotation.to_string(),
             range.location,
             range.end_location,

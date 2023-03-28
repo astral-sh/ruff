@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
@@ -48,7 +48,7 @@ pub fn redundant_tuple_in_exception_handler(checker: &mut Checker, handlers: &[E
             Range::from(type_),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 unparse_expr(elt, checker.stylist),
                 type_.location,
                 type_.end_location.unwrap(),

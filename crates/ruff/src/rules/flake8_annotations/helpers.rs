@@ -6,9 +6,7 @@ use ruff_python_ast::visibility;
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};
 
-pub(super) fn match_function_def(
-    stmt: &Stmt,
-) -> (&str, &Arguments, &Option<Box<Expr>>, &Vec<Stmt>) {
+pub(super) fn match_function_def(stmt: &Stmt) -> (&str, &Arguments, Option<&Expr>, &Vec<Stmt>) {
     match &stmt.node {
         StmtKind::FunctionDef {
             name,
@@ -23,7 +21,7 @@ pub(super) fn match_function_def(
             returns,
             body,
             ..
-        } => (name, args, returns, body),
+        } => (name, args, returns.as_ref().map(|expr| &**expr), body),
         _ => panic!("Found non-FunctionDef in match_name"),
     }
 }

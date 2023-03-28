@@ -24,7 +24,7 @@ pub use open_file_with_context_handler::{
 };
 pub use reimplemented_builtin::{convert_for_loop_to_any_all, ReimplementedBuiltin};
 pub use return_in_try_except_finally::{return_in_try_except_finally, ReturnInTryExceptFinally};
-pub use use_contextlib_suppress::{use_contextlib_suppress, UseContextlibSuppress};
+pub use suppressible_exception::{suppressible_exception, SuppressibleException};
 pub use yoda_conditions::{yoda_conditions, YodaConditions};
 
 mod ast_bool_op;
@@ -39,5 +39,5 @@ mod key_in_dict;
 mod open_file_with_context_handler;
 mod reimplemented_builtin;
 mod return_in_try_except_finally;
-mod use_contextlib_suppress;
+mod suppressible_exception;
 mod yoda_conditions;

@@ -5,7 +5,7 @@ use num_bigint::{BigInt, Sign};
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::{Range, RefEquality};
@@ -157,7 +157,7 @@ fn fix_py2_block(
     body: &[Stmt],
     orelse: &[Stmt],
     block: &BlockMetadata,
-) -> Option<Fix> {
+) -> Option<Edit> {
     if orelse.is_empty() {
         // Delete the entire statement. If this is an `elif`, know it's the only child
         // of its parent, so avoid passing in the parent at all. Otherwise,
@@ -195,7 +195,7 @@ fn fix_py2_block(
 
         if indentation(checker.locator, start).is_none() {
             // Inline `else` block (e.g., `else: x = 1`).
-            Some(Fix::replacement(
+            Some(Edit::replacement(
                 checker
                     .locator
                     .slice(Range::new(start.location, end.end_location.unwrap()))
@@ -218,7 +218,7 @@ fn fix_py2_block(
                     .ok()
                 })
                 .map(|contents| {
-                    Fix::replacement(
+                    Edit::replacement(
                         contents,
                         Location::new(stmt.location.row(), 0),
                         stmt.end_location.unwrap(),
@@ -241,7 +241,7 @@ fn fix_py2_block(
                 end_location = body.last().unwrap().end_location.unwrap();
             }
         }
-        Some(Fix::deletion(stmt.location, end_location))
+        Some(Edit::deletion(stmt.location, end_location))
     }
 }
 
@@ -252,7 +252,7 @@ fn fix_py3_block(
     test: &Expr,
     body: &[Stmt],
     block: &BlockMetadata,
-) -> Option<Fix> {
+) -> Option<Edit> {
     match block.starter {
         Tok::If => {
             // If the first statement is an if, use the body of this statement, and ignore
@@ -262,7 +262,7 @@ fn fix_py3_block(
 
             if indentation(checker.locator, start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
-                Some(Fix::replacement(
+                Some(Edit::replacement(
                     checker
                         .locator
                         .slice(Range::new(start.location, end.end_location.unwrap()))
@@ -285,7 +285,7 @@ fn fix_py3_block(
                         .ok()
                     })
                     .map(|contents| {
-                        Fix::replacement(
+                        Edit::replacement(
                             contents,
                             Location::new(stmt.location.row(), 0),
                             stmt.end_location.unwrap(),
@@ -301,7 +301,7 @@ fn fix_py3_block(
                 test.end_location.unwrap(),
                 end.end_location.unwrap(),
             ));
-            Some(Fix::replacement(
+            Some(Edit::replacement(
                 format!("else{text}"),
                 stmt.location,
                 stmt.end_location.unwrap(),
@@ -353,7 +353,7 @@ pub fn outdated_version_block(
                                 if let Some(fix) =
                                     fix_py2_block(checker, stmt, body, orelse, &block)
                                 {
-                                    diagnostic.amend(fix);
+                                    diagnostic.set_fix(fix);
                                 }
                             }
                         }
@@ -367,7 +367,7 @@ pub fn outdated_version_block(
                             if let Some(block) = metadata(checker.locator, stmt) {
                                 if let Some(fix) = fix_py3_block(checker, stmt, test, body, &block)
                                 {
-                                    diagnostic.amend(fix);
+                                    diagnostic.set_fix(fix);
                                 }
                             }
                         }
@@ -385,7 +385,7 @@ pub fn outdated_version_block(
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(block) = metadata(checker.locator, stmt) {
                             if let Some(fix) = fix_py2_block(checker, stmt, body, orelse, &block) {
-                                diagnostic.amend(fix);
+                                diagnostic.set_fix(fix);
                             }
                         }
                     }
@@ -395,7 +395,7 @@ pub fn outdated_version_block(
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(block) = metadata(checker.locator, stmt) {
                             if let Some(fix) = fix_py3_block(checker, stmt, test, body, &block) {
-                                diagnostic.amend(fix);
+                                diagnostic.set_fix(fix);
                             }
                         }
                     }

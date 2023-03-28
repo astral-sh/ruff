@@ -8,12 +8,41 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
+    row: 16
+    column: 0
+  end_location:
+    row: 16
+    column: 3
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 3
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+    suggestion: ~
+    fixable: false
+  location:
     row: 18
     column: 0
   end_location:
     row: 18
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -26,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -39,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -48,11 +79,12 @@ expression: diagnostics
     fixable: false
   location:
     row: 21
-    column: 0
+    column: 5
   end_location:
     row: 21
-    column: 3
-  fix: ~
+    column: 8
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -61,24 +93,26 @@ expression: diagnostics
     fixable: false
   location:
     row: 22
+    column: 5
+  end_location:
+    row: 22
+    column: 8
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: PairwiseOverZipped
+    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 23
     column: 0
   end_location:
-    row: 22
+    row: 23
     column: 3
-  fix: ~
-  parent: ~
-- kind:
-    name: PairwiseOverZipped
-    body: "Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 5
-  end_location:
-    row: 23
-    column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -87,11 +121,12 @@ expression: diagnostics
     fixable: false
   location:
     row: 24
-    column: 5
+    column: 0
   end_location:
     row: 24
-    column: 8
-  fix: ~
+    column: 3
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -104,6 +139,7 @@ expression: diagnostics
   end_location:
     row: 25
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

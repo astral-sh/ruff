@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use bitflags::bitflags;
 use itertools::Itertools;
 use log::error;
 use once_cell::sync::Lazy;
@@ -130,6 +129,39 @@ pub fn contains_effect(ctx: &Context, expr: &Expr) -> bool {
                     return !is_empty_initializer;
                 }
             }
+        }
+
+        // Avoid false positive for overloaded operators.
+        if let ExprKind::BinOp { left, right, .. } = &expr.node {
+            if !matches!(
+                left.node,
+                ExprKind::Constant { .. }
+                    | ExprKind::JoinedStr { .. }
+                    | ExprKind::List { .. }
+                    | ExprKind::Tuple { .. }
+                    | ExprKind::Set { .. }
+                    | ExprKind::Dict { .. }
+                    | ExprKind::ListComp { .. }
+                    | ExprKind::SetComp { .. }
+                    | ExprKind::DictComp { .. }
+            ) {
+                return true;
+            }
+            if !matches!(
+                right.node,
+                ExprKind::Constant { .. }
+                    | ExprKind::JoinedStr { .. }
+                    | ExprKind::List { .. }
+                    | ExprKind::Tuple { .. }
+                    | ExprKind::Set { .. }
+                    | ExprKind::Dict { .. }
+                    | ExprKind::ListComp { .. }
+                    | ExprKind::SetComp { .. }
+                    | ExprKind::DictComp { .. }
+            ) {
+                return true;
+            }
+            return false;
         }
 
         // Otherwise, avoid all complex expressions.
@@ -575,13 +607,6 @@ pub fn has_non_none_keyword(keywords: &[Keyword], keyword: &str) -> bool {
         let KeywordData { value, .. } = &keyword.node;
         !is_const_none(value)
     })
-}
-
-bitflags! {
-    pub struct Exceptions: u32 {
-        const NAME_ERROR = 0b0000_0001;
-        const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
-    }
 }
 
 /// Extract the names of all handled exceptions.
@@ -1263,9 +1288,20 @@ impl<'a> SimpleCallArgs<'a> {
 /// Return `true` if the given `Expr` is a potential logging call. Matches
 /// `logging.error`, `logger.error`, `self.logger.error`, etc., but not
 /// arbitrary `foo.error` calls.
-pub fn is_logger_candidate(func: &Expr) -> bool {
+///
+/// It even matches direct `logging.error` calls even if the `logging` module
+/// is aliased. Example:
+/// ```python
+/// import logging as bar
+///
+/// # This is detected to be a logger candidate
+/// bar.error()
+/// ```
+pub fn is_logger_candidate(context: &Context, func: &Expr) -> bool {
     if let ExprKind::Attribute { value, .. } = &func.node {
-        let call_path = collect_call_path(value);
+        let call_path = context
+            .resolve_call_path(value)
+            .unwrap_or_else(|| collect_call_path(value));
         if let Some(tail) = call_path.last() {
             if tail.starts_with("log") || tail.ends_with("logger") || tail.ends_with("logging") {
                 return true;

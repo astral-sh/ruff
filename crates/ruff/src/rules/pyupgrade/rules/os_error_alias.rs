@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers::{compose_call_path, create_expr, unparse_expr};
@@ -63,7 +63,7 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
         Range::from(target),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Fix::replacement(
+        diagnostic.set_fix(Edit::replacement(
             "OSError".to_string(),
             target.location,
             target.end_location.unwrap(),
@@ -104,13 +104,13 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
         }
 
         if remaining.len() == 1 {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 "OSError".to_string(),
                 target.location,
                 target.end_location.unwrap(),
             ));
         } else {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 format!(
                     "({})",
                     unparse_expr(

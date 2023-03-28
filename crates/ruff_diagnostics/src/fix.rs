@@ -2,40 +2,57 @@ use rustpython_parser::ast::Location;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-#[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
+use crate::edit::Edit;
+
+/// A collection of [`Edit`] elements to be applied to a source file.
+#[derive(Default, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Fix {
-    pub content: String,
-    pub location: Location,
-    pub end_location: Location,
+    edits: Vec<Edit>,
 }
 
 impl Fix {
-    pub const fn deletion(start: Location, end: Location) -> Self {
-        Self {
-            content: String::new(),
-            location: start,
-            end_location: end,
-        }
+    /// Create a new [`Fix`] from a vector of [`Edit`] elements.
+    pub fn new(edits: Vec<Edit>) -> Self {
+        Self { edits }
     }
 
-    pub fn replacement(content: String, start: Location, end: Location) -> Self {
-        debug_assert!(!content.is_empty(), "Prefer `Fix::deletion`");
-
-        Self {
-            content,
-            location: start,
-            end_location: end,
-        }
+    /// Create an empty [`Fix`].
+    pub const fn empty() -> Self {
+        Self { edits: Vec::new() }
     }
 
-    pub fn insertion(content: String, at: Location) -> Self {
-        debug_assert!(!content.is_empty(), "Insert content is empty");
+    /// Return `true` if the [`Fix`] contains no [`Edit`] elements.
+    pub fn is_empty(&self) -> bool {
+        self.edits.is_empty()
+    }
 
+    /// Return the [`Location`] of the first [`Edit`] in the [`Fix`].
+    pub fn location(&self) -> Option<Location> {
+        self.edits.iter().map(|edit| edit.location).min()
+    }
+
+    /// Return the [`Location`] of the last [`Edit`] in the [`Fix`].
+    pub fn end_location(&self) -> Option<Location> {
+        self.edits.iter().map(|edit| edit.end_location).max()
+    }
+
+    /// Return a slice of the [`Edit`] elements in the [`Fix`].
+    pub fn edits(&self) -> &[Edit] {
+        &self.edits
+    }
+}
+
+impl FromIterator<Edit> for Fix {
+    fn from_iter<T: IntoIterator<Item = Edit>>(iter: T) -> Self {
         Self {
-            content,
-            location: at,
-            end_location: at,
+            edits: Vec::from_iter(iter),
         }
+    }
+}
+
+impl From<Edit> for Fix {
+    fn from(edit: Edit) -> Self {
+        Self { edits: vec![edit] }
     }
 }

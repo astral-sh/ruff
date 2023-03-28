@@ -9,49 +9,53 @@ expression: diagnostics
     fixable: false
   location:
     row: 11
-    column: 9
-  end_location:
-    row: 11
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 16
-  end_location:
-    row: 18
-    column: 23
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 12
-  end_location:
-    row: 24
-    column: 19
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 30
     column: 10
   end_location:
-    row: 30
+    row: 11
+    column: 15
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: UndefinedName
+    body: "Undefined name `Model`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 18
     column: 17
-  fix: ~
+  end_location:
+    row: 18
+    column: 22
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: UndefinedName
+    body: "Undefined name `Model`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 24
+    column: 13
+  end_location:
+    row: 24
+    column: 18
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: UndefinedName
+    body: "Undefined name `Model`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 30
+    column: 11
+  end_location:
+    row: 30
+    column: 16
+  fix:
+    edits: []
   parent: ~
 

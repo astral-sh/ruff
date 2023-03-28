@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnnecessaryAssign
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 249
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

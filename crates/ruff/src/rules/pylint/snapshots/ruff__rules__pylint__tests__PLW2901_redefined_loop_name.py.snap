@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 34
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 40
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 41
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 46
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 50
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 54
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 58
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 63
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 68
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 73
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 78
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -208,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 78
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -221,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 95
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -234,7 +251,8 @@ expression: diagnostics
   end_location:
     row: 112
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -247,7 +265,8 @@ expression: diagnostics
   end_location:
     row: 118
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -260,7 +279,8 @@ expression: diagnostics
   end_location:
     row: 133
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -273,7 +293,8 @@ expression: diagnostics
   end_location:
     row: 138
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -286,7 +307,8 @@ expression: diagnostics
   end_location:
     row: 143
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -299,7 +321,8 @@ expression: diagnostics
   end_location:
     row: 148
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -312,7 +335,8 @@ expression: diagnostics
   end_location:
     row: 153
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RedefinedLoopName
@@ -325,6 +349,7 @@ expression: diagnostics
   end_location:
     row: 155
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BlindExcept
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 31
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BlindExcept
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 42
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BlindExcept
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 45
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BlindExcept
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 54
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BlindExcept
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 60
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BlindExcept
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 62
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BlindExcept
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 69
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BlindExcept
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 75
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BlindExcept
@@ -130,6 +139,7 @@ expression: diagnostics
   end_location:
     row: 81
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

@@ -2,7 +2,7 @@ use itertools::izip;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_ast::types::Range;
@@ -273,7 +273,7 @@ pub fn literal_comparisons(
             .collect::<Vec<_>>();
         let content = compare(left, &ops, comparators, checker.stylist);
         for diagnostic in &mut diagnostics {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 content.to_string(),
                 expr.location,
                 expr.end_location.unwrap(),

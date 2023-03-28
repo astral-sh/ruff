@@ -3,7 +3,7 @@ use log::error;
 use once_cell::unsync::Lazy;
 use rustpython_parser::ast::{Cmpop, Expr};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
 use ruff_python_ast::operations::locate_cmpops;
@@ -79,7 +79,7 @@ pub fn invalid_literal_comparison(
                             None
                         }
                     } {
-                        diagnostic.amend(Fix::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             content,
                             helpers::to_absolute(located_op.location, location.location),
                             helpers::to_absolute(

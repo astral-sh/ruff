@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 39
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: CollapsibleElseIf
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 49
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

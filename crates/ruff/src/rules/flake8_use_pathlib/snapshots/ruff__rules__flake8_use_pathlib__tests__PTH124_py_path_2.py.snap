@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_use_pathlib/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: PathlibPyPath
+    name: PyPath
     body: "`py.path` is in maintenance mode, use `pathlib` instead"
     suggestion: ~
     fixable: false
@@ -13,6 +13,7 @@ expression: diagnostics
   end_location:
     row: 3
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

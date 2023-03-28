@@ -1,10 +1,16 @@
+use anyhow::Result;
+use libcst_native::{Codegen, CodegenState};
+use log::error;
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::Edit;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
+use crate::cst::matchers::{match_attribute, match_call, match_expression};
 use crate::registry::AsRule;
 
 #[violation]
@@ -26,6 +32,26 @@ impl AlwaysAutofixableViolation for InDictKeys {
     }
 }
 
+fn get_value_content_for_key_in_dict(
+    locator: &Locator,
+    stylist: &Stylist,
+    expr: &rustpython_parser::ast::Expr,
+) -> Result<String> {
+    let content = locator.slice(expr);
+    let mut expression = match_expression(content)?;
+    let call = match_call(&mut expression)?;
+    let attribute = match_attribute(&mut call.func)?;
+
+    let mut state = CodegenState {
+        default_newline: stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
+    attribute.value.codegen(&mut state);
+
+    Ok(state.to_string())
+}
+
 /// SIM118
 fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
     let ExprKind::Call {
@@ -39,7 +65,7 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
         return;
     }
 
-    let ExprKind::Attribute { attr, value, .. } = &func.node else {
+    let ExprKind::Attribute { attr, .. } = &func.node else {
         return;
     };
     if attr != "keys" {
@@ -48,18 +74,25 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: Range) {
 
     // Slice exact content to preserve formatting.
     let left_content = checker.locator.slice(left);
-    let value_content = checker.locator.slice(value);
+    let value_content =
+        match get_value_content_for_key_in_dict(checker.locator, checker.stylist, right) {
+            Ok(value_content) => value_content,
+            Err(err) => {
+                error!("Failed to get value content for key in dict: {}", err);
+                return;
+            }
+        };
 
     let mut diagnostic = Diagnostic::new(
         InDictKeys {
             key: left_content.to_string(),
-            dict: value_content.to_string(),
+            dict: value_content.clone(),
         },
         range,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Fix::replacement(
-            value_content.to_string(),
+        diagnostic.set_fix(Edit::replacement(
+            value_content,
             right.location,
             right.end_location.unwrap(),
         ));

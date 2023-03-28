@@ -2,7 +2,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::Location;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -34,7 +34,7 @@ pub fn unnecessary_coding_comment(lineno: usize, line: &str, autofix: bool) -> O
             Range::new(Location::new(lineno + 1, 0), Location::new(lineno + 2, 0)),
         );
         if autofix {
-            diagnostic.amend(Fix::deletion(
+            diagnostic.set_fix(Edit::deletion(
                 Location::new(lineno + 1, 0),
                 Location::new(lineno + 2, 0),
             ));

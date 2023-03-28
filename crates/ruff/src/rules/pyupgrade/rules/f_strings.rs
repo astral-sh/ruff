@@ -4,7 +4,7 @@ use rustpython_common::format::{
 };
 use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData, Location};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{is_implicit_concatenation, leading_quote, trailing_quote};
 use ruff_python_ast::types::Range;
@@ -271,7 +271,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
 
     let mut diagnostic = Diagnostic::new(FString, Range::from(expr));
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Fix::replacement(
+        diagnostic.set_fix(Edit::replacement(
             contents,
             expr.location,
             expr.end_location.unwrap(),

@@ -1,0 +1,19 @@
+---
+source: crates/ruff/src/rules/pyflakes/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: UndefinedName
+    body: "Undefined name `List`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 8
+    column: 18
+  end_location:
+    row: 8
+    column: 22
+  fix:
+    edits: []
+  parent: ~
+

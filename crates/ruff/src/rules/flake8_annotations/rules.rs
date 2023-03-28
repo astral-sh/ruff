@@ -1,4 +1,3 @@
-use log::error;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
@@ -668,12 +667,9 @@ pub fn definition(
                             helpers::identifier_range(stmt, checker.locator),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            match fixes::add_return_annotation(checker.locator, stmt, "None") {
-                                Ok(fix) => {
-                                    diagnostic.amend(fix);
-                                }
-                                Err(e) => error!("Failed to generate fix: {e}"),
-                            }
+                            diagnostic.try_set_fix(|| {
+                                fixes::add_return_annotation(checker.locator, stmt, "None")
+                            });
                         }
                         diagnostics.push(diagnostic);
                     }
@@ -693,12 +689,9 @@ pub fn definition(
                     let return_type = SIMPLE_MAGIC_RETURN_TYPES.get(name);
                     if let Some(return_type) = return_type {
                         if checker.patch(diagnostic.kind.rule()) {
-                            match fixes::add_return_annotation(checker.locator, stmt, return_type) {
-                                Ok(fix) => {
-                                    diagnostic.amend(fix);
-                                }
-                                Err(e) => error!("Failed to generate fix: {e}"),
-                            }
+                            diagnostic.try_set_fix(|| {
+                                fixes::add_return_annotation(checker.locator, stmt, return_type)
+                            });
                         }
                     }
                     diagnostics.push(diagnostic);

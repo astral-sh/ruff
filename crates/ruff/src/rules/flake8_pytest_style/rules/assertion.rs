@@ -10,7 +10,7 @@ use rustpython_parser::ast::{
     Unaryop,
 };
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_comments_in, unparse_stmt};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -206,7 +206,7 @@ pub fn unittest_assertion(
                 );
                 if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                        diagnostic.amend(Fix::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             unparse_stmt(&stmt, checker.stylist),
                             expr.location,
                             expr.end_location.unwrap(),
@@ -317,7 +317,7 @@ fn negate<'a>(expression: &Expression<'a>) -> Expression<'a> {
 
 /// Replace composite condition `assert a == "hello" and b == "world"` with two statements
 /// `assert a == "hello"` and `assert b == "world"`.
-fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Result<Fix> {
+fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Result<Edit> {
     // Infer the indentation of the outer block.
     let Some(outer_indent) = whitespace::indentation(locator, stmt) else {
         bail!("Unable to fix multiline statement");
@@ -418,7 +418,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         .unwrap()
         .to_string();
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         contents,
         Location::new(stmt.location.row(), 0),
         Location::new(stmt.end_location.unwrap().row() + 1, 0),
@@ -435,9 +435,8 @@ pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
         let mut diagnostic =
             Diagnostic::new(PytestCompositeAssertion { fixable }, Range::from(stmt));
         if fixable && checker.patch(diagnostic.kind.rule()) {
-            if let Ok(fix) = fix_composite_condition(stmt, checker.locator, checker.stylist) {
-                diagnostic.amend(fix);
-            }
+            diagnostic
+                .try_set_fix(|| fix_composite_condition(stmt, checker.locator, checker.stylist));
         }
         checker.diagnostics.push(diagnostic);
     }

@@ -14,12 +14,13 @@ expression: diagnostics
     row: 9
     column: 50
   fix:
-    content: "(OSError, exceptions.OperationalError)"
-    location:
-      row: 9
-      column: 7
-    end_location:
-      row: 9
-      column: 50
+    edits:
+      - content: "(OSError, exceptions.OperationalError)"
+        location:
+          row: 9
+          column: 7
+        end_location:
+          row: 9
+          column: 50
   parent: ~
 

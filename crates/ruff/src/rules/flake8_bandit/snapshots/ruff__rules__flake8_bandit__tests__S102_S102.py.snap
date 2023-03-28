@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ExecBuiltin
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 5
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

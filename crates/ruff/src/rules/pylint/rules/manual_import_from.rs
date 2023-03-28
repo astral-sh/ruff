@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Alias, AliasData, Located, Stmt, StmtKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_stmt, unparse_stmt};
 use ruff_python_ast::types::Range;
@@ -54,7 +54,7 @@ pub fn manual_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, nam
         Range::from(alias),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Fix::replacement(
+        diagnostic.set_fix(Edit::replacement(
             unparse_stmt(
                 &create_stmt(StmtKind::ImportFrom {
                     module: Some(module.to_string()),

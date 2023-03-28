@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Location;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -94,7 +94,7 @@ pub fn trailing_whitespace(
                 if matches!(autofix, flags::Autofix::Enabled)
                     && settings.rules.should_fix(Rule::BlankLineWithWhitespace)
                 {
-                    diagnostic.amend(Fix::deletion(start, end));
+                    diagnostic.set_fix(Edit::deletion(start, end));
                 }
                 return Some(diagnostic);
             }
@@ -103,7 +103,7 @@ pub fn trailing_whitespace(
             if matches!(autofix, flags::Autofix::Enabled)
                 && settings.rules.should_fix(Rule::TrailingWhitespace)
             {
-                diagnostic.amend(Fix::deletion(start, end));
+                diagnostic.set_fix(Edit::deletion(start, end));
             }
             return Some(diagnostic);
         }

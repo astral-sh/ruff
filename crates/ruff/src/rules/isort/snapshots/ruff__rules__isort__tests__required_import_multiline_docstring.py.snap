@@ -14,12 +14,13 @@ expression: diagnostics
     row: 1
     column: 0
   fix:
-    content: "\nfrom __future__ import annotations"
-    location:
-      row: 3
-      column: 3
-    end_location:
-      row: 3
-      column: 3
+    edits:
+      - content: "\nfrom __future__ import annotations"
+        location:
+          row: 3
+          column: 3
+        end_location:
+          row: 3
+          column: 3
   parent: ~
 

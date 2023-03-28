@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 34
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BooleanDefaultValueInFunctionDefinition
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 46
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BooleanDefaultValueInFunctionDefinition
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BooleanDefaultValueInFunctionDefinition
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 15
     column: 49
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

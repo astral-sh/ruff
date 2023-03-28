@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PercentFormatExpectedMapping
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PercentFormatExpectedMapping
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PercentFormatExpectedMapping
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PercentFormatExpectedMapping
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 37
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PercentFormatExpectedMapping
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 37
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PercentFormatExpectedMapping
@@ -91,6 +97,7 @@ expression: diagnostics
   end_location:
     row: 13
     column: 37
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

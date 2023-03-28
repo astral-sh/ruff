@@ -1,7 +1,7 @@
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 use ruff_python_ast::types::Range;
@@ -100,7 +100,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.amend(Fix::replacement(
+                            diagnostic.set_fix(Edit::replacement(
                                 format!(
                                     "({})",
                                     unparse_expr(
@@ -133,7 +133,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.amend(Fix::replacement(
+                            diagnostic.set_fix(Edit::replacement(
                                 unparse_expr(
                                     &create_expr(ExprKind::List {
                                         elts: names
@@ -175,7 +175,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.amend(Fix::replacement(
+                            diagnostic.set_fix(Edit::replacement(
                                 unparse_expr(
                                     &create_expr(ExprKind::List {
                                         elts: elts.clone(),
@@ -198,7 +198,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
-                                diagnostic.amend(Fix::replacement(
+                                diagnostic.set_fix(Edit::replacement(
                                     content,
                                     expr.location,
                                     expr.end_location.unwrap(),
@@ -226,7 +226,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                             Range::from(expr),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.amend(Fix::replacement(
+                            diagnostic.set_fix(Edit::replacement(
                                 format!(
                                     "({})",
                                     unparse_expr(
@@ -252,7 +252,7 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
-                                diagnostic.amend(Fix::replacement(
+                                diagnostic.set_fix(Edit::replacement(
                                     content,
                                     expr.location,
                                     expr.end_location.unwrap(),
@@ -329,7 +329,7 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Fix::replacement(
+        diagnostic.set_fix(Edit::replacement(
             unparse_expr(&create_expr(value.node.clone()), checker.stylist),
             expr.location,
             expr.end_location.unwrap(),

@@ -2,7 +2,7 @@ use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, CompOp};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
@@ -31,7 +31,7 @@ impl Violation for YodaConditions {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let YodaConditions { suggestion, .. } = self;
+        let YodaConditions { suggestion } = self;
         if suggestion.is_some() {
             Some(|YodaConditions { suggestion }| {
                 let suggestion = suggestion.as_ref().unwrap();
@@ -162,7 +162,7 @@ pub fn yoda_conditions(
             Range::from(expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 suggestion,
                 expr.location,
                 expr.end_location.unwrap(),

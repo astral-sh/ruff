@@ -1,10 +1,12 @@
+use anyhow::Result;
+use log::error;
 use rustpython_parser::ast::Location;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use ruff_python_ast::types::Range;
 
-use crate::fix::Fix;
+use crate::Fix;
 
 #[derive(Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
@@ -25,28 +27,37 @@ pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub location: Location,
     pub end_location: Location,
-    pub fix: Option<Fix>,
+    pub fix: Fix,
     pub parent: Option<Location>,
 }
 
 impl Diagnostic {
-    pub fn new<K: Into<DiagnosticKind>>(kind: K, range: Range) -> Self {
+    pub fn new<T: Into<DiagnosticKind>>(kind: T, range: Range) -> Self {
         Self {
             kind: kind.into(),
             location: range.location,
             end_location: range.end_location,
-            fix: None,
+            fix: Fix::empty(),
             parent: None,
         }
     }
 
-    pub fn amend(&mut self, fix: Fix) -> &mut Self {
-        self.fix = Some(fix);
-        self
+    /// Set the [`Fix`] used to fix the diagnostic.
+    pub fn set_fix<T: Into<Fix>>(&mut self, fix: T) {
+        self.fix = fix.into();
     }
 
-    pub fn parent(&mut self, parent: Location) -> &mut Self {
+    /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
+    /// Otherwise, log the error.
+    pub fn try_set_fix<T: Into<Fix>>(&mut self, func: impl FnOnce() -> Result<T>) {
+        match func() {
+            Ok(fix) => self.fix = fix.into(),
+            Err(err) => error!("Failed to create fix: {}", err),
+        }
+    }
+
+    /// Set the location of the diagnostic's parent node.
+    pub fn set_parent(&mut self, parent: Location) {
         self.parent = Some(parent);
-        self
     }
 }

@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_useless_f_strings;
 use ruff_python_ast::types::Range;
@@ -55,12 +55,12 @@ fn fix_f_string_missing_placeholders(
     prefix_range: &Range,
     tok_range: &Range,
     checker: &mut Checker,
-) -> Fix {
+) -> Edit {
     let content = checker.locator.slice(Range::new(
         prefix_range.end_location,
         tok_range.end_location,
     ));
-    Fix::replacement(
+    Edit::replacement(
         unescape_f_string(content),
         prefix_range.location,
         tok_range.end_location,
@@ -76,7 +76,7 @@ pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut
         for (prefix_range, tok_range) in find_useless_f_strings(expr, checker.locator) {
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(fix_f_string_missing_placeholders(
+                diagnostic.set_fix(fix_f_string_missing_placeholders(
                     &prefix_range,
                     &tok_range,
                     checker,

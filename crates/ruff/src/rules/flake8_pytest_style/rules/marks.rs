@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind, Location};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -52,7 +52,7 @@ impl AlwaysAutofixableViolation for PytestUseFixturesWithoutParameters {
 fn pytest_mark_parentheses(
     checker: &mut Checker,
     decorator: &Expr,
-    fix: Fix,
+    fix: Edit,
     preferred: &str,
     actual: &str,
 ) {
@@ -65,7 +65,7 @@ fn pytest_mark_parentheses(
         Range::from(decorator),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(fix);
+        diagnostic.set_fix(fix);
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -83,13 +83,13 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr) {
                 && keywords.is_empty()
             {
                 let fix =
-                    Fix::deletion(func.end_location.unwrap(), decorator.end_location.unwrap());
+                    Edit::deletion(func.end_location.unwrap(), decorator.end_location.unwrap());
                 pytest_mark_parentheses(checker, decorator, fix, "", "()");
             }
         }
         _ => {
             if checker.settings.flake8_pytest_style.mark_parentheses {
-                let fix = Fix::insertion("()".to_string(), decorator.end_location.unwrap());
+                let fix = Edit::insertion("()".to_string(), decorator.end_location.unwrap());
                 pytest_mark_parentheses(checker, decorator, fix, "()", "");
             }
         }
@@ -114,7 +114,7 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
             Diagnostic::new(PytestUseFixturesWithoutParameters, Range::from(decorator));
         if checker.patch(diagnostic.kind.rule()) {
             let at_start = Location::new(decorator.location.row(), decorator.location.column() - 1);
-            diagnostic.amend(Fix::deletion(at_start, decorator.end_location.unwrap()));
+            diagnostic.set_fix(Edit::deletion(at_start, decorator.end_location.unwrap()));
         }
         checker.diagnostics.push(diagnostic);
     }

@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 85
     column: 68
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 89
     column: 71
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 93
     column: 67
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 109
     column: 49
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 113
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 113
     column: 51
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 117
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 155
     column: 47
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 160
     column: 37
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 164
     column: 57
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 170
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 170
     column: 47
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 176
     column: 62
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 181
     column: 59
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FunctionCallInDefaultArgument
@@ -195,6 +209,7 @@ expression: diagnostics
   end_location:
     row: 181
     column: 53
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

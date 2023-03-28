@@ -1,5 +1,6 @@
 use log::error;
 use rustpython_parser::ast::{Located, Stmt, StmtKind, Withitem};
+use unicode_width::UnicodeWidthStr;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_diagnostics::{AutofixKind, Violation};
@@ -117,9 +118,9 @@ pub fn multiple_with_statements(
                     if fix
                         .content
                         .universal_newlines()
-                        .all(|line| line.len() <= checker.settings.line_length)
+                        .all(|line| line.width() <= checker.settings.line_length)
                     {
-                        diagnostic.amend(fix);
+                        diagnostic.set_fix(fix);
                     }
                 }
                 Err(err) => error!("Failed to fix nested with: {err}"),

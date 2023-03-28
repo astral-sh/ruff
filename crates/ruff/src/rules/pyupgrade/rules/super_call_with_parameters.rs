@@ -99,7 +99,7 @@ pub fn super_call_with_parameters(checker: &mut Checker, expr: &Expr, func: &Exp
     let mut diagnostic = Diagnostic::new(SuperCallWithParameters, Range::from(expr));
     if checker.patch(diagnostic.kind.rule()) {
         if let Some(fix) = fixes::remove_super_arguments(checker.locator, checker.stylist, expr) {
-            diagnostic.amend(fix);
+            diagnostic.set_fix(fix);
         }
     }
     checker.diagnostics.push(diagnostic);

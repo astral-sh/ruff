@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 46
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundParameterEquals
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 46
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundParameterEquals
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 46
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingWhitespaceAroundParameterEquals
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 46
     column: 35
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

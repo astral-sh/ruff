@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 45
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ErrorInsteadOfException
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 49
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ErrorInsteadOfException
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ErrorInsteadOfException
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 28
     column: 48
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ErrorInsteadOfException
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 35
     column: 41
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ErrorInsteadOfException
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 38
     column: 45
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ErrorInsteadOfException
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 45
     column: 49
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ErrorInsteadOfException
@@ -104,6 +111,7 @@ expression: diagnostics
   end_location:
     row: 48
     column: 53
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

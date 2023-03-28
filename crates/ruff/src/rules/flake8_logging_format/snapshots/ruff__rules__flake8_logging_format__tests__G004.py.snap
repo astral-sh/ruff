@@ -13,6 +13,21 @@ expression: diagnostics
   end_location:
     row: 4
     column: 28
-  fix: ~
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: LoggingFString
+    body: Logging statement uses f-string
+    suggestion: ~
+    fixable: false
+  location:
+    row: 5
+    column: 26
+  end_location:
+    row: 5
+    column: 41
+  fix:
+    edits: []
   parent: ~
 

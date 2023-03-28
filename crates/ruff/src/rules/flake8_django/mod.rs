@@ -18,6 +18,7 @@ mod tests {
     #[test_case(Rule::DjangoExcludeWithModelForm, Path::new("DJ006.py"); "DJ006")]
     #[test_case(Rule::DjangoAllWithModelForm, Path::new("DJ007.py"); "DJ007")]
     #[test_case(Rule::DjangoModelWithoutDunderStr, Path::new("DJ008.py"); "DJ008")]
+    #[test_case(Rule::DjangoUnorderedBodyContentInModel, Path::new("DJ012.py"); "DJ012")]
     #[test_case(Rule::DjangoNonLeadingReceiverDecorator, Path::new("DJ013.py"); "DJ013")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());

@@ -26,4 +26,11 @@ rustflags = [
   "-Wclippy::print_stdout",
   "-Wclippy::print_stderr",
   "-Wclippy::dbg_macro",
+  "-Wclippy::empty_drop",
+  "-Wclippy::empty_structs_with_brackets",
+  "-Wclippy::exit",
+  "-Wclippy::get_unwrap",
+  "-Wclippy::rc_buffer",
+  "-Wclippy::rc_mutex",
+  "-Wclippy::rest_pat_in_fully_bound_structs",
 ]

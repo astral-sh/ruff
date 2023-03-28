@@ -1,0 +1,236 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: AssignmentDefaultInStub
+    body: Only simple default values allowed for assignments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 40
+    column: 22
+  end_location:
+    row: 40
+    column: 57
+  fix:
+    edits:
+      - content: "..."
+        location:
+          row: 40
+          column: 22
+        end_location:
+          row: 40
+          column: 57
+  parent: ~
+- kind:
+    name: AssignmentDefaultInStub
+    body: Only simple default values allowed for assignments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 41
+    column: 22
+  end_location:
+    row: 41
+    column: 34
+  fix:
+    edits:
+      - content: "..."
+        location:
+          row: 41
+          column: 22
+        end_location:
+          row: 41
+          column: 34
+  parent: ~
+- kind:
+    name: AssignmentDefaultInStub
+    body: Only simple default values allowed for assignments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 42
+    column: 22
+  end_location:
+    row: 42
+    column: 37
+  fix:
+    edits:
+      - content: "..."
+        location:
+          row: 42
+          column: 22
+        end_location:
+          row: 42
+          column: 37
+  parent: ~
+- kind:
+    name: AssignmentDefaultInStub
+    body: Only simple default values allowed for assignments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 43
+    column: 25
+  end_location:
+    row: 43
+    column: 35
+  fix:
+    edits:
+      - content: "..."
+        location:
+          row: 43
+          column: 25
+        end_location:
+          row: 43
+          column: 35
+  parent: ~
+- kind:
+    name: AssignmentDefaultInStub
+    body: Only simple default values allowed for assignments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 44
+    column: 46
+  end_location:
+    row: 44
+    column: 69
+  fix:
+    edits:
+      - content: "..."
+        location:
+          row: 44
+          column: 46
+        end_location:
+          row: 44
+          column: 69
+  parent: ~
+- kind:
+    name: AssignmentDefaultInStub
+    body: Only simple default values allowed for assignments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 45
+    column: 30
+  end_location:
+    row: 45
+    column: 53
+  fix:
+    edits:
+      - content: "..."
+        location:
+          row: 45
+          column: 30
+        end_location:
+          row: 45
+          column: 53
+  parent: ~
+- kind:
+    name: AssignmentDefaultInStub
+    body: Only simple default values allowed for assignments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 46
+    column: 36
+  end_location:
+    row: 46
+    column: 47
+  fix:
+    edits:
+      - content: "..."
+        location:
+          row: 46
+          column: 36
+        end_location:
+          row: 46
+          column: 47
+  parent: ~
+- kind:
+    name: AssignmentDefaultInStub
+    body: Only simple default values allowed for assignments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 48
+    column: 27
+  end_location:
+    row: 48
+    column: 43
+  fix:
+    edits:
+      - content: "..."
+        location:
+          row: 48
+          column: 27
+        end_location:
+          row: 48
+          column: 43
+  parent: ~
+- kind:
+    name: AssignmentDefaultInStub
+    body: Only simple default values allowed for assignments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 49
+    column: 10
+  end_location:
+    row: 49
+    column: 23
+  fix:
+    edits:
+      - content: "..."
+        location:
+          row: 49
+          column: 10
+        end_location:
+          row: 49
+          column: 23
+  parent: ~
+- kind:
+    name: AssignmentDefaultInStub
+    body: Only simple default values allowed for assignments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 50
+    column: 10
+  end_location:
+    row: 50
+    column: 25
+  fix:
+    edits:
+      - content: "..."
+        location:
+          row: 50
+          column: 10
+        end_location:
+          row: 50
+          column: 25
+  parent: ~
+- kind:
+    name: AssignmentDefaultInStub
+    body: Only simple default values allowed for assignments
+    suggestion: "Replace default value with `...`"
+    fixable: true
+  location:
+    row: 51
+    column: 10
+  end_location:
+    row: 51
+    column: 15
+  fix:
+    edits:
+      - content: "..."
+        location:
+          row: 51
+          column: 10
+        end_location:
+          row: 51
+          column: 15
+  parent: ~
+

@@ -1,8 +1,9 @@
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
+use ruff_python_ast::typing::AnnotationKind;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -40,7 +41,11 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
         .resolve_call_path(expr)
         .and_then(|call_path| call_path.last().copied())
     {
-        let fixable = !checker.ctx.in_deferred_string_type_definition;
+        let fixable = checker
+            .ctx
+            .in_deferred_string_type_definition
+            .as_ref()
+            .map_or(true, AnnotationKind::is_simple);
         let mut diagnostic = Diagnostic::new(
             NonPEP585Annotation {
                 name: binding.to_string(),
@@ -51,7 +56,7 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
         if fixable && checker.patch(diagnostic.kind.rule()) {
             let binding = binding.to_lowercase();
             if checker.ctx.is_builtin(&binding) {
-                diagnostic.amend(Fix::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     binding,
                     expr.location,
                     expr.end_location.unwrap(),

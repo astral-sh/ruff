@@ -2,6 +2,7 @@ use bitflags::bitflags;
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
+use unicode_width::UnicodeWidthStr;
 
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
@@ -86,7 +87,7 @@ fn build_line<'a>(
         // TODO(charlie): "Mute" strings.
         let s;
         let text = if let Tok::String { value, .. } = tok {
-            s = format!("\"{}\"", "x".repeat(value.len()).clone());
+            s = format!("\"{}\"", "x".repeat(value.width()).clone());
             &s
         } else {
             locator.slice(Range {

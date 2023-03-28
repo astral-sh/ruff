@@ -1,0 +1,103 @@
+---
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 27
+    column: 36
+  end_location:
+    row: 27
+    column: 49
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 29
+    column: 32
+  end_location:
+    row: 29
+    column: 45
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 33
+    column: 30
+  end_location:
+    row: 33
+    column: 43
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 40
+    column: 36
+  end_location:
+    row: 40
+    column: 49
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 46
+    column: 28
+  end_location:
+    row: 46
+    column: 41
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 56
+    column: 16
+  end_location:
+    row: 56
+    column: 29
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 79
+    column: 36
+  end_location:
+    row: 79
+    column: 49
+  fix:
+    edits: []
+  parent: ~
+

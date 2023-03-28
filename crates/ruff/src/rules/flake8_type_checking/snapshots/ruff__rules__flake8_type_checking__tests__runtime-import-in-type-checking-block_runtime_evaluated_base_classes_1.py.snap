@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RuntimeImportInTypeCheckingBlock
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RuntimeImportInTypeCheckingBlock
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 13
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

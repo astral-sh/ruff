@@ -71,7 +71,7 @@ mod tests {
             // Replaces the platform's default line ending with `<LineEnding>` to make the test platform-
             // agnostic
             {
-                "[].fix.content" => insta::dynamic_redaction(|value, _path| {
+                "[].fix.edits[].content" => insta::dynamic_redaction(|value, _path| {
                     value.as_str().unwrap().replace(LineEnding::default().as_str(), "<LineEnding>")
                 })
             }
@@ -79,7 +79,7 @@ mod tests {
         Ok(())
     }
 
-    #[cfg(debug_assertions)]
+    #[cfg(feature = "logical_lines")]
     #[test_case(Rule::IndentationWithInvalidMultiple, Path::new("E11.py"))]
     #[test_case(Rule::IndentationWithInvalidMultipleComment, Path::new("E11.py"))]
     #[test_case(Rule::MultipleLeadingHashesForBlockComment, Path::new("E26.py"))]

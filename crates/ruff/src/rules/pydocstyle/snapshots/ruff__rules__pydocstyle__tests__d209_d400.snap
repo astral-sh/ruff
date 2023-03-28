@@ -14,13 +14,14 @@ expression: diagnostics
     row: 3
     column: 72
   fix:
-    content: "\n    "
-    location:
-      row: 3
-      column: 69
-    end_location:
-      row: 3
-      column: 69
+    edits:
+      - content: "\n    "
+        location:
+          row: 3
+          column: 69
+        end_location:
+          row: 3
+          column: 69
   parent: ~
 - kind:
     name: EndsInPeriod
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 3
     column: 72
   fix:
-    content: "."
-    location:
-      row: 3
-      column: 69
-    end_location:
-      row: 3
-      column: 69
+    edits:
+      - content: "."
+        location:
+          row: 3
+          column: 69
+        end_location:
+          row: 3
+          column: 69
   parent: ~
 

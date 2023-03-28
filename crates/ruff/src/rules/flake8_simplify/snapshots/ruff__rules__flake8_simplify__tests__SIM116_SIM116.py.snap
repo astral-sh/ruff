@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfElseBlockInsteadOfDictLookup
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfElseBlockInsteadOfDictLookup
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfElseBlockInsteadOfDictLookup
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 40
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfElseBlockInsteadOfDictLookup
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 48
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfElseBlockInsteadOfDictLookup
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 58
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfElseBlockInsteadOfDictLookup
@@ -91,6 +97,7 @@ expression: diagnostics
   end_location:
     row: 86
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

@@ -9,24 +9,26 @@ expression: diagnostics
     fixable: false
   location:
     row: 4
-    column: 9
-  end_location:
-    row: 4
-    column: 16
-  fix: ~
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
     column: 10
   end_location:
+    row: 4
+    column: 15
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: UndefinedName
+    body: "Undefined name `Model`"
+    suggestion: ~
+    fixable: false
+  location:
     row: 9
-    column: 17
-  fix: ~
+    column: 11
+  end_location:
+    row: 9
+    column: 16
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -35,11 +37,12 @@ expression: diagnostics
     fixable: false
   location:
     row: 14
-    column: 14
+    column: 15
   end_location:
     row: 14
-    column: 21
-  fix: ~
+    column: 20
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -48,11 +51,12 @@ expression: diagnostics
     fixable: false
   location:
     row: 19
-    column: 30
+    column: 31
   end_location:
     row: 19
-    column: 37
-  fix: ~
+    column: 36
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedName
@@ -61,10 +65,11 @@ expression: diagnostics
     fixable: false
   location:
     row: 24
-    column: 18
+    column: 19
   end_location:
     row: 24
-    column: 25
-  fix: ~
+    column: 24
+  fix:
+    edits: []
   parent: ~
 

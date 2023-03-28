@@ -23,38 +23,38 @@ mod tests {
         let diagnostics = test_path(
             Path::new("flake8_use_pathlib").join(path).as_path(),
             &settings::Settings::for_rules(vec![
-                Rule::PathlibAbspath,
-                Rule::PathlibChmod,
-                Rule::PathlibMkdir,
-                Rule::PathlibMakedirs,
-                Rule::PathlibRename,
+                Rule::OsPathAbspath,
+                Rule::OsChmod,
+                Rule::OsMkdir,
+                Rule::OsMakedirs,
+                Rule::OsRename,
                 Rule::PathlibReplace,
-                Rule::PathlibRmdir,
-                Rule::PathlibRemove,
-                Rule::PathlibUnlink,
-                Rule::PathlibGetcwd,
-                Rule::PathlibExists,
-                Rule::PathlibExpanduser,
-                Rule::PathlibIsDir,
-                Rule::PathlibIsFile,
-                Rule::PathlibIsLink,
-                Rule::PathlibReadlink,
-                Rule::PathlibStat,
-                Rule::PathlibIsAbs,
-                Rule::PathlibJoin,
-                Rule::PathlibBasename,
-                Rule::PathlibDirname,
-                Rule::PathlibSamefile,
-                Rule::PathlibSplitext,
-                Rule::PathlibOpen,
+                Rule::OsRmdir,
+                Rule::OsRemove,
+                Rule::OsUnlink,
+                Rule::OsGetcwd,
+                Rule::OsPathExists,
+                Rule::OsPathExpanduser,
+                Rule::OsPathIsdir,
+                Rule::OsPathIsfile,
+                Rule::OsPathIslink,
+                Rule::OsReadlink,
+                Rule::OsStat,
+                Rule::OsPathIsabs,
+                Rule::OsPathJoin,
+                Rule::OsPathBasename,
+                Rule::OsPathDirname,
+                Rule::OsPathSamefile,
+                Rule::OsPathSplitext,
+                Rule::BuiltinOpen,
             ]),
         )?;
         insta::assert_yaml_snapshot!(snapshot, diagnostics);
         Ok(())
     }
 
-    #[test_case(Rule::PathlibPyPath, Path::new("py_path_1.py"); "PTH024_1")]
-    #[test_case(Rule::PathlibPyPath, Path::new("py_path_2.py"); "PTH024_2")]
+    #[test_case(Rule::PyPath, Path::new("py_path_1.py"); "PTH024_1")]
+    #[test_case(Rule::PyPath, Path::new("py_path_2.py"); "PTH024_2")]
     fn rules_pypath(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

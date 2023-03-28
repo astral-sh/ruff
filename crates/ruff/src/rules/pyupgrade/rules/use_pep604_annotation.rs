@@ -1,9 +1,10 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Operator};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
+use ruff_python_ast::typing::AnnotationKind;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -99,14 +100,18 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
     };
 
     // Avoid fixing forward references.
-    let fixable = !checker.ctx.in_deferred_string_type_definition;
+    let fixable = checker
+        .ctx
+        .in_deferred_string_type_definition
+        .as_ref()
+        .map_or(true, AnnotationKind::is_simple);
 
     match typing_member {
         TypingMember::Optional => {
             let mut diagnostic =
                 Diagnostic::new(NonPEP604Annotation { fixable }, Range::from(expr));
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Fix::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     unparse_expr(&optional(slice), checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),
@@ -123,7 +128,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                         // Invalid type annotation.
                     }
                     ExprKind::Tuple { elts, .. } => {
-                        diagnostic.amend(Fix::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             unparse_expr(&union(elts), checker.stylist),
                             expr.location,
                             expr.end_location.unwrap(),
@@ -131,7 +136,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                     }
                     _ => {
                         // Single argument.
-                        diagnostic.amend(Fix::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             unparse_expr(slice, checker.stylist),
                             expr.location,
                             expr.end_location.unwrap(),

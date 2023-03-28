@@ -1,4 +1,3 @@
-use log::error;
 use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::Diagnostic;
@@ -108,18 +107,15 @@ pub fn unnecessary_map(
             if args.len() == 2 && matches!(&args[0].node, ExprKind::Lambda { .. }) {
                 let mut diagnostic = create_diagnostic("generator", Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
-                    match fixes::fix_unnecessary_map(
-                        checker.locator,
-                        checker.stylist,
-                        expr,
-                        parent,
-                        "generator",
-                    ) {
-                        Ok(fix) => {
-                            diagnostic.amend(fix);
-                        }
-                        Err(e) => error!("Failed to generate fix: {e}"),
-                    }
+                    diagnostic.try_set_fix(|| {
+                        fixes::fix_unnecessary_map(
+                            checker.locator,
+                            checker.stylist,
+                            expr,
+                            parent,
+                            "generator",
+                        )
+                    });
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -140,18 +136,15 @@ pub fn unnecessary_map(
                     if let ExprKind::Lambda { .. } = argument {
                         let mut diagnostic = create_diagnostic(id, Range::from(expr));
                         if checker.patch(diagnostic.kind.rule()) {
-                            match fixes::fix_unnecessary_map(
-                                checker.locator,
-                                checker.stylist,
-                                expr,
-                                parent,
-                                id,
-                            ) {
-                                Ok(fix) => {
-                                    diagnostic.amend(fix);
-                                }
-                                Err(e) => error!("Failed to generate fix: {e}"),
-                            }
+                            diagnostic.try_set_fix(|| {
+                                fixes::fix_unnecessary_map(
+                                    checker.locator,
+                                    checker.stylist,
+                                    expr,
+                                    parent,
+                                    id,
+                                )
+                            });
                         }
                         checker.diagnostics.push(diagnostic);
                     }
@@ -173,18 +166,15 @@ pub fn unnecessary_map(
                         {
                             let mut diagnostic = create_diagnostic(id, Range::from(expr));
                             if checker.patch(diagnostic.kind.rule()) {
-                                match fixes::fix_unnecessary_map(
-                                    checker.locator,
-                                    checker.stylist,
-                                    expr,
-                                    parent,
-                                    id,
-                                ) {
-                                    Ok(fix) => {
-                                        diagnostic.amend(fix);
-                                    }
-                                    Err(e) => error!("Failed to generate fix: {e}"),
-                                }
+                                diagnostic.try_set_fix(|| {
+                                    fixes::fix_unnecessary_map(
+                                        checker.locator,
+                                        checker.stylist,
+                                        expr,
+                                        parent,
+                                        id,
+                                    )
+                                });
                             }
                             checker.diagnostics.push(diagnostic);
                         }

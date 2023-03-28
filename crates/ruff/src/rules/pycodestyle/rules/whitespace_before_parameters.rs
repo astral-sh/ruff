@@ -3,7 +3,7 @@
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -29,7 +29,7 @@ impl AlwaysAutofixableViolation for WhitespaceBeforeParameters {
 }
 
 /// E211
-#[cfg(debug_assertions)]
+#[cfg(feature = "logical_lines")]
 pub fn whitespace_before_parameters(
     tokens: &[(Location, &Tok, Location)],
     autofix: bool,
@@ -56,7 +56,7 @@ pub fn whitespace_before_parameters(
             let mut diagnostic = Diagnostic::new(kind, Range::new(start, end));
 
             if autofix {
-                diagnostic.amend(Fix::deletion(start, end));
+                diagnostic.set_fix(Edit::deletion(start, end));
             }
             diagnostics.push(diagnostic);
         }
@@ -66,7 +66,7 @@ pub fn whitespace_before_parameters(
     diagnostics
 }
 
-#[cfg(not(debug_assertions))]
+#[cfg(not(feature = "logical_lines"))]
 pub fn whitespace_before_parameters(
     _tokens: &[(Location, &Tok, Location)],
     _autofix: bool,

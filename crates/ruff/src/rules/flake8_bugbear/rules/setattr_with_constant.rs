@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_stmt;
 use ruff_python_ast::source_code::Stylist;
@@ -80,7 +80,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
             let mut diagnostic = Diagnostic::new(SetAttrWithConstant, Range::from(expr));
 
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Fix::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     assignment(obj, name, value, checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),

@@ -8,12 +8,13 @@ use smallvec::smallvec;
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
-use crate::helpers::{collect_call_path, from_relative_import, Exceptions};
+use crate::helpers::{collect_call_path, from_relative_import};
 use crate::scope::{
-    Binding, BindingId, BindingKind, Bindings, ExecutionContext, Scope, ScopeId, ScopeKind,
-    ScopeStack, Scopes,
+    Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
+    Importation, Scope, ScopeId, ScopeKind, ScopeStack, Scopes, SubmoduleImportation,
 };
 use crate::types::{CallPath, RefEquality};
+use crate::typing::AnnotationKind;
 use crate::visibility::{module_visibility, Modifier, VisibleScope};
 
 #[allow(clippy::struct_excessive_bools)]
@@ -41,9 +42,10 @@ pub struct Context<'a> {
     pub visible_scope: VisibleScope,
     pub in_annotation: bool,
     pub in_type_definition: bool,
-    pub in_deferred_string_type_definition: bool,
+    pub in_deferred_string_type_definition: Option<AnnotationKind>,
     pub in_deferred_type_definition: bool,
     pub in_exception_handler: bool,
+    pub in_f_string: bool,
     pub in_literal: bool,
     pub in_subscript: bool,
     pub in_type_checking_block: bool,
@@ -79,9 +81,10 @@ impl<'a> Context<'a> {
             },
             in_annotation: false,
             in_type_definition: false,
-            in_deferred_string_type_definition: false,
+            in_deferred_string_type_definition: None,
             in_deferred_type_definition: false,
             in_exception_handler: false,
+            in_f_string: false,
             in_literal: false,
             in_subscript: false,
             in_type_checking_block: false,
@@ -155,7 +158,10 @@ impl<'a> Context<'a> {
             return None;
         };
         match &binding.kind {
-            BindingKind::Importation(.., name) | BindingKind::SubmoduleImportation(name, ..) => {
+            BindingKind::Importation(Importation {
+                full_name: name, ..
+            })
+            | BindingKind::SubmoduleImportation(SubmoduleImportation { name, .. }) => {
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
@@ -170,7 +176,9 @@ impl<'a> Context<'a> {
                     Some(source_path)
                 }
             }
-            BindingKind::FromImportation(.., name) => {
+            BindingKind::FromImportation(FromImportation {
+                full_name: name, ..
+            }) => {
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
@@ -308,14 +316,24 @@ impl<'a> Context<'a> {
         self.in_exception_handler
     }
 
+    /// Return the [`ExecutionContext`] of the current scope.
     pub const fn execution_context(&self) -> ExecutionContext {
         if self.in_type_checking_block
             || self.in_annotation
-            || self.in_deferred_string_type_definition
+            || self.in_deferred_string_type_definition.is_some()
         {
             ExecutionContext::Typing
         } else {
             ExecutionContext::Runtime
         }
+    }
+
+    /// Return the union of all handled exceptions as an [`Exceptions`] bitflag.
+    pub fn exceptions(&self) -> Exceptions {
+        let mut exceptions = Exceptions::empty();
+        for exception in &self.handled_exceptions {
+            exceptions.insert(*exception);
+        }
+        exceptions
     }
 }

@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind, Keyword, Location};
 
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::Edit;
 use ruff_python_ast::helpers;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
@@ -33,7 +33,7 @@ pub fn fix_inplace_argument(
     violation_end: Location,
     args: &[Expr],
     keywords: &[Keyword],
-) -> Option<Fix> {
+) -> Option<Edit> {
     if let Ok(fix) = remove_argument(
         locator,
         expr.location,
@@ -44,7 +44,7 @@ pub fn fix_inplace_argument(
         false,
     ) {
         // Reset the line index.
-        let fix_me = Fix::deletion(
+        let fix_me = Edit::deletion(
             helpers::to_relative(fix.location, expr.location),
             helpers::to_relative(fix.end_location, expr.location),
         );
@@ -61,7 +61,7 @@ pub fn fix_inplace_argument(
         let new_contents = format!("{name} = {output}");
 
         // Create the new fix.
-        Some(Fix::replacement(
+        Some(Edit::replacement(
             new_contents,
             expr.location,
             expr.end_location.unwrap(),

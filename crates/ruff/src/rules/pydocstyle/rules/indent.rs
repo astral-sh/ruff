@@ -1,5 +1,5 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::types::Range;
@@ -94,7 +94,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                     ),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.amend(Fix::replacement(
+                    diagnostic.set_fix(Edit::replacement(
                         whitespace::clean(docstring.indentation),
                         Location::new(docstring.expr.location.row() + i, 0),
                         Location::new(docstring.expr.location.row() + i, line_indent.len()),
@@ -144,7 +144,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                         ),
                     );
                     if checker.patch(diagnostic.kind.rule()) {
-                        diagnostic.amend(Fix::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             whitespace::clean(docstring.indentation),
                             Location::new(docstring.expr.location.row() + i, 0),
                             Location::new(docstring.expr.location.row() + i, line_indent.len()),
@@ -168,7 +168,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                     ),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.amend(Fix::replacement(
+                    diagnostic.set_fix(Edit::replacement(
                         whitespace::clean(docstring.indentation),
                         Location::new(docstring.expr.location.row() + i, 0),
                         Location::new(docstring.expr.location.row() + i, line_indent.len()),

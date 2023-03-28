@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
@@ -48,7 +48,7 @@ pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Exp
                 Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Fix::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     unparse_expr(func, checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),

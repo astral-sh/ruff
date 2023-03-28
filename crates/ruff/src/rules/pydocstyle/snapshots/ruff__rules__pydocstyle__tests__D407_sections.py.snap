@@ -14,13 +14,14 @@ expression: diagnostics
     row: 47
     column: 7
   fix:
-    content: "\n    -------"
-    location:
-      row: 44
-      column: 11
-    end_location:
-      row: 44
-      column: 11
+    edits:
+      - content: "\n    -------"
+        location:
+          row: 44
+          column: 11
+        end_location:
+          row: 44
+          column: 11
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 58
     column: 7
   fix:
-    content: "\n    -------"
-    location:
-      row: 56
-      column: 11
-    end_location:
-      row: 56
-      column: 11
+    edits:
+      - content: "\n    -------"
+        location:
+          row: 56
+          column: 11
+        end_location:
+          row: 56
+          column: 11
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 67
     column: 14
   fix:
-    content: "\n    -------"
-    location:
-      row: 67
-      column: 11
-    end_location:
-      row: 67
-      column: 11
+    edits:
+      - content: "\n    -------"
+        location:
+          row: 67
+          column: 11
+        end_location:
+          row: 67
+          column: 11
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 230
     column: 7
   fix:
-    content: "\n    ------"
-    location:
-      row: 227
-      column: 11
-    end_location:
-      row: 227
-      column: 11
+    edits:
+      - content: "\n    ------"
+        location:
+          row: 227
+          column: 11
+        end_location:
+          row: 227
+          column: 11
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 271
     column: 7
   fix:
-    content: "\n    ----"
-    location:
-      row: 263
-      column: 9
-    end_location:
-      row: 263
-      column: 9
+    edits:
+      - content: "\n    ----"
+        location:
+          row: 263
+          column: 9
+        end_location:
+          row: 263
+          column: 9
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 271
     column: 7
   fix:
-    content: "\n    -------"
-    location:
-      row: 266
-      column: 12
-    end_location:
-      row: 266
-      column: 12
+    edits:
+      - content: "\n    -------"
+        location:
+          row: 266
+          column: 12
+        end_location:
+          row: 266
+          column: 12
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 271
     column: 7
   fix:
-    content: "\n    ------"
-    location:
-      row: 268
-      column: 11
-    end_location:
-      row: 268
-      column: 11
+    edits:
+      - content: "\n    ------"
+        location:
+          row: 268
+          column: 11
+        end_location:
+          row: 268
+          column: 11
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 283
     column: 7
   fix:
-    content: "\n    ----"
-    location:
-      row: 280
-      column: 8
-    end_location:
-      row: 280
-      column: 8
+    edits:
+      - content: "\n    ----"
+        location:
+          row: 280
+          column: 8
+        end_location:
+          row: 280
+          column: 8
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 301
     column: 11
   fix:
-    content: "\n        ----"
-    location:
-      row: 297
-      column: 13
-    end_location:
-      row: 297
-      column: 13
+    edits:
+      - content: "\n        ----"
+        location:
+          row: 297
+          column: 13
+        end_location:
+          row: 297
+          column: 13
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 315
     column: 7
   fix:
-    content: "\n    ----"
-    location:
-      row: 312
-      column: 9
-    end_location:
-      row: 312
-      column: 9
+    edits:
+      - content: "\n    ----"
+        location:
+          row: 312
+          column: 9
+        end_location:
+          row: 312
+          column: 9
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -214,13 +224,14 @@ expression: diagnostics
     row: 328
     column: 11
   fix:
-    content: "\n        ----"
-    location:
-      row: 324
-      column: 13
-    end_location:
-      row: 324
-      column: 13
+    edits:
+      - content: "\n        ----"
+        location:
+          row: 324
+          column: 13
+        end_location:
+          row: 324
+          column: 13
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -234,13 +245,14 @@ expression: diagnostics
     row: 339
     column: 11
   fix:
-    content: "\n        ----"
-    location:
-      row: 336
-      column: 13
-    end_location:
-      row: 336
-      column: 13
+    edits:
+      - content: "\n        ----"
+        location:
+          row: 336
+          column: 13
+        end_location:
+          row: 336
+          column: 13
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -254,13 +266,14 @@ expression: diagnostics
     row: 352
     column: 11
   fix:
-    content: "\n        ----"
-    location:
-      row: 348
-      column: 13
-    end_location:
-      row: 348
-      column: 13
+    edits:
+      - content: "\n        ----"
+        location:
+          row: 348
+          column: 13
+        end_location:
+          row: 348
+          column: 13
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -274,13 +287,14 @@ expression: diagnostics
     row: 364
     column: 11
   fix:
-    content: "\n        ----"
-    location:
-      row: 361
-      column: 13
-    end_location:
-      row: 361
-      column: 13
+    edits:
+      - content: "\n        ----"
+        location:
+          row: 361
+          column: 13
+        end_location:
+          row: 361
+          column: 13
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -294,13 +308,14 @@ expression: diagnostics
     row: 376
     column: 11
   fix:
-    content: "\n        ----"
-    location:
-      row: 373
-      column: 13
-    end_location:
-      row: 373
-      column: 13
+    edits:
+      - content: "\n        ----"
+        location:
+          row: 373
+          column: 13
+        end_location:
+          row: 373
+          column: 13
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -314,13 +329,14 @@ expression: diagnostics
     row: 391
     column: 11
   fix:
-    content: "\n        ----"
-    location:
-      row: 382
-      column: 13
-    end_location:
-      row: 382
-      column: 13
+    edits:
+      - content: "\n        ----"
+        location:
+          row: 382
+          column: 13
+        end_location:
+          row: 382
+          column: 13
   parent: ~
 - kind:
     name: DashedUnderlineAfterSection
@@ -334,12 +350,13 @@ expression: diagnostics
     row: 506
     column: 11
   fix:
-    content: "\n        ----"
-    location:
-      row: 503
-      column: 13
-    end_location:
-      row: 503
-      column: 13
+    edits:
+      - content: "\n        ----"
+        location:
+          row: 503
+          column: 13
+        end_location:
+          row: 503
+          column: 13
   parent: ~
 

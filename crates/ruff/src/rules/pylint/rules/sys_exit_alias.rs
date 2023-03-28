@@ -1,8 +1,10 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::scope::BindingKind;
+use ruff_python_ast::scope::{
+    BindingKind, FromImportation, Importation, StarImportation, SubmoduleImportation,
+};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -31,8 +33,10 @@ impl Violation for SysExitAlias {
 fn is_module_star_imported(checker: &Checker, module: &str) -> bool {
     checker.ctx.scopes().any(|scope| {
         scope.binding_ids().any(|index| {
-            if let BindingKind::StarImportation(_, name) = &checker.ctx.bindings[*index].kind {
-                name.as_ref().map(|name| name == module).unwrap_or_default()
+            if let BindingKind::StarImportation(StarImportation { module: name, .. }) =
+                &checker.ctx.bindings[*index].kind
+            {
+                name.as_ref().map_or(false, |name| name == module)
             } else {
                 false
             }
@@ -50,7 +54,7 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
                 // e.g. module=sys object=exit
                 // `import sys`         -> `sys.exit`
                 // `import sys as sys2` -> `sys2.exit`
-                BindingKind::Importation(name, full_name) => {
+                BindingKind::Importation(Importation { name, full_name }) => {
                     if full_name == &module {
                         Some(format!("{name}.{member}"))
                     } else {
@@ -60,7 +64,7 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
                 // e.g. module=os.path object=join
                 // `from os.path import join`          -> `join`
                 // `from os.path import join as join2` -> `join2`
-                BindingKind::FromImportation(name, full_name) => {
+                BindingKind::FromImportation(FromImportation { name, full_name }) => {
                     let mut parts = full_name.split('.');
                     if parts.next() == Some(module)
                         && parts.next() == Some(member)
@@ -73,8 +77,8 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
                 }
                 // e.g. module=os.path object=join
                 // `from os.path import *` -> `join`
-                BindingKind::StarImportation(_, name) => {
-                    if name.as_ref().map(|name| name == module).unwrap_or_default() {
+                BindingKind::StarImportation(StarImportation { module: name, .. }) => {
+                    if name.as_ref().map_or(false, |name| name == module) {
                         Some(member.to_string())
                     } else {
                         None
@@ -82,7 +86,7 @@ fn get_member_import_name_alias(checker: &Checker, module: &str, member: &str) -
                 }
                 // e.g. module=os.path object=join
                 // `import os.path ` -> `os.path.join`
-                BindingKind::SubmoduleImportation(_, full_name) => {
+                BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => {
                     if full_name == &module {
                         Some(format!("{full_name}.{member}"))
                     } else {
@@ -118,7 +122,7 @@ pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
         );
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(content) = get_member_import_name_alias(checker, "sys", "exit") {
-                diagnostic.amend(Fix::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     content,
                     func.location,
                     func.end_location.unwrap(),

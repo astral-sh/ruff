@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -71,7 +71,7 @@ pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             Range::from(expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 match type_name {
                     "unicode" => "str",
                     "long" => "int",

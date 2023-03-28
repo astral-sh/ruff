@@ -59,7 +59,7 @@ pub fn blind_except(
             if body.iter().any(|stmt| {
                 if let StmtKind::Expr { value } = &stmt.node {
                     if let ExprKind::Call { func, keywords, .. } = &value.node {
-                        if helpers::is_logger_candidate(func) {
+                        if helpers::is_logger_candidate(&checker.ctx, func) {
                             if let ExprKind::Attribute { attr, .. } = &func.node {
                                 if attr == "exception" {
                                     return true;

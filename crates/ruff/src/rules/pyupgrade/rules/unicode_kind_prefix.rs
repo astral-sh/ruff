@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Expr, Location};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -27,7 +27,7 @@ pub fn unicode_kind_prefix(checker: &mut Checker, expr: &Expr, kind: Option<&str
         if const_kind.to_lowercase() == "u" {
             let mut diagnostic = Diagnostic::new(UnicodeKindPrefix, Range::from(expr));
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Fix::deletion(
+                diagnostic.set_fix(Edit::deletion(
                     expr.location,
                     Location::new(expr.location.row(), expr.location.column() + 1),
                 ));

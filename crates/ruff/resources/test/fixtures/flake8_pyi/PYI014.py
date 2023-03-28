@@ -39,6 +39,58 @@ def f15(
     ...
 
 
+def f151(x={1: 2}) -> None:  # Ok
+    ...
+
+
+def f152(
+    x={  # OK
+        1: 2,
+        **{3: 4},
+    }
+) -> None:
+    ...
+
+
+def f153(
+    x=[  # OK
+        1,
+        2,
+        3,
+        4,
+        5,
+        6,
+        7,
+        8,
+        9,
+        10,
+        11,
+    ]
+) -> None:
+    ...
+
+
+def f154(
+    x=(  # OK
+        "foo",
+        ("bar", "baz"),
+    )
+) -> None:
+    ...
+
+
+def f141(
+    x=[*range(10)],  # OK
+) -> None:
+    ...
+
+
+def f142(
+    x=list(range(10)),  # OK
+) -> None:
+    ...
+
+
 def f16(x=frozenset({b"foo", b"bar", b"baz"})) -> None:
     ...  # OK
 

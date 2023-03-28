@@ -780,7 +780,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.257"
+version = "0.0.259"
 dependencies = [
  "anyhow",
  "clap 4.1.8",
@@ -1982,7 +1982,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.257"
+version = "0.0.259"
 dependencies = [
  "anyhow",
  "bisection",
@@ -2033,6 +2033,8 @@ dependencies = [
  "textwrap",
  "thiserror",
  "toml",
+ "typed-arena",
+ "unicode-width",
 ]
 
 [[package]]
@@ -2063,7 +2065,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.257"
+version = "0.0.259"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2102,6 +2104,7 @@ dependencies = [
  "tikv-jemallocator",
  "ureq",
  "walkdir",
+ "wild",
 ]
 
 [[package]]
@@ -2131,6 +2134,8 @@ dependencies = [
 name = "ruff_diagnostics"
 version = "0.0.0"
 dependencies = [
+ "anyhow",
+ "log",
  "ruff_python_ast",
  "rustpython-parser",
  "serde",
@@ -2254,6 +2259,7 @@ dependencies = [
  "js-sys",
  "log",
  "ruff",
+ "ruff_diagnostics",
  "ruff_python_ast",
  "ruff_rustpython",
  "rustpython-parser",
@@ -2917,6 +2923,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "typed-arena"
+version = "2.0.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "6af6ae20167a9ece4bcb41af5b80f8a1f1df981f6391189ce00fd257af04126a"
+
+[[package]]
 name = "typenum"
 version = "1.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3261,6 +3273,15 @@ name = "widestring"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17882f045410753661207383517a6f62ec3dbeb6a4ed2acce01f0728238d1983"
+
+[[package]]
+name = "wild"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05b116685a6be0c52f5a103334cbff26db643826c7b3735fc0a3ba9871310a74"
+dependencies = [
+ "glob",
+]
 
 [[package]]
 name = "winapi"

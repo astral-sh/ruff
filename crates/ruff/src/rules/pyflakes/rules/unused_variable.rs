@@ -3,7 +3,7 @@ use log::error;
 use rustpython_parser::ast::{ExprKind, Located, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::scope::{ScopeId, ScopeKind};
@@ -188,13 +188,13 @@ enum DeletionKind {
     Partial,
 }
 
-/// Generate a [`Fix`] to remove an unused variable assignment, given the
+/// Generate a [`Edit`] to remove an unused variable assignment, given the
 /// enclosing [`Stmt`] and the [`Range`] of the variable binding.
 fn remove_unused_variable(
     stmt: &Stmt,
     range: &Range,
     checker: &Checker,
-) -> Option<(DeletionKind, Fix)> {
+) -> Option<(DeletionKind, Edit)> {
     // First case: simple assignment (`x = 1`)
     if let StmtKind::Assign { targets, value, .. } = &stmt.node {
         if let Some(target) = targets.iter().find(|target| {
@@ -206,7 +206,7 @@ fn remove_unused_variable(
                     // but preserve the right-hand side.
                     Some((
                         DeletionKind::Partial,
-                        Fix::deletion(
+                        Edit::deletion(
                             target.location,
                             match_token_after(target, checker.locator, |tok| tok == Tok::Equal)
                                 .location,
@@ -252,7 +252,7 @@ fn remove_unused_variable(
                 // but preserve the right-hand side.
                 Some((
                     DeletionKind::Partial,
-                    Fix::deletion(
+                    Edit::deletion(
                         stmt.location,
                         match_token_after(stmt, checker.locator, |tok| tok == Tok::Equal).location,
                     ),
@@ -294,7 +294,7 @@ fn remove_unused_variable(
                 {
                     return Some((
                         DeletionKind::Partial,
-                        Fix::deletion(
+                        Edit::deletion(
                             item.context_expr.end_location.unwrap(),
                             // The end of the `Withitem` is the colon, comma, or closing
                             // parenthesis following the `optional_vars`.
@@ -343,7 +343,7 @@ pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
                         if matches!(kind, DeletionKind::Whole) {
                             checker.deletions.insert(RefEquality(stmt));
                         }
-                        diagnostic.amend(fix);
+                        diagnostic.set_fix(fix);
                     }
                 }
             }

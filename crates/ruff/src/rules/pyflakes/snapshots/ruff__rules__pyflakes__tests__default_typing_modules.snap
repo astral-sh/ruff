@@ -9,10 +9,11 @@ expression: diagnostics
     fixable: false
   location:
     row: 6
-    column: 34
+    column: 35
   end_location:
     row: 6
-    column: 38
-  fix: ~
+    column: 37
+  fix:
+    edits: []
   parent: ~
 

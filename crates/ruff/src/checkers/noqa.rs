@@ -1,16 +1,15 @@
 //! `NoQA` enforcement and validation.
 
-use log::warn;
 use nohash_hasher::IntMap;
 use rustpython_parser::ast::Location;
 
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::Range;
 
 use crate::codes::NoqaCode;
 use crate::noqa;
-use crate::noqa::{extract_file_exemption, Directive, Exemption};
+use crate::noqa::{Directive, FileExemption};
 use crate::registry::{AsRule, Rule};
 use crate::rule_redirects::get_redirect_target;
 use crate::rules::ruff::rules::{UnusedCodes, UnusedNOQA};
@@ -26,44 +25,26 @@ pub fn check_noqa(
 ) -> Vec<usize> {
     let enforce_noqa = settings.rules.enabled(Rule::UnusedNOQA);
 
-    // Whether the file is exempted from all checks.
-    let mut file_exempted = false;
+    let lines: Vec<&str> = contents.universal_newlines().collect();
 
-    // Codes that are globally exempted (within the current file).
-    let mut file_exemptions: Vec<NoqaCode> = vec![];
+    // Identify any codes that are globally exempted (within the current file).
+    let exemption = noqa::file_exemption(&lines, commented_lines);
 
     // Map from line number to `noqa` directive on that line, along with any codes
     // that were matched by the directive.
     let mut noqa_directives: IntMap<usize, (Directive, Vec<NoqaCode>)> = IntMap::default();
 
-    // Indices of diagnostics that were ignored by a `noqa` directive.
-    let mut ignored_diagnostics = vec![];
-
-    let lines: Vec<&str> = contents.universal_newlines().collect();
-    for lineno in commented_lines {
-        match extract_file_exemption(lines[lineno - 1]) {
-            Exemption::All => {
-                file_exempted = true;
-            }
-            Exemption::Codes(codes) => {
-                file_exemptions.extend(codes.into_iter().filter_map(|code| {
-                    if let Ok(rule) = Rule::from_code(get_redirect_target(code).unwrap_or(code)) {
-                        Some(rule.noqa_code())
-                    } else {
-                        warn!("Invalid code provided to `# ruff: noqa`: {}", code);
-                        None
-                    }
-                }));
-            }
-            Exemption::None => {}
-        }
-
-        if enforce_noqa {
+    // Extract all `noqa` directives.
+    if enforce_noqa {
+        for lineno in commented_lines {
             noqa_directives
                 .entry(lineno - 1)
                 .or_insert_with(|| (noqa::extract_noqa_directive(lines[lineno - 1]), vec![]));
         }
     }
+
+    // Indices of diagnostics that were ignored by a `noqa` directive.
+    let mut ignored_diagnostics = vec![];
 
     // Remove any ignored diagnostics.
     for (index, diagnostic) in diagnostics.iter().enumerate() {
@@ -71,18 +52,20 @@ pub fn check_noqa(
             continue;
         }
 
-        // If the file is exempted, ignore all diagnostics.
-        if file_exempted {
-            ignored_diagnostics.push(index);
-            continue;
-        }
-
-        // If the diagnostic is ignored by a global exemption, ignore it.
-        if !file_exemptions.is_empty() {
-            if file_exemptions.contains(&diagnostic.kind.rule().noqa_code()) {
+        match &exemption {
+            FileExemption::All => {
+                // If the file is exempted, ignore all diagnostics.
                 ignored_diagnostics.push(index);
                 continue;
             }
+            FileExemption::Codes(codes) => {
+                // If the diagnostic is ignored by a global exemption, ignore it.
+                if codes.contains(&diagnostic.kind.rule().noqa_code()) {
+                    ignored_diagnostics.push(index);
+                    continue;
+                }
+            }
+            FileExemption::None => {}
         }
 
         // Is the violation ignored by a `noqa` directive on the parent line?
@@ -155,7 +138,7 @@ pub fn check_noqa(
                             ),
                         );
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-                            diagnostic.amend(delete_noqa(
+                            diagnostic.set_fix(delete_noqa(
                                 row,
                                 lines[row],
                                 leading_spaces,
@@ -231,7 +214,7 @@ pub fn check_noqa(
                         );
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
                             if valid_codes.is_empty() {
-                                diagnostic.amend(delete_noqa(
+                                diagnostic.set_fix(delete_noqa(
                                     row,
                                     lines[row],
                                     leading_spaces,
@@ -240,7 +223,7 @@ pub fn check_noqa(
                                     trailing_spaces,
                                 ));
                             } else {
-                                diagnostic.amend(Fix::replacement(
+                                diagnostic.set_fix(Edit::replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),
                                     Location::new(row + 1, start_char),
                                     Location::new(row + 1, end_char),
@@ -259,7 +242,7 @@ pub fn check_noqa(
     ignored_diagnostics
 }
 
-/// Generate a [`Fix`] to delete a `noqa` directive.
+/// Generate a [`Edit`] to delete a `noqa` directive.
 fn delete_noqa(
     row: usize,
     line: &str,
@@ -267,15 +250,15 @@ fn delete_noqa(
     start_byte: usize,
     end_byte: usize,
     trailing_spaces: usize,
-) -> Fix {
+) -> Edit {
     if start_byte - leading_spaces == 0 && end_byte == line.len() {
         // Ex) `# noqa`
-        Fix::deletion(Location::new(row + 1, 0), Location::new(row + 2, 0))
+        Edit::deletion(Location::new(row + 1, 0), Location::new(row + 2, 0))
     } else if end_byte == line.len() {
         // Ex) `x = 1  # noqa`
         let start_char = line[..start_byte].chars().count();
         let end_char = start_char + line[start_byte..end_byte].chars().count();
-        Fix::deletion(
+        Edit::deletion(
             Location::new(row + 1, start_char - leading_spaces),
             Location::new(row + 1, end_char + trailing_spaces),
         )
@@ -283,7 +266,7 @@ fn delete_noqa(
         // Ex) `x = 1  # noqa  # type: ignore`
         let start_char = line[..start_byte].chars().count();
         let end_char = start_char + line[start_byte..end_byte].chars().count();
-        Fix::deletion(
+        Edit::deletion(
             Location::new(row + 1, start_char),
             Location::new(row + 1, end_char + trailing_spaces),
         )
@@ -291,7 +274,7 @@ fn delete_noqa(
         // Ex) `x = 1  # noqa here`
         let start_char = line[..start_byte].chars().count();
         let end_char = start_char + line[start_byte..end_byte].chars().count();
-        Fix::deletion(
+        Edit::deletion(
             Location::new(row + 1, start_char + 1 + 1),
             Location::new(row + 1, end_char + trailing_spaces),
         )

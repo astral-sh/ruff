@@ -14,13 +14,14 @@ expression: diagnostics
     row: 4
     column: 17
   fix:
-    content: "'test',"
-    location:
-      row: 4
-      column: 11
-    end_location:
-      row: 4
-      column: 17
+    edits:
+      - content: "'test',"
+        location:
+          row: 4
+          column: 11
+        end_location:
+          row: 4
+          column: 17
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 10
     column: 5
   fix:
-    content: "3,"
-    location:
-      row: 10
-      column: 4
-    end_location:
-      row: 10
-      column: 5
+    edits:
+      - content: "3,"
+        location:
+          row: 10
+          column: 4
+        end_location:
+          row: 10
+          column: 5
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 16
     column: 5
   fix:
-    content: "3,"
-    location:
-      row: 16
-      column: 4
-    end_location:
-      row: 16
-      column: 5
+    edits:
+      - content: "3,"
+        location:
+          row: 16
+          column: 4
+        end_location:
+          row: 16
+          column: 5
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 23
     column: 5
   fix:
-    content: "3,"
-    location:
-      row: 23
-      column: 4
-    end_location:
-      row: 23
-      column: 5
+    edits:
+      - content: "3,"
+        location:
+          row: 23
+          column: 4
+        end_location:
+          row: 23
+          column: 5
   parent: ~
 - kind:
     name: TrailingCommaOnBareTuple
@@ -93,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 36
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TrailingCommaOnBareTuple
@@ -106,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 38
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TrailingCommaOnBareTuple
@@ -119,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 45
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TrailingCommaOnBareTuple
@@ -132,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 49
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TrailingCommaOnBareTuple
@@ -145,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 56
     column: 32
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TrailingCommaOnBareTuple
@@ -158,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 58
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TrailingCommaOnBareTuple
@@ -171,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 61
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -185,13 +196,14 @@ expression: diagnostics
     row: 70
     column: 7
   fix:
-    content: "bar,"
-    location:
-      row: 70
-      column: 4
-    end_location:
-      row: 70
-      column: 7
+    edits:
+      - content: "bar,"
+        location:
+          row: 70
+          column: 4
+        end_location:
+          row: 70
+          column: 7
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -205,13 +217,14 @@ expression: diagnostics
     row: 78
     column: 7
   fix:
-    content: "bar,"
-    location:
-      row: 78
-      column: 4
-    end_location:
-      row: 78
-      column: 7
+    edits:
+      - content: "bar,"
+        location:
+          row: 78
+          column: 4
+        end_location:
+          row: 78
+          column: 7
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -225,13 +238,14 @@ expression: diagnostics
     row: 86
     column: 7
   fix:
-    content: "bar,"
-    location:
-      row: 86
-      column: 4
-    end_location:
-      row: 86
-      column: 7
+    edits:
+      - content: "bar,"
+        location:
+          row: 86
+          column: 4
+        end_location:
+          row: 86
+          column: 7
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -245,13 +259,14 @@ expression: diagnostics
     row: 152
     column: 5
   fix:
-    content: "y,"
-    location:
-      row: 152
-      column: 4
-    end_location:
-      row: 152
-      column: 5
+    edits:
+      - content: "y,"
+        location:
+          row: 152
+          column: 4
+        end_location:
+          row: 152
+          column: 5
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -265,13 +280,14 @@ expression: diagnostics
     row: 158
     column: 10
   fix:
-    content: "Anyway,"
-    location:
-      row: 158
-      column: 4
-    end_location:
-      row: 158
-      column: 10
+    edits:
+      - content: "Anyway,"
+        location:
+          row: 158
+          column: 4
+        end_location:
+          row: 158
+          column: 10
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -285,13 +301,14 @@ expression: diagnostics
     row: 293
     column: 14
   fix:
-    content: "123,"
-    location:
-      row: 293
-      column: 11
-    end_location:
-      row: 293
-      column: 14
+    edits:
+      - content: "123,"
+        location:
+          row: 293
+          column: 11
+        end_location:
+          row: 293
+          column: 14
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -305,13 +322,14 @@ expression: diagnostics
     row: 304
     column: 13
   fix:
-    content: "2,"
-    location:
-      row: 304
-      column: 12
-    end_location:
-      row: 304
-      column: 13
+    edits:
+      - content: "2,"
+        location:
+          row: 304
+          column: 12
+        end_location:
+          row: 304
+          column: 13
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -325,13 +343,14 @@ expression: diagnostics
     row: 310
     column: 13
   fix:
-    content: "3,"
-    location:
-      row: 310
-      column: 12
-    end_location:
-      row: 310
-      column: 13
+    edits:
+      - content: "3,"
+        location:
+          row: 310
+          column: 12
+        end_location:
+          row: 310
+          column: 13
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -345,13 +364,14 @@ expression: diagnostics
     row: 316
     column: 9
   fix:
-    content: "3,"
-    location:
-      row: 316
-      column: 8
-    end_location:
-      row: 316
-      column: 9
+    edits:
+      - content: "3,"
+        location:
+          row: 316
+          column: 8
+        end_location:
+          row: 316
+          column: 9
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -365,13 +385,14 @@ expression: diagnostics
     row: 322
     column: 14
   fix:
-    content: "123,"
-    location:
-      row: 322
-      column: 11
-    end_location:
-      row: 322
-      column: 14
+    edits:
+      - content: "123,"
+        location:
+          row: 322
+          column: 11
+        end_location:
+          row: 322
+          column: 14
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -385,13 +406,14 @@ expression: diagnostics
     row: 368
     column: 14
   fix:
-    content: "\"not good\","
-    location:
-      row: 368
-      column: 4
-    end_location:
-      row: 368
-      column: 14
+    edits:
+      - content: "\"not good\","
+        location:
+          row: 368
+          column: 4
+        end_location:
+          row: 368
+          column: 14
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -405,13 +427,14 @@ expression: diagnostics
     row: 375
     column: 14
   fix:
-    content: "\"not good\","
-    location:
-      row: 375
-      column: 4
-    end_location:
-      row: 375
-      column: 14
+    edits:
+      - content: "\"not good\","
+        location:
+          row: 375
+          column: 4
+        end_location:
+          row: 375
+          column: 14
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -425,13 +448,14 @@ expression: diagnostics
     row: 404
     column: 14
   fix:
-    content: "\"not fine\","
-    location:
-      row: 404
-      column: 4
-    end_location:
-      row: 404
-      column: 14
+    edits:
+      - content: "\"not fine\","
+        location:
+          row: 404
+          column: 4
+        end_location:
+          row: 404
+          column: 14
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -445,13 +469,14 @@ expression: diagnostics
     row: 432
     column: 14
   fix:
-    content: "\"not fine\","
-    location:
-      row: 432
-      column: 4
-    end_location:
-      row: 432
-      column: 14
+    edits:
+      - content: "\"not fine\","
+        location:
+          row: 432
+          column: 4
+        end_location:
+          row: 432
+          column: 14
   parent: ~
 - kind:
     name: ProhibitedTrailingComma
@@ -465,13 +490,14 @@ expression: diagnostics
     row: 485
     column: 21
   fix:
-    content: ""
-    location:
-      row: 485
-      column: 20
-    end_location:
-      row: 485
-      column: 21
+    edits:
+      - content: ""
+        location:
+          row: 485
+          column: 20
+        end_location:
+          row: 485
+          column: 21
   parent: ~
 - kind:
     name: ProhibitedTrailingComma
@@ -485,13 +511,14 @@ expression: diagnostics
     row: 487
     column: 13
   fix:
-    content: ""
-    location:
-      row: 487
-      column: 12
-    end_location:
-      row: 487
-      column: 13
+    edits:
+      - content: ""
+        location:
+          row: 487
+          column: 12
+        end_location:
+          row: 487
+          column: 13
   parent: ~
 - kind:
     name: ProhibitedTrailingComma
@@ -505,13 +532,14 @@ expression: diagnostics
     row: 489
     column: 18
   fix:
-    content: ""
-    location:
-      row: 489
-      column: 17
-    end_location:
-      row: 489
-      column: 18
+    edits:
+      - content: ""
+        location:
+          row: 489
+          column: 17
+        end_location:
+          row: 489
+          column: 18
   parent: ~
 - kind:
     name: ProhibitedTrailingComma
@@ -525,13 +553,14 @@ expression: diagnostics
     row: 494
     column: 6
   fix:
-    content: ""
-    location:
-      row: 494
-      column: 5
-    end_location:
-      row: 494
-      column: 6
+    edits:
+      - content: ""
+        location:
+          row: 494
+          column: 5
+        end_location:
+          row: 494
+          column: 6
   parent: ~
 - kind:
     name: ProhibitedTrailingComma
@@ -545,13 +574,14 @@ expression: diagnostics
     row: 496
     column: 21
   fix:
-    content: ""
-    location:
-      row: 496
-      column: 20
-    end_location:
-      row: 496
-      column: 21
+    edits:
+      - content: ""
+        location:
+          row: 496
+          column: 20
+        end_location:
+          row: 496
+          column: 21
   parent: ~
 - kind:
     name: ProhibitedTrailingComma
@@ -565,13 +595,14 @@ expression: diagnostics
     row: 498
     column: 13
   fix:
-    content: ""
-    location:
-      row: 498
-      column: 12
-    end_location:
-      row: 498
-      column: 13
+    edits:
+      - content: ""
+        location:
+          row: 498
+          column: 12
+        end_location:
+          row: 498
+          column: 13
   parent: ~
 - kind:
     name: ProhibitedTrailingComma
@@ -585,13 +616,14 @@ expression: diagnostics
     row: 500
     column: 18
   fix:
-    content: ""
-    location:
-      row: 500
-      column: 17
-    end_location:
-      row: 500
-      column: 18
+    edits:
+      - content: ""
+        location:
+          row: 500
+          column: 17
+        end_location:
+          row: 500
+          column: 18
   parent: ~
 - kind:
     name: ProhibitedTrailingComma
@@ -605,13 +637,14 @@ expression: diagnostics
     row: 505
     column: 6
   fix:
-    content: ""
-    location:
-      row: 505
-      column: 5
-    end_location:
-      row: 505
-      column: 6
+    edits:
+      - content: ""
+        location:
+          row: 505
+          column: 5
+        end_location:
+          row: 505
+          column: 6
   parent: ~
 - kind:
     name: ProhibitedTrailingComma
@@ -625,13 +658,14 @@ expression: diagnostics
     row: 511
     column: 10
   fix:
-    content: ""
-    location:
-      row: 511
-      column: 9
-    end_location:
-      row: 511
-      column: 10
+    edits:
+      - content: ""
+        location:
+          row: 511
+          column: 9
+        end_location:
+          row: 511
+          column: 10
   parent: ~
 - kind:
     name: ProhibitedTrailingComma
@@ -645,13 +679,14 @@ expression: diagnostics
     row: 513
     column: 9
   fix:
-    content: ""
-    location:
-      row: 513
-      column: 8
-    end_location:
-      row: 513
-      column: 9
+    edits:
+      - content: ""
+        location:
+          row: 513
+          column: 8
+        end_location:
+          row: 513
+          column: 9
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -665,13 +700,14 @@ expression: diagnostics
     row: 519
     column: 12
   fix:
-    content: "kwargs,"
-    location:
-      row: 519
-      column: 6
-    end_location:
-      row: 519
-      column: 12
+    edits:
+      - content: "kwargs,"
+        location:
+          row: 519
+          column: 6
+        end_location:
+          row: 519
+          column: 12
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -685,13 +721,14 @@ expression: diagnostics
     row: 526
     column: 9
   fix:
-    content: "args,"
-    location:
-      row: 526
-      column: 5
-    end_location:
-      row: 526
-      column: 9
+    edits:
+      - content: "args,"
+        location:
+          row: 526
+          column: 5
+        end_location:
+          row: 526
+          column: 9
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -705,13 +742,14 @@ expression: diagnostics
     row: 534
     column: 15
   fix:
-    content: "extra_kwarg,"
-    location:
-      row: 534
-      column: 4
-    end_location:
-      row: 534
-      column: 15
+    edits:
+      - content: "extra_kwarg,"
+        location:
+          row: 534
+          column: 4
+        end_location:
+          row: 534
+          column: 15
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -725,13 +763,14 @@ expression: diagnostics
     row: 541
     column: 12
   fix:
-    content: "kwargs,"
-    location:
-      row: 541
-      column: 6
-    end_location:
-      row: 541
-      column: 12
+    edits:
+      - content: "kwargs,"
+        location:
+          row: 541
+          column: 6
+        end_location:
+          row: 541
+          column: 12
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -745,13 +784,14 @@ expression: diagnostics
     row: 547
     column: 23
   fix:
-    content: "not_called_kwargs,"
-    location:
-      row: 547
-      column: 6
-    end_location:
-      row: 547
-      column: 23
+    edits:
+      - content: "not_called_kwargs,"
+        location:
+          row: 547
+          column: 6
+        end_location:
+          row: 547
+          column: 23
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -765,13 +805,14 @@ expression: diagnostics
     row: 554
     column: 14
   fix:
-    content: "kwarg_only,"
-    location:
-      row: 554
-      column: 4
-    end_location:
-      row: 554
-      column: 14
+    edits:
+      - content: "kwarg_only,"
+        location:
+          row: 554
+          column: 4
+        end_location:
+          row: 554
+          column: 14
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -785,13 +826,14 @@ expression: diagnostics
     row: 561
     column: 12
   fix:
-    content: "kwargs,"
-    location:
-      row: 561
-      column: 6
-    end_location:
-      row: 561
-      column: 12
+    edits:
+      - content: "kwargs,"
+        location:
+          row: 561
+          column: 6
+        end_location:
+          row: 561
+          column: 12
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -805,13 +847,14 @@ expression: diagnostics
     row: 565
     column: 12
   fix:
-    content: "kwargs,"
-    location:
-      row: 565
-      column: 6
-    end_location:
-      row: 565
-      column: 12
+    edits:
+      - content: "kwargs,"
+        location:
+          row: 565
+          column: 6
+        end_location:
+          row: 565
+          column: 12
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -825,13 +868,14 @@ expression: diagnostics
     row: 573
     column: 9
   fix:
-    content: "args,"
-    location:
-      row: 573
-      column: 5
-    end_location:
-      row: 573
-      column: 9
+    edits:
+      - content: "args,"
+        location:
+          row: 573
+          column: 5
+        end_location:
+          row: 573
+          column: 9
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -845,13 +889,14 @@ expression: diagnostics
     row: 577
     column: 9
   fix:
-    content: "args,"
-    location:
-      row: 577
-      column: 5
-    end_location:
-      row: 577
-      column: 9
+    edits:
+      - content: "args,"
+        location:
+          row: 577
+          column: 5
+        end_location:
+          row: 577
+          column: 9
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -865,13 +910,14 @@ expression: diagnostics
     row: 583
     column: 9
   fix:
-    content: "args,"
-    location:
-      row: 583
-      column: 5
-    end_location:
-      row: 583
-      column: 9
+    edits:
+      - content: "args,"
+        location:
+          row: 583
+          column: 5
+        end_location:
+          row: 583
+          column: 9
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -885,13 +931,14 @@ expression: diagnostics
     row: 590
     column: 12
   fix:
-    content: "kwargs,"
-    location:
-      row: 590
-      column: 6
-    end_location:
-      row: 590
-      column: 12
+    edits:
+      - content: "kwargs,"
+        location:
+          row: 590
+          column: 6
+        end_location:
+          row: 590
+          column: 12
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -905,13 +952,14 @@ expression: diagnostics
     row: 598
     column: 14
   fix:
-    content: "kwarg_only,"
-    location:
-      row: 598
-      column: 4
-    end_location:
-      row: 598
-      column: 14
+    edits:
+      - content: "kwarg_only,"
+        location:
+          row: 598
+          column: 4
+        end_location:
+          row: 598
+          column: 14
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -925,13 +973,14 @@ expression: diagnostics
     row: 627
     column: 19
   fix:
-    content: "},"
-    location:
-      row: 627
-      column: 18
-    end_location:
-      row: 627
-      column: 19
+    edits:
+      - content: "},"
+        location:
+          row: 627
+          column: 18
+        end_location:
+          row: 627
+          column: 19
   parent: ~
 - kind:
     name: MissingTrailingComma
@@ -945,12 +994,13 @@ expression: diagnostics
     row: 632
     column: 41
   fix:
-    content: "),"
-    location:
-      row: 632
-      column: 40
-    end_location:
-      row: 632
-      column: 41
+    edits:
+      - content: "),"
+        location:
+          row: 632
+          column: 40
+        end_location:
+          row: 632
+          column: 41
   parent: ~
 

@@ -111,7 +111,7 @@ impl RuleSet {
         let mut i = 0;
 
         while i < self.0.len() {
-            self.0[i] ^= other.0[i];
+            self.0[i] &= !other.0[i];
             i += 1;
         }
 
@@ -361,5 +361,16 @@ mod tests {
         let all_rules: Vec<_> = all_rules_set.iter().collect();
         let expected_rules: Vec<_> = Rule::iter().collect();
         assert_eq!(all_rules, expected_rules);
+    }
+
+    #[test]
+    fn remove_not_existing_rule_from_set() {
+        let mut set = RuleSet::default();
+
+        set.remove(Rule::AmbiguousFunctionName);
+
+        assert!(!set.contains(Rule::AmbiguousFunctionName));
+        assert!(set.is_empty());
+        assert_eq!(set.into_iter().collect::<Vec<_>>(), vec![]);
     }
 }

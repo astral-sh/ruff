@@ -211,7 +211,7 @@ mod tests {
                 flags::Autofix::Enabled,
             )
         };
-        assert!(!check_with_max_line_length(6).is_empty());
-        assert!(check_with_max_line_length(7).is_empty());
+        assert_eq!(check_with_max_line_length(8), vec![]);
+        assert_eq!(check_with_max_line_length(8), vec![]);
     }
 }

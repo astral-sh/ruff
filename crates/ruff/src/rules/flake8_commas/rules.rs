@@ -3,7 +3,7 @@ use rustpython_parser::lexer::{LexResult, Spanned};
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
@@ -261,7 +261,7 @@ pub fn trailing_commas(
                 },
             );
             if autofix.into() && settings.rules.should_fix(Rule::ProhibitedTrailingComma) {
-                diagnostic.amend(Fix::deletion(comma.0, comma.2));
+                diagnostic.set_fix(Edit::deletion(comma.0, comma.2));
             }
             diagnostics.push(diagnostic);
         }
@@ -310,7 +310,7 @@ pub fn trailing_commas(
                 // removing any brackets in the same linter pass - doing both at the same time could
                 // lead to a syntax error.
                 let contents = locator.slice(Range::new(missing_comma.0, missing_comma.2));
-                diagnostic.amend(Fix::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     format!("{contents},"),
                     missing_comma.0,
                     missing_comma.2,

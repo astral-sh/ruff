@@ -14,13 +14,14 @@ expression: diagnostics
     row: 161
     column: 32
   fix:
-    content: "\n"
-    location:
-      row: 161
-      column: 0
-    end_location:
-      row: 161
-      column: 0
+    edits:
+      - content: "\n"
+        location:
+          row: 161
+          column: 0
+        end_location:
+          row: 161
+          column: 0
   parent: ~
 - kind:
     name: OneBlankLineBeforeClass
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 192
     column: 45
   fix:
-    content: "\n"
-    location:
-      row: 192
-      column: 0
-    end_location:
-      row: 192
-      column: 0
+    edits:
+      - content: "\n"
+        location:
+          row: 192
+          column: 0
+        end_location:
+          row: 192
+          column: 0
   parent: ~
 - kind:
     name: OneBlankLineBeforeClass
@@ -54,12 +56,13 @@ expression: diagnostics
     row: 532
     column: 7
   fix:
-    content: "\n"
-    location:
-      row: 526
-      column: 0
-    end_location:
-      row: 526
-      column: 0
+    edits:
+      - content: "\n"
+        location:
+          row: 526
+          column: 0
+        end_location:
+          row: 526
+          column: 0
   parent: ~
 

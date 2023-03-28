@@ -5,7 +5,7 @@ use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
@@ -75,7 +75,7 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -93,7 +93,7 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -108,7 +108,7 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -120,7 +120,7 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -133,7 +133,7 @@ pub fn check_logical_lines(
                         kind,
                         location: range.location,
                         end_location: range.end_location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -148,7 +148,7 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
@@ -159,19 +159,21 @@ pub fn check_logical_lines(
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
             }
 
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "logical_lines")]
             let should_fix = autofix.into() && settings.rules.should_fix(Rule::MissingWhitespace);
 
-            #[cfg(not(debug_assertions))]
+            #[cfg(not(feature = "logical_lines"))]
             let should_fix = false;
 
-            for diagnostic in missing_whitespace(&line.text, start_loc.row(), should_fix) {
+            for diagnostic in
+                missing_whitespace(&line.text, start_loc.row(), should_fix, indent_level)
+            {
                 if settings.rules.enabled(diagnostic.kind.rule()) {
                     diagnostics.push(diagnostic);
                 }
@@ -179,11 +181,11 @@ pub fn check_logical_lines(
         }
 
         if line.flags.contains(TokenFlags::BRACKET) {
-            #[cfg(debug_assertions)]
+            #[cfg(feature = "logical_lines")]
             let should_fix =
                 autofix.into() && settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
 
-            #[cfg(not(debug_assertions))]
+            #[cfg(not(feature = "logical_lines"))]
             let should_fix = false;
 
             for diagnostic in whitespace_before_parameters(&line.tokens, should_fix) {
@@ -208,7 +210,7 @@ pub fn check_logical_lines(
                     kind,
                     location,
                     end_location: location,
-                    fix: None,
+                    fix: Fix::empty(),
                     parent: None,
                 });
             }

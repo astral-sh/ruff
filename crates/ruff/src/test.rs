@@ -51,7 +51,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
     // Detect autofixes that don't converge after multiple iterations.
     if diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.fix.is_some())
+        .any(|diagnostic| !diagnostic.fix.is_empty())
     {
         let max_iterations = 10;
 

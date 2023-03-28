@@ -1,7 +1,7 @@
 use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::Edit;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
@@ -197,7 +197,7 @@ pub fn invalid_string_characters(
             let end_location = Location::new(location.row(), location.column() + 1);
             let mut diagnostic = Diagnostic::new(rule, Range::new(location, end_location));
             if autofix {
-                diagnostic.amend(Fix::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     replacement.to_string(),
                     location,
                     end_location,

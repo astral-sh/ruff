@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 6
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Assert
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Assert
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 11
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

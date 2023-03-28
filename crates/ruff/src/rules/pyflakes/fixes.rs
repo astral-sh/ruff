@@ -3,7 +3,7 @@ use libcst_native::{Codegen, CodegenState, DictElement, Expression};
 use rustpython_parser::ast::{Excepthandler, Expr};
 use rustpython_parser::{lexer, Mode, Tok};
 
-use ruff_diagnostics::Fix;
+use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::str::raw_contents;
 use ruff_python_ast::types::Range;
@@ -15,13 +15,13 @@ use crate::cst::matchers::{
     match_attribute, match_call, match_dict, match_expression, match_simple_string,
 };
 
-/// Generate a [`Fix`] to remove unused keys from format dict.
+/// Generate a [`Edit`] to remove unused keys from format dict.
 pub fn remove_unused_format_arguments_from_dict(
     unused_arguments: &[&str],
     stmt: &Expr,
     locator: &Locator,
     stylist: &Stylist,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let module_text = locator.slice(stmt);
     let mut tree = match_expression(module_text)?;
     let dict = match_dict(&mut tree)?;
@@ -30,7 +30,7 @@ pub fn remove_unused_format_arguments_from_dict(
         !matches!(e, DictElement::Simple {
             key: Expression::SimpleString(name),
             ..
-        } if unused_arguments.contains(&raw_contents(name.value)))
+        } if raw_contents(name.value).map_or(false, |name| unused_arguments.contains(&name)))
     });
 
     let mut state = CodegenState {
@@ -40,20 +40,20 @@ pub fn remove_unused_format_arguments_from_dict(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         stmt.location,
         stmt.end_location.unwrap(),
     ))
 }
 
-/// Generate a [`Fix`] to remove unused keyword arguments from a `format` call.
+/// Generate a [`Edit`] to remove unused keyword arguments from a `format` call.
 pub fn remove_unused_keyword_arguments_from_format_call(
     unused_arguments: &[&str],
     location: Range,
     locator: &Locator,
     stylist: &Stylist,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let module_text = locator.slice(location);
     let mut tree = match_expression(module_text)?;
     let call = match_call(&mut tree)?;
@@ -68,7 +68,7 @@ pub fn remove_unused_keyword_arguments_from_format_call(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         location.location,
         location.end_location,
@@ -133,14 +133,14 @@ fn update_field_types(format_string: &FormatString, min_unused: usize) -> String
         .collect()
 }
 
-/// Generate a [`Fix`] to remove unused positional arguments from a `format` call.
+/// Generate a [`Edit`] to remove unused positional arguments from a `format` call.
 pub fn remove_unused_positional_arguments_from_format_call(
     unused_arguments: &[usize],
     location: Range,
     locator: &Locator,
     stylist: &Stylist,
     format_string: &FormatString,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let module_text = locator.slice(location);
     let mut tree = match_expression(module_text)?;
     let call = match_call(&mut tree)?;
@@ -176,18 +176,18 @@ pub fn remove_unused_positional_arguments_from_format_call(
     };
     tree.codegen(&mut state);
 
-    Ok(Fix::replacement(
+    Ok(Edit::replacement(
         state.to_string(),
         location.location,
         location.end_location,
     ))
 }
 
-/// Generate a [`Fix`] to remove the binding from an exception handler.
+/// Generate a [`Edit`] to remove the binding from an exception handler.
 pub fn remove_exception_handler_assignment(
     excepthandler: &Excepthandler,
     locator: &Locator,
-) -> Result<Fix> {
+) -> Result<Edit> {
     let contents = locator.slice(excepthandler);
     let mut fix_start = None;
     let mut fix_end = None;
@@ -208,7 +208,7 @@ pub fn remove_exception_handler_assignment(
     }
 
     if let (Some(start), Some(end)) = (fix_start, fix_end) {
-        Ok(Fix::deletion(start, end))
+        Ok(Edit::deletion(start, end))
     } else {
         bail!("Could not find span of exception handler")
     }

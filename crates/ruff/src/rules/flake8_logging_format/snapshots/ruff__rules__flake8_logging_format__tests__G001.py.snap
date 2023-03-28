@@ -8,11 +8,82 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 3
+    row: 4
     column: 13
   end_location:
-    row: 3
+    row: 4
     column: 40
-  fix: ~
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: LoggingStringFormat
+    body: "Logging statement uses `string.format()`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 5
+    column: 26
+  end_location:
+    row: 5
+    column: 53
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: LoggingStringFormat
+    body: "Logging statement uses `string.format()`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 6
+    column: 9
+  end_location:
+    row: 6
+    column: 36
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: LoggingStringFormat
+    body: "Logging statement uses `string.format()`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 7
+    column: 30
+  end_location:
+    row: 7
+    column: 57
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: LoggingStringFormat
+    body: "Logging statement uses `string.format()`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 8
+    column: 36
+  end_location:
+    row: 8
+    column: 63
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: LoggingStringFormat
+    body: "Logging statement uses `string.format()`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 9
+    column: 16
+  end_location:
+    row: 9
+    column: 43
+  fix:
+    edits: []
   parent: ~
 

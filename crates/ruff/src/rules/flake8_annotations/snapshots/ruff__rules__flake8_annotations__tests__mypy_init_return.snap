@@ -14,13 +14,14 @@ expression: diagnostics
     row: 5
     column: 16
   fix:
-    content: " -> None"
-    location:
-      row: 5
-      column: 22
-    end_location:
-      row: 5
-      column: 22
+    edits:
+      - content: " -> None"
+        location:
+          row: 5
+          column: 22
+        end_location:
+          row: 5
+          column: 22
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 11
     column: 16
   fix:
-    content: " -> None"
-    location:
-      row: 11
-      column: 27
-    end_location:
-      row: 11
-      column: 27
+    edits:
+      - content: " -> None"
+        location:
+          row: 11
+          column: 27
+        end_location:
+          row: 11
+          column: 27
   parent: ~
 - kind:
     name: MissingReturnTypePrivateFunction
@@ -53,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 40
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -67,12 +70,13 @@ expression: diagnostics
     row: 47
     column: 16
   fix:
-    content: " -> None"
-    location:
-      row: 47
-      column: 28
-    end_location:
-      row: 47
-      column: 28
+    edits:
+      - content: " -> None"
+        location:
+          row: 47
+          column: 28
+        end_location:
+          row: 47
+          column: 28
   parent: ~
 

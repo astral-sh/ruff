@@ -1,4 +1,5 @@
 use ruff_python_ast::source_code::Stylist;
+use unicode_width::UnicodeWidthStr;
 
 use super::types::{AliasData, CommentSet, ImportFromData, Importable};
 
@@ -69,9 +70,9 @@ pub fn format_import_from(
             || aliases.len() == 1
             || aliases.iter().all(|(alias, _)| alias.asname.is_none()))
     {
-        let (single_line, import_length) =
+        let (single_line, import_width) =
             format_single_line(import_from, comments, aliases, is_first, stylist);
-        if import_length <= line_length || aliases.iter().any(|(alias, _)| alias.name == "*") {
+        if import_width <= line_length || aliases.iter().any(|(alias, _)| alias.name == "*") {
             return single_line;
         }
     }
@@ -90,7 +91,7 @@ fn format_single_line(
     stylist: &Stylist,
 ) -> (String, usize) {
     let mut output = String::with_capacity(CAPACITY);
-    let mut line_length = 0;
+    let mut line_width = 0;
 
     if !is_first && !comments.atop.is_empty() {
         output.push_str(stylist.line_ending());
@@ -104,28 +105,28 @@ fn format_single_line(
     output.push_str("from ");
     output.push_str(&module_name);
     output.push_str(" import ");
-    line_length += 5 + module_name.len() + 8;
+    line_width += 5 + module_name.width() + 8;
 
     for (index, (AliasData { name, asname }, comments)) in aliases.iter().enumerate() {
         if let Some(asname) = asname {
             output.push_str(name);
             output.push_str(" as ");
             output.push_str(asname);
-            line_length += name.len() + 4 + asname.len();
+            line_width += name.width() + 4 + asname.width();
         } else {
             output.push_str(name);
-            line_length += name.len();
+            line_width += name.width();
         }
         if index < aliases.len() - 1 {
             output.push_str(", ");
-            line_length += 2;
+            line_width += 2;
         }
 
         for comment in &comments.inline {
             output.push(' ');
             output.push(' ');
             output.push_str(comment);
-            line_length += 2 + comment.len();
+            line_width += 2 + comment.width();
         }
     }
 
@@ -133,12 +134,12 @@ fn format_single_line(
         output.push(' ');
         output.push(' ');
         output.push_str(comment);
-        line_length += 2 + comment.len();
+        line_width += 2 + comment.width();
     }
 
     output.push_str(stylist.line_ending());
 
-    (output, line_length)
+    (output, line_width)
 }
 
 /// Format an import-from statement in multi-line format.

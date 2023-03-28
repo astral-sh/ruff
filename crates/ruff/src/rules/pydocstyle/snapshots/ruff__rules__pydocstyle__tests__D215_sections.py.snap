@@ -14,13 +14,14 @@ expression: diagnostics
     row: 162
     column: 7
   fix:
-    content: "    "
-    location:
-      row: 159
-      column: 0
-    end_location:
-      row: 159
-      column: 9
+    edits:
+      - content: "    "
+        location:
+          row: 159
+          column: 0
+        end_location:
+          row: 159
+          column: 9
   parent: ~
 - kind:
     name: SectionUnderlineNotOverIndented
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 174
     column: 7
   fix:
-    content: "    "
-    location:
-      row: 173
-      column: 0
-    end_location:
-      row: 173
-      column: 9
+    edits:
+      - content: "    "
+        location:
+          row: 173
+          column: 0
+        end_location:
+          row: 173
+          column: 9
   parent: ~
 

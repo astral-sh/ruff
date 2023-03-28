@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{NewlineWithTrailingNewline, StrExt};
 use ruff_python_ast::types::Range;
@@ -52,7 +52,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
                             checker.stylist.line_ending().as_str(),
                             whitespace::clean(docstring.indentation)
                         );
-                        diagnostic.amend(Fix::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             content,
                             Location::new(
                                 docstring.expr.end_location.unwrap().row(),

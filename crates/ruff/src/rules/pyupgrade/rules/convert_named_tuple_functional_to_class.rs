@@ -2,7 +2,7 @@ use anyhow::{bail, Result};
 use log::debug;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Keyword, Stmt, StmtKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Fix, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
@@ -164,8 +164,8 @@ fn convert_to_class(
     body: Vec<Stmt>,
     base_class: &Expr,
     stylist: &Stylist,
-) -> Fix {
-    Fix::replacement(
+) -> Edit {
+    Edit::replacement(
         unparse_stmt(&create_class_def_stmt(typename, body, base_class), stylist),
         stmt.location,
         stmt.end_location.unwrap(),
@@ -204,7 +204,7 @@ pub fn convert_named_tuple_functional_to_class(
         Range::from(stmt),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(convert_to_class(
+        diagnostic.set_fix(convert_to_class(
             stmt,
             typename,
             properties,

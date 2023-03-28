@@ -4,7 +4,7 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
@@ -146,7 +146,7 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
         if let Ok(contents) =
             generate_call(expr, &summary.indexes, checker.locator, checker.stylist)
         {
-            diagnostic.amend(Fix::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 contents,
                 expr.location,
                 expr.end_location.unwrap(),

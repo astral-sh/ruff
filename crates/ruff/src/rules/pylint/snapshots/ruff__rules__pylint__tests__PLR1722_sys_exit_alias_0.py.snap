@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 1
     column: 4
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SysExitAlias
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 4
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SysExitAlias
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SysExitAlias
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 7
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

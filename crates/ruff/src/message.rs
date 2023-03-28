@@ -12,7 +12,7 @@ pub struct Message {
     pub kind: DiagnosticKind,
     pub location: Location,
     pub end_location: Location,
-    pub fix: Option<Fix>,
+    pub fix: Fix,
     pub filename: String,
     pub source: Option<Source>,
     pub noqa_row: usize,

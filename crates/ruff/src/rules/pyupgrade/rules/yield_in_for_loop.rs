@@ -1,7 +1,7 @@
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{Range, RefEquality};
 use ruff_python_ast::visitor;
@@ -176,7 +176,7 @@ pub fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
             if checker.patch(diagnostic.kind.rule()) {
                 let contents = checker.locator.slice(item.iter);
                 let contents = format!("yield from {contents}");
-                diagnostic.amend(Fix::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     contents,
                     item.stmt.location,
                     item.stmt.end_location.unwrap(),
