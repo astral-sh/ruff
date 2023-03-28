@@ -79,6 +79,9 @@ fn get_complexity_number(stmts: &[Stmt]) -> usize {
                 complexity += get_complexity_number(body);
                 complexity += get_complexity_number(orelse);
             }
+            StmtKind::With { body, .. } | StmtKind::AsyncWith { body, .. } => {
+                complexity += get_complexity_number(body);
+            }
             StmtKind::While { body, orelse, .. } => {
                 complexity += 1;
                 complexity += get_complexity_number(body);
@@ -403,6 +406,19 @@ def process_detect_lines():
     finally:
         if res:
             errors.append(f"Non-zero exit code {res}")
+"#;
+        let stmts = parser::parse_program(source, "<filename>")?;
+        assert_eq!(get_complexity_number(&stmts), 2);
+        Ok(())
+    }
+
+    #[test]
+    fn with() -> Result<()> {
+        let source = r#"
+def with_lock():
+    with lock:
+        if foo:
+            print('bar')
 "#;
         let stmts = parser::parse_program(source, "<filename>")?;
         assert_eq!(get_complexity_number(&stmts), 2);
