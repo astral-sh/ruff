@@ -67,7 +67,7 @@ pub fn missing_whitespace_around_operator(
     let mut needs_space_main: Option<bool> = Some(false);
     let mut needs_space_aux: Option<bool> = None;
     let mut prev_end_aux: Option<&Location> = None;
-    let mut parens = 0;
+    let mut parens = 0u32;
     let mut prev_type: Option<&Tok> = None;
     let mut prev_end: Option<&Location> = None;
 

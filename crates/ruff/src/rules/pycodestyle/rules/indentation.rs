@@ -251,7 +251,7 @@ pub fn indentation(
         ));
     }
     let indent_expect = prev_logical_line.map_or(false, |prev_logical_line| {
-        prev_logical_line.text.ends_with(':')
+        prev_logical_line.text().ends_with(':')
     });
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         diagnostics.push((
