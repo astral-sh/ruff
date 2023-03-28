@@ -1,15 +1,10 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use itertools::Itertools;
-use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens};
+use super::LogicalLine;
 use ruff_diagnostics::Edit;
-use ruff_diagnostics::Violation;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
 #[violation]
@@ -31,7 +26,6 @@ impl AlwaysAutofixableViolation for MissingWhitespace {
 }
 
 /// E231
-#[cfg(feature = "logical_lines")]
 pub(crate) fn missing_whitespace(line: &LogicalLine, autofix: bool) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
@@ -88,9 +82,4 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, autofix: bool) -> Vec<Diagn
         }
     }
     diagnostics
-}
-
-#[cfg(not(feature = "logical_lines"))]
-pub fn missing_whitespace(_line: &LogicalLine, _autofix: bool) -> Vec<Diagnostic> {
-    vec![]
 }

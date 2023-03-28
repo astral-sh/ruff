@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
@@ -8,10 +6,10 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::rules::pycodestyle::helpers::{
-    is_arithmetic_token, is_keyword_token, is_op_token, is_singleton_token, is_skip_comment_token,
+    is_arithmetic_token, is_keyword_token, is_op_token, is_skip_comment_token,
     is_soft_keyword_token, is_unary_token, is_ws_needed_token, is_ws_optional_token,
 };
-use crate::rules::pycodestyle::logical_lines::LogicalLineTokens;
+use crate::rules::pycodestyle::rules::logical_lines::LogicalLineTokens;
 
 // E225
 #[violation]
@@ -58,7 +56,6 @@ impl Violation for MissingWhitespaceAroundModuloOperator {
 }
 
 /// E225, E226, E227, E228
-#[cfg(feature = "logical_lines")]
 #[allow(clippy::if_same_then_else)]
 pub(crate) fn missing_whitespace_around_operator(
     tokens: &LogicalLineTokens,
@@ -185,11 +182,4 @@ pub(crate) fn missing_whitespace_around_operator(
     }
 
     diagnostics
-}
-
-#[cfg(not(feature = "logical_lines"))]
-pub fn missing_whitespace_around_operator(
-    _tokens: &LogicalLineTokens,
-) -> Vec<(Location, DiagnosticKind)> {
-    vec![]
 }

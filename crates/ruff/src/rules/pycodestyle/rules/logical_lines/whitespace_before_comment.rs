@@ -1,9 +1,7 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use crate::rules::pycodestyle::logical_lines::LogicalLineTokens;
+use super::LogicalLineTokens;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -140,7 +138,6 @@ impl Violation for MultipleLeadingHashesForBlockComment {
 }
 
 /// E261, E262, E265, E266
-#[cfg(feature = "logical_lines")]
 pub(crate) fn whitespace_before_comment(
     tokens: &LogicalLineTokens,
     locator: &Locator,
@@ -202,12 +199,4 @@ pub(crate) fn whitespace_before_comment(
         }
     }
     diagnostics
-}
-
-#[cfg(not(feature = "logical_lines"))]
-pub fn whitespace_before_comment(
-    _tokens: &LogicalLineTokens,
-    _locator: &Locator,
-) -> Vec<(Range, DiagnosticKind)> {
-    vec![]
 }

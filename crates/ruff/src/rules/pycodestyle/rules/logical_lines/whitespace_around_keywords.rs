@@ -1,16 +1,10 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
-use once_cell::sync::Lazy;
-use regex::Regex;
 use rustpython_parser::ast::Location;
-use rustpython_parser::Tok;
 
+use super::{LogicalLine, Whitespace};
 use crate::rules::pycodestyle::helpers::is_keyword_token;
-use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens, Whitespace};
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
 /// Checks for extraneous whitespace after keywords.
@@ -116,7 +110,6 @@ impl Violation for TabBeforeKeyword {
 }
 
 /// E271, E272, E273, E274
-#[cfg(feature = "logical_lines")]
 pub(crate) fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut after_keyword = false;
@@ -152,9 +145,4 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(Location, D
     }
 
     diagnostics
-}
-
-#[cfg(not(feature = "logical_lines"))]
-pub fn whitespace_around_keywords(_line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
-    vec![]
 }

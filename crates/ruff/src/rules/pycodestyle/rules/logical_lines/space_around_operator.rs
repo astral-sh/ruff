@@ -1,17 +1,10 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
-use once_cell::sync::Lazy;
-use regex::Regex;
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use crate::rules::pycodestyle::helpers::{is_op_token, is_ws_needed_token};
-use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens, Whitespace};
+use super::{LogicalLine, Whitespace};
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks for extraneous tabs before an operator.
@@ -130,7 +123,6 @@ impl Violation for MultipleSpacesAfterOperator {
 }
 
 /// E221, E222, E223, E224
-#[cfg(feature = "logical_lines")]
 pub(crate) fn space_around_operator(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut after_operator = false;
@@ -203,9 +195,4 @@ const fn is_operator_token(token: &Tok) -> bool {
             | Tok::DoubleSlashEqual
             | Tok::ColonEqual
     )
-}
-
-#[cfg(not(feature = "logical_lines"))]
-pub fn space_around_operator(_line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
-    vec![]
 }

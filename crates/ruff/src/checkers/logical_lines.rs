@@ -1,6 +1,3 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
-use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 
@@ -9,12 +6,11 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
 use crate::registry::{AsRule, Rule};
-use crate::rules::pycodestyle::logical_lines::{LogicalLines, TokenFlags};
-use crate::rules::pycodestyle::rules::{
+use crate::rules::pycodestyle::rules::logical_lines::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
     missing_whitespace_around_operator, space_around_operator, whitespace_around_keywords,
     whitespace_around_named_parameter_equals, whitespace_before_comment,
-    whitespace_before_parameters,
+    whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::{flags, Settings};
 
@@ -209,7 +205,7 @@ mod tests {
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
-    use crate::rules::pycodestyle::logical_lines::LogicalLines;
+    use crate::rules::pycodestyle::rules::logical_lines::LogicalLines;
     use ruff_python_ast::source_code::Locator;
 
     #[test]

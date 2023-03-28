@@ -1,7 +1,3 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
-use once_cell::sync::Lazy;
-use regex::Regex;
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
@@ -9,9 +5,8 @@ use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
-#[cfg(feature = "logical_lines")]
+use super::LogicalLineTokens;
 use crate::rules::pycodestyle::helpers::is_op_token;
-use crate::rules::pycodestyle::logical_lines::LogicalLineTokens;
 
 #[violation]
 pub struct UnexpectedSpacesAroundKeywordParameterEquals;
@@ -46,7 +41,6 @@ fn is_in_def(tokens: &LogicalLineTokens) -> bool {
 }
 
 /// E251, E252
-#[cfg(feature = "logical_lines")]
 pub(crate) fn whitespace_around_named_parameter_equals(
     tokens: &LogicalLineTokens,
 ) -> Vec<(Location, DiagnosticKind)> {
@@ -124,11 +118,4 @@ pub(crate) fn whitespace_around_named_parameter_equals(
         prev_end = Some(token.end());
     }
     diagnostics
-}
-
-#[cfg(not(feature = "logical_lines"))]
-pub fn whitespace_around_named_parameter_equals(
-    _tokens: &LogicalLineTokens,
-) -> Vec<(Location, DiagnosticKind)> {
-    vec![]
 }

@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
@@ -8,8 +6,8 @@ use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 
+use super::LogicalLineTokens;
 use crate::rules::pycodestyle::helpers::{is_keyword_token, is_singleton_token};
-use crate::rules::pycodestyle::logical_lines::LogicalLineTokens;
 
 #[violation]
 pub struct MissingWhitespaceAfterKeyword;
@@ -22,7 +20,6 @@ impl Violation for MissingWhitespaceAfterKeyword {
 }
 
 /// E275
-#[cfg(feature = "logical_lines")]
 pub(crate) fn missing_whitespace_after_keyword(
     tokens: &LogicalLineTokens,
 ) -> Vec<(Location, DiagnosticKind)> {
@@ -44,11 +41,4 @@ pub(crate) fn missing_whitespace_after_keyword(
         }
     }
     diagnostics
-}
-
-#[cfg(not(feature = "logical_lines"))]
-pub fn missing_whitespace_after_keyword(
-    _tokens: &LogicalLineTokens,
-) -> Vec<(Location, DiagnosticKind)> {
-    vec![]
 }

@@ -1,15 +1,10 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
-use once_cell::sync::Lazy;
-use regex::Regex;
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use crate::rules::pycodestyle::logical_lines::{LogicalLine, LogicalLineTokens, Whitespace};
+use super::{LogicalLine, Whitespace};
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
 /// Checks for the use of extraneous whitespace after "(".
@@ -106,7 +101,6 @@ impl Violation for WhitespaceBeforePunctuation {
 }
 
 /// E201, E202, E203
-#[cfg(feature = "logical_lines")]
 pub(crate) fn extraneous_whitespace(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut last_token: Option<&Tok> = None;
@@ -130,16 +124,15 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine) -> Vec<(Location, Diagno
                     DiagnosticKind::from(WhitespaceBeforeCloseBracket)
                 };
 
-                match line.leading_whitespace(&token) {
-                    (Whitespace::None, _) => {}
-                    (_, offset) => {
-                        let start = token.start();
-                        if !matches!(last_token, Some(Tok::Comma)) {
-                            diagnostics.push((
-                                Location::new(start.row(), start.column() - offset),
-                                diagnostic_kind,
-                            ));
-                        }
+                if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
+                    line.leading_whitespace(&token)
+                {
+                    let start = token.start();
+                    if !matches!(last_token, Some(Tok::Comma)) {
+                        diagnostics.push((
+                            Location::new(start.row(), start.column() - offset),
+                            diagnostic_kind,
+                        ));
                     }
                 }
             }
@@ -151,9 +144,4 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine) -> Vec<(Location, Diagno
     }
 
     diagnostics
-}
-
-#[cfg(not(feature = "logical_lines"))]
-pub fn extraneous_whitespace(_line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
-    vec![]
 }

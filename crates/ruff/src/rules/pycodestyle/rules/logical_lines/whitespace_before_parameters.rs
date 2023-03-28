@@ -1,5 +1,3 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
@@ -7,9 +5,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
-use crate::registry::AsRule;
-use crate::rules::pycodestyle::helpers::{is_keyword_token, is_op_token, is_soft_keyword_token};
-use crate::rules::pycodestyle::logical_lines::LogicalLineTokens;
+use super::LogicalLineTokens;
 
 #[violation]
 pub struct WhitespaceBeforeParameters {
@@ -30,7 +26,6 @@ impl AlwaysAutofixableViolation for WhitespaceBeforeParameters {
 }
 
 /// E211
-#[cfg(feature = "logical_lines")]
 pub(crate) fn whitespace_before_parameters(
     tokens: &LogicalLineTokens,
     autofix: bool,
@@ -42,7 +37,7 @@ pub(crate) fn whitespace_before_parameters(
     let mut prev_token = previous.kind();
     let mut prev_end = previous.end();
 
-    for (idx, token) in tokens.iter().enumerate() {
+    for token in tokens {
         let kind = token.kind();
 
         if matches!(kind, Tok::Lpar | Tok::Lsqb)
@@ -73,12 +68,4 @@ pub(crate) fn whitespace_before_parameters(
         prev_end = token.end();
     }
     diagnostics
-}
-
-#[cfg(not(feature = "logical_lines"))]
-pub fn whitespace_before_parameters(
-    _tokens: &LogicalLineTokens,
-    _autofix: bool,
-) -> Vec<Diagnostic> {
-    vec![]
 }

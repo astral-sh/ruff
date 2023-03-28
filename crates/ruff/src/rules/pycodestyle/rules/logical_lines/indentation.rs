@@ -1,12 +1,10 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use rustpython_parser::ast::Location;
 use rustpython_parser::Tok;
 
-use crate::rules::pycodestyle::logical_lines::LogicalLine;
+use super::LogicalLine;
 
 /// ## What it does
 /// Checks for indentation with a non-multiple of 4 spaces.
@@ -232,7 +230,6 @@ impl Violation for OverIndented {
 }
 
 /// E111, E114, E112, E113, E115, E116, E117
-#[cfg(feature = "logical_lines")]
 pub(crate) fn indentation(
     logical_line: &LogicalLine,
     prev_logical_line: Option<&LogicalLine>,
@@ -289,16 +286,4 @@ pub(crate) fn indentation(
     }
 
     diagnostics
-}
-
-#[cfg(not(feature = "logical_lines"))]
-pub fn indentation(
-    _logical_line: &LogicalLine,
-    _prev_logical_line: Option<&LogicalLine>,
-    _indent_char: char,
-    _indent_level: usize,
-    _prev_indent_level: Option<usize>,
-    _indent_size: usize,
-) -> Vec<(Location, DiagnosticKind)> {
-    vec![]
 }
