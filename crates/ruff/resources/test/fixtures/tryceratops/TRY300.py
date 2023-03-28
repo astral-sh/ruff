@@ -40,8 +40,9 @@ def noreturn():
         logger.exception("process failed")
 
 
-def still_good():
+def good_return_with_side_effects():
     try:
+        pass
         return process()
     except MyException:
         logger.exception("process failed")
