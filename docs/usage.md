@@ -64,7 +64,15 @@ jobs:
       - uses: charliermarsh/ruff@v0
 ```
 
-The version of Ruff the action will use can be configured via version. This can be any valid version specifier or just the version number if you want an exact version. The action defaults to the latest release available on PyPI. Only versions available from PyPI are supported, so no commit SHAs or branch names.
+The version of Ruff the action will use can be configured via version. This can be any valid version specifier or just the version number if you want an exact version. The action defaults to the latest release available on PyPI. Only versions available from PyPI are supported, so no commit SHAs or branch names.  
+
+In the likely event that this will be used as a check that is a prerquisite for merging a PR, we suggest the use of `version`, like shown below, to pin the specfic version of Ruff used:
+
+```yaml
+- uses: charliermarsh/ruff@v0
+  with:
+    version: 0.0.259
+```
 
 You can also configure the arguments passed to Ruff via options (defaults to 'check) and src (default is '.').
 
