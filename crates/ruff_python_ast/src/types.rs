@@ -1,6 +1,5 @@
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::path::Path;
 use std::{collections::hash_map::Iter as HashMapIter, ops::Deref};
 
 use rustpython_parser::ast::{Expr, Located, Location, Stmt};
@@ -103,29 +102,25 @@ impl From<&Import> for Range {
     }
 }
 
+impl From<Import> for Range {
+    fn from(import: Import) -> Range {
+        Range::new(import.location, import.end_location)
+    }
+}
+
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Imports {
     pub imports_per_module: FxHashMap<String, Vec<Import>>,
-    pub module_to_path_mapping: FxHashMap<String, PathBuf>,
-    pub path_to_module_mapping: FxHashMap<PathBuf, String>,
 }
 
 impl Imports {
-    pub fn insert(&mut self, module: &str, module_path: &Path, imports_vec: Vec<Import>) {
+    pub fn insert(&mut self, module: &str, imports_vec: Vec<Import>) {
         self.imports_per_module
             .insert(module.to_owned(), imports_vec);
-        self.module_to_path_mapping
-            .insert(module.to_owned(), module_path.to_owned());
-        self.path_to_module_mapping
-            .insert(module_path.to_owned(), module.to_owned());
     }
 
     pub fn extend(&mut self, other: Self) {
         self.imports_per_module.extend(other.imports_per_module);
-        self.module_to_path_mapping
-            .extend(other.module_to_path_mapping);
-        self.path_to_module_mapping
-            .extend(other.path_to_module_mapping);
     }
 }
 

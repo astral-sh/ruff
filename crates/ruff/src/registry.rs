@@ -164,6 +164,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::BadStrStripCall,
     rules::pylint::rules::CollapsibleElseIf,
     rules::pylint::rules::ContinueInFinally,
+    rules::pylint::rules::CyclicImport,
     rules::pylint::rules::UselessImportAlias,
     rules::pylint::rules::UnnecessaryDirectLambdaCall,
     rules::pylint::rules::NonlocalWithoutBinding,

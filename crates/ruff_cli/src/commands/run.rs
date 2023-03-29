@@ -8,11 +8,13 @@ use ignore::Error;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use rustc_hash::FxHashMap;
 
 use crate::panic::catch_unwind;
 use ruff::message::{Location, Message};
 use ruff::registry::Rule;
 use ruff::resolver::PyprojectDiscovery;
+use ruff::rules::pylint::pylint_cyclic_import;
 use ruff::settings::{flags, AllSettings};
 use ruff::{fix, fs, packaging, resolver, warn_user_once, IOError, Range};
 use ruff_diagnostics::Diagnostic;
@@ -141,8 +143,46 @@ pub fn run(
             acc += item;
             acc
         });
-    // TODO(chris): actually check the imports?
+
     debug!("{:#?}", diagnostics.imports);
+    let mut cycles: FxHashMap<String, Vec<Vec<String>>> = FxHashMap::default();
+
+    for (path, package, settings) in
+        paths
+            .iter()
+            .filter_map(|entry| entry.as_ref().ok())
+            .map(|entry| {
+                let path = entry.path();
+                let package = path
+                    .parent()
+                    .and_then(|parent| package_roots.get(parent))
+                    .and_then(|package| *package);
+                let settings = resolver.resolve_all(path, pyproject_strategy);
+                (path, package, settings)
+            })
+    {
+        if settings.lib.rules.enabled(Rule::CyclicImport) {
+            if let Some(cycle_diagnostics) =
+                pylint_cyclic_import(path, package, &diagnostics.imports, &mut cycles)
+            {
+                diagnostics += Diagnostics::new(
+                    cycle_diagnostics
+                        .into_iter()
+                        .map(|diagnostic| {
+                            Message::from_diagnostic(
+                                diagnostic,
+                                format!("{}", path.to_owned().display()),
+                                None,
+                                0,
+                            )
+                        })
+                        .collect::<Vec<_>>(),
+                    Imports::default(),
+                );
+            }
+        }
+    }
+
     diagnostics.messages.sort_unstable();
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);
