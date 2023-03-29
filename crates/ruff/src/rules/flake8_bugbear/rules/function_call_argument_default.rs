@@ -39,6 +39,7 @@ const IMMUTABLE_FUNCS: &[&[&str]] = &[
     &["operator", "attrgetter"],
     &["operator", "itemgetter"],
     &["operator", "methodcaller"],
+    &["pathlib", "Path"],
     &["types", "MappingProxyType"],
     &["re", "compile"],
 ];

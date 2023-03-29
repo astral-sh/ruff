@@ -3,6 +3,7 @@ import datetime as dt
 from decimal import Decimal
 import logging
 import operator
+from pathlib import Path
 import random
 import re
 import time
@@ -180,6 +181,10 @@ def datetime_okay(value=dt.datetime(2023, 3, 27, 13, 51, 59)):
 
 # Allow timedeltas
 def timedelta_okay(value=dt.timedelta(hours=1)):
+    pass
+
+# Allow paths
+def path_okay(value=Path(".")):
     pass
 
 # B006 and B008
