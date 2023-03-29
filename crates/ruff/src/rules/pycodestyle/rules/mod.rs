@@ -41,7 +41,6 @@ mod invalid_escape_sequence;
 mod lambda_assignment;
 mod line_too_long;
 mod literal_comparisons;
-#[cfg(feature = "logical_lines")]
 pub(crate) mod logical_lines;
 mod missing_newline_at_end_of_file;
 mod mixed_spaces_and_tabs;
