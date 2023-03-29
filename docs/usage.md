@@ -72,5 +72,6 @@ You can also configure the arguments passed to Ruff via options (defaults to 'ch
 - uses: charliermarsh/ruff@v0
   with:
     src: "./src"
-    version: "0.0.259"
+    version: 0.0.259
+    options: --select B
 ```
