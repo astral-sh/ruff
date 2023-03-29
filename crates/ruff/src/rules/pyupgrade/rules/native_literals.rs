@@ -10,7 +10,7 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum LiteralType {
     Str,
     Bytes,

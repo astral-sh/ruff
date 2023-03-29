@@ -20,6 +20,7 @@ use super::types::{ImportBlock, Importable};
     Ord,
     PartialEq,
     Eq,
+    Copy,
     Clone,
     Serialize,
     Deserialize,

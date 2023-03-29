@@ -206,13 +206,10 @@ impl<'a> Context<'a> {
     pub fn push_parent(&mut self, parent: &'a Stmt) {
         let num_existing = self.parents.len();
         self.parents.push(RefEquality(parent));
-        self.depths
-            .insert(self.parents[num_existing].clone(), num_existing);
+        self.depths.insert(self.parents[num_existing], num_existing);
         if num_existing > 0 {
-            self.child_to_parent.insert(
-                self.parents[num_existing].clone(),
-                self.parents[num_existing - 1].clone(),
-            );
+            self.child_to_parent
+                .insert(self.parents[num_existing], self.parents[num_existing - 1]);
         }
     }
 

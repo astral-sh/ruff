@@ -455,7 +455,7 @@ fn check_dynamically_typed<F>(
 pub fn definition(
     checker: &Checker,
     definition: &Definition,
-    visibility: &Visibility,
+    visibility: Visibility,
 ) -> Vec<Diagnostic> {
     // TODO(charlie): Consider using the AST directly here rather than `Definition`.
     // We could adhere more closely to `flake8-annotations` by defining public

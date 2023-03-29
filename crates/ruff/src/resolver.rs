@@ -41,6 +41,7 @@ impl PyprojectDiscovery {
 }
 
 /// The strategy for resolving file paths in a `pyproject.toml`.
+#[derive(Copy, Clone)]
 pub enum Relativity {
     /// Resolve file paths relative to the current working directory.
     Cwd,

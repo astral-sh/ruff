@@ -93,11 +93,7 @@ impl Violation for UndocumentedPublicInit {
 }
 
 /// D100, D101, D102, D103, D104, D105, D106, D107
-pub fn not_missing(
-    checker: &mut Checker,
-    definition: &Definition,
-    visibility: &Visibility,
-) -> bool {
+pub fn not_missing(checker: &mut Checker, definition: &Definition, visibility: Visibility) -> bool {
     if matches!(visibility, Visibility::Private) {
         return true;
     }

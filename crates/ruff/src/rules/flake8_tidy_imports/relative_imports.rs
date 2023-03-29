@@ -14,7 +14,9 @@ use crate::registry::AsRule;
 
 pub type Settings = Strictness;
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema, Default)]
+#[derive(
+    Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema, Default,
+)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
 pub enum Strictness {
     /// Ban imports that extend into the parent module or beyond.
@@ -166,7 +168,7 @@ pub fn banned_relative_import(
     if level? > &strictness_level {
         let mut diagnostic = Diagnostic::new(
             RelativeImports {
-                strictness: strictness.clone(),
+                strictness: *strictness,
             },
             Range::from(stmt),
         );

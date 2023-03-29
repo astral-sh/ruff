@@ -23,6 +23,7 @@ mod panic;
 mod printer;
 mod resolve;
 
+#[derive(Copy, Clone)]
 pub enum ExitStatus {
     /// Linting was successful and there were no linting errors.
     Success,

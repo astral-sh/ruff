@@ -280,12 +280,12 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
 
     match convention {
         Some(Convention::Google) => {
-            for context in &section_contexts(&lines, &SectionStyle::Google) {
+            for context in &section_contexts(&lines, SectionStyle::Google) {
                 google_section(checker, docstring, context);
             }
         }
         Some(Convention::Numpy) => {
-            for context in &section_contexts(&lines, &SectionStyle::Numpy) {
+            for context in &section_contexts(&lines, SectionStyle::Numpy) {
                 numpy_section(checker, docstring, context);
             }
         }
@@ -296,7 +296,7 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
 
             // If the docstring contains `Parameters:` or `Other Parameters:`, use the NumPy
             // convention.
-            let numpy_sections = section_contexts(&lines, &SectionStyle::Numpy);
+            let numpy_sections = section_contexts(&lines, SectionStyle::Numpy);
             if numpy_sections.iter().any(|context| {
                 matches!(
                     context.kind,
@@ -310,7 +310,7 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
             }
 
             // If the docstring contains `Args:` or `Arguments:`, use the Google convention.
-            let google_sections = section_contexts(&lines, &SectionStyle::Google);
+            let google_sections = section_contexts(&lines, SectionStyle::Google);
             if google_sections
                 .iter()
                 .any(|context| matches!(context.kind, SectionKind::Arguments | SectionKind::Args))

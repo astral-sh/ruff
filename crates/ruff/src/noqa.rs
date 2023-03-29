@@ -188,7 +188,7 @@ pub fn add_noqa(
     contents: &str,
     commented_lines: &[usize],
     noqa_line_for: &IntMap<usize, usize>,
-    line_ending: &LineEnding,
+    line_ending: LineEnding,
 ) -> Result<usize> {
     let (count, output) = add_noqa_inner(
         diagnostics,
@@ -206,7 +206,7 @@ fn add_noqa_inner(
     contents: &str,
     commented_lines: &[usize],
     noqa_line_for: &IntMap<usize, usize>,
-    line_ending: &LineEnding,
+    line_ending: LineEnding,
 ) -> (usize, String) {
     // Map of line number to set of (non-ignored) diagnostic codes that are triggered on that line.
     let mut matches_by_line: FxHashMap<usize, RuleSet> = FxHashMap::default();
@@ -288,7 +288,7 @@ fn add_noqa_inner(
         match matches_by_line.get(&lineno) {
             None => {
                 output.push_str(line);
-                output.push_str(line_ending);
+                output.push_str(&line_ending);
             }
             Some(rules) => {
                 match extract_noqa_directive(line) {
@@ -301,13 +301,13 @@ fn add_noqa_inner(
 
                         // Add codes.
                         push_codes(&mut output, rules.iter().map(|rule| rule.noqa_code()));
-                        output.push_str(line_ending);
+                        output.push_str(&line_ending);
                         count += 1;
                     }
                     Directive::All(..) => {
                         // Leave the line as-is.
                         output.push_str(line);
-                        output.push_str(line_ending);
+                        output.push_str(&line_ending);
                     }
                     Directive::Codes(_, start_byte, _, existing, _) => {
                         // Reconstruct the line based on the preserved rule codes.
@@ -331,7 +331,7 @@ fn add_noqa_inner(
                         );
 
                         output.push_str(&formatted);
-                        output.push_str(line_ending);
+                        output.push_str(&line_ending);
 
                         // Only count if the new line is an actual edit.
                         if formatted != line {
@@ -395,7 +395,7 @@ mod tests {
             contents,
             &commented_lines,
             &noqa_line_for,
-            &LineEnding::Lf,
+            LineEnding::Lf,
         );
         assert_eq!(count, 0);
         assert_eq!(output, format!("{contents}\n"));
@@ -414,7 +414,7 @@ mod tests {
             contents,
             &commented_lines,
             &noqa_line_for,
-            &LineEnding::Lf,
+            LineEnding::Lf,
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: F841\n");
@@ -439,7 +439,7 @@ mod tests {
             contents,
             &commented_lines,
             &noqa_line_for,
-            &LineEnding::Lf,
+            LineEnding::Lf,
         );
         assert_eq!(count, 1);
         assert_eq!(output, "x = 1  # noqa: E741, F841\n");
@@ -464,7 +464,7 @@ mod tests {
             contents,
             &commented_lines,
             &noqa_line_for,
-            &LineEnding::Lf,
+            LineEnding::Lf,
         );
         assert_eq!(count, 0);
         assert_eq!(output, "x = 1  # noqa\n");
