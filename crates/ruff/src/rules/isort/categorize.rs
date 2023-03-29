@@ -227,46 +227,45 @@ impl KnownModules {
     /// Return the [`ImportType`] for a given module, if it's been categorized as a known module
     /// by the user.
     fn categorize(&self, module_name: &str) -> Option<(ImportType, Reason)> {
-        // Happy path: no submodules, so we can check the module base and be done.
-        if !self.has_submodules {
+        if self.has_submodules {
+            // Check all module prefixes from the longest to the shortest (e.g., given
+            // `foo.bar.baz`, check `foo.bar.baz`, then `foo.bar`, then `foo`, taking the first,
+            // most precise match).
+            for i in module_name
+                .match_indices('.')
+                .map(|(i, _)| i)
+                .chain(iter::once(module_name.len()))
+                .rev()
+            {
+                let submodule = &module_name[0..i];
+                if self.first_party.contains(submodule) {
+                    return Some((ImportType::FirstParty, Reason::KnownFirstParty));
+                }
+                if self.third_party.contains(submodule) {
+                    return Some((ImportType::ThirdParty, Reason::KnownThirdParty));
+                }
+                if self.local_folder.contains(submodule) {
+                    return Some((ImportType::LocalFolder, Reason::KnownLocalFolder));
+                }
+                if self.standard_library.contains(submodule) {
+                    return Some((ImportType::StandardLibrary, Reason::ExtraStandardLibrary));
+                }
+            }
+            None
+        } else {
+            // Happy path: no submodules, so we can check the module base and be done.
             let module_base = module_name.split('.').next().unwrap();
             if self.first_party.contains(module_base) {
-                return Some((ImportType::FirstParty, Reason::KnownFirstParty));
-            }
-            if self.third_party.contains(module_base) {
-                return Some((ImportType::ThirdParty, Reason::KnownThirdParty));
-            }
-            if self.local_folder.contains(module_base) {
-                return Some((ImportType::LocalFolder, Reason::KnownLocalFolder));
-            }
-            if self.standard_library.contains(module_base) {
-                return Some((ImportType::StandardLibrary, Reason::ExtraStandardLibrary));
-            }
-        }
-
-        // Check all module prefixes from the longest to the shortest (e.g., given `foo.bar.baz`,
-        // check `foo.bar.baz`, then `foo.bar`, then `foo`, taking the first, most precise match).
-        for i in module_name
-            .match_indices('.')
-            .map(|(i, _)| i)
-            .chain(iter::once(module_name.len()))
-            .rev()
-        {
-            let submodule = &module_name[0..i];
-            if self.first_party.contains(submodule) {
-                return Some((ImportType::FirstParty, Reason::KnownFirstParty));
-            }
-            if self.third_party.contains(submodule) {
-                return Some((ImportType::ThirdParty, Reason::KnownThirdParty));
-            }
-            if self.local_folder.contains(submodule) {
-                return Some((ImportType::LocalFolder, Reason::KnownLocalFolder));
-            }
-            if self.standard_library.contains(submodule) {
-                return Some((ImportType::StandardLibrary, Reason::ExtraStandardLibrary));
+                Some((ImportType::FirstParty, Reason::KnownFirstParty))
+            } else if self.third_party.contains(module_base) {
+                Some((ImportType::ThirdParty, Reason::KnownThirdParty))
+            } else if self.local_folder.contains(module_base) {
+                Some((ImportType::LocalFolder, Reason::KnownLocalFolder))
+            } else if self.standard_library.contains(module_base) {
+                Some((ImportType::StandardLibrary, Reason::ExtraStandardLibrary))
+            } else {
+                None
             }
         }
-
-        None
     }
 }
