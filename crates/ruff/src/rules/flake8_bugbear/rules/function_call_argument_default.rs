@@ -32,6 +32,10 @@ impl Violation for FunctionCallInDefaultArgument {
 const IMMUTABLE_FUNCS: &[&[&str]] = &[
     &["", "tuple"],
     &["", "frozenset"],
+    &["datetime", "date"],
+    &["datetime", "datetime"],
+    &["datetime", "timedelta"],
+    &["decimal", "Decimal"],
     &["operator", "attrgetter"],
     &["operator", "itemgetter"],
     &["operator", "methodcaller"],

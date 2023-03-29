@@ -42,11 +42,12 @@ use crate::registry::{AsRule, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
-    flake8_django, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
-    flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise,
-    flake8_return, flake8_self, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, flake8_use_pathlib, mccabe, numpy, pandas_vet, pep8_naming,
-    pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff, tryceratops,
+    flake8_django, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
+    flake8_import_conventions, flake8_logging_format, flake8_pie, flake8_print, flake8_pyi,
+    flake8_pytest_style, flake8_raise, flake8_return, flake8_self, flake8_simplify,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, flake8_use_pathlib, mccabe,
+    numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint,
+    pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -89,7 +90,7 @@ impl<'a> Checker<'a> {
         package: Option<&'a Path>,
         module_path: Option<Vec<String>>,
         locator: &'a Locator,
-        style: &'a Stylist,
+        stylist: &'a Stylist,
         indexer: &'a Indexer,
     ) -> Checker<'a> {
         Checker {
@@ -102,13 +103,13 @@ impl<'a> Checker<'a> {
             module_path: module_path.clone(),
             is_stub: is_python_stub_file(path),
             locator,
-            stylist: style,
+            stylist,
             indexer,
             ctx: Context::new(&settings.typing_modules, path, module_path),
             deferred: Deferred::default(),
-            diagnostics: vec![],
+            diagnostics: Vec::default(),
             deletions: FxHashSet::default(),
-            flake8_bugbear_seen: vec![],
+            flake8_bugbear_seen: Vec::default(),
         }
     }
 }
@@ -774,6 +775,9 @@ where
                     if self.settings.rules.enabled(Rule::PassStatementStubBody) {
                         flake8_pyi::rules::pass_statement_stub_body(self, body);
                     }
+                    if self.settings.rules.enabled(Rule::PassInClassBody) {
+                        flake8_pyi::rules::pass_in_class_body(self, stmt, body);
+                    }
                 }
 
                 if self
@@ -941,8 +945,10 @@ where
                     }
 
                     // pylint
-                    if self.settings.rules.enabled(Rule::UselessImportAlias) {
-                        pylint::rules::useless_import_alias(self, alias);
+                    if !self.is_stub {
+                        if self.settings.rules.enabled(Rule::UselessImportAlias) {
+                            pylint::rules::useless_import_alias(self, alias);
+                        }
                     }
                     if self.settings.rules.enabled(Rule::ManualFromImport) {
                         pylint::rules::manual_from_import(self, stmt, alias, names);
@@ -957,10 +963,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::constant_imported_as_non_constant(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -974,10 +977,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -991,10 +991,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1008,10 +1005,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1025,10 +1019,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1339,10 +1330,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::constant_imported_as_non_constant(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1356,10 +1347,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1373,10 +1364,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1390,10 +1381,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1407,10 +1398,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1418,8 +1409,10 @@ where
                         }
 
                         // pylint
-                        if self.settings.rules.enabled(Rule::UselessImportAlias) {
-                            pylint::rules::useless_import_alias(self, alias);
+                        if !self.is_stub {
+                            if self.settings.rules.enabled(Rule::UselessImportAlias) {
+                                pylint::rules::useless_import_alias(self, alias);
+                            }
                         }
                     }
                 }
@@ -2895,6 +2888,29 @@ where
                 if self.settings.rules.enabled(Rule::PairwiseOverZipped) {
                     if self.settings.target_version >= PythonVersion::Py310 {
                         ruff::rules::pairwise_over_zipped(self, func, args);
+                    }
+                }
+
+                // flake8-gettext
+                if self.settings.rules.any_enabled(&[
+                    Rule::FStringInGetTextFuncCall,
+                    Rule::FormatInGetTextFuncCall,
+                    Rule::PrintfInGetTextFuncCall,
+                ]) && flake8_gettext::rules::is_gettext_func_call(
+                    func,
+                    &self.settings.flake8_gettext.functions_names,
+                ) {
+                    if self.settings.rules.enabled(Rule::FStringInGetTextFuncCall) {
+                        self.diagnostics
+                            .extend(flake8_gettext::rules::f_string_in_gettext_func_call(args));
+                    }
+                    if self.settings.rules.enabled(Rule::FormatInGetTextFuncCall) {
+                        self.diagnostics
+                            .extend(flake8_gettext::rules::format_in_gettext_func_call(args));
+                    }
+                    if self.settings.rules.enabled(Rule::PrintfInGetTextFuncCall) {
+                        self.diagnostics
+                            .extend(flake8_gettext::rules::printf_in_gettext_func_call(args));
                     }
                 }
 
@@ -4968,9 +4984,7 @@ impl<'a> Checker<'a> {
                     let child: &Stmt = defined_by.into();
 
                     let diagnostic_lineno = binding.range.location.row();
-                    let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. })
-                        && child.location.row() != diagnostic_lineno
-                    {
+                    let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. }) {
                         Some(child.location.row())
                     } else {
                         None
@@ -5046,9 +5060,7 @@ impl<'a> Checker<'a> {
                             },
                             *range,
                         );
-                        if matches!(child.node, StmtKind::ImportFrom { .. })
-                            && child.location.row() != range.location.row()
-                        {
+                        if matches!(child.node, StmtKind::ImportFrom { .. }) {
                             diagnostic.set_parent(child.location);
                         }
                         if let Some(fix) = fix.as_ref() {
@@ -5080,9 +5092,7 @@ impl<'a> Checker<'a> {
                             },
                             *range,
                         );
-                        if matches!(child.node, StmtKind::ImportFrom { .. })
-                            && child.location.row() != range.location.row()
-                        {
+                        if matches!(child.node, StmtKind::ImportFrom { .. }) {
                             diagnostic.set_parent(child.location);
                         }
                         diagnostics.push(diagnostic);

@@ -3,7 +3,6 @@ pub(crate) mod rules;
 pub mod settings;
 
 pub(crate) mod helpers;
-pub(crate) mod logical_lines;
 
 #[cfg(test)]
 mod tests {

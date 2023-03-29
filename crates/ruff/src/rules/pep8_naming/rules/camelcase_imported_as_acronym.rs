@@ -1,9 +1,8 @@
-use rustpython_parser::ast::Stmt;
+use rustpython_parser::ast::{Alias, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 use ruff_python_stdlib::str::{self};
 
 use crate::rules::pep8_naming::helpers;
@@ -50,23 +49,25 @@ impl Violation for CamelcaseImportedAsAcronym {
 
 /// N817
 pub fn camelcase_imported_as_acronym(
-    import_from: &Stmt,
     name: &str,
     asname: &str,
-    locator: &Locator,
+    alias: &Alias,
+    stmt: &Stmt,
 ) -> Option<Diagnostic> {
     if helpers::is_camelcase(name)
         && !str::is_lower(asname)
         && str::is_upper(asname)
         && helpers::is_acronym(name, asname)
     {
-        return Some(Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             CamelcaseImportedAsAcronym {
                 name: name.to_string(),
                 asname: asname.to_string(),
             },
-            identifier_range(import_from, locator),
-        ));
+            Range::from(alias),
+        );
+        diagnostic.set_parent(stmt.location);
+        return Some(diagnostic);
     }
     None
 }

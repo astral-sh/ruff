@@ -160,7 +160,7 @@ select = ["E", "F"]
 ignore = []
 
 # Allow autofix for all enabled rules (when `--fix`) is provided.
-fixable = ["A", "B", "C", "D", "E", "F", "..."]
+fixable = ["A", "B", "C", "D", "E", "F", "G", "I", "N", "Q", "S", "T", "W", "ANN", "ARG", "BLE", "COM", "DJ", "DTZ", "EM", "ERA", "EXE", "FBT", "ICN", "INP", "ISC", "NPY", "PD", "PGH", "PIE", "PL", "PT", "PTH", "PYI", "RET", "RSE", "RUF", "SIM", "SLF", "TCH", "TID", "TRY", "UP", "YTT"]
 unfixable = []
 
 # Exclude a variety of commonly ignored directories.
@@ -248,6 +248,7 @@ quality tools, including:
 - [flake8-eradicate](https://pypi.org/project/flake8-eradicate/)
 - [flake8-errmsg](https://pypi.org/project/flake8-errmsg/)
 - [flake8-executable](https://pypi.org/project/flake8-executable/)
+- [flake8-gettext](https://pypi.org/project/flake8-gettext/)
 - [flake8-implicit-str-concat](https://pypi.org/project/flake8-implicit-str-concat/)
 - [flake8-import-conventions](https://github.com/joaopalmeiro/flake8-import-conventions)
 - [flake8-logging-format](https://pypi.org/project/flake8-logging-format/)

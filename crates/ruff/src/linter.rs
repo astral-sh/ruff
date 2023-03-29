@@ -16,7 +16,6 @@ use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
 use crate::checkers::filesystem::check_file_path;
 use crate::checkers::imports::check_imports;
-use crate::checkers::logical_lines::check_logical_lines;
 use crate::checkers::noqa::check_noqa;
 use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
@@ -105,7 +104,8 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_logical_lines())
     {
-        diagnostics.extend(check_logical_lines(
+        #[cfg(feature = "logical_lines")]
+        diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
             &tokens,
             locator,
             stylist,
@@ -257,7 +257,7 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
     let locator = Locator::new(&contents);
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_contents(&contents, &locator);
+    let stylist = Stylist::from_tokens(&tokens, &locator);
 
     // Extra indices from the code.
     let indexer: Indexer = tokens.as_slice().into();
@@ -322,7 +322,7 @@ pub fn lint_only(
     let locator = Locator::new(contents);
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_contents(contents, &locator);
+    let stylist = Stylist::from_tokens(&tokens, &locator);
 
     // Extra indices from the code.
     let indexer: Indexer = tokens.as_slice().into();
@@ -394,7 +394,7 @@ pub fn lint_fix<'a>(
         let locator = Locator::new(&transformed);
 
         // Detect the current code style (lazily).
-        let stylist = Stylist::from_contents(&transformed, &locator);
+        let stylist = Stylist::from_tokens(&tokens, &locator);
 
         // Extra indices from the code.
         let indexer: Indexer = tokens.as_slice().into();
