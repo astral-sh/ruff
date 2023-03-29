@@ -65,8 +65,11 @@ fn is_utf8_encoding_arg(arg: &Expr) -> bool {
 
 #[derive(Debug)]
 enum EncodingArg<'a> {
+    /// Ex) `"".encode()`
     Empty,
+    /// Ex) `"".encode("utf-8")`
     Positional(&'a Expr),
+    /// Ex) `"".encode(encoding="utf-8")`
     Keyword(&'a Keyword),
 }
 
@@ -74,16 +77,16 @@ enum EncodingArg<'a> {
 /// UTF-8-equivalent encoding.
 fn match_encoding_arg<'a>(args: &'a [Expr], kwargs: &'a [Keyword]) -> Option<EncodingArg<'a>> {
     match (args.len(), kwargs.len()) {
-        // .encode()
+        // Ex `"".encode()`
         (0, 0) => return Some(EncodingArg::Empty),
-        // .encode(encoding)
+        // Ex `"".encode(encoding)`
         (1, 0) => {
             let arg = &args[0];
             if is_utf8_encoding_arg(arg) {
                 return Some(EncodingArg::Positional(arg));
             }
         }
-        // .encode(kwarg=kwarg)
+        // Ex `"".encode(kwarg=kwarg)`
         (0, 1) => {
             let kwarg = &kwargs[0];
             if kwarg
@@ -97,7 +100,7 @@ fn match_encoding_arg<'a>(args: &'a [Expr], kwargs: &'a [Keyword]) -> Option<Enc
                 }
             }
         }
-        // .encode(*args, **kwargs)
+        // Ex `"".encode(*args, **kwargs)`
         _ => {}
     }
     None
@@ -106,10 +109,7 @@ fn match_encoding_arg<'a>(args: &'a [Expr], kwargs: &'a [Keyword]) -> Option<Enc
 /// Return an [`Edit`] replacing the call to encode with a byte string.
 fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, constant: &Expr) -> Edit {
     // Build up a replacement string by prefixing all string tokens with `b`.
-    let contents = locator.slice(Range::new(
-        constant.location,
-        constant.end_location.unwrap(),
-    ));
+    let contents = locator.slice(constant);
     let mut replacement = String::with_capacity(contents.len() + 1);
     let mut prev = None;
     for (start, tok, end) in lexer::lex_located(contents, Mode::Module, constant.location).flatten()
@@ -180,7 +180,7 @@ pub fn unnecessary_encode_utf8(
                         diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
-                                variable.end_location.unwrap(),
+                                func.location,
                                 kwarg.location,
                                 kwarg.end_location.unwrap(),
                                 args,
@@ -202,7 +202,7 @@ pub fn unnecessary_encode_utf8(
                         diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
-                                variable.end_location.unwrap(),
+                                func.location,
                                 arg.location,
                                 arg.end_location.unwrap(),
                                 args,
@@ -231,7 +231,7 @@ pub fn unnecessary_encode_utf8(
                         diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
-                                variable.end_location.unwrap(),
+                                func.location,
                                 kwarg.location,
                                 kwarg.end_location.unwrap(),
                                 args,
@@ -253,7 +253,7 @@ pub fn unnecessary_encode_utf8(
                         diagnostic.try_set_fix(|| {
                             remove_argument(
                                 checker.locator,
-                                variable.end_location.unwrap(),
+                                func.location,
                                 arg.location,
                                 arg.end_location.unwrap(),
                                 args,
