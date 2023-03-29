@@ -1,9 +1,11 @@
+use crate::keyword::KWLIST;
+
 /// Returns `true` if a string is a valid Python identifier (e.g., variable
 /// name).
 pub fn is_identifier(s: &str) -> bool {
     // Is the first character a letter or underscore?
-    if !s
-        .chars()
+    let mut chars = s.chars();
+    if !chars
         .next()
         .map_or(false, |c| c.is_alphabetic() || c == '_')
     {
@@ -11,7 +13,7 @@ pub fn is_identifier(s: &str) -> bool {
     }
 
     // Are the rest of the characters letters, digits, or underscores?
-    s.chars().skip(1).all(|c| c.is_alphanumeric() || c == '_')
+    chars.all(|c| c.is_alphanumeric() || c == '_')
 }
 
 /// Returns `true` if a string is a private identifier, such that, when the
@@ -24,10 +26,23 @@ pub fn is_mangled_private(id: &str) -> bool {
 }
 
 /// Returns `true` if a string is a PEP 8-compliant module name (i.e., consists of lowercase
-/// letters, numbers, and underscores).
+/// letters, numbers, underscores, and is not a keyword).
 pub fn is_module_name(s: &str) -> bool {
-    s.chars()
-        .all(|c| c.is_lowercase() || c.is_numeric() || c == '_')
+    // Is the string a keyword?
+    if KWLIST.contains(&s) {
+        return false;
+    }
+    let mut chars = s.chars();
+    // Is the first character a letter or underscore?
+    if !chars
+        .next()
+        .map_or(false, |c| c.is_ascii_lowercase() || c == '_')
+    {
+        return false;
+    }
+
+    // Are the rest of the characters letters, digits, or underscores?
+    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
 #[cfg(test)]
@@ -41,9 +56,11 @@ mod tests {
         assert!(is_module_name("abc0"));
         assert!(is_module_name("abc_"));
         assert!(is_module_name("a_b_c"));
-        assert!(is_module_name("0abc"));
         assert!(is_module_name("_abc"));
         assert!(!is_module_name("a-b-c"));
         assert!(!is_module_name("a_B_c"));
+        assert!(!is_module_name("0abc"));
+        assert!(!is_module_name("class"));
+        assert!(!is_module_name("δ"));
     }
 }
