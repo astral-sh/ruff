@@ -138,14 +138,18 @@ impl<'a> Context<'a> {
             .map_or(false, |binding| binding.kind.is_builtin())
     }
 
-    /// Resolves the call path, e.g. if you have a file
+    /// Resolves the [`Expr`] to a fully-qualified symbol-name, if `value` resolves to an imported
+    /// or builtin symbol.
+    ///
+    /// E.g., given:
+    ///
     ///
     /// ```python
     /// from sys import version_info as python_version
     /// print(python_version)
     /// ```
     ///
-    /// then `python_version` from the print statement will resolve to `sys.version_info`.
+    /// ...then `resolve_call_path(${python_version})` will resolve to `sys.version_info`.
     pub fn resolve_call_path<'b>(&'a self, value: &'b Expr) -> Option<CallPath<'a>>
     where
         'b: 'a,
@@ -201,6 +205,76 @@ impl<'a> Context<'a> {
             }
             _ => None,
         }
+    }
+
+    /// Given a `module` and `member`, return the fully-qualified name of the binding in the current
+    /// scope, if it exists.
+    ///
+    /// E.g., given:
+    ///
+    /// ```python
+    /// from sys import version_info as python_version
+    /// print(python_version)
+    /// ```
+    ///
+    /// ...then `resolve_qualified_import_name("sys", "version_info")` will return
+    /// `Some("python_version")`.
+    pub fn resolve_qualified_import_name(&self, module: &str, member: &str) -> Option<String> {
+        self.scopes().enumerate().find_map(|(scope_index, scope)| {
+            scope.binding_ids().find_map(|binding_index| {
+                match &self.bindings[*binding_index].kind {
+                    // Ex) Given `module="sys"` and `object="exit"`:
+                    // `import sys`         -> `sys.exit`
+                    // `import sys as sys2` -> `sys2.exit`
+                    BindingKind::Importation(Importation { name, full_name }) => {
+                        if full_name == &module {
+                            // Verify that `sys` isn't bound in an inner scope.
+                            if self
+                                .scopes()
+                                .take(scope_index)
+                                .all(|scope| scope.get(name).is_none())
+                            {
+                                return Some(format!("{name}.{member}"));
+                            }
+                        }
+                    }
+                    // Ex) Given `module="os.path"` and `object="join"`:
+                    // `from os.path import join`          -> `join`
+                    // `from os.path import join as join2` -> `join2`
+                    BindingKind::FromImportation(FromImportation { name, full_name }) => {
+                        if let Some((target_module, target_member)) = full_name.split_once('.') {
+                            if target_module == module && target_member == member {
+                                // Verify that `join` isn't bound in an inner scope.
+                                if self
+                                    .scopes()
+                                    .take(scope_index)
+                                    .all(|scope| scope.get(name).is_none())
+                                {
+                                    return Some((*name).to_string());
+                                }
+                            }
+                        }
+                    }
+                    // Ex) Given `module="os"` and `object="name"`:
+                    // `import os.path ` -> `os.name`
+                    BindingKind::SubmoduleImportation(SubmoduleImportation { name, .. }) => {
+                        if name == &module {
+                            // Verify that `os` isn't bound in an inner scope.
+                            if self
+                                .scopes()
+                                .take(scope_index)
+                                .all(|scope| scope.get(name).is_none())
+                            {
+                                return Some(format!("{name}.{member}"));
+                            }
+                        }
+                    }
+                    // Non-imports.
+                    _ => {}
+                }
+                None
+            })
+        })
     }
 
     pub fn push_parent(&mut self, parent: &'a Stmt) {
