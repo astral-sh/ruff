@@ -187,8 +187,6 @@ pub fn typing_only_runtime_import(
             &settings.src,
             package,
             &settings.isort.known_modules,
-            &settings.isort.known_local_folder,
-            &settings.isort.extra_standard_library,
             settings.target_version,
         ) {
             ImportType::LocalFolder | ImportType::FirstParty => Some(Diagnostic::new(

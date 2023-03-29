@@ -272,13 +272,11 @@ pub struct Options {
 pub struct Settings {
     pub required_imports: BTreeSet<String>,
     pub combine_as_imports: bool,
-    pub extra_standard_library: BTreeSet<String>,
     pub force_single_line: bool,
     pub force_sort_within_sections: bool,
     pub force_wrap_aliases: bool,
     pub force_to_top: BTreeSet<String>,
     pub known_modules: KnownModules,
-    pub known_local_folder: BTreeSet<String>,
     pub order_by_type: bool,
     pub relative_imports_order: RelativeImportsOrder,
     pub single_line_exclusions: BTreeSet<String>,
@@ -297,13 +295,11 @@ impl Default for Settings {
         Self {
             required_imports: BTreeSet::new(),
             combine_as_imports: false,
-            extra_standard_library: BTreeSet::new(),
             force_single_line: false,
             force_sort_within_sections: false,
             force_wrap_aliases: false,
             force_to_top: BTreeSet::new(),
             known_modules: KnownModules::default(),
-            known_local_folder: BTreeSet::new(),
             order_by_type: true,
             relative_imports_order: RelativeImportsOrder::default(),
             single_line_exclusions: BTreeSet::new(),
@@ -324,9 +320,6 @@ impl From<Options> for Settings {
         Self {
             required_imports: BTreeSet::from_iter(options.required_imports.unwrap_or_default()),
             combine_as_imports: options.combine_as_imports.unwrap_or(false),
-            extra_standard_library: BTreeSet::from_iter(
-                options.extra_standard_library.unwrap_or_default(),
-            ),
             force_single_line: options.force_single_line.unwrap_or(false),
             force_sort_within_sections: options.force_sort_within_sections.unwrap_or(false),
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
@@ -334,8 +327,9 @@ impl From<Options> for Settings {
             known_modules: KnownModules::new(
                 options.known_first_party.unwrap_or_default(),
                 options.known_third_party.unwrap_or_default(),
+                options.known_local_folder.unwrap_or_default(),
+                options.extra_standard_library.unwrap_or_default(),
             ),
-            known_local_folder: BTreeSet::from_iter(options.known_local_folder.unwrap_or_default()),
             order_by_type: options.order_by_type.unwrap_or(true),
             relative_imports_order: options.relative_imports_order.unwrap_or_default(),
             single_line_exclusions: BTreeSet::from_iter(
@@ -358,14 +352,20 @@ impl From<Settings> for Options {
         Self {
             required_imports: Some(settings.required_imports.into_iter().collect()),
             combine_as_imports: Some(settings.combine_as_imports),
-            extra_standard_library: Some(settings.extra_standard_library.into_iter().collect()),
+            extra_standard_library: Some(
+                settings
+                    .known_modules
+                    .standard_library
+                    .into_iter()
+                    .collect(),
+            ),
             force_single_line: Some(settings.force_single_line),
             force_sort_within_sections: Some(settings.force_sort_within_sections),
             force_wrap_aliases: Some(settings.force_wrap_aliases),
             force_to_top: Some(settings.force_to_top.into_iter().collect()),
             known_first_party: Some(settings.known_modules.first_party.into_iter().collect()),
             known_third_party: Some(settings.known_modules.third_party.into_iter().collect()),
-            known_local_folder: Some(settings.known_local_folder.into_iter().collect()),
+            known_local_folder: Some(settings.known_modules.local_folder.into_iter().collect()),
             order_by_type: Some(settings.order_by_type),
             relative_imports_order: Some(settings.relative_imports_order),
             single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),

@@ -119,13 +119,11 @@ pub fn format_imports(
     src: &[PathBuf],
     package: Option<&Path>,
     combine_as_imports: bool,
-    extra_standard_library: &BTreeSet<String>,
     force_single_line: bool,
     force_sort_within_sections: bool,
     force_wrap_aliases: bool,
     force_to_top: &BTreeSet<String>,
     known_modules: &KnownModules,
-    known_local_folder: &BTreeSet<String>,
     order_by_type: bool,
     relative_imports_order: RelativeImportsOrder,
     single_line_exclusions: &BTreeSet<String>,
@@ -154,13 +152,11 @@ pub fn format_imports(
             stylist,
             src,
             package,
-            extra_standard_library,
             force_single_line,
             force_sort_within_sections,
             force_wrap_aliases,
             force_to_top,
             known_modules,
-            known_local_folder,
             order_by_type,
             relative_imports_order,
             single_line_exclusions,
@@ -213,13 +209,11 @@ fn format_import_block(
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
-    extra_standard_library: &BTreeSet<String>,
     force_single_line: bool,
     force_sort_within_sections: bool,
     force_wrap_aliases: bool,
     force_to_top: &BTreeSet<String>,
     known_modules: &KnownModules,
-    known_local_folder: &BTreeSet<String>,
     order_by_type: bool,
     relative_imports_order: RelativeImportsOrder,
     single_line_exclusions: &BTreeSet<String>,
@@ -232,15 +226,7 @@ fn format_import_block(
     target_version: PythonVersion,
 ) -> String {
     // Categorize by type (e.g., first-party vs. third-party).
-    let mut block_by_type = categorize_imports(
-        block,
-        src,
-        package,
-        known_modules,
-        known_local_folder,
-        extra_standard_library,
-        target_version,
-    );
+    let mut block_by_type = categorize_imports(block, src, package, known_modules, target_version);
 
     let mut output = String::new();
 
@@ -422,8 +408,10 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     known_modules: KnownModules::new(
-                        ["foo.bar".to_string(), "baz".to_string()],
-                        ["foo".to_string(), "__future__".to_string()],
+                        vec!["foo.bar".to_string(), "baz".to_string()],
+                        vec!["foo".to_string(), "__future__".to_string()],
+                        vec![],
+                        vec![],
                     ),
                     ..super::settings::Settings::default()
                 },
@@ -442,7 +430,12 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
-                    known_modules: KnownModules::new(["foo".to_string()], ["foo.bar".to_string()]),
+                    known_modules: KnownModules::new(
+                        vec!["foo".to_string()],
+                        vec!["foo.bar".to_string()],
+                        vec![],
+                        vec![],
+                    ),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
@@ -478,7 +471,12 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
-                    known_local_folder: BTreeSet::from(["ruff".to_string()]),
+                    known_modules: KnownModules::new(
+                        vec![],
+                        vec![],
+                        vec!["ruff".to_string()],
+                        vec![],
+                    ),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],
