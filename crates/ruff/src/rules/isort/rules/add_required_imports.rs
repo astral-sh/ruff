@@ -11,9 +11,9 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
 use crate::registry::Rule;
+use crate::rules::isort::helpers::{top_of_file_insertion, Insertion};
 use crate::settings::{flags, Settings};
 
-use super::super::helpers;
 use super::super::track::Block;
 
 /// ## What it does
@@ -169,32 +169,15 @@ fn add_required_import(
         Range::new(Location::default(), Location::default()),
     );
     if autofix.into() && settings.rules.should_fix(Rule::MissingRequiredImport) {
-        // Determine the location at which the import should be inserted.
-        let splice = helpers::find_splice_location(python_ast, locator);
-
-        // Generate the edit.
-        let mut contents = String::with_capacity(required_import.len() + 1);
-
-        // Newline (LF/CRLF)
-        let line_sep = stylist.line_ending().as_str();
-
-        // If we're inserting beyond the start of the file, we add
-        // a newline _before_, since the splice represents the _end_ of the last
-        // irrelevant token (e.g., the end of a comment or the end of
-        // docstring). This ensures that we properly handle awkward cases like
-        // docstrings that are followed by semicolons.
-        if splice > Location::default() {
-            contents.push_str(line_sep);
-        }
-        contents.push_str(&required_import);
-
-        // If we're inserting at the start of the file, add a trailing newline instead.
-        if splice == Location::default() {
-            contents.push_str(line_sep);
-        }
-
-        // Construct the fix.
-        diagnostic.set_fix(Edit::insertion(contents, splice));
+        let Insertion {
+            prefix,
+            location,
+            suffix,
+        } = top_of_file_insertion(python_ast, locator, stylist);
+        diagnostic.set_fix(Edit::insertion(
+            format!("{prefix}{required_import}{suffix}"),
+            location,
+        ));
     }
     Some(diagnostic)
 }
@@ -224,8 +207,8 @@ pub fn add_required_imports(
                 );
                 return vec![];
             }
-
-            match &body[0].node {
+            let stmt = &body[0];
+            match &stmt.node {
                 StmtKind::ImportFrom {
                     module,
                     names,
