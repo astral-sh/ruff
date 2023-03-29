@@ -29,10 +29,13 @@ string = "hello there"
 string.encode("utf-8")
 
 bar = "bar"
-f"foo{bar}".encode("utf-8")  # f"foo{bar}".encode()
+f"foo{bar}".encode("utf-8")
 encoding = "latin"
 "foo".encode(encoding)
 f"foo{bar}".encode(encoding)
+f"{a=} {b=}".encode(
+    "utf-8",
+)
 
 # `encode` with custom args and kwargs should not be processed.
 "foo".encode("utf-8", errors="replace")
