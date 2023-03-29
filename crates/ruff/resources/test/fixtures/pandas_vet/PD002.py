@@ -18,3 +18,7 @@ if True:
         columns=["a"],
         axis=1,
     )
+
+x.drop(["a"], axis=1, **kwargs, inplace=True)
+x.drop(["a"], axis=1, inplace=True, **kwargs)
+f(x.drop(["a"], axis=1, inplace=True))
