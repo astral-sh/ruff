@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 1
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ZipWithoutExplicitStrict
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ZipWithoutExplicitStrict
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ZipWithoutExplicitStrict
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ZipWithoutExplicitStrict
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ZipWithoutExplicitStrict
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ZipWithoutExplicitStrict
@@ -91,6 +97,7 @@ expression: diagnostics
   end_location:
     row: 6
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

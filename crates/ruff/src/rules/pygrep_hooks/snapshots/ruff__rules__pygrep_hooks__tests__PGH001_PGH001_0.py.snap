@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 4
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: Eval
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 9
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

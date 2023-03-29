@@ -80,7 +80,8 @@ pub fn ends_with_punctuation(checker: &mut Checker, docstring: &Docstring) {
                         trimmed.chars().count(),
                     ))
                 } {
-                    diagnostic.amend(Edit::insertion(".".to_string(), Location::new(row, column)));
+                    diagnostic
+                        .set_fix(Edit::insertion(".".to_string(), Location::new(row, column)));
                 }
             }
             checker.diagnostics.push(diagnostic);

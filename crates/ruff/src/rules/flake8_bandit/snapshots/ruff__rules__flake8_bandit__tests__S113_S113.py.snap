@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 46
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 47
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 46
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 49
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 48
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 50
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithoutTimeout
@@ -182,6 +195,7 @@ expression: diagnostics
   end_location:
     row: 22
     column: 47
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

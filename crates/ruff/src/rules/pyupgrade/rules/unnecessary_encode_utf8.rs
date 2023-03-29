@@ -78,13 +78,13 @@ fn delete_default_encode_arg_or_kwarg(
     if let Some(arg) = args.get(0) {
         let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from(expr));
         if patch {
-            diagnostic.amend(Edit::deletion(arg.location, arg.end_location.unwrap()));
+            diagnostic.set_fix(Edit::deletion(arg.location, arg.end_location.unwrap()));
         }
         Some(diagnostic)
     } else if let Some(kwarg) = kwargs.get(0) {
         let mut diagnostic = Diagnostic::new(UnnecessaryEncodeUTF8, Range::from(expr));
         if patch {
-            diagnostic.amend(Edit::deletion(kwarg.location, kwarg.end_location.unwrap()));
+            diagnostic.set_fix(Edit::deletion(kwarg.location, kwarg.end_location.unwrap()));
         }
         Some(diagnostic)
     } else {
@@ -127,7 +127,7 @@ fn replace_with_bytes_literal(
             }
             prev = Some(end);
         }
-        diagnostic.amend(Edit::replacement(
+        diagnostic.set_fix(Edit::replacement(
             replacement,
             expr.location,
             expr.end_location.unwrap(),

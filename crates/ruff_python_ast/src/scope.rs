@@ -215,7 +215,18 @@ impl ScopeStack {
     pub fn iter(&self) -> std::iter::Rev<std::slice::Iter<ScopeId>> {
         self.0.iter().rev()
     }
+
+    pub fn snapshot(&self) -> ScopeStackSnapshot {
+        ScopeStackSnapshot(self.0.len())
+    }
+
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn restore(&mut self, snapshot: ScopeStackSnapshot) {
+        self.0.truncate(snapshot.0);
+    }
 }
+
+pub struct ScopeStackSnapshot(usize);
 
 impl Default for ScopeStack {
     fn default() -> Self {

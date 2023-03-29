@@ -14,13 +14,14 @@ expression: diagnostics
     row: 6
     column: 14
   fix:
-    content: list(x)
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 14
+    edits:
+      - content: list(x)
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 6
+          column: 14
   parent: ~
 - kind:
     name: UnnecessaryComprehension
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 7
     column: 14
   fix:
-    content: set(x)
-    location:
-      row: 7
-      column: 0
-    end_location:
-      row: 7
-      column: 14
+    edits:
+      - content: set(x)
+        location:
+          row: 7
+          column: 0
+        end_location:
+          row: 7
+          column: 14
   parent: ~
 - kind:
     name: UnnecessaryComprehension
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 8
     column: 20
   fix:
-    content: dict(y)
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 8
-      column: 20
+    edits:
+      - content: dict(y)
+        location:
+          row: 8
+          column: 0
+        end_location:
+          row: 8
+          column: 20
   parent: ~
 - kind:
     name: UnnecessaryComprehension
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 9
     column: 28
   fix:
-    content: dict(d.items())
-    location:
-      row: 9
-      column: 0
-    end_location:
-      row: 9
-      column: 28
+    edits:
+      - content: dict(d.items())
+        location:
+          row: 9
+          column: 0
+        end_location:
+          row: 9
+          column: 28
   parent: ~
 

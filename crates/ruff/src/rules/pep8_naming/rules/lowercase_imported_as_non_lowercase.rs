@@ -1,9 +1,8 @@
-use rustpython_parser::ast::Stmt;
+use rustpython_parser::ast::{Alias, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::types::Range;
 use ruff_python_stdlib::str;
 
 /// ## What it does
@@ -45,19 +44,21 @@ impl Violation for LowercaseImportedAsNonLowercase {
 
 /// N812
 pub fn lowercase_imported_as_non_lowercase(
-    import_from: &Stmt,
     name: &str,
     asname: &str,
-    locator: &Locator,
+    alias: &Alias,
+    stmt: &Stmt,
 ) -> Option<Diagnostic> {
     if !str::is_upper(name) && str::is_lower(name) && asname.to_lowercase() != asname {
-        return Some(Diagnostic::new(
+        let mut diagnostic = Diagnostic::new(
             LowercaseImportedAsNonLowercase {
                 name: name.to_string(),
                 asname: asname.to_string(),
             },
-            identifier_range(import_from, locator),
-        ));
+            Range::from(alias),
+        );
+        diagnostic.set_parent(stmt.location);
+        return Some(diagnostic);
     }
     None
 }

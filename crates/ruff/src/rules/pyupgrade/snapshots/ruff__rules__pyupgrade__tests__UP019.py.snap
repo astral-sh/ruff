@@ -14,13 +14,14 @@ expression: diagnostics
     row: 7
     column: 25
   fix:
-    content: str
-    location:
-      row: 7
-      column: 21
-    end_location:
-      row: 7
-      column: 25
+    edits:
+      - content: str
+        location:
+          row: 7
+          column: 21
+        end_location:
+          row: 7
+          column: 25
   parent: ~
 - kind:
     name: TypingTextStrAlias
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 11
     column: 39
   fix:
-    content: str
-    location:
-      row: 11
-      column: 28
-    end_location:
-      row: 11
-      column: 39
+    edits:
+      - content: str
+        location:
+          row: 11
+          column: 28
+        end_location:
+          row: 11
+          column: 39
   parent: ~
 - kind:
     name: TypingTextStrAlias
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 15
     column: 37
   fix:
-    content: str
-    location:
-      row: 15
-      column: 27
-    end_location:
-      row: 15
-      column: 37
+    edits:
+      - content: str
+        location:
+          row: 15
+          column: 27
+        end_location:
+          row: 15
+          column: 37
   parent: ~
 - kind:
     name: TypingTextStrAlias
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 19
     column: 35
   fix:
-    content: str
-    location:
-      row: 19
-      column: 28
-    end_location:
-      row: 19
-      column: 35
+    edits:
+      - content: str
+        location:
+          row: 19
+          column: 28
+        end_location:
+          row: 19
+          column: 35
   parent: ~
 

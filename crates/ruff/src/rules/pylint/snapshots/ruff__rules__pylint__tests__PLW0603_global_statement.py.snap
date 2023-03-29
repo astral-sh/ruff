@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: GlobalStatement
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: GlobalStatement
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: GlobalStatement
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 36
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: GlobalStatement
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 43
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: GlobalStatement
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 50
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: GlobalStatement
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 60
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: GlobalStatement
@@ -104,6 +111,7 @@ expression: diagnostics
   end_location:
     row: 70
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

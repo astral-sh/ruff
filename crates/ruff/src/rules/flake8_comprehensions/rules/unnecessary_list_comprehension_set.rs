@@ -57,7 +57,7 @@ pub fn unnecessary_list_comprehension_set(
     if let ExprKind::ListComp { .. } = &argument {
         let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionSet, Range::from(expr));
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_amend(|| {
+            diagnostic.try_set_fix(|| {
                 fixes::fix_unnecessary_list_comprehension_set(
                     checker.locator,
                     checker.stylist,

@@ -133,12 +133,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bisection"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "021e079a1bab0ecce6cf4b4b74c0c37afa4a697136eb3b127875c84a8f04a8c3"
-
-[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -780,7 +774,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.259"
+version = "0.0.260"
 dependencies = [
  "anyhow",
  "clap 4.1.8",
@@ -1982,10 +1976,9 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.259"
+version = "0.0.260"
 dependencies = [
  "anyhow",
- "bisection",
  "bitflags",
  "chrono",
  "clap 4.1.8",
@@ -2065,7 +2058,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.259"
+version = "0.0.260"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2105,6 +2098,7 @@ dependencies = [
  "tikv-jemallocator",
  "ureq",
  "walkdir",
+ "wild",
 ]
 
 [[package]]
@@ -2260,6 +2254,7 @@ dependencies = [
  "js-sys",
  "log",
  "ruff",
+ "ruff_diagnostics",
  "ruff_python_ast",
  "ruff_rustpython",
  "rustpython-parser",
@@ -3273,6 +3268,15 @@ name = "widestring"
 version = "0.5.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "17882f045410753661207383517a6f62ec3dbeb6a4ed2acce01f0728238d1983"
+
+[[package]]
+name = "wild"
+version = "2.1.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "05b116685a6be0c52f5a103334cbff26db643826c7b3735fc0a3ba9871310a74"
+dependencies = [
+ "glob",
+]
 
 [[package]]
 name = "winapi"

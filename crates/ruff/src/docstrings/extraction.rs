@@ -28,10 +28,10 @@ pub fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
 
 /// Extract a `Definition` from the AST node defined by a `Stmt`.
 pub fn extract<'a>(
-    scope: &VisibleScope,
+    scope: VisibleScope,
     stmt: &'a Stmt,
     body: &'a [Stmt],
-    kind: &Documentable,
+    kind: Documentable,
 ) -> Definition<'a> {
     let expr = docstring_from(body);
     match kind {

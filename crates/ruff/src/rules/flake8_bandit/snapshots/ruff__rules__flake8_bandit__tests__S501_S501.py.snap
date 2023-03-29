@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 58
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 59
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 58
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 61
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 60
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 62
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 59
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 54
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 43
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 47
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 26
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 28
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 43
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 32
     column: 45
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 34
     column: 46
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -208,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 36
     column: 46
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -221,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 38
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RequestWithNoCertValidation
@@ -234,6 +251,7 @@ expression: diagnostics
   end_location:
     row: 40
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

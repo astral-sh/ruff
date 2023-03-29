@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 73
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: ComplexStructure
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 113
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

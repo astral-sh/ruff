@@ -54,7 +54,7 @@ pub fn empty_type_checking_block<'a, 'b>(
                     if fix.content.is_empty() || fix.content == "pass" {
                         checker.deletions.insert(RefEquality(stmt));
                     }
-                    diagnostic.amend(fix);
+                    diagnostic.set_fix(fix);
                 }
                 Err(e) => error!("Failed to remove empty type-checking block: {e}"),
             }

@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedIndentationComment
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedIndentationComment
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedIndentationComment
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 26
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

@@ -107,13 +107,12 @@ impl From<&str> for Index {
 
         let mut line_start_offsets: Vec<u32> = Vec::with_capacity(48);
         line_start_offsets.push(0);
+        let mut utf8 = false;
 
         // SAFE because of length assertion above
         #[allow(clippy::cast_possible_truncation)]
         for (i, byte) in contents.bytes().enumerate() {
-            if !byte.is_ascii() {
-                return Self::Utf8(continue_utf8_index(&contents[i..], i, line_start_offsets));
-            }
+            utf8 |= !byte.is_ascii();
 
             match byte {
                 // Only track one line break for `\r\n`.
@@ -125,32 +124,12 @@ impl From<&str> for Index {
             }
         }
 
-        Self::Ascii(AsciiIndex::new(line_start_offsets))
-    }
-}
-
-// SAFE because of length assertion in `Index::from(&str)`
-#[allow(clippy::cast_possible_truncation)]
-fn continue_utf8_index(
-    non_ascii_part: &str,
-    offset: usize,
-    line_start_offsets: Vec<u32>,
-) -> Utf8Index {
-    let mut lines = line_start_offsets;
-
-    for (position, char) in non_ascii_part.char_indices() {
-        match char {
-            // Only track `\n` for `\r\n`
-            '\r' if non_ascii_part.as_bytes().get(position + 1) == Some(&b'\n') => continue,
-            '\r' | '\n' => {
-                let absolute_offset = offset + position + 1;
-                lines.push(absolute_offset as u32);
-            }
-            _ => {}
+        if utf8 {
+            Self::Utf8(Utf8Index::new(line_start_offsets))
+        } else {
+            Self::Ascii(AsciiIndex::new(line_start_offsets))
         }
     }
-
-    Utf8Index::new(lines)
 }
 
 /// Index for fast [`Location`] to byte offset conversions for ASCII documents.

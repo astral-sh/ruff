@@ -9,18 +9,19 @@ expression: diagnostics
     fixable: true
   location:
     row: 1
-    column: 9
+    column: 3
   end_location:
     row: 1
     column: 14
   fix:
-    content: "False"
-    location:
-      row: 1
-      column: 3
-    end_location:
-      row: 1
-      column: 14
+    edits:
+      - content: "False"
+        location:
+          row: 1
+          column: 3
+        end_location:
+          row: 1
+          column: 14
   parent: ~
 - kind:
     name: ExprAndFalse
@@ -29,18 +30,19 @@ expression: diagnostics
     fixable: true
   location:
     row: 4
-    column: 16
+    column: 3
   end_location:
     row: 4
     column: 21
   fix:
-    content: "False"
-    location:
-      row: 4
-      column: 3
-    end_location:
-      row: 4
-      column: 21
+    edits:
+      - content: "False"
+        location:
+          row: 4
+          column: 3
+        end_location:
+          row: 4
+          column: 21
   parent: ~
 - kind:
     name: ExprAndFalse
@@ -49,17 +51,81 @@ expression: diagnostics
     fixable: true
   location:
     row: 7
-    column: 15
+    column: 9
   end_location:
     row: 7
     column: 20
   fix:
-    content: "False"
-    location:
-      row: 7
-      column: 9
-    end_location:
-      row: 7
-      column: 20
+    edits:
+      - content: "False"
+        location:
+          row: 7
+          column: 9
+        end_location:
+          row: 7
+          column: 20
+  parent: ~
+- kind:
+    name: ExprAndFalse
+    body: "Use `False` instead of `... and False`"
+    suggestion: "Replace with `False`"
+    fixable: true
+  location:
+    row: 19
+    column: 17
+  end_location:
+    row: 19
+    column: 36
+  fix:
+    edits:
+      - content: "False"
+        location:
+          row: 19
+          column: 17
+        end_location:
+          row: 19
+          column: 36
+  parent: ~
+- kind:
+    name: ExprAndFalse
+    body: "Use `False` instead of `... and False`"
+    suggestion: "Replace with `False`"
+    fixable: true
+  location:
+    row: 22
+    column: 3
+  end_location:
+    row: 22
+    column: 36
+  fix:
+    edits:
+      - content: "False"
+        location:
+          row: 22
+          column: 3
+        end_location:
+          row: 22
+          column: 36
+  parent: ~
+- kind:
+    name: ExprAndFalse
+    body: "Use `False` instead of `... and False`"
+    suggestion: "Replace with `False`"
+    fixable: true
+  location:
+    row: 25
+    column: 3
+  end_location:
+    row: 25
+    column: 36
+  fix:
+    edits:
+      - content: "False"
+        location:
+          row: 25
+          column: 3
+        end_location:
+          row: 25
+          column: 36
   parent: ~
 

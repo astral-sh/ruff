@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TryExceptContinue
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TryExceptContinue
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TryExceptContinue
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 19
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

@@ -14,13 +14,14 @@ expression: diagnostics
     row: 1
     column: 45
   fix:
-    content: "isinstance(a, (int, float))"
-    location:
-      row: 1
-      column: 3
-    end_location:
-      row: 1
-      column: 45
+    edits:
+      - content: "isinstance(a, (int, float))"
+        location:
+          row: 1
+          column: 3
+        end_location:
+          row: 1
+          column: 45
   parent: ~
 - kind:
     name: DuplicateIsinstanceCall
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 4
     column: 53
   fix:
-    content: "isinstance(a, (int, float, bool))"
-    location:
-      row: 4
-      column: 3
-    end_location:
-      row: 4
-      column: 53
+    edits:
+      - content: "isinstance(a, (int, float, bool))"
+        location:
+          row: 4
+          column: 3
+        end_location:
+          row: 4
+          column: 53
   parent: ~
 - kind:
     name: DuplicateIsinstanceCall
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 7
     column: 68
   fix:
-    content: "isinstance(a, (int, float)) or isinstance(b, bool)"
-    location:
-      row: 7
-      column: 3
-    end_location:
-      row: 7
-      column: 68
+    edits:
+      - content: "isinstance(a, (int, float)) or isinstance(b, bool)"
+        location:
+          row: 7
+          column: 3
+        end_location:
+          row: 7
+          column: 68
   parent: ~
 - kind:
     name: DuplicateIsinstanceCall
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 10
     column: 68
   fix:
-    content: "isinstance(a, (int, float)) or isinstance(b, bool)"
-    location:
-      row: 10
-      column: 3
-    end_location:
-      row: 10
-      column: 68
+    edits:
+      - content: "isinstance(a, (int, float)) or isinstance(b, bool)"
+        location:
+          row: 10
+          column: 3
+        end_location:
+          row: 10
+          column: 68
   parent: ~
 - kind:
     name: DuplicateIsinstanceCall
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 13
     column: 68
   fix:
-    content: "isinstance(a, (int, float)) or isinstance(b, bool)"
-    location:
-      row: 13
-      column: 3
-    end_location:
-      row: 13
-      column: 68
+    edits:
+      - content: "isinstance(a, (int, float)) or isinstance(b, bool)"
+        location:
+          row: 13
+          column: 3
+        end_location:
+          row: 13
+          column: 68
   parent: ~
 - kind:
     name: DuplicateIsinstanceCall
@@ -114,12 +119,13 @@ expression: diagnostics
     row: 16
     column: 46
   fix:
-    content: "isinstance(a, (int, float))"
-    location:
-      row: 16
-      column: 4
-    end_location:
-      row: 16
-      column: 46
+    edits:
+      - content: "isinstance(a, (int, float))"
+        location:
+          row: 16
+          column: 4
+        end_location:
+          row: 16
+          column: 46
   parent: ~
 

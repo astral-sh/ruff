@@ -14,14 +14,17 @@ expression: diagnostics
     row: 2
     column: 17
   fix:
-    content: ""
-    location:
-      row: 2
-      column: 0
-    end_location:
-      row: 3
-      column: 0
-  parent: ~
+    edits:
+      - content: ""
+        location:
+          row: 2
+          column: 0
+        end_location:
+          row: 3
+          column: 0
+  parent:
+    row: 2
+    column: 0
 - kind:
     name: UnusedImport
     body: "`d.e.f` imported but unused"
@@ -34,14 +37,17 @@ expression: diagnostics
     row: 3
     column: 22
   fix:
-    content: ""
-    location:
-      row: 3
-      column: 0
-    end_location:
-      row: 4
-      column: 0
-  parent: ~
+    edits:
+      - content: ""
+        location:
+          row: 3
+          column: 0
+        end_location:
+          row: 4
+          column: 0
+  parent:
+    row: 3
+    column: 0
 - kind:
     name: UnusedImport
     body: "`h.i` imported but unused"
@@ -54,13 +60,14 @@ expression: diagnostics
     row: 4
     column: 10
   fix:
-    content: ""
-    location:
-      row: 4
-      column: 0
-    end_location:
-      row: 5
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 4
+          column: 0
+        end_location:
+          row: 5
+          column: 0
   parent: ~
 - kind:
     name: UnusedImport
@@ -74,12 +81,13 @@ expression: diagnostics
     row: 5
     column: 15
   fix:
-    content: ""
-    location:
-      row: 5
-      column: 0
-    end_location:
-      row: 6
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 5
+          column: 0
+        end_location:
+          row: 6
+          column: 0
   parent: ~
 

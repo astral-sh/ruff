@@ -12,11 +12,11 @@ use log::{debug, error};
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
+use ruff::fs;
 use ruff::jupyter::{is_jupyter_notebook, JupyterIndex, JupyterNotebook};
 use ruff::linter::{lint_fix, lint_only, FixTable, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
-use ruff::{fix, fs};
 use ruff_python_ast::types::Imports;
 
 use crate::cache;
@@ -104,7 +104,7 @@ pub fn lint_path(
     settings: &AllSettings,
     cache: flags::Cache,
     noqa: flags::Noqa,
-    autofix: fix::FixMode,
+    autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
     // Check the cache.
     // TODO(charlie): `fixer::Mode::Apply` and `fixer::Mode::Diff` both have
@@ -114,7 +114,7 @@ pub fn lint_path(
     // to reason about. We need to come up with a better solution here.)
     let metadata = if cache.into()
         && noqa.into()
-        && matches!(autofix, fix::FixMode::None | fix::FixMode::Generate)
+        && matches!(autofix, flags::FixMode::None | flags::FixMode::Generate)
     {
         let metadata = path.metadata()?;
         if let Some((messages, imports)) =
@@ -147,14 +147,14 @@ pub fn lint_path(
             error: parse_error,
         },
         fixed,
-    ) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
+    ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
         if let Ok((result, transformed, fixed)) =
             lint_fix(&contents, path, package, noqa, &settings.lib)
         {
             if !fixed.is_empty() {
-                if matches!(autofix, fix::FixMode::Apply) {
+                if matches!(autofix, flags::FixMode::Apply) {
                     write(path, transformed.as_bytes())?;
-                } else if matches!(autofix, fix::FixMode::Diff) {
+                } else if matches!(autofix, flags::FixMode::Diff) {
                     let mut stdout = io::stdout().lock();
                     TextDiff::from_lines(contents.as_str(), &transformed)
                         .unified_diff()
@@ -249,7 +249,7 @@ pub fn lint_stdin(
     contents: &str,
     settings: &Settings,
     noqa: flags::Noqa,
-    autofix: fix::FixMode,
+    autofix: flags::FixMode,
 ) -> Result<Diagnostics> {
     // Lint the inputs.
     let (
@@ -258,7 +258,7 @@ pub fn lint_stdin(
             error: parse_error,
         },
         fixed,
-    ) = if matches!(autofix, fix::FixMode::Apply | fix::FixMode::Diff) {
+    ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
         if let Ok((result, transformed, fixed)) = lint_fix(
             contents,
             path.unwrap_or_else(|| Path::new("-")),
@@ -266,10 +266,10 @@ pub fn lint_stdin(
             noqa,
             settings,
         ) {
-            if matches!(autofix, fix::FixMode::Apply) {
+            if matches!(autofix, flags::FixMode::Apply) {
                 // Write the contents to stdout, regardless of whether any errors were fixed.
                 io::stdout().write_all(transformed.as_bytes())?;
-            } else if matches!(autofix, fix::FixMode::Diff) {
+            } else if matches!(autofix, flags::FixMode::Diff) {
                 // But only write a diff if it's non-empty.
                 if !fixed.is_empty() {
                     let text_diff = TextDiff::from_lines(contents, &transformed);
@@ -299,7 +299,7 @@ pub fn lint_stdin(
             let fixed = FxHashMap::default();
 
             // Write the contents to stdout anyway.
-            if matches!(autofix, fix::FixMode::Apply) {
+            if matches!(autofix, flags::FixMode::Apply) {
                 io::stdout().write_all(contents.as_bytes())?;
             }
 

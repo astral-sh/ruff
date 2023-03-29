@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SixPY3
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 6
     column: 6
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

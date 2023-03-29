@@ -14,13 +14,14 @@ expression: diagnostics
     row: 40
     column: 25
   fix:
-    content: foo.bar = None
-    location:
-      row: 40
-      column: 0
-    end_location:
-      row: 40
-      column: 25
+    edits:
+      - content: foo.bar = None
+        location:
+          row: 40
+          column: 0
+        end_location:
+          row: 40
+          column: 25
   parent: ~
 - kind:
     name: SetAttrWithConstant
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 41
     column: 29
   fix:
-    content: foo._123abc = None
-    location:
-      row: 41
-      column: 0
-    end_location:
-      row: 41
-      column: 29
+    edits:
+      - content: foo._123abc = None
+        location:
+          row: 41
+          column: 0
+        end_location:
+          row: 41
+          column: 29
   parent: ~
 - kind:
     name: SetAttrWithConstant
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 42
     column: 32
   fix:
-    content: foo.__123abc__ = None
-    location:
-      row: 42
-      column: 0
-    end_location:
-      row: 42
-      column: 32
+    edits:
+      - content: foo.__123abc__ = None
+        location:
+          row: 42
+          column: 0
+        end_location:
+          row: 42
+          column: 32
   parent: ~
 - kind:
     name: SetAttrWithConstant
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 43
     column: 28
   fix:
-    content: foo.abc123 = None
-    location:
-      row: 43
-      column: 0
-    end_location:
-      row: 43
-      column: 28
+    edits:
+      - content: foo.abc123 = None
+        location:
+          row: 43
+          column: 0
+        end_location:
+          row: 43
+          column: 28
   parent: ~
 - kind:
     name: SetAttrWithConstant
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 44
     column: 29
   fix:
-    content: foo.abc123 = None
-    location:
-      row: 44
-      column: 0
-    end_location:
-      row: 44
-      column: 29
+    edits:
+      - content: foo.abc123 = None
+        location:
+          row: 44
+          column: 0
+        end_location:
+          row: 44
+          column: 29
   parent: ~
 - kind:
     name: SetAttrWithConstant
@@ -114,12 +119,13 @@ expression: diagnostics
     row: 45
     column: 30
   fix:
-    content: foo.bar.baz = None
-    location:
-      row: 45
-      column: 0
-    end_location:
-      row: 45
-      column: 30
+    edits:
+      - content: foo.bar.baz = None
+        location:
+          row: 45
+          column: 0
+        end_location:
+          row: 45
+          column: 30
   parent: ~
 

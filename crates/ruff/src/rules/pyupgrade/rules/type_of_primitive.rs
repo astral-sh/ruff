@@ -47,7 +47,7 @@ pub fn type_of_primitive(checker: &mut Checker, expr: &Expr, func: &Expr, args: 
     };
     let mut diagnostic = Diagnostic::new(TypeOfPrimitive { primitive }, Range::from(expr));
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Edit::replacement(
+        diagnostic.set_fix(Edit::replacement(
             primitive.builtin(),
             expr.location,
             expr.end_location.unwrap(),

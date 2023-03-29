@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 34
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 34
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 35
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 36
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 38
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 56
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 26
     column: 40
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 27
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -169,6 +181,7 @@ expression: diagnostics
   end_location:
     row: 28
     column: 62
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

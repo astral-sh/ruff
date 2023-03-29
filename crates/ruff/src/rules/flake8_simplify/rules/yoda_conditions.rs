@@ -31,7 +31,7 @@ impl Violation for YodaConditions {
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let YodaConditions { suggestion, .. } = self;
+        let YodaConditions { suggestion } = self;
         if suggestion.is_some() {
             Some(|YodaConditions { suggestion }| {
                 let suggestion = suggestion.as_ref().unwrap();
@@ -123,7 +123,7 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
     };
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -162,7 +162,7 @@ pub fn yoda_conditions(
             Range::from(expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 suggestion,
                 expr.location,
                 expr.end_location.unwrap(),

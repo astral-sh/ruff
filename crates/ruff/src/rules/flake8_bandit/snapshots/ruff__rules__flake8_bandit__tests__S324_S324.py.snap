@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HashlibInsecureHashFunction
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HashlibInsecureHashFunction
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HashlibInsecureHashFunction
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HashlibInsecureHashFunction
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HashlibInsecureHashFunction
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HashlibInsecureHashFunction
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HashlibInsecureHashFunction
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HashlibInsecureHashFunction
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HashlibInsecureHashFunction
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HashlibInsecureHashFunction
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 27
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HashlibInsecureHashFunction
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 29
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HashlibInsecureHashFunction
@@ -169,6 +181,7 @@ expression: diagnostics
   end_location:
     row: 32
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

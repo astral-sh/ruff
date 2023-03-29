@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UselessElseOnLoop
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UselessElseOnLoop
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 4
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UselessElseOnLoop
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 37
     column: 4
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UselessElseOnLoop
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 42
     column: 4
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UselessElseOnLoop
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 88
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UselessElseOnLoop
@@ -91,6 +97,7 @@ expression: diagnostics
   end_location:
     row: 98
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 46
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: VerboseLogMessage
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 55
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: VerboseLogMessage
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 47
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: VerboseLogMessage
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 53
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: VerboseLogMessage
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 47
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: VerboseLogMessage
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 47
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: VerboseLogMessage
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 27
     column: 51
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: VerboseLogMessage
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 39
     column: 48
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: VerboseLogMessage
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 46
     column: 54
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: VerboseLogMessage
@@ -130,6 +139,7 @@ expression: diagnostics
   end_location:
     row: 53
     column: 48
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

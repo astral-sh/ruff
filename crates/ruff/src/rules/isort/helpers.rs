@@ -3,9 +3,9 @@ use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::source_code::{Locator, Stylist};
 
-use super::types::TrailingComma;
+use crate::rules::isort::types::TrailingComma;
 
 /// Return `true` if a `StmtKind::ImportFrom` statement ends with a magic
 /// trailing comma.
@@ -102,23 +102,73 @@ fn match_docstring_end(body: &[Stmt]) -> Option<Location> {
     Some(stmt.end_location.unwrap())
 }
 
-/// Find the end of the first token that isn't a docstring, comment, or
-/// whitespace.
-pub fn find_splice_location(body: &[Stmt], locator: &Locator) -> Location {
-    // Find the first AST node that isn't a docstring.
-    let mut splice = match_docstring_end(body).unwrap_or_default();
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct Insertion {
+    /// The content to add before the insertion.
+    pub prefix: &'static str,
+    /// The location at which to insert.
+    pub location: Location,
+    /// The content to add after the insertion.
+    pub suffix: &'static str,
+}
 
-    // Find the first token that isn't a comment or whitespace.
-    let contents = locator.skip(splice);
-    for (.., tok, end) in lexer::lex_located(contents, Mode::Module, splice).flatten() {
+impl Insertion {
+    pub fn new(prefix: &'static str, location: Location, suffix: &'static str) -> Self {
+        Self {
+            prefix,
+            location,
+            suffix,
+        }
+    }
+}
+
+/// Find the location at which a "top-of-file" import should be inserted,
+/// along with a prefix and suffix to use for the insertion.
+///
+/// For example, given the following code:
+///
+/// ```python
+/// """Hello, world!"""
+///
+/// import os
+/// ```
+///
+/// The location returned will be the start of the `import os` statement,
+/// along with a trailing newline suffix.
+pub(super) fn top_of_file_insertion(
+    body: &[Stmt],
+    locator: &Locator,
+    stylist: &Stylist,
+) -> Insertion {
+    // Skip over any docstrings.
+    let mut location = if let Some(location) = match_docstring_end(body) {
+        // If the first token after the docstring is a semicolon, insert after the semicolon as an
+        // inline statement;
+        let first_token = lexer::lex_located(locator.skip(location), Mode::Module, location)
+            .flatten()
+            .next();
+        if let Some((.., Tok::Semi, end)) = first_token {
+            return Insertion::new(" ", end, ";");
+        }
+
+        // Otherwise, advance to the next row.
+        Location::new(location.row() + 1, 0)
+    } else {
+        Location::default()
+    };
+
+    // Skip over any comments and empty lines.
+    for (.., tok, end) in
+        lexer::lex_located(locator.skip(location), Mode::Module, location).flatten()
+    {
         if matches!(tok, Tok::Comment(..) | Tok::Newline) {
-            splice = end;
+            location = Location::new(end.row() + 1, 0);
         } else {
             break;
         }
     }
 
-    splice
+    return Insertion::new("", location, stylist.line_ending().as_str());
 }
 
 #[cfg(test)]
@@ -126,79 +176,120 @@ mod tests {
     use anyhow::Result;
     use rustpython_parser as parser;
     use rustpython_parser::ast::Location;
+    use rustpython_parser::lexer::LexResult;
 
-    use ruff_python_ast::source_code::Locator;
+    use ruff_python_ast::source_code::{LineEnding, Locator, Stylist};
 
-    use super::find_splice_location;
+    use crate::rules::isort::helpers::{top_of_file_insertion, Insertion};
 
-    fn splice_contents(contents: &str) -> Result<Location> {
+    fn insert(contents: &str) -> Result<Insertion> {
         let program = parser::parse_program(contents, "<filename>")?;
+        let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
         let locator = Locator::new(contents);
-        Ok(find_splice_location(&program, &locator))
+        let stylist = Stylist::from_tokens(&tokens, &locator);
+        Ok(top_of_file_insertion(&program, &locator, &stylist))
     }
 
     #[test]
-    fn splice() -> Result<()> {
+    fn top_of_file_insertions() -> Result<()> {
         let contents = "";
-        assert_eq!(splice_contents(contents)?, Location::new(1, 0));
+        assert_eq!(
+            insert(contents)?,
+            Insertion::new("", Location::new(1, 0), LineEnding::default().as_str())
+        );
+
+        let contents = r#"
+"""Hello, world!""""#
+            .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::new("", Location::new(2, 0), LineEnding::default().as_str())
+        );
 
         let contents = r#"
 """Hello, world!"""
 "#
-        .trim();
-        assert_eq!(splice_contents(contents)?, Location::new(1, 19));
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::new("", Location::new(2, 0), "\n")
+        );
 
         let contents = r#"
 """Hello, world!"""
 """Hello, world!"""
 "#
-        .trim();
-        assert_eq!(splice_contents(contents)?, Location::new(2, 19));
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::new("", Location::new(3, 0), "\n")
+        );
 
         let contents = r#"
 x = 1
 "#
-        .trim();
-        assert_eq!(splice_contents(contents)?, Location::new(1, 0));
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::new("", Location::new(1, 0), "\n")
+        );
 
         let contents = r#"
 #!/usr/bin/env python3
 "#
-        .trim();
-        assert_eq!(splice_contents(contents)?, Location::new(1, 22));
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::new("", Location::new(2, 0), "\n")
+        );
 
         let contents = r#"
 #!/usr/bin/env python3
 """Hello, world!"""
 "#
-        .trim();
-        assert_eq!(splice_contents(contents)?, Location::new(2, 19));
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::new("", Location::new(3, 0), "\n")
+        );
 
         let contents = r#"
 """Hello, world!"""
 #!/usr/bin/env python3
 "#
-        .trim();
-        assert_eq!(splice_contents(contents)?, Location::new(2, 22));
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::new("", Location::new(3, 0), "\n")
+        );
 
         let contents = r#"
 """%s""" % "Hello, world!"
 "#
-        .trim();
-        assert_eq!(splice_contents(contents)?, Location::new(1, 0));
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::new("", Location::new(1, 0), "\n")
+        );
 
         let contents = r#"
 """Hello, world!"""; x = 1
 "#
-        .trim();
-        assert_eq!(splice_contents(contents)?, Location::new(1, 19));
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::new(" ", Location::new(1, 20), ";")
+        );
 
         let contents = r#"
 """Hello, world!"""; x = 1; y = \
     2
 "#
-        .trim();
-        assert_eq!(splice_contents(contents)?, Location::new(1, 19));
+        .trim_start();
+        assert_eq!(
+            insert(contents)?,
+            Insertion::new(" ", Location::new(1, 20), ";")
+        );
 
         Ok(())
     }

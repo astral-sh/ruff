@@ -35,7 +35,7 @@ pub fn adjust_indentation(
     indented_block.indent = Some(indentation);
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..Default::default()
     };
@@ -71,7 +71,7 @@ pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr)
     body.whitespace_after_func = ParenthesizableWhitespace::default();
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };

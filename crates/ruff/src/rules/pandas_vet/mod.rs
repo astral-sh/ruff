@@ -26,7 +26,7 @@ mod tests {
         let settings = settings::Settings::for_rules(&Linter::PandasVet);
         let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
         let locator = Locator::new(&contents);
-        let stylist = Stylist::from_contents(&contents, &locator);
+        let stylist = Stylist::from_tokens(&tokens, &locator);
         let indexer: Indexer = tokens.as_slice().into();
         let directives =
             directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));

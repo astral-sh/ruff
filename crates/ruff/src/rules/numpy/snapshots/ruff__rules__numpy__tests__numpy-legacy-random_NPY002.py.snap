@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 34
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 26
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 27
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -208,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 28
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -221,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 29
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -234,7 +251,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -247,7 +265,8 @@ expression: diagnostics
   end_location:
     row: 31
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -260,7 +279,8 @@ expression: diagnostics
   end_location:
     row: 32
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -273,7 +293,8 @@ expression: diagnostics
   end_location:
     row: 33
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -286,7 +307,8 @@ expression: diagnostics
   end_location:
     row: 34
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -299,7 +321,8 @@ expression: diagnostics
   end_location:
     row: 35
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -312,7 +335,8 @@ expression: diagnostics
   end_location:
     row: 36
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -325,7 +349,8 @@ expression: diagnostics
   end_location:
     row: 37
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -338,7 +363,8 @@ expression: diagnostics
   end_location:
     row: 38
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -351,7 +377,8 @@ expression: diagnostics
   end_location:
     row: 39
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -364,7 +391,8 @@ expression: diagnostics
   end_location:
     row: 40
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -377,7 +405,8 @@ expression: diagnostics
   end_location:
     row: 41
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -390,7 +419,8 @@ expression: diagnostics
   end_location:
     row: 42
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -403,7 +433,8 @@ expression: diagnostics
   end_location:
     row: 43
     column: 32
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -416,7 +447,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -429,7 +461,8 @@ expression: diagnostics
   end_location:
     row: 45
     column: 33
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -442,7 +475,8 @@ expression: diagnostics
   end_location:
     row: 46
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -455,7 +489,8 @@ expression: diagnostics
   end_location:
     row: 47
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -468,7 +503,8 @@ expression: diagnostics
   end_location:
     row: 48
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -481,7 +517,8 @@ expression: diagnostics
   end_location:
     row: 49
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -494,7 +531,8 @@ expression: diagnostics
   end_location:
     row: 50
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -507,7 +545,8 @@ expression: diagnostics
   end_location:
     row: 51
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -520,7 +559,8 @@ expression: diagnostics
   end_location:
     row: 52
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -533,7 +573,8 @@ expression: diagnostics
   end_location:
     row: 53
     column: 33
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -546,7 +587,8 @@ expression: diagnostics
   end_location:
     row: 54
     column: 27
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -559,7 +601,8 @@ expression: diagnostics
   end_location:
     row: 55
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -572,7 +615,8 @@ expression: diagnostics
   end_location:
     row: 56
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -585,7 +629,8 @@ expression: diagnostics
   end_location:
     row: 57
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -598,7 +643,8 @@ expression: diagnostics
   end_location:
     row: 58
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -611,7 +657,8 @@ expression: diagnostics
   end_location:
     row: 59
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -624,7 +671,8 @@ expression: diagnostics
   end_location:
     row: 60
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -637,7 +685,8 @@ expression: diagnostics
   end_location:
     row: 61
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NumpyLegacyRandom
@@ -650,6 +699,7 @@ expression: diagnostics
   end_location:
     row: 62
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

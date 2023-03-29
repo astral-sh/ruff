@@ -9,7 +9,7 @@ use rustpython_parser::ast::{
 
 use num_bigint::BigInt;
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableExprContext {
     Load,
     Store,
@@ -26,7 +26,7 @@ impl From<&ExprContext> for ComparableExprContext {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableBoolop {
     And,
     Or,
@@ -41,7 +41,7 @@ impl From<&Boolop> for ComparableBoolop {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableOperator {
     Add,
     Sub,
@@ -78,7 +78,7 @@ impl From<&Operator> for ComparableOperator {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableUnaryop {
     Invert,
     Not,
@@ -97,7 +97,7 @@ impl From<&Unaryop> for ComparableUnaryop {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Hash)]
+#[derive(Debug, PartialEq, Eq, Hash, Copy, Clone)]
 pub enum ComparableCmpop {
     Eq,
     NotEq,

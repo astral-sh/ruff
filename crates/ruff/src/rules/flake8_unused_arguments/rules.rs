@@ -82,7 +82,7 @@ impl Violation for UnusedLambdaArgument {
 
 /// Check a plain function for unused arguments.
 fn function(
-    argumentable: &Argumentable,
+    argumentable: Argumentable,
     args: &Arguments,
     values: &Scope,
     bindings: &Bindings,
@@ -109,7 +109,7 @@ fn function(
 
 /// Check a method for unused arguments.
 fn method(
-    argumentable: &Argumentable,
+    argumentable: Argumentable,
     args: &Arguments,
     values: &Scope,
     bindings: &Bindings,
@@ -136,7 +136,7 @@ fn method(
 }
 
 fn call<'a>(
-    argumentable: &Argumentable,
+    argumentable: Argumentable,
     args: impl Iterator<Item = &'a Arg>,
     values: &Scope,
     bindings: &Bindings,
@@ -193,7 +193,7 @@ pub fn unused_arguments(
                         && !visibility::is_overload(&checker.ctx, decorator_list)
                     {
                         function(
-                            &Argumentable::Function,
+                            Argumentable::Function,
                             args,
                             scope,
                             bindings,
@@ -222,7 +222,7 @@ pub fn unused_arguments(
                         && !visibility::is_overload(&checker.ctx, decorator_list)
                     {
                         method(
-                            &Argumentable::Method,
+                            Argumentable::Method,
                             args,
                             scope,
                             bindings,
@@ -251,7 +251,7 @@ pub fn unused_arguments(
                         && !visibility::is_overload(&checker.ctx, decorator_list)
                     {
                         method(
-                            &Argumentable::ClassMethod,
+                            Argumentable::ClassMethod,
                             args,
                             scope,
                             bindings,
@@ -280,7 +280,7 @@ pub fn unused_arguments(
                         && !visibility::is_overload(&checker.ctx, decorator_list)
                     {
                         function(
-                            &Argumentable::StaticMethod,
+                            Argumentable::StaticMethod,
                             args,
                             scope,
                             bindings,
@@ -303,7 +303,7 @@ pub fn unused_arguments(
                 .enabled(Argumentable::Lambda.rule_code())
             {
                 function(
-                    &Argumentable::Lambda,
+                    Argumentable::Lambda,
                     args,
                     scope,
                     bindings,

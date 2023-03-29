@@ -14,13 +14,14 @@ expression: diagnostics
     row: 19
     column: 26
   fix:
-    content: ""
-    location:
-      row: 19
-      column: 0
-    end_location:
-      row: 19
-      column: 26
+    edits:
+      - content: ""
+        location:
+          row: 19
+          column: 0
+        end_location:
+          row: 19
+          column: 26
   parent: ~
 - kind:
     name: PytestUseFixturesWithoutParameters
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 24
     column: 24
   fix:
-    content: ""
-    location:
-      row: 24
-      column: 0
-    end_location:
-      row: 24
-      column: 24
+    edits:
+      - content: ""
+        location:
+          row: 24
+          column: 0
+        end_location:
+          row: 24
+          column: 24
   parent: ~
 

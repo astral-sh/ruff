@@ -182,6 +182,8 @@ pub fn check_physical_lines(
 
 #[cfg(test)]
 mod tests {
+    use rustpython_parser::lexer::lex;
+    use rustpython_parser::Mode;
     use std::path::Path;
 
     use ruff_python_ast::source_code::{Locator, Stylist};
@@ -195,7 +197,8 @@ mod tests {
     fn e501_non_ascii_char() {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
         let locator = Locator::new(line);
-        let stylist = Stylist::from_contents(line, &locator);
+        let tokens: Vec<_> = lex(line, Mode::Module).collect();
+        let stylist = Stylist::from_tokens(&tokens, &locator);
 
         let check_with_max_line_length = |line_length: usize| {
             check_physical_lines(

@@ -14,12 +14,15 @@ expression: diagnostics
     row: 4
     column: 24
   fix:
-    content: from foo import bar
-    location:
-      row: 4
-      column: 0
-    end_location:
-      row: 4
-      column: 24
-  parent: ~
+    edits:
+      - content: from foo import bar
+        location:
+          row: 4
+          column: 0
+        end_location:
+          row: 4
+          column: 24
+  parent:
+    row: 4
+    column: 0
 

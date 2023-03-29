@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 59
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 59
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 59
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 61
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 67
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 57
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 64
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 56
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 59
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 61
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 67
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 57
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 64
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 26
     column: 56
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 27
     column: 59
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -208,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 28
     column: 61
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -221,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 29
     column: 67
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DjangoNullableModelStringField
@@ -234,6 +251,7 @@ expression: diagnostics
   end_location:
     row: 30
     column: 57
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

@@ -197,7 +197,7 @@ pub fn invalid_string_characters(
             let end_location = Location::new(location.row(), location.column() + 1);
             let mut diagnostic = Diagnostic::new(rule, Range::new(location, end_location));
             if autofix {
-                diagnostic.amend(Edit::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     replacement.to_string(),
                     location,
                     end_location,

@@ -11,6 +11,7 @@ use ruff_python_ast::helpers::{create_expr, create_stmt};
 /// An enum to represent the different types of assertions present in the
 /// `unittest` module. Note: any variants that can't be replaced with plain
 /// `assert` statements are commented out.
+#[derive(Copy, Clone)]
 pub enum UnittestAssert {
     AlmostEqual,
     AlmostEquals,
@@ -258,7 +259,7 @@ impl UnittestAssert {
         Ok(args_map)
     }
 
-    pub fn generate_assert(&self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
+    pub fn generate_assert(self, args: &[Expr], keywords: &[Keyword]) -> Result<Stmt> {
         let args = self.args_map(args, keywords)?;
         match self {
             UnittestAssert::True | UnittestAssert::False => {

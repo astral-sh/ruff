@@ -8,12 +8,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 60
+    row: 62
     column: 24
   end_location:
-    row: 60
+    row: 62
     column: 33
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -21,12 +22,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 64
+    row: 66
     column: 29
   end_location:
-    row: 64
+    row: 66
     column: 31
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -34,12 +36,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 68
+    row: 70
     column: 19
   end_location:
-    row: 68
+    row: 70
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -47,12 +50,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 72
+    row: 74
     column: 19
   end_location:
-    row: 72
+    row: 74
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -60,12 +64,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 76
+    row: 78
     column: 31
   end_location:
-    row: 76
+    row: 78
     column: 56
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -73,12 +78,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 80
+    row: 82
     column: 25
   end_location:
-    row: 80
+    row: 82
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -86,12 +92,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 85
+    row: 87
     column: 45
   end_location:
-    row: 85
+    row: 87
     column: 69
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -99,12 +106,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 89
+    row: 91
     column: 45
   end_location:
-    row: 89
+    row: 91
     column: 72
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -112,12 +120,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 93
+    row: 95
     column: 44
   end_location:
-    row: 93
+    row: 95
     column: 68
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -125,12 +134,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 97
+    row: 99
     column: 32
   end_location:
-    row: 97
+    row: 99
     column: 34
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -138,12 +148,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 170
+    row: 192
     column: 19
   end_location:
-    row: 170
+    row: 192
     column: 48
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -151,12 +162,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 203
+    row: 225
     column: 26
   end_location:
-    row: 203
+    row: 225
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -164,12 +176,13 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 204
+    row: 226
     column: 34
   end_location:
-    row: 204
+    row: 226
     column: 36
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MutableArgumentDefault
@@ -177,11 +190,12 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 205
+    row: 227
     column: 61
   end_location:
-    row: 205
+    row: 227
     column: 66
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

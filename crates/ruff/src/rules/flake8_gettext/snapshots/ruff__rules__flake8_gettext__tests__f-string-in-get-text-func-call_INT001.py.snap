@@ -1,0 +1,19 @@
+---
+source: crates/ruff/src/rules/flake8_gettext/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: FStringInGetTextFuncCall
+    body: "f-string is resolved before function call; consider `_(\"string %s\") % arg`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 1
+    column: 2
+  end_location:
+    row: 1
+    column: 14
+  fix:
+    edits: []
+  parent: ~
+

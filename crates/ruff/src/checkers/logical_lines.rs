@@ -1,42 +1,32 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
-use bisection::bisect_left;
-use itertools::Itertools;
 use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
 use crate::registry::{AsRule, Rule};
-use crate::rules::pycodestyle::logical_lines::{iter_logical_lines, TokenFlags};
-use crate::rules::pycodestyle::rules::{
+use crate::rules::pycodestyle::rules::logical_lines::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
     missing_whitespace_around_operator, space_around_operator, whitespace_around_keywords,
     whitespace_around_named_parameter_equals, whitespace_before_comment,
-    whitespace_before_parameters,
+    whitespace_before_parameters, LogicalLines, TokenFlags,
 };
 use crate::settings::{flags, Settings};
 
 /// Return the amount of indentation, expanding tabs to the next multiple of 8.
-fn expand_indent(mut line: &str) -> usize {
-    while line.ends_with("\n\r") {
-        line = &line[..line.len() - 2];
-    }
-    if !line.contains('\t') {
-        return line.len() - line.trim_start().len();
-    }
+fn expand_indent(line: &str) -> usize {
+    let line = line.trim_end_matches(['\n', '\r']);
+
     let mut indent = 0;
-    for c in line.chars() {
-        if c == '\t' {
-            indent = (indent / 8) * 8 + 8;
-        } else if c == ' ' {
-            indent += 1;
-        } else {
-            break;
+    for c in line.bytes() {
+        match c {
+            b'\t' => indent = (indent / 8) * 8 + 8,
+            b' ' => indent += 1,
+            _ => break,
         }
     }
+
     indent
 }
 
@@ -49,153 +39,140 @@ pub fn check_logical_lines(
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    let indent_char = stylist.indentation().as_char();
+    #[cfg(feature = "logical_lines")]
+    let should_fix_missing_whitespace =
+        autofix.into() && settings.rules.should_fix(Rule::MissingWhitespace);
+
+    #[cfg(not(feature = "logical_lines"))]
+    let should_fix_missing_whitespace = false;
+
+    #[cfg(feature = "logical_lines")]
+    let should_fix_whitespace_before_parameters =
+        autofix.into() && settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
+
+    #[cfg(not(feature = "logical_lines"))]
+    let should_fix_whitespace_before_parameters = false;
+
     let mut prev_line = None;
     let mut prev_indent_level = None;
-    for line in iter_logical_lines(tokens, locator) {
-        if line.mapping.is_empty() {
-            continue;
-        }
+    let indent_char = stylist.indentation().as_char();
 
-        // Extract the indentation level.
-        let start_loc = line.mapping[0].1;
-        let start_line = locator.slice(Range::new(Location::new(start_loc.row(), 0), start_loc));
-        let indent_level = expand_indent(start_line);
-        let indent_size = 4;
-
-        // Generate mapping from logical to physical offsets.
-        let mapping_offsets = line.mapping.iter().map(|(offset, _)| *offset).collect_vec();
-
-        if line.flags.contains(TokenFlags::OPERATOR) {
-            for (index, kind) in space_around_operator(&line.text) {
-                let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
-                let location = Location::new(pos.row(), pos.column() + index - token_offset);
+    for line in &LogicalLines::from_tokens(tokens, locator) {
+        if line.flags().contains(TokenFlags::OPERATOR) {
+            for (location, kind) in space_around_operator(&line) {
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
+                }
+            }
+
+            for (location, kind) in whitespace_around_named_parameter_equals(&line.tokens()) {
+                if settings.rules.enabled(kind.rule()) {
+                    diagnostics.push(Diagnostic {
+                        kind,
+                        location,
+                        end_location: location,
+                        fix: Fix::empty(),
+                        parent: None,
+                    });
+                }
+            }
+            for (location, kind) in missing_whitespace_around_operator(&line.tokens()) {
+                if settings.rules.enabled(kind.rule()) {
+                    diagnostics.push(Diagnostic {
+                        kind,
+                        location,
+                        end_location: location,
+                        fix: Fix::empty(),
+                        parent: None,
+                    });
+                }
+            }
+
+            for diagnostic in missing_whitespace(&line, should_fix_missing_whitespace) {
+                if settings.rules.enabled(diagnostic.kind.rule()) {
+                    diagnostics.push(diagnostic);
                 }
             }
         }
         if line
-            .flags
+            .flags()
             .contains(TokenFlags::OPERATOR | TokenFlags::PUNCTUATION)
         {
-            for (index, kind) in extraneous_whitespace(&line.text) {
-                let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
-                let location = Location::new(pos.row(), pos.column() + index - token_offset);
+            for (location, kind) in extraneous_whitespace(&line) {
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
             }
         }
-        if line.flags.contains(TokenFlags::KEYWORD) {
-            for (index, kind) in whitespace_around_keywords(&line.text) {
-                let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
-                let location = Location::new(pos.row(), pos.column() + index - token_offset);
+        if line.flags().contains(TokenFlags::KEYWORD) {
+            for (location, kind) in whitespace_around_keywords(&line) {
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
             }
 
-            for (location, kind) in missing_whitespace_after_keyword(&line.tokens) {
+            for (location, kind) in missing_whitespace_after_keyword(&line.tokens()) {
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
                         location,
                         end_location: location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
             }
         }
-        if line.flags.contains(TokenFlags::COMMENT) {
-            for (range, kind) in whitespace_before_comment(&line.tokens, locator) {
+        if line.flags().contains(TokenFlags::COMMENT) {
+            for (range, kind) in whitespace_before_comment(&line.tokens(), locator) {
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
                         location: range.location,
                         end_location: range.end_location,
-                        fix: None,
+                        fix: Fix::empty(),
                         parent: None,
                     });
                 }
             }
         }
-        if line.flags.contains(TokenFlags::OPERATOR) {
-            for (location, kind) in
-                whitespace_around_named_parameter_equals(&line.tokens, &line.text)
-            {
-                if settings.rules.enabled(kind.rule()) {
-                    diagnostics.push(Diagnostic {
-                        kind,
-                        location,
-                        end_location: location,
-                        fix: None,
-                        parent: None,
-                    });
-                }
-            }
-            for (location, kind) in missing_whitespace_around_operator(&line.tokens) {
-                if settings.rules.enabled(kind.rule()) {
-                    diagnostics.push(Diagnostic {
-                        kind,
-                        location,
-                        end_location: location,
-                        fix: None,
-                        parent: None,
-                    });
-                }
-            }
 
-            #[cfg(feature = "logical_lines")]
-            let should_fix = autofix.into() && settings.rules.should_fix(Rule::MissingWhitespace);
-
-            #[cfg(not(feature = "logical_lines"))]
-            let should_fix = false;
-
-            for diagnostic in
-                missing_whitespace(&line.text, start_loc.row(), should_fix, indent_level)
-            {
+        if line.flags().contains(TokenFlags::BRACKET) {
+            for diagnostic in whitespace_before_parameters(
+                &line.tokens(),
+                should_fix_whitespace_before_parameters,
+            ) {
                 if settings.rules.enabled(diagnostic.kind.rule()) {
                     diagnostics.push(diagnostic);
                 }
             }
         }
 
-        if line.flags.contains(TokenFlags::BRACKET) {
-            #[cfg(feature = "logical_lines")]
-            let should_fix =
-                autofix.into() && settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
+        // Extract the indentation level.
+        let Some(start_loc) = line.first_token_location() else { continue; };
+        let start_line = locator.slice(Range::new(Location::new(start_loc.row(), 0), start_loc));
+        let indent_level = expand_indent(start_line);
+        let indent_size = 4;
 
-            #[cfg(not(feature = "logical_lines"))]
-            let should_fix = false;
-
-            for diagnostic in whitespace_before_parameters(&line.tokens, should_fix) {
-                if settings.rules.enabled(diagnostic.kind.rule()) {
-                    diagnostics.push(diagnostic);
-                }
-            }
-        }
-
-        for (index, kind) in indentation(
+        for (location, kind) in indentation(
             &line,
             prev_line.as_ref(),
             indent_char,
@@ -203,20 +180,18 @@ pub fn check_logical_lines(
             prev_indent_level,
             indent_size,
         ) {
-            let (token_offset, pos) = line.mapping[bisect_left(&mapping_offsets, &index)];
-            let location = Location::new(pos.row(), pos.column() + index - token_offset);
             if settings.rules.enabled(kind.rule()) {
                 diagnostics.push(Diagnostic {
                     kind,
                     location,
                     end_location: location,
-                    fix: None,
+                    fix: Fix::empty(),
                     parent: None,
                 });
             }
         }
 
-        if !line.is_comment() {
+        if !line.is_comment_only() {
             prev_line = Some(line);
             prev_indent_level = Some(indent_level);
         }
@@ -229,9 +204,8 @@ mod tests {
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
+    use crate::rules::pycodestyle::rules::logical_lines::LogicalLines;
     use ruff_python_ast::source_code::Locator;
-
-    use crate::checkers::logical_lines::iter_logical_lines;
 
     #[test]
     fn split_logical_lines() {
@@ -241,9 +215,9 @@ y = 2
 z = x + 1"#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
-        let actual: Vec<String> = iter_logical_lines(&lxr, &locator)
+        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
-            .map(|line| line.text)
+            .map(|line| line.text_trimmed().to_string())
             .collect();
         let expected = vec![
             "x = 1".to_string(),
@@ -262,12 +236,12 @@ y = 2
 z = x + 1"#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
-        let actual: Vec<String> = iter_logical_lines(&lxr, &locator)
+        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
-            .map(|line| line.text)
+            .map(|line| line.text_trimmed().to_string())
             .collect();
         let expected = vec![
-            "x = [1, 2, 3, ]".to_string(),
+            "x = [\n  1,\n  2,\n  3,\n]".to_string(),
             "y = 2".to_string(),
             "z = x + 1".to_string(),
         ];
@@ -276,11 +250,11 @@ z = x + 1"#;
         let contents = "x = 'abc'";
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
-        let actual: Vec<String> = iter_logical_lines(&lxr, &locator)
+        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
-            .map(|line| line.text)
+            .map(|line| line.text_trimmed().to_string())
             .collect();
-        let expected = vec!["x = \"xxx\"".to_string()];
+        let expected = vec!["x = 'abc'".to_string()];
         assert_eq!(actual, expected);
 
         let contents = r#"
@@ -289,9 +263,9 @@ def f():
 f()"#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
-        let actual: Vec<String> = iter_logical_lines(&lxr, &locator)
+        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
-            .map(|line| line.text)
+            .map(|line| line.text_trimmed().to_string())
             .collect();
         let expected = vec!["def f():", "x = 1", "f()"];
         assert_eq!(actual, expected);
@@ -304,11 +278,17 @@ def f():
 f()"#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
-        let actual: Vec<String> = iter_logical_lines(&lxr, &locator)
+        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
-            .map(|line| line.text)
+            .map(|line| line.text_trimmed().to_string())
             .collect();
-        let expected = vec!["def f():", "\"xxxxxxxxxxxxxxxxxxxx\"", "", "x = 1", "f()"];
+        let expected = vec![
+            "def f():",
+            "\"\"\"Docstring goes here.\"\"\"",
+            "",
+            "x = 1",
+            "f()",
+        ];
         assert_eq!(actual, expected);
     }
 }

@@ -14,13 +14,21 @@ expression: diagnostics
     row: 4
     column: 69
   fix:
-    content: capture_output=True
-    location:
-      row: 4
-      column: 22
-    end_location:
-      row: 4
-      column: 68
+    edits:
+      - content: capture_output=True
+        location:
+          row: 4
+          column: 22
+        end_location:
+          row: 4
+          column: 44
+      - content: ""
+        location:
+          row: 4
+          column: 44
+        end_location:
+          row: 4
+          column: 68
   parent: ~
 - kind:
     name: ReplaceStdoutStderr
@@ -34,13 +42,21 @@ expression: diagnostics
     row: 6
     column: 80
   fix:
-    content: capture_output=True
-    location:
-      row: 6
-      column: 33
-    end_location:
-      row: 6
-      column: 79
+    edits:
+      - content: capture_output=True
+        location:
+          row: 6
+          column: 33
+        end_location:
+          row: 6
+          column: 55
+      - content: ""
+        location:
+          row: 6
+          column: 55
+        end_location:
+          row: 6
+          column: 79
   parent: ~
 - kind:
     name: ReplaceStdoutStderr
@@ -54,13 +70,21 @@ expression: diagnostics
     row: 8
     column: 86
   fix:
-    content: "capture_output=True, args=[\"foo\"]"
-    location:
-      row: 8
-      column: 24
-    end_location:
-      row: 8
-      column: 85
+    edits:
+      - content: capture_output=True
+        location:
+          row: 8
+          column: 24
+        end_location:
+          row: 8
+          column: 46
+      - content: ""
+        location:
+          row: 8
+          column: 60
+        end_location:
+          row: 8
+          column: 85
   parent: ~
 - kind:
     name: ReplaceStdoutStderr
@@ -74,13 +98,21 @@ expression: diagnostics
     row: 12
     column: 1
   fix:
-    content: "capture_output=True, check=True"
-    location:
-      row: 11
-      column: 13
-    end_location:
-      row: 11
-      column: 71
+    edits:
+      - content: capture_output=True
+        location:
+          row: 11
+          column: 13
+        end_location:
+          row: 11
+          column: 35
+      - content: ""
+        location:
+          row: 11
+          column: 47
+        end_location:
+          row: 11
+          column: 71
   parent: ~
 - kind:
     name: ReplaceStdoutStderr
@@ -94,13 +126,21 @@ expression: diagnostics
     row: 16
     column: 1
   fix:
-    content: "capture_output=True, check=True"
-    location:
-      row: 15
-      column: 13
-    end_location:
-      row: 15
-      column: 71
+    edits:
+      - content: capture_output=True
+        location:
+          row: 15
+          column: 13
+        end_location:
+          row: 15
+          column: 35
+      - content: ""
+        location:
+          row: 15
+          column: 47
+        end_location:
+          row: 15
+          column: 71
   parent: ~
 - kind:
     name: ReplaceStdoutStderr
@@ -114,13 +154,21 @@ expression: diagnostics
     row: 26
     column: 1
   fix:
-    content: "capture_output=True,\n    check=True"
-    location:
-      row: 20
-      column: 4
-    end_location:
-      row: 22
-      column: 26
+    edits:
+      - content: capture_output=True
+        location:
+          row: 20
+          column: 4
+        end_location:
+          row: 20
+          column: 26
+      - content: ""
+        location:
+          row: 22
+          column: 4
+        end_location:
+          row: 23
+          column: 4
   parent: ~
 - kind:
     name: ReplaceStdoutStderr
@@ -134,12 +182,20 @@ expression: diagnostics
     row: 36
     column: 5
   fix:
-    content: "capture_output=True,\n        check=True"
-    location:
-      row: 31
-      column: 8
-    end_location:
-      row: 33
-      column: 30
+    edits:
+      - content: capture_output=True
+        location:
+          row: 31
+          column: 8
+        end_location:
+          row: 31
+          column: 30
+      - content: ""
+        location:
+          row: 33
+          column: 8
+        end_location:
+          row: 34
+          column: 8
   parent: ~
 

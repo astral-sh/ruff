@@ -1,10 +1,10 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::token_kind::TokenKind;
+use rustpython_parser::ast::Location;
 
-use crate::rules::pycodestyle::logical_lines::LogicalLine;
+use super::LogicalLine;
 
 /// ## What it does
 /// Checks for indentation with a non-multiple of 4 spaces.
@@ -230,33 +230,36 @@ impl Violation for OverIndented {
 }
 
 /// E111, E114, E112, E113, E115, E116, E117
-#[cfg(feature = "logical_lines")]
-pub fn indentation(
+pub(crate) fn indentation(
     logical_line: &LogicalLine,
     prev_logical_line: Option<&LogicalLine>,
     indent_char: char,
     indent_level: usize,
     prev_indent_level: Option<usize>,
     indent_size: usize,
-) -> Vec<(usize, DiagnosticKind)> {
+) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
+
+    let location = logical_line.first_token_location().unwrap();
+
     if indent_level % indent_size != 0 {
         diagnostics.push((
-            0,
-            if logical_line.is_comment() {
+            location,
+            if logical_line.is_comment_only() {
                 IndentationWithInvalidMultipleComment { indent_size }.into()
             } else {
                 IndentationWithInvalidMultiple { indent_size }.into()
             },
         ));
     }
-    let indent_expect = prev_logical_line.map_or(false, |prev_logical_line| {
-        prev_logical_line.text.ends_with(':')
-    });
+    let indent_expect = prev_logical_line
+        .and_then(|prev_logical_line| prev_logical_line.tokens_trimmed().last())
+        .map_or(false, |t| t.kind() == TokenKind::Colon);
+
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         diagnostics.push((
-            0,
-            if logical_line.is_comment() {
+            location,
+            if logical_line.is_comment_only() {
                 NoIndentedBlockComment.into()
             } else {
                 NoIndentedBlock.into()
@@ -266,8 +269,8 @@ pub fn indentation(
         && prev_indent_level.map_or(false, |prev_indent_level| indent_level > prev_indent_level)
     {
         diagnostics.push((
-            0,
-            if logical_line.is_comment() {
+            location,
+            if logical_line.is_comment_only() {
                 UnexpectedIndentationComment.into()
             } else {
                 UnexpectedIndentation.into()
@@ -278,20 +281,9 @@ pub fn indentation(
         let expected_indent_amount = if indent_char == '\t' { 8 } else { 4 };
         let expected_indent_level = prev_indent_level.unwrap_or(0) + expected_indent_amount;
         if indent_level > expected_indent_level {
-            diagnostics.push((0, OverIndented.into()));
+            diagnostics.push((location, OverIndented.into()));
         }
     }
-    diagnostics
-}
 
-#[cfg(not(feature = "logical_lines"))]
-pub fn indentation(
-    _logical_line: &LogicalLine,
-    _prev_logical_line: Option<&LogicalLine>,
-    _indent_char: char,
-    _indent_level: usize,
-    _prev_indent_level: Option<usize>,
-    _indent_size: usize,
-) -> Vec<(usize, DiagnosticKind)> {
-    vec![]
+    diagnostics
 }

@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LoopVariableOverridesIterator
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: LoopVariableOverridesIterator
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 36
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

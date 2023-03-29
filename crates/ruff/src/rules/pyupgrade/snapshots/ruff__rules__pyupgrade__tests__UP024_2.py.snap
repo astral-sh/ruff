@@ -14,13 +14,14 @@ expression: diagnostics
     row: 10
     column: 18
   fix:
-    content: OSError
-    location:
-      row: 10
-      column: 6
-    end_location:
-      row: 10
-      column: 18
+    edits:
+      - content: OSError
+        location:
+          row: 10
+          column: 6
+        end_location:
+          row: 10
+          column: 18
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 11
     column: 16
   fix:
-    content: OSError
-    location:
-      row: 11
-      column: 6
-    end_location:
-      row: 11
-      column: 16
+    edits:
+      - content: OSError
+        location:
+          row: 11
+          column: 6
+        end_location:
+          row: 11
+          column: 16
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 12
     column: 18
   fix:
-    content: OSError
-    location:
-      row: 12
-      column: 6
-    end_location:
-      row: 12
-      column: 18
+    edits:
+      - content: OSError
+        location:
+          row: 12
+          column: 6
+        end_location:
+          row: 12
+          column: 18
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 14
     column: 18
   fix:
-    content: OSError
-    location:
-      row: 14
-      column: 6
-    end_location:
-      row: 14
-      column: 18
+    edits:
+      - content: OSError
+        location:
+          row: 14
+          column: 6
+        end_location:
+          row: 14
+          column: 18
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 15
     column: 16
   fix:
-    content: OSError
-    location:
-      row: 15
-      column: 6
-    end_location:
-      row: 15
-      column: 16
+    edits:
+      - content: OSError
+        location:
+          row: 15
+          column: 6
+        end_location:
+          row: 15
+          column: 16
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 16
     column: 18
   fix:
-    content: OSError
-    location:
-      row: 16
-      column: 6
-    end_location:
-      row: 16
-      column: 18
+    edits:
+      - content: OSError
+        location:
+          row: 16
+          column: 6
+        end_location:
+          row: 16
+          column: 18
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 18
     column: 18
   fix:
-    content: OSError
-    location:
-      row: 18
-      column: 6
-    end_location:
-      row: 18
-      column: 18
+    edits:
+      - content: OSError
+        location:
+          row: 18
+          column: 6
+        end_location:
+          row: 18
+          column: 18
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 25
     column: 11
   fix:
-    content: OSError
-    location:
-      row: 25
-      column: 6
-    end_location:
-      row: 25
-      column: 11
+    edits:
+      - content: OSError
+        location:
+          row: 25
+          column: 6
+        end_location:
+          row: 25
+          column: 11
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 28
     column: 11
   fix:
-    content: OSError
-    location:
-      row: 28
-      column: 6
-    end_location:
-      row: 28
-      column: 11
+    edits:
+      - content: OSError
+        location:
+          row: 28
+          column: 6
+        end_location:
+          row: 28
+          column: 11
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 31
     column: 11
   fix:
-    content: OSError
-    location:
-      row: 31
-      column: 6
-    end_location:
-      row: 31
-      column: 11
+    edits:
+      - content: OSError
+        location:
+          row: 31
+          column: 6
+        end_location:
+          row: 31
+          column: 11
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -214,13 +224,14 @@ expression: diagnostics
     row: 34
     column: 22
   fix:
-    content: OSError
-    location:
-      row: 34
-      column: 6
-    end_location:
-      row: 34
-      column: 22
+    edits:
+      - content: OSError
+        location:
+          row: 34
+          column: 6
+        end_location:
+          row: 34
+          column: 22
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -234,13 +245,14 @@ expression: diagnostics
     row: 35
     column: 13
   fix:
-    content: OSError
-    location:
-      row: 35
-      column: 6
-    end_location:
-      row: 35
-      column: 13
+    edits:
+      - content: OSError
+        location:
+          row: 35
+          column: 6
+        end_location:
+          row: 35
+          column: 13
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -254,13 +266,14 @@ expression: diagnostics
     row: 36
     column: 18
   fix:
-    content: OSError
-    location:
-      row: 36
-      column: 6
-    end_location:
-      row: 36
-      column: 18
+    edits:
+      - content: OSError
+        location:
+          row: 36
+          column: 6
+        end_location:
+          row: 36
+          column: 18
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -274,13 +287,14 @@ expression: diagnostics
     row: 38
     column: 22
   fix:
-    content: OSError
-    location:
-      row: 38
-      column: 6
-    end_location:
-      row: 38
-      column: 22
+    edits:
+      - content: OSError
+        location:
+          row: 38
+          column: 6
+        end_location:
+          row: 38
+          column: 22
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -294,13 +308,14 @@ expression: diagnostics
     row: 39
     column: 13
   fix:
-    content: OSError
-    location:
-      row: 39
-      column: 6
-    end_location:
-      row: 39
-      column: 13
+    edits:
+      - content: OSError
+        location:
+          row: 39
+          column: 6
+        end_location:
+          row: 39
+          column: 13
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -314,13 +329,14 @@ expression: diagnostics
     row: 40
     column: 18
   fix:
-    content: OSError
-    location:
-      row: 40
-      column: 6
-    end_location:
-      row: 40
-      column: 18
+    edits:
+      - content: OSError
+        location:
+          row: 40
+          column: 6
+        end_location:
+          row: 40
+          column: 18
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -334,13 +350,14 @@ expression: diagnostics
     row: 42
     column: 22
   fix:
-    content: OSError
-    location:
-      row: 42
-      column: 6
-    end_location:
-      row: 42
-      column: 22
+    edits:
+      - content: OSError
+        location:
+          row: 42
+          column: 6
+        end_location:
+          row: 42
+          column: 22
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -354,13 +371,14 @@ expression: diagnostics
     row: 48
     column: 18
   fix:
-    content: OSError
-    location:
-      row: 48
-      column: 6
-    end_location:
-      row: 48
-      column: 18
+    edits:
+      - content: OSError
+        location:
+          row: 48
+          column: 6
+        end_location:
+          row: 48
+          column: 18
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -374,13 +392,14 @@ expression: diagnostics
     row: 49
     column: 22
   fix:
-    content: OSError
-    location:
-      row: 49
-      column: 6
-    end_location:
-      row: 49
-      column: 22
+    edits:
+      - content: OSError
+        location:
+          row: 49
+          column: 6
+        end_location:
+          row: 49
+          column: 22
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -394,12 +413,13 @@ expression: diagnostics
     row: 50
     column: 13
   fix:
-    content: OSError
-    location:
-      row: 50
-      column: 6
-    end_location:
-      row: 50
-      column: 13
+    edits:
+      - content: OSError
+        location:
+          row: 50
+          column: 6
+        end_location:
+          row: 50
+          column: 13
   parent: ~
 

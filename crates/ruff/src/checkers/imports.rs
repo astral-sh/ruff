@@ -30,9 +30,7 @@ pub fn check_imports(
     // Extract all imports from the AST.
     let tracker = {
         let mut tracker = ImportTracker::new(locator, directives, path);
-        for stmt in python_ast {
-            tracker.visit_stmt(stmt);
-        }
+        tracker.visit_body(python_ast);
         tracker
     };
     let blocks: Vec<&Block> = tracker.iter().collect();

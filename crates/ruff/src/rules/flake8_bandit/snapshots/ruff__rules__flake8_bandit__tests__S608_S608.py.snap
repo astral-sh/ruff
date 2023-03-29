@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 40
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 35
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 43
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 49
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 52
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 47
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 54
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 55
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 48
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 50
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 50
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 57
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 51
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 49
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -208,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 49
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -221,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 53
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -234,7 +251,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 43
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -247,7 +265,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 41
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -260,7 +279,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 36
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -273,7 +293,8 @@ expression: diagnostics
   end_location:
     row: 26
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -286,7 +307,8 @@ expression: diagnostics
   end_location:
     row: 27
     column: 45
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -299,7 +321,8 @@ expression: diagnostics
   end_location:
     row: 28
     column: 50
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -312,7 +335,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 53
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -325,7 +349,8 @@ expression: diagnostics
   end_location:
     row: 31
     column: 48
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -338,7 +363,8 @@ expression: diagnostics
   end_location:
     row: 32
     column: 55
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -351,7 +377,8 @@ expression: diagnostics
   end_location:
     row: 33
     column: 56
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -364,7 +391,8 @@ expression: diagnostics
   end_location:
     row: 34
     column: 48
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -377,7 +405,8 @@ expression: diagnostics
   end_location:
     row: 36
     column: 50
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -390,7 +419,8 @@ expression: diagnostics
   end_location:
     row: 37
     column: 50
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -403,7 +433,8 @@ expression: diagnostics
   end_location:
     row: 38
     column: 57
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -416,7 +447,8 @@ expression: diagnostics
   end_location:
     row: 39
     column: 51
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -429,7 +461,8 @@ expression: diagnostics
   end_location:
     row: 41
     column: 49
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -442,7 +475,8 @@ expression: diagnostics
   end_location:
     row: 42
     column: 49
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -455,7 +489,8 @@ expression: diagnostics
   end_location:
     row: 43
     column: 53
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -468,7 +503,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 43
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -481,7 +517,8 @@ expression: diagnostics
   end_location:
     row: 52
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -494,7 +531,8 @@ expression: diagnostics
   end_location:
     row: 59
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -507,7 +545,8 @@ expression: diagnostics
   end_location:
     row: 66
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -520,7 +559,8 @@ expression: diagnostics
   end_location:
     row: 73
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -533,7 +573,8 @@ expression: diagnostics
   end_location:
     row: 79
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -546,7 +587,8 @@ expression: diagnostics
   end_location:
     row: 83
     column: 67
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -559,7 +601,8 @@ expression: diagnostics
   end_location:
     row: 84
     column: 65
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -572,7 +615,8 @@ expression: diagnostics
   end_location:
     row: 85
     column: 73
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedSQLExpression
@@ -585,6 +629,7 @@ expression: diagnostics
   end_location:
     row: 86
     column: 71
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

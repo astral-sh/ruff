@@ -10,6 +10,7 @@ use crate::source_code::Locator;
 use crate::str;
 use crate::types::Range;
 
+#[derive(Copy, Clone)]
 pub enum Callable {
     Cast,
     NewType,
@@ -19,6 +20,7 @@ pub enum Callable {
     MypyExtension,
 }
 
+#[derive(Copy, Clone)]
 pub enum SubscriptKind {
     AnnotatedSubscript,
     PEP593AnnotatedSubscript,
@@ -72,7 +74,7 @@ pub fn is_pep585_builtin(expr: &Expr, context: &Context) -> bool {
     })
 }
 
-#[derive(is_macro::Is)]
+#[derive(is_macro::Is, Copy, Clone)]
 pub enum AnnotationKind {
     /// The annotation is defined as part a simple string literal,
     /// e.g. `x: "List[int]" = []`. Annotations within simple literals

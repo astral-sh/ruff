@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UndefinedLocalWithImportStarUsage
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 11
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

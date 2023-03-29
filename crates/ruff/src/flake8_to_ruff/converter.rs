@@ -416,7 +416,7 @@ pub fn convert(
         if let Some(src_paths) = &isort.src_paths {
             match options.src.as_mut() {
                 Some(src) => {
-                    src.extend(src_paths.clone());
+                    src.extend_from_slice(src_paths);
                 }
                 None => {
                     options.src = Some(src_paths.clone());

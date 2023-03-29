@@ -14,13 +14,14 @@ expression: diagnostics
     row: 14
     column: 39
   fix:
-    content: "    assert something\n    assert something_else\n"
-    location:
-      row: 14
-      column: 0
-    end_location:
-      row: 15
-      column: 0
+    edits:
+      - content: "    assert something\n    assert something_else\n"
+        location:
+          row: 14
+          column: 0
+        end_location:
+          row: 15
+          column: 0
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 15
     column: 59
   fix:
-    content: "    assert something and something_else\n    assert something_third\n"
-    location:
-      row: 15
-      column: 0
-    end_location:
-      row: 16
-      column: 0
+    edits:
+      - content: "    assert something and something_else\n    assert something_third\n"
+        location:
+          row: 15
+          column: 0
+        end_location:
+          row: 16
+          column: 0
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 16
     column: 43
   fix:
-    content: "    assert something\n    assert not something_else\n"
-    location:
-      row: 16
-      column: 0
-    end_location:
-      row: 17
-      column: 0
+    edits:
+      - content: "    assert something\n    assert not something_else\n"
+        location:
+          row: 16
+          column: 0
+        end_location:
+          row: 17
+          column: 0
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 17
     column: 60
   fix:
-    content: "    assert something\n    assert (something_else or something_third)\n"
-    location:
-      row: 17
-      column: 0
-    end_location:
-      row: 18
-      column: 0
+    edits:
+      - content: "    assert something\n    assert (something_else or something_third)\n"
+        location:
+          row: 17
+          column: 0
+        end_location:
+          row: 18
+          column: 0
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 18
     column: 43
   fix:
-    content: "    assert not something\n    assert something_else\n"
-    location:
-      row: 18
-      column: 0
-    end_location:
-      row: 19
-      column: 0
+    edits:
+      - content: "    assert not something\n    assert something_else\n"
+        location:
+          row: 18
+          column: 0
+        end_location:
+          row: 19
+          column: 0
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 19
     column: 44
   fix:
-    content: "    assert not something\n    assert not something_else\n"
-    location:
-      row: 19
-      column: 0
-    end_location:
-      row: 20
-      column: 0
+    edits:
+      - content: "    assert not something\n    assert not something_else\n"
+        location:
+          row: 19
+          column: 0
+        end_location:
+          row: 20
+          column: 0
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 20
     column: 63
   fix:
-    content: "    assert not something or something_else\n    assert not something_third\n"
-    location:
-      row: 20
-      column: 0
-    end_location:
-      row: 21
-      column: 0
+    edits:
+      - content: "    assert not something or something_else\n    assert not something_third\n"
+        location:
+          row: 20
+          column: 0
+        end_location:
+          row: 21
+          column: 0
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 23
     column: 7
   fix:
-    content: "    assert something\n    assert something_else == \"\"\"error\n    message\n    \"\"\"\n"
-    location:
-      row: 21
-      column: 0
-    end_location:
-      row: 24
-      column: 0
+    edits:
+      - content: "    assert something\n    assert something_else == \"\"\"error\n    message\n    \"\"\"\n"
+        location:
+          row: 21
+          column: 0
+        end_location:
+          row: 24
+          column: 0
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 26
     column: 34
   fix:
-    content: "    assert not a\n    assert (b or c)\n"
-    location:
-      row: 26
-      column: 0
-    end_location:
-      row: 27
-      column: 0
+    edits:
+      - content: "    assert not a\n    assert (b or c)\n"
+        location:
+          row: 26
+          column: 0
+        end_location:
+          row: 27
+          column: 0
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 27
     column: 35
   fix:
-    content: "    assert not a\n    assert (b and c)\n"
-    location:
-      row: 27
-      column: 0
-    end_location:
-      row: 28
-      column: 0
+    edits:
+      - content: "    assert not a\n    assert (b and c)\n"
+        location:
+          row: 27
+          column: 0
+        end_location:
+          row: 28
+          column: 0
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -213,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 56
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -226,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 31
     column: 80
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -239,7 +251,8 @@ expression: diagnostics
   end_location:
     row: 33
     column: 64
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestCompositeAssertion
@@ -252,6 +265,7 @@ expression: diagnostics
   end_location:
     row: 41
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

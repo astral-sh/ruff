@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnsafeYAMLLoad
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 24
     column: 34
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

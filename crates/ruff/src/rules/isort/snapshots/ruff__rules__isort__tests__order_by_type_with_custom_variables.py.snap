@@ -14,12 +14,13 @@ expression: diagnostics
     row: 3
     column: 0
   fix:
-    content: "from subprocess import CONSTANT, Klass, Variable, exe, utils, var_ABC\n\nfrom sklearn.svm import CONST, VAR, Class, MyVar, abc\n"
-    location:
-      row: 1
-      column: 0
-    end_location:
-      row: 3
-      column: 0
+    edits:
+      - content: "from subprocess import CONSTANT, Klass, Variable, exe, utils, var_ABC\n\nfrom sklearn.svm import CONST, VAR, Class, MyVar, abc\n"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 3
+          column: 0
   parent: ~
 

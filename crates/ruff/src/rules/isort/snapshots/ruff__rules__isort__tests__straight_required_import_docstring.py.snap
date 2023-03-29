@@ -14,12 +14,13 @@ expression: diagnostics
     row: 1
     column: 0
   fix:
-    content: "\nimport os"
-    location:
-      row: 1
-      column: 19
-    end_location:
-      row: 1
-      column: 19
+    edits:
+      - content: "import os\n"
+        location:
+          row: 2
+          column: 0
+        end_location:
+          row: 2
+          column: 0
   parent: ~
 

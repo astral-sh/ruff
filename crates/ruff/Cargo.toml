@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.259"
+version = "0.0.260"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -22,7 +22,6 @@ ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_rustpython = { path = "../ruff_rustpython" }
 
 anyhow = { workspace = true }
-bisection = { version = "0.1.0" }
 bitflags = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "string"], optional = true }
