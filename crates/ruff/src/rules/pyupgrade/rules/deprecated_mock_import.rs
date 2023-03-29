@@ -17,7 +17,7 @@ use crate::checkers::ast::Checker;
 use crate::cst::matchers::{match_import, match_import_from, match_module};
 use crate::registry::{AsRule, Rule};
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum MockReference {
     Import,
     Attribute,
@@ -99,7 +99,7 @@ fn format_mocks(aliases: Vec<Option<AsName>>, indent: &str, stylist: &Stylist) -
         match alias {
             None => {
                 if !content.is_empty() {
-                    content.push_str(stylist.line_ending());
+                    content.push_str(&stylist.line_ending());
                     content.push_str(indent);
                 }
                 content.push_str("from unittest import mock");
@@ -107,7 +107,7 @@ fn format_mocks(aliases: Vec<Option<AsName>>, indent: &str, stylist: &Stylist) -
             Some(as_name) => {
                 if let AssignTargetExpression::Name(name) = as_name.name {
                     if !content.is_empty() {
-                        content.push_str(stylist.line_ending());
+                        content.push_str(&stylist.line_ending());
                         content.push_str(indent);
                     }
                     content.push_str("from unittest import mock as ");
@@ -139,14 +139,14 @@ fn format_import(
         import.names = clean_aliases;
 
         let mut state = CodegenState {
-            default_newline: stylist.line_ending(),
+            default_newline: &stylist.line_ending(),
             default_indent: stylist.indentation(),
             ..CodegenState::default()
         };
         tree.codegen(&mut state);
 
         let mut content = state.to_string();
-        content.push_str(stylist.line_ending());
+        content.push_str(&stylist.line_ending());
         content.push_str(indent);
         content.push_str(&format_mocks(mock_aliases, indent, stylist));
         content
@@ -189,7 +189,7 @@ fn format_import_from(
             rpar: vec![],
         })));
         let mut state = CodegenState {
-            default_newline: stylist.line_ending(),
+            default_newline: &stylist.line_ending(),
             default_indent: stylist.indentation(),
             ..CodegenState::default()
         };
@@ -226,7 +226,7 @@ fn format_import_from(
             })));
 
             let mut state = CodegenState {
-                default_newline: stylist.line_ending(),
+                default_newline: &stylist.line_ending(),
                 default_indent: stylist.indentation(),
                 ..CodegenState::default()
             };
@@ -234,7 +234,7 @@ fn format_import_from(
 
             let mut content = state.to_string();
             if !mock_aliases.is_empty() {
-                content.push_str(stylist.line_ending());
+                content.push_str(&stylist.line_ending());
                 content.push_str(indent);
                 content.push_str(&format_mocks(mock_aliases, indent, stylist));
             }

@@ -103,7 +103,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {
-                    checker.deletions.insert(defined_by.clone());
+                    checker.deletions.insert(*defined_by);
                 }
                 diagnostic.set_fix(fix);
             }

@@ -172,7 +172,7 @@ pub fn format_imports(
         if !block_output.is_empty() && !output.is_empty() {
             // If we are about to output something, and had already
             // output a block, separate them.
-            output.push_str(stylist.line_ending());
+            output.push_str(&stylist.line_ending());
         }
         output.push_str(block_output.as_str());
     }
@@ -182,20 +182,20 @@ pub fn format_imports(
         Some(Trailer::Sibling) => {
             if lines_after_imports >= 0 {
                 for _ in 0..lines_after_imports {
-                    output.push_str(stylist.line_ending());
+                    output.push_str(&stylist.line_ending());
                 }
             } else {
-                output.push_str(stylist.line_ending());
+                output.push_str(&stylist.line_ending());
             }
         }
         Some(Trailer::FunctionDef | Trailer::ClassDef) => {
             if lines_after_imports >= 0 {
                 for _ in 0..lines_after_imports {
-                    output.push_str(stylist.line_ending());
+                    output.push_str(&stylist.line_ending());
                 }
             } else {
-                output.push_str(stylist.line_ending());
-                output.push_str(stylist.line_ending());
+                output.push_str(&stylist.line_ending());
+                output.push_str(&stylist.line_ending());
             }
         }
     }
@@ -277,7 +277,7 @@ fn format_import_block(
             is_first_block = false;
             pending_lines_before = false;
         } else if pending_lines_before {
-            output.push_str(stylist.line_ending());
+            output.push_str(&stylist.line_ending());
             pending_lines_before = false;
         }
 
@@ -301,7 +301,7 @@ fn format_import_block(
                     // Add a blank lines between direct and from imports
                     if lines_between_types > 0 && has_direct_import && !lines_inserted {
                         for _ in 0..lines_between_types {
-                            output.push_str(stylist.line_ending());
+                            output.push_str(&stylist.line_ending());
                         }
 
                         lines_inserted = true;

@@ -6,7 +6,7 @@
 
 use rustpython_parser::Tok;
 
-#[derive(Default)]
+#[derive(Default, Copy, Clone)]
 enum State {
     // Start of the module: first string gets marked as a docstring.
     #[default]

@@ -6,20 +6,20 @@ use crate::context::Context;
 use crate::helpers::{collect_call_path, map_callable};
 use crate::types::CallPath;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Modifier {
     Module,
     Class,
     Function,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub enum Visibility {
     Public,
     Private,
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy)]
 pub struct VisibleScope {
     pub modifier: Modifier,
     pub visibility: Visibility,

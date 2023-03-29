@@ -61,7 +61,7 @@ pub fn fix_unnecessary_generator_list(
     }));
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -108,7 +108,7 @@ pub fn fix_unnecessary_generator_set(
     }));
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -182,7 +182,7 @@ pub fn fix_unnecessary_generator_dict(
     }));
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -237,7 +237,7 @@ pub fn fix_unnecessary_list_comprehension_set(
     }));
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -293,7 +293,7 @@ pub fn fix_unnecessary_list_comprehension_dict(
     }));
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -387,7 +387,7 @@ pub fn fix_unnecessary_literal_set(
     }
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -460,7 +460,7 @@ pub fn fix_unnecessary_literal_dict(
     }));
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -576,7 +576,7 @@ pub fn fix_unnecessary_collection_call(
     };
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -635,7 +635,7 @@ pub fn fix_unnecessary_literal_within_tuple_call(
     }));
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -696,7 +696,7 @@ pub fn fix_unnecessary_literal_within_list_call(
     }));
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -725,7 +725,7 @@ pub fn fix_unnecessary_list_call(
     body.value = arg.value.clone();
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -854,7 +854,7 @@ pub fn fix_unnecessary_call_around_sorted(
     }
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -893,7 +893,7 @@ pub fn fix_unnecessary_double_cast_or_process(
     outer_call.args = inner_call.clone();
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -989,7 +989,7 @@ pub fn fix_unnecessary_comprehension(
     }
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -1142,7 +1142,7 @@ pub fn fix_unnecessary_map(
         }
 
         let mut state = CodegenState {
-            default_newline: stylist.line_ending(),
+            default_newline: &stylist.line_ending(),
             default_indent: stylist.indentation(),
             ..CodegenState::default()
         };

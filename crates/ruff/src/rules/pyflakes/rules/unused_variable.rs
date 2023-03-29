@@ -183,6 +183,7 @@ where
     unreachable!("No token after matched");
 }
 
+#[derive(Copy, Clone)]
 enum DeletionKind {
     Whole,
     Partial,
