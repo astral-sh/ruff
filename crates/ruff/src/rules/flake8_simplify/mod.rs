@@ -38,6 +38,7 @@ mod tests {
     #[test_case(Rule::ExprAndFalse, Path::new("SIM223.py"); "SIM223")]
     #[test_case(Rule::YodaConditions, Path::new("SIM300.py"); "SIM300")]
     #[test_case(Rule::IfElseBlockInsteadOfDictGet, Path::new("SIM401.py"); "SIM401")]
+    #[test_case(Rule::AvoidableUseDictGetWithNone, Path::new("SIM910.py"); "SIM910")]
     #[test_case(Rule::IfElseBlockInsteadOfDictLookup, Path::new("SIM116.py"); "SIM116")]
     #[test_case(Rule::IfWithSameArms, Path::new("SIM114.py"); "SIM114")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {

@@ -3,7 +3,10 @@ pub use ast_bool_op::{
     expr_or_not_expr, expr_or_true, CompareWithTuple, DuplicateIsinstanceCall, ExprAndFalse,
     ExprAndNotExpr, ExprOrNotExpr, ExprOrTrue,
 };
-pub use ast_expr::{use_capital_environment_variables, UncapitalizedEnvironmentVariables};
+pub use ast_expr::{
+    avoid_to_use_dict_get_with_none, use_capital_environment_variables,
+    AvoidableUseDictGetWithNone, UncapitalizedEnvironmentVariables,
+};
 pub use ast_if::{
     if_with_same_arms, manual_dict_lookup, needless_bool, nested_if_statements,
     use_dict_get_with_default, use_ternary_operator, CollapsibleIf, IfElseBlockInsteadOfDictGet,
