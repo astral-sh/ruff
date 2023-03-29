@@ -7,7 +7,8 @@ use ruff_macros::{derive_message_formats, violation, CacheKey};
 use ruff_python_ast::helpers::{create_stmt, from_relative_import, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::types::Range;
-use ruff_python_stdlib::identifiers::is_module_name;
+use ruff_python_stdlib::identifiers::is_identifier;
+use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -106,25 +107,34 @@ fn fix_banned_relative_import(
 
         let module_name = if let Some(module) = module {
             let call_path = from_relative_import(&parts, module);
-            // Require import to be a valid PEP 8 module:
+            // Require import to be a valid module:
             // https://python.org/dev/peps/pep-0008/#package-and-module-names
-            if !call_path.iter().all(|part| is_module_name(part)) {
+            if !call_path
+                .iter()
+                .all(|part| is_identifier(part) && !KWLIST.contains(part))
+            {
                 return None;
             }
             call_path.as_slice().join(".")
         } else if parts.len() > 1 {
             let module = parts.pop().unwrap();
             let call_path = from_relative_import(&parts, &module);
-            // Require import to be a valid PEP 8 module:
+            // Require import to be a valid module:
             // https://python.org/dev/peps/pep-0008/#package-and-module-names
-            if !call_path.iter().all(|part| is_module_name(part)) {
+            if !call_path
+                .iter()
+                .all(|part| is_identifier(part) && !KWLIST.contains(part))
+            {
                 return None;
             }
             call_path.as_slice().join(".")
         } else {
-            // Require import to be a valid PEP 8 module:
+            // Require import to be a valid module:
             // https://python.org/dev/peps/pep-0008/#package-and-module-names
-            if !parts.iter().all(|part| is_module_name(part)) {
+            if !parts
+                .iter()
+                .all(|part| is_identifier(part) && !KWLIST.contains(&part.as_str()))
+            {
                 return None;
             }
             parts.join(".")
