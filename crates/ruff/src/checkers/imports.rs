@@ -106,8 +106,8 @@ pub fn check_imports(
         let module_path = modules_vec.join(".");
 
         if !imports_vec.is_empty() {
-            imports.insert(&module_path, imports_vec);
-            imports.insert_new_module(&module_path, path);
+            imports.insert(&module_path, path, imports_vec);
+            // imports.insert_new_module(&module_path, path);
         }
     }
 

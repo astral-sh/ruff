@@ -111,12 +111,9 @@ pub struct Imports {
 }
 
 impl Imports {
-    pub fn insert(&mut self, module_path: &str, imports_vec: Vec<Import>) {
+    pub fn insert(&mut self, module: &str, module_path: &Path, imports_vec: Vec<Import>) {
         self.imports_per_module
-            .insert(module_path.to_owned(), imports_vec);
-    }
-
-    pub fn insert_new_module(&mut self, module: &str, module_path: &Path) {
+            .insert(module.to_owned(), imports_vec);
         self.module_to_path_mapping
             .insert(module.to_owned(), module_path.to_owned());
         self.path_to_module_mapping
@@ -127,6 +124,8 @@ impl Imports {
         self.imports_per_module.extend(other.imports_per_module);
         self.module_to_path_mapping
             .extend(other.module_to_path_mapping);
+        self.path_to_module_mapping
+            .extend(other.path_to_module_mapping);
     }
 }
 
