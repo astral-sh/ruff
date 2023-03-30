@@ -11,9 +11,10 @@ use crate::registry::Linter;
 use crate::rule_selector::{prefix_to_selector, RuleSelector};
 use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
-    flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
-    flake8_variables_names, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
+    flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
+    flake8_unused_arguments, flake8_variables_names, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
+    pyupgrade,
 };
 use crate::settings::types::FilePatternSet;
 
@@ -88,6 +89,7 @@ impl Default for Settings {
             flake8_import_conventions: flake8_import_conventions::settings::Settings::default(),
             flake8_pytest_style: flake8_pytest_style::settings::Settings::default(),
             flake8_quotes: flake8_quotes::settings::Settings::default(),
+            flake8_gettext: flake8_gettext::settings::Settings::default(),
             flake8_self: flake8_self::settings::Settings::default(),
             flake8_tidy_imports: flake8_tidy_imports::Settings::default(),
             flake8_type_checking: flake8_type_checking::settings::Settings::default(),

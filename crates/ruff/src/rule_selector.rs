@@ -265,7 +265,7 @@ impl RuleSelector {
     }
 }
 
-#[derive(EnumIter, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(EnumIter, PartialEq, Eq, PartialOrd, Ord, Copy, Clone)]
 pub(crate) enum Specificity {
     All,
     LinterGroup,

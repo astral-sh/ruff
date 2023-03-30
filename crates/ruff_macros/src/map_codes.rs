@@ -278,9 +278,7 @@ struct Entry {
 }
 
 impl Parse for Entry {
-    /// Parses a match arm like:
-    ///
-    ///     (Pycodestyle, "E101") => Rule::MixedSpacesAndTabs,
+    /// Parses a match arm such as `(Pycodestyle, "E101") => Rule::MixedSpacesAndTabs,`
     fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
         let attrs = Attribute::parse_outer(input)?;
         let pat_tuple;

@@ -327,7 +327,7 @@ pub fn remove_unused_imports<'a>(
         delete_stmt(stmt, parent, deleted, locator, indexer, stylist)
     } else {
         let mut state = CodegenState {
-            default_newline: stylist.line_ending(),
+            default_newline: &stylist.line_ending(),
             default_indent: stylist.indentation(),
             ..CodegenState::default()
         };
@@ -349,7 +349,7 @@ pub fn remove_unused_imports<'a>(
 /// For this behavior, set `remove_parentheses` to `true`.
 pub fn remove_argument(
     locator: &Locator,
-    stmt_at: Location,
+    call_at: Location,
     expr_at: Location,
     expr_end: Location,
     args: &[Expr],
@@ -357,7 +357,7 @@ pub fn remove_argument(
     remove_parentheses: bool,
 ) -> Result<Edit> {
     // TODO(sbrugman): Preserve trailing comments.
-    let contents = locator.skip(stmt_at);
+    let contents = locator.skip(call_at);
 
     let mut fix_start = None;
     let mut fix_end = None;
@@ -370,7 +370,7 @@ pub fn remove_argument(
     if n_arguments == 1 {
         // Case 1: there is only one argument.
         let mut count: usize = 0;
-        for (start, tok, end) in lexer::lex_located(contents, Mode::Module, stmt_at).flatten() {
+        for (start, tok, end) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
             if matches!(tok, Tok::Lpar) {
                 if count == 0 {
                     fix_start = Some(if remove_parentheses {
@@ -402,7 +402,7 @@ pub fn remove_argument(
     {
         // Case 2: argument or keyword is _not_ the last node.
         let mut seen_comma = false;
-        for (start, tok, end) in lexer::lex_located(contents, Mode::Module, stmt_at).flatten() {
+        for (start, tok, end) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
             if seen_comma {
                 if matches!(tok, Tok::NonLogicalNewline) {
                     // Also delete any non-logical newlines after the comma.
@@ -425,7 +425,7 @@ pub fn remove_argument(
     } else {
         // Case 3: argument or keyword is the last node, so we have to find the last
         // comma in the stmt.
-        for (start, tok, _) in lexer::lex_located(contents, Mode::Module, stmt_at).flatten() {
+        for (start, tok, _) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
             if start == expr_at {
                 fix_end = Some(expr_end);
                 break;

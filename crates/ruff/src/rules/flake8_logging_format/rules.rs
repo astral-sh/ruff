@@ -125,6 +125,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     }
 }
 
+#[derive(Copy, Clone)]
 enum LoggingCallType {
     /// Logging call with a level method, e.g., `logging.info`.
     LevelCall(LoggingLevel),

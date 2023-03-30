@@ -49,7 +49,7 @@ fn make_splat_elts(
     new_elts
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum Kind {
     List,
     Tuple,

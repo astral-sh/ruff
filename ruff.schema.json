@@ -176,6 +176,17 @@
         }
       ]
     },
+    "flake8-gettext": {
+      "description": "Options for the `flake8-gettext` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/Flake8GetTextOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "flake8-implicit-str-concat": {
       "description": "Options for the `flake8-implicit-str-concat` plugin.",
       "anyOf": [
@@ -701,6 +712,30 @@
           ],
           "format": "uint",
           "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
+    },
+    "Flake8GetTextOptions": {
+      "type": "object",
+      "properties": {
+        "extend-function-names": {
+          "description": "Additional function names to consider as internationalization calls, in addition to those included in `function-names`.",
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "function-names": {
+          "description": "The function names to consider as internationalization calls.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false
@@ -1766,6 +1801,12 @@
         "INP0",
         "INP00",
         "INP001",
+        "INT",
+        "INT0",
+        "INT00",
+        "INT001",
+        "INT002",
+        "INT003",
         "ISC",
         "ISC0",
         "ISC00",

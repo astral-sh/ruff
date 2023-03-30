@@ -42,12 +42,12 @@ use crate::registry::{AsRule, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
     flake8_bugbear, flake8_builtins, flake8_comprehensions, flake8_datetimez, flake8_debugger,
-    flake8_django, flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions,
-    flake8_logging_format, flake8_pie, flake8_print, flake8_pyi, flake8_pytest_style, flake8_raise,
-    flake8_return, flake8_self, flake8_simplify, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, flake8_use_pathlib, flake8_variables_names, mccabe, numpy, pandas_vet,
-    pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint, pyupgrade, ruff,
-    tryceratops,
+    flake8_django, flake8_errmsg, flake8_gettext, flake8_implicit_str_concat,
+    flake8_import_conventions, flake8_logging_format, flake8_pie, flake8_print, flake8_pyi,
+    flake8_pytest_style, flake8_raise, flake8_return, flake8_self, flake8_simplify,
+    flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, flake8_use_pathlib, flake8_variables_names,
+    mccabe, numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint,
+    pyupgrade, ruff, tryceratops,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -90,7 +90,7 @@ impl<'a> Checker<'a> {
         package: Option<&'a Path>,
         module_path: Option<Vec<String>>,
         locator: &'a Locator,
-        style: &'a Stylist,
+        stylist: &'a Stylist,
         indexer: &'a Indexer,
     ) -> Checker<'a> {
         Checker {
@@ -103,13 +103,13 @@ impl<'a> Checker<'a> {
             module_path: module_path.clone(),
             is_stub: is_python_stub_file(path),
             locator,
-            stylist: style,
+            stylist,
             indexer,
             ctx: Context::new(&settings.typing_modules, path, module_path),
             deferred: Deferred::default(),
-            diagnostics: vec![],
+            diagnostics: Vec::default(),
             deletions: FxHashSet::default(),
-            flake8_bugbear_seen: vec![],
+            flake8_bugbear_seen: Vec::default(),
         }
     }
 }
@@ -699,7 +699,7 @@ where
                         synthetic_usage: None,
                         typing_usage: None,
                         range: Range::from(stmt),
-                        source: Some(self.ctx.current_stmt().clone()),
+                        source: Some(*self.ctx.current_stmt()),
                         context: self.ctx.execution_context(),
                         exceptions: self.ctx.exceptions(),
                     },
@@ -897,7 +897,7 @@ where
                                 synthetic_usage: Some((self.ctx.scope_id(), Range::from(alias))),
                                 typing_usage: None,
                                 range: Range::from(alias),
-                                source: Some(self.ctx.current_stmt().clone()),
+                                source: Some(*self.ctx.current_stmt()),
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -927,7 +927,7 @@ where
                                 synthetic_usage: None,
                                 typing_usage: None,
                                 range: Range::from(alias),
-                                source: Some(self.ctx.current_stmt().clone()),
+                                source: Some(*self.ctx.current_stmt()),
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -955,7 +955,7 @@ where
                                 },
                                 typing_usage: None,
                                 range: Range::from(alias),
-                                source: Some(self.ctx.current_stmt().clone()),
+                                source: Some(*self.ctx.current_stmt()),
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -1007,10 +1007,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::constant_imported_as_non_constant(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1024,10 +1021,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1041,10 +1035,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1058,10 +1049,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1075,10 +1063,7 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
-                                    stmt,
-                                    name,
-                                    asname,
-                                    self.locator,
+                                    name, asname, alias, stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1216,7 +1201,7 @@ where
                                 synthetic_usage: Some((self.ctx.scope_id(), Range::from(alias))),
                                 typing_usage: None,
                                 range: Range::from(alias),
-                                source: Some(self.ctx.current_stmt().clone()),
+                                source: Some(*self.ctx.current_stmt()),
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -1250,7 +1235,7 @@ where
                                 synthetic_usage: None,
                                 typing_usage: None,
                                 range: Range::from(stmt),
-                                source: Some(self.ctx.current_stmt().clone()),
+                                source: Some(*self.ctx.current_stmt()),
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -1330,7 +1315,7 @@ where
                                 },
                                 typing_usage: None,
                                 range: Range::from(alias),
-                                source: Some(self.ctx.current_stmt().clone()),
+                                source: Some(*self.ctx.current_stmt()),
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -1389,10 +1374,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::constant_imported_as_non_constant(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1406,10 +1391,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::lowercase_imported_as_non_lowercase(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1423,10 +1408,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_lowercase(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1440,10 +1425,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_constant(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1457,10 +1442,10 @@ where
                         {
                             if let Some(diagnostic) =
                                 pep8_naming::rules::camelcase_imported_as_acronym(
-                                    stmt,
                                     &alias.node.name,
                                     asname,
-                                    self.locator,
+                                    alias,
+                                    stmt,
                                 )
                             {
                                 self.diagnostics.push(diagnostic);
@@ -1930,7 +1915,7 @@ where
 
         // Recurse.
         let prev_in_exception_handler = self.ctx.in_exception_handler;
-        let prev_visible_scope = self.ctx.visible_scope.clone();
+        let prev_visible_scope = self.ctx.visible_scope;
         match &stmt.node {
             StmtKind::FunctionDef {
                 body,
@@ -1950,19 +1935,18 @@ where
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
                 let definition = docstrings::extraction::extract(
-                    &self.ctx.visible_scope,
+                    self.ctx.visible_scope,
                     stmt,
                     body,
-                    &Documentable::Function,
+                    Documentable::Function,
                 );
                 if self.settings.rules.enabled(Rule::YieldInForLoop) {
                     pyupgrade::rules::yield_in_for_loop(self, stmt);
                 }
-                let scope =
-                    transition_scope(&self.ctx.visible_scope, stmt, &Documentable::Function);
+                let scope = transition_scope(self.ctx.visible_scope, stmt, Documentable::Function);
                 self.deferred.definitions.push((
                     definition,
-                    scope.visibility.clone(),
+                    scope.visibility,
                     (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                 ));
                 self.ctx.visible_scope = scope;
@@ -2002,7 +1986,7 @@ where
                 self.deferred.functions.push((
                     stmt,
                     (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
-                    self.ctx.visible_scope.clone(),
+                    self.ctx.visible_scope,
                 ));
             }
             StmtKind::ClassDef {
@@ -2017,15 +2001,15 @@ where
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
                 let definition = docstrings::extraction::extract(
-                    &self.ctx.visible_scope,
+                    self.ctx.visible_scope,
                     stmt,
                     body,
-                    &Documentable::Class,
+                    Documentable::Class,
                 );
-                let scope = transition_scope(&self.ctx.visible_scope, stmt, &Documentable::Class);
+                let scope = transition_scope(self.ctx.visible_scope, stmt, Documentable::Class);
                 self.deferred.definitions.push((
                     definition,
-                    scope.visibility.clone(),
+                    scope.visibility,
                     (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                 ));
                 self.ctx.visible_scope = scope;
@@ -2195,7 +2179,7 @@ where
                         synthetic_usage: None,
                         typing_usage: None,
                         range: Range::from(stmt),
-                        source: Some(self.ctx.current_stmt().clone()),
+                        source: Some(*self.ctx.current_stmt()),
                         context: self.ctx.execution_context(),
                         exceptions: self.ctx.exceptions(),
                     },
@@ -2971,6 +2955,29 @@ where
                 if self.settings.rules.enabled(Rule::PairwiseOverZipped) {
                     if self.settings.target_version >= PythonVersion::Py310 {
                         ruff::rules::pairwise_over_zipped(self, func, args);
+                    }
+                }
+
+                // flake8-gettext
+                if self.settings.rules.any_enabled(&[
+                    Rule::FStringInGetTextFuncCall,
+                    Rule::FormatInGetTextFuncCall,
+                    Rule::PrintfInGetTextFuncCall,
+                ]) && flake8_gettext::rules::is_gettext_func_call(
+                    func,
+                    &self.settings.flake8_gettext.functions_names,
+                ) {
+                    if self.settings.rules.enabled(Rule::FStringInGetTextFuncCall) {
+                        self.diagnostics
+                            .extend(flake8_gettext::rules::f_string_in_gettext_func_call(args));
+                    }
+                    if self.settings.rules.enabled(Rule::FormatInGetTextFuncCall) {
+                        self.diagnostics
+                            .extend(flake8_gettext::rules::format_in_gettext_func_call(args));
+                    }
+                    if self.settings.rules.enabled(Rule::PrintfInGetTextFuncCall) {
+                        self.diagnostics
+                            .extend(flake8_gettext::rules::printf_in_gettext_func_call(args));
                     }
                 }
 
@@ -4014,7 +4021,7 @@ where
                 synthetic_usage: None,
                 typing_usage: None,
                 range: Range::from(arg),
-                source: Some(self.ctx.current_stmt().clone()),
+                source: Some(*self.ctx.current_stmt()),
                 context: self.ctx.execution_context(),
                 exceptions: self.ctx.exceptions(),
             },
@@ -4078,7 +4085,7 @@ where
                     synthetic_usage: None,
                     typing_usage: None,
                     range: Range::from(pattern),
-                    source: Some(self.ctx.current_stmt().clone()),
+                    source: Some(*self.ctx.current_stmt()),
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4125,8 +4132,8 @@ impl<'a> Checker<'a> {
             let existing = &self.ctx.bindings[existing_binding_index];
             let in_current_scope = stack_index == 0;
             if !existing.kind.is_builtin()
-                && existing.source.as_ref().map_or(true, |left| {
-                    binding.source.as_ref().map_or(true, |right| {
+                && existing.source.map_or(true, |left| {
+                    binding.source.map_or(true, |right| {
                         !branch_detection::different_forks(
                             left,
                             right,
@@ -4479,7 +4486,7 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: Range::from(expr),
-                    source: Some(self.ctx.current_stmt().clone()),
+                    source: Some(*self.ctx.current_stmt()),
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4500,7 +4507,7 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: Range::from(expr),
-                    source: Some(self.ctx.current_stmt().clone()),
+                    source: Some(*self.ctx.current_stmt()),
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4517,7 +4524,7 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: Range::from(expr),
-                    source: Some(self.ctx.current_stmt().clone()),
+                    source: Some(*self.ctx.current_stmt()),
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4583,7 +4590,7 @@ impl<'a> Checker<'a> {
                         synthetic_usage: None,
                         typing_usage: None,
                         range: Range::from(expr),
-                        source: Some(self.ctx.current_stmt().clone()),
+                        source: Some(*self.ctx.current_stmt()),
                         context: self.ctx.execution_context(),
                         exceptions: self.ctx.exceptions(),
                     },
@@ -4600,7 +4607,7 @@ impl<'a> Checker<'a> {
                 synthetic_usage: None,
                 typing_usage: None,
                 range: Range::from(expr),
-                source: Some(self.ctx.current_stmt().clone()),
+                source: Some(*self.ctx.current_stmt()),
                 context: self.ctx.execution_context(),
                 exceptions: self.ctx.exceptions(),
             },
@@ -4645,34 +4652,36 @@ impl<'a> Checker<'a> {
                 },
                 docstring,
             },
-            self.ctx.visible_scope.visibility.clone(),
+            self.ctx.visible_scope.visibility,
             (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
         ));
         docstring.is_some()
     }
 
     fn check_deferred_type_definitions(&mut self) {
-        self.deferred.type_definitions.reverse();
-        while let Some((expr, (in_annotation, in_type_checking_block), (scopes, parents))) =
-            self.deferred.type_definitions.pop()
-        {
-            self.ctx.scope_stack = scopes;
-            self.ctx.parents = parents;
-            self.ctx.in_annotation = in_annotation;
-            self.ctx.in_type_checking_block = in_type_checking_block;
-            self.ctx.in_type_definition = true;
-            self.ctx.in_deferred_type_definition = true;
-            self.visit_expr(expr);
-            self.ctx.in_deferred_type_definition = false;
-            self.ctx.in_type_definition = false;
+        while !self.deferred.type_definitions.is_empty() {
+            let type_definitions = std::mem::take(&mut self.deferred.type_definitions);
+            for (expr, (in_annotation, in_type_checking_block), (scopes, parents)) in
+                type_definitions
+            {
+                self.ctx.scope_stack = scopes;
+                self.ctx.parents = parents;
+                self.ctx.in_annotation = in_annotation;
+                self.ctx.in_type_checking_block = in_type_checking_block;
+                self.ctx.in_type_definition = true;
+                self.ctx.in_deferred_type_definition = true;
+                self.visit_expr(expr);
+                self.ctx.in_deferred_type_definition = false;
+                self.ctx.in_type_definition = false;
+            }
         }
     }
 
     fn check_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
-        let mut type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
-        loop {
+        while !self.deferred.string_type_definitions.is_empty() {
+            let type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
             for (range, value, (in_annotation, in_type_checking_block), (scopes, parents)) in
-                type_definitions.into_iter().rev()
+                type_definitions
             {
                 if let Ok((expr, kind)) = parse_type_annotation(value, range, self.locator) {
                     if in_annotation && self.ctx.annotations_future_enabled {
@@ -4707,100 +4716,125 @@ impl<'a> Checker<'a> {
                     }
                 }
             }
-            if self.deferred.string_type_definitions.is_empty() {
-                break;
-            }
-            type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
         }
     }
 
     fn check_deferred_functions(&mut self) {
-        self.deferred.functions.reverse();
-        while let Some((stmt, (scopes, parents), visibility)) = self.deferred.functions.pop() {
-            self.ctx.scope_stack = scopes.clone();
-            self.ctx.parents = parents.clone();
-            self.ctx.visible_scope = visibility;
+        while !self.deferred.functions.is_empty() {
+            let deferred_functions = std::mem::take(&mut self.deferred.functions);
+            for (stmt, (scopes, parents), visibility) in deferred_functions {
+                let scope_snapshot = scopes.snapshot();
+                let parents_snapshot = parents.len();
+                self.ctx.scope_stack = scopes;
+                self.ctx.parents = parents;
+                self.ctx.visible_scope = visibility;
 
-            match &stmt.node {
-                StmtKind::FunctionDef { body, args, .. }
-                | StmtKind::AsyncFunctionDef { body, args, .. } => {
-                    self.visit_arguments(args);
-                    self.visit_body(body);
+                match &stmt.node {
+                    StmtKind::FunctionDef { body, args, .. }
+                    | StmtKind::AsyncFunctionDef { body, args, .. } => {
+                        self.visit_arguments(args);
+                        self.visit_body(body);
+                    }
+                    _ => {
+                        unreachable!("Expected StmtKind::FunctionDef | StmtKind::AsyncFunctionDef")
+                    }
                 }
-                _ => unreachable!("Expected StmtKind::FunctionDef | StmtKind::AsyncFunctionDef"),
-            }
 
-            self.deferred.assignments.push((scopes, parents));
+                let mut scopes = std::mem::take(&mut self.ctx.scope_stack);
+                scopes.restore(scope_snapshot);
+
+                let mut parents = std::mem::take(&mut self.ctx.parents);
+                parents.truncate(parents_snapshot);
+
+                self.deferred.assignments.push((scopes, parents));
+            }
         }
     }
 
     fn check_deferred_lambdas(&mut self) {
-        self.deferred.lambdas.reverse();
-        while let Some((expr, (scopes, parents))) = self.deferred.lambdas.pop() {
-            self.ctx.scope_stack = scopes.clone();
-            self.ctx.parents = parents.clone();
+        while !self.deferred.lambdas.is_empty() {
+            let lambdas = std::mem::take(&mut self.deferred.lambdas);
+            for (expr, (scopes, parents)) in lambdas {
+                let scope_snapshot = scopes.snapshot();
+                let parents_snapshot = parents.len();
 
-            if let ExprKind::Lambda { args, body } = &expr.node {
-                self.visit_arguments(args);
-                self.visit_expr(body);
-            } else {
-                unreachable!("Expected ExprKind::Lambda");
+                self.ctx.scope_stack = scopes;
+                self.ctx.parents = parents;
+
+                if let ExprKind::Lambda { args, body } = &expr.node {
+                    self.visit_arguments(args);
+                    self.visit_expr(body);
+                } else {
+                    unreachable!("Expected ExprKind::Lambda");
+                }
+
+                let mut scopes = std::mem::take(&mut self.ctx.scope_stack);
+                scopes.restore(scope_snapshot);
+
+                let mut parents = std::mem::take(&mut self.ctx.parents);
+                parents.truncate(parents_snapshot);
+                self.deferred.assignments.push((scopes, parents));
             }
-
-            self.deferred.assignments.push((scopes, parents));
         }
     }
 
     fn check_deferred_assignments(&mut self) {
-        self.deferred.assignments.reverse();
-        while let Some((scopes, ..)) = self.deferred.assignments.pop() {
-            let mut scopes_iter = scopes.iter();
-            let scope_index = *scopes_iter.next().unwrap();
-            let parent_scope_index = *scopes_iter.next().unwrap();
+        while !self.deferred.assignments.is_empty() {
+            let assignments = std::mem::take(&mut self.deferred.assignments);
+            for (scopes, ..) in assignments {
+                let mut scopes_iter = scopes.iter();
+                let scope_index = *scopes_iter.next().unwrap();
+                let parent_scope_index = *scopes_iter.next().unwrap();
 
-            // pyflakes
-            if self.settings.rules.enabled(Rule::UnusedVariable) {
-                pyflakes::rules::unused_variable(self, scope_index);
-            }
-            if self.settings.rules.enabled(Rule::UnusedAnnotation) {
-                pyflakes::rules::unused_annotation(self, scope_index);
-            }
+                // pyflakes
+                if self.settings.rules.enabled(Rule::UnusedVariable) {
+                    pyflakes::rules::unused_variable(self, scope_index);
+                }
+                if self.settings.rules.enabled(Rule::UnusedAnnotation) {
+                    pyflakes::rules::unused_annotation(self, scope_index);
+                }
 
-            if !self.is_stub {
-                // flake8-unused-arguments
-                if self.settings.rules.any_enabled(&[
-                    Rule::UnusedFunctionArgument,
-                    Rule::UnusedMethodArgument,
-                    Rule::UnusedClassMethodArgument,
-                    Rule::UnusedStaticMethodArgument,
-                    Rule::UnusedLambdaArgument,
-                ]) {
-                    self.diagnostics
-                        .extend(flake8_unused_arguments::rules::unused_arguments(
-                            self,
-                            &self.ctx.scopes[parent_scope_index],
-                            &self.ctx.scopes[scope_index],
-                            &self.ctx.bindings,
-                        ));
+                if !self.is_stub {
+                    // flake8-unused-arguments
+                    if self.settings.rules.any_enabled(&[
+                        Rule::UnusedFunctionArgument,
+                        Rule::UnusedMethodArgument,
+                        Rule::UnusedClassMethodArgument,
+                        Rule::UnusedStaticMethodArgument,
+                        Rule::UnusedLambdaArgument,
+                    ]) {
+                        self.diagnostics
+                            .extend(flake8_unused_arguments::rules::unused_arguments(
+                                self,
+                                &self.ctx.scopes[parent_scope_index],
+                                &self.ctx.scopes[scope_index],
+                                &self.ctx.bindings,
+                            ));
+                    }
                 }
             }
         }
     }
 
     fn check_deferred_for_loops(&mut self) {
-        self.deferred.for_loops.reverse();
-        while let Some((stmt, (scopes, parents))) = self.deferred.for_loops.pop() {
-            self.ctx.scope_stack = scopes.clone();
-            self.ctx.parents = parents.clone();
+        while !self.deferred.for_loops.is_empty() {
+            let for_loops = std::mem::take(&mut self.deferred.for_loops);
 
-            if let StmtKind::For { target, body, .. } | StmtKind::AsyncFor { target, body, .. } =
-                &stmt.node
-            {
-                if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
-                    flake8_bugbear::rules::unused_loop_control_variable(self, stmt, target, body);
+            for (stmt, (scopes, parents)) in for_loops {
+                self.ctx.scope_stack = scopes;
+                self.ctx.parents = parents;
+
+                if let StmtKind::For { target, body, .. }
+                | StmtKind::AsyncFor { target, body, .. } = &stmt.node
+                {
+                    if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
+                        flake8_bugbear::rules::unused_loop_control_variable(
+                            self, stmt, target, body,
+                        );
+                    }
+                } else {
+                    unreachable!("Expected ExprKind::Lambda");
                 }
-            } else {
-                unreachable!("Expected ExprKind::Lambda");
             }
         }
     }
@@ -5090,9 +5124,7 @@ impl<'a> Checker<'a> {
                     let child: &Stmt = defined_by.into();
 
                     let diagnostic_lineno = binding.range.location.row();
-                    let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. })
-                        && child.location.row() != diagnostic_lineno
-                    {
+                    let parent_lineno = if matches!(child.node, StmtKind::ImportFrom { .. }) {
                         Some(child.location.row())
                     } else {
                         None
@@ -5140,7 +5172,7 @@ impl<'a> Checker<'a> {
                         ) {
                             Ok(fix) => {
                                 if fix.content.is_empty() || fix.content == "pass" {
-                                    self.deletions.insert(defined_by.clone());
+                                    self.deletions.insert(*defined_by);
                                 }
                                 Some(fix)
                             }
@@ -5168,9 +5200,7 @@ impl<'a> Checker<'a> {
                             },
                             *range,
                         );
-                        if matches!(child.node, StmtKind::ImportFrom { .. })
-                            && child.location.row() != range.location.row()
-                        {
+                        if matches!(child.node, StmtKind::ImportFrom { .. }) {
                             diagnostic.set_parent(child.location);
                         }
                         if let Some(fix) = fix.as_ref() {
@@ -5202,9 +5232,7 @@ impl<'a> Checker<'a> {
                             },
                             *range,
                         );
-                        if matches!(child.node, StmtKind::ImportFrom { .. })
-                            && child.location.row() != range.location.row()
-                        {
+                        if matches!(child.node, StmtKind::ImportFrom { .. }) {
                             diagnostic.set_parent(child.location);
                         }
                         diagnostics.push(diagnostic);
@@ -5279,181 +5307,182 @@ impl<'a> Checker<'a> {
         ]);
 
         let mut overloaded_name: Option<String> = None;
-        self.deferred.definitions.reverse();
-        while let Some((definition, visibility, (scopes, parents))) =
-            self.deferred.definitions.pop()
-        {
-            self.ctx.scope_stack = scopes.clone();
-            self.ctx.parents = parents.clone();
+        while !self.deferred.definitions.is_empty() {
+            let definitions = std::mem::take(&mut self.deferred.definitions);
+            for (definition, visibility, (scopes, parents)) in definitions {
+                self.ctx.scope_stack = scopes;
+                self.ctx.parents = parents;
 
-            // flake8-annotations
-            if enforce_annotations {
-                // TODO(charlie): This should be even stricter, in that an overload
-                // implementation should come immediately after the overloaded
-                // interfaces, without any AST nodes in between. Right now, we
-                // only error when traversing definition boundaries (functions,
-                // classes, etc.).
-                if !overloaded_name.map_or(false, |overloaded_name| {
-                    flake8_annotations::helpers::is_overload_impl(
-                        self,
-                        &definition,
-                        &overloaded_name,
-                    )
-                }) {
-                    self.diagnostics
-                        .extend(flake8_annotations::rules::definition(
+                // flake8-annotations
+                if enforce_annotations {
+                    // TODO(charlie): This should be even stricter, in that an overload
+                    // implementation should come immediately after the overloaded
+                    // interfaces, without any AST nodes in between. Right now, we
+                    // only error when traversing definition boundaries (functions,
+                    // classes, etc.).
+                    if !overloaded_name.map_or(false, |overloaded_name| {
+                        flake8_annotations::helpers::is_overload_impl(
                             self,
                             &definition,
-                            &visibility,
-                        ));
-                }
-                overloaded_name = flake8_annotations::helpers::overloaded_name(self, &definition);
-            }
-
-            if self.is_stub {
-                if self.settings.rules.enabled(Rule::DocstringInStub) {
-                    flake8_pyi::rules::docstring_in_stubs(self, definition.docstring);
-                }
-            }
-
-            // pydocstyle
-            if enforce_docstrings {
-                if pydocstyle::helpers::should_ignore_definition(
-                    self,
-                    &definition,
-                    &self.settings.pydocstyle.ignore_decorators,
-                ) {
-                    continue;
+                            &overloaded_name,
+                        )
+                    }) {
+                        self.diagnostics
+                            .extend(flake8_annotations::rules::definition(
+                                self,
+                                &definition,
+                                visibility,
+                            ));
+                    }
+                    overloaded_name =
+                        flake8_annotations::helpers::overloaded_name(self, &definition);
                 }
 
-                if definition.docstring.is_none() {
-                    pydocstyle::rules::not_missing(self, &definition, &visibility);
-                    continue;
+                if self.is_stub {
+                    if self.settings.rules.enabled(Rule::DocstringInStub) {
+                        flake8_pyi::rules::docstring_in_stubs(self, definition.docstring);
+                    }
                 }
 
-                // Extract a `Docstring` from a `Definition`.
-                let expr = definition.docstring.unwrap();
-                let contents = self.locator.slice(expr);
-                let indentation = self.locator.slice(Range::new(
-                    Location::new(expr.location.row(), 0),
-                    Location::new(expr.location.row(), expr.location.column()),
-                ));
+                // pydocstyle
+                if enforce_docstrings {
+                    if pydocstyle::helpers::should_ignore_definition(
+                        self,
+                        &definition,
+                        &self.settings.pydocstyle.ignore_decorators,
+                    ) {
+                        continue;
+                    }
 
-                if pydocstyle::helpers::should_ignore_docstring(contents) {
-                    warn_user!(
+                    if definition.docstring.is_none() {
+                        pydocstyle::rules::not_missing(self, &definition, visibility);
+                        continue;
+                    }
+
+                    // Extract a `Docstring` from a `Definition`.
+                    let expr = definition.docstring.unwrap();
+                    let contents = self.locator.slice(expr);
+                    let indentation = self.locator.slice(Range::new(
+                        Location::new(expr.location.row(), 0),
+                        Location::new(expr.location.row(), expr.location.column()),
+                    ));
+
+                    if pydocstyle::helpers::should_ignore_docstring(contents) {
+                        warn_user!(
                         "Docstring at {}:{}:{} contains implicit string concatenation; ignoring...",
                         relativize_path(self.path),
                         expr.location.row(),
                         expr.location.column() + 1
                     );
-                    continue;
-                }
+                        continue;
+                    }
 
-                // SAFETY: Safe for docstrings that pass `should_ignore_docstring`.
-                let body = str::raw_contents(contents).unwrap();
-                let docstring = Docstring {
-                    kind: definition.kind,
-                    expr,
-                    contents,
-                    indentation,
-                    body,
-                };
+                    // SAFETY: Safe for docstrings that pass `should_ignore_docstring`.
+                    let body = str::raw_contents(contents).unwrap();
+                    let docstring = Docstring {
+                        kind: definition.kind,
+                        expr,
+                        contents,
+                        indentation,
+                        body,
+                    };
 
-                if !pydocstyle::rules::not_empty(self, &docstring) {
-                    continue;
-                }
+                    if !pydocstyle::rules::not_empty(self, &docstring) {
+                        continue;
+                    }
 
-                if self.settings.rules.enabled(Rule::FitsOnOneLine) {
-                    pydocstyle::rules::one_liner(self, &docstring);
-                }
-                if self.settings.rules.any_enabled(&[
-                    Rule::NoBlankLineBeforeFunction,
-                    Rule::NoBlankLineAfterFunction,
-                ]) {
-                    pydocstyle::rules::blank_before_after_function(self, &docstring);
-                }
-                if self.settings.rules.any_enabled(&[
-                    Rule::OneBlankLineBeforeClass,
-                    Rule::OneBlankLineAfterClass,
-                    Rule::BlankLineBeforeClass,
-                ]) {
-                    pydocstyle::rules::blank_before_after_class(self, &docstring);
-                }
-                if self.settings.rules.enabled(Rule::BlankLineAfterSummary) {
-                    pydocstyle::rules::blank_after_summary(self, &docstring);
-                }
-                if self.settings.rules.any_enabled(&[
-                    Rule::IndentWithSpaces,
-                    Rule::UnderIndentation,
-                    Rule::OverIndentation,
-                ]) {
-                    pydocstyle::rules::indent(self, &docstring);
-                }
-                if self.settings.rules.enabled(Rule::NewLineAfterLastParagraph) {
-                    pydocstyle::rules::newline_after_last_paragraph(self, &docstring);
-                }
-                if self.settings.rules.enabled(Rule::SurroundingWhitespace) {
-                    pydocstyle::rules::no_surrounding_whitespace(self, &docstring);
-                }
-                if self.settings.rules.any_enabled(&[
-                    Rule::MultiLineSummaryFirstLine,
-                    Rule::MultiLineSummarySecondLine,
-                ]) {
-                    pydocstyle::rules::multi_line_summary_start(self, &docstring);
-                }
-                if self.settings.rules.enabled(Rule::TripleSingleQuotes) {
-                    pydocstyle::rules::triple_quotes(self, &docstring);
-                }
-                if self.settings.rules.enabled(Rule::EscapeSequenceInDocstring) {
-                    pydocstyle::rules::backslashes(self, &docstring);
-                }
-                if self.settings.rules.enabled(Rule::EndsInPeriod) {
-                    pydocstyle::rules::ends_with_period(self, &docstring);
-                }
-                if self.settings.rules.enabled(Rule::NonImperativeMood) {
-                    pydocstyle::rules::non_imperative_mood(
-                        self,
-                        &docstring,
-                        &self.settings.pydocstyle.property_decorators,
-                    );
-                }
-                if self.settings.rules.enabled(Rule::NoSignature) {
-                    pydocstyle::rules::no_signature(self, &docstring);
-                }
-                if self.settings.rules.enabled(Rule::FirstLineCapitalized) {
-                    pydocstyle::rules::capitalized(self, &docstring);
-                }
-                if self.settings.rules.enabled(Rule::DocstringStartsWithThis) {
-                    pydocstyle::rules::starts_with_this(self, &docstring);
-                }
-                if self.settings.rules.enabled(Rule::EndsInPunctuation) {
-                    pydocstyle::rules::ends_with_punctuation(self, &docstring);
-                }
-                if self.settings.rules.enabled(Rule::OverloadWithDocstring) {
-                    pydocstyle::rules::if_needed(self, &docstring);
-                }
-                if self.settings.rules.any_enabled(&[
-                    Rule::MultiLineSummaryFirstLine,
-                    Rule::SectionNotOverIndented,
-                    Rule::SectionUnderlineNotOverIndented,
-                    Rule::CapitalizeSectionName,
-                    Rule::NewLineAfterSectionName,
-                    Rule::DashedUnderlineAfterSection,
-                    Rule::SectionUnderlineAfterName,
-                    Rule::SectionUnderlineMatchesSectionLength,
-                    Rule::NoBlankLineAfterSection,
-                    Rule::NoBlankLineBeforeSection,
-                    Rule::BlankLinesBetweenHeaderAndContent,
-                    Rule::BlankLineAfterLastSection,
-                    Rule::EmptyDocstringSection,
-                    Rule::SectionNameEndsInColon,
-                    Rule::UndocumentedParam,
-                ]) {
-                    pydocstyle::rules::sections(
-                        self,
-                        &docstring,
-                        self.settings.pydocstyle.convention.as_ref(),
-                    );
+                    if self.settings.rules.enabled(Rule::FitsOnOneLine) {
+                        pydocstyle::rules::one_liner(self, &docstring);
+                    }
+                    if self.settings.rules.any_enabled(&[
+                        Rule::NoBlankLineBeforeFunction,
+                        Rule::NoBlankLineAfterFunction,
+                    ]) {
+                        pydocstyle::rules::blank_before_after_function(self, &docstring);
+                    }
+                    if self.settings.rules.any_enabled(&[
+                        Rule::OneBlankLineBeforeClass,
+                        Rule::OneBlankLineAfterClass,
+                        Rule::BlankLineBeforeClass,
+                    ]) {
+                        pydocstyle::rules::blank_before_after_class(self, &docstring);
+                    }
+                    if self.settings.rules.enabled(Rule::BlankLineAfterSummary) {
+                        pydocstyle::rules::blank_after_summary(self, &docstring);
+                    }
+                    if self.settings.rules.any_enabled(&[
+                        Rule::IndentWithSpaces,
+                        Rule::UnderIndentation,
+                        Rule::OverIndentation,
+                    ]) {
+                        pydocstyle::rules::indent(self, &docstring);
+                    }
+                    if self.settings.rules.enabled(Rule::NewLineAfterLastParagraph) {
+                        pydocstyle::rules::newline_after_last_paragraph(self, &docstring);
+                    }
+                    if self.settings.rules.enabled(Rule::SurroundingWhitespace) {
+                        pydocstyle::rules::no_surrounding_whitespace(self, &docstring);
+                    }
+                    if self.settings.rules.any_enabled(&[
+                        Rule::MultiLineSummaryFirstLine,
+                        Rule::MultiLineSummarySecondLine,
+                    ]) {
+                        pydocstyle::rules::multi_line_summary_start(self, &docstring);
+                    }
+                    if self.settings.rules.enabled(Rule::TripleSingleQuotes) {
+                        pydocstyle::rules::triple_quotes(self, &docstring);
+                    }
+                    if self.settings.rules.enabled(Rule::EscapeSequenceInDocstring) {
+                        pydocstyle::rules::backslashes(self, &docstring);
+                    }
+                    if self.settings.rules.enabled(Rule::EndsInPeriod) {
+                        pydocstyle::rules::ends_with_period(self, &docstring);
+                    }
+                    if self.settings.rules.enabled(Rule::NonImperativeMood) {
+                        pydocstyle::rules::non_imperative_mood(
+                            self,
+                            &docstring,
+                            &self.settings.pydocstyle.property_decorators,
+                        );
+                    }
+                    if self.settings.rules.enabled(Rule::NoSignature) {
+                        pydocstyle::rules::no_signature(self, &docstring);
+                    }
+                    if self.settings.rules.enabled(Rule::FirstLineCapitalized) {
+                        pydocstyle::rules::capitalized(self, &docstring);
+                    }
+                    if self.settings.rules.enabled(Rule::DocstringStartsWithThis) {
+                        pydocstyle::rules::starts_with_this(self, &docstring);
+                    }
+                    if self.settings.rules.enabled(Rule::EndsInPunctuation) {
+                        pydocstyle::rules::ends_with_punctuation(self, &docstring);
+                    }
+                    if self.settings.rules.enabled(Rule::OverloadWithDocstring) {
+                        pydocstyle::rules::if_needed(self, &docstring);
+                    }
+                    if self.settings.rules.any_enabled(&[
+                        Rule::MultiLineSummaryFirstLine,
+                        Rule::SectionNotOverIndented,
+                        Rule::SectionUnderlineNotOverIndented,
+                        Rule::CapitalizeSectionName,
+                        Rule::NewLineAfterSectionName,
+                        Rule::DashedUnderlineAfterSection,
+                        Rule::SectionUnderlineAfterName,
+                        Rule::SectionUnderlineMatchesSectionLength,
+                        Rule::NoBlankLineAfterSection,
+                        Rule::NoBlankLineBeforeSection,
+                        Rule::BlankLinesBetweenHeaderAndContent,
+                        Rule::BlankLineAfterLastSection,
+                        Rule::EmptyDocstringSection,
+                        Rule::SectionNameEndsInColon,
+                        Rule::UndocumentedParam,
+                    ]) {
+                        pydocstyle::rules::sections(
+                            self,
+                            &docstring,
+                            self.settings.pydocstyle.convention.as_ref(),
+                        );
+                    }
                 }
             }
         }

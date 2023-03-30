@@ -133,12 +133,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "bisection"
-version = "0.1.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "021e079a1bab0ecce6cf4b4b74c0c37afa4a697136eb3b127875c84a8f04a8c3"
-
-[[package]]
 name = "bit-set"
 version = "0.5.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -780,7 +774,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.259"
+version = "0.0.260"
 dependencies = [
  "anyhow",
  "clap 4.1.8",
@@ -1549,8 +1543,9 @@ checksum = "9fa00462b37ead6d11a82c9d568b26682d78e0477dc02d1966c013af80969739"
 
 [[package]]
 name = "pep440_rs"
-version = "0.2.0"
-source = "git+https://github.com/konstin/pep440-rs.git?rev=a8fef4ec47f4c25b070b39cdbe6a0b9847e49941#a8fef4ec47f4c25b070b39cdbe6a0b9847e49941"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5daf676dd9ff1a39faf9c9da9c46f0dbb6211b21a1839a749f5510c24ceca3f"
 dependencies = [
  "lazy_static",
  "regex",
@@ -1982,10 +1977,9 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.259"
+version = "0.0.260"
 dependencies = [
  "anyhow",
- "bisection",
  "bitflags",
  "chrono",
  "clap 4.1.8",
@@ -2065,7 +2059,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.259"
+version = "0.0.260"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",

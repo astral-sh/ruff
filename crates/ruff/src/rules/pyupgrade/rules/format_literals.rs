@@ -101,7 +101,7 @@ fn generate_call(
     };
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -111,7 +111,7 @@ fn generate_call(
     call.func = Box::new(match_expression(&cleaned)?);
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };

@@ -7,7 +7,7 @@ use anyhow::anyhow;
 use crate::registry::Linter;
 use crate::rule_selector::RuleSelector;
 
-#[derive(Clone, Ord, PartialOrd, Eq, PartialEq)]
+#[derive(Copy, Clone, Ord, PartialOrd, Eq, PartialEq)]
 pub enum Plugin {
     Flake82020,
     Flake8Annotations,

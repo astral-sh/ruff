@@ -74,6 +74,7 @@ fn any_arg_is_str(slice: &Expr) -> bool {
     }
 }
 
+#[derive(Copy, Clone)]
 enum TypingMember {
     Union,
     Optional,

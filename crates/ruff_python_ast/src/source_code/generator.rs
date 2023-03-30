@@ -63,9 +63,9 @@ pub struct Generator<'a> {
     /// The indentation style to use.
     indent: &'a Indentation,
     /// The quote style to use for string literals.
-    quote: &'a Quote,
+    quote: Quote,
     /// The line ending to use.
-    line_ending: &'a LineEnding,
+    line_ending: LineEnding,
     buffer: String,
     indent_depth: usize,
     num_newlines: usize,
@@ -87,11 +87,7 @@ impl<'a> From<&'a Stylist<'a>> for Generator<'a> {
 }
 
 impl<'a> Generator<'a> {
-    pub const fn new(
-        indent: &'a Indentation,
-        quote: &'a Quote,
-        line_ending: &'a LineEnding,
-    ) -> Self {
+    pub const fn new(indent: &'a Indentation, quote: Quote, line_ending: LineEnding) -> Self {
         Self {
             // Style preferences.
             indent,
@@ -132,7 +128,7 @@ impl<'a> Generator<'a> {
     fn p(&mut self, s: &str) {
         if self.num_newlines > 0 {
             for _ in 0..self.num_newlines {
-                self.buffer += self.line_ending;
+                self.buffer += &self.line_ending;
             }
             self.num_newlines = 0;
         }
@@ -1229,8 +1225,8 @@ impl<'a> Generator<'a> {
             let mut generator = Generator::new(
                 self.indent,
                 match self.quote {
-                    Quote::Single => &Quote::Double,
-                    Quote::Double => &Quote::Single,
+                    Quote::Single => Quote::Double,
+                    Quote::Double => Quote::Single,
                 },
                 self.line_ending,
             );
@@ -1270,15 +1266,15 @@ mod tests {
         let line_ending = LineEnding::default();
         let program = parser::parse_program(contents, "<filename>").unwrap();
         let stmt = program.first().unwrap();
-        let mut generator = Generator::new(&indentation, &quote, &line_ending);
+        let mut generator = Generator::new(&indentation, quote, line_ending);
         generator.unparse_stmt(stmt);
         generator.generate()
     }
 
     fn round_trip_with(
         indentation: &Indentation,
-        quote: &Quote,
-        line_ending: &LineEnding,
+        quote: Quote,
+        line_ending: LineEnding,
         contents: &str,
     ) -> String {
         let program = parser::parse_program(contents, "<filename>").unwrap();
@@ -1452,8 +1448,8 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                &Quote::Double,
-                &LineEnding::default(),
+                Quote::Double,
+                LineEnding::default(),
                 r#""hello""#
             ),
             r#""hello""#
@@ -1461,8 +1457,8 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                &Quote::Single,
-                &LineEnding::default(),
+                Quote::Single,
+                LineEnding::default(),
                 r#""hello""#
             ),
             r#"'hello'"#
@@ -1470,8 +1466,8 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                &Quote::Double,
-                &LineEnding::default(),
+                Quote::Double,
+                LineEnding::default(),
                 r#"'hello'"#
             ),
             r#""hello""#
@@ -1479,8 +1475,8 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                &Quote::Single,
-                &LineEnding::default(),
+                Quote::Single,
+                LineEnding::default(),
                 r#"'hello'"#
             ),
             r#"'hello'"#
@@ -1492,8 +1488,8 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::new("    ".to_string()),
-                &Quote::default(),
-                &LineEnding::default(),
+                Quote::default(),
+                LineEnding::default(),
                 r#"
 if True:
   pass
@@ -1510,8 +1506,8 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::new("  ".to_string()),
-                &Quote::default(),
-                &LineEnding::default(),
+                Quote::default(),
+                LineEnding::default(),
                 r#"
 if True:
   pass
@@ -1528,8 +1524,8 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::new("\t".to_string()),
-                &Quote::default(),
-                &LineEnding::default(),
+                Quote::default(),
+                LineEnding::default(),
                 r#"
 if True:
   pass
@@ -1550,8 +1546,8 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                &Quote::default(),
-                &LineEnding::Lf,
+                Quote::default(),
+                LineEnding::Lf,
                 "if True:\n    print(42)",
             ),
             "if True:\n    print(42)",
@@ -1560,8 +1556,8 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                &Quote::default(),
-                &LineEnding::CrLf,
+                Quote::default(),
+                LineEnding::CrLf,
                 "if True:\n    print(42)",
             ),
             "if True:\r\n    print(42)",
@@ -1570,8 +1566,8 @@ if True:
         assert_eq!(
             round_trip_with(
                 &Indentation::default(),
-                &Quote::default(),
-                &LineEnding::Cr,
+                Quote::default(),
+                LineEnding::Cr,
                 "if True:\n    print(42)",
             ),
             "if True:\r    print(42)",

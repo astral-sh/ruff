@@ -1,5 +1,6 @@
 use std::fmt::{Debug, Display};
 
+#[derive(Copy, Clone)]
 pub enum AutofixKind {
     Sometimes,
     Always,

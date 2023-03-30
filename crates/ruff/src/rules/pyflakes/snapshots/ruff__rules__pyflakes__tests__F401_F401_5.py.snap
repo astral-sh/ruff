@@ -22,7 +22,9 @@ expression: diagnostics
         end_location:
           row: 3
           column: 0
-  parent: ~
+  parent:
+    row: 2
+    column: 0
 - kind:
     name: UnusedImport
     body: "`d.e.f` imported but unused"
@@ -43,7 +45,9 @@ expression: diagnostics
         end_location:
           row: 4
           column: 0
-  parent: ~
+  parent:
+    row: 3
+    column: 0
 - kind:
     name: UnusedImport
     body: "`h.i` imported but unused"

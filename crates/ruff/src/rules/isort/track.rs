@@ -14,7 +14,7 @@ use crate::directives::IsortDirectives;
 
 use super::helpers;
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 pub enum Trailer {
     Sibling,
     ClassDef,
