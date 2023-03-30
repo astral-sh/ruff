@@ -9,8 +9,10 @@ use std::ops::{Deref, Index, IndexMut};
 pub struct Scope<'a> {
     pub id: ScopeId,
     pub kind: ScopeKind<'a>,
-    pub import_starred: bool,
     pub uses_locals: bool,
+    /// A list of star imports in this scope. These represent _module_ imports (e.g., `sys` in
+    /// `from sys import *`), rather than individual bindings (e.g., individual members in `sys`).
+    star_imports: Vec<StarImportation<'a>>,
     /// A map from bound name to binding index, for live bindings.
     bindings: FxHashMap<&'a str, BindingId>,
     /// A map from bound name to binding index, for bindings that were created
@@ -28,8 +30,8 @@ impl<'a> Scope<'a> {
         Scope {
             id,
             kind,
-            import_starred: false,
             uses_locals: false,
+            star_imports: Vec::default(),
             bindings: FxHashMap::default(),
             rebounds: FxHashMap::default(),
         }
@@ -60,8 +62,24 @@ impl<'a> Scope<'a> {
         self.bindings.values()
     }
 
+    /// Returns a tuple of the name and id of all bindings defined in this scope.
     pub fn bindings(&self) -> std::collections::hash_map::Iter<&'a str, BindingId> {
         self.bindings.iter()
+    }
+
+    /// Adds a reference to a star import (e.g., `from sys import *`) to this scope.
+    pub fn add_star_import(&mut self, import: StarImportation<'a>) {
+        self.star_imports.push(import);
+    }
+
+    /// Returns `true` if this scope contains a star import (e.g., `from sys import *`).
+    pub fn uses_star_imports(&self) -> bool {
+        !self.star_imports.is_empty()
+    }
+
+    /// Returns an iterator over all star imports (e.g., `from sys import *`) in this scope.
+    pub fn star_imports(&self) -> impl Iterator<Item = &StarImportation<'a>> {
+        self.star_imports.iter()
     }
 }
 
@@ -286,7 +304,6 @@ impl<'a> Binding<'a> {
                 | BindingKind::FunctionDefinition
                 | BindingKind::Builtin
                 | BindingKind::FutureImportation
-                | BindingKind::StarImportation(..)
                 | BindingKind::Importation(..)
                 | BindingKind::FromImportation(..)
                 | BindingKind::SubmoduleImportation(..)
@@ -340,9 +357,6 @@ impl<'a> Binding<'a> {
             BindingKind::FutureImportation => {
                 return false;
             }
-            BindingKind::StarImportation(..) => {
-                return false;
-            }
             _ => {}
         }
         existing.is_definition()
@@ -379,6 +393,14 @@ impl TryFrom<usize> for BindingId {
 
 impl nohash_hasher::IsEnabled for BindingId {}
 
+#[derive(Debug, Clone)]
+pub struct StarImportation<'a> {
+    /// The level of the import. `None` or `Some(0)` indicate an absolute import.
+    pub level: Option<usize>,
+    /// The module being imported. `None` indicates a wildcard import.
+    pub module: Option<&'a str>,
+}
+
 // Pyflakes defines the following binding hierarchy (via inheritance):
 //   Binding
 //    ExportBinding
@@ -393,21 +415,12 @@ impl nohash_hasher::IsEnabled for BindingId {}
 //      Importation
 //        SubmoduleImportation
 //        ImportationFrom
-//        StarImportation
 //        FutureImportation
 
 #[derive(Clone, Debug)]
 pub struct Export {
     /// The names of the bindings exported via `__all__`.
     pub names: Vec<String>,
-}
-
-#[derive(Clone, Debug)]
-pub struct StarImportation {
-    /// The level of the import. `None` or `Some(0)` indicate an absolute import.
-    pub level: Option<usize>,
-    /// The module being imported. `None` indicates a wildcard import.
-    pub module: Option<String>,
 }
 
 #[derive(Clone, Debug)]
@@ -458,7 +471,6 @@ pub enum BindingKind<'a> {
     FunctionDefinition,
     Export(Export),
     FutureImportation,
-    StarImportation(StarImportation),
     Importation(Importation<'a>),
     FromImportation(FromImportation<'a>),
     SubmoduleImportation(SubmoduleImportation<'a>),
