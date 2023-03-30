@@ -183,7 +183,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
-      - name: "Install Rust toolchain"
+      - name: "Install nightly Rust toolchain"
         # Only pinned to make caching work, update freely
         run: rustup toolchain install nightly-2023-03-30
       - uses: Swatinem/rust-cache@v2
