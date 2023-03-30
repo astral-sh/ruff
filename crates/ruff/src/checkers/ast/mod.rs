@@ -1113,7 +1113,7 @@ where
                         stmt,
                         names,
                         module.as_ref().map(String::as_str),
-                        level.as_ref(),
+                        *level,
                     );
                 }
                 if self.settings.rules.enabled(Rule::UnnecessaryBuiltinImport) {
@@ -1152,11 +1152,9 @@ where
                     .rules
                     .enabled(Rule::PytestIncorrectPytestImport)
                 {
-                    if let Some(diagnostic) = flake8_pytest_style::rules::import_from(
-                        stmt,
-                        module.as_deref(),
-                        level.as_ref(),
-                    ) {
+                    if let Some(diagnostic) =
+                        flake8_pytest_style::rules::import_from(stmt, module.as_deref(), *level)
+                    {
                         self.diagnostics.push(diagnostic);
                     }
                 }
@@ -1223,7 +1221,7 @@ where
                                 self.diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
                                         name: helpers::format_import_from(
-                                            level.as_ref(),
+                                            *level,
                                             module.as_deref(),
                                         ),
                                     },
@@ -1239,10 +1237,7 @@ where
                         {
                             self.diagnostics.push(Diagnostic::new(
                                 pyflakes::rules::UndefinedLocalWithImportStar {
-                                    name: helpers::format_import_from(
-                                        level.as_ref(),
-                                        module.as_deref(),
-                                    ),
+                                    name: helpers::format_import_from(*level, module.as_deref()),
                                 },
                                 Range::from(stmt),
                             ));
@@ -1268,7 +1263,7 @@ where
                         // and `full_name` would be "foo.bar".
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
                         let full_name = helpers::format_import_from_member(
-                            level.as_ref(),
+                            *level,
                             module.as_deref(),
                             &alias.node.name,
                         );
@@ -1299,7 +1294,7 @@ where
                             flake8_tidy_imports::relative_imports::banned_relative_import(
                                 self,
                                 stmt,
-                                level.as_ref(),
+                                *level,
                                 module.as_deref(),
                                 self.module_path.as_ref(),
                                 &self.settings.flake8_tidy_imports.ban_relative_imports,
@@ -1322,7 +1317,7 @@ where
 
                     if self.settings.rules.enabled(Rule::UnconventionalImportAlias) {
                         let full_name = helpers::format_import_from_member(
-                            level.as_ref(),
+                            *level,
                             module.as_deref(),
                             &alias.node.name,
                         );
@@ -4273,10 +4268,7 @@ impl<'a> Checker<'a> {
                         if let BindingKind::StarImportation(StarImportation { level, module }) =
                             &binding.kind
                         {
-                            from_list.push(helpers::format_import_from(
-                                level.as_ref(),
-                                module.as_deref(),
-                            ));
+                            from_list.push(helpers::format_import_from(*level, module.as_deref()));
                         }
                     }
                 }
@@ -4927,10 +4919,8 @@ impl<'a> Checker<'a> {
                             if let BindingKind::StarImportation(StarImportation { level, module }) =
                                 &binding.kind
                             {
-                                from_list.push(helpers::format_import_from(
-                                    level.as_ref(),
-                                    module.as_deref(),
-                                ));
+                                from_list
+                                    .push(helpers::format_import_from(*level, module.as_deref()));
                             }
                         }
                         from_list.sort();
