@@ -1816,7 +1816,7 @@ dependencies = [
 [[package]]
 name = "pyproject-toml"
 version = "0.5.0"
-source = "git+https://github.com/PyO3/pyproject-toml-rs?branch=derive_equal#9160405609ad0a8fa2006098afa35b7fb14e2f54"
+source = "git+https://github.com/PyO3/pyproject-toml-rs?branch=derive_equal#03a61ba33dd032a4899f81556e33bb182b9128e7"
 dependencies = [
  "indexmap",
  "pep440_rs",
