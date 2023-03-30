@@ -200,10 +200,8 @@ where
             StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
         ) {
             let scope_index = self.ctx.scope_id();
-            if scope_index.is_global() {
-                if self.ctx.current_stmt_parent().is_none() {
-                    self.importer.visit_import(stmt);
-                }
+            if scope_index.is_global() && self.ctx.current_stmt_parent().is_none() {
+                self.importer.visit_import(stmt);
             }
         }
 

@@ -51,7 +51,7 @@ impl<'a> Importer<'a> {
                 }
             }
             _ => {
-                unreachable!("Expected StmtKind::Import | StmtKind::ImportFrom");
+                panic!("Expected StmtKind::Import | StmtKind::ImportFrom");
             }
         }
 

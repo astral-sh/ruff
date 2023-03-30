@@ -463,8 +463,24 @@ pub fn get_or_import_symbol(
     locator: &Locator,
 ) -> Result<(Edit, String)> {
     if let Some((source, binding)) = context.resolve_qualified_import_name(module, member) {
-        // If the symbol is already available in the current scope, use it, and add a no-nop edit to
-        // force conflicts with any other fixes that might try to remove the import.
+        // If the symbol is already available in the current scope, use it.
+        //
+        // We also add a no-nop edit to force conflicts with any other fixes that might try to
+        // remove the import. Consider:
+        //
+        // ```py
+        // import sys
+        //
+        // quit()
+        // ```
+        //
+        // Assume you omit this no-op edit. If you run Ruff with `unused-imports` and
+        // `sys-exit-alias` over this snippet, it will generate two fixes: (1) remove the unused
+        // `sys` import; and (2) replace `quit()` with `sys.exit()`, under the assumption that `sys`
+        // is already imported and available.
+        //
+        // By adding this no-op edit, we force the `unused-imports` fix to conflict with the
+        // `sys-exit-alias` fix, and thus will avoid applying both fixes in the same pass.
         let import_edit = Edit::replacement(
             locator.slice(source).to_string(),
             source.location,
@@ -490,7 +506,7 @@ pub fn get_or_import_symbol(
             }
         } else {
             // Case 2: No `functools` import is in scope; thus, we add `import functools`, and
-            // return `"functools.lru_cache"` as the bound name.
+            // return `"functools.cache"` as the bound name.
             if context
                 .find_binding(module)
                 .map_or(true, |binding| binding.kind.is_builtin())
