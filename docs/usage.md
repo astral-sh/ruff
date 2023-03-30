@@ -41,7 +41,7 @@ Note that Ruff's pre-commit hook should run before Black, isort, and other forma
 Ruff can also be used as a [VS Code extension](https://github.com/charliermarsh/ruff-vscode) or
 alongside any other editor through the [Ruff LSP](https://github.com/charliermarsh/ruff-lsp).
 
-Ruff can also be used as a [GitHub Action](https://github.com/features/actions):
+Ruff can also be used as a [GitHub Action](https://github.com/features/actions).  Commonly, as a pass/fail test to ensure your repository stays clean, abiding the [Rules](https://beta.ruff.rs/docs/rules/) specified in your configuration.  
 
 Compatibility
 This action is known to support all GitHub-hosted runner OSes. In addition, only published versions of Ruff are supported (i.e. whatever is available on PyPI).
