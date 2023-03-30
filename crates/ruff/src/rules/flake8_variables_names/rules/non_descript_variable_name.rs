@@ -32,18 +32,18 @@ impl Violation for NonDescriptVariableName {
 }
 
 fn is_non_descript_variable(name: &str, strict_mode: bool) -> bool {
-    const BLOCKLIST: [&str; 17] = [
+    const DENYLIST: [&str; 17] = [
         "val", "vals", "var", "vars", "variable", "contents", "handle", "file", "objs", "some",
         "do", "no", "true", "false", "foo", "bar", "baz",
     ];
 
-    const BLOCKLIST_STRICT: [&str; 11] = [
+    const DENYLIST_STRICT: [&str; 11] = [
         "data", "result", "results", "item", "items", "value", "values", "content", "obj", "info",
         "handler",
     ];
 
-    if BLOCKLIST.contains(&name.to_lowercase().as_str())
-        || (strict_mode && BLOCKLIST_STRICT.contains(&name.to_lowercase().as_str()))
+    if DENYLIST.contains(&name.to_lowercase().as_str())
+        || (strict_mode && DENYLIST_STRICT.contains(&name.to_lowercase().as_str()))
     {
         return true;
     }

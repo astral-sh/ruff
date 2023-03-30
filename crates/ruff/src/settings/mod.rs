@@ -19,8 +19,8 @@ use crate::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
     flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
-    flake8_unused_arguments, flake8_variables_names, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
+    flake8_unused_arguments, flake8_variables_names, isort, mccabe, pep8_naming, pycodestyle,
+    pydocstyle, pylint, pyupgrade,
 };
 use crate::settings::configuration::Configuration;
 use crate::settings::types::{FilePatternSet, PerFileIgnore, PythonVersion, SerializationFormat};

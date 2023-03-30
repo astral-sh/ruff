@@ -29,10 +29,8 @@ impl Violation for SingleLetterVariableName {
 }
 
 fn is_single_letter_variable(name: &str, strict_mode: bool) -> bool {
-    const ALLOWLIST: [&str; 3] = ["i", "_", "T"];
-    const ALLOWLIST_STRICT: [&str; 2] = ["_", "T"];
     if name.len() == 1
-        && (!ALLOWLIST.contains(&name) || (strict_mode && !ALLOWLIST_STRICT.contains(&name)))
+        && (!matches!(name, "i" | "_" | "T") || (strict_mode && !matches!(name, "_" | "T")))
     {
         return true;
     }
