@@ -48,7 +48,7 @@ pub fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
             ExprKind::Yield { .. } => DeferralKeyword::Yield,
             ExprKind::YieldFrom { .. } => DeferralKeyword::YieldFrom,
             ExprKind::Await { .. } => DeferralKeyword::Await,
-            _ => unreachable!("Expected ExprKind::Yield | ExprKind::YieldFrom | ExprKind::Await"),
+            _ => panic!("Expected ExprKind::Yield | ExprKind::YieldFrom | ExprKind::Await"),
         };
         checker.diagnostics.push(Diagnostic::new(
             YieldOutsideFunction { keyword },
