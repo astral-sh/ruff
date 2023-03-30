@@ -1,7 +1,7 @@
 use anyhow::{bail, Result};
 use libcst_native::{
-    Attribute, Call, Comparison, Dict, Expr, Expression, Import, ImportFrom, Module, SimpleString,
-    SmallStatement, Statement,
+    Attribute, Call, Comparison, Dict, Expr, Expression, Import, ImportAlias, ImportFrom,
+    ImportNames, Module, SimpleString, SmallStatement, Statement,
 };
 
 pub fn match_module(module_text: &str) -> Result<Module> {
@@ -51,6 +51,16 @@ pub fn match_import_from<'a, 'b>(module: &'a mut Module<'b>) -> Result<&'a mut I
         }
     } else {
         bail!("Expected Statement::Simple")
+    }
+}
+
+pub fn match_aliases<'a, 'b>(
+    import_from: &'a mut ImportFrom<'b>,
+) -> Result<&'a mut Vec<ImportAlias<'b>>> {
+    if let ImportNames::Aliases(aliases) = &mut import_from.names {
+        Ok(aliases)
+    } else {
+        bail!("Expected ImportNames::Aliases")
     }
 }
 

@@ -14,13 +14,14 @@ expression: diagnostics
     row: 252
     column: 0
   fix:
-    content: "    "
-    location:
-      row: 252
-      column: 0
-    end_location:
-      row: 252
-      column: 7
+    edits:
+      - content: "    "
+        location:
+          row: 252
+          column: 0
+        end_location:
+          row: 252
+          column: 7
   parent: ~
 - kind:
     name: OverIndentation
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 264
     column: 0
   fix:
-    content: "    "
-    location:
-      row: 264
-      column: 0
-    end_location:
-      row: 264
-      column: 8
+    edits:
+      - content: "    "
+        location:
+          row: 264
+          column: 0
+        end_location:
+          row: 264
+          column: 8
   parent: ~
 - kind:
     name: OverIndentation
@@ -54,12 +56,13 @@ expression: diagnostics
     row: 272
     column: 0
   fix:
-    content: "    "
-    location:
-      row: 272
-      column: 0
-    end_location:
-      row: 272
-      column: 8
+    edits:
+      - content: "    "
+        location:
+          row: 272
+          column: 0
+        end_location:
+          row: 272
+          column: 8
   parent: ~
 

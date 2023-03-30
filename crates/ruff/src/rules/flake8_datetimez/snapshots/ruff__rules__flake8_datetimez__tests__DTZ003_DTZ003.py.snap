@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: CallDatetimeUtcnow
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 9
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

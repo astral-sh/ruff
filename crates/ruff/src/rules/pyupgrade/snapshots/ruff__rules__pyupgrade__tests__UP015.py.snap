@@ -14,13 +14,14 @@ expression: diagnostics
     row: 1
     column: 16
   fix:
-    content: ""
-    location:
-      row: 1
-      column: 10
-    end_location:
-      row: 1
-      column: 15
+    edits:
+      - content: ""
+        location:
+          row: 1
+          column: 10
+        end_location:
+          row: 1
+          column: 15
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 2
     column: 17
   fix:
-    content: ""
-    location:
-      row: 2
-      column: 10
-    end_location:
-      row: 2
-      column: 16
+    edits:
+      - content: ""
+        location:
+          row: 2
+          column: 10
+        end_location:
+          row: 2
+          column: 16
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 3
     column: 17
   fix:
-    content: "\"rb\""
-    location:
-      row: 3
-      column: 12
-    end_location:
-      row: 3
-      column: 16
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 3
+          column: 12
+        end_location:
+          row: 3
+          column: 16
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 4
     column: 18
   fix:
-    content: "\"rb\""
-    location:
-      row: 4
-      column: 12
-    end_location:
-      row: 4
-      column: 17
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 4
+          column: 12
+        end_location:
+          row: 4
+          column: 17
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 5
     column: 16
   fix:
-    content: ""
-    location:
-      row: 5
-      column: 10
-    end_location:
-      row: 5
-      column: 15
+    edits:
+      - content: ""
+        location:
+          row: 5
+          column: 10
+        end_location:
+          row: 5
+          column: 15
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 6
     column: 17
   fix:
-    content: ""
-    location:
-      row: 6
-      column: 10
-    end_location:
-      row: 6
-      column: 16
+    edits:
+      - content: ""
+        location:
+          row: 6
+          column: 10
+        end_location:
+          row: 6
+          column: 16
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 7
     column: 32
   fix:
-    content: ""
-    location:
-      row: 7
-      column: 8
-    end_location:
-      row: 7
-      column: 13
+    edits:
+      - content: ""
+        location:
+          row: 7
+          column: 8
+        end_location:
+          row: 7
+          column: 13
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 8
     column: 15
   fix:
-    content: "\"w\""
-    location:
-      row: 8
-      column: 10
-    end_location:
-      row: 8
-      column: 14
+    edits:
+      - content: "\"w\""
+        location:
+          row: 8
+          column: 10
+        end_location:
+          row: 8
+          column: 14
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 10
     column: 21
   fix:
-    content: ""
-    location:
-      row: 10
-      column: 15
-    end_location:
-      row: 10
-      column: 20
+    edits:
+      - content: ""
+        location:
+          row: 10
+          column: 15
+        end_location:
+          row: 10
+          column: 20
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 12
     column: 22
   fix:
-    content: ""
-    location:
-      row: 12
-      column: 15
-    end_location:
-      row: 12
-      column: 21
+    edits:
+      - content: ""
+        location:
+          row: 12
+          column: 15
+        end_location:
+          row: 12
+          column: 21
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -214,13 +224,14 @@ expression: diagnostics
     row: 14
     column: 22
   fix:
-    content: "\"rb\""
-    location:
-      row: 14
-      column: 17
-    end_location:
-      row: 14
-      column: 21
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 14
+          column: 17
+        end_location:
+          row: 14
+          column: 21
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -234,13 +245,14 @@ expression: diagnostics
     row: 16
     column: 23
   fix:
-    content: "\"rb\""
-    location:
-      row: 16
-      column: 17
-    end_location:
-      row: 16
-      column: 22
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 16
+          column: 17
+        end_location:
+          row: 16
+          column: 22
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -254,13 +266,14 @@ expression: diagnostics
     row: 18
     column: 21
   fix:
-    content: ""
-    location:
-      row: 18
-      column: 15
-    end_location:
-      row: 18
-      column: 20
+    edits:
+      - content: ""
+        location:
+          row: 18
+          column: 15
+        end_location:
+          row: 18
+          column: 20
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -274,13 +287,14 @@ expression: diagnostics
     row: 20
     column: 22
   fix:
-    content: ""
-    location:
-      row: 20
-      column: 15
-    end_location:
-      row: 20
-      column: 21
+    edits:
+      - content: ""
+        location:
+          row: 20
+          column: 15
+        end_location:
+          row: 20
+          column: 21
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -294,13 +308,14 @@ expression: diagnostics
     row: 22
     column: 39
   fix:
-    content: ""
-    location:
-      row: 22
-      column: 15
-    end_location:
-      row: 22
-      column: 20
+    edits:
+      - content: ""
+        location:
+          row: 22
+          column: 15
+        end_location:
+          row: 22
+          column: 20
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -314,13 +329,14 @@ expression: diagnostics
     row: 24
     column: 22
   fix:
-    content: "\"w\""
-    location:
-      row: 24
-      column: 17
-    end_location:
-      row: 24
-      column: 21
+    edits:
+      - content: "\"w\""
+        location:
+          row: 24
+          column: 17
+        end_location:
+          row: 24
+          column: 21
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -334,13 +350,14 @@ expression: diagnostics
     row: 27
     column: 27
   fix:
-    content: ""
-    location:
-      row: 27
-      column: 21
-    end_location:
-      row: 27
-      column: 26
+    edits:
+      - content: ""
+        location:
+          row: 27
+          column: 21
+        end_location:
+          row: 27
+          column: 26
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -354,13 +371,14 @@ expression: diagnostics
     row: 28
     column: 28
   fix:
-    content: "\"rb\""
-    location:
-      row: 28
-      column: 23
-    end_location:
-      row: 28
-      column: 27
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 28
+          column: 23
+        end_location:
+          row: 28
+          column: 27
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -374,13 +392,14 @@ expression: diagnostics
     row: 30
     column: 32
   fix:
-    content: ""
-    location:
-      row: 30
-      column: 26
-    end_location:
-      row: 30
-      column: 31
+    edits:
+      - content: ""
+        location:
+          row: 30
+          column: 26
+        end_location:
+          row: 30
+          column: 31
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -394,13 +413,14 @@ expression: diagnostics
     row: 32
     column: 33
   fix:
-    content: "\"rb\""
-    location:
-      row: 32
-      column: 28
-    end_location:
-      row: 32
-      column: 32
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 32
+          column: 28
+        end_location:
+          row: 32
+          column: 32
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -414,13 +434,14 @@ expression: diagnostics
     row: 35
     column: 21
   fix:
-    content: ""
-    location:
-      row: 35
-      column: 15
-    end_location:
-      row: 35
-      column: 20
+    edits:
+      - content: ""
+        location:
+          row: 35
+          column: 15
+        end_location:
+          row: 35
+          column: 20
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -434,13 +455,14 @@ expression: diagnostics
     row: 35
     column: 45
   fix:
-    content: ""
-    location:
-      row: 35
-      column: 39
-    end_location:
-      row: 35
-      column: 44
+    edits:
+      - content: ""
+        location:
+          row: 35
+          column: 39
+        end_location:
+          row: 35
+          column: 44
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -454,13 +476,14 @@ expression: diagnostics
     row: 37
     column: 22
   fix:
-    content: "\"rb\""
-    location:
-      row: 37
-      column: 17
-    end_location:
-      row: 37
-      column: 21
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 37
+          column: 17
+        end_location:
+          row: 37
+          column: 21
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -474,13 +497,14 @@ expression: diagnostics
     row: 37
     column: 47
   fix:
-    content: "\"rb\""
-    location:
-      row: 37
-      column: 42
-    end_location:
-      row: 37
-      column: 46
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 37
+          column: 42
+        end_location:
+          row: 37
+          column: 46
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -494,13 +518,14 @@ expression: diagnostics
     row: 40
     column: 21
   fix:
-    content: ""
-    location:
-      row: 40
-      column: 10
-    end_location:
-      row: 40
-      column: 20
+    edits:
+      - content: ""
+        location:
+          row: 40
+          column: 10
+        end_location:
+          row: 40
+          column: 20
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -514,13 +539,14 @@ expression: diagnostics
     row: 41
     column: 26
   fix:
-    content: ""
-    location:
-      row: 41
-      column: 15
-    end_location:
-      row: 41
-      column: 25
+    edits:
+      - content: ""
+        location:
+          row: 41
+          column: 15
+        end_location:
+          row: 41
+          column: 25
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -534,13 +560,14 @@ expression: diagnostics
     row: 42
     column: 26
   fix:
-    content: ""
-    location:
-      row: 42
-      column: 5
-    end_location:
-      row: 42
-      column: 15
+    edits:
+      - content: ""
+        location:
+          row: 42
+          column: 5
+        end_location:
+          row: 42
+          column: 15
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -554,13 +581,14 @@ expression: diagnostics
     row: 44
     column: 26
   fix:
-    content: ""
-    location:
-      row: 44
-      column: 15
-    end_location:
-      row: 44
-      column: 25
+    edits:
+      - content: ""
+        location:
+          row: 44
+          column: 15
+        end_location:
+          row: 44
+          column: 25
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -574,13 +602,14 @@ expression: diagnostics
     row: 46
     column: 31
   fix:
-    content: ""
-    location:
-      row: 46
-      column: 20
-    end_location:
-      row: 46
-      column: 30
+    edits:
+      - content: ""
+        location:
+          row: 46
+          column: 20
+        end_location:
+          row: 46
+          column: 30
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -594,13 +623,14 @@ expression: diagnostics
     row: 48
     column: 31
   fix:
-    content: ""
-    location:
-      row: 48
-      column: 10
-    end_location:
-      row: 48
-      column: 20
+    edits:
+      - content: ""
+        location:
+          row: 48
+          column: 10
+        end_location:
+          row: 48
+          column: 20
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -614,13 +644,14 @@ expression: diagnostics
     row: 51
     column: 22
   fix:
-    content: "\"rb\""
-    location:
-      row: 51
-      column: 17
-    end_location:
-      row: 51
-      column: 21
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 51
+          column: 17
+        end_location:
+          row: 51
+          column: 21
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -634,13 +665,14 @@ expression: diagnostics
     row: 52
     column: 27
   fix:
-    content: "\"rb\""
-    location:
-      row: 52
-      column: 22
-    end_location:
-      row: 52
-      column: 26
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 52
+          column: 22
+        end_location:
+          row: 52
+          column: 26
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -654,13 +686,14 @@ expression: diagnostics
     row: 53
     column: 27
   fix:
-    content: "\"rb\""
-    location:
-      row: 53
-      column: 10
-    end_location:
-      row: 53
-      column: 14
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 53
+          column: 10
+        end_location:
+          row: 53
+          column: 14
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -674,13 +707,14 @@ expression: diagnostics
     row: 55
     column: 27
   fix:
-    content: "\"rb\""
-    location:
-      row: 55
-      column: 22
-    end_location:
-      row: 55
-      column: 26
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 55
+          column: 22
+        end_location:
+          row: 55
+          column: 26
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -694,13 +728,14 @@ expression: diagnostics
     row: 57
     column: 32
   fix:
-    content: "\"rb\""
-    location:
-      row: 57
-      column: 27
-    end_location:
-      row: 57
-      column: 31
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 57
+          column: 27
+        end_location:
+          row: 57
+          column: 31
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -714,13 +749,14 @@ expression: diagnostics
     row: 59
     column: 32
   fix:
-    content: "\"rb\""
-    location:
-      row: 59
-      column: 15
-    end_location:
-      row: 59
-      column: 19
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 59
+          column: 15
+        end_location:
+          row: 59
+          column: 19
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -734,13 +770,14 @@ expression: diagnostics
     row: 62
     column: 110
   fix:
-    content: ""
-    location:
-      row: 62
-      column: 15
-    end_location:
-      row: 62
-      column: 25
+    edits:
+      - content: ""
+        location:
+          row: 62
+          column: 15
+        end_location:
+          row: 62
+          column: 25
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -754,13 +791,14 @@ expression: diagnostics
     row: 63
     column: 110
   fix:
-    content: ""
-    location:
-      row: 63
-      column: 99
-    end_location:
-      row: 63
-      column: 109
+    edits:
+      - content: ""
+        location:
+          row: 63
+          column: 99
+        end_location:
+          row: 63
+          column: 109
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -774,13 +812,14 @@ expression: diagnostics
     row: 64
     column: 110
   fix:
-    content: ""
-    location:
-      row: 64
-      column: 58
-    end_location:
-      row: 64
-      column: 68
+    edits:
+      - content: ""
+        location:
+          row: 64
+          column: 58
+        end_location:
+          row: 64
+          column: 68
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -794,13 +833,14 @@ expression: diagnostics
     row: 65
     column: 110
   fix:
-    content: ""
-    location:
-      row: 65
-      column: 5
-    end_location:
-      row: 65
-      column: 15
+    edits:
+      - content: ""
+        location:
+          row: 65
+          column: 5
+        end_location:
+          row: 65
+          column: 15
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -814,13 +854,14 @@ expression: diagnostics
     row: 67
     column: 111
   fix:
-    content: "\"rb\""
-    location:
-      row: 67
-      column: 22
-    end_location:
-      row: 67
-      column: 26
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 67
+          column: 22
+        end_location:
+          row: 67
+          column: 26
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -834,13 +875,14 @@ expression: diagnostics
     row: 68
     column: 111
   fix:
-    content: "\"rb\""
-    location:
-      row: 68
-      column: 106
-    end_location:
-      row: 68
-      column: 110
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 68
+          column: 106
+        end_location:
+          row: 68
+          column: 110
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -854,13 +896,14 @@ expression: diagnostics
     row: 69
     column: 111
   fix:
-    content: "\"rb\""
-    location:
-      row: 69
-      column: 65
-    end_location:
-      row: 69
-      column: 69
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 69
+          column: 65
+        end_location:
+          row: 69
+          column: 69
   parent: ~
 - kind:
     name: RedundantOpenModes
@@ -874,12 +917,13 @@ expression: diagnostics
     row: 70
     column: 111
   fix:
-    content: "\"rb\""
-    location:
-      row: 70
-      column: 10
-    end_location:
-      row: 70
-      column: 14
+    edits:
+      - content: "\"rb\""
+        location:
+          row: 70
+          column: 10
+        end_location:
+          row: 70
+          column: 14
   parent: ~
 

@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BannedApi
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BannedApi
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BannedApi
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BannedApi
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BannedApi
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BannedApi
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BannedApi
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BannedApi
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BannedApi
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 27
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BannedApi
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 29
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BannedApi
@@ -156,6 +167,7 @@ expression: diagnostics
   end_location:
     row: 33
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

@@ -129,7 +129,7 @@ pub(crate) struct SectionContext<'a> {
     pub(crate) original_index: usize,
 }
 
-fn suspected_as_section(line: &str, style: &SectionStyle) -> Option<SectionKind> {
+fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> {
     if let Some(kind) = SectionKind::from_str(whitespace::leading_words(line)) {
         if style.sections().contains(&kind) {
             return Some(kind);
@@ -168,7 +168,7 @@ fn is_docstring_section(context: &SectionContext) -> bool {
 /// Extract all `SectionContext` values from a docstring.
 pub(crate) fn section_contexts<'a>(
     lines: &'a [&'a str],
-    style: &SectionStyle,
+    style: SectionStyle,
 ) -> Vec<SectionContext<'a>> {
     let mut contexts = vec![];
     for (kind, lineno) in lines

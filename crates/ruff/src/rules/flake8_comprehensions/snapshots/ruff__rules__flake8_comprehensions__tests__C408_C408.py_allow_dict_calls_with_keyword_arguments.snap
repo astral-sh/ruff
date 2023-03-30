@@ -14,13 +14,14 @@ expression: diagnostics
     row: 1
     column: 11
   fix:
-    content: ()
-    location:
-      row: 1
-      column: 4
-    end_location:
-      row: 1
-      column: 11
+    edits:
+      - content: ()
+        location:
+          row: 1
+          column: 4
+        end_location:
+          row: 1
+          column: 11
   parent: ~
 - kind:
     name: UnnecessaryCollectionCall
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 2
     column: 10
   fix:
-    content: "[]"
-    location:
-      row: 2
-      column: 4
-    end_location:
-      row: 2
-      column: 10
+    edits:
+      - content: "[]"
+        location:
+          row: 2
+          column: 4
+        end_location:
+          row: 2
+          column: 10
   parent: ~
 - kind:
     name: UnnecessaryCollectionCall
@@ -54,12 +56,13 @@ expression: diagnostics
     row: 3
     column: 11
   fix:
-    content: "{}"
-    location:
-      row: 3
-      column: 5
-    end_location:
-      row: 3
-      column: 11
+    edits:
+      - content: "{}"
+        location:
+          row: 3
+          column: 5
+        end_location:
+          row: 3
+          column: 11
   parent: ~
 

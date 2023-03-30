@@ -185,35 +185,35 @@ impl AlwaysAutofixableViolation for AvoidableEscapedQuote {
     }
 }
 
-const fn good_single(quote: &Quote) -> char {
+const fn good_single(quote: Quote) -> char {
     match quote {
         Quote::Single => '\'',
         Quote::Double => '"',
     }
 }
 
-const fn bad_single(quote: &Quote) -> char {
+const fn bad_single(quote: Quote) -> char {
     match quote {
         Quote::Double => '\'',
         Quote::Single => '"',
     }
 }
 
-const fn good_multiline(quote: &Quote) -> &str {
+const fn good_multiline(quote: Quote) -> &'static str {
     match quote {
         Quote::Single => "'''",
         Quote::Double => "\"\"\"",
     }
 }
 
-const fn good_multiline_ending(quote: &Quote) -> &str {
+const fn good_multiline_ending(quote: Quote) -> &'static str {
     match quote {
         Quote::Single => "'\"\"\"",
         Quote::Double => "\"'''",
     }
 }
 
-const fn good_docstring(quote: &Quote) -> &str {
+const fn good_docstring(quote: Quote) -> &'static str {
     match quote {
         Quote::Single => "'",
         Quote::Double => "\"",
@@ -270,28 +270,28 @@ fn docstring(
 
     if trivia
         .raw_text
-        .contains(good_docstring(&quotes_settings.docstring_quotes))
+        .contains(good_docstring(quotes_settings.docstring_quotes))
     {
         return None;
     }
 
     let mut diagnostic = Diagnostic::new(
         BadQuotesDocstring {
-            quote: quotes_settings.docstring_quotes.clone(),
+            quote: quotes_settings.docstring_quotes,
         },
         Range::new(start, end),
     );
     if autofix.into() && settings.rules.should_fix(Rule::BadQuotesDocstring) {
         let quote_count = if trivia.is_multiline { 3 } else { 1 };
         let string_contents = &trivia.raw_text[quote_count..trivia.raw_text.len() - quote_count];
-        let quote = good_docstring(&quotes_settings.docstring_quotes).repeat(quote_count);
+        let quote = good_docstring(quotes_settings.docstring_quotes).repeat(quote_count);
         let mut fixed_contents =
             String::with_capacity(trivia.prefix.len() + string_contents.len() + quote.len() * 2);
         fixed_contents.push_str(trivia.prefix);
         fixed_contents.push_str(&quote);
         fixed_contents.push_str(string_contents);
         fixed_contents.push_str(&quote);
-        diagnostic.amend(Edit::replacement(fixed_contents, start, end));
+        diagnostic.set_fix(Edit::replacement(fixed_contents, start, end));
     }
     Some(diagnostic)
 }
@@ -323,12 +323,12 @@ fn strings(
             return false;
         }
 
-        if trivia.last_quote_char == good_single(&quotes_settings.inline_quotes) {
+        if trivia.last_quote_char == good_single(quotes_settings.inline_quotes) {
             return false;
         }
 
         let string_contents = &trivia.raw_text[1..trivia.raw_text.len() - 1];
-        string_contents.contains(good_single(&quotes_settings.inline_quotes))
+        string_contents.contains(good_single(quotes_settings.inline_quotes))
     });
 
     for ((start, end), trivia) in sequence.iter().zip(trivia.into_iter()) {
@@ -336,7 +336,7 @@ fn strings(
             // If our string is or contains a known good string, ignore it.
             if trivia
                 .raw_text
-                .contains(good_multiline(&quotes_settings.multiline_quotes))
+                .contains(good_multiline(quotes_settings.multiline_quotes))
             {
                 continue;
             }
@@ -344,21 +344,21 @@ fn strings(
             // If our string ends with a known good ending, then ignore it.
             if trivia
                 .raw_text
-                .ends_with(good_multiline_ending(&quotes_settings.multiline_quotes))
+                .ends_with(good_multiline_ending(quotes_settings.multiline_quotes))
             {
                 continue;
             }
 
             let mut diagnostic = Diagnostic::new(
                 BadQuotesMultilineString {
-                    quote: quotes_settings.multiline_quotes.clone(),
+                    quote: quotes_settings.multiline_quotes,
                 },
                 Range::new(*start, *end),
             );
 
             if autofix.into() && settings.rules.should_fix(Rule::BadQuotesMultilineString) {
                 let string_contents = &trivia.raw_text[3..trivia.raw_text.len() - 3];
-                let quote = good_multiline(&quotes_settings.multiline_quotes);
+                let quote = good_multiline(quotes_settings.multiline_quotes);
                 let mut fixed_contents = String::with_capacity(
                     trivia.prefix.len() + string_contents.len() + quote.len() * 2,
                 );
@@ -366,14 +366,14 @@ fn strings(
                 fixed_contents.push_str(quote);
                 fixed_contents.push_str(string_contents);
                 fixed_contents.push_str(quote);
-                diagnostic.amend(Edit::replacement(fixed_contents, *start, *end));
+                diagnostic.set_fix(Edit::replacement(fixed_contents, *start, *end));
             }
             diagnostics.push(diagnostic);
         } else {
             let string_contents = &trivia.raw_text[1..trivia.raw_text.len() - 1];
 
             // If we're using the preferred quotation type, check for escapes.
-            if trivia.last_quote_char == good_single(&quotes_settings.inline_quotes) {
+            if trivia.last_quote_char == good_single(quotes_settings.inline_quotes) {
                 if !quotes_settings.avoid_escape
                     || trivia.prefix.contains('r')
                     || trivia.prefix.contains('R')
@@ -381,13 +381,13 @@ fn strings(
                     continue;
                 }
 
-                if string_contents.contains(good_single(&quotes_settings.inline_quotes))
-                    && !string_contents.contains(bad_single(&quotes_settings.inline_quotes))
+                if string_contents.contains(good_single(quotes_settings.inline_quotes))
+                    && !string_contents.contains(bad_single(quotes_settings.inline_quotes))
                 {
                     let mut diagnostic =
                         Diagnostic::new(AvoidableEscapedQuote, Range::new(*start, *end));
                     if autofix.into() && settings.rules.should_fix(Rule::AvoidableEscapedQuote) {
-                        let quote = bad_single(&quotes_settings.inline_quotes);
+                        let quote = bad_single(quotes_settings.inline_quotes);
 
                         let mut fixed_contents =
                             String::with_capacity(trivia.prefix.len() + string_contents.len() + 2);
@@ -430,7 +430,7 @@ fn strings(
 
                         fixed_contents.push(quote);
 
-                        diagnostic.amend(Edit::replacement(fixed_contents, *start, *end));
+                        diagnostic.set_fix(Edit::replacement(fixed_contents, *start, *end));
                     }
                     diagnostics.push(diagnostic);
                 }
@@ -441,19 +441,19 @@ fn strings(
             if !relax_quote {
                 let mut diagnostic = Diagnostic::new(
                     BadQuotesInlineString {
-                        quote: quotes_settings.inline_quotes.clone(),
+                        quote: quotes_settings.inline_quotes,
                     },
                     Range::new(*start, *end),
                 );
                 if autofix.into() && settings.rules.should_fix(Rule::BadQuotesInlineString) {
-                    let quote = good_single(&quotes_settings.inline_quotes);
+                    let quote = good_single(quotes_settings.inline_quotes);
                     let mut fixed_contents =
                         String::with_capacity(trivia.prefix.len() + string_contents.len() + 2);
                     fixed_contents.push_str(trivia.prefix);
                     fixed_contents.push(quote);
                     fixed_contents.push_str(string_contents);
                     fixed_contents.push(quote);
-                    diagnostic.amend(Edit::replacement(fixed_contents, *start, *end));
+                    diagnostic.set_fix(Edit::replacement(fixed_contents, *start, *end));
                 }
                 diagnostics.push(diagnostic);
             }

@@ -63,7 +63,7 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
         Range::from(target),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.amend(Edit::replacement(
+        diagnostic.set_fix(Edit::replacement(
             "OSError".to_string(),
             target.location,
             target.end_location.unwrap(),
@@ -77,7 +77,7 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, Range::from(target));
     if checker.patch(diagnostic.kind.rule()) {
         let ExprKind::Tuple { elts, ..} = &target.node else {
-            unreachable!("expected ExprKind::Tuple");
+            panic!("Expected ExprKind::Tuple");
         };
 
         // Filter out any `OSErrors` aliases.
@@ -104,13 +104,13 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
         }
 
         if remaining.len() == 1 {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 "OSError".to_string(),
                 target.location,
                 target.end_location.unwrap(),
             ));
         } else {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 format!(
                     "({})",
                     unparse_expr(

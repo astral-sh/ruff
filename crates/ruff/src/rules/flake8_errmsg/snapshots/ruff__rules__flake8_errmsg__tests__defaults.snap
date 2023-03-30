@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 53
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RawStringInException
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FStringInException
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 56
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DotFormatInException
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 18
     column: 81
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

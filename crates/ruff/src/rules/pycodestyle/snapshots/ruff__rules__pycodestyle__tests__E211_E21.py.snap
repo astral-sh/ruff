@@ -14,13 +14,14 @@ expression: diagnostics
     row: 2
     column: 5
   fix:
-    content: ""
-    location:
-      row: 2
-      column: 4
-    end_location:
-      row: 2
-      column: 5
+    edits:
+      - content: ""
+        location:
+          row: 2
+          column: 4
+        end_location:
+          row: 2
+          column: 5
   parent: ~
 - kind:
     name: WhitespaceBeforeParameters
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 4
     column: 5
   fix:
-    content: ""
-    location:
-      row: 4
-      column: 4
-    end_location:
-      row: 4
-      column: 5
+    edits:
+      - content: ""
+        location:
+          row: 4
+          column: 4
+        end_location:
+          row: 4
+          column: 5
   parent: ~
 - kind:
     name: WhitespaceBeforeParameters
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 4
     column: 20
   fix:
-    content: ""
-    location:
-      row: 4
-      column: 19
-    end_location:
-      row: 4
-      column: 20
+    edits:
+      - content: ""
+        location:
+          row: 4
+          column: 19
+        end_location:
+          row: 4
+          column: 20
   parent: ~
 - kind:
     name: WhitespaceBeforeParameters
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 6
     column: 12
   fix:
-    content: ""
-    location:
-      row: 6
-      column: 11
-    end_location:
-      row: 6
-      column: 12
+    edits:
+      - content: ""
+        location:
+          row: 6
+          column: 11
+        end_location:
+          row: 6
+          column: 12
   parent: ~
 

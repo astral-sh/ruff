@@ -74,6 +74,7 @@ fn any_arg_is_str(slice: &Expr) -> bool {
     }
 }
 
+#[derive(Copy, Clone)]
 enum TypingMember {
     Union,
     Optional,
@@ -111,7 +112,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             let mut diagnostic =
                 Diagnostic::new(NonPEP604Annotation { fixable }, Range::from(expr));
             if fixable && checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Edit::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     unparse_expr(&optional(slice), checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),
@@ -128,7 +129,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                         // Invalid type annotation.
                     }
                     ExprKind::Tuple { elts, .. } => {
-                        diagnostic.amend(Edit::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             unparse_expr(&union(elts), checker.stylist),
                             expr.location,
                             expr.end_location.unwrap(),
@@ -136,7 +137,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                     }
                     _ => {
                         // Single argument.
-                        diagnostic.amend(Edit::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             unparse_expr(slice, checker.stylist),
                             expr.location,
                             expr.end_location.unwrap(),

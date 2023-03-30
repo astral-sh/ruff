@@ -14,13 +14,14 @@ expression: diagnostics
     row: 6
     column: 15
   fix:
-    content: ""
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 7
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 7
+          column: 0
   parent: ~
 - kind:
     name: UselessReturn
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 11
     column: 15
   fix:
-    content: ""
-    location:
-      row: 11
-      column: 0
-    end_location:
-      row: 12
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 11
+          column: 0
+        end_location:
+          row: 12
+          column: 0
   parent: ~
 - kind:
     name: UselessReturn
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 16
     column: 15
   fix:
-    content: ""
-    location:
-      row: 16
-      column: 0
-    end_location:
-      row: 17
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 16
+          column: 0
+        end_location:
+          row: 17
+          column: 0
   parent: ~
 - kind:
     name: UselessReturn
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 22
     column: 19
   fix:
-    content: ""
-    location:
-      row: 22
-      column: 0
-    end_location:
-      row: 23
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 22
+          column: 0
+        end_location:
+          row: 23
+          column: 0
   parent: ~
 - kind:
     name: UselessReturn
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 50
     column: 15
   fix:
-    content: ""
-    location:
-      row: 50
-      column: 0
-    end_location:
-      row: 51
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 50
+          column: 0
+        end_location:
+          row: 51
+          column: 0
   parent: ~
 - kind:
     name: UselessReturn
@@ -114,12 +119,13 @@ expression: diagnostics
     row: 60
     column: 19
   fix:
-    content: ""
-    location:
-      row: 60
-      column: 0
-    end_location:
-      row: 61
-      column: 0
+    edits:
+      - content: ""
+        location:
+          row: 60
+          column: 0
+        end_location:
+          row: 61
+          column: 0
   parent: ~
 

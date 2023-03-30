@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedFunctionArgument
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedFunctionArgument
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedFunctionArgument
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedFunctionArgument
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedFunctionArgument
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedFunctionArgument
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnusedFunctionArgument
@@ -104,6 +111,7 @@ expression: diagnostics
   end_location:
     row: 21
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

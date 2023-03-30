@@ -26,7 +26,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
     let contents = std::fs::read_to_string(&path)?;
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
     let locator = Locator::new(&contents);
-    let stylist = Stylist::from_contents(&contents, &locator);
+    let stylist = Stylist::from_tokens(&tokens, &locator);
     let indexer: Indexer = tokens.as_slice().into();
     let directives =
         directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
@@ -51,7 +51,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
     // Detect autofixes that don't converge after multiple iterations.
     if diagnostics
         .iter()
-        .any(|diagnostic| diagnostic.fix.is_some())
+        .any(|diagnostic| !diagnostic.fix.is_empty())
     {
         let max_iterations = 10;
 
@@ -61,7 +61,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Diag
         loop {
             let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
             let locator = Locator::new(&contents);
-            let stylist = Stylist::from_contents(&contents, &locator);
+            let stylist = Stylist::from_tokens(&tokens, &locator);
             let indexer: Indexer = tokens.as_slice().into();
             let directives =
                 directives::extract_directives(&tokens, directives::Flags::from_settings(settings));

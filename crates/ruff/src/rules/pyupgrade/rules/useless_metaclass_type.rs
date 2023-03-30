@@ -62,9 +62,9 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {
-                    checker.deletions.insert(defined_by.clone());
+                    checker.deletions.insert(*defined_by);
                 }
-                diagnostic.amend(fix);
+                diagnostic.set_fix(fix);
             }
             Err(e) => error!("Failed to fix remove metaclass type: {e}"),
         }

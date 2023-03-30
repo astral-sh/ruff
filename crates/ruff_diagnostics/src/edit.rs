@@ -2,6 +2,8 @@ use rustpython_parser::ast::Location;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
+/// A text edit to be applied to a source file. Inserts, deletes, or replaces
+/// content at a given location.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Edit {

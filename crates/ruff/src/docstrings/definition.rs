@@ -29,12 +29,13 @@ pub struct Docstring<'a> {
     pub indentation: &'a str,
 }
 
+#[derive(Copy, Clone)]
 pub enum Documentable {
     Class,
     Function,
 }
 
-pub fn transition_scope(scope: &VisibleScope, stmt: &Stmt, kind: &Documentable) -> VisibleScope {
+pub fn transition_scope(scope: VisibleScope, stmt: &Stmt, kind: Documentable) -> VisibleScope {
     match kind {
         Documentable::Function => VisibleScope {
             modifier: Modifier::Function,

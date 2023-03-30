@@ -25,7 +25,7 @@ fn add_check_for_node<T>(checker: &mut Checker, node: &Located<T>) {
     let mut diagnostic = Diagnostic::new(DeprecatedCElementTree, Range::from(node));
     if checker.patch(diagnostic.kind.rule()) {
         let contents = checker.locator.slice(node);
-        diagnostic.amend(Edit::replacement(
+        diagnostic.set_fix(Edit::replacement(
             contents.replacen("cElementTree", "ElementTree", 1),
             node.location,
             node.end_location.unwrap(),
@@ -66,6 +66,6 @@ pub fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
                 }
             }
         }
-        _ => unreachable!("Expected StmtKind::Import | StmtKind::ImportFrom"),
+        _ => panic!("Expected StmtKind::Import | StmtKind::ImportFrom"),
     }
 }

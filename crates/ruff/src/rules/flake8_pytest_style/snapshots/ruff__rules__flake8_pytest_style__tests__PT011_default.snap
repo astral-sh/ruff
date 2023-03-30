@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 33
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestRaisesTooBroad
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 35
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestRaisesTooBroad
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 33
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestRaisesTooBroad
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 28
     column: 33
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestRaisesTooBroad
@@ -65,6 +69,7 @@ expression: diagnostics
   end_location:
     row: 31
     column: 33
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

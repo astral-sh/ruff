@@ -311,7 +311,7 @@ pub(crate) fn percent_format_extra_named_arguments(
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_amend(|| {
+        diagnostic.try_set_fix(|| {
             remove_unused_format_arguments_from_dict(
                 &missing,
                 right,
@@ -474,7 +474,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_amend(|| {
+        diagnostic.try_set_fix(|| {
             remove_unused_keyword_arguments_from_format_call(
                 &missing,
                 location,
@@ -515,7 +515,7 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
         location,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.try_amend(|| {
+        diagnostic.try_set_fix(|| {
             remove_unused_positional_arguments_from_format_call(
                 &missing,
                 location,

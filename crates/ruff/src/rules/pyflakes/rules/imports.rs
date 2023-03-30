@@ -9,7 +9,7 @@ use ruff_python_stdlib::future::ALL_FEATURE_NAMES;
 
 use crate::checkers::ast::Checker;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum UnusedImportContext {
     ExceptHandler,
     Init,

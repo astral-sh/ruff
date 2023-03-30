@@ -40,12 +40,12 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::test::test_path;
     use crate::settings;
+    use crate::test::test_path;
 
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
-        let diagnostics =test_path(
+        let diagnostics = test_path(
             Path::new("%s").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
@@ -61,15 +61,17 @@ mod tests {
     rules_dir = plugin_dir / "rules"
     rules_dir.mkdir(exist_ok=True)
 
-    with (rules_dir / "mod.rs").open("w+") as fp:
-        fp.write("\n\n")
+    (rules_dir / "mod.rs").touch()
 
     # Create the snapshots subdirectory
     (plugin_dir / "snapshots").mkdir(exist_ok=True)
 
     # Add the plugin to `rules/mod.rs`.
-    with (ROOT_DIR / "crates/ruff/src/rules/mod.rs").open("a") as fp:
-        fp.write(f"pub mod {dir_name(plugin)};")
+    rules_mod_path = ROOT_DIR / "crates/ruff/src/rules/mod.rs"
+    lines = rules_mod_path.read_text().strip().splitlines()
+    lines.append(f"pub mod {dir_name(plugin)};")
+    lines.sort()
+    rules_mod_path.write_text("\n".join(lines) + "\n")
 
     # Add the relevant sections to `src/registry.rs`.
     content = (ROOT_DIR / "crates/ruff/src/registry.rs").read_text()
@@ -95,7 +97,7 @@ mod tests {
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("r") as fp:
         while (line := next(fp)).strip() != "// ruff":
             text += line
-        text += " " * 8 + f"// {plugin}\n"
+        text += " " * 8 + f"// {plugin}\n\n"
         text += line
         text += fp.read()
 

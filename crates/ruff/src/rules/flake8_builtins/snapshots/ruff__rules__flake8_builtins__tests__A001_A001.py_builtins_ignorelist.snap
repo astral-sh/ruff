@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 1
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 27
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -208,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 27
     column: 47
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -221,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 27
     column: 52
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BuiltinVariableShadowing
@@ -234,6 +251,7 @@ expression: diagnostics
   end_location:
     row: 30
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

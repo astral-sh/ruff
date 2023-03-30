@@ -122,14 +122,11 @@ pub fn organize_imports(
         &settings.src,
         package,
         settings.isort.combine_as_imports,
-        &settings.isort.extra_standard_library,
         settings.isort.force_single_line,
         settings.isort.force_sort_within_sections,
         settings.isort.force_wrap_aliases,
         &settings.isort.force_to_top,
-        &settings.isort.known_first_party,
-        &settings.isort.known_third_party,
-        &settings.isort.known_local_folder,
+        &settings.isort.known_modules,
         settings.isort.order_by_type,
         settings.isort.relative_imports_order,
         &settings.isort.single_line_exclusions,
@@ -155,7 +152,7 @@ pub fn organize_imports(
     } else {
         let mut diagnostic = Diagnostic::new(UnsortedImports, range);
         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 indent(&expected, indentation),
                 range.location,
                 range.end_location,

@@ -9,12 +9,15 @@ expression: diagnostics
     fixable: false
   location:
     row: 1
-    column: 0
+    column: 7
   end_location:
     row: 1
     column: 22
-  fix: ~
-  parent: ~
+  fix:
+    edits: []
+  parent:
+    row: 1
+    column: 0
 - kind:
     name: CamelcaseImportedAsAcronym
     body: "CamelCase `CamelCase` imported as acronym `CC`"
@@ -22,10 +25,13 @@ expression: diagnostics
     fixable: false
   location:
     row: 2
-    column: 0
+    column: 16
   end_location:
     row: 2
     column: 31
-  fix: ~
-  parent: ~
+  fix:
+    edits: []
+  parent:
+    row: 2
+    column: 0
 

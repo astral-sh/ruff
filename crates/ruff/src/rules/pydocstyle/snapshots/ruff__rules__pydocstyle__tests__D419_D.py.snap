@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: EmptyDocstring
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 74
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: EmptyDocstring
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 80
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

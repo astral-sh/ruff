@@ -14,13 +14,14 @@ expression: diagnostics
     row: 4
     column: 20
   fix:
-    content: list
-    location:
-      row: 4
-      column: 9
-    end_location:
-      row: 4
-      column: 20
+    edits:
+      - content: list
+        location:
+          row: 4
+          column: 9
+        end_location:
+          row: 4
+          column: 20
   parent: ~
 - kind:
     name: NonPEP585Annotation
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 11
     column: 13
   fix:
-    content: list
-    location:
-      row: 11
-      column: 9
-    end_location:
-      row: 11
-      column: 13
+    edits:
+      - content: list
+        location:
+          row: 11
+          column: 9
+        end_location:
+          row: 11
+          column: 13
   parent: ~
 - kind:
     name: NonPEP585Annotation
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 18
     column: 15
   fix:
-    content: list
-    location:
-      row: 18
-      column: 9
-    end_location:
-      row: 18
-      column: 15
+    edits:
+      - content: list
+        location:
+          row: 18
+          column: 9
+        end_location:
+          row: 18
+          column: 15
   parent: ~
 - kind:
     name: NonPEP585Annotation
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 25
     column: 14
   fix:
-    content: list
-    location:
-      row: 25
-      column: 9
-    end_location:
-      row: 25
-      column: 14
+    edits:
+      - content: list
+        location:
+          row: 25
+          column: 9
+        end_location:
+          row: 25
+          column: 14
   parent: ~
 - kind:
     name: NonPEP585Annotation
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 29
     column: 14
   fix:
-    content: list
-    location:
-      row: 29
-      column: 10
-    end_location:
-      row: 29
-      column: 14
+    edits:
+      - content: list
+        location:
+          row: 29
+          column: 10
+        end_location:
+          row: 29
+          column: 14
   parent: ~
 - kind:
     name: NonPEP585Annotation
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 33
     column: 15
   fix:
-    content: list
-    location:
-      row: 33
-      column: 11
-    end_location:
-      row: 33
-      column: 15
+    edits:
+      - content: list
+        location:
+          row: 33
+          column: 11
+        end_location:
+          row: 33
+          column: 15
   parent: ~
 - kind:
     name: NonPEP585Annotation
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 37
     column: 14
   fix:
-    content: list
-    location:
-      row: 37
-      column: 10
-    end_location:
-      row: 37
-      column: 14
+    edits:
+      - content: list
+        location:
+          row: 37
+          column: 10
+        end_location:
+          row: 37
+          column: 14
   parent: ~
 - kind:
     name: NonPEP585Annotation
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 41
     column: 16
   fix:
-    content: list
-    location:
-      row: 41
-      column: 12
-    end_location:
-      row: 41
-      column: 16
+    edits:
+      - content: list
+        location:
+          row: 41
+          column: 12
+        end_location:
+          row: 41
+          column: 16
   parent: ~
 - kind:
     name: NonPEP585Annotation
@@ -173,6 +181,112 @@ expression: diagnostics
   end_location:
     row: 45
     column: 23
-  fix: ~
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: NonPEP585Annotation
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: "Replace `List` with `list`"
+    fixable: true
+  location:
+    row: 49
+    column: 10
+  end_location:
+    row: 49
+    column: 14
+  fix:
+    edits:
+      - content: list
+        location:
+          row: 49
+          column: 10
+        end_location:
+          row: 49
+          column: 14
+  parent: ~
+- kind:
+    name: NonPEP585Annotation
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: "Replace `List` with `list`"
+    fixable: true
+  location:
+    row: 49
+    column: 16
+  end_location:
+    row: 49
+    column: 20
+  fix:
+    edits:
+      - content: list
+        location:
+          row: 49
+          column: 16
+        end_location:
+          row: 49
+          column: 20
+  parent: ~
+- kind:
+    name: NonPEP585Annotation
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: "Replace `List` with `list`"
+    fixable: true
+  location:
+    row: 53
+    column: 10
+  end_location:
+    row: 53
+    column: 14
+  fix:
+    edits:
+      - content: list
+        location:
+          row: 53
+          column: 10
+        end_location:
+          row: 53
+          column: 14
+  parent: ~
+- kind:
+    name: NonPEP585Annotation
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 53
+    column: 15
+  end_location:
+    row: 53
+    column: 29
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: NonPEP585Annotation
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 57
+    column: 9
+  end_location:
+    row: 57
+    column: 31
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: NonPEP585Annotation
+    body: "Use `list` instead of `List` for type annotations"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 57
+    column: 9
+  end_location:
+    row: 57
+    column: 31
+  fix:
+    edits: []
   parent: ~
 

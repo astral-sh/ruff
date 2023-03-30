@@ -455,7 +455,7 @@ fn check_dynamically_typed<F>(
 pub fn definition(
     checker: &Checker,
     definition: &Definition,
-    visibility: &Visibility,
+    visibility: Visibility,
 ) -> Vec<Diagnostic> {
     // TODO(charlie): Consider using the AST directly here rather than `Definition`.
     // We could adhere more closely to `flake8-annotations` by defining public
@@ -667,7 +667,7 @@ pub fn definition(
                             helpers::identifier_range(stmt, checker.locator),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.try_amend(|| {
+                            diagnostic.try_set_fix(|| {
                                 fixes::add_return_annotation(checker.locator, stmt, "None")
                             });
                         }
@@ -689,7 +689,7 @@ pub fn definition(
                     let return_type = SIMPLE_MAGIC_RETURN_TYPES.get(name);
                     if let Some(return_type) = return_type {
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.try_amend(|| {
+                            diagnostic.try_set_fix(|| {
                                 fixes::add_return_annotation(checker.locator, stmt, return_type)
                             });
                         }

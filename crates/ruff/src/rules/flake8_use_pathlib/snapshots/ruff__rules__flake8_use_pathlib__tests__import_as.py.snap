@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsChmod
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsMkdir
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsMakedirs
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsRename
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PathlibReplace
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsRmdir
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsRemove
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsUnlink
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsGetcwd
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsPathExists
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsPathExpanduser
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsPathIsdir
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsPathIsfile
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsPathIslink
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsReadlink
@@ -208,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsStat
@@ -221,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsPathIsabs
@@ -234,7 +251,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsPathJoin
@@ -247,7 +265,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 10
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsPathBasename
@@ -260,7 +279,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsPathDirname
@@ -273,7 +293,8 @@ expression: diagnostics
   end_location:
     row: 26
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsPathSamefile
@@ -286,7 +307,8 @@ expression: diagnostics
   end_location:
     row: 27
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: OsPathSplitext
@@ -299,6 +321,7 @@ expression: diagnostics
   end_location:
     row: 28
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

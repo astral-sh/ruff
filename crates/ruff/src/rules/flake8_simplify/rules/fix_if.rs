@@ -114,7 +114,7 @@ pub(crate) fn fix_nested_if_statements(
     outer_if.body = inner_if.body.clone();
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..Default::default()
     };

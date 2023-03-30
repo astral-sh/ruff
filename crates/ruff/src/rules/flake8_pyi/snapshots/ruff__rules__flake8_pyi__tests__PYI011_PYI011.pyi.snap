@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 10
@@ -14,18 +14,19 @@ expression: diagnostics
     row: 10
     column: 23
   fix:
-    content: "..."
-    location:
-      row: 10
-      column: 13
-    end_location:
-      row: 10
-      column: 23
+    edits:
+      - content: "..."
+        location:
+          row: 10
+          column: 13
+        end_location:
+          row: 10
+          column: 23
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 38
@@ -34,18 +35,19 @@ expression: diagnostics
     row: 41
     column: 5
   fix:
-    content: "..."
-    location:
-      row: 38
-      column: 8
-    end_location:
-      row: 41
-      column: 5
+    edits:
+      - content: "..."
+        location:
+          row: 38
+          column: 8
+        end_location:
+          row: 41
+          column: 5
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 46
@@ -54,18 +56,19 @@ expression: diagnostics
     row: 58
     column: 5
   fix:
-    content: "..."
-    location:
-      row: 46
-      column: 8
-    end_location:
-      row: 58
-      column: 5
+    edits:
+      - content: "..."
+        location:
+          row: 46
+          column: 8
+        end_location:
+          row: 58
+          column: 5
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 63
@@ -74,18 +77,19 @@ expression: diagnostics
     row: 66
     column: 5
   fix:
-    content: "..."
-    location:
-      row: 63
-      column: 8
-    end_location:
-      row: 66
-      column: 5
+    edits:
+      - content: "..."
+        location:
+          row: 63
+          column: 8
+        end_location:
+          row: 66
+          column: 5
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 71
@@ -94,18 +98,19 @@ expression: diagnostics
     row: 73
     column: 5
   fix:
-    content: "..."
-    location:
-      row: 71
-      column: 8
-    end_location:
-      row: 73
-      column: 5
+    edits:
+      - content: "..."
+        location:
+          row: 71
+          column: 8
+        end_location:
+          row: 73
+          column: 5
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 78
@@ -114,18 +119,19 @@ expression: diagnostics
     row: 80
     column: 5
   fix:
-    content: "..."
-    location:
-      row: 78
-      column: 8
-    end_location:
-      row: 80
-      column: 5
+    edits:
+      - content: "..."
+        location:
+          row: 78
+          column: 8
+        end_location:
+          row: 80
+          column: 5
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 85
@@ -134,18 +140,19 @@ expression: diagnostics
     row: 87
     column: 5
   fix:
-    content: "..."
-    location:
-      row: 85
-      column: 8
-    end_location:
-      row: 87
-      column: 5
+    edits:
+      - content: "..."
+        location:
+          row: 85
+          column: 8
+        end_location:
+          row: 87
+          column: 5
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 90
@@ -154,18 +161,19 @@ expression: diagnostics
     row: 91
     column: 11
   fix:
-    content: "..."
-    location:
-      row: 90
-      column: 13
-    end_location:
-      row: 91
-      column: 11
+    edits:
+      - content: "..."
+        location:
+          row: 90
+          column: 13
+        end_location:
+          row: 91
+          column: 11
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 94
@@ -174,18 +182,19 @@ expression: diagnostics
     row: 95
     column: 12
   fix:
-    content: "..."
-    location:
-      row: 94
-      column: 13
-    end_location:
-      row: 95
-      column: 12
+    edits:
+      - content: "..."
+        location:
+          row: 94
+          column: 13
+        end_location:
+          row: 95
+          column: 12
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 98
@@ -194,18 +203,19 @@ expression: diagnostics
     row: 99
     column: 7
   fix:
-    content: "..."
-    location:
-      row: 98
-      column: 16
-    end_location:
-      row: 99
-      column: 7
+    edits:
+      - content: "..."
+        location:
+          row: 98
+          column: 16
+        end_location:
+          row: 99
+          column: 7
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 102
@@ -214,18 +224,19 @@ expression: diagnostics
     row: 103
     column: 7
   fix:
-    content: "..."
-    location:
-      row: 102
-      column: 13
-    end_location:
-      row: 103
-      column: 7
+    edits:
+      - content: "..."
+        location:
+          row: 102
+          column: 13
+        end_location:
+          row: 103
+          column: 7
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 106
@@ -234,18 +245,19 @@ expression: diagnostics
     row: 107
     column: 8
   fix:
-    content: "..."
-    location:
-      row: 106
-      column: 17
-    end_location:
-      row: 107
-      column: 8
+    edits:
+      - content: "..."
+        location:
+          row: 106
+          column: 17
+        end_location:
+          row: 107
+          column: 8
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 110
@@ -254,18 +266,19 @@ expression: diagnostics
     row: 111
     column: 10
   fix:
-    content: "..."
-    location:
-      row: 110
-      column: 17
-    end_location:
-      row: 111
-      column: 10
+    edits:
+      - content: "..."
+        location:
+          row: 110
+          column: 17
+        end_location:
+          row: 111
+          column: 10
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 138
@@ -274,18 +287,19 @@ expression: diagnostics
     row: 138
     column: 18
   fix:
-    content: "..."
-    location:
-      row: 138
-      column: 15
-    end_location:
-      row: 138
-      column: 18
+    edits:
+      - content: "..."
+        location:
+          row: 138
+          column: 15
+        end_location:
+          row: 138
+          column: 18
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 141
@@ -294,18 +308,19 @@ expression: diagnostics
     row: 141
     column: 21
   fix:
-    content: "..."
-    location:
-      row: 141
-      column: 15
-    end_location:
-      row: 141
-      column: 21
+    edits:
+      - content: "..."
+        location:
+          row: 141
+          column: 15
+        end_location:
+          row: 141
+          column: 21
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 147
@@ -314,18 +329,19 @@ expression: diagnostics
     row: 147
     column: 24
   fix:
-    content: "..."
-    location:
-      row: 147
-      column: 15
-    end_location:
-      row: 147
-      column: 24
+    edits:
+      - content: "..."
+        location:
+          row: 147
+          column: 15
+        end_location:
+          row: 147
+          column: 24
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 150
@@ -334,18 +350,19 @@ expression: diagnostics
     row: 151
     column: 8
   fix:
-    content: "..."
-    location:
-      row: 150
-      column: 17
-    end_location:
-      row: 151
-      column: 8
+    edits:
+      - content: "..."
+        location:
+          row: 150
+          column: 17
+        end_location:
+          row: 151
+          column: 8
   parent: ~
 - kind:
     name: TypedArgumentDefaultInStub
     body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value by `...`"
+    suggestion: "Replace default value with `...`"
     fixable: true
   location:
     row: 159
@@ -354,12 +371,13 @@ expression: diagnostics
     row: 160
     column: 8
   fix:
-    content: "..."
-    location:
-      row: 159
-      column: 13
-    end_location:
-      row: 160
-      column: 8
+    edits:
+      - content: "..."
+        location:
+          row: 159
+          column: 13
+        end_location:
+          row: 160
+          column: 8
   parent: ~
 

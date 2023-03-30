@@ -34,7 +34,7 @@ pub fn unnecessary_coding_comment(lineno: usize, line: &str, autofix: bool) -> O
             Range::new(Location::new(lineno + 1, 0), Location::new(lineno + 2, 0)),
         );
         if autofix {
-            diagnostic.amend(Edit::deletion(
+            diagnostic.set_fix(Edit::deletion(
                 Location::new(lineno + 1, 0),
                 Location::new(lineno + 2, 0),
             ));

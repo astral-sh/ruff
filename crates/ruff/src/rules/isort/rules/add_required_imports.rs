@@ -1,20 +1,18 @@
-use std::fmt;
-
 use log::error;
 use rustpython_parser as parser;
 use rustpython_parser::ast::{Location, StmtKind, Suite};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
+use ruff_python_ast::imports::{Alias, AnyImport, Import, ImportFrom};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
+use crate::importer::Importer;
 use crate::registry::Rule;
+use crate::rules::isort::track::Block;
 use crate::settings::{flags, Settings};
-
-use super::super::helpers;
-use super::super::track::Block;
 
 /// ## What it does
 /// Adds any required imports, as specified by the user, to the top of the
@@ -55,59 +53,6 @@ impl AlwaysAutofixableViolation for MissingRequiredImport {
     }
 }
 
-struct Alias<'a> {
-    name: &'a str,
-    as_name: Option<&'a str>,
-}
-
-struct ImportFrom<'a> {
-    module: Option<&'a str>,
-    name: Alias<'a>,
-    level: Option<&'a usize>,
-}
-
-struct Import<'a> {
-    name: Alias<'a>,
-}
-
-enum AnyImport<'a> {
-    Import(Import<'a>),
-    ImportFrom(ImportFrom<'a>),
-}
-
-impl fmt::Display for ImportFrom<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "from ")?;
-        if let Some(level) = self.level {
-            write!(f, "{}", ".".repeat(*level))?;
-        }
-        if let Some(module) = self.module {
-            write!(f, "{module}")?;
-        }
-        write!(f, " import {}", self.name.name)?;
-        Ok(())
-    }
-}
-
-impl fmt::Display for Import<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "import {}", self.name.name)?;
-        if let Some(as_name) = self.name.as_name {
-            write!(f, " as {as_name}")?;
-        }
-        Ok(())
-    }
-}
-
-impl fmt::Display for AnyImport<'_> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        match self {
-            AnyImport::Import(import) => write!(f, "{import}"),
-            AnyImport::ImportFrom(import_from) => write!(f, "{import_from}"),
-        }
-    }
-}
-
 fn contains(block: &Block, required_import: &AnyImport) -> bool {
     block.imports.iter().any(|import| match required_import {
         AnyImport::Import(required_import) => {
@@ -130,7 +75,7 @@ fn contains(block: &Block, required_import: &AnyImport) -> bool {
                 return false;
             };
             module.as_deref() == required_import.module
-                && level.as_ref() == required_import.level
+                && *level == required_import.level
                 && names.iter().any(|alias| {
                     alias.node.name == required_import.name.name
                         && alias.node.asname.as_deref() == required_import.name.as_name
@@ -163,38 +108,12 @@ fn add_required_import(
     }
 
     // Always insert the diagnostic at top-of-file.
-    let required_import = required_import.to_string();
     let mut diagnostic = Diagnostic::new(
-        MissingRequiredImport(required_import.clone()),
+        MissingRequiredImport(required_import.to_string()),
         Range::new(Location::default(), Location::default()),
     );
     if autofix.into() && settings.rules.should_fix(Rule::MissingRequiredImport) {
-        // Determine the location at which the import should be inserted.
-        let splice = helpers::find_splice_location(python_ast, locator);
-
-        // Generate the edit.
-        let mut contents = String::with_capacity(required_import.len() + 1);
-
-        // Newline (LF/CRLF)
-        let line_sep = stylist.line_ending().as_str();
-
-        // If we're inserting beyond the start of the file, we add
-        // a newline _before_, since the splice represents the _end_ of the last
-        // irrelevant token (e.g., the end of a comment or the end of
-        // docstring). This ensures that we properly handle awkward cases like
-        // docstrings that are followed by semicolons.
-        if splice > Location::default() {
-            contents.push_str(line_sep);
-        }
-        contents.push_str(&required_import);
-
-        // If we're inserting at the start of the file, add a trailing newline instead.
-        if splice == Location::default() {
-            contents.push_str(line_sep);
-        }
-
-        // Construct the fix.
-        diagnostic.amend(Edit::insertion(contents, splice));
+        diagnostic.set_fix(Importer::new(python_ast, locator, stylist).add_import(required_import));
     }
     Some(diagnostic)
 }
@@ -224,8 +143,8 @@ pub fn add_required_imports(
                 );
                 return vec![];
             }
-
-            match &body[0].node {
+            let stmt = &body[0];
+            match &stmt.node {
                 StmtKind::ImportFrom {
                     module,
                     names,
@@ -240,7 +159,7 @@ pub fn add_required_imports(
                                     name: name.node.name.as_str(),
                                     as_name: name.node.asname.as_deref(),
                                 },
-                                level: level.as_ref(),
+                                level: *level,
                             }),
                             blocks,
                             python_ast,

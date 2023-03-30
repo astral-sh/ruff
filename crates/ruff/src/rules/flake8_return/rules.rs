@@ -4,14 +4,15 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind}
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::elif_else_range;
 use ruff_python_ast::helpers::is_const_none;
-use ruff_python_ast::helpers::{elif_else_range, end_of_statement};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
+use crate::rules::flake8_return::helpers::end_of_last_statement;
 
 use super::branch::Branch;
 use super::helpers::result_exists;
@@ -140,7 +141,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, Range::from(*stmt));
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 "return".to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
@@ -158,7 +159,7 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic = Diagnostic::new(ImplicitReturnValue, Range::from(*stmt));
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 "return None".to_string(),
                 stmt.location,
                 stmt.end_location.unwrap(),
@@ -220,9 +221,9 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.amend(Edit::insertion(
+                        diagnostic.set_fix(Edit::insertion(
                             content,
-                            end_of_statement(stmt, checker.locator),
+                            end_of_last_statement(stmt, checker.locator),
                         ));
                     }
                 }
@@ -258,9 +259,9 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                         content.push_str(checker.stylist.line_ending().as_str());
                         content.push_str(indent);
                         content.push_str("return None");
-                        diagnostic.amend(Edit::insertion(
+                        diagnostic.set_fix(Edit::insertion(
                             content,
-                            end_of_statement(stmt, checker.locator),
+                            end_of_last_statement(stmt, checker.locator),
                         ));
                     }
                 }
@@ -297,9 +298,9 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                     content.push_str(checker.stylist.line_ending().as_str());
                     content.push_str(indent);
                     content.push_str("return None");
-                    diagnostic.amend(Edit::insertion(
+                    diagnostic.set_fix(Edit::insertion(
                         content,
-                        end_of_statement(stmt, checker.locator),
+                        end_of_last_statement(stmt, checker.locator),
                     ));
                 }
             }

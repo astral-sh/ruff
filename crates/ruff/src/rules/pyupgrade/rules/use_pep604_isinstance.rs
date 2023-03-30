@@ -10,7 +10,7 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum CallKind {
     Isinstance,
     Issubclass,
@@ -94,7 +94,7 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                 let mut diagnostic =
                     Diagnostic::new(NonPEP604Isinstance { kind }, Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.amend(Edit::replacement(
+                    diagnostic.set_fix(Edit::replacement(
                         unparse_expr(&union(elts), checker.stylist),
                         types.location,
                         types.end_location.unwrap(),

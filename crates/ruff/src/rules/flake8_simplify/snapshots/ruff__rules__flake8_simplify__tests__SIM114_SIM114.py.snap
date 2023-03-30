@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfWithSameArms
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfWithSameArms
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfWithSameArms
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 36
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfWithSameArms
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 29
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfWithSameArms
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 36
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfWithSameArms
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 56
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: IfWithSameArms
@@ -104,6 +111,7 @@ expression: diagnostics
   end_location:
     row: 65
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

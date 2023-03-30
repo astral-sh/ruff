@@ -116,7 +116,7 @@ pub fn annotate_imports<'a>(
                     inline,
                 });
             }
-            _ => unreachable!("Expected StmtKind::Import | StmtKind::ImportFrom"),
+            _ => panic!("Expected StmtKind::Import | StmtKind::ImportFrom"),
         }
     }
     annotated

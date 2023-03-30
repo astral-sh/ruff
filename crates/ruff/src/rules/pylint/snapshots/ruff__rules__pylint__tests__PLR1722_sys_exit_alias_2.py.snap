@@ -14,13 +14,21 @@ expression: diagnostics
     row: 3
     column: 4
   fix:
-    content: sys2.exit
-    location:
-      row: 3
-      column: 0
-    end_location:
-      row: 3
-      column: 4
+    edits:
+      - content: import sys as sys2
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 18
+      - content: sys2.exit
+        location:
+          row: 3
+          column: 0
+        end_location:
+          row: 3
+          column: 4
   parent: ~
 - kind:
     name: SysExitAlias
@@ -34,13 +42,21 @@ expression: diagnostics
     row: 4
     column: 4
   fix:
-    content: sys2.exit
-    location:
-      row: 4
-      column: 0
-    end_location:
-      row: 4
-      column: 4
+    edits:
+      - content: import sys as sys2
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 18
+      - content: sys2.exit
+        location:
+          row: 4
+          column: 0
+        end_location:
+          row: 4
+          column: 4
   parent: ~
 - kind:
     name: SysExitAlias
@@ -54,13 +70,21 @@ expression: diagnostics
     row: 8
     column: 8
   fix:
-    content: sys2.exit
-    location:
-      row: 8
-      column: 4
-    end_location:
-      row: 8
-      column: 8
+    edits:
+      - content: import sys as sys2
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 18
+      - content: sys2.exit
+        location:
+          row: 8
+          column: 4
+        end_location:
+          row: 8
+          column: 8
   parent: ~
 - kind:
     name: SysExitAlias
@@ -74,12 +98,20 @@ expression: diagnostics
     row: 9
     column: 8
   fix:
-    content: sys2.exit
-    location:
-      row: 9
-      column: 4
-    end_location:
-      row: 9
-      column: 8
+    edits:
+      - content: import sys as sys2
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 18
+      - content: sys2.exit
+        location:
+          row: 9
+          column: 4
+        end_location:
+          row: 9
+          column: 8
   parent: ~
 

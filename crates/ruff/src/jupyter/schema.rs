@@ -226,7 +226,7 @@ pub enum CodemirrorMode {
 }
 
 /// String identifying the type of cell.
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
+#[derive(Debug, Serialize, Deserialize, PartialEq, Copy, Clone)]
 pub enum CellType {
     #[serde(rename = "code")]
     Code,
@@ -236,14 +236,14 @@ pub enum CellType {
     Raw,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub enum ScrolledEnum {
     #[serde(rename = "auto")]
     Auto,
 }
 
 /// Type of cell output.
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Copy, Clone)]
 pub enum OutputType {
     #[serde(rename = "display_data")]
     DisplayData,

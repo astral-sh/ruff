@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
@@ -18,7 +18,7 @@ impl AlwaysAutofixableViolation for TypedArgumentDefaultInStub {
     }
 
     fn autofix_title(&self) -> String {
-        "Replace default value by `...`".to_string()
+        "Replace default value with `...`".to_string()
     }
 }
 
@@ -26,10 +26,29 @@ impl AlwaysAutofixableViolation for TypedArgumentDefaultInStub {
 pub struct ArgumentDefaultInStub;
 
 /// PYI014
-impl Violation for ArgumentDefaultInStub {
+impl AlwaysAutofixableViolation for ArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Only simple default values allowed for arguments")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace default value with `...`".to_string()
+    }
+}
+
+#[violation]
+pub struct AssignmentDefaultInStub;
+
+/// PYI015
+impl AlwaysAutofixableViolation for AssignmentDefaultInStub {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Only simple default values allowed for assignments")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Replace default value with `...`".to_string()
     }
 }
 
@@ -217,7 +236,7 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                             Diagnostic::new(TypedArgumentDefaultInStub, Range::from(default));
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.amend(Edit::replacement(
+                            diagnostic.set_fix(Edit::replacement(
                                 "...".to_string(),
                                 default.location,
                                 default.end_location.unwrap(),
@@ -244,7 +263,7 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                             Diagnostic::new(TypedArgumentDefaultInStub, Range::from(default));
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.amend(Edit::replacement(
+                            diagnostic.set_fix(Edit::replacement(
                                 "...".to_string(),
                                 default.location,
                                 default.end_location.unwrap(),
@@ -270,9 +289,18 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
             {
                 if arg.node.annotation.is_none() {
                     if !is_valid_default_value_with_annotation(default, checker, true) {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(ArgumentDefaultInStub, Range::from(default)));
+                        let mut diagnostic =
+                            Diagnostic::new(ArgumentDefaultInStub, Range::from(default));
+
+                        if checker.patch(diagnostic.kind.rule()) {
+                            diagnostic.set_fix(Edit::replacement(
+                                "...".to_string(),
+                                default.location,
+                                default.end_location.unwrap(),
+                            ));
+                        }
+
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -288,12 +316,43 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
             {
                 if kwarg.node.annotation.is_none() {
                     if !is_valid_default_value_with_annotation(default, checker, true) {
-                        checker
-                            .diagnostics
-                            .push(Diagnostic::new(ArgumentDefaultInStub, Range::from(default)));
+                        let mut diagnostic =
+                            Diagnostic::new(ArgumentDefaultInStub, Range::from(default));
+
+                        if checker.patch(diagnostic.kind.rule()) {
+                            diagnostic.set_fix(Edit::replacement(
+                                "...".to_string(),
+                                default.location,
+                                default.end_location.unwrap(),
+                            ));
+                        }
+
+                        checker.diagnostics.push(diagnostic);
                     }
                 }
             }
         }
+    }
+}
+
+/// PYI015
+pub fn assignment_default_in_stub(checker: &mut Checker, value: &Expr, annotation: Option<&Expr>) {
+    if annotation.map_or(false, |annotation| {
+        checker.ctx.match_typing_expr(annotation, "TypeAlias")
+    }) {
+        return;
+    }
+    if !is_valid_default_value_with_annotation(value, checker, true) {
+        let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, Range::from(value));
+
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.set_fix(Edit::replacement(
+                "...".to_string(),
+                value.location,
+                value.end_location.unwrap(),
+            ));
+        }
+
+        checker.diagnostics.push(diagnostic);
     }
 }

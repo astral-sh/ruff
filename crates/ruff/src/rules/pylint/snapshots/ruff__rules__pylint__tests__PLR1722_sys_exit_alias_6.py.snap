@@ -13,7 +13,22 @@ expression: diagnostics
   end_location:
     row: 1
     column: 4
-  fix: ~
+  fix:
+    edits:
+      - content: "import sys\n"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 0
+      - content: sys.exit
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 4
   parent: ~
 - kind:
     name: SysExitAlias
@@ -26,6 +41,21 @@ expression: diagnostics
   end_location:
     row: 2
     column: 4
-  fix: ~
+  fix:
+    edits:
+      - content: "import sys\n"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 0
+      - content: sys.exit
+        location:
+          row: 2
+          column: 0
+        end_location:
+          row: 2
+          column: 4
   parent: ~
 

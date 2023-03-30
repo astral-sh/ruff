@@ -1,13 +1,11 @@
-#![allow(dead_code, unused_imports, unused_variables)]
-
-use rustpython_parser::ast::Location;
-use rustpython_parser::Tok;
-
+use super::LogicalLineTokens;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
+use ruff_python_ast::token_kind::TokenKind;
 use ruff_python_ast::types::Range;
+use rustpython_parser::ast::Location;
 
 /// ## What it does
 /// Checks if inline comments are separated by at least two spaces.
@@ -139,25 +137,29 @@ impl Violation for MultipleLeadingHashesForBlockComment {
 }
 
 /// E261, E262, E265, E266
-#[cfg(feature = "logical_lines")]
-pub fn whitespace_before_comment(
-    tokens: &[(Location, &Tok, Location)],
+pub(crate) fn whitespace_before_comment(
+    tokens: &LogicalLineTokens,
     locator: &Locator,
 ) -> Vec<(Range, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut prev_end = Location::new(0, 0);
-    for (start, tok, end) in tokens {
-        if let Tok::Comment(text) = tok {
+    for token in tokens {
+        let kind = token.kind();
+
+        if let TokenKind::Comment = kind {
+            let (start, end) = token.range();
             let line = locator.slice(Range::new(
                 Location::new(start.row(), 0),
                 Location::new(start.row(), start.column()),
             ));
 
+            let text = locator.slice(Range::new(start, end));
+
             let is_inline_comment = !line.trim().is_empty();
             if is_inline_comment {
                 if prev_end.row() == start.row() && start.column() < prev_end.column() + 2 {
                     diagnostics.push((
-                        Range::new(prev_end, *start),
+                        Range::new(prev_end, start),
                         TooFewSpacesBeforeInlineComment.into(),
                     ));
                 }
@@ -177,32 +179,23 @@ pub fn whitespace_before_comment(
             if is_inline_comment {
                 if bad_prefix.is_some() || comment.chars().next().map_or(false, char::is_whitespace)
                 {
-                    diagnostics.push((Range::new(*start, *end), NoSpaceAfterInlineComment.into()));
+                    diagnostics.push((Range::new(start, end), NoSpaceAfterInlineComment.into()));
                 }
             } else if let Some(bad_prefix) = bad_prefix {
                 if bad_prefix != '!' || start.row() > 1 {
                     if bad_prefix != '#' {
-                        diagnostics
-                            .push((Range::new(*start, *end), NoSpaceAfterBlockComment.into()));
+                        diagnostics.push((Range::new(start, end), NoSpaceAfterBlockComment.into()));
                     } else if !comment.is_empty() {
                         diagnostics.push((
-                            Range::new(*start, *end),
+                            Range::new(start, end),
                             MultipleLeadingHashesForBlockComment.into(),
                         ));
                     }
                 }
             }
-        } else if !matches!(tok, Tok::NonLogicalNewline) {
-            prev_end = *end;
+        } else if !matches!(kind, TokenKind::NonLogicalNewline) {
+            prev_end = token.end();
         }
     }
     diagnostics
-}
-
-#[cfg(not(feature = "logical_lines"))]
-pub fn whitespace_before_comment(
-    _tokens: &[(Location, &Tok, Location)],
-    _locator: &Locator,
-) -> Vec<(Range, DiagnosticKind)> {
-    vec![]
 }

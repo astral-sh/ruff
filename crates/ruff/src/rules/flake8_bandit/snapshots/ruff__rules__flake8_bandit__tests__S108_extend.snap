@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedTempFile
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedTempFile
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: HardcodedTempFile
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 15
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

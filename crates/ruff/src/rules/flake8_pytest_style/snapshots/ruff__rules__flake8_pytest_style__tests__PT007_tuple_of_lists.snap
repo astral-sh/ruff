@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 31
     column: 40
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 41
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 39
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 40
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 52
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 63
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 74
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 80
     column: 36
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 81
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -156,6 +167,7 @@ expression: diagnostics
   end_location:
     row: 81
     column: 52
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

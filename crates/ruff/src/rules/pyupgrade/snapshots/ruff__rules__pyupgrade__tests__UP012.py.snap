@@ -5,7 +5,7 @@ expression: diagnostics
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Rewrite as bytes literal
     fixable: true
   location:
     row: 2
@@ -14,18 +14,19 @@ expression: diagnostics
     row: 2
     column: 21
   fix:
-    content: "b\"foo\""
-    location:
-      row: 2
-      column: 0
-    end_location:
-      row: 2
-      column: 21
+    edits:
+      - content: "b\"foo\""
+        location:
+          row: 2
+          column: 0
+        end_location:
+          row: 2
+          column: 21
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Rewrite as bytes literal
     fixable: true
   location:
     row: 3
@@ -34,18 +35,19 @@ expression: diagnostics
     row: 3
     column: 18
   fix:
-    content: "b\"foo\""
-    location:
-      row: 3
-      column: 0
-    end_location:
-      row: 3
-      column: 18
+    edits:
+      - content: "b\"foo\""
+        location:
+          row: 3
+          column: 0
+        end_location:
+          row: 3
+          column: 18
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Rewrite as bytes literal
     fixable: true
   location:
     row: 4
@@ -54,18 +56,19 @@ expression: diagnostics
     row: 4
     column: 14
   fix:
-    content: "b\"foo\""
-    location:
-      row: 4
-      column: 0
-    end_location:
-      row: 4
-      column: 14
+    edits:
+      - content: "b\"foo\""
+        location:
+          row: 4
+          column: 0
+        end_location:
+          row: 4
+          column: 14
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Rewrite as bytes literal
     fixable: true
   location:
     row: 5
@@ -74,18 +77,19 @@ expression: diagnostics
     row: 5
     column: 20
   fix:
-    content: "b\"foo\""
-    location:
-      row: 5
-      column: 0
-    end_location:
-      row: 5
-      column: 20
+    edits:
+      - content: "b\"foo\""
+        location:
+          row: 5
+          column: 0
+        end_location:
+          row: 5
+          column: 20
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Rewrite as bytes literal
     fixable: true
   location:
     row: 6
@@ -94,18 +98,19 @@ expression: diagnostics
     row: 6
     column: 22
   fix:
-    content: "b\"foo\""
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 22
+    edits:
+      - content: "b\"foo\""
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 6
+          column: 22
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Rewrite as bytes literal
     fixable: true
   location:
     row: 7
@@ -114,18 +119,19 @@ expression: diagnostics
     row: 7
     column: 30
   fix:
-    content: "b\"foo\""
-    location:
-      row: 7
-      column: 0
-    end_location:
-      row: 7
-      column: 30
+    edits:
+      - content: "b\"foo\""
+        location:
+          row: 7
+          column: 0
+        end_location:
+          row: 7
+          column: 30
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Rewrite as bytes literal
     fixable: true
   location:
     row: 8
@@ -134,18 +140,19 @@ expression: diagnostics
     row: 14
     column: 1
   fix:
-    content: "b\"\"\"\nLorem\n\nIpsum\n\"\"\""
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 14
-      column: 1
+    edits:
+      - content: "b\"\"\"\nLorem\n\nIpsum\n\"\"\""
+        location:
+          row: 8
+          column: 0
+        end_location:
+          row: 14
+          column: 1
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Rewrite as bytes literal
     fixable: true
   location:
     row: 16
@@ -154,18 +161,19 @@ expression: diagnostics
     row: 17
     column: 20
   fix:
-    content: "b\"Lorem \"\n    b\"Ipsum\""
-    location:
-      row: 16
-      column: 4
-    end_location:
-      row: 17
-      column: 20
+    edits:
+      - content: "b\"Lorem \"\n    b\"Ipsum\""
+        location:
+          row: 16
+          column: 4
+        end_location:
+          row: 17
+          column: 20
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Rewrite as bytes literal
     fixable: true
   location:
     row: 20
@@ -174,18 +182,19 @@ expression: diagnostics
     row: 21
     column: 20
   fix:
-    content: "b\"Lorem \"  # Comment\n    b\"Ipsum\""
-    location:
-      row: 20
-      column: 4
-    end_location:
-      row: 21
-      column: 20
+    edits:
+      - content: "b\"Lorem \"  # Comment\n    b\"Ipsum\""
+        location:
+          row: 20
+          column: 4
+        end_location:
+          row: 21
+          column: 20
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Rewrite as bytes literal
     fixable: true
   location:
     row: 24
@@ -194,18 +203,19 @@ expression: diagnostics
     row: 24
     column: 29
   fix:
-    content: "b\"Lorem \" b\"Ipsum\""
-    location:
-      row: 24
-      column: 4
-    end_location:
-      row: 24
-      column: 29
+    edits:
+      - content: "b\"Lorem \" b\"Ipsum\""
+        location:
+          row: 24
+          column: 4
+        end_location:
+          row: 24
+          column: 29
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Remove unnecessary encoding argument
     fixable: true
   location:
     row: 32
@@ -214,152 +224,181 @@ expression: diagnostics
     row: 32
     column: 27
   fix:
-    content: ""
-    location:
-      row: 32
-      column: 19
-    end_location:
-      row: 32
-      column: 26
+    edits:
+      - content: ""
+        location:
+          row: 32
+          column: 19
+        end_location:
+          row: 32
+          column: 26
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Remove unnecessary encoding argument
     fixable: true
   location:
-    row: 50
+    row: 36
     column: 0
   end_location:
-    row: 50
+    row: 38
+    column: 1
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 36
+          column: 20
+        end_location:
+          row: 38
+          column: 0
+  parent: ~
+- kind:
+    name: UnnecessaryEncodeUTF8
+    body: "Unnecessary call to `encode` as UTF-8"
+    suggestion: Remove unnecessary encoding argument
+    fixable: true
+  location:
+    row: 53
+    column: 0
+  end_location:
+    row: 53
     column: 31
   fix:
-    content: ""
-    location:
-      row: 50
-      column: 23
-    end_location:
-      row: 50
-      column: 30
+    edits:
+      - content: ""
+        location:
+          row: 53
+          column: 23
+        end_location:
+          row: 53
+          column: 30
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Remove unnecessary encoding argument
     fixable: true
   location:
-    row: 52
+    row: 55
     column: 0
   end_location:
-    row: 52
+    row: 55
     column: 39
   fix:
-    content: ""
-    location:
-      row: 52
-      column: 23
-    end_location:
-      row: 52
-      column: 38
+    edits:
+      - content: ""
+        location:
+          row: 55
+          column: 23
+        end_location:
+          row: 55
+          column: 38
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
-    fixable: true
-  location:
-    row: 54
-    column: 0
-  end_location:
-    row: 54
-    column: 24
-  fix:
-    content: "br\"foo\\o\""
-    location:
-      row: 54
-      column: 0
-    end_location:
-      row: 54
-      column: 24
-  parent: ~
-- kind:
-    name: UnnecessaryEncodeUTF8
-    body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
-    fixable: true
-  location:
-    row: 55
-    column: 0
-  end_location:
-    row: 55
-    column: 22
-  fix:
-    content: "b\"foo\""
-    location:
-      row: 55
-      column: 0
-    end_location:
-      row: 55
-      column: 22
-  parent: ~
-- kind:
-    name: UnnecessaryEncodeUTF8
-    body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
-    fixable: true
-  location:
-    row: 56
-    column: 0
-  end_location:
-    row: 56
-    column: 24
-  fix:
-    content: "bR\"foo\\o\""
-    location:
-      row: 56
-      column: 0
-    end_location:
-      row: 56
-      column: 24
-  parent: ~
-- kind:
-    name: UnnecessaryEncodeUTF8
-    body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Rewrite as bytes literal
     fixable: true
   location:
     row: 57
     column: 0
   end_location:
     row: 57
-    column: 22
+    column: 24
   fix:
-    content: "b\"foo\""
-    location:
-      row: 57
-      column: 0
-    end_location:
-      row: 57
-      column: 22
+    edits:
+      - content: "br\"foo\\o\""
+        location:
+          row: 57
+          column: 0
+        end_location:
+          row: 57
+          column: 24
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
     body: "Unnecessary call to `encode` as UTF-8"
-    suggestion: "Remove unnecessary `encode`"
+    suggestion: Rewrite as bytes literal
     fixable: true
   location:
     row: 58
+    column: 0
+  end_location:
+    row: 58
+    column: 22
+  fix:
+    edits:
+      - content: "b\"foo\""
+        location:
+          row: 58
+          column: 0
+        end_location:
+          row: 58
+          column: 22
+  parent: ~
+- kind:
+    name: UnnecessaryEncodeUTF8
+    body: "Unnecessary call to `encode` as UTF-8"
+    suggestion: Rewrite as bytes literal
+    fixable: true
+  location:
+    row: 59
+    column: 0
+  end_location:
+    row: 59
+    column: 24
+  fix:
+    edits:
+      - content: "bR\"foo\\o\""
+        location:
+          row: 59
+          column: 0
+        end_location:
+          row: 59
+          column: 24
+  parent: ~
+- kind:
+    name: UnnecessaryEncodeUTF8
+    body: "Unnecessary call to `encode` as UTF-8"
+    suggestion: Rewrite as bytes literal
+    fixable: true
+  location:
+    row: 60
+    column: 0
+  end_location:
+    row: 60
+    column: 22
+  fix:
+    edits:
+      - content: "b\"foo\""
+        location:
+          row: 60
+          column: 0
+        end_location:
+          row: 60
+          column: 22
+  parent: ~
+- kind:
+    name: UnnecessaryEncodeUTF8
+    body: "Unnecessary call to `encode` as UTF-8"
+    suggestion: Rewrite as bytes literal
+    fixable: true
+  location:
+    row: 61
     column: 6
   end_location:
-    row: 58
+    row: 61
     column: 20
   fix:
-    content: "b\"foo\""
-    location:
-      row: 58
-      column: 6
-    end_location:
-      row: 58
-      column: 20
+    edits:
+      - content: "b\"foo\""
+        location:
+          row: 61
+          column: 6
+        end_location:
+          row: 61
+          column: 20
   parent: ~
 

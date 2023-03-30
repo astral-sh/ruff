@@ -14,13 +14,14 @@ expression: diagnostics
     row: 2
     column: 46
   fix:
-    content: "obj.startswith((\"foo\", \"bar\"))"
-    location:
-      row: 2
-      column: 0
-    end_location:
-      row: 2
-      column: 46
+    edits:
+      - content: "obj.startswith((\"foo\", \"bar\"))"
+        location:
+          row: 2
+          column: 0
+        end_location:
+          row: 2
+          column: 46
   parent: ~
 - kind:
     name: MultipleStartsEndsWith
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 4
     column: 42
   fix:
-    content: "obj.endswith((\"foo\", \"bar\"))"
-    location:
-      row: 4
-      column: 0
-    end_location:
-      row: 4
-      column: 42
+    edits:
+      - content: "obj.endswith((\"foo\", \"bar\"))"
+        location:
+          row: 4
+          column: 0
+        end_location:
+          row: 4
+          column: 42
   parent: ~
 - kind:
     name: MultipleStartsEndsWith
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 6
     column: 42
   fix:
-    content: "obj.startswith((foo, bar))"
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 42
+    edits:
+      - content: "obj.startswith((foo, bar))"
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 6
+          column: 42
   parent: ~
 - kind:
     name: MultipleStartsEndsWith
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 8
     column: 44
   fix:
-    content: "obj.startswith((foo, \"foo\"))"
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 8
-      column: 44
+    edits:
+      - content: "obj.startswith((foo, \"foo\"))"
+        location:
+          row: 8
+          column: 0
+        end_location:
+          row: 8
+          column: 44
   parent: ~
 - kind:
     name: MultipleStartsEndsWith
@@ -94,12 +98,13 @@ expression: diagnostics
     row: 10
     column: 65
   fix:
-    content: "obj.endswith(foo) or obj.startswith((foo, \"foo\"))"
-    location:
-      row: 10
-      column: 0
-    end_location:
-      row: 10
-      column: 65
+    edits:
+      - content: "obj.endswith(foo) or obj.startswith((foo, \"foo\"))"
+        location:
+          row: 10
+          column: 0
+        end_location:
+          row: 10
+          column: 65
   parent: ~
 

@@ -44,6 +44,7 @@ impl AlwaysAutofixableViolation for RedundantOpenModes {
 const OPEN_FUNC_NAME: &str = "open";
 const MODE_KEYWORD_ARGUMENT: &str = "mode";
 
+#[derive(Copy, Clone)]
 enum OpenMode {
     U,
     Ur,
@@ -72,15 +73,15 @@ impl FromStr for OpenMode {
 }
 
 impl OpenMode {
-    fn replacement_value(&self) -> Option<String> {
-        match *self {
+    fn replacement_value(self) -> Option<&'static str> {
+        match self {
             Self::U => None,
             Self::Ur => None,
-            Self::Ub => Some(String::from("\"rb\"")),
-            Self::RUb => Some(String::from("\"rb\"")),
+            Self::Ub => Some("\"rb\""),
+            Self::RUb => Some("\"rb\""),
             Self::R => None,
             Self::Rt => None,
-            Self::Wt => Some(String::from("\"w\"")),
+            Self::Wt => Some("\"w\""),
         }
     }
 }
@@ -103,32 +104,32 @@ fn match_open(expr: &Expr) -> (Option<&Expr>, Vec<Keyword>) {
 fn create_check(
     expr: &Expr,
     mode_param: &Expr,
-    replacement_value: Option<String>,
+    replacement_value: Option<&str>,
     locator: &Locator,
     patch: bool,
 ) -> Diagnostic {
     let mut diagnostic = Diagnostic::new(
         RedundantOpenModes {
-            replacement: replacement_value.clone(),
+            replacement: replacement_value.map(ToString::to_string),
         },
         Range::from(expr),
     );
     if patch {
         if let Some(content) = replacement_value {
-            diagnostic.amend(Edit::replacement(
-                content,
+            diagnostic.set_fix(Edit::replacement(
+                content.to_string(),
                 mode_param.location,
                 mode_param.end_location.unwrap(),
             ));
         } else {
-            diagnostic.try_amend(|| create_remove_param_fix(locator, expr, mode_param));
+            diagnostic.try_set_fix(|| create_remove_param_fix(locator, expr, mode_param));
         }
     }
     diagnostic
 }
 
 fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) -> Result<Edit> {
-    let content = locator.slice(Range::new(expr.location, expr.end_location.unwrap()));
+    let content = locator.slice(expr);
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
     let mut fix_start: Option<Location> = None;

@@ -14,13 +14,14 @@ expression: diagnostics
     row: 3
     column: 27
   fix:
-    content: "''' Not a docstring '''"
-    location:
-      row: 3
-      column: 4
-    end_location:
-      row: 3
-      column: 27
+    edits:
+      - content: "''' Not a docstring '''"
+        location:
+          row: 3
+          column: 4
+        end_location:
+          row: 3
+          column: 27
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 5
     column: 43
   fix:
-    content: "'''not a docstring'''"
-    location:
-      row: 5
-      column: 22
-    end_location:
-      row: 5
-      column: 43
+    edits:
+      - content: "'''not a docstring'''"
+        location:
+          row: 5
+          column: 22
+        end_location:
+          row: 5
+          column: 43
   parent: ~
 

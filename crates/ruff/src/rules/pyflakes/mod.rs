@@ -34,6 +34,7 @@ mod tests {
     #[test_case(Rule::UnusedImport, Path::new("F401_8.py"); "F401_8")]
     #[test_case(Rule::UnusedImport, Path::new("F401_9.py"); "F401_9")]
     #[test_case(Rule::UnusedImport, Path::new("F401_10.py"); "F401_10")]
+    #[test_case(Rule::UnusedImport, Path::new("F401_11.py"); "F401_11")]
     #[test_case(Rule::ImportShadowedByLoopVar, Path::new("F402.py"); "F402")]
     #[test_case(Rule::UndefinedLocalWithImportStar, Path::new("F403.py"); "F403")]
     #[test_case(Rule::LateFutureImport, Path::new("F404.py"); "F404")]
@@ -252,7 +253,7 @@ mod tests {
         let settings = settings::Settings::for_rules(&Linter::Pyflakes);
         let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
         let locator = Locator::new(&contents);
-        let stylist = Stylist::from_contents(&contents, &locator);
+        let stylist = Stylist::from_tokens(&tokens, &locator);
         let indexer: Indexer = tokens.as_slice().into();
         let directives =
             directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));

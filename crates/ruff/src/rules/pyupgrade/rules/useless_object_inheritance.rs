@@ -66,7 +66,7 @@ pub fn useless_object_inheritance(
         if checker.patch(diagnostic.kind.rule()) {
             let location = diagnostic.location;
             let end_location = diagnostic.end_location;
-            diagnostic.try_amend(|| {
+            diagnostic.try_set_fix(|| {
                 remove_argument(
                     checker.locator,
                     stmt.location,

@@ -12,7 +12,7 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum IsCmpop {
     Is,
     IsNot,
@@ -23,7 +23,7 @@ impl From<&Cmpop> for IsCmpop {
         match cmpop {
             Cmpop::Is => IsCmpop::Is,
             Cmpop::IsNot => IsCmpop::IsNot,
-            _ => unreachable!("Expected Cmpop::Is | Cmpop::IsNot"),
+            _ => panic!("Expected Cmpop::Is | Cmpop::IsNot"),
         }
     }
 }
@@ -79,7 +79,7 @@ pub fn invalid_literal_comparison(
                             None
                         }
                     } {
-                        diagnostic.amend(Edit::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             content,
                             helpers::to_absolute(located_op.location, location.location),
                             helpers::to_absolute(

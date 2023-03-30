@@ -120,7 +120,7 @@ pub fn multiple_with_statements(
                         .universal_newlines()
                         .all(|line| line.width() <= checker.settings.line_length)
                     {
-                        diagnostic.amend(fix);
+                        diagnostic.set_fix(fix);
                     }
                 }
                 Err(err) => error!("Failed to fix nested with: {err}"),

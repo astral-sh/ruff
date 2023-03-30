@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 6
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BareExcept
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 6
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: BareExcept
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 16
     column: 6
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

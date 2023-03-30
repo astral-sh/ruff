@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: JumpStatementInFinally
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: JumpStatementInFinally
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: JumpStatementInFinally
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 31
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: JumpStatementInFinally
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: JumpStatementInFinally
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 66
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: JumpStatementInFinally
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 78
     column: 20
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: JumpStatementInFinally
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 94
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: JumpStatementInFinally
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 101
     column: 16
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: JumpStatementInFinally
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 107
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: JumpStatementInFinally
@@ -143,6 +153,7 @@ expression: diagnostics
   end_location:
     row: 118
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 
