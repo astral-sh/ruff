@@ -65,9 +65,7 @@ thiserror = { version = "1.0.38" }
 toml = { workspace = true }
 typed-arena = { version = "2.0.2" }
 unicode-width = { version = "0.1.10" }
-# pyproject-toml = "0.5.0"
-# TODO: Should get merged before we merge this PR. otherwise use a git tag and remove this message
-pyproject-toml = { git = "https://github.com/PyO3/pyproject-toml-rs", branch = "derive_equal" }
+pyproject-toml = { version = "0.5.1" }
 
 [dev-dependencies]
 insta = { workspace = true, features = ["yaml", "redactions"] }
