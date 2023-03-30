@@ -368,7 +368,7 @@ pub struct ComparableComprehension<'a> {
     pub target: ComparableExpr<'a>,
     pub iter: ComparableExpr<'a>,
     pub ifs: Vec<ComparableExpr<'a>>,
-    pub is_async: &'a usize,
+    pub is_async: usize,
 }
 
 impl<'a> From<&'a Comprehension> for ComparableComprehension<'a> {
@@ -377,7 +377,7 @@ impl<'a> From<&'a Comprehension> for ComparableComprehension<'a> {
             target: (&comprehension.target).into(),
             iter: (&comprehension.iter).into(),
             ifs: comprehension.ifs.iter().map(Into::into).collect(),
-            is_async: &comprehension.is_async,
+            is_async: comprehension.is_async,
         }
     }
 }
@@ -475,7 +475,7 @@ pub enum ComparableExpr<'a> {
     },
     FormattedValue {
         value: Box<ComparableExpr<'a>>,
-        conversion: &'a usize,
+        conversion: usize,
         format_spec: Option<Box<ComparableExpr<'a>>>,
     },
     JoinedStr {
@@ -623,7 +623,7 @@ impl<'a> From<&'a Expr> for ComparableExpr<'a> {
                 format_spec,
             } => Self::FormattedValue {
                 value: value.into(),
-                conversion,
+                conversion: *conversion,
                 format_spec: format_spec.as_ref().map(Into::into),
             },
             ExprKind::JoinedStr { values } => Self::JoinedStr {

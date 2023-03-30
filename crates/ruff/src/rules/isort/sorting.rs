@@ -95,8 +95,8 @@ pub fn cmp_members(
 
 /// Compare two relative import levels.
 pub fn cmp_levels(
-    level1: Option<&usize>,
-    level2: Option<&usize>,
+    level1: Option<usize>,
+    level2: Option<usize>,
     relative_imports_order: RelativeImportsOrder,
 ) -> Ordering {
     match (level1, level2) {
@@ -104,8 +104,8 @@ pub fn cmp_levels(
         (None, Some(_)) => Ordering::Less,
         (Some(_), None) => Ordering::Greater,
         (Some(level1), Some(level2)) => match relative_imports_order {
-            RelativeImportsOrder::ClosestToFurthest => level1.cmp(level2),
-            RelativeImportsOrder::FurthestToClosest => level2.cmp(level1),
+            RelativeImportsOrder::ClosestToFurthest => level1.cmp(&level2),
+            RelativeImportsOrder::FurthestToClosest => level2.cmp(&level1),
         },
     }
 }

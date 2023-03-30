@@ -642,13 +642,13 @@ fn format_import_from(
     stmt: &Stmt,
     module: Option<&str>,
     names: &[Alias],
-    level: Option<&usize>,
+    level: Option<usize>,
 ) -> FormatResult<()> {
     write!(f, [text("from")])?;
     write!(f, [space()])?;
 
     if let Some(level) = level {
-        for _ in 0..*level {
+        for _ in 0..level {
             write!(f, [text(".")])?;
         }
     }
@@ -939,7 +939,7 @@ impl Format<ASTFormatContext<'_>> for FormatStmt<'_> {
                 self.item,
                 module.as_ref().map(String::as_str),
                 names,
-                level.as_ref(),
+                *level,
             ),
             StmtKind::Expr { value } => format_expr(f, self.item, value),
         }?;
