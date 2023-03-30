@@ -632,7 +632,7 @@ mod tests {
             &ExternalConfig {
                 project: Some(&Project {
                     requires_python: Some(VersionSpecifiers::from_str(">=3.8.16, <3.11")?),
-                    ..Project::new("".to_string())
+                    ..Project::new(String::new())
                 }),
                 ..ExternalConfig::default()
             },
