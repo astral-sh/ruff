@@ -12,7 +12,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{create_expr, match_trailing_comment, unparse_expr};
+use ruff_python_ast::helpers::{any_over_expr, create_expr, match_trailing_comment, unparse_expr};
 use ruff_python_ast::types::{Range, RefEquality};
 use ruff_python_stdlib::identifiers::is_identifier;
 use ruff_python_stdlib::keyword::KWLIST;
@@ -332,6 +332,11 @@ pub fn unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: 
     }
 }
 
+/// Return `true` if the `Expr` contains an `await` expression.
+fn is_async_generator(expr: &Expr) -> bool {
+    any_over_expr(expr, &|expr| matches!(expr.node, ExprKind::Await { .. }))
+}
+
 /// PIE802
 pub fn unnecessary_comprehension_any_all(
     checker: &mut Checker,
@@ -344,7 +349,10 @@ pub fn unnecessary_comprehension_any_all(
             if !checker.ctx.is_builtin(id) {
                 return;
             }
-            if let ExprKind::ListComp { .. } = args[0].node {
+            if let ExprKind::ListComp { elt, .. } = &args[0].node {
+                if is_async_generator(elt) {
+                    return;
+                }
                 let mut diagnostic =
                     Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from(&args[0]));
                 if checker.patch(diagnostic.kind.rule()) {
