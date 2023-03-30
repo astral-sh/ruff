@@ -987,6 +987,7 @@ checksum = "1885e79c1fc4b10f0e172c475f458b7f7b93061064d98c3293e98c5ba0c8b399"
 dependencies = [
  "autocfg",
  "hashbrown",
+ "serde",
 ]
 
 [[package]]
@@ -1555,6 +1556,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "pep508_rs"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e566191336ac8cf72db45240583769ab9fb75bd87dd9544cd96a9bc7e28585c4"
+dependencies = [
+ "once_cell",
+ "pep440_rs",
+ "regex",
+ "serde",
+ "thiserror",
+ "tracing",
+ "unicode-width",
+ "url",
+]
+
+[[package]]
 name = "percent-encoding"
 version = "2.2.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1797,6 +1814,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "pyproject-toml"
+version = "0.5.0"
+source = "git+https://github.com/PyO3/pyproject-toml-rs?branch=derive_equal#9160405609ad0a8fa2006098afa35b7fb14e2f54"
+dependencies = [
+ "indexmap",
+ "pep440_rs",
+ "pep508_rs",
+ "serde",
+ "toml",
+]
+
+[[package]]
 name = "quick-junit"
 version = "0.3.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2004,6 +2033,7 @@ dependencies = [
  "pathdiff",
  "pep440_rs",
  "pretty_assertions",
+ "pyproject-toml",
  "regex",
  "result-like",
  "ruff_cache",
@@ -2881,6 +2911,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "8ce8c33a8d48bd45d624a6e523445fd21ec13d3653cd51f681abf67418f54eb8"
 dependencies = [
  "cfg-if",
+ "log",
  "pin-project-lite",
  "tracing-attributes",
  "tracing-core",
@@ -3080,6 +3111,7 @@ dependencies = [
  "form_urlencoded",
  "idna",
  "percent-encoding",
+ "serde",
 ]
 
 [[package]]

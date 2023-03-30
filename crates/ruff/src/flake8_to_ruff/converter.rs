@@ -455,11 +455,11 @@ mod tests {
     use itertools::Itertools;
     use pep440_rs::VersionSpecifiers;
     use pretty_assertions::assert_eq;
+    use pyproject_toml::Project;
 
     use super::super::plugin::Plugin;
     use super::convert;
     use crate::flake8_to_ruff::converter::DEFAULT_SELECTORS;
-    use crate::flake8_to_ruff::pep621::Project;
     use crate::flake8_to_ruff::ExternalConfig;
     use crate::registry::Linter;
     use crate::rule_selector::RuleSelector;
@@ -632,6 +632,7 @@ mod tests {
             &ExternalConfig {
                 project: Some(&Project {
                     requires_python: Some(VersionSpecifiers::from_str(">=3.8.16, <3.11")?),
+                    ..Project::default_with_name("".to_string())
                 }),
                 ..ExternalConfig::default()
             },
