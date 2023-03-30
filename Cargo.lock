@@ -1543,8 +1543,9 @@ checksum = "9fa00462b37ead6d11a82c9d568b26682d78e0477dc02d1966c013af80969739"
 
 [[package]]
 name = "pep440_rs"
-version = "0.2.0"
-source = "git+https://github.com/konstin/pep440-rs.git?rev=a8fef4ec47f4c25b070b39cdbe6a0b9847e49941#a8fef4ec47f4c25b070b39cdbe6a0b9847e49941"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d5daf676dd9ff1a39faf9c9da9c46f0dbb6211b21a1839a749f5510c24ceca3f"
 dependencies = [
  "lazy_static",
  "regex",
