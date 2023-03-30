@@ -15,13 +15,20 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: "x = x.drop([\"a\"], axis=1)"
+      - content: "x = "
         location:
           row: 5
           column: 0
         end_location:
           row: 5
-          column: 35
+          column: 0
+      - content: ""
+        location:
+          row: 5
+          column: 20
+        end_location:
+          row: 5
+          column: 34
   parent: ~
 - kind:
     name: PandasUseOfInplaceArgument
@@ -36,13 +43,20 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: "x = x.drop([\"a\"], axis=1)"
+      - content: "x = "
         location:
           row: 7
           column: 0
         end_location:
           row: 7
-          column: 35
+          column: 0
+      - content: ""
+        location:
+          row: 7
+          column: 20
+        end_location:
+          row: 7
+          column: 34
   parent: ~
 - kind:
     name: PandasUseOfInplaceArgument
@@ -57,13 +71,20 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "x = x.drop(\n    columns=[\"a\"],\n    axis=1,\n)"
+      - content: "x = "
         location:
           row: 9
           column: 0
         end_location:
-          row: 13
-          column: 1
+          row: 9
+          column: 0
+      - content: ""
+        location:
+          row: 10
+          column: 4
+        end_location:
+          row: 11
+          column: 4
   parent: ~
 - kind:
     name: PandasUseOfInplaceArgument
@@ -78,12 +99,75 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "x = x.drop(\n        columns=[\"a\"],\n        axis=1,\n    )"
+      - content: "x = "
         location:
           row: 16
           column: 4
         end_location:
-          row: 20
-          column: 5
+          row: 16
+          column: 4
+      - content: ""
+        location:
+          row: 17
+          column: 8
+        end_location:
+          row: 18
+          column: 8
+  parent: ~
+- kind:
+    name: PandasUseOfInplaceArgument
+    body: "`inplace=True` should be avoided; it has inconsistent behavior"
+    suggestion: "Assign to variable; remove `inplace` arg"
+    fixable: true
+  location:
+    row: 22
+    column: 32
+  end_location:
+    row: 22
+    column: 44
+  fix:
+    edits:
+      - content: "x = "
+        location:
+          row: 22
+          column: 0
+        end_location:
+          row: 22
+          column: 0
+      - content: ""
+        location:
+          row: 22
+          column: 30
+        end_location:
+          row: 22
+          column: 44
+  parent: ~
+- kind:
+    name: PandasUseOfInplaceArgument
+    body: "`inplace=True` should be avoided; it has inconsistent behavior"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 23
+    column: 22
+  end_location:
+    row: 23
+    column: 34
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: PandasUseOfInplaceArgument
+    body: "`inplace=True` should be avoided; it has inconsistent behavior"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 24
+    column: 24
+  end_location:
+    row: 24
+    column: 36
+  fix:
+    edits: []
   parent: ~
 
