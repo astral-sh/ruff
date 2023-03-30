@@ -219,10 +219,15 @@ impl<'a> Context<'a> {
     ///
     /// ...then `resolve_qualified_import_name("sys", "version_info")` will return
     /// `Some("python_version")`.
-    pub fn resolve_qualified_import_name(&self, module: &str, member: &str) -> Option<String> {
+    pub fn resolve_qualified_import_name(
+        &self,
+        module: &str,
+        member: &str,
+    ) -> Option<(&Stmt, String)> {
         self.scopes().enumerate().find_map(|(scope_index, scope)| {
             scope.binding_ids().find_map(|binding_index| {
-                match &self.bindings[*binding_index].kind {
+                let binding = &self.bindings[*binding_index];
+                match &binding.kind {
                     // Ex) Given `module="sys"` and `object="exit"`:
                     // `import sys`         -> `sys.exit`
                     // `import sys as sys2` -> `sys2.exit`
@@ -234,7 +239,10 @@ impl<'a> Context<'a> {
                                 .take(scope_index)
                                 .all(|scope| scope.get(name).is_none())
                             {
-                                return Some(format!("{name}.{member}"));
+                                return Some((
+                                    binding.source.as_ref().unwrap().into(),
+                                    format!("{name}.{member}"),
+                                ));
                             }
                         }
                     }
@@ -250,7 +258,10 @@ impl<'a> Context<'a> {
                                     .take(scope_index)
                                     .all(|scope| scope.get(name).is_none())
                                 {
-                                    return Some((*name).to_string());
+                                    return Some((
+                                        binding.source.as_ref().unwrap().into(),
+                                        (*name).to_string(),
+                                    ));
                                 }
                             }
                         }
@@ -265,7 +276,10 @@ impl<'a> Context<'a> {
                                 .take(scope_index)
                                 .all(|scope| scope.get(name).is_none())
                             {
-                                return Some(format!("{name}.{member}"));
+                                return Some((
+                                    binding.source.as_ref().unwrap().into(),
+                                    format!("{name}.{member}"),
+                                ));
                             }
                         }
                     }
