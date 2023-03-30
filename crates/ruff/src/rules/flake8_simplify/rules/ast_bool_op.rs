@@ -3,13 +3,15 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
-use ruff_python_ast::context::Context;
+use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{
     Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Location, Unaryop,
 };
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
+use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers::{contains_effect, create_expr, has_comments, unparse_expr};
 use ruff_python_ast::types::Range;
 
@@ -44,19 +46,32 @@ use crate::registry::AsRule;
 /// - [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]
 pub struct DuplicateIsinstanceCall {
-    pub name: String,
+    pub name: Option<String>,
+    pub fixable: bool,
 }
 
-impl AlwaysAutofixableViolation for DuplicateIsinstanceCall {
+impl Violation for DuplicateIsinstanceCall {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateIsinstanceCall { name } = self;
-        format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
+        let DuplicateIsinstanceCall { name, .. } = self;
+        if let Some(name) = name {
+            format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
+        } else {
+            format!("Multiple `isinstance` calls for expression, merge into a single call")
+        }
     }
 
-    fn autofix_title(&self) -> String {
-        let DuplicateIsinstanceCall { name } = self;
-        format!("Merge `isinstance` calls for `{name}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        self.fixable
+            .then_some(|DuplicateIsinstanceCall { name, .. }| {
+                if let Some(name) = name {
+                    format!("Merge `isinstance` calls for `{name}`")
+                } else {
+                    format!("Merge `isinstance` calls")
+                }
+            })
     }
 }
 
@@ -156,9 +171,9 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    // Locate duplicate `isinstance` calls, represented as a map from argument name
+    // Locate duplicate `isinstance` calls, represented as a map from `ComparableExpr`
     // to indices of the relevant `Expr` instances in `values`.
-    let mut duplicates = BTreeMap::new();
+    let mut duplicates: FxHashMap<ComparableExpr, Vec<usize>> = FxHashMap::default();
     for (index, call) in values.iter().enumerate() {
         // Verify that this is an `isinstance` call.
         let ExprKind::Call { func, args, keywords } = &call.node else {
@@ -180,27 +195,39 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
             continue;
         }
 
-        // Collect the name of the argument.
-        let ExprKind::Name { id: arg_name, .. } = &args[0].node else {
-            continue;
-        };
+        // Collect the target (e.g., `obj` in `isinstance(obj, int)`).
+        let target = &args[0];
         duplicates
-            .entry(arg_name.as_str())
+            .entry(target.into())
             .or_insert_with(Vec::new)
             .push(index);
     }
 
     // Generate a `Diagnostic` for each duplicate.
-    for (arg_name, indices) in duplicates {
+    for indices in duplicates.values() {
         if indices.len() > 1 {
+            // Grab the target used in each duplicate `isinstance` call (e.g., `obj` in
+            // `isinstance(obj, int)`).
+            let target = if let ExprKind::Call { args, .. } = &values[indices[0]].node {
+                args.get(0).expect("`isinstance` should have two arguments")
+            } else {
+                unreachable!("Indices should only contain `isinstance` calls")
+            };
+            let fixable = !contains_effect(&checker.ctx, target);
             let mut diagnostic = Diagnostic::new(
                 DuplicateIsinstanceCall {
-                    name: arg_name.to_string(),
+                    name: if let ExprKind::Name { id, .. } = &target.node {
+                        Some(id.to_string())
+                    } else {
+                        None
+                    },
+                    fixable,
                 },
                 Range::from(expr),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Grab the types used in each duplicate `isinstance` call.
+            if fixable && checker.patch(diagnostic.kind.rule()) {
+                // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
+                // in `isinstance(obj, int) or isinstance(obj, str)`).
                 let types: Vec<&Expr> = indices
                     .iter()
                     .map(|index| &values[*index])
@@ -219,10 +246,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                         ctx: ExprContext::Load,
                     })),
                     args: vec![
-                        create_expr(ExprKind::Name {
-                            id: arg_name.to_string(),
-                            ctx: ExprContext::Load,
-                        }),
+                        target.clone(),
                         create_expr(ExprKind::Tuple {
                             // Flatten all the types used across the `isinstance` calls.
                             elts: types
