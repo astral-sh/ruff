@@ -241,7 +241,7 @@ fn format_import_from(
             content
         })
     } else {
-        unreachable!("Expected ImportNames::Aliases | ImportNames::Star");
+        panic!("Expected ImportNames::Aliases | ImportNames::Star");
     }
 }
 

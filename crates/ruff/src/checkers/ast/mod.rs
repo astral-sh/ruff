@@ -4735,7 +4735,7 @@ impl<'a> Checker<'a> {
                         );
                     }
                 } else {
-                    unreachable!("Expected ExprKind::Lambda");
+                    unreachable!("Expected ExprKind::For | ExprKind::AsyncFor");
                 }
             }
         }

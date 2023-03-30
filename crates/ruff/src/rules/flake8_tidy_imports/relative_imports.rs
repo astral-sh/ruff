@@ -141,7 +141,7 @@ fn fix_banned_relative_import(
         };
 
         let StmtKind::ImportFrom { names, .. } = &stmt.node else {
-            unreachable!("Expected StmtKind::ImportFrom");
+            panic!("Expected StmtKind::ImportFrom");
         };
         let content = unparse_stmt(
             &create_stmt(StmtKind::ImportFrom {

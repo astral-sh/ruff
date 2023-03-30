@@ -317,6 +317,6 @@ pub fn unused_arguments(
                 vec![]
             }
         }
-        _ => unreachable!("Expected ScopeKind::Function | ScopeKind::Lambda"),
+        _ => panic!("Expected ScopeKind::Function | ScopeKind::Lambda"),
     }
 }
