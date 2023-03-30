@@ -27,16 +27,17 @@ pub fn is_mangled_private(id: &str) -> bool {
 
 /// Returns `true` if a string is a PEP 8-compliant module name (i.e., consists of lowercase
 /// letters, numbers, underscores, and is not a keyword).
-pub fn is_module_name(s: &str) -> bool {
+pub fn is_module_name(parent: Option<&str>, s: &str) -> bool {
     // Is the string a keyword?
     if KWLIST.contains(&s) {
         return false;
     }
     let mut chars = s.chars();
     // Is the first character a letter or underscore?
-    if !chars
-        .next()
-        .map_or(false, |c| c.is_ascii_lowercase() || c == '_')
+    if !parent.map_or(false, |parent| ["versions", "migrations"].contains(&parent))
+        && !chars
+            .next()
+            .map_or(false, |c| c.is_ascii_lowercase() || c == '_')
     {
         return false;
     }
@@ -51,16 +52,49 @@ mod tests {
 
     #[test]
     fn test_is_module_name() {
-        assert!(is_module_name("a"));
-        assert!(is_module_name("abc"));
-        assert!(is_module_name("abc0"));
-        assert!(is_module_name("abc_"));
-        assert!(is_module_name("a_b_c"));
-        assert!(is_module_name("_abc"));
-        assert!(!is_module_name("a-b-c"));
-        assert!(!is_module_name("a_B_c"));
-        assert!(!is_module_name("0abc"));
-        assert!(!is_module_name("class"));
-        assert!(!is_module_name("δ"));
+        let parent = None;
+        assert!(is_module_name(parent, "a"));
+        assert!(is_module_name(parent, "abc"));
+        assert!(is_module_name(parent, "abc0"));
+        assert!(is_module_name(parent, "abc_"));
+        assert!(is_module_name(parent, "a_b_c"));
+        assert!(is_module_name(parent, "_abc"));
+        assert!(!is_module_name(parent, "a-b-c"));
+        assert!(!is_module_name(parent, "a_B_c"));
+        assert!(!is_module_name(parent, "0abc"));
+        assert!(!is_module_name(parent, "class"));
+        assert!(!is_module_name(parent, "δ"));
+    }
+
+    #[test]
+    fn test_is_module_name_versions() {
+        let parent = Some("versions");
+        assert!(is_module_name(parent, "a"));
+        assert!(is_module_name(parent, "abc"));
+        assert!(is_module_name(parent, "abc0"));
+        assert!(is_module_name(parent, "abc_"));
+        assert!(is_module_name(parent, "a_b_c"));
+        assert!(is_module_name(parent, "_abc"));
+        assert!(is_module_name(parent, "0abc"));
+        assert!(!is_module_name(parent, "a-b-c"));
+        assert!(!is_module_name(parent, "a_B_c"));
+        assert!(!is_module_name(parent, "class"));
+        assert!(!is_module_name(parent, "δ"));
+    }
+
+    #[test]
+    fn test_is_module_name_migrations() {
+        let parent = Some("migrations");
+        assert!(is_module_name(parent, "a"));
+        assert!(is_module_name(parent, "abc"));
+        assert!(is_module_name(parent, "abc0"));
+        assert!(is_module_name(parent, "abc_"));
+        assert!(is_module_name(parent, "a_b_c"));
+        assert!(is_module_name(parent, "_abc"));
+        assert!(is_module_name(parent, "0abc"));
+        assert!(!is_module_name(parent, "a-b-c"));
+        assert!(!is_module_name(parent, "a_B_c"));
+        assert!(!is_module_name(parent, "class"));
+        assert!(!is_module_name(parent, "δ"));
     }
 }

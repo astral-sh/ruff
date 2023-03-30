@@ -1,3 +1,4 @@
+use std::ffi::OsStr;
 use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -60,7 +61,12 @@ pub fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagno
             path.file_stem().unwrap().to_string_lossy()
         };
 
-        if !is_module_name(&module_name) {
+        let parent = path
+            .parent()
+            .and_then(Path::file_name)
+            .and_then(OsStr::to_str);
+
+        if !is_module_name(parent, &module_name) {
             return Some(Diagnostic::new(
                 InvalidModuleName {
                     name: module_name.to_string(),
