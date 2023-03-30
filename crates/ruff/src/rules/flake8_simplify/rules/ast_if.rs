@@ -253,18 +253,21 @@ pub fn nested_if_statements(
         return;
     }
 
+    // Allow `if __name__ == "__main__":` statements.
     if is_main_check(test) {
         return;
     }
 
-    // If test is False, do not fix.
-    let mut fixable = !matches!(
-        &test.node,
+    // Allow `if True:` and `if False:` statements.
+    if matches!(
+        test.node,
         ExprKind::Constant {
-            value: Constant::Bool(false),
+            value: Constant::Bool(..),
             ..
         }
-    );
+    ) {
+        return;
+    }
 
     // Find the deepest nested if-statement, to inform the range.
     let Some((test, first_stmt)) = find_last_nested_if(body) else {
@@ -279,11 +282,10 @@ pub fn nested_if_statements(
     // The fixer preserves comments in the nested body, but removes comments between
     // the outer and inner if statements.
     let nested_if = &body[0];
-    fixable = fixable
-        && !has_comments_in(
-            Range::new(stmt.location, nested_if.location),
-            checker.locator,
-        );
+    let fixable = !has_comments_in(
+        Range::new(stmt.location, nested_if.location),
+        checker.locator,
+    );
 
     let mut diagnostic = Diagnostic::new(
         CollapsibleIf { fixable },

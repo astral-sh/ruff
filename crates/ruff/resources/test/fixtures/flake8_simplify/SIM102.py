@@ -46,10 +46,10 @@ if a:
     if b:
         c
 
-while True:
+while x > 0:
     # SIM102
-    if True:
-        if True:
+    if y > 0:
+        if z > 0:
             """this
 is valid"""
 
@@ -64,8 +64,8 @@ is valid"""
 
 
 # SIM102
-if True:
-    if True:
+if x > 0:
+    if y > 0:
         """this
 is valid"""
 
@@ -78,7 +78,7 @@ is valid"""
         ("so is"
 "this for some reason")
 
-while True:
+while x > 0:
     # SIM102
     if node.module:
         if node.module == "multiprocessing" or node.module.startswith(
@@ -130,7 +130,14 @@ if a:
 else:
     print("bar")
 
-# https://github.com/charliermarsh/ruff/issues/2919
+
+# OK
 if False:
-    if self._requestid2response_queue:
+    if a:
+        pass
+
+
+# OK
+if True:
+    if a:
         pass
