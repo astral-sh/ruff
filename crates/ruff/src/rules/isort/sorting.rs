@@ -10,7 +10,7 @@ use super::settings::RelativeImportsOrder;
 use super::types::EitherImport::{Import, ImportFrom};
 use super::types::{AliasData, EitherImport, ImportFromData};
 
-#[derive(PartialOrd, Ord, PartialEq, Eq)]
+#[derive(PartialOrd, Ord, PartialEq, Eq, Copy, Clone)]
 pub enum Prefix {
     Constants,
     Classes,

@@ -5,6 +5,7 @@ pub mod context;
 pub mod function_type;
 pub mod hashable;
 pub mod helpers;
+pub mod imports;
 pub mod logging;
 pub mod newlines;
 pub mod operations;

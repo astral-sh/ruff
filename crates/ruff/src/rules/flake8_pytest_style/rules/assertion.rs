@@ -247,6 +247,7 @@ pub fn assert_in_exception_handler(handlers: &[Excepthandler]) -> Vec<Diagnostic
         .collect()
 }
 
+#[derive(Copy, Clone)]
 enum CompositionKind {
     // E.g., `a or b or c`.
     None,
@@ -405,7 +406,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     }
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };

@@ -56,8 +56,9 @@ impl<'a> Stylist<'a> {
         })
     }
 
-    pub fn line_ending(&'a self) -> &'a LineEnding {
-        self.line_ending
+    pub fn line_ending(&'a self) -> LineEnding {
+        *self
+            .line_ending
             .get_or_init(|| detect_line_ending(self.locator.contents()).unwrap_or_default())
     }
 
@@ -160,7 +161,7 @@ impl Deref for Indentation {
 
 /// The line ending style used in Python source code.
 /// See <https://docs.python.org/3/reference/lexical_analysis.html#physical-lines>
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum LineEnding {
     Lf,
     Cr,

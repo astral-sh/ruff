@@ -4,6 +4,20 @@ expression: diagnostics
 ---
 - kind:
     name: SysExitAlias
+    body: "Use `sys.exit()` instead of `exit`"
+    suggestion: "Replace `exit` with `sys.exit()`"
+    fixable: true
+  location:
+    row: 3
+    column: 0
+  end_location:
+    row: 3
+    column: 4
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: SysExitAlias
     body: "Use `sys.exit()` instead of `quit`"
     suggestion: "Replace `quit` with `sys.exit()`"
     fixable: true
@@ -14,14 +28,21 @@ expression: diagnostics
     row: 4
     column: 4
   fix:
-    edits:
-      - content: exit
-        location:
-          row: 4
-          column: 0
-        end_location:
-          row: 4
-          column: 4
+    edits: []
+  parent: ~
+- kind:
+    name: SysExitAlias
+    body: "Use `sys.exit()` instead of `exit`"
+    suggestion: "Replace `exit` with `sys.exit()`"
+    fixable: true
+  location:
+    row: 8
+    column: 4
+  end_location:
+    row: 8
+    column: 8
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SysExitAlias
@@ -35,13 +56,6 @@ expression: diagnostics
     row: 9
     column: 8
   fix:
-    edits:
-      - content: exit
-        location:
-          row: 9
-          column: 4
-        end_location:
-          row: 9
-          column: 8
+    edits: []
   parent: ~
 

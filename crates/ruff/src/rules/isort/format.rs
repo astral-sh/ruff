@@ -15,11 +15,11 @@ pub fn format_import(
 ) -> String {
     let mut output = String::with_capacity(CAPACITY);
     if !is_first && !comments.atop.is_empty() {
-        output.push_str(stylist.line_ending());
+        output.push_str(&stylist.line_ending());
     }
     for comment in &comments.atop {
         output.push_str(comment);
-        output.push_str(stylist.line_ending());
+        output.push_str(&stylist.line_ending());
     }
     if let Some(asname) = alias.asname {
         output.push_str("import ");
@@ -34,7 +34,7 @@ pub fn format_import(
         output.push_str("  ");
         output.push_str(comment);
     }
-    output.push_str(stylist.line_ending());
+    output.push_str(&stylist.line_ending());
     output
 }
 
@@ -94,11 +94,11 @@ fn format_single_line(
     let mut line_width = 0;
 
     if !is_first && !comments.atop.is_empty() {
-        output.push_str(stylist.line_ending());
+        output.push_str(&stylist.line_ending());
     }
     for comment in &comments.atop {
         output.push_str(comment);
-        output.push_str(stylist.line_ending());
+        output.push_str(&stylist.line_ending());
     }
 
     let module_name = import_from.module_name();
@@ -137,7 +137,7 @@ fn format_single_line(
         line_width += 2 + comment.width();
     }
 
-    output.push_str(stylist.line_ending());
+    output.push_str(&stylist.line_ending());
 
     (output, line_width)
 }
@@ -153,11 +153,11 @@ fn format_multi_line(
     let mut output = String::with_capacity(CAPACITY);
 
     if !is_first && !comments.atop.is_empty() {
-        output.push_str(stylist.line_ending());
+        output.push_str(&stylist.line_ending());
     }
     for comment in &comments.atop {
         output.push_str(comment);
-        output.push_str(stylist.line_ending());
+        output.push_str(&stylist.line_ending());
     }
 
     output.push_str("from ");
@@ -169,13 +169,13 @@ fn format_multi_line(
         output.push(' ');
         output.push_str(comment);
     }
-    output.push_str(stylist.line_ending());
+    output.push_str(&stylist.line_ending());
 
     for (AliasData { name, asname }, comments) in aliases {
         for comment in &comments.atop {
             output.push_str(stylist.indentation());
             output.push_str(comment);
-            output.push_str(stylist.line_ending());
+            output.push_str(&stylist.line_ending());
         }
         output.push_str(stylist.indentation());
         if let Some(asname) = asname {
@@ -192,11 +192,11 @@ fn format_multi_line(
             output.push(' ');
             output.push_str(comment);
         }
-        output.push_str(stylist.line_ending());
+        output.push_str(&stylist.line_ending());
     }
 
     output.push(')');
-    output.push_str(stylist.line_ending());
+    output.push_str(&stylist.line_ending());
 
     output
 }

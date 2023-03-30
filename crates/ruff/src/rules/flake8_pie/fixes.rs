@@ -36,7 +36,7 @@ pub fn fix_unnecessary_comprehension_any_all(
     }
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };

@@ -110,10 +110,10 @@ expression: diagnostics
     column: 4
   end_location:
     row: 52
-    column: 16
+    column: 17
   fix:
     edits:
-      - content: "    if True and True:\n        \"\"\"this\nis valid\"\"\"\n\n        \"\"\"the indentation on\n            this line is significant\"\"\"\n\n        \"this is\" \\\n\"allowed too\"\n\n        (\"so is\"\n\"this for some reason\")\n"
+      - content: "    if y > 0 and z > 0:\n        \"\"\"this\nis valid\"\"\"\n\n        \"\"\"the indentation on\n            this line is significant\"\"\"\n\n        \"this is\" \\\n\"allowed too\"\n\n        (\"so is\"\n\"this for some reason\")\n"
         location:
           row: 51
           column: 0
@@ -131,10 +131,10 @@ expression: diagnostics
     column: 0
   end_location:
     row: 68
-    column: 12
+    column: 13
   fix:
     edits:
-      - content: "if True and True:\n    \"\"\"this\nis valid\"\"\"\n\n    \"\"\"the indentation on\n        this line is significant\"\"\"\n\n    \"this is\" \\\n\"allowed too\"\n\n    (\"so is\"\n\"this for some reason\")\n"
+      - content: "if x > 0 and y > 0:\n    \"\"\"this\nis valid\"\"\"\n\n    \"\"\"the indentation on\n        this line is significant\"\"\"\n\n    \"this is\" \\\n\"allowed too\"\n\n    (\"so is\"\n\"this for some reason\")\n"
         location:
           row: 67
           column: 0

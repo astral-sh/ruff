@@ -10,9 +10,10 @@ use ruff::linter::{check_path, LinterResult};
 use ruff::registry::AsRule;
 use ruff::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
-    flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
-    isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
+    flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
+    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
+    pyupgrade,
 };
 use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
@@ -136,6 +137,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         flake8_pytest_style: Some(flake8_pytest_style::settings::Settings::default().into()),
         flake8_quotes: Some(flake8_quotes::settings::Settings::default().into()),
         flake8_self: Some(flake8_self::settings::Settings::default().into()),
+        flake8_gettext: Some(flake8_gettext::settings::Settings::default().into()),
         flake8_implicit_str_concat: Some(
             flake8_implicit_str_concat::settings::Settings::default().into(),
         ),

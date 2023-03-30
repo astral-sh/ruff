@@ -1,0 +1,26 @@
+---
+source: crates/ruff/src/rules/isort/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: UnsortedImports
+    body: Import block is un-sorted or un-formatted
+    suggestion: Organize imports
+    fixable: true
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 9
+    column: 0
+  fix:
+    edits:
+      - content: "import sys\n\nimport foo\nfrom foo import bar, baz\n\nimport baz\nimport foo.bar\nimport foo.bar.baz\nfrom foo.bar import blah, blub\nfrom foo.bar.baz import something\n"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 9
+          column: 0
+  parent: ~
+

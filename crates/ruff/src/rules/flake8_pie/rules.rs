@@ -512,7 +512,7 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
 /// PIE807
 pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Lambda { args, body } = &expr.node else {
-        unreachable!("Expected ExprKind::Lambda");
+        panic!("Expected ExprKind::Lambda");
     };
     if args.args.is_empty()
         && args.kwonlyargs.is_empty()

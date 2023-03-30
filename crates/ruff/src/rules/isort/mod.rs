@@ -6,6 +6,7 @@ use std::path::{Path, PathBuf};
 use itertools::Either::{Left, Right};
 use strum::IntoEnumIterator;
 
+use crate::rules::isort::categorize::KnownModules;
 use annotate::annotate_imports;
 use categorize::categorize_imports;
 pub use categorize::{categorize, ImportType};
@@ -118,14 +119,11 @@ pub fn format_imports(
     src: &[PathBuf],
     package: Option<&Path>,
     combine_as_imports: bool,
-    extra_standard_library: &BTreeSet<String>,
     force_single_line: bool,
     force_sort_within_sections: bool,
     force_wrap_aliases: bool,
     force_to_top: &BTreeSet<String>,
-    known_first_party: &BTreeSet<String>,
-    known_third_party: &BTreeSet<String>,
-    known_local_folder: &BTreeSet<String>,
+    known_modules: &KnownModules,
     order_by_type: bool,
     relative_imports_order: RelativeImportsOrder,
     single_line_exclusions: &BTreeSet<String>,
@@ -154,14 +152,11 @@ pub fn format_imports(
             stylist,
             src,
             package,
-            extra_standard_library,
             force_single_line,
             force_sort_within_sections,
             force_wrap_aliases,
             force_to_top,
-            known_first_party,
-            known_third_party,
-            known_local_folder,
+            known_modules,
             order_by_type,
             relative_imports_order,
             single_line_exclusions,
@@ -177,7 +172,7 @@ pub fn format_imports(
         if !block_output.is_empty() && !output.is_empty() {
             // If we are about to output something, and had already
             // output a block, separate them.
-            output.push_str(stylist.line_ending());
+            output.push_str(&stylist.line_ending());
         }
         output.push_str(block_output.as_str());
     }
@@ -187,20 +182,20 @@ pub fn format_imports(
         Some(Trailer::Sibling) => {
             if lines_after_imports >= 0 {
                 for _ in 0..lines_after_imports {
-                    output.push_str(stylist.line_ending());
+                    output.push_str(&stylist.line_ending());
                 }
             } else {
-                output.push_str(stylist.line_ending());
+                output.push_str(&stylist.line_ending());
             }
         }
         Some(Trailer::FunctionDef | Trailer::ClassDef) => {
             if lines_after_imports >= 0 {
                 for _ in 0..lines_after_imports {
-                    output.push_str(stylist.line_ending());
+                    output.push_str(&stylist.line_ending());
                 }
             } else {
-                output.push_str(stylist.line_ending());
-                output.push_str(stylist.line_ending());
+                output.push_str(&stylist.line_ending());
+                output.push_str(&stylist.line_ending());
             }
         }
     }
@@ -214,14 +209,11 @@ fn format_import_block(
     stylist: &Stylist,
     src: &[PathBuf],
     package: Option<&Path>,
-    extra_standard_library: &BTreeSet<String>,
     force_single_line: bool,
     force_sort_within_sections: bool,
     force_wrap_aliases: bool,
     force_to_top: &BTreeSet<String>,
-    known_first_party: &BTreeSet<String>,
-    known_third_party: &BTreeSet<String>,
-    known_local_folder: &BTreeSet<String>,
+    known_modules: &KnownModules,
     order_by_type: bool,
     relative_imports_order: RelativeImportsOrder,
     single_line_exclusions: &BTreeSet<String>,
@@ -234,16 +226,7 @@ fn format_import_block(
     target_version: PythonVersion,
 ) -> String {
     // Categorize by type (e.g., first-party vs. third-party).
-    let mut block_by_type = categorize_imports(
-        block,
-        src,
-        package,
-        known_first_party,
-        known_third_party,
-        known_local_folder,
-        extra_standard_library,
-        target_version,
-    );
+    let mut block_by_type = categorize_imports(block, src, package, known_modules, target_version);
 
     let mut output = String::new();
 
@@ -294,7 +277,7 @@ fn format_import_block(
             is_first_block = false;
             pending_lines_before = false;
         } else if pending_lines_before {
-            output.push_str(stylist.line_ending());
+            output.push_str(&stylist.line_ending());
             pending_lines_before = false;
         }
 
@@ -318,7 +301,7 @@ fn format_import_block(
                     // Add a blank lines between direct and from imports
                     if lines_between_types > 0 && has_direct_import && !lines_inserted {
                         for _ in 0..lines_between_types {
-                            output.push_str(stylist.line_ending());
+                            output.push_str(&stylist.line_ending());
                         }
 
                         lines_inserted = true;
@@ -352,6 +335,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
+    use crate::rules::isort::categorize::KnownModules;
     use crate::settings::Settings;
     use crate::test::{test_path, test_resource_path};
 
@@ -416,6 +400,52 @@ mod tests {
         Ok(())
     }
 
+    #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
+    fn separate_modules(path: &Path) -> Result<()> {
+        let snapshot = format!("1_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec!["foo.bar".to_string(), "baz".to_string()],
+                        vec!["foo".to_string(), "__future__".to_string()],
+                        vec![],
+                        vec![],
+                    ),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("separate_subpackage_first_and_third_party_imports.py"))]
+    fn separate_modules_first_party(path: &Path) -> Result<()> {
+        let snapshot = format!("2_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec!["foo".to_string()],
+                        vec!["foo.bar".to_string()],
+                        vec![],
+                        vec![],
+                    ),
+                    ..super::settings::Settings::default()
+                },
+                src: vec![test_resource_path("fixtures/isort")],
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_yaml_snapshot!(snapshot, diagnostics);
+        Ok(())
+    }
+
     // Test currently disabled as line endings are automatically converted to
     // platform-appropriate ones in CI/CD #[test_case(Path::new("
     // line_ending_crlf.py"))] #[test_case(Path::new("line_ending_lf.py"))]
@@ -441,7 +471,12 @@ mod tests {
             Path::new("isort").join(path).as_path(),
             &Settings {
                 isort: super::settings::Settings {
-                    known_local_folder: BTreeSet::from(["ruff".to_string()]),
+                    known_modules: KnownModules::new(
+                        vec![],
+                        vec![],
+                        vec!["ruff".to_string()],
+                        vec![],
+                    ),
                     ..super::settings::Settings::default()
                 },
                 src: vec![test_resource_path("fixtures/isort")],

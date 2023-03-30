@@ -11,7 +11,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::pycodestyle::helpers::compare;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum EqCmpop {
     Eq,
     NotEq,
@@ -22,7 +22,7 @@ impl From<&Cmpop> for EqCmpop {
         match cmpop {
             Cmpop::Eq => EqCmpop::Eq,
             Cmpop::NotEq => EqCmpop::NotEq,
-            _ => unreachable!("Expected Cmpop::Eq | Cmpop::NotEq"),
+            _ => panic!("Expected Cmpop::Eq | Cmpop::NotEq"),
         }
     }
 }

@@ -78,7 +78,7 @@ pub(crate) fn fix_multiple_with_statements(
     outer_with.body = inner_with.body.clone();
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };

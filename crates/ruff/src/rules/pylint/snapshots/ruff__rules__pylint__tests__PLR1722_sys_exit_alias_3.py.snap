@@ -15,6 +15,13 @@ expression: diagnostics
     column: 4
   fix:
     edits:
+      - content: from sys import exit
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 20
       - content: exit
         location:
           row: 4
@@ -36,6 +43,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
+      - content: from sys import exit
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 20
       - content: exit
         location:
           row: 9
@@ -43,5 +57,19 @@ expression: diagnostics
         end_location:
           row: 9
           column: 8
+  parent: ~
+- kind:
+    name: SysExitAlias
+    body: "Use `sys.exit()` instead of `quit`"
+    suggestion: "Replace `quit` with `sys.exit()`"
+    fixable: true
+  location:
+    row: 16
+    column: 4
+  end_location:
+    row: 16
+    column: 8
+  fix:
+    edits: []
   parent: ~
 

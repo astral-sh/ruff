@@ -119,11 +119,11 @@ fn reverse_comparison(expr: &Expr, locator: &Locator, stylist: &Stylist) -> Resu
             whitespace_before,
             whitespace_after,
         },
-        _ => unreachable!("Expected comparison operator"),
+        _ => panic!("Expected comparison operator"),
     };
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
