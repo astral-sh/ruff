@@ -196,7 +196,7 @@ jobs:
             echo "No unused dependencies found" > $GITHUB_STEP_SUMMARY
             exit 0
           else
-            echo "Unused dependencies found" > $GITHUB_STEP_SUMMARY
+            echo "Found unused dependencies" > $GITHUB_STEP_SUMMARY
             echo '```console' >> $GITHUB_STEP_SUMMARY
             echo "$unused_dependencies" >> $GITHUB_STEP_SUMMARY
             echo '```' >> $GITHUB_STEP_SUMMARY
