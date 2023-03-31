@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::SimpleCallArgs;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -74,7 +73,7 @@ pub fn hashlib_insecure_hash_functions(
                                 HashlibInsecureHashFunction {
                                     string: hash_func_name.to_string(),
                                 },
-                                Range::from(name_arg),
+                                name_arg.range(),
                             ));
                         }
                     }
@@ -91,7 +90,7 @@ pub fn hashlib_insecure_hash_functions(
                     HashlibInsecureHashFunction {
                         string: (*func_name).to_string(),
                     },
-                    Range::from(func),
+                    func.range(),
                 ));
             }
         }

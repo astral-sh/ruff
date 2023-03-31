@@ -5,7 +5,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::settings::types::PythonVersion;
@@ -132,7 +131,7 @@ pub fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
                             };
                             checker.diagnostics.push(Diagnostic::new(
                                 BadStrStripCall { strip, removal },
-                                Range::from(arg),
+                                arg.range(),
                             ));
                         }
                     }

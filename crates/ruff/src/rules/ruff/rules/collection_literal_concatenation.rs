@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Operator};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, has_comments, unparse_expr};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -59,12 +58,9 @@ enum Kind {
 /// This suggestion could be unsafe if the non-literal expression in the
 /// expression has overridden the `__add__` (or `__radd__`) magic methods.
 pub fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::BinOp { op, left, right } = &expr.node else {
+    let ExprKind::BinOp { left, op: Operator::Add, right } = &expr.node else {
         return;
     };
-    if !matches!(op, Operator::Add) {
-        return;
-    }
 
     // Figure out which way the splat is, and what the kind of the collection is.
     let (kind, splat_element, other_elements, splat_at_left, ctx) = match (&left.node, &right.node)
@@ -108,15 +104,11 @@ pub fn collection_literal_concatenation(checker: &mut Checker, expr: &Expr) {
             expr: contents.clone(),
             fixable,
         },
-        Range::from(expr),
+        expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         if fixable {
-            diagnostic.set_fix(Edit::replacement(
-                contents,
-                expr.location,
-                expr.end_location.unwrap(),
-            ));
+            diagnostic.set_fix(Edit::replacement(contents, expr.start(), expr.end()));
         }
     }
     checker.diagnostics.push(diagnostic);

@@ -3,7 +3,6 @@ use rustpython_parser::{Mode, Tok};
 use ruff_formatter::prelude::*;
 use ruff_formatter::{write, Format};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::types::Range;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::context::ASTFormatContext;
@@ -11,18 +10,15 @@ use crate::cst::Expr;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct StringLiteralPart {
-    range: Range,
+    range: TextRange,
 }
 
 impl Format<ASTFormatContext<'_>> for StringLiteralPart {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let locator = f.context().locator();
         let contents = f.context().contents();
-        let start_index = locator.offset(self.range.location);
-        let end_index = locator.offset(self.range.end_location);
 
         // Extract leading and trailing quotes.
-        let contents = &contents[TextRange::new(start_index, end_index)];
+        let contents = &contents[self.range];
         let leading_quote = leading_quote(contents).unwrap();
         let trailing_quote = trailing_quote(contents).unwrap();
         let body = &contents[leading_quote.len()..contents.len() - trailing_quote.len()];
@@ -114,7 +110,7 @@ impl Format<ASTFormatContext<'_>> for StringLiteralPart {
 }
 
 #[inline]
-pub const fn string_literal_part(range: Range) -> StringLiteralPart {
+pub const fn string_literal_part(range: TextRange) -> StringLiteralPart {
     StringLiteralPart { range }
 }
 
@@ -129,12 +125,12 @@ impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
 
         // TODO(charlie): This tokenization needs to happen earlier, so that we can attach
         // comments to individual string literals.
-        let contents = f.context().locator().slice(expr);
-        let elts = rustpython_parser::lexer::lex_located(contents, Mode::Module, expr.location)
+        let contents = f.context().locator().slice(expr.range());
+        let elts = rustpython_parser::lexer::lex_located(contents, Mode::Module, expr.start())
             .flatten()
             .filter_map(|(start, tok, end)| {
                 if matches!(tok, Tok::String { .. }) {
-                    Some(Range::new(start, end))
+                    Some(TextRange::new(start, end))
                 } else {
                     None
                 }

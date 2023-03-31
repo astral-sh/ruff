@@ -1,6 +1,5 @@
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
-use ruff_diagnostics::Edit;
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::json;
@@ -39,18 +38,26 @@ impl Serialize for ExpandedMessages<'_> {
             } else {
                 Some(json!({
                     "message": message.kind.suggestion.as_deref(),
-                    "edits": &ExpandedEdits { edits: message.fix.edits() },
+                    "edits": &ExpandedEdits { message },
                 }))
             };
+
+            let start_location = message.compute_start_location();
+            let end_location = message.compute_end_location();
+
+            let noqa_location = message
+                .file
+                .source_code()
+                .source_location(message.noqa_offset);
 
             let value = json!({
                 "code": message.kind.rule().noqa_code().to_string(),
                 "message": message.kind.body,
                 "fix": fix,
-                "location": message.location,
-                "end_location": message.end_location,
+                "location": start_location,
+                "end_location": end_location,
                 "filename": message.filename(),
-                "noqa_row": message.noqa_row
+                "noqa_row": noqa_location.row
             });
 
             s.serialize_element(&value)?;
@@ -61,7 +68,7 @@ impl Serialize for ExpandedMessages<'_> {
 }
 
 struct ExpandedEdits<'a> {
-    edits: &'a [Edit],
+    message: &'a Message,
 }
 
 impl Serialize for ExpandedEdits<'_> {
@@ -69,13 +76,20 @@ impl Serialize for ExpandedEdits<'_> {
     where
         S: Serializer,
     {
-        let mut s = serializer.serialize_seq(Some(self.edits.len()))?;
+        let edits = self.message.fix.edits();
+        let mut s = serializer.serialize_seq(Some(edits.len()))?;
 
-        for edit in self.edits {
+        for edit in edits {
+            let start_location = self
+                .message
+                .file
+                .source_code()
+                .source_location(edit.start());
+            let end_location = self.message.file.source_code().source_location(edit.end());
             let value = json!({
                 "content": edit.content().unwrap_or_default(),
-                "location": edit.location(),
-                "end_location": edit.end_location()
+                "location": start_location,
+                "end_location": end_location
             });
 
             s.serialize_element(&value)?;

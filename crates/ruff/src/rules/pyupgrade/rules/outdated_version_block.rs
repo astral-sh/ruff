@@ -2,13 +2,14 @@ use std::cmp::Ordering;
 
 use log::error;
 use num_bigint::{BigInt, Sign};
-use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Location, Stmt};
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located, Stmt};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_ast::types::RefEquality;
 use ruff_python_ast::whitespace::indentation;
 
 use crate::autofix::actions::delete_stmt;
@@ -36,13 +37,13 @@ struct BlockMetadata {
     /// The first non-whitespace token in the block.
     starter: Tok,
     /// The location of the first `elif` token, if any.
-    elif: Option<Location>,
+    elif: Option<TextSize>,
     /// The location of the `else` token, if any.
-    else_: Option<Location>,
+    else_: Option<TextSize>,
 }
 
 impl BlockMetadata {
-    const fn new(starter: Tok, elif: Option<Location>, else_: Option<Location>) -> Self {
+    const fn new(starter: Tok, elif: Option<TextSize>, else_: Option<TextSize>) -> Self {
         Self {
             starter,
             elif,
@@ -54,30 +55,27 @@ impl BlockMetadata {
 fn metadata<T>(locator: &Locator, located: &Located<T>) -> Option<BlockMetadata> {
     indentation(locator, located)?;
 
+    let line_start = locator.line_start(located.start());
     // Start the selection at the start-of-line. This ensures consistent indentation
     // in the token stream, in the event that the entire block is indented.
-    let text = locator.slice(Range::new(
-        Location::new(located.location.row(), 0),
-        located.end_location.unwrap(),
-    ));
+    let text = locator.slice(TextRange::new(line_start, located.end()));
 
     let mut starter: Option<Tok> = None;
     let mut elif = None;
     let mut else_ = None;
 
-    for (start, tok, _) in
-        lexer::lex_located(text, Mode::Module, Location::new(located.location.row(), 0))
-            .flatten()
-            .filter(|(_, tok, _)| {
-                !matches!(
-                    tok,
-                    Tok::Indent
-                        | Tok::Dedent
-                        | Tok::NonLogicalNewline
-                        | Tok::Newline
-                        | Tok::Comment(..)
-                )
-            })
+    for (start, tok, _) in lexer::lex_located(text, Mode::Module, line_start)
+        .flatten()
+        .filter(|(_, tok, _)| {
+            !matches!(
+                tok,
+                Tok::Indent
+                    | Tok::Dedent
+                    | Tok::NonLogicalNewline
+                    | Tok::Newline
+                    | Tok::Comment(..)
+            )
+        })
     {
         if starter.is_none() {
             starter = Some(tok.clone());
@@ -198,19 +196,16 @@ fn fix_py2_block(
             Some(Edit::replacement(
                 checker
                     .locator
-                    .slice(Range::new(start.location, end.end_location.unwrap()))
+                    .slice(TextRange::new(start.start(), end.end()))
                     .to_string(),
-                stmt.location,
-                stmt.end_location.unwrap(),
+                stmt.start(),
+                stmt.end(),
             ))
         } else {
             indentation(checker.locator, stmt)
                 .and_then(|indentation| {
                     adjust_indentation(
-                        Range::new(
-                            Location::new(start.location.row(), 0),
-                            end.end_location.unwrap(),
-                        ),
+                        TextRange::new(checker.locator.line_start(start.start()), end.end()),
                         indentation,
                         checker.locator,
                         checker.stylist,
@@ -220,28 +215,26 @@ fn fix_py2_block(
                 .map(|contents| {
                     Edit::replacement(
                         contents,
-                        Location::new(stmt.location.row(), 0),
-                        stmt.end_location.unwrap(),
+                        checker.locator.line_start(stmt.start()),
+                        stmt.end(),
                     )
                 })
         }
     } else {
-        let mut end_location = orelse.last().unwrap().location;
+        let mut end_location = orelse.last().unwrap().start();
         if block.starter == Tok::If && block.elif.is_some() {
             // Turn the `elif` into an `if`.
-            end_location = block.elif.unwrap();
-            end_location.go_right();
-            end_location.go_right();
+            end_location = block.elif.unwrap() + TextSize::from(2);
         } else if block.starter == Tok::Elif {
             if let Some(elif) = block.elif {
                 end_location = elif;
             } else if let Some(else_) = block.else_ {
                 end_location = else_;
             } else {
-                end_location = body.last().unwrap().end_location.unwrap();
+                end_location = body.last().unwrap().end();
             }
         }
-        Some(Edit::deletion(stmt.location, end_location))
+        Some(Edit::deletion(stmt.start(), end_location))
     }
 }
 
@@ -265,19 +258,16 @@ fn fix_py3_block(
                 Some(Edit::replacement(
                     checker
                         .locator
-                        .slice(Range::new(start.location, end.end_location.unwrap()))
+                        .slice(TextRange::new(start.start(), end.end()))
                         .to_string(),
-                    stmt.location,
-                    stmt.end_location.unwrap(),
+                    stmt.start(),
+                    stmt.end(),
                 ))
             } else {
                 indentation(checker.locator, stmt)
                     .and_then(|indentation| {
                         adjust_indentation(
-                            Range::new(
-                                Location::new(start.location.row(), 0),
-                                end.end_location.unwrap(),
-                            ),
+                            TextRange::new(checker.locator.line_start(start.start()), end.end()),
                             indentation,
                             checker.locator,
                             checker.stylist,
@@ -287,8 +277,8 @@ fn fix_py3_block(
                     .map(|contents| {
                         Edit::replacement(
                             contents,
-                            Location::new(stmt.location.row(), 0),
-                            stmt.end_location.unwrap(),
+                            checker.locator.line_start(stmt.start()),
+                            stmt.end(),
                         )
                     })
             }
@@ -297,14 +287,11 @@ fn fix_py3_block(
             // Replace the `elif` with an `else, preserve the body of the elif, and remove
             // the rest.
             let end = body.last().unwrap();
-            let text = checker.locator.slice(Range::new(
-                test.end_location.unwrap(),
-                end.end_location.unwrap(),
-            ));
+            let text = checker.locator.slice(TextRange::new(test.end(), end.end()));
             Some(Edit::replacement(
                 format!("else{text}"),
-                stmt.location,
-                stmt.end_location.unwrap(),
+                stmt.start(),
+                stmt.end(),
             ))
         }
         _ => None,
@@ -346,8 +333,7 @@ pub fn outdated_version_block(
                 let target = checker.settings.target_version;
                 if op == &Cmpop::Lt || op == &Cmpop::LtE {
                     if compare_version(&version, target, op == &Cmpop::LtE) {
-                        let mut diagnostic =
-                            Diagnostic::new(OutdatedVersionBlock, Range::from(stmt));
+                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(block) = metadata(checker.locator, stmt) {
                                 if let Some(fix) =
@@ -361,8 +347,7 @@ pub fn outdated_version_block(
                     }
                 } else if op == &Cmpop::Gt || op == &Cmpop::GtE {
                     if compare_version(&version, target, op == &Cmpop::GtE) {
-                        let mut diagnostic =
-                            Diagnostic::new(OutdatedVersionBlock, Range::from(stmt));
+                        let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(block) = metadata(checker.locator, stmt) {
                                 if let Some(fix) = fix_py3_block(checker, stmt, test, body, &block)
@@ -381,7 +366,7 @@ pub fn outdated_version_block(
             } => {
                 let version_number = bigint_to_u32(number);
                 if version_number == 2 && op == &Cmpop::Eq {
-                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, Range::from(stmt));
+                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(block) = metadata(checker.locator, stmt) {
                             if let Some(fix) = fix_py2_block(checker, stmt, body, orelse, &block) {
@@ -391,7 +376,7 @@ pub fn outdated_version_block(
                     }
                     checker.diagnostics.push(diagnostic);
                 } else if version_number == 3 && op == &Cmpop::Eq {
-                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, Range::from(stmt));
+                    let mut diagnostic = Diagnostic::new(OutdatedVersionBlock, stmt.range());
                     if checker.patch(diagnostic.kind.rule()) {
                         if let Some(block) = metadata(checker.locator, stmt) {
                             if let Some(fix) = fix_py3_block(checker, stmt, test, body, &block) {

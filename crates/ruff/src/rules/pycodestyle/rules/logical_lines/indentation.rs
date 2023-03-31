@@ -2,7 +2,7 @@ use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use rustpython_parser::ast::Location;
+use ruff_text_size::TextSize;
 
 use super::LogicalLine;
 
@@ -237,7 +237,7 @@ pub(crate) fn indentation(
     indent_level: usize,
     prev_indent_level: Option<usize>,
     indent_size: usize,
-) -> Vec<(Location, DiagnosticKind)> {
+) -> Vec<(TextSize, DiagnosticKind)> {
     let mut diagnostics = vec![];
 
     let location = logical_line.first_token_location().unwrap();

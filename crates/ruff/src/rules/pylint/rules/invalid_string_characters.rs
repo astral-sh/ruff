@@ -1,13 +1,10 @@
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::Edit;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers;
-use ruff_python_ast::newlines::UniversalNewlineIterator;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks for strings that contain the control character `BS`.
@@ -176,40 +173,38 @@ impl AlwaysAutofixableViolation for InvalidCharacterZeroWidthSpace {
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
 pub fn invalid_string_characters(
     locator: &Locator,
-    start: Location,
-    end: Location,
+    start: TextSize,
+    end: TextSize,
     autofix: bool,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
-    let text = locator.slice(Range::new(start, end));
+    let text = locator.slice(TextRange::new(start, end));
 
-    for (row, line) in UniversalNewlineIterator::from(text).enumerate() {
-        let mut char_offset = 0;
-        for char in line.chars() {
-            let (replacement, rule): (&str, DiagnosticKind) = match char {
-                '\x08' => ("\\b", InvalidCharacterBackspace.into()),
-                '\x1A' => ("\\x1A", InvalidCharacterSub.into()),
-                '\x1B' => ("\\x1B", InvalidCharacterEsc.into()),
-                '\0' => ("\\0", InvalidCharacterNul.into()),
-                '\u{200b}' => ("\\u200b", InvalidCharacterZeroWidthSpace.into()),
-                _ => {
-                    char_offset += 1;
-                    continue;
-                }
-            };
-            let location = helpers::to_absolute(Location::new(row + 1, char_offset), start);
-            let end_location = Location::new(location.row(), location.column() + 1);
-            let mut diagnostic = Diagnostic::new(rule, Range::new(location, end_location));
-            if autofix {
-                diagnostic.set_fix(Edit::replacement(
-                    replacement.to_string(),
-                    location,
-                    end_location,
-                ));
+    for (column, match_) in text.match_indices(&['\x08', '\x1A', '\x1B', '\0', '\u{200b}']) {
+        let c = match_.chars().next().unwrap();
+        let (replacement, rule): (&str, DiagnosticKind) = match c {
+            '\x08' => ("\\b", InvalidCharacterBackspace.into()),
+            '\x1A' => ("\\x1A", InvalidCharacterSub.into()),
+            '\x1B' => ("\\x1B", InvalidCharacterEsc.into()),
+            '\0' => ("\\0", InvalidCharacterNul.into()),
+            '\u{200b}' => ("\\u200b", InvalidCharacterZeroWidthSpace.into()),
+            _ => {
+                continue;
             }
-            diagnostics.push(diagnostic);
-            char_offset += 1;
+        };
+
+        let location = start + TextSize::try_from(column).unwrap();
+        let range = TextRange::at(location, c.text_len());
+
+        let mut diagnostic = Diagnostic::new(rule, range);
+        if autofix {
+            diagnostic.set_fix(Edit::replacement(
+                replacement.to_string(),
+                range.start(),
+                range.end(),
+            ));
         }
+        diagnostics.push(diagnostic);
     }
 
     diagnostics

@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::{self, Visitor};
 
 use crate::checkers::ast::Checker;
@@ -85,6 +84,6 @@ pub fn raise_within_try(checker: &mut Checker, body: &[Stmt]) {
     for stmt in raises {
         checker
             .diagnostics
-            .push(Diagnostic::new(RaiseWithinTry, Range::from(stmt)));
+            .push(Diagnostic::new(RaiseWithinTry, stmt.range()));
     }
 }

@@ -1,6 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_text_size::TextRange;
 
 use crate::rules::pycodestyle::helpers::is_ambiguous_name;
 
@@ -36,7 +36,7 @@ impl Violation for AmbiguousClassName {
 /// E742
 pub fn ambiguous_class_name<F>(name: &str, locate: F) -> Option<Diagnostic>
 where
-    F: FnOnce() -> Range,
+    F: FnOnce() -> TextRange,
 {
     if is_ambiguous_name(name) {
         Some(Diagnostic::new(

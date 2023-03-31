@@ -24,7 +24,7 @@ use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_ast::types::RefEquality;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{helpers, visitor};
 
@@ -160,7 +160,7 @@ pub fn unused_loop_control_variable(
                 rename: rename.clone(),
                 certainty,
             },
-            Range::from(expr),
+            expr.range(),
         );
         if let Some(rename) = rename {
             if certainty.into() && checker.patch(diagnostic.kind.rule()) {
@@ -176,11 +176,7 @@ pub fn unused_loop_control_variable(
                 if let Some(binding) = binding {
                     if binding.kind.is_loop_var() {
                         if !binding.used() {
-                            diagnostic.set_fix(Edit::replacement(
-                                rename,
-                                expr.location,
-                                expr.end_location.unwrap(),
-                            ));
+                            diagnostic.set_fix(Edit::replacement(rename, expr.start(), expr.end()));
                         }
                     }
                 }

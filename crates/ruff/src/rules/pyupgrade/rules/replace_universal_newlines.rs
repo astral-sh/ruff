@@ -1,9 +1,9 @@
-use rustpython_parser::ast::{Expr, Keyword, Location};
+use ruff_text_size::{TextLen, TextRange};
+use rustpython_parser::ast::{Expr, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -32,19 +32,16 @@ pub fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[
         })
     {
         let Some(kwarg) = find_keyword(kwargs, "universal_newlines") else { return; };
-        let range = Range::new(
-            kwarg.location,
-            Location::new(
-                kwarg.location.row(),
-                kwarg.location.column() + "universal_newlines".len(),
-            ),
+        let range = TextRange::new(
+            kwarg.start(),
+            kwarg.start() + "universal_newlines".text_len(),
         );
         let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, range);
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.set_fix(Edit::replacement(
                 "text".to_string(),
-                range.location,
-                range.end_location,
+                range.start(),
+                range.end(),
             ));
         }
         checker.diagnostics.push(diagnostic);

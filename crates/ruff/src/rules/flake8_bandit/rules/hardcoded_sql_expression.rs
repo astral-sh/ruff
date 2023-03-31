@@ -5,7 +5,6 @@ use rustpython_parser::ast::{Expr, ExprKind, Operator};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{any_over_expr, unparse_expr};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -98,7 +97,7 @@ pub fn hardcoded_sql_expression(checker: &mut Checker, expr: &Expr) {
         Some(string) if matches_sql_statement(&string) => {
             checker
                 .diagnostics
-                .push(Diagnostic::new(HardcodedSQLExpression, Range::from(expr)));
+                .push(Diagnostic::new(HardcodedSQLExpression, expr.range()));
         }
         _ => (),
     }

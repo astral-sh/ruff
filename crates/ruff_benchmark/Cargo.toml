@@ -40,4 +40,4 @@ mimalloc = "0.1.34"
 tikv-jemallocator = "0.5.0"
 
 [features]
-logical_lines = [ "ruff/logical_lines" ]
+ logical_lines = [ "ruff/logical_lines" ]

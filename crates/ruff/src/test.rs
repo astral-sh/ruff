@@ -29,9 +29,13 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
     let locator = Locator::new(&contents);
     let stylist = Stylist::from_tokens(&tokens, &locator);
-    let indexer: Indexer = tokens.as_slice().into();
-    let directives =
-        directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
+    let indexer = Indexer::from_tokens(&tokens, &locator);
+    let directives = directives::extract_directives(
+        &tokens,
+        directives::Flags::from_settings(settings),
+        &locator,
+        &indexer,
+    );
     let LinterResult {
         data: (diagnostics, _imports),
         ..
@@ -39,7 +43,6 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
         &path,
         path.parent()
             .and_then(|parent| detect_package_root(parent, &settings.namespace_packages)),
-        &contents,
         tokens,
         &locator,
         &stylist,
@@ -64,16 +67,19 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
             let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
             let locator = Locator::new(&contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
-            let indexer: Indexer = tokens.as_slice().into();
-            let directives =
-                directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
+            let indexer = Indexer::from_tokens(&tokens, &locator);
+            let directives = directives::extract_directives(
+                &tokens,
+                directives::Flags::from_settings(settings),
+                &locator,
+                &indexer,
+            );
             let LinterResult {
                 data: (diagnostics, _imports),
                 ..
             } = check_path(
                 &path,
                 None,
-                &contents,
                 tokens,
                 &locator,
                 &stylist,
@@ -88,9 +94,36 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
                     iterations += 1;
                     contents = fixed_contents.to_string();
                 } else {
+                    let source_code =
+                        SourceFileBuilder::new(&path.file_name().unwrap().to_string_lossy())
+                            .source_text_string(contents)
+                            .finish();
+
+                    let messages: Vec<_> = diagnostics
+                        .into_iter()
+                        .map(|diagnostic| {
+                            // Not strictly necessary but adds some coverage for this code path
+                            let noqa = directives.noqa_line_for.resolve(diagnostic.start());
+
+                            Message::from_diagnostic(diagnostic, source_code.clone(), noqa)
+                        })
+                        .collect();
+
+                    let mut output: Vec<u8> = Vec::new();
+                    TextEmitter::default()
+                        .with_show_fix(true)
+                        .with_show_source(true)
+                        .emit(
+                            &mut output,
+                            &messages,
+                            &EmitterContext::new(&FxHashMap::default()),
+                        )
+                        .unwrap();
+
+                    let output_str = String::from_utf8(output).unwrap();
                     panic!(
                         "Failed to converge after {max_iterations} iterations. This likely \
-                         indicates a bug in the implementation of the fix."
+                         indicates a bug in the implementation of the fix. Last diagnostics:\n{output_str}"
                     );
                 }
             } else {
@@ -105,7 +138,12 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
 
     Ok(diagnostics
         .into_iter()
-        .map(|diagnostic| Message::from_diagnostic(diagnostic, source_code.clone(), 1))
+        .map(|diagnostic| {
+            // Not strictly necessary but adds some coverage for this code path
+            let noqa = directives.noqa_line_for.resolve(diagnostic.start());
+
+            Message::from_diagnostic(diagnostic, source_code.clone(), noqa)
+        })
         .sorted()
         .collect())
 }
@@ -116,6 +154,7 @@ pub(crate) fn print_messages(messages: &[Message]) -> String {
     TextEmitter::default()
         .with_show_fix_status(true)
         .with_show_fix(true)
+        .with_show_source(true)
         .emit(
             &mut output,
             messages,

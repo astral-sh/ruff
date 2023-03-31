@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Comprehension, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::{self, Visitor};
 
 use crate::checkers::ast::Checker;
@@ -339,6 +338,6 @@ pub fn reuse_of_groupby_generator(
     for expr in finder.exprs {
         checker
             .diagnostics
-            .push(Diagnostic::new(ReuseOfGroupbyGenerator, Range::from(expr)));
+            .push(Diagnostic::new(ReuseOfGroupbyGenerator, expr.range()));
     }
 }

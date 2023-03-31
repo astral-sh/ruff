@@ -2,7 +2,6 @@ use crate::message::Message;
 use colored::{Color, ColoredString, Colorize, Styles};
 use ruff_diagnostics::Fix;
 use ruff_python_ast::source_code::{OneIndexed, SourceCode};
-use ruff_python_ast::types::Range;
 use ruff_text_size::{TextRange, TextSize};
 use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Formatter};
@@ -23,12 +22,13 @@ pub(super) struct Diff<'a> {
 
 impl<'a> Diff<'a> {
     pub fn from_message(message: &'a Message) -> Option<Diff> {
-        match message.file.source_code() {
-            Some(source_code) if !message.fix.is_empty() => Some(Diff {
-                source_code,
+        if !message.fix.is_empty() {
+            Some(Diff {
+                source_code: message.file.source_code(),
                 fix: &message.fix,
-            }),
-            _ => None,
+            })
+        } else {
+            None
         }
     }
 }
@@ -39,12 +39,9 @@ impl Display for Diff<'_> {
         let mut last_end = TextSize::default();
 
         for edit in self.fix.edits() {
-            let edit_range = self
-                .source_code
-                .text_range(Range::new(edit.location(), edit.end_location()));
-            output.push_str(&self.source_code.text()[TextRange::new(last_end, edit_range.start())]);
+            output.push_str(&self.source_code.text()[TextRange::new(last_end, edit.start())]);
             output.push_str(edit.content().unwrap_or_default());
-            last_end = edit_range.end();
+            last_end = edit.end();
         }
 
         output.push_str(&self.source_code.text()[usize::from(last_end)..]);

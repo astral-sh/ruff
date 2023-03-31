@@ -2,7 +2,6 @@ use rustpython_parser::ast::Expr;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -68,7 +67,7 @@ pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             NumpyDeprecatedTypeAlias {
                 type_name: type_name.to_string(),
             },
-            Range::from(expr),
+            expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.set_fix(Edit::replacement(
@@ -78,8 +77,8 @@ pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
                     _ => type_name,
                 }
                 .to_string(),
-                expr.location,
-                expr.end_location.unwrap(),
+                expr.start(),
+                expr.end(),
             ));
         }
         checker.diagnostics.push(diagnostic);

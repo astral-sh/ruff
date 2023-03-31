@@ -4,7 +4,6 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -67,13 +66,13 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
             alias: attr.to_string(),
             target: target.to_string(),
         },
-        Range::from(expr),
+        expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Edit::replacement(
             format!("self.{target}"),
-            expr.location,
-            expr.end_location.unwrap(),
+            expr.start(),
+            expr.end(),
         ));
     }
     checker.diagnostics.push(diagnostic);

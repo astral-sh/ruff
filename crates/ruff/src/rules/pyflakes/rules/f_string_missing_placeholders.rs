@@ -1,10 +1,11 @@
-use rustpython_parser::ast::{Expr, ExprKind, Location};
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::{Expr, ExprKind};
 use rustpython_parser::{lexer, Mode, StringKind, Tok};
+use std::ops::Add;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -52,35 +53,27 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
 fn find_useless_f_strings<'a>(
     expr: &'a Expr,
     locator: &'a Locator,
-) -> impl Iterator<Item = (Range, Range)> + 'a {
-    let contents = locator.slice(expr);
-    lexer::lex_located(contents, Mode::Module, expr.location)
+) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
+    let contents = locator.slice(expr.range());
+    lexer::lex_located(contents, Mode::Module, expr.start())
         .flatten()
         .filter_map(|(location, tok, end_location)| match tok {
             Tok::String {
                 kind: StringKind::FString | StringKind::RawFString,
                 ..
             } => {
-                let first_char = locator.slice(Range {
-                    location,
-                    end_location: Location::new(location.row(), location.column() + 1),
-                });
+                let first_char =
+                    &locator.contents()[TextRange::new(location, location.add(TextSize::from(1)))];
                 // f"..."  => f_position = 0
                 // fr"..." => f_position = 0
                 // rf"..." => f_position = 1
-                let f_position = usize::from(!(first_char == "f" || first_char == "F"));
+                let f_position = u32::from(!(first_char == "f" || first_char == "F"));
                 Some((
-                    Range {
-                        location: Location::new(location.row(), location.column() + f_position),
-                        end_location: Location::new(
-                            location.row(),
-                            location.column() + f_position + 1,
-                        ),
-                    },
-                    Range {
-                        location,
-                        end_location,
-                    },
+                    TextRange::new(
+                        location.add(TextSize::from(f_position)),
+                        location.add(TextSize::from(f_position + 1)),
+                    ),
+                    TextRange::new(location, end_location),
                 ))
             }
             _ => None,
@@ -92,18 +85,15 @@ fn unescape_f_string(content: &str) -> String {
 }
 
 fn fix_f_string_missing_placeholders(
-    prefix_range: &Range,
-    tok_range: &Range,
+    prefix_range: &TextRange,
+    tok_range: &TextRange,
     checker: &mut Checker,
 ) -> Edit {
-    let content = checker.locator.slice(Range::new(
-        prefix_range.end_location,
-        tok_range.end_location,
-    ));
+    let content = &checker.locator.contents()[TextRange::new(prefix_range.end(), tok_range.end())];
     Edit::replacement(
         unescape_f_string(content),
-        prefix_range.location,
-        tok_range.end_location,
+        prefix_range.start(),
+        tok_range.end(),
     )
 }
 

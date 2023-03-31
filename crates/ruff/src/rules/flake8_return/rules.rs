@@ -1,12 +1,13 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::elif_else_range;
 use ruff_python_ast::helpers::is_const_none;
-use ruff_python_ast::types::Range;
+use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::context::Context;
@@ -140,12 +141,12 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         ) {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, Range::from(*stmt));
+        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.set_fix(Edit::replacement(
                 "return".to_string(),
-                stmt.location,
-                stmt.end_location.unwrap(),
+                stmt.start(),
+                stmt.end(),
             ));
         }
         checker.diagnostics.push(diagnostic);
@@ -158,12 +159,12 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         if expr.is_some() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, Range::from(*stmt));
+        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.set_fix(Edit::replacement(
                 "return None".to_string(),
-                stmt.location,
-                stmt.end_location.unwrap(),
+                stmt.start(),
+                stmt.end(),
             ));
         }
         checker.diagnostics.push(diagnostic);
@@ -211,7 +212,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
             } else {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
+                let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         let mut content = String::new();
@@ -249,7 +250,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
             } else {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
+                let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         let mut content = String::new();
@@ -288,7 +289,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
                     if is_noreturn_func(&checker.ctx, func)
             ) => {}
         _ => {
-            let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
+            let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
             if checker.patch(diagnostic.kind.rule()) {
                 if let Some(indent) = indentation(checker.locator, stmt) {
                     let mut content = String::new();
@@ -318,18 +319,21 @@ fn has_multiple_assigns(id: &str, stack: &Stack) -> bool {
 
 /// Return `true` if the `id` has a (read) reference between the `return_location` and its
 /// preceding assignment.
-fn has_refs_before_next_assign(id: &str, return_location: Location, stack: &Stack) -> bool {
-    let mut assignment_before_return: Option<&Location> = None;
-    let mut assignment_after_return: Option<&Location> = None;
+fn has_refs_before_next_assign(
+    id: &str,
+    return_location: TextSize,
+    stack: &Stack,
+    locator: &Locator,
+) -> bool {
+    let mut assignment_before_return: Option<TextSize> = None;
+    let mut assignment_after_return: Option<TextSize> = None;
     if let Some(assignments) = stack.assignments.get(&id) {
         for location in assignments.iter().sorted() {
-            if location.row() > return_location.row() {
-                assignment_after_return = Some(location);
+            if *location > return_location {
+                assignment_after_return = Some(*location);
                 break;
             }
-            if location.row() <= return_location.row() {
-                assignment_before_return = Some(location);
-            }
+            assignment_before_return = Some(*location);
         }
     }
 
@@ -341,17 +345,25 @@ fn has_refs_before_next_assign(id: &str, return_location: Location, stack: &Stac
 
     if let Some(references) = stack.references.get(&id) {
         for location in references {
-            if location.row() == return_location.row() {
+            if *location >= return_location
+                || !locator.contains_line_break(TextRange::new(*location, return_location))
+            {
                 continue;
             }
-            if let Some(assignment_after_return) = assignment_after_return {
-                if assignment_before_return.row() < location.row()
-                    && location.row() <= assignment_after_return.row()
-                {
-                    return true;
+
+            if assignment_before_return < *location {
+                let location_on_new_row = locator
+                    .contains_line_break(TextRange::new(assignment_before_return, *location));
+
+                if location_on_new_row {
+                    if let Some(assignment_after_return) = assignment_after_return {
+                        if *location <= assignment_after_return {
+                            return true;
+                        }
+                    } else {
+                        return true;
+                    }
                 }
-            } else if assignment_before_return.row() < location.row() {
-                return true;
             }
         }
     }
@@ -360,16 +372,19 @@ fn has_refs_before_next_assign(id: &str, return_location: Location, stack: &Stac
 }
 
 /// Return `true` if the `id` has a read or write reference within a `try` or loop body.
-fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
+fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack, locator: &Locator) -> bool {
     if let Some(references) = stack.references.get(&id) {
         for location in references {
             for (try_location, try_end_location) in &stack.tries {
-                if try_location.row() < location.row() && location.row() <= try_end_location.row() {
+                if locator.contains_line_break(TextRange::new(*try_location, *location))
+                    && location <= try_end_location
+                {
                     return true;
                 }
             }
             for (loop_location, loop_end_location) in &stack.loops {
-                if loop_location.row() < location.row() && location.row() <= loop_end_location.row()
+                if locator.contains_line_break(TextRange::new(*loop_location, *location))
+                    && location <= loop_end_location
                 {
                     return true;
                 }
@@ -379,12 +394,15 @@ fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
     if let Some(assignments) = stack.assignments.get(&id) {
         for location in assignments {
             for (try_location, try_end_location) in &stack.tries {
-                if try_location.row() < location.row() && location.row() <= try_end_location.row() {
+                if locator.contains_line_break(TextRange::new(*try_location, *location))
+                    && location <= try_end_location
+                {
                     return true;
                 }
             }
             for (loop_location, loop_end_location) in &stack.loops {
-                if loop_location.row() < location.row() && location.row() <= loop_end_location.row()
+                if locator.contains_line_break(TextRange::new(*loop_location, *location))
+                    && location <= loop_end_location
                 {
                     return true;
                 }
@@ -404,13 +422,13 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
         if !stack.references.contains_key(id.as_str()) {
             checker
                 .diagnostics
-                .push(Diagnostic::new(UnnecessaryAssign, Range::from(expr)));
+                .push(Diagnostic::new(UnnecessaryAssign, expr.range()));
             return;
         }
 
         if has_multiple_assigns(id, stack)
-            || has_refs_before_next_assign(id, expr.location, stack)
-            || has_refs_or_assigns_within_try_or_loop(id, stack)
+            || has_refs_before_next_assign(id, expr.start(), stack, checker.locator)
+            || has_refs_or_assigns_within_try_or_loop(id, stack, checker.locator)
         {
             return;
         }
@@ -421,7 +439,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
 
         checker
             .diagnostics
-            .push(Diagnostic::new(UnnecessaryAssign, Range::from(expr)));
+            .push(Diagnostic::new(UnnecessaryAssign, expr.range()));
     }
 }
 
@@ -434,7 +452,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Return { .. }) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseReturn { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -444,7 +462,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Break) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseBreak { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -454,7 +472,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Raise { .. }) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseRaise { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -464,7 +482,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Continue) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseContinue { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);

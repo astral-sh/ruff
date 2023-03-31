@@ -1,10 +1,10 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::registry::Rule;
 use crate::settings::{flags, Settings};
@@ -161,7 +161,8 @@ pub fn compound_statements(
         match tok {
             Tok::Newline => {
                 if let Some((start, end)) = semi {
-                    let mut diagnostic = Diagnostic::new(UselessSemicolon, Range::new(start, end));
+                    let mut diagnostic =
+                        Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
                     if autofix.into() && settings.rules.should_fix(Rule::UselessSemicolon) {
                         diagnostic.set_fix(Edit::deletion(start, end));
                     };
@@ -214,7 +215,7 @@ pub fn compound_statements(
                 if let Some((start, end)) = semi {
                     diagnostics.push(Diagnostic::new(
                         MultipleStatementsOnOneLineSemicolon,
-                        Range::new(start, end),
+                        TextRange::new(start, end),
                     ));
 
                     // Reset.
@@ -224,7 +225,7 @@ pub fn compound_statements(
                 if let Some((start, end)) = colon {
                     diagnostics.push(Diagnostic::new(
                         MultipleStatementsOnOneLineColon,
-                        Range::new(start, end),
+                        TextRange::new(start, end),
                     ));
 
                     // Reset.

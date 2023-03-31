@@ -1,20 +1,32 @@
 use crate::fs::relativize_path;
 use crate::jupyter::JupyterIndex;
+use crate::message::diff::calculate_print_width;
 use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
-use crate::message::{group_messages_by_filename, Emitter, EmitterContext, Message};
+use crate::message::{
+    group_messages_by_filename, Emitter, EmitterContext, Message, MessageWithLocation,
+};
 use colored::Colorize;
+use ruff_python_ast::source_code::OneIndexed;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
+use std::num::NonZeroUsize;
 
 #[derive(Default)]
 pub struct GroupedEmitter {
     show_fix_status: bool,
+    show_source: bool,
 }
 
 impl GroupedEmitter {
     #[must_use]
     pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
         self.show_fix_status = show_fix_status;
+        self
+    }
+
+    #[must_use]
+    pub fn with_show_source(mut self, show_source: bool) -> Self {
+        self.show_source = show_source;
         self
     }
 }
@@ -29,20 +41,17 @@ impl Emitter for GroupedEmitter {
         for (filename, messages) in group_messages_by_filename(messages) {
             // Compute the maximum number of digits in the row and column, for messages in
             // this file.
-            let row_length = num_digits(
-                messages
-                    .iter()
-                    .map(|message| message.location.row())
-                    .max()
-                    .unwrap(),
-            );
-            let column_length = num_digits(
-                messages
-                    .iter()
-                    .map(|message| message.location.column())
-                    .max()
-                    .unwrap(),
-            );
+
+            let mut max_row_length = OneIndexed::MIN;
+            let mut max_column_length = OneIndexed::MIN;
+
+            for message in &messages {
+                max_row_length = max_row_length.max(message.start_location.row);
+                max_column_length = max_column_length.max(message.start_location.column);
+            }
+
+            let row_length = calculate_print_width(max_row_length);
+            let column_length = calculate_print_width(max_column_length);
 
             // Print the filename.
             writeln!(writer, "{}:", relativize_path(filename).underline())?;
@@ -53,11 +62,12 @@ impl Emitter for GroupedEmitter {
                     writer,
                     "{}",
                     DisplayGroupedMessage {
+                        jupyter_index: context.jupyter_index(message.filename()),
                         message,
                         show_fix_status: self.show_fix_status,
+                        show_source: self.show_source,
                         row_length,
                         column_length,
-                        jupyter_index: context.jupyter_index(message.filename()),
                     }
                 )?;
             }
@@ -69,21 +79,26 @@ impl Emitter for GroupedEmitter {
 }
 
 struct DisplayGroupedMessage<'a> {
-    message: &'a Message,
+    message: MessageWithLocation<'a>,
     show_fix_status: bool,
-    row_length: usize,
-    column_length: usize,
+    show_source: bool,
+    row_length: NonZeroUsize,
+    column_length: NonZeroUsize,
     jupyter_index: Option<&'a JupyterIndex>,
 }
 
 impl Display for DisplayGroupedMessage<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let message = self.message;
+        let MessageWithLocation {
+            message,
+            start_location,
+        } = &self.message;
 
         write!(
             f,
             "  {row_padding}",
-            row_padding = " ".repeat(self.row_length - num_digits(message.location.row()))
+            row_padding =
+                " ".repeat(self.row_length.get() - calculate_print_width(start_location.row).get())
         )?;
 
         // Check if we're working on a jupyter notebook and translate positions with cell accordingly
@@ -91,29 +106,31 @@ impl Display for DisplayGroupedMessage<'_> {
             write!(
                 f,
                 "cell {cell}{sep}",
-                cell = jupyter_index.row_to_cell[message.location.row()],
+                cell = jupyter_index.row_to_cell[start_location.row.get()],
                 sep = ":".cyan()
             )?;
             (
-                jupyter_index.row_to_row_in_cell[message.location.row()] as usize,
-                message.location.column(),
+                jupyter_index.row_to_row_in_cell[start_location.row.get()] as usize,
+                start_location.column.get(),
             )
         } else {
-            (message.location.row(), message.location.column())
+            (start_location.row.get(), start_location.column.get())
         };
 
         writeln!(
             f,
             "{row}{sep}{col}{col_padding} {code_and_body}",
             sep = ":".cyan(),
-            col_padding = " ".repeat(self.column_length - num_digits(message.location.column())),
+            col_padding = " ".repeat(
+                self.column_length.get() - calculate_print_width(start_location.column).get()
+            ),
             code_and_body = RuleCodeAndBody {
                 message_kind: &message.kind,
                 show_fix_status: self.show_fix_status
             },
         )?;
 
-        {
+        if self.show_source {
             use std::fmt::Write;
             let mut padded = PadAdapter::new(f);
             write!(padded, "{}", MessageCodeFrame { message })?;
@@ -123,16 +140,6 @@ impl Display for DisplayGroupedMessage<'_> {
 
         Ok(())
     }
-}
-
-fn num_digits(n: usize) -> usize {
-    std::iter::successors(Some(n), |n| {
-        let next = n / 10;
-
-        (next > 0).then_some(next)
-    })
-    .count()
-    .max(1)
 }
 
 /// Adapter that adds a '  ' at the start of every line without the need to copy the string.
@@ -174,7 +181,7 @@ mod tests {
 
     #[test]
     fn default() {
-        let mut emitter = GroupedEmitter::default();
+        let mut emitter = GroupedEmitter::default().with_show_source(true);
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);
@@ -182,7 +189,9 @@ mod tests {
 
     #[test]
     fn fix_status() {
-        let mut emitter = GroupedEmitter::default().with_show_fix_status(true);
+        let mut emitter = GroupedEmitter::default()
+            .with_show_fix_status(true)
+            .with_show_source(true);
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
         assert_snapshot!(content);

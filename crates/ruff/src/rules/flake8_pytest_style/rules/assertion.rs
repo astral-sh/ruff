@@ -6,15 +6,13 @@ use libcst_native::{
     SmallStatement, Statement, Suite, TrailingWhitespace, UnaryOp, UnaryOperation,
 };
 use rustpython_parser::ast::{
-    Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Location, Stmt, StmtKind,
-    Unaryop,
+    Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Stmt, StmtKind, Unaryop,
 };
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_comments_in, unparse_stmt, Truthiness};
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{visitor, whitespace};
 
@@ -161,7 +159,7 @@ where
                             PytestAssertInExcept {
                                 name: id.to_string(),
                             },
-                            Range::from(current_assert),
+                            current_assert.range(),
                         ));
                     }
                 }
@@ -195,20 +193,20 @@ pub fn unittest_assertion(
                 // the assertion is part of a larger expression.
                 let fixable = checker.ctx.current_expr_parent().is_none()
                     && matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
-                    && !has_comments_in(Range::from(expr), checker.locator);
+                    && !has_comments_in(expr.range(), checker.locator);
                 let mut diagnostic = Diagnostic::new(
                     PytestUnittestAssertion {
                         assertion: unittest_assert.to_string(),
                         fixable,
                     },
-                    Range::from(func),
+                    func.range(),
                 );
                 if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
                         diagnostic.set_fix(Edit::replacement(
                             unparse_stmt(&stmt, checker.stylist),
-                            expr.location,
-                            expr.end_location.unwrap(),
+                            expr.start(),
+                            expr.end(),
                         ));
                     }
                 }
@@ -226,7 +224,7 @@ pub fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
     if Truthiness::from_expr(test, |id| checker.ctx.is_builtin(id)).is_falsey() {
         checker
             .diagnostics
-            .push(Diagnostic::new(PytestAssertAlwaysFalse, Range::from(stmt)));
+            .push(Diagnostic::new(PytestAssertAlwaysFalse, stmt.range()));
     }
 }
 
@@ -324,10 +322,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
     };
 
     // Extract the module text.
-    let contents = locator.slice(Range::new(
-        Location::new(stmt.location.row(), 0),
-        Location::new(stmt.end_location.unwrap().row() + 1, 0),
-    ));
+    let contents = locator.lines(stmt.range());
 
     // "Embed" it in a function definition, to preserve indentation while retaining valid source
     // code. (We'll strip the prefix later on.)
@@ -418,11 +413,9 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
         .unwrap()
         .to_string();
 
-    Ok(Edit::replacement(
-        contents,
-        Location::new(stmt.location.row(), 0),
-        Location::new(stmt.end_location.unwrap().row() + 1, 0),
-    ))
+    let range = locator.full_lines_range(stmt.range());
+
+    Ok(Edit::replacement(contents, range.start(), range.end()))
 }
 
 /// PT018
@@ -431,9 +424,8 @@ pub fn composite_condition(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg:
     if matches!(composite, CompositionKind::Simple | CompositionKind::Mixed) {
         let fixable = matches!(composite, CompositionKind::Simple)
             && msg.is_none()
-            && !has_comments_in(Range::from(stmt), checker.locator);
-        let mut diagnostic =
-            Diagnostic::new(PytestCompositeAssertion { fixable }, Range::from(stmt));
+            && !has_comments_in(stmt.range(), checker.locator);
+        let mut diagnostic = Diagnostic::new(PytestCompositeAssertion { fixable }, stmt.range());
         if fixable && checker.patch(diagnostic.kind.rule()) {
             diagnostic
                 .try_set_fix(|| fix_composite_condition(stmt, checker.locator, checker.stylist));

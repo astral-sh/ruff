@@ -7,7 +7,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::Truthiness;
-use ruff_python_ast::types::Range;
 use ruff_python_semantic::context::Context;
 
 use crate::{
@@ -202,7 +201,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                             SubprocessPopenWithShellEqualsTrue {
                                 seems_safe: shell_call_seems_safe(arg),
                             },
-                            Range::from(keyword),
+                            keyword.range(),
                         ));
                     }
                 }
@@ -218,7 +217,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
-                            Range::from(keyword),
+                            keyword.range(),
                         ));
                     }
                 }
@@ -231,7 +230,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
-                            Range::from(arg),
+                            arg.range(),
                         ));
                     }
                 }
@@ -248,10 +247,9 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
             .rules
             .enabled(Rule::CallWithShellEqualsTrue)
         {
-            checker.diagnostics.push(Diagnostic::new(
-                CallWithShellEqualsTrue,
-                Range::from(keyword),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(CallWithShellEqualsTrue, keyword.range()));
         }
     }
 
@@ -263,7 +261,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                     StartProcessWithAShell {
                         seems_safe: shell_call_seems_safe(arg),
                     },
-                    Range::from(arg),
+                    arg.range(),
                 ));
             }
         }
@@ -278,7 +276,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
         {
             checker
                 .diagnostics
-                .push(Diagnostic::new(StartProcessWithNoShell, Range::from(func)));
+                .push(Diagnostic::new(StartProcessWithNoShell, func.range()));
         }
     }
 
@@ -292,10 +290,9 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
             {
                 if let Some(value) = try_string_literal(arg) {
                     if FULL_PATH_REGEX.find(value).is_none() {
-                        checker.diagnostics.push(Diagnostic::new(
-                            StartProcessWithPartialPath,
-                            Range::from(arg),
-                        ));
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(StartProcessWithPartialPath, arg.range()));
                     }
                 }
             }

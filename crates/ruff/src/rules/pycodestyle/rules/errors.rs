@@ -1,8 +1,8 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::ParseError;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 #[violation]
 pub struct IOError {
@@ -37,6 +37,6 @@ pub fn syntax_error(diagnostics: &mut Vec<Diagnostic>, parse_error: &ParseError)
         SyntaxError {
             message: parse_error.error.to_string(),
         },
-        Range::new(parse_error.location, parse_error.location),
+        TextRange::new(parse_error.location, parse_error.location),
     ));
 }

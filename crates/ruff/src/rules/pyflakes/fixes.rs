@@ -1,12 +1,12 @@
 use anyhow::{bail, Ok, Result};
 use libcst_native::{Codegen, CodegenState, DictElement, Expression};
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Excepthandler, Expr};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::str::raw_contents;
-use ruff_python_ast::types::Range;
 use rustpython_common::format::{
     FieldName, FieldNamePart, FieldType, FormatPart, FormatString, FromTemplate,
 };
@@ -22,7 +22,7 @@ pub fn remove_unused_format_arguments_from_dict(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
-    let module_text = locator.slice(stmt);
+    let module_text = locator.slice(stmt.range());
     let mut tree = match_expression(module_text)?;
     let dict = match_dict(&mut tree)?;
 
@@ -42,15 +42,15 @@ pub fn remove_unused_format_arguments_from_dict(
 
     Ok(Edit::replacement(
         state.to_string(),
-        stmt.location,
-        stmt.end_location.unwrap(),
+        stmt.start(),
+        stmt.end(),
     ))
 }
 
 /// Generate a [`Edit`] to remove unused keyword arguments from a `format` call.
 pub fn remove_unused_keyword_arguments_from_format_call(
     unused_arguments: &[&str],
-    location: Range,
+    location: TextRange,
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<Edit> {
@@ -70,8 +70,8 @@ pub fn remove_unused_keyword_arguments_from_format_call(
 
     Ok(Edit::replacement(
         state.to_string(),
-        location.location,
-        location.end_location,
+        location.start(),
+        location.end(),
     ))
 }
 
@@ -136,7 +136,7 @@ fn update_field_types(format_string: &FormatString, min_unused: usize) -> String
 /// Generate a [`Edit`] to remove unused positional arguments from a `format` call.
 pub fn remove_unused_positional_arguments_from_format_call(
     unused_arguments: &[usize],
-    location: Range,
+    location: TextRange,
     locator: &Locator,
     stylist: &Stylist,
     format_string: &FormatString,
@@ -178,8 +178,8 @@ pub fn remove_unused_positional_arguments_from_format_call(
 
     Ok(Edit::replacement(
         state.to_string(),
-        location.location,
-        location.end_location,
+        location.start(),
+        location.end(),
     ))
 }
 
@@ -188,14 +188,14 @@ pub fn remove_exception_handler_assignment(
     excepthandler: &Excepthandler,
     locator: &Locator,
 ) -> Result<Edit> {
-    let contents = locator.slice(excepthandler);
+    let contents = locator.slice(excepthandler.range());
     let mut fix_start = None;
     let mut fix_end = None;
 
     // End of the token just before the `as` to the semicolon.
     let mut prev = None;
     for (start, tok, end) in
-        lexer::lex_located(contents, Mode::Module, excepthandler.location).flatten()
+        lexer::lex_located(contents, Mode::Module, excepthandler.start()).flatten()
     {
         if matches!(tok, Tok::As) {
             fix_start = prev;

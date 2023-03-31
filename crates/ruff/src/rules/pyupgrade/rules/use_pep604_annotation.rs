@@ -1,9 +1,9 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Operator};
+use ruff_text_size::TextSize;
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::types::Range;
 use ruff_python_ast::typing::AnnotationKind;
 
 use crate::checkers::ast::Checker;
@@ -29,14 +29,14 @@ impl Violation for NonPEP604Annotation {
 
 fn optional(expr: &Expr) -> Expr {
     Expr::new(
-        Location::default(),
-        Location::default(),
+        TextSize::default(),
+        TextSize::default(),
         ExprKind::BinOp {
             left: Box::new(expr.clone()),
             op: Operator::BitOr,
             right: Box::new(Expr::new(
-                Location::default(),
-                Location::default(),
+                TextSize::default(),
+                TextSize::default(),
                 ExprKind::Constant {
                     value: Constant::None,
                     kind: None,
@@ -51,8 +51,8 @@ fn union(elts: &[Expr]) -> Expr {
         elts[0].clone()
     } else {
         Expr::new(
-            Location::default(),
-            Location::default(),
+            TextSize::default(),
+            TextSize::default(),
             ExprKind::BinOp {
                 left: Box::new(union(&elts[..elts.len() - 1])),
                 op: Operator::BitOr,
@@ -109,20 +109,18 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
 
     match typing_member {
         TypingMember::Optional => {
-            let mut diagnostic =
-                Diagnostic::new(NonPEP604Annotation { fixable }, Range::from(expr));
+            let mut diagnostic = Diagnostic::new(NonPEP604Annotation { fixable }, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Edit::replacement(
                     unparse_expr(&optional(slice), checker.stylist),
-                    expr.location,
-                    expr.end_location.unwrap(),
+                    expr.start(),
+                    expr.end(),
                 ));
             }
             checker.diagnostics.push(diagnostic);
         }
         TypingMember::Union => {
-            let mut diagnostic =
-                Diagnostic::new(NonPEP604Annotation { fixable }, Range::from(expr));
+            let mut diagnostic = Diagnostic::new(NonPEP604Annotation { fixable }, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
                 match &slice.node {
                     ExprKind::Slice { .. } => {
@@ -131,16 +129,16 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
                     ExprKind::Tuple { elts, .. } => {
                         diagnostic.set_fix(Edit::replacement(
                             unparse_expr(&union(elts), checker.stylist),
-                            expr.location,
-                            expr.end_location.unwrap(),
+                            expr.start(),
+                            expr.end(),
                         ));
                     }
                     _ => {
                         // Single argument.
                         diagnostic.set_fix(Edit::replacement(
                             unparse_expr(slice, checker.stylist),
-                            expr.location,
-                            expr.end_location.unwrap(),
+                            expr.start(),
+                            expr.end(),
                         ));
                     }
                 }

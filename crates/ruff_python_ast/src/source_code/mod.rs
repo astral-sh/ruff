@@ -5,14 +5,14 @@ mod locator;
 mod stylist;
 
 pub use crate::source_code::line_index::{LineIndex, OneIndexed};
-use crate::types::Range;
 pub use generator::Generator;
 pub use indexer::Indexer;
 pub use locator::Locator;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser as parser;
-use rustpython_parser::ast::Location;
 use rustpython_parser::{lexer, Mode, ParseError};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
 
 use std::sync::Arc;
@@ -44,35 +44,29 @@ impl<'src, 'index> SourceCode<'src, 'index> {
         }
     }
 
+    /// Computes the one indexed row and column numbers for `offset`.
+    pub fn source_location(&self, offset: TextSize) -> SourceLocation {
+        self.index.source_location(offset, self.text)
+    }
+
+    pub fn line_index(&self, offset: TextSize) -> OneIndexed {
+        self.index.line_index(offset)
+    }
+
+    // TODO inline
     /// Take the source code up to the given [`Location`].
-    pub fn up_to(&self, location: Location) -> &'src str {
-        let offset = self.index.location_offset(location, self.text);
+    pub fn up_to(&self, offset: TextSize) -> &'src str {
         &self.text[TextRange::up_to(offset)]
     }
 
     /// Take the source code after the given [`Location`].
-    pub fn after(&self, location: Location) -> &'src str {
-        let offset = self.index.location_offset(location, self.text);
+    pub fn after(&self, offset: TextSize) -> &'src str {
         &self.text[usize::from(offset)..]
     }
 
     /// Take the source code between the given [`Range`].
-    pub fn slice<R: Into<Range>>(&self, range: R) -> &'src str {
-        let range = self.text_range(range);
-        &self.text[range]
-    }
-
-    /// Converts a [`Location`] range to a byte offset range
-    pub fn text_range<R: Into<Range>>(&self, range: R) -> TextRange {
-        let range = range.into();
-        let start = self.index.location_offset(range.location, self.text);
-        let end = self.index.location_offset(range.end_location, self.text);
-        TextRange::new(start, end)
-    }
-
-    /// Return the byte offset of the given [`Location`].
-    pub fn offset(&self, location: Location) -> TextSize {
-        self.index.location_offset(location, self.text)
+    pub fn slice<R: Into<TextRange>>(&self, range: R) -> &'src str {
+        &self.text[range.into()]
     }
 
     pub fn line_start(&self, line: OneIndexed) -> TextSize {
@@ -85,20 +79,6 @@ impl<'src, 'index> SourceCode<'src, 'index> {
 
     pub fn line_range(&self, line: OneIndexed) -> TextRange {
         self.index.line_range(line, self.text)
-    }
-
-    /// Returns a string with the lines spawning between location and end location.
-    pub fn lines(&self, range: Range) -> &'src str {
-        let start_line = self
-            .index
-            .line_range(OneIndexed::new(range.location.row()).unwrap(), self.text);
-
-        let end_line = self.index.line_range(
-            OneIndexed::new(range.end_location.row()).unwrap(),
-            self.text,
-        );
-
-        &self.text[TextRange::new(start_line.start(), end_line.end())]
     }
 
     /// Returns the source text of the line with the given index
@@ -167,6 +147,10 @@ impl SourceFileBuilder {
         });
     }
 
+    pub fn set_source_text(&mut self, text: &str) {
+        self.set_source_code(&SourceCode::new(text, &LineIndex::from_source_text(text)))
+    }
+
     /// Consumes `self` and returns a builder for a file with the source text `text`. Builds the [`LineIndex`] from `text`.
     #[must_use]
     pub fn source_text(self, text: &str) -> Self {
@@ -190,10 +174,11 @@ impl SourceFileBuilder {
 
     /// Consumes `self` and returns the [`SourceFile`].
     pub fn finish(self) -> SourceFile {
+        // FIXME micha avoid unwrap or simply remove builder?
         SourceFile {
             inner: Arc::new(SourceFileInner {
                 name: self.name,
-                code: self.code,
+                code: self.code.unwrap(),
             }),
         }
     }
@@ -225,24 +210,25 @@ impl SourceFile {
 
     /// Returns `Some` with the source code if set, or `None`.
     #[inline]
-    pub fn source_code(&self) -> Option<SourceCode> {
-        self.inner.code.as_ref().map(|code| SourceCode {
+    pub fn source_code(&self) -> SourceCode {
+        let code = &self.inner.code;
+        SourceCode {
             text: &code.text,
             index: &code.index,
-        })
+        }
     }
 
     /// Returns `Some` with the source text if set, or `None`.
     #[inline]
-    pub fn source_text(&self) -> Option<&str> {
-        self.inner.code.as_ref().map(|code| &*code.text)
+    pub fn source_text(&self) -> &str {
+        self.source_code().text()
     }
 }
 
 #[derive(Eq, PartialEq)]
 struct SourceFileInner {
     name: Box<str>,
-    code: Option<FileSourceCode>,
+    code: FileSourceCode,
 }
 
 struct FileSourceCode {
@@ -258,3 +244,19 @@ impl PartialEq for FileSourceCode {
 }
 
 impl Eq for FileSourceCode {}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct SourceLocation {
+    pub row: OneIndexed,
+    pub column: OneIndexed,
+}
+
+impl Debug for SourceLocation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SourceLocation")
+            .field("row", &self.row.get())
+            .field("column", &self.column.get())
+            .finish()
+    }
+}

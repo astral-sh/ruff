@@ -3,7 +3,6 @@ use rustpython_parser::ast::{ExprKind, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -63,7 +62,7 @@ pub fn model_without_dunder_str(
     if !has_dunder_method(body) {
         return Some(Diagnostic::new(
             DjangoModelWithoutDunderStr,
-            Range::from(class_location),
+            class_location.range(),
         ));
     }
     None

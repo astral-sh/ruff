@@ -64,9 +64,11 @@ impl Serialize for SerializedMessages<'_> {
                     "end": 1
                 })
             } else {
+                let start_location = message.compute_start_location();
+                let end_location = message.compute_end_location();
                 json!({
-                    "begin": message.location.row(),
-                    "end": message.end_location.row()
+                    "begin": start_location.row,
+                    "end": end_location.row
                 })
             };
 
@@ -96,20 +98,16 @@ impl Serialize for SerializedMessages<'_> {
 fn fingerprint(message: &Message) -> String {
     let Message {
         kind,
-        location,
-        end_location,
+        range,
         fix: _fix,
         file,
-        noqa_row: _noqa_row,
+        noqa_offset: _,
     } = message;
 
     let mut hasher = DefaultHasher::new();
 
     kind.rule().hash(&mut hasher);
-    location.row().hash(&mut hasher);
-    location.column().hash(&mut hasher);
-    end_location.row().hash(&mut hasher);
-    end_location.column().hash(&mut hasher);
+    range.hash(&mut hasher);
     file.name().hash(&mut hasher);
 
     format!("{:x}", hasher.finish())

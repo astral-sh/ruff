@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -80,7 +79,7 @@ pub fn locals_in_render_function(
 
     checker.diagnostics.push(Diagnostic::new(
         DjangoLocalsInRenderFunction,
-        Range::from(locals),
+        locals.range(),
     ));
 }
 

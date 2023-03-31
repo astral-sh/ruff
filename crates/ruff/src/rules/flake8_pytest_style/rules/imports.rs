@@ -2,7 +2,6 @@ use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 #[violation]
 pub struct PytestIncorrectPytestImport;
@@ -25,7 +24,7 @@ pub fn import(import_from: &Stmt, name: &str, asname: Option<&str>) -> Option<Di
             if alias != name {
                 return Some(Diagnostic::new(
                     PytestIncorrectPytestImport,
-                    Range::from(import_from),
+                    import_from.range(),
                 ));
             }
         }
@@ -50,7 +49,7 @@ pub fn import_from(
         if is_pytest_or_subpackage(module) {
             return Some(Diagnostic::new(
                 PytestIncorrectPytestImport,
-                Range::from(import_from),
+                import_from.range(),
             ));
         }
     };

@@ -35,7 +35,7 @@ pub fn fix_unnecessary_generator_list(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     // Expr(Call(GeneratorExp)))) -> Expr(ListComp)))
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -69,8 +69,8 @@ pub fn fix_unnecessary_generator_list(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -82,7 +82,7 @@ pub fn fix_unnecessary_generator_set(
     parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Edit> {
     // Expr(Call(GeneratorExp)))) -> Expr(SetComp)))
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -124,11 +124,7 @@ pub fn fix_unnecessary_generator_set(
         }
     }
 
-    Ok(Edit::replacement(
-        content,
-        expr.location,
-        expr.end_location.unwrap(),
-    ))
+    Ok(Edit::replacement(content, expr.start(), expr.end()))
 }
 
 /// (C402) Convert `dict((x, x) for x in range(3))` to `{x: x for x in
@@ -139,7 +135,7 @@ pub fn fix_unnecessary_generator_dict(
     expr: &rustpython_parser::ast::Expr,
     parent: Option<&rustpython_parser::ast::Expr>,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -198,11 +194,7 @@ pub fn fix_unnecessary_generator_dict(
         }
     }
 
-    Ok(Edit::replacement(
-        content,
-        expr.location,
-        expr.end_location.unwrap(),
-    ))
+    Ok(Edit::replacement(content, expr.start(), expr.end()))
 }
 
 /// (C403) Convert `set([x for x in y])` to `{x for x in y}`.
@@ -213,7 +205,7 @@ pub fn fix_unnecessary_list_comprehension_set(
 ) -> Result<Edit> {
     // Expr(Call(ListComp)))) ->
     // Expr(SetComp)))
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -245,8 +237,8 @@ pub fn fix_unnecessary_list_comprehension_set(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -257,7 +249,7 @@ pub fn fix_unnecessary_list_comprehension_dict(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -301,8 +293,8 @@ pub fn fix_unnecessary_list_comprehension_dict(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -356,7 +348,7 @@ pub fn fix_unnecessary_literal_set(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     // Expr(Call(List|Tuple)))) -> Expr(Set)))
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let mut call = match_call(body)?;
@@ -395,8 +387,8 @@ pub fn fix_unnecessary_literal_set(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -407,7 +399,7 @@ pub fn fix_unnecessary_literal_dict(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     // Expr(Call(List|Tuple)))) -> Expr(Dict)))
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -468,8 +460,8 @@ pub fn fix_unnecessary_literal_dict(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -480,7 +472,7 @@ pub fn fix_unnecessary_collection_call(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     // Expr(Call("list" | "tuple" | "dict")))) -> Expr(List|Tuple|Dict)
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -584,8 +576,8 @@ pub fn fix_unnecessary_collection_call(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -595,7 +587,7 @@ pub fn fix_unnecessary_literal_within_tuple_call(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -643,8 +635,8 @@ pub fn fix_unnecessary_literal_within_tuple_call(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -654,7 +646,7 @@ pub fn fix_unnecessary_literal_within_list_call(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -704,8 +696,8 @@ pub fn fix_unnecessary_literal_within_list_call(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -716,7 +708,7 @@ pub fn fix_unnecessary_list_call(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     // Expr(Call(List|Tuple)))) -> Expr(List|Tuple)))
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -733,8 +725,8 @@ pub fn fix_unnecessary_list_call(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -746,7 +738,7 @@ pub fn fix_unnecessary_call_around_sorted(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let outer_call = match_call(body)?;
@@ -862,8 +854,8 @@ pub fn fix_unnecessary_call_around_sorted(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -873,7 +865,7 @@ pub fn fix_unnecessary_double_cast_or_process(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let body = match_expr(&mut tree)?;
     let mut outer_call = match_call(body)?;
@@ -903,8 +895,8 @@ pub fn fix_unnecessary_double_cast_or_process(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -914,7 +906,7 @@ pub fn fix_unnecessary_comprehension(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
 
@@ -999,8 +991,8 @@ pub fn fix_unnecessary_comprehension(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -1012,7 +1004,7 @@ pub fn fix_unnecessary_map(
     parent: Option<&rustpython_parser::ast::Expr>,
     kind: &str,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -1164,11 +1156,7 @@ pub fn fix_unnecessary_map(
             }
         }
 
-        Ok(Edit::replacement(
-            content,
-            expr.location,
-            expr.end_location.unwrap(),
-        ))
+        Ok(Edit::replacement(content, expr.start(), expr.end()))
     } else {
         bail!("Should have two arguments");
     }
@@ -1180,7 +1168,7 @@ pub fn fix_unnecessary_literal_within_dict_call(
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let mut body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -1197,8 +1185,8 @@ pub fn fix_unnecessary_literal_within_dict_call(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }
 
@@ -1209,7 +1197,7 @@ pub fn fix_unnecessary_comprehension_any_all(
     expr: &rustpython_parser::ast::Expr,
 ) -> Result<Edit> {
     // Expr(ListComp) -> Expr(GeneratorExp)
-    let module_text = locator.slice(expr);
+    let module_text = locator.slice(expr.range());
     let mut tree = match_module(module_text)?;
     let body = match_expr(&mut tree)?;
     let call = match_call(body)?;
@@ -1241,7 +1229,7 @@ pub fn fix_unnecessary_comprehension_any_all(
 
     Ok(Edit::replacement(
         state.to_string(),
-        expr.location,
-        expr.end_location.unwrap(),
+        expr.start(),
+        expr.end(),
     ))
 }

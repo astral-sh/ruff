@@ -1,12 +1,10 @@
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
-
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
 
 use super::helpers;
 
@@ -71,7 +69,7 @@ pub fn unnecessary_literal_set(
         UnnecessaryLiteralSet {
             obj_type: kind.to_string(),
         },
-        Range::from(expr),
+        expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {

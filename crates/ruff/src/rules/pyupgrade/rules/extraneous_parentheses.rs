@@ -1,10 +1,10 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 use crate::registry::Rule;
 use crate::settings::{flags, Settings};
@@ -136,9 +136,9 @@ pub fn extraneous_parentheses(
                     return diagnostics;
                 };
                 let mut diagnostic =
-                    Diagnostic::new(ExtraneousParentheses, Range::new(*start, *end));
+                    Diagnostic::new(ExtraneousParentheses, TextRange::new(*start, *end));
                 if autofix.into() && settings.rules.should_fix(Rule::ExtraneousParentheses) {
-                    let contents = locator.slice(Range::new(*start, *end));
+                    let contents = locator.slice(TextRange::new(*start, *end));
                     diagnostic.set_fix(Edit::replacement(
                         contents[1..contents.len() - 1].to_string(),
                         *start,

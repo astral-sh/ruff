@@ -1,13 +1,13 @@
 use log::error;
+use ruff_text_size::TextRange;
 use rustpython_parser as parser;
-use rustpython_parser::ast::{Location, StmtKind, Suite};
+use rustpython_parser::ast::{StmtKind, Suite};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
 use ruff_python_ast::imports::{Alias, AnyImport, FutureImport, Import, ImportFrom};
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
 
 use crate::importer::Importer;
 use crate::registry::Rule;
@@ -117,7 +117,7 @@ fn add_required_import(
     // Always insert the diagnostic at top-of-file.
     let mut diagnostic = Diagnostic::new(
         MissingRequiredImport(required_import.to_string()),
-        Range::new(Location::default(), Location::default()),
+        TextRange::default(),
     );
     if autofix.into() && settings.rules.should_fix(Rule::MissingRequiredImport) {
         diagnostic.set_fix(Importer::new(python_ast, locator, stylist).add_import(required_import));

@@ -1,8 +1,8 @@
+use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::Location;
-use serde::{Deserialize, Serialize};
 
-use crate::types::Range;
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 
 /// A representation of an individual name imported via any import statement.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -102,15 +102,16 @@ impl FutureImport for AnyImport<'_> {
 }
 
 /// A representation of a module reference in an import statement.
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ModuleImport {
     module: String,
-    location: Location,
-    end_location: Location,
+    location: TextSize,
+    end_location: TextSize,
 }
 
 impl ModuleImport {
-    pub fn new(module: String, location: Location, end_location: Location) -> Self {
+    pub fn new(module: String, location: TextSize, end_location: TextSize) -> Self {
         Self {
             module,
             location,
@@ -119,14 +120,15 @@ impl ModuleImport {
     }
 }
 
-impl From<&ModuleImport> for Range {
-    fn from(import: &ModuleImport) -> Range {
-        Range::new(import.location, import.end_location)
+impl From<&ModuleImport> for TextRange {
+    fn from(import: &ModuleImport) -> TextRange {
+        TextRange::new(import.location, import.end_location)
     }
 }
 
 /// A representation of the import dependencies between modules.
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ImportMap {
     /// A map from dot-delimited module name to the list of imports in that module.
     module_to_imports: FxHashMap<String, Vec<ModuleImport>>,

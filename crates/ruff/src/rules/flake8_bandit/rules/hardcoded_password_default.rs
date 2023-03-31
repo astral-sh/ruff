@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Arg, Arguments, Expr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use super::super::helpers::{matches_password_name, string_literal};
 
@@ -29,7 +28,7 @@ fn check_password_kwarg(arg: &Arg, default: &Expr) -> Option<Diagnostic> {
         HardcodedPasswordDefault {
             string: string.to_string(),
         },
-        Range::from(default),
+        default.range(),
     ))
 }
 

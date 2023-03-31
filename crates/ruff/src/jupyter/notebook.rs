@@ -1,3 +1,4 @@
+use ruff_text_size::TextRange;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::iter;
@@ -7,7 +8,6 @@ use serde::Serialize;
 use serde_json::error::Category;
 
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::types::Range;
 
 use crate::jupyter::{CellType, JupyterNotebook, SourceValue};
 use crate::rules::pycodestyle::rules::SyntaxError;
@@ -46,7 +46,7 @@ impl JupyterNotebook {
                 IOError {
                     message: format!("{err}"),
                 },
-                Range::default(),
+                TextRange::default(),
             )
         })?);
         let notebook: JupyterNotebook = match serde_json::from_reader(reader) {
@@ -59,7 +59,7 @@ impl JupyterNotebook {
                             IOError {
                                 message: format!("{err}"),
                             },
-                            Range::default(),
+                            TextRange::default(),
                         ),
                         Category::Syntax | Category::Eof => {
                             // Maybe someone saved the python sources (those with the `# %%` separator)
@@ -69,7 +69,7 @@ impl JupyterNotebook {
                                     IOError {
                                         message: format!("{err}"),
                                     },
-                                    Range::default(),
+                                    TextRange::default(),
                                 )
                             })?;
                             // Check if tokenizing was successful and the file is non-empty
@@ -84,7 +84,7 @@ impl JupyterNotebook {
                                 but this file isn't valid JSON: {err}"
                                         ),
                                     },
-                                    Range::default(),
+                                    TextRange::default(),
                                 )
                             } else {
                                 Diagnostic::new(
@@ -95,7 +95,7 @@ impl JupyterNotebook {
                                     but found a Python source file: {err}"
                                         ),
                                     },
-                                    Range::default(),
+                                    TextRange::default(),
                                 )
                             }
                         }
@@ -108,7 +108,7 @@ impl JupyterNotebook {
                                         "This file does not match the schema expected of Jupyter Notebooks: {err}"
                                     ),
                                 },
-                                Range::default(),
+                                TextRange::default(),
                             )
                         }
                     }
@@ -126,7 +126,7 @@ impl JupyterNotebook {
                         notebook.nbformat
                     ),
                 },
-                Range::default(),
+                TextRange::default(),
             )));
         }
 

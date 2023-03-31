@@ -1,14 +1,14 @@
 use std::str::FromStr;
 
 use anyhow::{anyhow, Result};
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location};
+use ruff_text_size::TextSize;
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::find_keyword;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -112,14 +112,14 @@ fn create_check(
         RedundantOpenModes {
             replacement: replacement_value.map(ToString::to_string),
         },
-        Range::from(expr),
+        expr.range(),
     );
     if patch {
         if let Some(content) = replacement_value {
             diagnostic.set_fix(Edit::replacement(
                 content.to_string(),
-                mode_param.location,
-                mode_param.end_location.unwrap(),
+                mode_param.start(),
+                mode_param.end(),
             ));
         } else {
             diagnostic.try_set_fix(|| create_remove_param_fix(locator, expr, mode_param));
@@ -129,15 +129,15 @@ fn create_check(
 }
 
 fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) -> Result<Edit> {
-    let content = locator.slice(expr);
+    let content = locator.slice(expr.range());
     // Find the last comma before mode_param and create a deletion fix
     // starting from the comma and ending after mode_param.
-    let mut fix_start: Option<Location> = None;
-    let mut fix_end: Option<Location> = None;
+    let mut fix_start: Option<TextSize> = None;
+    let mut fix_end: Option<TextSize> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    for (start, tok, end) in lexer::lex_located(content, Mode::Module, expr.location).flatten() {
-        if start == mode_param.location {
+    for (start, tok, end) in lexer::lex_located(content, Mode::Module, expr.start()).flatten() {
+        if start == mode_param.start() {
             if is_first_arg {
                 delete_first_arg = true;
                 continue;

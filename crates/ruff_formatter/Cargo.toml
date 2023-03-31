@@ -6,7 +6,7 @@ edition = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-ruff_text_size = { path = "../ruff_text_size" }
+ruff_text_size = { workspace = true }
 
 drop_bomb = { version = "0.1.5" }
 rustc-hash = { workspace = true }
@@ -19,4 +19,5 @@ unicode-width = { version = "0.1.10" }
 insta = { workspace = true }
 
 [features]
-serde = ["dep:serde", "schemars"]
+serde = ["dep:serde", "ruff_text_size/serde"]
+schemars = ["dep:schemars", "ruff_text_size/schemars"]

@@ -3,7 +3,6 @@ use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks for imports that are typically imported using a common convention,
@@ -54,7 +53,7 @@ pub fn conventional_import_alias(
                     name: name.to_string(),
                     asname: expected_alias.to_string(),
                 },
-                Range::from(stmt),
+                stmt.range(),
             ));
         }
     }

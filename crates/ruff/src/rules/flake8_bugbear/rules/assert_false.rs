@@ -1,9 +1,9 @@
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
+use ruff_text_size::TextSize;
+use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_stmt;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -24,16 +24,16 @@ impl AlwaysAutofixableViolation for AssertFalse {
 
 fn assertion_error(msg: Option<&Expr>) -> Stmt {
     Stmt::new(
-        Location::default(),
-        Location::default(),
+        TextSize::default(),
+        TextSize::default(),
         StmtKind::Raise {
             exc: Some(Box::new(Expr::new(
-                Location::default(),
-                Location::default(),
+                TextSize::default(),
+                TextSize::default(),
                 ExprKind::Call {
                     func: Box::new(Expr::new(
-                        Location::default(),
-                        Location::default(),
+                        TextSize::default(),
+                        TextSize::default(),
                         ExprKind::Name {
                             id: "AssertionError".to_string(),
                             ctx: ExprContext::Load,
@@ -61,12 +61,12 @@ pub fn assert_false(checker: &mut Checker, stmt: &Stmt, test: &Expr, msg: Option
         return;
     };
 
-    let mut diagnostic = Diagnostic::new(AssertFalse, Range::from(test));
+    let mut diagnostic = Diagnostic::new(AssertFalse, test.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.set_fix(Edit::replacement(
             unparse_stmt(&assertion_error(msg), checker.stylist),
-            stmt.location,
-            stmt.end_location.unwrap(),
+            stmt.start(),
+            stmt.end(),
         ));
     }
     checker.diagnostics.push(diagnostic);

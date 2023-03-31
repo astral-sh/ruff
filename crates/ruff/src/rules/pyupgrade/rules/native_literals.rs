@@ -5,7 +5,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::is_implicit_concatenation;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -63,7 +62,7 @@ pub fn native_literals(
                 LiteralType::Str
             } else {
                 LiteralType::Bytes
-            }}, Range::from(expr));
+            }}, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Edit::replacement(
                     if id == "bytes" {
@@ -78,8 +77,8 @@ pub fn native_literals(
                         content.push(checker.stylist.quote().into());
                         content
                     },
-                    expr.location,
-                    expr.end_location.unwrap(),
+                    expr.start(),
+                    expr.end(),
                 ));
             }
             checker.diagnostics.push(diagnostic);
@@ -113,7 +112,7 @@ pub fn native_literals(
         }
 
         // Skip implicit string concatenations.
-        let arg_code = checker.locator.slice(arg);
+        let arg_code = checker.locator.slice(arg.range());
         if is_implicit_concatenation(arg_code) {
             return;
         }
@@ -126,13 +125,13 @@ pub fn native_literals(
                     LiteralType::Bytes
                 },
             },
-            Range::from(expr),
+            expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.set_fix(Edit::replacement(
                 arg_code.to_string(),
-                expr.location,
-                expr.end_location.unwrap(),
+                expr.start(),
+                expr.end(),
             ));
         }
         checker.diagnostics.push(diagnostic);

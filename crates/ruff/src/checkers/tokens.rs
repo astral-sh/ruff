@@ -155,6 +155,7 @@ pub fn check_tokens(
             flake8_implicit_str_concat::rules::implicit(
                 tokens,
                 &settings.flake8_implicit_str_concat,
+                locator,
             )
             .into_iter()
             .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),

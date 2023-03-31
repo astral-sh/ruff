@@ -10,7 +10,6 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::indentation;
 
 use crate::checkers::ast::Checker;
@@ -126,7 +125,7 @@ fn format_import(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(stmt);
+    let module_text = locator.slice(stmt.range());
     let mut tree = match_module(module_text)?;
     let mut import = match_import(&mut tree)?;
 
@@ -160,7 +159,7 @@ fn format_import_from(
     locator: &Locator,
     stylist: &Stylist,
 ) -> Result<String> {
-    let module_text = locator.slice(stmt);
+    let module_text = locator.slice(stmt.range());
     let mut tree = match_module(module_text).unwrap();
     let mut import = match_import_from(&mut tree)?;
 
@@ -255,13 +254,13 @@ pub fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 DeprecatedMockImport {
                     reference_type: MockReference::Attribute,
                 },
-                Range::from(value),
+                value.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(Edit::replacement(
                     "mock".to_string(),
-                    value.location,
-                    value.end_location.unwrap(),
+                    value.start(),
+                    value.end(),
                 ));
             }
             checker.diagnostics.push(diagnostic);
@@ -302,13 +301,13 @@ pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             DeprecatedMockImport {
                                 reference_type: MockReference::Import,
                             },
-                            Range::from(name),
+                            name.range(),
                         );
                         if let Some(content) = content.as_ref() {
                             diagnostic.set_fix(Edit::replacement(
                                 content.clone(),
-                                stmt.location,
-                                stmt.end_location.unwrap(),
+                                stmt.start(),
+                                stmt.end(),
                             ));
                         }
                         checker.diagnostics.push(diagnostic);
@@ -330,20 +329,13 @@ pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                     DeprecatedMockImport {
                         reference_type: MockReference::Import,
                     },
-                    Range::from(stmt),
+                    stmt.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         diagnostic.try_set_fix(|| {
-                            format_import_from(stmt, indent, checker.locator, checker.stylist).map(
-                                |content| {
-                                    Edit::replacement(
-                                        content,
-                                        stmt.location,
-                                        stmt.end_location.unwrap(),
-                                    )
-                                },
-                            )
+                            format_import_from(stmt, indent, checker.locator, checker.stylist)
+                                .map(|content| Edit::replacement(content, stmt.start(), stmt.end()))
                         });
                     }
                 }

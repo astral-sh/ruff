@@ -1,15 +1,16 @@
+use ruff_text_size::{TextRange, TextSize};
 use std::str::FromStr;
 
 use rustpython_common::cformat::{
     CConversionFlags, CFormatPart, CFormatPrecision, CFormatQuantity, CFormatString,
 };
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Location};
+use rustpython_parser::ast::{Constant, Expr, ExprKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_stdlib::identifiers::is_identifier;
 
@@ -137,11 +138,11 @@ fn percent_to_format(format_string: &CFormatString) -> String {
 }
 
 /// If a tuple has one argument, remove the comma; otherwise, return it as-is.
-fn clean_params_tuple(checker: &mut Checker, right: &Expr) -> String {
-    let mut contents = checker.locator.slice(right).to_string();
+fn clean_params_tuple(checker: &mut Checker, right: &Expr, locator: &Locator) -> String {
+    let mut contents = checker.locator.slice(right.range()).to_string();
     if let ExprKind::Tuple { elts, .. } = &right.node {
         if elts.len() == 1 {
-            if right.location.row() == right.end_location.unwrap().row() {
+            if !locator.contains_line_break(right.range()) {
                 for (i, character) in contents.chars().rev().enumerate() {
                     if character == ',' {
                         let correct_index = contents.len() - i - 1;
@@ -157,8 +158,12 @@ fn clean_params_tuple(checker: &mut Checker, right: &Expr) -> String {
 
 /// Converts a dictionary to a function call while preserving as much styling as
 /// possible.
-fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String> {
-    let is_multi_line = right.location.row() < right.end_location.unwrap().row();
+fn clean_params_dictionary(
+    checker: &mut Checker,
+    right: &Expr,
+    locator: &Locator,
+) -> Option<String> {
+    let is_multi_line = locator.contains_line_break(right.range());
     let mut contents = String::new();
     if let ExprKind::Dict { keys, values } = &right.node {
         let mut arguments: Vec<String> = vec![];
@@ -187,7 +192,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                             }
                         }
 
-                        let value_string = checker.locator.slice(value);
+                        let value_string = checker.locator.slice(value.range());
                         arguments.push(format!("{key_string}={value_string}"));
                     } else {
                         // If there are any non-string keys, abort.
@@ -195,7 +200,7 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                     }
                 }
                 None => {
-                    let value_string = checker.locator.slice(value);
+                    let value_string = checker.locator.slice(value.range());
                     arguments.push(format!("**{value_string}"));
                 }
             }
@@ -296,12 +301,21 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
 }
 
 /// UP031
-pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
+pub(crate) fn printf_string_formatting(
+    checker: &mut Checker,
+    expr: &Expr,
+    right: &Expr,
+    locator: &Locator,
+) {
     // Grab each string segment (in case there's an implicit concatenation).
-    let mut strings: Vec<(Location, Location)> = vec![];
+    let mut strings: Vec<(TextSize, TextSize)> = vec![];
     let mut extension = None;
-    for (start, tok, end) in
-        lexer::lex_located(checker.locator.slice(expr), Mode::Module, expr.location).flatten()
+    for (start, tok, end) in lexer::lex_located(
+        checker.locator.slice(expr.range()),
+        Mode::Module,
+        expr.start(),
+    )
+    .flatten()
     {
         if matches!(tok, Tok::String { .. }) {
             strings.push((start, end));
@@ -324,7 +338,7 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     let mut num_keyword_arguments = 0;
     let mut format_strings = Vec::with_capacity(strings.len());
     for (start, end) in &strings {
-        let string = checker.locator.slice(Range::new(*start, *end));
+        let string = checker.locator.slice(TextRange::new(*start, *end));
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };
@@ -358,7 +372,7 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     // Parse the parameters.
     let params_string = match right.node {
         ExprKind::Constant { .. } | ExprKind::JoinedStr { .. } => {
-            format!("({})", checker.locator.slice(right))
+            format!("({})", checker.locator.slice(right.range()))
         }
         ExprKind::Name { .. }
         | ExprKind::Attribute { .. }
@@ -366,11 +380,11 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
         | ExprKind::Call { .. } => {
             if num_keyword_arguments > 0 {
                 // If we have _any_ named fields, assume the right-hand side is a mapping.
-                format!("(**{})", checker.locator.slice(right))
+                format!("(**{})", checker.locator.slice(right.range()))
             } else if num_positional_arguments > 1 {
                 // If we have multiple fields, but no named fields, assume the right-hand side is a
                 // tuple.
-                format!("(*{})", checker.locator.slice(right))
+                format!("(*{})", checker.locator.slice(right.range()))
             } else {
                 // Otherwise, if we have a single field, we can't make any assumptions about the
                 // right-hand side. It _could_ be a tuple, but it could also be a single value,
@@ -384,9 +398,9 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
                 return;
             }
         }
-        ExprKind::Tuple { .. } => clean_params_tuple(checker, right),
+        ExprKind::Tuple { .. } => clean_params_tuple(checker, right, locator),
         ExprKind::Dict { .. } => {
-            if let Some(params_string) = clean_params_dictionary(checker, right) {
+            if let Some(params_string) = clean_params_dictionary(checker, right, locator) {
                 params_string
             } else {
                 return;
@@ -402,10 +416,10 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
         // Add the content before the string segment.
         match prev {
             None => {
-                contents.push_str(checker.locator.slice(Range::new(expr.location, *start)));
+                contents.push_str(checker.locator.slice(TextRange::new(expr.start(), *start)));
             }
             Some(prev) => {
-                contents.push_str(checker.locator.slice(Range::new(prev, *start)));
+                contents.push_str(checker.locator.slice(TextRange::new(prev, *start)));
             }
         }
         // Add the string itself.
@@ -414,19 +428,15 @@ pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right
     }
 
     if let Some((.., end)) = extension {
-        contents.push_str(checker.locator.slice(Range::new(prev.unwrap(), end)));
+        contents.push_str(checker.locator.slice(TextRange::new(prev.unwrap(), end)));
     }
 
     // Add the `.format` call.
     contents.push_str(&format!(".format{params_string}"));
 
-    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, Range::from(expr));
+    let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
-            contents,
-            expr.location,
-            expr.end_location.unwrap(),
-        ));
+        diagnostic.set_fix(Edit::replacement(contents, expr.start(), expr.end()));
     }
     checker.diagnostics.push(diagnostic);
 }

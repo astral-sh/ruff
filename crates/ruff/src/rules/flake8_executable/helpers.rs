@@ -7,15 +7,16 @@ use std::path::Path;
 use anyhow::Result;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use ruff_text_size::{TextLen, TextSize};
 
 static SHEBANG_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^(?P<spaces>\s*)#!(?P<directive>.*)").unwrap());
 
-#[derive(Debug)]
+#[derive(Debug, PartialEq, Eq)]
 pub enum ShebangDirective<'a> {
     None,
     // whitespace length, start of shebang, end, shebang contents
-    Match(usize, usize, usize, &'a str),
+    Match(TextSize, TextSize, TextSize, &'a str),
 }
 
 pub fn extract_shebang(line: &str) -> ShebangDirective {
@@ -27,9 +28,9 @@ pub fn extract_shebang(line: &str) -> ShebangDirective {
         Some(caps) => match caps.name("spaces") {
             Some(spaces) => match caps.name("directive") {
                 Some(matches) => ShebangDirective::Match(
-                    spaces.as_str().chars().count(),
-                    matches.start(),
-                    matches.end(),
+                    spaces.as_str().text_len(),
+                    TextSize::try_from(matches.start()).unwrap(),
+                    TextSize::try_from(matches.end()).unwrap(),
                     matches.as_str(),
                 ),
                 None => ShebangDirective::None,
@@ -55,6 +56,8 @@ mod tests {
         extract_shebang, ShebangDirective, SHEBANG_REGEX,
     };
 
+    use ruff_text_size::TextSize;
+
     #[test]
     fn shebang_regex() {
         // Positive cases
@@ -69,21 +72,28 @@ mod tests {
 
     #[test]
     fn shebang_extract_match() {
-        assert!(matches!(
-            extract_shebang("not a match"),
-            ShebangDirective::None
-        ));
-        assert!(matches!(
+        assert_eq!(extract_shebang("not a match"), ShebangDirective::None);
+        assert_eq!(
             extract_shebang("#!/usr/bin/env python"),
-            ShebangDirective::Match(0, 2, 21, "/usr/bin/env python")
-        ));
-        assert!(matches!(
+            ShebangDirective::Match(
+                TextSize::from(0),
+                TextSize::from(2),
+                TextSize::from(21),
+                "/usr/bin/env python"
+            )
+        );
+        assert_eq!(
             extract_shebang("  #!/usr/bin/env python"),
-            ShebangDirective::Match(2, 4, 23, "/usr/bin/env python")
-        ));
-        assert!(matches!(
+            ShebangDirective::Match(
+                TextSize::from(2),
+                TextSize::from(4),
+                TextSize::from(23),
+                "/usr/bin/env python"
+            )
+        );
+        assert_eq!(
             extract_shebang("print('test')  #!/usr/bin/python"),
             ShebangDirective::None
-        ));
+        );
     }
 }

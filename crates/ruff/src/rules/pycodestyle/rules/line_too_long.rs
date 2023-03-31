@@ -1,5 +1,6 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::newlines::Line;
 
 use crate::rules::pycodestyle::helpers::is_overlong;
 use crate::settings::Settings;
@@ -34,7 +35,7 @@ impl Violation for LineTooLong {
 }
 
 /// E501
-pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<Diagnostic> {
+pub(crate) fn line_too_long(line: &Line, settings: &Settings) -> Option<Diagnostic> {
     let limit = settings.line_length;
 
     is_overlong(
@@ -43,5 +44,5 @@ pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<D
         settings.pycodestyle.ignore_overlong_task_comments,
         &settings.task_tags,
     )
-    .map(|overlong| Diagnostic::new(LineTooLong(overlong.width(), limit), overlong.range(lineno)))
+    .map(|overlong| Diagnostic::new(LineTooLong(overlong.width(), limit), overlong.range()))
 }

@@ -1,10 +1,8 @@
 use rustpython_parser::ast::Expr;
 
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
-
-use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for the use of legacy `np.random` function calls.
@@ -122,7 +120,7 @@ pub fn numpy_legacy_random(checker: &mut Checker, expr: &Expr) {
             NumpyLegacyRandom {
                 method_name: method_name.to_string(),
             },
-            Range::from(expr),
+            expr.range(),
         ));
     }
 }

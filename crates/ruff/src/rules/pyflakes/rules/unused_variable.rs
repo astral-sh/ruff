@@ -1,5 +1,6 @@
 use itertools::Itertools;
 use log::error;
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{ExprKind, Located, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
@@ -7,7 +8,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_ast::types::RefEquality;
 use ruff_python_semantic::scope::{ScopeId, ScopeKind};
 
 use crate::autofix::actions::delete_stmt;
@@ -62,11 +63,11 @@ impl AlwaysAutofixableViolation for UnusedVariable {
 
 /// Return the start and end [`Location`] of the token after the next match of
 /// the predicate, skipping over any bracketed expressions.
-fn match_token_after<F, T>(located: &Located<T>, locator: &Locator, f: F) -> Range
+fn match_token_after<F, T>(located: &Located<T>, locator: &Locator, f: F) -> TextRange
 where
     F: Fn(Tok) -> bool,
 {
-    let contents = locator.after(located.location);
+    let contents = locator.after(located.start());
 
     // Track the bracket depth.
     let mut par_count = 0;
@@ -74,7 +75,7 @@ where
     let mut brace_count = 0;
 
     for ((_, tok, _), (start, _, end)) in
-        lexer::lex_located(contents, Mode::Module, located.location)
+        lexer::lex_located(contents, Mode::Module, located.start())
             .flatten()
             .tuple_windows()
     {
@@ -117,7 +118,7 @@ where
         }
 
         if f(tok) {
-            return Range::new(start, end);
+            return TextRange::new(start, end);
         }
     }
     unreachable!("No token after matched");
@@ -125,19 +126,18 @@ where
 
 /// Return the start and end [`Location`] of the token matching the predicate,
 /// skipping over any bracketed expressions.
-fn match_token<F, T>(located: &Located<T>, locator: &Locator, f: F) -> Range
+fn match_token<F, T>(located: &Located<T>, locator: &Locator, f: F) -> TextRange
 where
     F: Fn(Tok) -> bool,
 {
-    let contents = locator.after(located.location);
+    let contents = locator.after(located.start());
 
     // Track the bracket depth.
     let mut par_count = 0;
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for (start, tok, end) in lexer::lex_located(contents, Mode::Module, located.location).flatten()
-    {
+    for (start, tok, end) in lexer::lex_located(contents, Mode::Module, located.start()).flatten() {
         match tok {
             Tok::Lpar => {
                 par_count += 1;
@@ -177,7 +177,7 @@ where
         }
 
         if f(tok) {
-            return Range::new(start, end);
+            return TextRange::new(start, end);
         }
     }
     unreachable!("No token after matched");
@@ -193,14 +193,12 @@ enum DeletionKind {
 /// enclosing [`Stmt`] and the [`Range`] of the variable binding.
 fn remove_unused_variable(
     stmt: &Stmt,
-    range: &Range,
+    range: &TextRange,
     checker: &Checker,
 ) -> Option<(DeletionKind, Edit)> {
     // First case: simple assignment (`x = 1`)
     if let StmtKind::Assign { targets, value, .. } = &stmt.node {
-        if let Some(target) = targets.iter().find(|target| {
-            range.location == target.location && range.end_location == target.end_location.unwrap()
-        }) {
+        if let Some(target) = targets.iter().find(|target| *range == target.range()) {
             if matches!(target.node, ExprKind::Name { .. }) {
                 return if targets.len() > 1
                     || contains_effect(value, |id| checker.ctx.is_builtin(id))
@@ -210,9 +208,9 @@ fn remove_unused_variable(
                     Some((
                         DeletionKind::Partial,
                         Edit::deletion(
-                            target.location,
+                            target.start(),
                             match_token_after(target, checker.locator, |tok| tok == Tok::Equal)
-                                .location,
+                                .start(),
                         ),
                     ))
                 } else {
@@ -256,8 +254,8 @@ fn remove_unused_variable(
                 Some((
                     DeletionKind::Partial,
                     Edit::deletion(
-                        stmt.location,
-                        match_token_after(stmt, checker.locator, |tok| tok == Tok::Equal).location,
+                        stmt.start(),
+                        match_token_after(stmt, checker.locator, |tok| tok == Tok::Equal).start(),
                     ),
                 ))
             } else {
@@ -292,19 +290,17 @@ fn remove_unused_variable(
         // TODO(charlie): Store the `Withitem` in the `Binding`.
         for item in items {
             if let Some(optional_vars) = &item.optional_vars {
-                if optional_vars.location == range.location
-                    && optional_vars.end_location.unwrap() == range.end_location
-                {
+                if optional_vars.range() == *range {
                     return Some((
                         DeletionKind::Partial,
                         Edit::deletion(
-                            item.context_expr.end_location.unwrap(),
+                            item.context_expr.end(),
                             // The end of the `Withitem` is the colon, comma, or closing
                             // parenthesis following the `optional_vars`.
                             match_token(&item.context_expr, checker.locator, |tok| {
                                 tok == Tok::Colon || tok == Tok::Comma || tok == Tok::Rpar
                             })
-                            .location,
+                            .start(),
                         ),
                     ));
                 }

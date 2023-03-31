@@ -4,7 +4,7 @@ use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -12,23 +12,24 @@ use ruff_rustpython::vendor;
 
 use crate::source_code::Locator;
 use crate::str::leading_quote;
-use crate::types::Range;
 
 pub struct Stylist<'a> {
     locator: &'a Locator<'a>,
     indentation: OnceCell<Indentation>,
-    indent_end: Option<Location>,
+    indent_end: Option<TextSize>,
     quote: OnceCell<Quote>,
-    quote_range: Option<Range>,
+    quote_range: Option<TextRange>,
     line_ending: OnceCell<LineEnding>,
 }
 
+/// TODO this is now cheap, remove lazy computation?
 impl<'a> Stylist<'a> {
     pub fn indentation(&'a self) -> &'a Indentation {
         self.indentation.get_or_init(|| {
             if let Some(indent_end) = self.indent_end {
-                let start = Location::new(indent_end.row(), 0);
-                let whitespace = self.locator.slice(Range::new(start, indent_end));
+                let start = self.locator.line_start(indent_end);
+                let whitespace = &self.locator.contents()[TextRange::new(start, indent_end)];
+
                 Indentation(whitespace.to_string())
             } else {
                 Indentation::default()
@@ -40,7 +41,7 @@ impl<'a> Stylist<'a> {
         *self.quote.get_or_init(|| {
             self.quote_range
                 .and_then(|quote_range| {
-                    let content = self.locator.slice(quote_range);
+                    let content = &self.locator.contents()[quote_range];
                     leading_quote(content)
                 })
                 .map(|pattern| {
@@ -75,7 +76,7 @@ impl<'a> Stylist<'a> {
             Tok::String {
                 triple_quoted: false,
                 ..
-            } => Some(Range::new(*start, *end)),
+            } => Some(TextRange::new(*start, *end)),
             _ => None,
         });
 

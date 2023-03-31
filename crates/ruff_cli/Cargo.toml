@@ -26,6 +26,7 @@ ruff = { path = "../ruff", features = ["clap"] }
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_text_size = { workspace = true }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }

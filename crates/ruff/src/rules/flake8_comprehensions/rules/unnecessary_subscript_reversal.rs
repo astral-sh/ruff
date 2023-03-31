@@ -1,11 +1,9 @@
 use num_bigint::BigInt;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Unaryop};
 
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
-
-use crate::checkers::ast::Checker;
 
 use super::helpers;
 
@@ -93,6 +91,6 @@ pub fn unnecessary_subscript_reversal(
         UnnecessarySubscriptReversal {
             func: id.to_string(),
         },
-        Range::from(expr),
+        expr.range(),
     ));
 }

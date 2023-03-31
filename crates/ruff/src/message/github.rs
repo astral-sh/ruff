@@ -1,6 +1,7 @@
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
+use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
 use std::io::Write;
 
 /// Generate error workflow command in GitHub Actions format.
@@ -16,13 +17,19 @@ impl Emitter for GithubEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
-            let (row, column) = if context.is_jupyter_notebook(message.filename()) {
+            let source_location = message.compute_start_location();
+            let location = if context.is_jupyter_notebook(message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
-                (1, 0)
+                SourceLocation {
+                    row: OneIndexed::from_zero_indexed(0),
+                    column: OneIndexed::from_zero_indexed(0),
+                }
             } else {
-                (message.location.row(), message.location.column())
+                source_location.clone()
             };
+
+            let end_location = message.compute_end_location();
 
             write!(
                 writer,
@@ -30,16 +37,18 @@ impl Emitter for GithubEmitter {
                          ({code}),file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
                 code = message.kind.rule().noqa_code(),
                 file = message.filename(),
-                row = message.location.row(),
-                column = message.location.column(),
-                end_row = message.end_location.row(),
-                end_column = message.end_location.column(),
+                row = source_location.row,
+                column = source_location.column,
+                end_row = end_location.row,
+                end_column = end_location.column,
             )?;
 
             writeln!(
                 writer,
                 "{path}:{row}:{column}: {code} {body}",
                 path = relativize_path(message.filename()),
+                row = location.row,
+                column = location.column,
                 code = message.kind.rule().noqa_code(),
                 body = message.kind.body,
             )?;

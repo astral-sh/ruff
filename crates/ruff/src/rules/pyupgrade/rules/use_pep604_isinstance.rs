@@ -1,11 +1,11 @@
+use ruff_text_size::TextSize;
 use std::fmt;
 
-use rustpython_parser::ast::{Expr, ExprKind, Location, Operator};
+use rustpython_parser::ast::{Expr, ExprKind, Operator};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -56,8 +56,8 @@ fn union(elts: &[Expr]) -> Expr {
         elts[0].clone()
     } else {
         Expr::new(
-            Location::default(),
-            Location::default(),
+            TextSize::default(),
+            TextSize::default(),
             ExprKind::BinOp {
                 left: Box::new(union(&elts[..elts.len() - 1])),
                 op: Operator::BitOr,
@@ -91,13 +91,12 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
                     return;
                 }
 
-                let mut diagnostic =
-                    Diagnostic::new(NonPEP604Isinstance { kind }, Range::from(expr));
+                let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.set_fix(Edit::replacement(
                         unparse_expr(&union(elts), checker.stylist),
-                        types.location,
-                        types.end_location.unwrap(),
+                        types.start(),
+                        types.end(),
                     ));
                 }
                 checker.diagnostics.push(diagnostic);

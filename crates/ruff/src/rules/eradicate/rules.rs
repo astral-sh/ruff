@@ -1,9 +1,8 @@
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 use crate::registry::Rule;
 use crate::settings::{flags, Settings};
@@ -49,20 +48,19 @@ fn is_standalone_comment(line: &str) -> bool {
 /// ERA001
 pub fn commented_out_code(
     locator: &Locator,
-    start: Location,
-    end: Location,
+    start: TextSize,
+    end: TextSize,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Option<Diagnostic> {
-    let location = Location::new(start.row(), 0);
-    let end_location = Location::new(end.row() + 1, 0);
-    let line = locator.slice(Range::new(location, end_location));
+    let line = locator.lines(TextRange::new(start, end));
 
     // Verify that the comment is on its own line, and that it contains code.
     if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
-        let mut diagnostic = Diagnostic::new(CommentedOutCode, Range::new(start, end));
+        let mut diagnostic = Diagnostic::new(CommentedOutCode, TextRange::new(start, end));
         if autofix.into() && settings.rules.should_fix(Rule::CommentedOutCode) {
-            diagnostic.set_fix(Edit::deletion(location, end_location));
+            let range = locator.full_lines_range(TextRange::new(start, end));
+            diagnostic.set_fix(Edit::deletion(range.start(), range.end()));
         }
         Some(diagnostic)
     } else {

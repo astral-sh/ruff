@@ -1,4 +1,5 @@
 use log::error;
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Located, Stmt, StmtKind, Withitem};
 use unicode_width::UnicodeWidthStr;
 
@@ -7,7 +8,6 @@ use ruff_diagnostics::{AutofixKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{first_colon_range, has_comments_in};
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -85,27 +85,24 @@ pub fn multiple_with_statements(
     if let Some((items, body)) = find_last_with(with_body) {
         let last_item = items.last().expect("Expected items to be non-empty");
         let colon = first_colon_range(
-            Range::new(
+            TextRange::new(
                 last_item
                     .optional_vars
                     .as_ref()
-                    .map_or(last_item.context_expr.end_location, |v| v.end_location)
-                    .unwrap(),
-                body.first()
-                    .expect("Expected body to be non-empty")
-                    .location,
+                    .map_or(last_item.context_expr.end(), |v| v.end()),
+                body.first().expect("Expected body to be non-empty").start(),
             ),
             checker.locator,
         );
         let fixable = !has_comments_in(
-            Range::new(with_stmt.location, with_body[0].location),
+            TextRange::new(with_stmt.start(), with_body[0].start()),
             checker.locator,
         );
         let mut diagnostic = Diagnostic::new(
             MultipleWithStatements { fixable },
             colon.map_or_else(
-                || Range::from(with_stmt),
-                |colon| Range::new(with_stmt.location, colon.end_location),
+                || with_stmt.range(),
+                |colon| TextRange::new(with_stmt.start(), colon.end()),
             ),
         );
         if fixable && checker.patch(diagnostic.kind.rule()) {

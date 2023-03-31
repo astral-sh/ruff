@@ -2,7 +2,6 @@ use rustpython_parser::ast::Expr;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -30,12 +29,12 @@ pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
             call_path.as_slice() == ["typing", "Text"]
         })
     {
-        let mut diagnostic = Diagnostic::new(TypingTextStrAlias, Range::from(expr));
+        let mut diagnostic = Diagnostic::new(TypingTextStrAlias, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.set_fix(Edit::replacement(
                 "str".to_string(),
-                expr.location,
-                expr.end_location.unwrap(),
+                expr.start(),
+                expr.end(),
             ));
         }
         checker.diagnostics.push(diagnostic);

@@ -1,8 +1,8 @@
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_python_ast::newlines::Line;
 
 use crate::registry::Rule;
 use crate::settings::{flags, Settings};
@@ -75,35 +75,36 @@ impl AlwaysAutofixableViolation for BlankLineWithWhitespace {
 }
 
 /// W291, W293
-pub fn trailing_whitespace(
-    lineno: usize,
-    line: &str,
+pub(crate) fn trailing_whitespace(
+    line: &Line,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Option<Diagnostic> {
-    let whitespace_count = line.chars().rev().take_while(|c| c.is_whitespace()).count();
-    if whitespace_count > 0 {
-        let line_char_count = line.chars().count();
-        let start = Location::new(lineno + 1, line_char_count - whitespace_count);
-        let end = Location::new(lineno + 1, line_char_count);
+    let whitespace_len: TextSize = line
+        .chars()
+        .rev()
+        .take_while(|c| c.is_whitespace())
+        .map(|c| c.text_len())
+        .sum();
+    if whitespace_len > TextSize::from(0) {
+        let range = TextRange::new(line.end() - whitespace_len, line.end());
 
-        if whitespace_count == line_char_count {
+        if range == line.range() {
             if settings.rules.enabled(Rule::BlankLineWithWhitespace) {
-                let mut diagnostic =
-                    Diagnostic::new(BlankLineWithWhitespace, Range::new(start, end));
+                let mut diagnostic = Diagnostic::new(BlankLineWithWhitespace, range);
                 if matches!(autofix, flags::Autofix::Enabled)
                     && settings.rules.should_fix(Rule::BlankLineWithWhitespace)
                 {
-                    diagnostic.set_fix(Edit::deletion(start, end));
+                    diagnostic.set_fix(Edit::deletion(range.start(), range.end()));
                 }
                 return Some(diagnostic);
             }
         } else if settings.rules.enabled(Rule::TrailingWhitespace) {
-            let mut diagnostic = Diagnostic::new(TrailingWhitespace, Range::new(start, end));
+            let mut diagnostic = Diagnostic::new(TrailingWhitespace, range);
             if matches!(autofix, flags::Autofix::Enabled)
                 && settings.rules.should_fix(Rule::TrailingWhitespace)
             {
-                diagnostic.set_fix(Edit::deletion(start, end));
+                diagnostic.set_fix(Edit::deletion(range.start(), range.end()));
             }
             return Some(diagnostic);
         }

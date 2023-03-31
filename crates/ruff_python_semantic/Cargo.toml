@@ -10,6 +10,7 @@ rust-version = { workspace = true }
 [dependencies]
 ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
+ruff_text_size = { workspace = true }
 
 bitflags = { workspace = true }
 is-macro = { workspace = true }

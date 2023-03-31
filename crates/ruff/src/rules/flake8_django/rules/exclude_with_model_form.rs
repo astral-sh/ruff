@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_django::rules::helpers::is_model_form;
@@ -68,10 +67,7 @@ pub fn exclude_with_model_form(
                     continue;
                 };
                 if id == "exclude" {
-                    return Some(Diagnostic::new(
-                        DjangoExcludeWithModelForm,
-                        Range::from(target),
-                    ));
+                    return Some(Diagnostic::new(DjangoExcludeWithModelForm, target.range()));
                 }
             }
         }

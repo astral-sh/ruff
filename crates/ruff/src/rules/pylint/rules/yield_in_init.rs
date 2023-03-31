@@ -2,7 +2,6 @@ use rustpython_parser::ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::helpers::in_dunder_init;
@@ -43,6 +42,6 @@ pub fn yield_in_init(checker: &mut Checker, expr: &Expr) {
     if in_dunder_init(checker) {
         checker
             .diagnostics
-            .push(Diagnostic::new(YieldInInit, Range::from(expr)));
+            .push(Diagnostic::new(YieldInInit, expr.range()));
     }
 }

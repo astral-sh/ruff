@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -76,6 +75,6 @@ pub fn binary_op_exception(checker: &mut Checker, excepthandler: &Excepthandler)
 
     checker.diagnostics.push(Diagnostic::new(
         BinaryOpException { op: op.into() },
-        Range::from(type_),
+        type_.range(),
     ));
 }

@@ -1,11 +1,11 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
+use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks for the use of type comments (e.g., `x = 1  # type: int`) in stub
@@ -44,10 +44,7 @@ pub fn type_comment_in_stub(tokens: &[LexResult]) -> Vec<Diagnostic> {
             if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
                 diagnostics.push(Diagnostic::new(
                     TypeCommentInStub,
-                    Range {
-                        location: *location,
-                        end_location: *end_location,
-                    },
+                    TextRange::new(*location, *end_location),
                 ));
             }
         }

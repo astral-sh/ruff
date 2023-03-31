@@ -3,7 +3,7 @@ use ruff_diagnostics::Edit;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_python_ast::types::Range;
+use ruff_text_size::TextRange;
 
 #[violation]
 pub struct MissingWhitespace {
@@ -81,7 +81,7 @@ pub(crate) fn missing_whitespace(line: &LogicalLine, autofix: bool) -> Vec<Diagn
                     let kind = MissingWhitespace { token: kind };
 
                     let (start, end) = token.range();
-                    let mut diagnostic = Diagnostic::new(kind, Range::new(start, start));
+                    let mut diagnostic = Diagnostic::new(kind, TextRange::new(start, start));
 
                     if autofix {
                         diagnostic.set_fix(Edit::insertion(" ".to_string(), end));

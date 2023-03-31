@@ -2,7 +2,6 @@ use rustpython_parser::ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 #[violation]
 pub struct HardcodedTempFile {
@@ -31,7 +30,7 @@ pub fn hardcoded_tmp_directory(
             HardcodedTempFile {
                 string: value.to_string(),
             },
-            Range::from(expr),
+            expr.range(),
         ))
     } else {
         None

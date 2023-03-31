@@ -9,6 +9,7 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::{debug, error};
+use ruff_text_size::TextSize;
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
@@ -87,7 +88,7 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Box<Diag
                 messages: vec![Message::from_diagnostic(
                     *diagnostic,
                     SourceFileBuilder::new(&path.to_string_lossy()).finish(),
-                    1,
+                    TextSize::default(),
                 )],
                 ..Diagnostics::default()
             }));

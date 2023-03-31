@@ -4,7 +4,6 @@ use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks for object type comparisons without using isinstance().
@@ -57,7 +56,7 @@ pub fn type_comparison(checker: &mut Checker, expr: &Expr, ops: &[Cmpop], compar
                             ) {
                                 checker
                                     .diagnostics
-                                    .push(Diagnostic::new(TypeComparison, Range::from(expr)));
+                                    .push(Diagnostic::new(TypeComparison, expr.range()));
                             }
                         }
                     }
@@ -76,7 +75,7 @@ pub fn type_comparison(checker: &mut Checker, expr: &Expr, ops: &[Cmpop], compar
                     {
                         checker
                             .diagnostics
-                            .push(Diagnostic::new(TypeComparison, Range::from(expr)));
+                            .push(Diagnostic::new(TypeComparison, expr.range()));
                     }
                 }
             }

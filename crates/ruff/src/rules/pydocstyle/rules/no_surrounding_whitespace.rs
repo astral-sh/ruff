@@ -1,12 +1,10 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
-use ruff_python_ast::str::leading_quote;
-use ruff_python_ast::types::Range;
+use ruff_text_size::TextLen;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
-use crate::message::Location;
 use crate::registry::AsRule;
 use crate::rules::pydocstyle::helpers::ends_with_backslash;
 
@@ -26,10 +24,9 @@ impl AlwaysAutofixableViolation for SurroundingWhitespace {
 
 /// D210
 pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
-    let contents = docstring.contents;
-    let body = docstring.body;
+    let body = docstring.body();
 
-    let mut lines = NewlineWithTrailingNewline::from(body);
+    let mut lines = NewlineWithTrailingNewline::from(body.as_str());
     let Some(line) = lines.next() else {
         return;
     };
@@ -40,27 +37,18 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
     if line == trimmed {
         return;
     }
-    let mut diagnostic = Diagnostic::new(SurroundingWhitespace, Range::from(docstring.expr));
+    let mut diagnostic = Diagnostic::new(SurroundingWhitespace, docstring.range());
     if checker.patch(diagnostic.kind.rule()) {
-        if let Some(pattern) = leading_quote(contents) {
-            // If removing whitespace would lead to an invalid string of quote
-            // characters, avoid applying the fix.
-            if !trimmed.ends_with(pattern.chars().last().unwrap())
-                && !trimmed.starts_with(pattern.chars().last().unwrap())
-                && !ends_with_backslash(trimmed)
-            {
-                diagnostic.set_fix(Edit::replacement(
-                    trimmed.to_string(),
-                    Location::new(
-                        docstring.expr.location.row(),
-                        docstring.expr.location.column() + pattern.len(),
-                    ),
-                    Location::new(
-                        docstring.expr.location.row(),
-                        docstring.expr.location.column() + pattern.len() + line.chars().count(),
-                    ),
-                ));
-            }
+        let quote = docstring.contents.chars().last().unwrap();
+        // If removing whitespace would lead to an invalid string of quote
+        // characters, avoid applying the fix.
+        if !trimmed.ends_with(quote) && !trimmed.starts_with(quote) && !ends_with_backslash(trimmed)
+        {
+            diagnostic.set_fix(Edit::replacement(
+                trimmed.to_string(),
+                body.start(),
+                body.start() + line.text_len(),
+            ));
         }
     }
     checker.diagnostics.push(diagnostic);

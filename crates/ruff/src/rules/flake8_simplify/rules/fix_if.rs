@@ -4,11 +4,9 @@ use libcst_native::{
     LeftParen, ParenthesizableWhitespace, ParenthesizedNode, RightParen, SimpleWhitespace,
     Statement, Suite,
 };
-use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace;
 
 use crate::cst::matchers::match_module;
@@ -40,10 +38,7 @@ pub(crate) fn fix_nested_if_statements(
     };
 
     // Extract the module text.
-    let contents = locator.slice(Range::new(
-        Location::new(stmt.location.row(), 0),
-        Location::new(stmt.end_location.unwrap().row() + 1, 0),
-    ));
+    let contents = locator.lines(stmt.range());
 
     // Handle `elif` blocks differently; detect them upfront.
     let is_elif = contents.trim_start().starts_with("elif");
@@ -135,9 +130,6 @@ pub(crate) fn fix_nested_if_statements(
         module_text.to_string()
     };
 
-    Ok(Edit::replacement(
-        contents,
-        Location::new(stmt.location.row(), 0),
-        Location::new(stmt.end_location.unwrap().row() + 1, 0),
-    ))
+    let range = locator.lines_range(stmt.range());
+    Ok(Edit::replacement(contents, range.start(), range.end()))
 }

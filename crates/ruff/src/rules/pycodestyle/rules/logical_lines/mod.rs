@@ -1,12 +1,11 @@
 use bitflags::bitflags;
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_python_ast::types::Range;
 
 pub(crate) use extraneous_whitespace::{
     extraneous_whitespace, WhitespaceAfterOpenBracket, WhitespaceBeforeCloseBracket,
@@ -224,7 +223,7 @@ impl<'a> LogicalLine<'a> {
         let last_token = self.tokens().last().unwrap();
         self.lines
             .locator
-            .slice(Range::new(token.end(), last_token.end()))
+            .slice(TextRange::new(token.end(), last_token.end()))
     }
 
     /// Returns the text before `token`
@@ -240,7 +239,7 @@ impl<'a> LogicalLine<'a> {
         let first_token = self.tokens().first().unwrap();
         self.lines
             .locator
-            .slice(Range::new(first_token.start(), token.start()))
+            .slice(TextRange::new(first_token.start(), token.start()))
     }
 
     /// Returns the whitespace *after* the `token`
@@ -248,8 +247,8 @@ impl<'a> LogicalLine<'a> {
         Whitespace::leading(self.text_after(token))
     }
 
-    /// Returns the whitespace and whitespace character-length *before* the `token`
-    pub fn leading_whitespace(&self, token: &LogicalLineToken<'a>) -> (Whitespace, usize) {
+    /// Returns the whitespace and whitespace byte-length *before* the `token`
+    pub fn leading_whitespace(&self, token: &LogicalLineToken<'a>) -> (Whitespace, TextSize) {
         Whitespace::trailing(self.text_before(token))
     }
 
@@ -263,7 +262,7 @@ impl<'a> LogicalLine<'a> {
     }
 
     /// Returns the [`Location`] of the first token on the line or [`None`].
-    pub fn first_token_location(&self) -> Option<Location> {
+    pub fn first_token_location(&self) -> Option<TextSize> {
         self.tokens().first().map(|t| t.start())
     }
 
@@ -344,7 +343,7 @@ impl<'a> LogicalLineTokens<'a> {
         match (self.first(), self.last()) {
             (Some(first), Some(last)) => {
                 let locator = self.lines.locator;
-                locator.slice(Range::new(first.start(), last.end()))
+                locator.slice(TextRange::new(first.start(), last.end()))
             }
             _ => "",
         }
@@ -452,7 +451,7 @@ impl<'a> LogicalLineToken<'a> {
 
     /// Returns the token's start location
     #[inline]
-    pub fn start(&self) -> Location {
+    pub fn start(&self) -> TextSize {
         #[allow(unsafe_code)]
         unsafe {
             *self.tokens.starts.get_unchecked(self.position)
@@ -461,7 +460,7 @@ impl<'a> LogicalLineToken<'a> {
 
     /// Returns the token's end location
     #[inline]
-    pub fn end(&self) -> Location {
+    pub fn end(&self) -> TextSize {
         #[allow(unsafe_code)]
         unsafe {
             *self.tokens.ends.get_unchecked(self.position)
@@ -470,7 +469,7 @@ impl<'a> LogicalLineToken<'a> {
 
     /// Returns a tuple with the token's `(start, end)` locations
     #[inline]
-    pub fn range(&self) -> (Location, Location) {
+    pub fn range(&self) -> (TextSize, TextSize) {
         (self.start(), self.end())
     }
 }
@@ -515,26 +514,28 @@ impl Whitespace {
         }
     }
 
-    fn trailing(content: &str) -> (Self, usize) {
-        let mut count = 0;
+    fn trailing(content: &str) -> (Self, TextSize) {
+        let mut len = TextSize::default();
+        let mut count = 0usize;
 
         for c in content.chars().rev() {
             if c == '\t' {
-                return (Self::Tab, count + 1);
+                return (Self::Tab, len + c.text_len());
             } else if matches!(c, '\n' | '\r') {
                 // Indent
-                return (Self::None, 0);
+                return (Self::None, TextSize::default());
             } else if c.is_whitespace() {
                 count += 1;
+                len += c.text_len();
             } else {
                 break;
             }
         }
 
         match count {
-            0 => (Self::None, 0),
-            1 => (Self::Single, count),
-            _ => (Self::Many, count),
+            0 => (Self::None, TextSize::default()),
+            1 => (Self::Single, len),
+            _ => (Self::Many, len),
         }
     }
 }
@@ -563,7 +564,7 @@ impl LogicalLinesBuilder {
 
     // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
     #[allow(clippy::cast_possible_truncation)]
-    fn push_token(&mut self, start: Location, kind: TokenKind, end: Location) {
+    fn push_token(&mut self, start: TextSize, kind: TokenKind, end: TextSize) {
         let tokens_start = self.tokens.len();
 
         let line = self.current_line.get_or_insert_with(|| CurrentLine {
@@ -647,10 +648,10 @@ struct Tokens {
     kinds: Vec<TokenKind>,
 
     /// The start locations
-    starts: Vec<Location>,
+    starts: Vec<TextSize>,
 
     /// The end locations
-    ends: Vec<Location>,
+    ends: Vec<TextSize>,
 }
 
 impl Tokens {
@@ -669,7 +670,7 @@ impl Tokens {
     }
 
     /// Adds a new token with the given `kind` and `start`, `end` location.
-    fn push(&mut self, kind: TokenKind, start: Location, end: Location) {
+    fn push(&mut self, kind: TokenKind, start: TextSize, end: TextSize) {
         self.kinds.push(kind);
         self.starts.push(start);
         self.ends.push(end);

@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_semantic::binding::{Binding, BindingKind, Bindings};
 use ruff_python_semantic::scope::Scope;
 
@@ -48,7 +47,7 @@ fn rule(name: &str, bases: &[Expr], scope: &Scope, bindings: &Bindings) -> Optio
             UselessObjectInheritance {
                 name: name.to_string(),
             },
-            Range::from(expr),
+            expr.range(),
         ));
     }
 
@@ -65,12 +64,12 @@ pub fn useless_object_inheritance(
 ) {
     if let Some(mut diagnostic) = rule(name, bases, checker.ctx.scope(), &checker.ctx.bindings) {
         if checker.patch(diagnostic.kind.rule()) {
-            let location = diagnostic.location;
-            let end_location = diagnostic.end_location;
+            let location = diagnostic.start();
+            let end_location = diagnostic.end();
             diagnostic.try_set_fix(|| {
                 remove_argument(
                     checker.locator,
-                    stmt.location,
+                    stmt.start(),
                     location,
                     end_location,
                     bases,

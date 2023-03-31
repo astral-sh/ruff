@@ -1,8 +1,8 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, KeywordData};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
@@ -55,7 +55,7 @@ pub fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Expr
             {
                 let mut diagnostic = Diagnostic::new(
                     LRUCacheWithMaxsizeNone,
-                    Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
+                    TextRange::new(func.end(), expr.end()),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.try_set_fix(|| {
@@ -66,8 +66,7 @@ pub fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Expr
                             &checker.importer,
                             checker.locator,
                         )?;
-                        let reference_edit =
-                            Edit::replacement(binding, expr.location, expr.end_location.unwrap());
+                        let reference_edit = Edit::replacement(binding, expr.start(), expr.end());
                         Ok(Fix::from_iter([import_edit, reference_edit]))
                     });
                 }

@@ -4,7 +4,6 @@ use rustpython_parser::ast::{Alias, AliasData, Stmt};
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::indentation;
 
 use crate::checkers::ast::Checker;
@@ -456,7 +455,7 @@ impl<'a> ImportReplacer<'a> {
 
             let matched = ImportReplacer::format_import_from(&matched_names, target);
             let unmatched = fixes::remove_import_members(
-                self.locator.slice(self.stmt),
+                self.locator.slice(self.stmt.range()),
                 &matched_names
                     .iter()
                     .map(|name| name.name.as_str())
@@ -548,15 +547,11 @@ pub fn deprecated_import(
             DeprecatedImport {
                 deprecation: Deprecation::WithoutRename(operation),
             },
-            Range::from(stmt),
+            stmt.range(),
         );
         if checker.patch(Rule::DeprecatedImport) {
             if let Some(content) = fix {
-                diagnostic.set_fix(Edit::replacement(
-                    content,
-                    stmt.location,
-                    stmt.end_location.unwrap(),
-                ));
+                diagnostic.set_fix(Edit::replacement(content, stmt.start(), stmt.end()));
             }
         }
         checker.diagnostics.push(diagnostic);
@@ -567,7 +562,7 @@ pub fn deprecated_import(
             DeprecatedImport {
                 deprecation: Deprecation::WithRename(operation),
             },
-            Range::from(stmt),
+            stmt.range(),
         );
         checker.diagnostics.push(diagnostic);
     }

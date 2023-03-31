@@ -1,12 +1,12 @@
 use itertools::izip;
 use log::error;
 use once_cell::unsync::Lazy;
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Cmpop, Expr};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -57,7 +57,7 @@ pub fn invalid_literal_comparison(
     left: &Expr,
     ops: &[Cmpop],
     comparators: &[Expr],
-    location: Range,
+    location: TextRange,
 ) {
     let located = Lazy::new(|| helpers::locate_cmpops(checker.locator.slice(location)));
     let mut left = left;
@@ -80,11 +80,8 @@ pub fn invalid_literal_comparison(
                     } {
                         diagnostic.set_fix(Edit::replacement(
                             content,
-                            helpers::to_absolute(located_op.location, location.location),
-                            helpers::to_absolute(
-                                located_op.end_location.unwrap(),
-                                location.location,
-                            ),
+                            location.start() + located_op.start(),
+                            location.start() + located_op.end(),
                         ));
                     }
                 } else {

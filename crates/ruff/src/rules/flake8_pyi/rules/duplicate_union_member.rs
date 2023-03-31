@@ -5,7 +5,6 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -63,7 +62,7 @@ fn traverse_union<'a>(
             DuplicateUnionMember {
                 duplicate_name: unparse_expr(expr, checker.stylist),
             },
-            Range::from(expr),
+            expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
             // Delete the "|" character as well as the duplicate value by reconstructing the
@@ -83,8 +82,8 @@ fn traverse_union<'a>(
                     if expr.node == left.node { right } else { left },
                     checker.stylist,
                 ),
-                parent.location,
-                parent.end_location.unwrap(),
+                parent.start(),
+                parent.end(),
             ));
         }
         checker.diagnostics.push(diagnostic);

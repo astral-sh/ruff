@@ -31,11 +31,7 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
         match &stmt.node {
             StmtKind::Import { names } => {
                 module_imports.extend(names.iter().map(|name| {
-                    ModuleImport::new(
-                        name.node.name.clone(),
-                        stmt.location,
-                        stmt.end_location.unwrap(),
-                    )
+                    ModuleImport::new(name.node.name.clone(), stmt.start(), stmt.end())
                 }));
             }
             StmtKind::ImportFrom {
@@ -63,8 +59,8 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
                 module_imports.extend(names.iter().map(|name| {
                     ModuleImport::new(
                         format!("{}.{}", module, name.node.name),
-                        name.location,
-                        name.end_location.unwrap(),
+                        name.start(),
+                        name.end(),
                     )
                 }));
             }

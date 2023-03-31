@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 #[violation]
 pub struct PandasDfVariableName;
@@ -26,5 +25,5 @@ pub fn assignment_to_df(targets: &[Expr]) -> Option<Diagnostic> {
     if id != "df" {
         return None;
     }
-    Some(Diagnostic::new(PandasDfVariableName, Range::from(target)))
+    Some(Diagnostic::new(PandasDfVariableName, target.range()))
 }

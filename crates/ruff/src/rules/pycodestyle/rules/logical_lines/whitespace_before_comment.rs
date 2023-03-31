@@ -4,8 +4,7 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_python_ast::types::Range;
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextRange, TextSize};
 
 /// ## What it does
 /// Checks if inline comments are separated by at least two spaces.
@@ -140,26 +139,27 @@ impl Violation for MultipleLeadingHashesForBlockComment {
 pub(crate) fn whitespace_before_comment(
     tokens: &LogicalLineTokens,
     locator: &Locator,
-) -> Vec<(Range, DiagnosticKind)> {
+    is_first_row: bool,
+) -> Vec<(TextRange, DiagnosticKind)> {
     let mut diagnostics = vec![];
-    let mut prev_end = Location::new(0, 0);
+    let mut prev_end = TextSize::default();
     for token in tokens {
         let kind = token.kind();
 
         if let TokenKind::Comment = kind {
             let (start, end) = token.range();
-            let line = locator.slice(Range::new(
-                Location::new(start.row(), 0),
-                Location::new(start.row(), start.column()),
-            ));
 
-            let text = locator.slice(Range::new(start, end));
+            let line = locator.slice(TextRange::new(locator.line_start(start), start));
+            let text = locator.slice(TextRange::new(start, end));
 
             let is_inline_comment = !line.trim().is_empty();
             if is_inline_comment {
-                if prev_end.row() == start.row() && start.column() < prev_end.column() + 2 {
+                if start < prev_end + TextSize::from(2)
+                    && !locator
+                        .contains_line_break(TextRange::new(start, prev_end + TextSize::from(2)))
+                {
                     diagnostics.push((
-                        Range::new(prev_end, start),
+                        TextRange::new(prev_end, start),
                         TooFewSpacesBeforeInlineComment.into(),
                     ));
                 }
@@ -179,15 +179,17 @@ pub(crate) fn whitespace_before_comment(
             if is_inline_comment {
                 if bad_prefix.is_some() || comment.chars().next().map_or(false, char::is_whitespace)
                 {
-                    diagnostics.push((Range::new(start, end), NoSpaceAfterInlineComment.into()));
+                    diagnostics
+                        .push((TextRange::new(start, end), NoSpaceAfterInlineComment.into()));
                 }
             } else if let Some(bad_prefix) = bad_prefix {
-                if bad_prefix != '!' || start.row() > 1 {
+                if bad_prefix != '!' || !is_first_row {
                     if bad_prefix != '#' {
-                        diagnostics.push((Range::new(start, end), NoSpaceAfterBlockComment.into()));
+                        diagnostics
+                            .push((TextRange::new(start, end), NoSpaceAfterBlockComment.into()));
                     } else if !comment.is_empty() {
                         diagnostics.push((
-                            Range::new(start, end),
+                            TextRange::new(start, end),
                             MultipleLeadingHashesForBlockComment.into(),
                         ));
                     }
