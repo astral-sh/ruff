@@ -60,14 +60,15 @@ pub fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagno
             path.file_stem().unwrap().to_string_lossy()
         };
 
-        if !is_module_name(&module_name) {
-            // As a special case, we allow files in `versions` and `migrations` directories to start
-            // with a digit (e.g., `0001_initial.py`), to support common conventions used by Django
-            // and other frameworks.
-            if is_migration_file(path) && is_migration_name(&module_name) {
-                return None;
-            }
-
+        // As a special case, we allow files in `versions` and `migrations` directories to start
+        // with a digit (e.g., `0001_initial.py`), to support common conventions used by Django
+        // and other frameworks.
+        let is_valid_module_name = if is_migration_file(path) {
+            is_migration_name(&module_name)
+        } else {
+            is_module_name(&module_name)
+        };
+        if !is_valid_module_name {
             return Some(Diagnostic::new(
                 InvalidModuleName {
                     name: module_name.to_string(),
