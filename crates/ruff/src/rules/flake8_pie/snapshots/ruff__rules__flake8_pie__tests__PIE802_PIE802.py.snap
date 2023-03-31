@@ -86,4 +86,18 @@ expression: diagnostics
           row: 9
           column: 1
   parent: ~
+- kind:
+    name: UnnecessaryComprehensionAnyAll
+    body: Unnecessary list comprehension.
+    suggestion: Remove unnecessary list comprehension
+    fixable: true
+  location:
+    row: 10
+    column: 4
+  end_location:
+    row: 10
+    column: 23
+  fix:
+    edits: []
+  parent: ~
 

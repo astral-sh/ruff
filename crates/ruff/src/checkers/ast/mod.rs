@@ -1194,22 +1194,10 @@ where
                             ));
                         }
                     } else if alias.node.name == "*" {
-                        self.add_binding(
-                            "*",
-                            Binding {
-                                kind: BindingKind::StarImportation(StarImportation {
-                                    level: *level,
-                                    module: module.clone(),
-                                }),
-                                runtime_usage: None,
-                                synthetic_usage: None,
-                                typing_usage: None,
-                                range: Range::from(stmt),
-                                source: Some(*self.ctx.current_stmt()),
-                                context: self.ctx.execution_context(),
-                                exceptions: self.ctx.exceptions(),
-                            },
-                        );
+                        self.ctx.scope_mut().add_star_import(StarImportation {
+                            module: module.as_ref().map(String::as_str),
+                            level: *level,
+                        });
 
                         if self
                             .settings
@@ -1242,9 +1230,6 @@ where
                                 Range::from(stmt),
                             ));
                         }
-
-                        let scope = self.ctx.scope_mut();
-                        scope.import_starred = true;
                     } else {
                         if let Some(asname) = &alias.node.asname {
                             self.check_builtin_shadowing(asname, stmt, false);
@@ -4045,7 +4030,6 @@ impl<'a> Checker<'a> {
                     BindingKind::Importation(..)
                         | BindingKind::FromImportation(..)
                         | BindingKind::SubmoduleImportation(..)
-                        | BindingKind::StarImportation(..)
                         | BindingKind::FutureImportation
                 );
                 if binding.kind.is_loop_var() && existing_is_import {
@@ -4252,32 +4236,31 @@ impl<'a> Checker<'a> {
 
             first_iter = false;
             in_generator = matches!(scope.kind, ScopeKind::Generator);
-            import_starred = import_starred || scope.import_starred;
+            import_starred = import_starred || scope.uses_star_imports();
         }
 
         if import_starred {
+            // F405
             if self
                 .settings
                 .rules
                 .enabled(Rule::UndefinedLocalWithImportStarUsage)
             {
-                let mut from_list = vec![];
-                for scope_index in self.ctx.scope_stack.iter() {
-                    let scope = &self.ctx.scopes[*scope_index];
-                    for binding in scope.binding_ids().map(|index| &self.ctx.bindings[*index]) {
-                        if let BindingKind::StarImportation(StarImportation { level, module }) =
-                            &binding.kind
-                        {
-                            from_list.push(helpers::format_import_from(*level, module.as_deref()));
-                        }
-                    }
-                }
-                from_list.sort();
-
+                let sources: Vec<String> = self
+                    .ctx
+                    .scopes
+                    .iter()
+                    .flat_map(Scope::star_imports)
+                    .map(|StarImportation { level, module }| {
+                        helpers::format_import_from(*level, *module)
+                    })
+                    .sorted()
+                    .dedup()
+                    .collect();
                 self.diagnostics.push(Diagnostic::new(
                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
                         name: id.to_string(),
-                        sources: from_list,
+                        sources,
                     },
                     Range::from(expr),
                 ));
@@ -4755,7 +4738,6 @@ impl<'a> Checker<'a> {
         }
 
         // Mark anything referenced in `__all__` as used.
-
         let all_bindings: Option<(Vec<BindingId>, Range)> = {
             let global_scope = self.ctx.global_scope();
             let all_names: Option<(&Vec<String>, Range)> = global_scope
@@ -4829,13 +4811,45 @@ impl<'a> Checker<'a> {
         for (index, stack) in self.ctx.dead_scopes.iter().rev() {
             let scope = &self.ctx.scopes[*index];
 
-            // F822
             if index.is_global() {
+                // F822
                 if self.settings.rules.enabled(Rule::UndefinedExport) {
+                    if !self.path.ends_with("__init__.py") {
+                        if let Some((names, range)) = &all_names {
+                            diagnostics
+                                .extend(pyflakes::rules::undefined_export(names, range, scope));
+                        }
+                    }
+                }
+
+                // F405
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UndefinedLocalWithImportStarUsage)
+                {
                     if let Some((names, range)) = &all_names {
-                        diagnostics.extend(pyflakes::rules::undefined_export(
-                            names, range, self.path, scope,
-                        ));
+                        let sources: Vec<String> = scope
+                            .star_imports()
+                            .map(|StarImportation { level, module }| {
+                                helpers::format_import_from(*level, *module)
+                            })
+                            .sorted()
+                            .dedup()
+                            .collect();
+                        if !sources.is_empty() {
+                            for &name in names {
+                                if !scope.defines(name) {
+                                    diagnostics.push(Diagnostic::new(
+                                        pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                                            name: name.to_string(),
+                                            sources: sources.clone(),
+                                        },
+                                        *range,
+                                    ));
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -4876,7 +4890,6 @@ impl<'a> Checker<'a> {
                         BindingKind::Importation(..)
                             | BindingKind::FromImportation(..)
                             | BindingKind::SubmoduleImportation(..)
-                            | BindingKind::StarImportation(..)
                             | BindingKind::FutureImportation
                     ) {
                         if binding.used() {
@@ -4901,39 +4914,6 @@ impl<'a> Checker<'a> {
                                     }
                                 };
                                 diagnostics.push(diagnostic);
-                            }
-                        }
-                    }
-                }
-            }
-
-            if self
-                .settings
-                .rules
-                .enabled(Rule::UndefinedLocalWithImportStarUsage)
-            {
-                if scope.import_starred {
-                    if let Some((names, range)) = &all_names {
-                        let mut from_list = vec![];
-                        for binding in scope.binding_ids().map(|index| &self.ctx.bindings[*index]) {
-                            if let BindingKind::StarImportation(StarImportation { level, module }) =
-                                &binding.kind
-                            {
-                                from_list
-                                    .push(helpers::format_import_from(*level, module.as_deref()));
-                            }
-                        }
-                        from_list.sort();
-
-                        for &name in names {
-                            if !scope.defines(name) {
-                                diagnostics.push(Diagnostic::new(
-                                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                        name: name.to_string(),
-                                        sources: from_list.clone(),
-                                    },
-                                    *range,
-                                ));
                             }
                         }
                     }

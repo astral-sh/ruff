@@ -99,7 +99,6 @@ pub fn check_call(checker: &mut Checker, func: &Expr) {
                         | BindingKind::FunctionDefinition
                         | BindingKind::Export(..)
                         | BindingKind::FutureImportation
-                        | BindingKind::StarImportation(..)
                         | BindingKind::Importation(..)
                         | BindingKind::FromImportation(..)
                         | BindingKind::SubmoduleImportation(..)

@@ -344,29 +344,26 @@ pub fn unnecessary_comprehension_any_all(
     func: &Expr,
     args: &[Expr],
 ) {
-    if let ExprKind::Name { id, .. } = &func.node {
-        if (id == "all" || id == "any") && args.len() == 1 {
-            if !checker.ctx.is_builtin(id) {
-                return;
-            }
-            if let ExprKind::ListComp { elt, .. } = &args[0].node {
-                if is_async_generator(elt) {
-                    return;
-                }
-                let mut diagnostic =
-                    Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from(&args[0]));
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.try_set_fix(|| {
-                        fixes::fix_unnecessary_comprehension_any_all(
-                            checker.locator,
-                            checker.stylist,
-                            expr,
-                        )
-                    });
-                }
-                checker.diagnostics.push(diagnostic);
-            }
+    let ExprKind::Name { id, .. } = &func.node  else {
+        return;
+    };
+    if (matches!(id.as_str(), "all" | "any")) && args.len() == 1 {
+        let (ExprKind::ListComp { elt, .. } | ExprKind::SetComp { elt, .. }) = &args[0].node else {
+            return;
+        };
+        if is_async_generator(elt) {
+            return;
         }
+        if !checker.ctx.is_builtin(id) {
+            return;
+        }
+        let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from(&args[0]));
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.try_set_fix(|| {
+                fixes::fix_unnecessary_comprehension_any_all(checker.locator, checker.stylist, expr)
+            });
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }
 

@@ -82,7 +82,6 @@ pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &E
                     | BindingKind::FunctionDefinition
                     | BindingKind::Export(..)
                     | BindingKind::FutureImportation
-                    | BindingKind::StarImportation(..)
                     | BindingKind::Importation(..)
                     | BindingKind::FromImportation(..)
                     | BindingKind::SubmoduleImportation(..)
