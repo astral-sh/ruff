@@ -29,3 +29,16 @@ if True or f() or a or g() or b:  # SIM222
 
 if a or True or f() or b or g():  # SIM222
     pass
+
+
+if a and f() and b and g() and False:  # OK
+    pass
+
+if a and f() and False and g() and b:  # OK
+    pass
+
+if False and f() and a and g() and b:  # OK
+    pass
+
+if a and False and f() and b and g():  # OK
+    pass
