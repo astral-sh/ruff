@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 use serde::{Deserialize, Serialize};
-use std::{collections::hash_map::Iter as HashMapIter, ops::Deref};
+use std::{collections::hash_map::Iter as HashMapIter, convert::AsRef, ops::Deref};
 
 use rustpython_parser::ast::{Expr, Located, Location, Stmt};
 
@@ -102,9 +102,9 @@ impl From<&Import> for Range {
     }
 }
 
-impl From<Import> for Range {
-    fn from(import: Import) -> Range {
-        Range::new(import.location, import.end_location)
+impl AsRef<Import> for Import {
+    fn as_ref(&self) -> &Import {
+        self
     }
 }
 
