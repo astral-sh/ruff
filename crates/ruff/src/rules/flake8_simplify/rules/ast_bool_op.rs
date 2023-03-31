@@ -503,10 +503,17 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-pub fn is_short_circuit(ctx: &Context, expr: &Expr) -> Option<(Location, Location)> {
+pub fn is_short_circuit(
+    ctx: &Context,
+    expr: &Expr,
+    expected_op: &Boolop,
+) -> Option<(Location, Location)> {
     let ExprKind::BoolOp { op, values, } = &expr.node else {
         return None;
     };
+    if op != expected_op {
+        return None;
+    }
     let short_circuit_value = match op {
         Boolop::And => false,
         Boolop::Or => true,
@@ -551,7 +558,7 @@ pub fn is_short_circuit(ctx: &Context, expr: &Expr) -> Option<(Location, Locatio
 
 /// SIM222
 pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
-    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr) else {
+    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr, &Boolop::Or) else {
         return;
     };
     let mut diagnostic = Diagnostic::new(
@@ -573,7 +580,7 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
 
 /// SIM223
 pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
-    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr) else {
+    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr, &Boolop::And) else {
         return;
     };
     let mut diagnostic = Diagnostic::new(
