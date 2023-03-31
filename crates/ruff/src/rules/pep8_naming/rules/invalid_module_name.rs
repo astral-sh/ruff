@@ -4,11 +4,11 @@ use std::path::Path;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
-use ruff_python_stdlib::identifiers::is_module_name;
+use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};
 
 /// ## What it does
 /// Checks for module names that do not follow the `snake_case` naming
-/// convention.
+/// convention or are otherwise invalid.
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends the use of the `snake_case` naming convention for
@@ -21,6 +21,10 @@ use ruff_python_stdlib::identifiers::is_module_name;
 /// > When an extension module written in C or C++ has an accompanying Python module that
 /// > provides a higher level (e.g. more object oriented) interface, the C/C++ module has
 /// > a leading underscore (e.g. `_socket`).
+///
+/// Further, in order for Python modules to be importable, they must be valid
+/// identifiers. As such, they cannot start with a digit, or collide with hard
+/// keywords, like `import` or `class`.
 ///
 /// ## Example
 /// - Instead of `example-module-name` or `example module name`, use `example_module_name`.
@@ -50,23 +54,20 @@ pub fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagno
     }
 
     if let Some(package) = package {
-        let module_name = if path.file_name().map_or(false, |file_name| {
-            file_name == "__init__.py"
-                || file_name == "__init__.pyi"
-                || file_name == "__main__.py"
-                || file_name == "__main__.pyi"
-        }) {
+        let module_name = if is_module_file(path) {
             package.file_name().unwrap().to_string_lossy()
         } else {
             path.file_stem().unwrap().to_string_lossy()
         };
 
-        let parent = path
-            .parent()
-            .and_then(Path::file_name)
-            .and_then(OsStr::to_str);
+        if !is_module_name(&module_name) {
+            // As a special case, we allow files in `versions` and `migrations` directories to start
+            // with a digit (e.g., `0001_initial.py`), to support common conventions used by Django
+            // and other frameworks.
+            if is_migration_file(path) && is_migration_name(&module_name) {
+                return None;
+            }
 
-        if !is_module_name(&module_name, parent) {
             return Some(Diagnostic::new(
                 InvalidModuleName {
                     name: module_name.to_string(),
@@ -77,4 +78,22 @@ pub fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagno
     }
 
     None
+}
+
+/// Return `true` if a [`Path`] should use the name of its parent directory as its module name.
+fn is_module_file(path: &Path) -> bool {
+    path.file_name().map_or(false, |file_name| {
+        file_name == "__init__.py"
+            || file_name == "__init__.pyi"
+            || file_name == "__main__.py"
+            || file_name == "__main__.pyi"
+    })
+}
+
+/// Return `true` if a [`Path`] refers to a migration file.
+fn is_migration_file(path: &Path) -> bool {
+    path.parent()
+        .and_then(Path::file_name)
+        .and_then(OsStr::to_str)
+        .map_or(false, |parent| matches!(parent, "versions" | "migrations"))
 }

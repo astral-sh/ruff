@@ -27,78 +27,70 @@ pub fn is_mangled_private(id: &str) -> bool {
 
 /// Returns `true` if a string is a PEP 8-compliant module name (i.e., consists of lowercase
 /// letters, numbers, underscores, and is not a keyword).
-pub fn is_module_name(name: &str, parent: Option<&str>) -> bool {
+pub fn is_module_name(name: &str) -> bool {
     // Is the string a keyword?
     if KWLIST.contains(&name) {
         return false;
     }
 
-    // Is the first character a letter or underscore? As a special case, we allow files in
-    // `versions` and `migrations` directories to start with a digit (e.g., `0001_initial.py`), to
-    // support common conventions used by Django and other frameworks.
+    // Is the first character a letter or underscore?
     let mut chars = name.chars();
-    if !parent.map_or(false, |parent| matches!(parent, "versions" | "migrations")) {
-        if !chars
-            .next()
-            .map_or(false, |c| c.is_ascii_lowercase() || c == '_')
-        {
-            return false;
-        }
+    if !chars
+        .next()
+        .map_or(false, |c| c.is_ascii_lowercase() || c == '_')
+    {
+        return false;
     }
 
     // Are the rest of the characters letters, digits, or underscores?
     chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
 }
 
+/// Returns `true` if a string appears to be a valid migration file name (e.g., `0001_initial.py`).
+pub fn is_migration_name(name: &str) -> bool {
+    // Is the string a keyword?
+    if KWLIST.contains(&name) {
+        return false;
+    }
+
+    // Are characters letters, digits, or underscores?
+    name.chars()
+        .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+}
+
 #[cfg(test)]
 mod tests {
-    use crate::identifiers::is_module_name;
+    use crate::identifiers::{is_migration_name, is_module_name};
 
     #[test]
-    fn test_is_module_name() {
-        let parent = None;
-        assert!(is_module_name("a", parent));
-        assert!(is_module_name("abc", parent));
-        assert!(is_module_name("abc0", parent));
-        assert!(is_module_name("abc_", parent));
-        assert!(is_module_name("a_b_c", parent));
-        assert!(is_module_name("_abc", parent));
-        assert!(!is_module_name("a-b-c", parent));
-        assert!(!is_module_name("a_B_c", parent));
-        assert!(!is_module_name("0abc", parent));
-        assert!(!is_module_name("class", parent));
-        assert!(!is_module_name("δ", parent));
+    fn module_name() {
+        assert!(is_module_name("_abc"));
+        assert!(is_module_name("a"));
+        assert!(is_module_name("a_b_c"));
+        assert!(is_module_name("abc"));
+        assert!(is_module_name("abc0"));
+        assert!(is_module_name("abc_"));
+        assert!(!is_module_name("0001_initial"));
+        assert!(!is_module_name("0abc"));
+        assert!(!is_module_name("a-b-c"));
+        assert!(!is_module_name("a_B_c"));
+        assert!(!is_module_name("class"));
+        assert!(!is_module_name("δ"));
     }
 
     #[test]
-    fn test_is_module_name_versions() {
-        let parent = Some("versions");
-        assert!(is_module_name("a", parent));
-        assert!(is_module_name("abc", parent));
-        assert!(is_module_name("abc0", parent));
-        assert!(is_module_name("abc_", parent));
-        assert!(is_module_name("a_b_c", parent));
-        assert!(is_module_name("_abc", parent));
-        assert!(is_module_name("0abc", parent));
-        assert!(!is_module_name("a-b-c", parent));
-        assert!(!is_module_name("a_B_c", parent));
-        assert!(!is_module_name("class", parent));
-        assert!(!is_module_name("δ", parent));
-    }
-
-    #[test]
-    fn test_is_module_name_migrations() {
-        let parent = Some("migrations");
-        assert!(is_module_name("a", parent));
-        assert!(is_module_name("abc", parent));
-        assert!(is_module_name("abc0", parent));
-        assert!(is_module_name("abc_", parent));
-        assert!(is_module_name("a_b_c", parent));
-        assert!(is_module_name("_abc", parent));
-        assert!(is_module_name("0abc", parent));
-        assert!(!is_module_name("a-b-c", parent));
-        assert!(!is_module_name("a_B_c", parent));
-        assert!(!is_module_name("class", parent));
-        assert!(!is_module_name("δ", parent));
+    fn migration_name() {
+        assert!(is_migration_name("0001_initial"));
+        assert!(is_migration_name("0abc"));
+        assert!(is_migration_name("_abc"));
+        assert!(is_migration_name("a"));
+        assert!(is_migration_name("a_b_c"));
+        assert!(is_migration_name("abc"));
+        assert!(is_migration_name("abc0"));
+        assert!(is_migration_name("abc_"));
+        assert!(!is_migration_name("a-b-c"));
+        assert!(!is_migration_name("a_B_c"));
+        assert!(!is_migration_name("class"));
+        assert!(!is_migration_name("δ"));
     }
 }
