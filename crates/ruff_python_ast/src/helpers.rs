@@ -711,10 +711,10 @@ pub fn uses_magic_variable_access(ctx: &Context, body: &[Stmt]) -> bool {
 }
 
 /// Format the module name for a relative import.
-pub fn format_import_from(level: Option<&usize>, module: Option<&str>) -> String {
+pub fn format_import_from(level: Option<usize>, module: Option<&str>) -> String {
     let mut module_name = String::with_capacity(16);
     if let Some(level) = level {
-        for _ in 0..*level {
+        for _ in 0..level {
             module_name.push('.');
         }
     }
@@ -726,18 +726,18 @@ pub fn format_import_from(level: Option<&usize>, module: Option<&str>) -> String
 
 /// Format the member reference name for a relative import.
 pub fn format_import_from_member(
-    level: Option<&usize>,
+    level: Option<usize>,
     module: Option<&str>,
     member: &str,
 ) -> String {
     let mut full_name = String::with_capacity(
-        level.map_or(0, |level| *level)
+        level.map_or(0, |level| level)
             + module.as_ref().map_or(0, |module| module.len())
             + 1
             + member.len(),
     );
     if let Some(level) = level {
-        for _ in 0..*level {
+        for _ in 0..level {
             full_name.push('.');
         }
     }
