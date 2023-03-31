@@ -87,9 +87,9 @@ pub struct Import {
 }
 
 impl Import {
-    pub fn new(name: String, location: Location, end_location: Location) -> Self {
+    pub fn new(name: &str, location: Location, end_location: Location) -> Self {
         Self {
-            name,
+            name: name.to_string(),
             location,
             end_location,
         }

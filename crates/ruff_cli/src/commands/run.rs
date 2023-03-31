@@ -8,7 +8,7 @@ use ignore::Error;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::panic::catch_unwind;
 use ruff::message::{Location, Message};
@@ -145,7 +145,7 @@ pub fn run(
         });
 
     debug!("{:#?}", diagnostics.imports);
-    let mut cycles: FxHashMap<String, Vec<Vec<String>>> = FxHashMap::default();
+    let mut cycles: FxHashMap<String, FxHashSet<Vec<String>>> = FxHashMap::default();
 
     for (path, package, settings) in
         paths

@@ -67,8 +67,8 @@ impl CyclicImportChecker<'_> {
                     stack.pop();
                 }
             }
-            fully_visited.insert(name);
         }
+        fully_visited.insert(name);
     }
 }
 
@@ -77,13 +77,15 @@ pub fn cyclic_import(
     path: &Path,
     package: Option<&Path>,
     imports: &Imports,
-    cycles: &mut FxHashMap<String, Vec<Vec<String>>>,
+    cycles: &mut FxHashMap<String, FxHashSet<Vec<String>>>,
 ) -> Option<Vec<Diagnostic>> {
     let module_name = to_module_path(package.unwrap(), path).unwrap().join(".");
+    debug!("Checking module {module_name}");
     if let Some(existing_cycles) = cycles.get(&module_name as &str) {
         if existing_cycles.is_empty() {
             return None;
         }
+        debug!("Existing cycles: {existing_cycles:#?}");
         Some(
             existing_cycles
                 .iter()
@@ -113,63 +115,108 @@ pub fn cyclic_import(
                 .collect::<Vec<Diagnostic>>(),
         )
     } else {
-        if imports.imports_per_module.get(&module_name).is_some() {
-            let cyclic_import_checker = CyclicImportChecker {
-                imports: &imports.imports_per_module,
-            };
-            let (mut visited, new_cycles) = cyclic_import_checker.has_cycles(&module_name);
-            // we'll always have new visited stuff if we have
-            let mut out_vec: Vec<Diagnostic> = Vec::new();
-            if let Some(new_cycles) = new_cycles {
-                for new_cycle in &new_cycles {
-                    if let [first, the_rest @ ..] = &new_cycle[..] {
-                        if first == &module_name {
-                            out_vec.push(Diagnostic::new(
-                                CyclicImport {
-                                    cycle: new_cycle
-                                        .iter()
-                                        .map(std::clone::Clone::clone)
-                                        .collect::<Vec<_>>()
-                                        .join(" -> "),
-                                },
-                                imports
-                                    .imports_per_module
-                                    .get(&module_name)
-                                    .unwrap()
+        let cyclic_import_checker = CyclicImportChecker {
+            imports: &imports.imports_per_module,
+        };
+        let (mut visited, new_cycles) = cyclic_import_checker.has_cycles(&module_name);
+        // we'll always have new visited stuff if we have
+        let mut out_vec: Vec<Diagnostic> = Vec::new();
+        if let Some(new_cycles) = new_cycles {
+            debug!("New cycles {new_cycles:#?}");
+            for new_cycle in &new_cycles {
+                if let [first, the_rest @ ..] = &new_cycle[..] {
+                    if first == &module_name {
+                        out_vec.push(Diagnostic::new(
+                            CyclicImport {
+                                cycle: new_cycle
                                     .iter()
-                                    .find(|m| &m.name == the_rest.first().unwrap())
-                                    .unwrap()
-                                    .into(),
-                            ));
-                        } else {
-                            // these should always be new and start off with the module that is the start of a cycle
-                            cycles
-                                .entry(first.clone())
-                                .and_modify(|cycle| cycle.push(new_cycle.clone()))
-                                .or_insert(vec![new_cycle.clone()]);
-                        }
-                        visited.remove(first as &str);
-                        // process the_rest
-                        for involved_module in the_rest.iter() {
-                            cycles
-                                .entry(involved_module.clone())
-                                .and_modify(|cycle| cycle.push(new_cycle.clone()))
-                                .or_insert(vec![new_cycle.clone()]);
-                        }
+                                    .map(std::clone::Clone::clone)
+                                    .collect::<Vec<_>>()
+                                    .join(" -> "),
+                            },
+                            imports
+                                .imports_per_module
+                                .get(&module_name)
+                                .unwrap()
+                                .iter()
+                                .find(|m| &m.name == the_rest.first().unwrap())
+                                .unwrap()
+                                .into(),
+                        ));
                     }
                 }
+                for involved_module in new_cycle.iter() {
+                    cycles
+                        .entry(involved_module.clone())
+                        .and_modify(|cycle| {
+                            cycle.insert(new_cycle.clone());
+                        })
+                        .or_insert({
+                            let mut set = FxHashSet::default();
+                            set.insert(new_cycle.clone());
+                            set
+                        });
+
+                    visited.remove(involved_module as &str);
+                }
             }
-            // process the visited nodes which don't have cycles
-            for visited_module in &visited {
-                cycles.insert((*visited_module).to_string(), vec![]);
-            }
-            if out_vec.is_empty() {
-                None
-            } else {
-                Some(out_vec)
-            }
-        } else {
-            None
         }
+        // process the visited nodes which don't have cycles
+        for visited_module in &visited {
+            cycles.insert((*visited_module).to_string(), FxHashSet::default());
+        }
+        if out_vec.is_empty() {
+            None
+        } else {
+            Some(out_vec)
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use rustpython_parser::ast::Location;
+
+    use super::*;
+
+    fn test_simple_cycle_helper() -> Imports {
+        let mut map = FxHashMap::default();
+        let location = Location::new(1, 1);
+        map.insert(
+            "grand.a".to_string(),
+            vec![
+                Import::new("grand.b", location, location),
+                Import::new("grand.parent.a", location, location),
+            ],
+        );
+        map.insert(
+            "grand.b".to_string(),
+            vec![Import::new("grand.a", location, location)],
+        );
+        Imports {
+            imports_per_module: map,
+        }
+    }
+
+    #[test]
+    fn cyclic_import_simple_one() {
+        let imports = test_simple_cycle_helper();
+        let cyclic_checker = CyclicImportChecker {
+            imports: &imports.imports_per_module,
+        };
+        let (visited, cycles) = cyclic_checker.has_cycles("grand.a");
+
+        let mut check_visited = FxHashSet::default();
+        check_visited.insert("grand.a");
+        check_visited.insert("grand.b");
+        check_visited.insert("grand.parent.a");
+        assert_eq!(visited, check_visited);
+        let check_cycles = vec![vec!["grand.a".to_string(), "grand.b".to_string()]];
+        assert_eq!(cycles, Some(check_cycles));
+
+        let (visited, cycles) = cyclic_checker.has_cycles("grand.b");
+        assert_eq!(visited, check_visited);
+        let check_cycles = vec![vec!["grand.b".to_string(), "grand.a".to_string()]];
+        assert_eq!(cycles, Some(check_cycles));
     }
 }
