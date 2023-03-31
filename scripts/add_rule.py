@@ -15,7 +15,7 @@ import argparse
 from _utils import ROOT_DIR, dir_name, get_indent, pascal_case, snake_case
 
 
-def main(*, name: str, prefix: str, code: str, linter: str) -> None:
+def main(*, name: str, prefix: str, code: str, linter: str) -> None:  # noqa: C901
     """Generate boilerplate for a new rule."""
     # Create a test fixture.
     with (
