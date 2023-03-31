@@ -66,7 +66,7 @@ pub fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagno
             .and_then(Path::file_name)
             .and_then(OsStr::to_str);
 
-        if !is_module_name(parent, &module_name) {
+        if !is_module_name(&module_name, parent) {
             return Some(Diagnostic::new(
                 InvalidModuleName {
                     name: module_name.to_string(),
