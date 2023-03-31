@@ -12,7 +12,6 @@ use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -175,10 +174,6 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                     {
                         // If the dictionary key is not a valid variable name, abort.
                         if !is_identifier(key_string) {
-                            return None;
-                        }
-                        // If the key is a Python keyword, abort.
-                        if KWLIST.contains(&key_string.as_str()) {
                             return None;
                         }
                         // If there are multiple entries of the same key, abort.

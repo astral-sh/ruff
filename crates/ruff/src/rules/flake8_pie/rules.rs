@@ -1,7 +1,7 @@
-use itertools::Either::{Left, Right};
 use std::collections::BTreeMap;
 use std::iter;
 
+use itertools::Either::{Left, Right};
 use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{
@@ -15,7 +15,6 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{any_over_expr, create_expr, match_trailing_comment, unparse_expr};
 use ruff_python_ast::types::{Range, RefEquality};
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::autofix::helpers::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -374,7 +373,7 @@ fn is_valid_kwarg_name(key: &Expr) -> bool {
         ..
     } = &key.node
     {
-        is_identifier(value) && !KWLIST.contains(&value.as_str())
+        is_identifier(value)
     } else {
         false
     }
