@@ -1949,6 +1949,8 @@ dependencies = [
  "mimalloc",
  "once_cell",
  "ruff",
+ "ruff_python_ast",
+ "rustpython-parser",
  "serde",
  "serde_json",
  "tikv-jemallocator",
