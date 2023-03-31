@@ -13,7 +13,16 @@ pub fn is_identifier(name: &str) -> bool {
     }
 
     // Are the rest of the characters letters, digits, or underscores?
-    chars.all(|c| c.is_alphanumeric() || c == '_')
+    if !chars.all(|c| c.is_alphanumeric() || c == '_') {
+        return false;
+    }
+
+    // Is the identifier a keyword?
+    if KWLIST.contains(&name) {
+        return false;
+    }
+
+    true
 }
 
 /// Returns `true` if a string is a private identifier, such that, when the
@@ -28,11 +37,6 @@ pub fn is_mangled_private(id: &str) -> bool {
 /// Returns `true` if a string is a PEP 8-compliant module name (i.e., consists of lowercase
 /// letters, numbers, underscores, and is not a keyword).
 pub fn is_module_name(name: &str) -> bool {
-    // Is the string a keyword?
-    if KWLIST.contains(&name) {
-        return false;
-    }
-
     // Is the first character a letter or underscore?
     let mut chars = name.chars();
     if !chars
@@ -43,19 +47,34 @@ pub fn is_module_name(name: &str) -> bool {
     }
 
     // Are the rest of the characters letters, digits, or underscores?
-    chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
-}
+    if !chars.all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_') {
+        return false;
+    }
 
-/// Returns `true` if a string appears to be a valid migration file name (e.g., `0001_initial.py`).
-pub fn is_migration_name(name: &str) -> bool {
-    // Is the string a keyword?
+    // Is the identifier a keyword?
     if KWLIST.contains(&name) {
         return false;
     }
 
+    true
+}
+
+/// Returns `true` if a string appears to be a valid migration file name (e.g., `0001_initial.py`).
+pub fn is_migration_name(name: &str) -> bool {
     // Are characters letters, digits, or underscores?
-    name.chars()
+    if !name
+        .chars()
         .all(|c| c.is_ascii_lowercase() || c.is_ascii_digit() || c == '_')
+    {
+        return false;
+    }
+
+    // Is the identifier a keyword?
+    if KWLIST.contains(&name) {
+        return false;
+    }
+
+    true
 }
 
 #[cfg(test)]

@@ -8,7 +8,6 @@ use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::types::Range;
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -117,7 +116,7 @@ fn properties_from_dict_literal(keys: &[Option<Expr>], values: &[Expr]) -> Resul
                     },
                 ..
             }) => {
-                if is_identifier(property) && !KWLIST.contains(&property.as_str()) {
+                if is_identifier(property) {
                     Ok(create_property_assignment_stmt(property, &value.node))
                 } else {
                     bail!("Property name is not valid identifier: {}", property)
