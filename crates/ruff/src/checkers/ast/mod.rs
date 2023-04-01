@@ -14,12 +14,14 @@ use rustpython_parser::ast::{
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
+use ruff_python_ast::binding::{
+    Binding, BindingId, BindingKind, Exceptions, ExecutionContext, Export, FromImportation,
+    Importation, StarImportation, SubmoduleImportation,
+};
 use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::scope::{
-    Binding, BindingId, BindingKind, ClassDef, Exceptions, ExecutionContext, Export,
-    FromImportation, FunctionDef, Importation, Lambda, Scope, ScopeId, ScopeKind, ScopeStack,
-    StarImportation, SubmoduleImportation,
+    ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind, ScopeStack,
 };
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::types::{Node, Range, RefEquality};

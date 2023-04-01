@@ -1,8 +1,9 @@
 use bitflags::bitflags;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
+use crate::binding::{BindingKind, Export};
 use crate::context::Context;
-use crate::scope::{BindingKind, Export, Scope};
+use crate::scope::Scope;
 
 bitflags! {
     #[derive(Default)]

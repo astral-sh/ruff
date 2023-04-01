@@ -8,11 +8,12 @@ use smallvec::smallvec;
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
-use crate::helpers::{collect_call_path, from_relative_import};
-use crate::scope::{
+use crate::binding::{
     Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
-    Importation, Scope, ScopeId, ScopeKind, ScopeStack, Scopes, SubmoduleImportation,
+    Importation, SubmoduleImportation,
 };
+use crate::helpers::{collect_call_path, from_relative_import};
+use crate::scope::{Scope, ScopeId, ScopeKind, ScopeStack, Scopes};
 use crate::types::{CallPath, RefEquality};
 use crate::typing::AnnotationKind;
 use crate::visibility::{module_visibility, Modifier, VisibleScope};
