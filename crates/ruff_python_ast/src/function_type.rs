@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Expr;
 
-use crate::call_path::to_call_path;
+use crate::call_path::from_qualified_name;
 use crate::context::Context;
 use crate::helpers::map_callable;
 use crate::scope::{Scope, ScopeKind};
@@ -36,7 +36,7 @@ pub fn classify(
                 call_path.as_slice() == ["", "staticmethod"]
                     || staticmethod_decorators
                         .iter()
-                        .any(|decorator| call_path == to_call_path(decorator))
+                        .any(|decorator| call_path == from_qualified_name(decorator))
             })
     }) {
         FunctionType::StaticMethod
@@ -56,7 +56,7 @@ pub fn classify(
                 call_path.as_slice() == ["", "classmethod"] ||
                 classmethod_decorators
                     .iter()
-                    .any(|decorator| call_path == to_call_path(decorator))
+                    .any(|decorator| call_path == from_qualified_name(decorator))
             })
         })
     {

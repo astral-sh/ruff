@@ -73,46 +73,48 @@ pub fn private_member_access(checker: &mut Checker, expr: &Expr) {
 
             if let ExprKind::Call { func, .. } = &value.node {
                 // Ignore `super()` calls.
-                let call_path = collect_call_path(func);
-                if call_path.as_slice() == ["super"] {
-                    return;
+                if let Some(call_path) = collect_call_path(func) {
+                    if call_path.as_slice() == ["super"] {
+                        return;
+                    }
                 }
             } else {
                 // Ignore `self` and `cls` accesses.
-                let call_path = collect_call_path(value);
-                if call_path.as_slice() == ["self"]
-                    || call_path.as_slice() == ["cls"]
-                    || call_path.as_slice() == ["mcs"]
-                {
-                    return;
-                }
+                if let Some(call_path) = collect_call_path(value) {
+                    if call_path.as_slice() == ["self"]
+                        || call_path.as_slice() == ["cls"]
+                        || call_path.as_slice() == ["mcs"]
+                    {
+                        return;
+                    }
 
-                // Ignore accesses on class members from _within_ the class.
-                if checker
-                    .ctx
-                    .scopes
-                    .iter()
-                    .rev()
-                    .find_map(|scope| match &scope.kind {
-                        ScopeKind::Class(class_def) => Some(class_def),
-                        _ => None,
-                    })
-                    .map_or(false, |class_def| {
-                        if call_path.as_slice() == [class_def.name] {
-                            checker
-                                .ctx
-                                .find_binding(class_def.name)
-                                .map_or(false, |binding| {
-                                    // TODO(charlie): Could the name ever be bound to a _different_
-                                    // class here?
-                                    binding.kind.is_class_definition()
-                                })
-                        } else {
-                            false
-                        }
-                    })
-                {
-                    return;
+                    // Ignore accesses on class members from _within_ the class.
+                    if checker
+                        .ctx
+                        .scopes
+                        .iter()
+                        .rev()
+                        .find_map(|scope| match &scope.kind {
+                            ScopeKind::Class(class_def) => Some(class_def),
+                            _ => None,
+                        })
+                        .map_or(false, |class_def| {
+                            if call_path.as_slice() == [class_def.name] {
+                                checker
+                                    .ctx
+                                    .find_binding(class_def.name)
+                                    .map_or(false, |binding| {
+                                        // TODO(charlie): Could the name ever be bound to a
+                                        // _different_ class here?
+                                        binding.kind.is_class_definition()
+                                    })
+                            } else {
+                                false
+                            }
+                        })
+                    {
+                        return;
+                    }
                 }
             }
 

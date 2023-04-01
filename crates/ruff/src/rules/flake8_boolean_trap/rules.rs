@@ -107,8 +107,7 @@ pub fn check_positional_boolean_in_def(
     }
 
     if decorator_list.iter().any(|expr| {
-        let call_path = collect_call_path(expr);
-        call_path.as_slice() == [name, "setter"]
+        collect_call_path(expr).map_or(false, |call_path| call_path.as_slice() == [name, "setter"])
     }) {
         return;
     }
@@ -151,8 +150,7 @@ pub fn check_boolean_default_value_in_function_definition(
     }
 
     if decorator_list.iter().any(|expr| {
-        let call_path = collect_call_path(expr);
-        call_path.as_slice() == [name, "setter"]
+        collect_call_path(expr).map_or(false, |call_path| call_path.as_slice() == [name, "setter"])
     }) {
         return;
     }

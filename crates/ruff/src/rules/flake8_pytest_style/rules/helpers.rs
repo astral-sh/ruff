@@ -1,5 +1,5 @@
 use num_traits::identities::Zero;
-use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_ast::call_path::{collect_call_path, CallPath};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use ruff_python_ast::helpers::map_callable;
@@ -8,14 +8,17 @@ use crate::checkers::ast::Checker;
 
 const ITERABLE_INITIALIZERS: &[&str] = &["dict", "frozenset", "list", "tuple", "set"];
 
-pub fn get_mark_decorators(decorators: &[Expr]) -> impl Iterator<Item = &Expr> {
-    decorators
-        .iter()
-        .filter(|decorator| is_pytest_mark(decorator))
-}
-
-pub fn get_mark_name(decorator: &Expr) -> &str {
-    collect_call_path(map_callable(decorator)).last().unwrap()
+pub fn get_mark_decorators(decorators: &[Expr]) -> impl Iterator<Item = (&Expr, CallPath)> {
+    decorators.iter().filter_map(|decorator| {
+        let Some(call_path) = collect_call_path(map_callable(decorator)) else {
+            return None;
+        };
+        if call_path.len() > 2 && call_path.as_slice()[..2] == ["pytest", "mark"] {
+            Some((decorator, call_path))
+        } else {
+            None
+        }
+    })
 }
 
 pub fn is_pytest_fail(call: &Expr, checker: &Checker) -> bool {
@@ -38,15 +41,6 @@ pub fn is_pytest_fixture(decorator: &Expr, checker: &Checker) -> bool {
         .map_or(false, |call_path| {
             call_path.as_slice() == ["pytest", "fixture"]
         })
-}
-
-pub fn is_pytest_mark(decorator: &Expr) -> bool {
-    let segments = collect_call_path(map_callable(decorator));
-    if segments.len() > 2 {
-        segments[0] == "pytest" && segments[1] == "mark"
-    } else {
-        false
-    }
 }
 
 pub fn is_pytest_yield_fixture(decorator: &Expr, checker: &Checker) -> bool {
