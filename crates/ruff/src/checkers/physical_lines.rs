@@ -58,6 +58,8 @@ pub fn check_physical_lines(
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
     let mut in_quote = false;
+    let _quote_block_delimiter: Option<&str> = None;
+
     for (index, line) in locator.contents().universal_newlines().enumerate() {
         while commented_lines_iter
             .next_if(|lineno| &(index + 1) == *lineno)
@@ -155,14 +157,26 @@ pub fn check_physical_lines(
             }
         }
 
+        // Find the quote delimiter in the line before checking the indentation
+        let (quote_delimiter, occurrences) = find_delimiter(line);
+        if quote_delimiter.is_some() {
+            in_quote = !in_quote;
+        }
         if enforce_tab_indentation {
-            // Update in_quote with the state of `line`
-            if let Some(diagnostic) = tab_indentation(index, line, in_quote) {
-                diagnostics.push(diagnostic);
+            if let Some(diagnostic) = tab_indentation(index, line) {
+                if !in_quote {
+                    diagnostics.push(diagnostic);
+                }
             }
         }
 
-        in_quote = switch_in_quote(line, in_quote);
+        // If we've found multiple occurrences of a delimiter on the same line, we should flip
+        // in_quote back to its original state
+        if quote_delimiter.is_some() {
+            if occurrences % 2 == 0 {
+                in_quote = !in_quote;
+            }
+        }
     }
 
     if enforce_no_newline_at_end_of_file {
@@ -184,19 +198,21 @@ pub fn check_physical_lines(
     diagnostics
 }
 
-// fn switch_in_quote(line: &str, currently_in_quote: bool, quote_delimiter: &str) -> bool {
-fn switch_in_quote(line: &str, currently_in_quote: bool) -> bool {
-    let mut in_quote_int = if currently_in_quote { 1 } else { -1 };
-    let quote_delimiters = vec!["\"\"\"", "'''"];
+/// Finds the first delimiter which occurs on a line, and returns both the delimiter and how many
+/// times it appears
+fn find_delimiter(line: &str) -> (Option<&str>, i32) {
+    let delimiters = vec!["\"\"\"", "'''"];
 
-    for delimiter in quote_delimiters {
-        let delimiter_count = line.matches(delimiter).count() as i32;
-        if delimiter_count > 0 {
-            in_quote_int = in_quote_int * (-1 * delimiter_count);
+    let mut delimiter_string = None;
+    let mut delimiter_count = 0;
+    for delimiter in delimiters {
+        if line.contains(delimiter) {
+            delimiter_count = line.matches(delimiter).count() as i32;
+            delimiter_string = Some(delimiter);
         }
     }
 
-    in_quote_int == 1
+    (delimiter_string, delimiter_count)
 }
 
 #[cfg(test)]
