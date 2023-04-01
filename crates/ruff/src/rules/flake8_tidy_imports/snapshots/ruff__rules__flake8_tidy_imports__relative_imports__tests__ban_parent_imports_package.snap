@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: RelativeImports
@@ -27,13 +28,14 @@ expression: diagnostics
     row: 6
     column: 55
   fix:
-    content: "from my_package.sublib.protocol import commands, definitions, responses"
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 55
+    edits:
+      - content: "from my_package.sublib.protocol import commands, definitions, responses"
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 6
+          column: 55
   parent: ~
 - kind:
     name: RelativeImports
@@ -47,13 +49,14 @@ expression: diagnostics
     row: 6
     column: 55
   fix:
-    content: "from my_package.sublib.protocol import commands, definitions, responses"
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 55
+    edits:
+      - content: "from my_package.sublib.protocol import commands, definitions, responses"
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 6
+          column: 55
   parent: ~
 - kind:
     name: RelativeImports
@@ -67,13 +70,14 @@ expression: diagnostics
     row: 6
     column: 55
   fix:
-    content: "from my_package.sublib.protocol import commands, definitions, responses"
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 55
+    edits:
+      - content: "from my_package.sublib.protocol import commands, definitions, responses"
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 6
+          column: 55
   parent: ~
 - kind:
     name: RelativeImports
@@ -87,13 +91,14 @@ expression: diagnostics
     row: 7
     column: 28
   fix:
-    content: from my_package.sublib.server import example
-    location:
-      row: 7
-      column: 0
-    end_location:
-      row: 7
-      column: 28
+    edits:
+      - content: from my_package.sublib.server import example
+        location:
+          row: 7
+          column: 0
+        end_location:
+          row: 7
+          column: 28
   parent: ~
 - kind:
     name: RelativeImports
@@ -107,12 +112,34 @@ expression: diagnostics
     row: 8
     column: 21
   fix:
-    content: from my_package.sublib import server
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 8
-      column: 21
+    edits:
+      - content: from my_package.sublib import server
+        location:
+          row: 8
+          column: 0
+        end_location:
+          row: 8
+          column: 21
+  parent: ~
+- kind:
+    name: RelativeImports
+    body: Relative imports from parent modules are banned
+    suggestion: Replace relative imports from parent modules with absolute imports
+    fixable: true
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 52
+  fix:
+    edits:
+      - content: from my_package.sublib.protocol.UpperCaseModule import some_function
+        location:
+          row: 10
+          column: 0
+        end_location:
+          row: 10
+          column: 52
   parent: ~
 

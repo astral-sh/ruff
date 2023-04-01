@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 1
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: SingleLineImplicitStringConcatenation
@@ -26,6 +27,7 @@ expression: diagnostics
   end_location:
     row: 1
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

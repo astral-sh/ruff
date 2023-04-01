@@ -14,13 +14,14 @@ expression: diagnostics
     row: 288
     column: 33
   fix:
-    content: Whitespace at the end.
-    location:
-      row: 288
-      column: 7
-    end_location:
-      row: 288
-      column: 30
+    edits:
+      - content: Whitespace at the end.
+        location:
+          row: 288
+          column: 7
+        end_location:
+          row: 288
+          column: 30
   parent: ~
 - kind:
     name: SurroundingWhitespace
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 293
     column: 37
   fix:
-    content: Whitespace at everywhere.
-    location:
-      row: 293
-      column: 7
-    end_location:
-      row: 293
-      column: 34
+    edits:
+      - content: Whitespace at everywhere.
+        location:
+          row: 293
+          column: 7
+        end_location:
+          row: 293
+          column: 34
   parent: ~
 - kind:
     name: SurroundingWhitespace
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 302
     column: 7
   fix:
-    content: Whitespace at the beginning.
-    location:
-      row: 299
-      column: 7
-    end_location:
-      row: 299
-      column: 36
+    edits:
+      - content: Whitespace at the beginning.
+        location:
+          row: 299
+          column: 7
+        end_location:
+          row: 299
+          column: 36
   parent: ~
 - kind:
     name: SurroundingWhitespace
@@ -73,6 +76,7 @@ expression: diagnostics
   end_location:
     row: 581
     column: 51
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

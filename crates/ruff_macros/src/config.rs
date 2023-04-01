@@ -82,7 +82,6 @@ fn handle_option_group(field: &Field) -> syn::Result<proc_macro2::TokenStream> {
                 ident: type_ident,
                 arguments:
                     PathArguments::AngleBracketed(AngleBracketedGenericArguments { args, .. }),
-                ..
             }) if type_ident == "Option" => {
                 let path = &args[0];
                 let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
@@ -142,7 +141,6 @@ fn handle_option(
         default,
         value_type,
         example,
-        ..
     } = attr.parse_args::<FieldAttributes>()?;
     let kebab_name = LitStr::new(&ident.to_string().replace('_', "-"), ident.span());
 

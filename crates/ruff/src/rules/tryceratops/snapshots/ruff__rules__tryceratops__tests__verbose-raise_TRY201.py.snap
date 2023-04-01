@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: VerboseRaise
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 63
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: VerboseRaise
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 74
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

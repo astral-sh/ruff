@@ -1,8 +1,6 @@
-#![allow(dead_code, unused_imports, unused_variables)]
+use rustpython_parser::ast::Location;
 
-use once_cell::sync::Lazy;
-use regex::Regex;
-
+use super::{LogicalLine, Whitespace};
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
@@ -110,34 +108,49 @@ impl Violation for TabBeforeKeyword {
     }
 }
 
-static KEYWORD_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"(\s*)\b(?:False|None|True|and|as|assert|async|await|break|class|continue|def|del|elif|else|except|finally|for|from|global|if|import|in|is|lambda|nonlocal|not|or|pass|raise|return|try|while|with|yield)\b(\s*)").unwrap()
-});
-
 /// E271, E272, E273, E274
-#[cfg(feature = "logical_lines")]
-pub fn whitespace_around_keywords(line: &str) -> Vec<(usize, DiagnosticKind)> {
+pub(crate) fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
     let mut diagnostics = vec![];
-    for line_match in KEYWORD_REGEX.captures_iter(line) {
-        let before = line_match.get(1).unwrap();
-        let after = line_match.get(2).unwrap();
+    let mut after_keyword = false;
 
-        if before.as_str().contains('\t') {
-            diagnostics.push((before.start(), TabBeforeKeyword.into()));
-        } else if before.as_str().len() > 1 {
-            diagnostics.push((before.start(), MultipleSpacesBeforeKeyword.into()));
+    for token in line.tokens() {
+        let is_keyword = token.kind().is_keyword();
+        if is_keyword {
+            if !after_keyword {
+                match line.leading_whitespace(&token) {
+                    (Whitespace::Tab, offset) => {
+                        let start = token.start();
+                        diagnostics.push((
+                            Location::new(start.row(), start.column() - offset),
+                            TabBeforeKeyword.into(),
+                        ));
+                    }
+                    (Whitespace::Many, offset) => {
+                        let start = token.start();
+                        diagnostics.push((
+                            Location::new(start.row(), start.column() - offset),
+                            MultipleSpacesBeforeKeyword.into(),
+                        ));
+                    }
+                    _ => {}
+                }
+            }
+
+            match line.trailing_whitespace(&token) {
+                Whitespace::Tab => {
+                    let end = token.end();
+                    diagnostics.push((end, TabAfterKeyword.into()));
+                }
+                Whitespace::Many => {
+                    let end = token.end();
+                    diagnostics.push((end, MultipleSpacesAfterKeyword.into()));
+                }
+                _ => {}
+            }
         }
 
-        if after.as_str().contains('\t') {
-            diagnostics.push((after.start(), TabAfterKeyword.into()));
-        } else if after.as_str().len() > 1 {
-            diagnostics.push((after.start(), MultipleSpacesAfterKeyword.into()));
-        }
+        after_keyword = is_keyword;
     }
-    diagnostics
-}
 
-#[cfg(not(feature = "logical_lines"))]
-pub fn whitespace_around_keywords(_line: &str) -> Vec<(usize, DiagnosticKind)> {
-    vec![]
+    diagnostics
 }

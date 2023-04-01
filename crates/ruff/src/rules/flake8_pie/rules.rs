@@ -184,7 +184,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                 let mut diagnostic = Diagnostic::new(UnnecessaryPass, Range::from(pass_stmt));
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(index) = match_trailing_comment(pass_stmt, checker.locator) {
-                        diagnostic.amend(Edit::deletion(
+                        diagnostic.set_fix(Edit::deletion(
                             pass_stmt.location,
                             Location::new(
                                 pass_stmt.end_location.unwrap().row(),
@@ -192,7 +192,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                             ),
                         ));
                     } else {
-                        diagnostic.try_amend(|| {
+                        diagnostic.try_set_fix(|| {
                             delete_stmt(
                                 pass_stmt,
                                 None,
@@ -260,7 +260,7 @@ pub fn duplicate_class_field_definition<'a, 'b>(
                 ) {
                     Ok(fix) => {
                         checker.deletions.insert(RefEquality(stmt));
-                        diagnostic.amend(fix);
+                        diagnostic.set_fix(fix);
                     }
                     Err(err) => {
                         error!("Failed to remove duplicate class definition: {}", err);
@@ -348,7 +348,7 @@ pub fn unnecessary_comprehension_any_all(
                 let mut diagnostic =
                     Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from(&args[0]));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.try_amend(|| {
+                    diagnostic.try_set_fix(|| {
                         fixes::fix_unnecessary_comprehension_any_all(
                             checker.locator,
                             checker.stylist,
@@ -498,7 +498,7 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                         .collect(),
                 });
 
-                diagnostic.amend(Edit::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     unparse_expr(&bool_op, checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),
@@ -524,7 +524,7 @@ pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, Range::from(expr));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.amend(Edit::replacement(
+                    diagnostic.set_fix(Edit::replacement(
                         "list".to_string(),
                         expr.location,
                         expr.end_location.unwrap(),

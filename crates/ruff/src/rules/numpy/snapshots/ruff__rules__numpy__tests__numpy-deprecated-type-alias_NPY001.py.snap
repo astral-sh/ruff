@@ -14,13 +14,14 @@ expression: diagnostics
     row: 6
     column: 8
   fix:
-    content: bool
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 8
+    edits:
+      - content: bool
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 6
+          column: 8
   parent: ~
 - kind:
     name: NumpyDeprecatedTypeAlias
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 7
     column: 7
   fix:
-    content: int
-    location:
-      row: 7
-      column: 0
-    end_location:
-      row: 7
-      column: 7
+    edits:
+      - content: int
+        location:
+          row: 7
+          column: 0
+        end_location:
+          row: 7
+          column: 7
   parent: ~
 - kind:
     name: NumpyDeprecatedTypeAlias
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 9
     column: 21
   fix:
-    content: object
-    location:
-      row: 9
-      column: 12
-    end_location:
-      row: 9
-      column: 21
+    edits:
+      - content: object
+        location:
+          row: 9
+          column: 12
+        end_location:
+          row: 9
+          column: 21
   parent: ~
 - kind:
     name: NumpyDeprecatedTypeAlias
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 12
     column: 77
   fix:
-    content: int
-    location:
-      row: 12
-      column: 71
-    end_location:
-      row: 12
-      column: 77
+    edits:
+      - content: int
+        location:
+          row: 12
+          column: 71
+        end_location:
+          row: 12
+          column: 77
   parent: ~
 - kind:
     name: NumpyDeprecatedTypeAlias
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 12
     column: 86
   fix:
-    content: int
-    location:
-      row: 12
-      column: 79
-    end_location:
-      row: 12
-      column: 86
+    edits:
+      - content: int
+        location:
+          row: 12
+          column: 79
+        end_location:
+          row: 12
+          column: 86
   parent: ~
 - kind:
     name: NumpyDeprecatedTypeAlias
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 17
     column: 22
   fix:
-    content: object
-    location:
-      row: 17
-      column: 10
-    end_location:
-      row: 17
-      column: 22
+    edits:
+      - content: object
+        location:
+          row: 17
+          column: 10
+        end_location:
+          row: 17
+          column: 22
   parent: ~
 - kind:
     name: NumpyDeprecatedTypeAlias
@@ -134,12 +140,13 @@ expression: diagnostics
     row: 20
     column: 21
   fix:
-    content: int
-    location:
-      row: 20
-      column: 15
-    end_location:
-      row: 20
-      column: 21
+    edits:
+      - content: int
+        location:
+          row: 20
+          column: 15
+        end_location:
+          row: 20
+          column: 21
   parent: ~
 

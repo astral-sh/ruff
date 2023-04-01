@@ -4,7 +4,7 @@ use itertools::Itertools;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
@@ -15,7 +15,7 @@ pub mod helpers;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
 pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String, FixTable)> {
-    if diagnostics.iter().all(|check| check.fix.is_none()) {
+    if diagnostics.iter().all(|check| check.fix.is_empty()) {
         None
     } else {
         Some(apply_fixes(diagnostics.iter(), locator))
@@ -34,36 +34,43 @@ fn apply_fixes<'a>(
 
     for (rule, fix) in diagnostics
         .filter_map(|diagnostic| {
-            diagnostic
-                .fix
-                .as_ref()
-                .map(|fix| (diagnostic.kind.rule(), fix))
+            if diagnostic.fix.is_empty() {
+                None
+            } else {
+                Some((diagnostic.kind.rule(), &diagnostic.fix))
+            }
         })
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {
         // If we already applied an identical fix as part of another correction, skip
         // any re-application.
-        if applied.contains(&fix) {
+        if fix.edits().iter().all(|edit| applied.contains(edit)) {
             *fixed.entry(rule).or_default() += 1;
             continue;
         }
 
         // Best-effort approach: if this fix overlaps with a fix we've already applied,
         // skip it.
-        if last_pos.map_or(false, |last_pos| last_pos >= fix.location) {
+        if last_pos.map_or(false, |last_pos| {
+            fix.location()
+                .map_or(false, |fix_location| last_pos >= fix_location)
+        }) {
             continue;
         }
 
-        // Add all contents from `last_pos` to `fix.location`.
-        let slice = locator.slice(Range::new(last_pos.unwrap_or_default(), fix.location));
-        output.push_str(slice);
+        for edit in fix.edits() {
+            // Add all contents from `last_pos` to `fix.location`.
+            let slice = locator.slice(Range::new(last_pos.unwrap_or_default(), edit.location));
+            output.push_str(slice);
 
-        // Add the patch itself.
-        output.push_str(&fix.content);
+            // Add the patch itself.
+            output.push_str(&edit.content);
 
-        // Track that the fix was applied.
-        last_pos = Some(fix.end_location);
-        applied.insert(fix);
+            // Track that the edit was applied.
+            last_pos = Some(edit.end_location);
+            applied.insert(edit);
+        }
+
         *fixed.entry(rule).or_default() += 1;
     }
 
@@ -93,9 +100,9 @@ pub(crate) fn apply_fix(fix: &Edit, locator: &Locator) -> String {
 }
 
 /// Compare two fixes.
-fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Edit, fix2: &Edit) -> std::cmp::Ordering {
-    fix1.location
-        .cmp(&fix2.location)
+fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
+    fix1.location()
+        .cmp(&fix2.location())
         .then_with(|| match (&rule1, &rule2) {
             // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
             (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
@@ -115,15 +122,14 @@ mod tests {
     use crate::autofix::{apply_fix, apply_fixes};
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
-    fn create_diagnostics(fixes: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {
-        fixes
-            .into_iter()
-            .map(|fix| Diagnostic {
+    fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {
+        edit.into_iter()
+            .map(|edit| Diagnostic {
                 // The choice of rule here is arbitrary.
                 kind: MissingNewlineAtEndOfFile.into(),
-                location: fix.location,
-                end_location: fix.end_location,
-                fix: Some(fix),
+                location: edit.location,
+                end_location: edit.end_location,
+                fix: edit.into(),
                 parent: None,
             })
             .collect()

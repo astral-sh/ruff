@@ -14,12 +14,13 @@ expression: diagnostics
     row: 2
     column: 20
   fix:
-    content: "[i for i in x]"
-    location:
-      row: 2
-      column: 0
-    end_location:
-      row: 2
-      column: 20
+    edits:
+      - content: "[i for i in x]"
+        location:
+          row: 2
+          column: 0
+        end_location:
+          row: 2
+          column: 20
   parent: ~
 

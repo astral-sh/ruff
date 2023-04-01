@@ -48,7 +48,7 @@ pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Exp
                 Range::new(func.end_location.unwrap(), expr.end_location.unwrap()),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.amend(Edit::replacement(
+                diagnostic.set_fix(Edit::replacement(
                     unparse_expr(func, checker.stylist),
                     expr.location,
                     expr.end_location.unwrap(),

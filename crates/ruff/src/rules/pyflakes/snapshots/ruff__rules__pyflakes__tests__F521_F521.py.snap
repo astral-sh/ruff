@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 1
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StringDotFormatInvalidFormat
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StringDotFormatInvalidFormat
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 3
     column: 22
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StringDotFormatInvalidFormat
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StringDotFormatInvalidFormat
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StringDotFormatInvalidFormat
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StringDotFormatInvalidFormat
@@ -91,6 +97,7 @@ expression: diagnostics
   end_location:
     row: 9
     column: 26
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

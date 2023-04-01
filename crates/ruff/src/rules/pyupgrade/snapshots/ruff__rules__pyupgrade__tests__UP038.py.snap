@@ -14,13 +14,14 @@ expression: diagnostics
     row: 1
     column: 27
   fix:
-    content: int | float
-    location:
-      row: 1
-      column: 14
-    end_location:
-      row: 1
-      column: 26
+    edits:
+      - content: int | float
+        location:
+          row: 1
+          column: 14
+        end_location:
+          row: 1
+          column: 26
   parent: ~
 - kind:
     name: NonPEP604Isinstance
@@ -34,12 +35,13 @@ expression: diagnostics
     row: 2
     column: 36
   fix:
-    content: int | float | str
-    location:
-      row: 2
-      column: 18
-    end_location:
-      row: 2
-      column: 35
+    edits:
+      - content: int | float | str
+        location:
+          row: 2
+          column: 18
+        end_location:
+          row: 2
+          column: 35
   parent: ~
 

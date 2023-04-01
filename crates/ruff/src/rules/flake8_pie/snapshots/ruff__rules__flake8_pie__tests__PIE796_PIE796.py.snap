@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NonUniqueEnums
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NonUniqueEnums
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NonUniqueEnums
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 26
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NonUniqueEnums
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 33
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NonUniqueEnums
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 40
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: NonUniqueEnums
@@ -91,6 +97,7 @@ expression: diagnostics
   end_location:
     row: 54
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

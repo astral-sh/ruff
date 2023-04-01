@@ -1,5 +1,22 @@
-use crate::fix;
 use ruff_macros::CacheKey;
+
+#[derive(Debug, Copy, Clone, Hash)]
+pub enum FixMode {
+    Generate,
+    Apply,
+    Diff,
+    None,
+}
+
+impl From<bool> for FixMode {
+    fn from(value: bool) -> Self {
+        if value {
+            Self::Apply
+        } else {
+            Self::None
+        }
+    }
+}
 
 #[derive(Debug, Copy, Clone, CacheKey, result_like::BoolLike)]
 pub enum Autofix {
@@ -7,11 +24,11 @@ pub enum Autofix {
     Disabled,
 }
 
-impl From<fix::FixMode> for Autofix {
-    fn from(value: fix::FixMode) -> Self {
+impl From<FixMode> for Autofix {
+    fn from(value: FixMode) -> Self {
         match value {
-            fix::FixMode::Generate | fix::FixMode::Diff | fix::FixMode::Apply => Self::Enabled,
-            fix::FixMode::None => Self::Disabled,
+            FixMode::Generate | FixMode::Diff | FixMode::Apply => Self::Enabled,
+            FixMode::None => Self::Disabled,
         }
     }
 }

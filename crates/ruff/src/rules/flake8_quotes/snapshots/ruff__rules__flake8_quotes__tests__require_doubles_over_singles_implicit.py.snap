@@ -14,13 +14,14 @@ expression: diagnostics
     row: 2
     column: 10
   fix:
-    content: "\"This\""
-    location:
-      row: 2
-      column: 4
-    end_location:
-      row: 2
-      column: 10
+    edits:
+      - content: "\"This\""
+        location:
+          row: 2
+          column: 4
+        end_location:
+          row: 2
+          column: 10
   parent: ~
 - kind:
     name: BadQuotesInlineString
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 3
     column: 8
   fix:
-    content: "\"is\""
-    location:
-      row: 3
-      column: 4
-    end_location:
-      row: 3
-      column: 8
+    edits:
+      - content: "\"is\""
+        location:
+          row: 3
+          column: 4
+        end_location:
+          row: 3
+          column: 8
   parent: ~
 - kind:
     name: BadQuotesInlineString
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 4
     column: 9
   fix:
-    content: "\"not\""
-    location:
-      row: 4
-      column: 4
-    end_location:
-      row: 4
-      column: 9
+    edits:
+      - content: "\"not\""
+        location:
+          row: 4
+          column: 4
+        end_location:
+          row: 4
+          column: 9
   parent: ~
 - kind:
     name: BadQuotesInlineString
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 8
     column: 10
   fix:
-    content: "\"This\""
-    location:
-      row: 8
-      column: 4
-    end_location:
-      row: 8
-      column: 10
+    edits:
+      - content: "\"This\""
+        location:
+          row: 8
+          column: 4
+        end_location:
+          row: 8
+          column: 10
   parent: ~
 - kind:
     name: BadQuotesInlineString
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 9
     column: 8
   fix:
-    content: "\"is\""
-    location:
-      row: 9
-      column: 4
-    end_location:
-      row: 9
-      column: 8
+    edits:
+      - content: "\"is\""
+        location:
+          row: 9
+          column: 4
+        end_location:
+          row: 9
+          column: 8
   parent: ~
 - kind:
     name: BadQuotesInlineString
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 10
     column: 9
   fix:
-    content: "\"not\""
-    location:
-      row: 10
-      column: 4
-    end_location:
-      row: 10
-      column: 9
+    edits:
+      - content: "\"not\""
+        location:
+          row: 10
+          column: 4
+        end_location:
+          row: 10
+          column: 9
   parent: ~
 - kind:
     name: BadQuotesInlineString
@@ -134,12 +140,13 @@ expression: diagnostics
     row: 27
     column: 30
   fix:
-    content: "\"But this needs to be changed\""
-    location:
-      row: 27
-      column: 0
-    end_location:
-      row: 27
-      column: 30
+    edits:
+      - content: "\"But this needs to be changed\""
+        location:
+          row: 27
+          column: 0
+        end_location:
+          row: 27
+          column: 30
   parent: ~
 

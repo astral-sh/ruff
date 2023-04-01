@@ -123,9 +123,9 @@ pub fn unnecessary_builtin_import(
         ) {
             Ok(fix) => {
                 if fix.content.is_empty() || fix.content == "pass" {
-                    checker.deletions.insert(defined_by.clone());
+                    checker.deletions.insert(*defined_by);
                 }
-                diagnostic.amend(fix);
+                diagnostic.set_fix(fix);
             }
             Err(e) => error!("Failed to remove builtin import: {e}"),
         }

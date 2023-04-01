@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 127
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCommentInStub
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 183
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCommentInStub
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 126
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCommentInStub
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 9
     column: 132
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCommentInStub
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 128
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCommentInStub
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 11
     column: 123
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCommentInStub
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 128
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCommentInStub
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 172
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCommentInStub
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 139
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCommentInStub
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 29
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCommentInStub
@@ -143,6 +153,7 @@ expression: diagnostics
   end_location:
     row: 32
     column: 55
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

@@ -14,13 +14,14 @@ expression: diagnostics
     row: 3
     column: 3
   fix:
-    content: "\"\"\"\nSingle quotes multiline module docstring\n\"\"\""
-    location:
-      row: 1
-      column: 0
-    end_location:
-      row: 3
-      column: 3
+    edits:
+      - content: "\"\"\"\nSingle quotes multiline module docstring\n\"\"\""
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 3
+          column: 3
   parent: ~
 - kind:
     name: BadQuotesDocstring
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 16
     column: 7
   fix:
-    content: "\"\"\"\n    Single quotes multiline class docstring\n    \"\"\""
-    location:
-      row: 14
-      column: 4
-    end_location:
-      row: 16
-      column: 7
+    edits:
+      - content: "\"\"\"\n    Single quotes multiline class docstring\n    \"\"\""
+        location:
+          row: 14
+          column: 4
+        end_location:
+          row: 16
+          column: 7
   parent: ~
 - kind:
     name: BadQuotesDocstring
@@ -54,12 +56,13 @@ expression: diagnostics
     row: 28
     column: 11
   fix:
-    content: "\"\"\"\n        Single quotes multiline function docstring\n        \"\"\""
-    location:
-      row: 26
-      column: 8
-    end_location:
-      row: 28
-      column: 11
+    edits:
+      - content: "\"\"\"\n        Single quotes multiline function docstring\n        \"\"\""
+        location:
+          row: 26
+          column: 8
+        end_location:
+          row: 28
+          column: 11
   parent: ~
 

@@ -34,7 +34,7 @@ pub fn remove_unused_format_arguments_from_dict(
     });
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -62,7 +62,7 @@ pub fn remove_unused_keyword_arguments_from_format_call(
         .retain(|e| !matches!(&e.keyword, Some(kw) if unused_arguments.contains(&kw.value)));
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -170,7 +170,7 @@ pub fn remove_unused_positional_arguments_from_format_call(
     }
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };

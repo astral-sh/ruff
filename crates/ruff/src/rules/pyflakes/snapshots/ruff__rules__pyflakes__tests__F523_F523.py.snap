@@ -14,13 +14,14 @@ expression: diagnostics
     row: 2
     column: 18
   fix:
-    content: "\"{0}\".format(1, )"
-    location:
-      row: 2
-      column: 0
-    end_location:
-      row: 2
-      column: 18
+    edits:
+      - content: "\"{0}\".format(1, )"
+        location:
+          row: 2
+          column: 0
+        end_location:
+          row: 2
+          column: 18
   parent: ~
 - kind:
     name: StringDotFormatExtraPositionalArguments
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 3
     column: 21
   fix:
-    content: "\"{0}\".format(2, )"
-    location:
-      row: 3
-      column: 0
-    end_location:
-      row: 3
-      column: 21
+    edits:
+      - content: "\"{0}\".format(2, )"
+        location:
+          row: 3
+          column: 0
+        end_location:
+          row: 3
+          column: 21
   parent: ~
 - kind:
     name: StringDotFormatExtraPositionalArguments
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 5
     column: 25
   fix:
-    content: "\"{1:{0}}\".format(1, 2, )"
-    location:
-      row: 5
-      column: 0
-    end_location:
-      row: 5
-      column: 25
+    edits:
+      - content: "\"{1:{0}}\".format(1, 2, )"
+        location:
+          row: 5
+          column: 0
+        end_location:
+          row: 5
+          column: 25
   parent: ~
 - kind:
     name: StringDotFormatExtraPositionalArguments
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 6
     column: 21
   fix:
-    content: "\"{0}{2}\".format(1, )"
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 21
+    edits:
+      - content: "\"{0}{2}\".format(1, )"
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 6
+          column: 21
   parent: ~
 - kind:
     name: StringDotFormatExtraPositionalArguments
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 7
     column: 48
   fix:
-    content: "\"{0.arg[1]!r:0{1['arg']}{0}}\".format(2, 3, )"
-    location:
-      row: 7
-      column: 0
-    end_location:
-      row: 7
-      column: 48
+    edits:
+      - content: "\"{0.arg[1]!r:0{1['arg']}{0}}\".format(2, 3, )"
+        location:
+          row: 7
+          column: 0
+        end_location:
+          row: 7
+          column: 48
   parent: ~
 - kind:
     name: StringDotFormatExtraPositionalArguments
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 10
     column: 17
   fix:
-    content: "\"{}\".format(1, )"
-    location:
-      row: 10
-      column: 0
-    end_location:
-      row: 10
-      column: 17
+    edits:
+      - content: "\"{}\".format(1, )"
+        location:
+          row: 10
+          column: 0
+        end_location:
+          row: 10
+          column: 17
   parent: ~
 - kind:
     name: StringDotFormatExtraPositionalArguments
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 11
     column: 20
   fix:
-    content: "\"{}\".format(1, )"
-    location:
-      row: 11
-      column: 0
-    end_location:
-      row: 11
-      column: 20
+    edits:
+      - content: "\"{}\".format(1, )"
+        location:
+          row: 11
+          column: 0
+        end_location:
+          row: 11
+          column: 20
   parent: ~
 - kind:
     name: StringDotFormatExtraPositionalArguments
@@ -154,12 +161,13 @@ expression: diagnostics
     row: 13
     column: 23
   fix:
-    content: "\"{:{}}\".format(1, 2, )"
-    location:
-      row: 13
-      column: 0
-    end_location:
-      row: 13
-      column: 23
+    edits:
+      - content: "\"{:{}}\".format(1, 2, )"
+        location:
+          row: 13
+          column: 0
+        end_location:
+          row: 13
+          column: 23
   parent: ~
 

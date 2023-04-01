@@ -14,13 +14,14 @@ expression: diagnostics
     row: 18
     column: 22
   fix:
-    content: MyClass
-    location:
-      row: 18
-      column: 13
-    end_location:
-      row: 18
-      column: 22
+    edits:
+      - content: MyClass
+        location:
+          row: 18
+          column: 13
+        end_location:
+          row: 18
+          column: 22
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 18
     column: 36
   fix:
-    content: MyClass
-    location:
-      row: 18
-      column: 27
-    end_location:
-      row: 18
-      column: 36
+    edits:
+      - content: MyClass
+        location:
+          row: 18
+          column: 27
+        end_location:
+          row: 18
+          column: 36
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 19
     column: 16
   fix:
-    content: MyClass
-    location:
-      row: 19
-      column: 7
-    end_location:
-      row: 19
-      column: 16
+    edits:
+      - content: MyClass
+        location:
+          row: 19
+          column: 7
+        end_location:
+          row: 19
+          column: 16
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 22
     column: 26
   fix:
-    content: bool
-    location:
-      row: 22
-      column: 20
-    end_location:
-      row: 22
-      column: 26
+    edits:
+      - content: bool
+        location:
+          row: 22
+          column: 20
+        end_location:
+          row: 22
+          column: 26
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 26
     column: 20
   fix:
-    content: str
-    location:
-      row: 26
-      column: 15
-    end_location:
-      row: 26
-      column: 20
+    edits:
+      - content: str
+        location:
+          row: 26
+          column: 15
+        end_location:
+          row: 26
+          column: 20
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 26
     column: 37
   fix:
-    content: int
-    location:
-      row: 26
-      column: 32
-    end_location:
-      row: 26
-      column: 37
+    edits:
+      - content: int
+        location:
+          row: 26
+          column: 32
+        end_location:
+          row: 26
+          column: 37
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 30
     column: 18
   fix:
-    content: MyClass
-    location:
-      row: 30
-      column: 9
-    end_location:
-      row: 30
-      column: 18
+    edits:
+      - content: MyClass
+        location:
+          row: 30
+          column: 9
+        end_location:
+          row: 30
+          column: 18
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 32
     column: 22
   fix:
-    content: MyClass
-    location:
-      row: 32
-      column: 13
-    end_location:
-      row: 32
-      column: 22
+    edits:
+      - content: MyClass
+        location:
+          row: 32
+          column: 13
+        end_location:
+          row: 32
+          column: 22
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 36
     column: 16
   fix:
-    content: MyClass
-    location:
-      row: 36
-      column: 7
-    end_location:
-      row: 36
-      column: 16
+    edits:
+      - content: MyClass
+        location:
+          row: 36
+          column: 7
+        end_location:
+          row: 36
+          column: 16
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 40
     column: 31
   fix:
-    content: int
-    location:
-      row: 40
-      column: 26
-    end_location:
-      row: 40
-      column: 31
+    edits:
+      - content: int
+        location:
+          row: 40
+          column: 26
+        end_location:
+          row: 40
+          column: 31
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -214,13 +224,14 @@ expression: diagnostics
     row: 44
     column: 35
   fix:
-    content: int
-    location:
-      row: 44
-      column: 30
-    end_location:
-      row: 44
-      column: 35
+    edits:
+      - content: int
+        location:
+          row: 44
+          column: 30
+        end_location:
+          row: 44
+          column: 35
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -234,13 +245,14 @@ expression: diagnostics
     row: 47
     column: 18
   fix:
-    content: str
-    location:
-      row: 47
-      column: 13
-    end_location:
-      row: 47
-      column: 18
+    edits:
+      - content: str
+        location:
+          row: 47
+          column: 13
+        end_location:
+          row: 47
+          column: 18
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -254,13 +266,14 @@ expression: diagnostics
     row: 49
     column: 12
   fix:
-    content: str
-    location:
-      row: 49
-      column: 7
-    end_location:
-      row: 49
-      column: 12
+    edits:
+      - content: str
+        location:
+          row: 49
+          column: 7
+        end_location:
+          row: 49
+          column: 12
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -274,13 +287,14 @@ expression: diagnostics
     row: 51
     column: 19
   fix:
-    content: str
-    location:
-      row: 51
-      column: 14
-    end_location:
-      row: 51
-      column: 19
+    edits:
+      - content: str
+        location:
+          row: 51
+          column: 14
+        end_location:
+          row: 51
+          column: 19
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -294,13 +308,14 @@ expression: diagnostics
     row: 53
     column: 17
   fix:
-    content: str
-    location:
-      row: 53
-      column: 12
-    end_location:
-      row: 53
-      column: 17
+    edits:
+      - content: str
+        location:
+          row: 53
+          column: 12
+        end_location:
+          row: 53
+          column: 17
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -314,13 +329,14 @@ expression: diagnostics
     row: 55
     column: 24
   fix:
-    content: str
-    location:
-      row: 55
-      column: 19
-    end_location:
-      row: 55
-      column: 24
+    edits:
+      - content: str
+        location:
+          row: 55
+          column: 19
+        end_location:
+          row: 55
+          column: 24
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -334,13 +350,14 @@ expression: diagnostics
     row: 57
     column: 24
   fix:
-    content: str
-    location:
-      row: 57
-      column: 19
-    end_location:
-      row: 57
-      column: 24
+    edits:
+      - content: str
+        location:
+          row: 57
+          column: 19
+        end_location:
+          row: 57
+          column: 24
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -354,13 +371,14 @@ expression: diagnostics
     row: 59
     column: 15
   fix:
-    content: str
-    location:
-      row: 59
-      column: 10
-    end_location:
-      row: 59
-      column: 15
+    edits:
+      - content: str
+        location:
+          row: 59
+          column: 10
+        end_location:
+          row: 59
+          column: 15
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -374,13 +392,14 @@ expression: diagnostics
     row: 61
     column: 27
   fix:
-    content: MyClass
-    location:
-      row: 61
-      column: 18
-    end_location:
-      row: 61
-      column: 27
+    edits:
+      - content: MyClass
+        location:
+          row: 61
+          column: 18
+        end_location:
+          row: 61
+          column: 27
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -394,13 +413,14 @@ expression: diagnostics
     row: 63
     column: 33
   fix:
-    content: int
-    location:
-      row: 63
-      column: 28
-    end_location:
-      row: 63
-      column: 33
+    edits:
+      - content: int
+        location:
+          row: 63
+          column: 28
+        end_location:
+          row: 63
+          column: 33
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -414,13 +434,14 @@ expression: diagnostics
     row: 63
     column: 49
   fix:
-    content: str
-    location:
-      row: 63
-      column: 44
-    end_location:
-      row: 63
-      column: 49
+    edits:
+      - content: str
+        location:
+          row: 63
+          column: 44
+        end_location:
+          row: 63
+          column: 49
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -434,13 +455,14 @@ expression: diagnostics
     row: 65
     column: 33
   fix:
-    content: foo
-    location:
-      row: 65
-      column: 28
-    end_location:
-      row: 65
-      column: 33
+    edits:
+      - content: foo
+        location:
+          row: 65
+          column: 28
+        end_location:
+          row: 65
+          column: 33
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -454,13 +476,14 @@ expression: diagnostics
     row: 65
     column: 40
   fix:
-    content: int
-    location:
-      row: 65
-      column: 35
-    end_location:
-      row: 65
-      column: 40
+    edits:
+      - content: int
+        location:
+          row: 65
+          column: 35
+        end_location:
+          row: 65
+          column: 40
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -474,13 +497,14 @@ expression: diagnostics
     row: 65
     column: 49
   fix:
-    content: bar
-    location:
-      row: 65
-      column: 44
-    end_location:
-      row: 65
-      column: 49
+    edits:
+      - content: bar
+        location:
+          row: 65
+          column: 44
+        end_location:
+          row: 65
+          column: 49
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -494,13 +518,14 @@ expression: diagnostics
     row: 65
     column: 56
   fix:
-    content: str
-    location:
-      row: 65
-      column: 51
-    end_location:
-      row: 65
-      column: 56
+    edits:
+      - content: str
+        location:
+          row: 65
+          column: 51
+        end_location:
+          row: 65
+          column: 56
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -514,13 +539,14 @@ expression: diagnostics
     row: 67
     column: 26
   fix:
-    content: X
-    location:
-      row: 67
-      column: 23
-    end_location:
-      row: 67
-      column: 26
+    edits:
+      - content: X
+        location:
+          row: 67
+          column: 23
+        end_location:
+          row: 67
+          column: 26
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -534,13 +560,14 @@ expression: diagnostics
     row: 67
     column: 42
   fix:
-    content: foo
-    location:
-      row: 67
-      column: 37
-    end_location:
-      row: 67
-      column: 42
+    edits:
+      - content: foo
+        location:
+          row: 67
+          column: 37
+        end_location:
+          row: 67
+          column: 42
   parent: ~
 - kind:
     name: QuotedAnnotation
@@ -554,12 +581,13 @@ expression: diagnostics
     row: 67
     column: 49
   fix:
-    content: int
-    location:
-      row: 67
-      column: 44
-    end_location:
-      row: 67
-      column: 49
+    edits:
+      - content: int
+        location:
+          row: 67
+          column: 44
+        end_location:
+          row: 67
+          column: 49
   parent: ~
 

@@ -38,7 +38,7 @@ impl Violation for BadStringFormatType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum DataType {
     String,
     Integer,
@@ -87,7 +87,7 @@ impl From<&Expr> for DataType {
 }
 
 impl DataType {
-    fn is_compatible_with(&self, format: &FormatType) -> bool {
+    fn is_compatible_with(self, format: FormatType) -> bool {
         match self {
             DataType::String => matches!(
                 format,
@@ -119,7 +119,7 @@ impl DataType {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum FormatType {
     Repr,
     String,
@@ -161,7 +161,7 @@ fn collect_specs(formats: &[CFormatStrOrBytes<String>]) -> Vec<&CFormatSpec> {
 fn equivalent(format: &CFormatSpec, value: &Expr) -> bool {
     let constant: DataType = value.into();
     let format: FormatType = format.format_char.into();
-    constant.is_compatible_with(&format)
+    constant.is_compatible_with(format)
 }
 
 /// Return `true` if the [`Constnat`] aligns with the format type.
@@ -172,7 +172,7 @@ fn is_valid_constant(formats: &[CFormatStrOrBytes<String>], value: &Expr) -> boo
     if formats.len() != 1 {
         return true;
     }
-    let format = formats.get(0).unwrap();
+    let format = formats[0];
     equivalent(format, value)
 }
 

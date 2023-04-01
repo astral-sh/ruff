@@ -5,7 +5,8 @@ use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
 use rustpython_parser::ast::Location;
-use rustpython_parser::{lexer, Mode, Tok};
+use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use crate::source_code::Locator;
 use ruff_rustpython::vendor;
@@ -14,34 +15,75 @@ use crate::str::leading_quote;
 use crate::types::Range;
 
 pub struct Stylist<'a> {
-    contents: &'a str,
     locator: &'a Locator<'a>,
     indentation: OnceCell<Indentation>,
+    indent_end: Option<Location>,
     quote: OnceCell<Quote>,
+    quote_range: Option<Range>,
     line_ending: OnceCell<LineEnding>,
 }
 
 impl<'a> Stylist<'a> {
     pub fn indentation(&'a self) -> &'a Indentation {
-        self.indentation
-            .get_or_init(|| detect_indentation(self.contents, self.locator).unwrap_or_default())
+        self.indentation.get_or_init(|| {
+            if let Some(indent_end) = self.indent_end {
+                let start = Location::new(indent_end.row(), 0);
+                let whitespace = self.locator.slice(Range::new(start, indent_end));
+                Indentation(whitespace.to_string())
+            } else {
+                Indentation::default()
+            }
+        })
     }
 
-    pub fn quote(&'a self) -> &'a Quote {
-        self.quote
-            .get_or_init(|| detect_quote(self.contents, self.locator).unwrap_or_default())
+    pub fn quote(&'a self) -> Quote {
+        *self.quote.get_or_init(|| {
+            self.quote_range
+                .and_then(|quote_range| {
+                    let content = self.locator.slice(quote_range);
+                    leading_quote(content)
+                })
+                .map(|pattern| {
+                    if pattern.contains('\'') {
+                        Quote::Single
+                    } else if pattern.contains('"') {
+                        Quote::Double
+                    } else {
+                        unreachable!("Expected string to start with a valid quote prefix")
+                    }
+                })
+                .unwrap_or_default()
+        })
     }
 
-    pub fn line_ending(&'a self) -> &'a LineEnding {
-        self.line_ending
-            .get_or_init(|| detect_line_ending(self.contents).unwrap_or_default())
+    pub fn line_ending(&'a self) -> LineEnding {
+        *self
+            .line_ending
+            .get_or_init(|| detect_line_ending(self.locator.contents()).unwrap_or_default())
     }
 
-    pub fn from_contents(contents: &'a str, locator: &'a Locator<'a>) -> Self {
+    pub fn from_tokens(tokens: &[LexResult], locator: &'a Locator<'a>) -> Self {
+        let indent_end = tokens.iter().flatten().find_map(|(_, t, end)| {
+            if matches!(t, Tok::Indent) {
+                Some(*end)
+            } else {
+                None
+            }
+        });
+
+        let quote_range = tokens.iter().flatten().find_map(|(start, t, end)| match t {
+            Tok::String {
+                triple_quoted: false,
+                ..
+            } => Some(Range::new(*start, *end)),
+            _ => None,
+        });
+
         Self {
-            contents,
             locator,
             indentation: OnceCell::default(),
+            indent_end,
+            quote_range,
             quote: OnceCell::default(),
             line_ending: OnceCell::default(),
         }
@@ -49,7 +91,7 @@ impl<'a> Stylist<'a> {
 }
 
 /// The quotation style used in Python source code.
-#[derive(Debug, Default, PartialEq, Eq)]
+#[derive(Debug, Default, PartialEq, Eq, Copy, Clone)]
 pub enum Quote {
     Single,
     #[default]
@@ -65,8 +107,8 @@ impl From<Quote> for char {
     }
 }
 
-impl From<&Quote> for vendor::str::Quote {
-    fn from(val: &Quote) -> Self {
+impl From<Quote> for vendor::str::Quote {
+    fn from(val: Quote) -> Self {
         match val {
             Quote::Single => vendor::str::Quote::Single,
             Quote::Double => vendor::str::Quote::Double,
@@ -79,15 +121,6 @@ impl fmt::Display for Quote {
         match self {
             Quote::Single => write!(f, "\'"),
             Quote::Double => write!(f, "\""),
-        }
-    }
-}
-
-impl From<&Quote> for char {
-    fn from(val: &Quote) -> Self {
-        match val {
-            Quote::Single => '\'',
-            Quote::Double => '"',
         }
     }
 }
@@ -128,7 +161,7 @@ impl Deref for Indentation {
 
 /// The line ending style used in Python source code.
 /// See <https://docs.python.org/3/reference/lexical_analysis.html#physical-lines>
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum LineEnding {
     Lf,
     Cr,
@@ -163,38 +196,6 @@ impl Deref for LineEnding {
     }
 }
 
-/// Detect the indentation style of the given tokens.
-fn detect_indentation(contents: &str, locator: &Locator) -> Option<Indentation> {
-    for (_start, tok, end) in lexer::lex(contents, Mode::Module).flatten() {
-        if let Tok::Indent { .. } = tok {
-            let start = Location::new(end.row(), 0);
-            let whitespace = locator.slice(Range::new(start, end));
-            return Some(Indentation(whitespace.to_string()));
-        }
-    }
-    None
-}
-
-/// Detect the quotation style of the given tokens.
-fn detect_quote(contents: &str, locator: &Locator) -> Option<Quote> {
-    for (start, tok, end) in lexer::lex(contents, Mode::Module).flatten() {
-        if let Tok::String { .. } = tok {
-            let content = locator.slice(Range::new(start, end));
-            if let Some(pattern) = leading_quote(content) {
-                if pattern.contains("\"\"\"") {
-                    continue;
-                } else if pattern.contains('\'') {
-                    return Some(Quote::Single);
-                } else if pattern.contains('"') {
-                    return Some(Quote::Double);
-                }
-                unreachable!("Expected string to start with a valid quote prefix")
-            }
-        }
-    }
-    None
-}
-
 /// Detect the line ending style of the given contents.
 fn detect_line_ending(contents: &str) -> Option<LineEnding> {
     if let Some(position) = contents.find('\n') {
@@ -212,25 +213,30 @@ fn detect_line_ending(contents: &str) -> Option<LineEnding> {
 
 #[cfg(test)]
 mod tests {
-    use crate::source_code::stylist::{
-        detect_indentation, detect_line_ending, detect_quote, Indentation, LineEnding, Quote,
-    };
-    use crate::source_code::Locator;
+    use crate::source_code::stylist::{detect_line_ending, Indentation, LineEnding, Quote};
+    use crate::source_code::{Locator, Stylist};
+    use rustpython_parser::lexer::lex;
+    use rustpython_parser::Mode;
 
     #[test]
     fn indentation() {
         let contents = r#"x = 1"#;
         let locator = Locator::new(contents);
-        assert_eq!(detect_indentation(contents, &locator), None);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).indentation(),
+            &Indentation::default()
+        );
 
         let contents = r#"
 if True:
   pass
 "#;
         let locator = Locator::new(contents);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
-            detect_indentation(contents, &locator),
-            Some(Indentation("  ".to_string()))
+            Stylist::from_tokens(&tokens, &locator).indentation(),
+            &Indentation("  ".to_string())
         );
 
         let contents = r#"
@@ -238,9 +244,10 @@ if True:
     pass
 "#;
         let locator = Locator::new(contents);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
-            detect_indentation(contents, &locator),
-            Some(Indentation("    ".to_string()))
+            Stylist::from_tokens(&tokens, &locator).indentation(),
+            &Indentation("    ".to_string())
         );
 
         let contents = r#"
@@ -248,9 +255,10 @@ if True:
 	pass
 "#;
         let locator = Locator::new(contents);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
         assert_eq!(
-            detect_indentation(contents, &locator),
-            Some(Indentation("\t".to_string()))
+            Stylist::from_tokens(&tokens, &locator).indentation(),
+            &Indentation("\t".to_string())
         );
 
         // TODO(charlie): Should non-significant whitespace be detected?
@@ -262,26 +270,46 @@ x = (
 )
 "#;
         let locator = Locator::new(contents);
-        assert_eq!(detect_indentation(contents, &locator), None);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).indentation(),
+            &Indentation::default()
+        );
     }
 
     #[test]
     fn quote() {
         let contents = r#"x = 1"#;
         let locator = Locator::new(contents);
-        assert_eq!(detect_quote(contents, &locator), None);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).quote(),
+            Quote::default()
+        );
 
         let contents = r#"x = '1'"#;
         let locator = Locator::new(contents);
-        assert_eq!(detect_quote(contents, &locator), Some(Quote::Single));
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).quote(),
+            Quote::Single
+        );
 
         let contents = r#"x = "1""#;
         let locator = Locator::new(contents);
-        assert_eq!(detect_quote(contents, &locator), Some(Quote::Double));
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).quote(),
+            Quote::Double
+        );
 
         let contents = r#"s = "It's done.""#;
         let locator = Locator::new(contents);
-        assert_eq!(detect_quote(contents, &locator), Some(Quote::Double));
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).quote(),
+            Quote::Double
+        );
 
         // No style if only double quoted docstring (will take default Double)
         let contents = r#"
@@ -290,7 +318,11 @@ def f():
     pass
 "#;
         let locator = Locator::new(contents);
-        assert_eq!(detect_quote(contents, &locator), None);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).quote(),
+            Quote::default()
+        );
 
         // Detect from string literal appearing after docstring
         let contents = r#"
@@ -299,7 +331,23 @@ def f():
 a = 'v'
 "#;
         let locator = Locator::new(contents);
-        assert_eq!(detect_quote(contents, &locator), Some(Quote::Single));
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).quote(),
+            Quote::Single
+        );
+
+        let contents = r#"
+'''Module docstring.'''
+
+a = "v"
+"#;
+        let locator = Locator::new(contents);
+        let tokens: Vec<_> = lex(contents, Mode::Module).collect();
+        assert_eq!(
+            Stylist::from_tokens(&tokens, &locator).quote(),
+            Quote::Double
+        );
     }
 
     #[test]

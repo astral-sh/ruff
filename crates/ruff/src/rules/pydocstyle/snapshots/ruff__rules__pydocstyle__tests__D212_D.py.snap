@@ -14,13 +14,14 @@ expression: diagnostics
     row: 131
     column: 7
   fix:
-    content: ""
-    location:
-      row: 129
-      column: 7
-    end_location:
-      row: 130
-      column: 4
+    edits:
+      - content: ""
+        location:
+          row: 129
+          column: 7
+        end_location:
+          row: 130
+          column: 4
   parent: ~
 - kind:
     name: MultiLineSummaryFirstLine
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 599
     column: 13
   fix:
-    content: ""
-    location:
-      row: 597
-      column: 7
-    end_location:
-      row: 599
-      column: 4
+    edits:
+      - content: ""
+        location:
+          row: 597
+          column: 7
+        end_location:
+          row: 599
+          column: 4
   parent: ~
 - kind:
     name: MultiLineSummaryFirstLine
@@ -54,12 +56,13 @@ expression: diagnostics
     row: 626
     column: 14
   fix:
-    content: ""
-    location:
-      row: 624
-      column: 7
-    end_location:
-      row: 626
-      column: 4
+    edits:
+      - content: ""
+        location:
+          row: 624
+          column: 7
+        end_location:
+          row: 626
+          column: 4
   parent: ~
 

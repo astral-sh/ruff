@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: EmptyMethodWithoutAbstractDecorator
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: EmptyMethodWithoutAbstractDecorator
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: EmptyMethodWithoutAbstractDecorator
@@ -52,6 +55,7 @@ expression: diagnostics
   end_location:
     row: 28
     column: 12
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

@@ -14,13 +14,14 @@ expression: diagnostics
     row: 2
     column: 31
   fix:
-    content: from collections.abc import Mapping
-    location:
-      row: 2
-      column: 0
-    end_location:
-      row: 2
-      column: 31
+    edits:
+      - content: from collections.abc import Mapping
+        location:
+          row: 2
+          column: 0
+        end_location:
+          row: 2
+          column: 31
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 4
     column: 38
   fix:
-    content: from collections.abc import Mapping as MAP
-    location:
-      row: 4
-      column: 0
-    end_location:
-      row: 4
-      column: 38
+    edits:
+      - content: from collections.abc import Mapping as MAP
+        location:
+          row: 4
+          column: 0
+        end_location:
+          row: 4
+          column: 38
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 6
     column: 41
   fix:
-    content: "from collections.abc import Mapping, Sequence"
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 41
+    edits:
+      - content: "from collections.abc import Mapping, Sequence"
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 6
+          column: 41
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 8
     column: 40
   fix:
-    content: "from collections import Counter\nfrom collections.abc import Mapping"
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 8
-      column: 40
+    edits:
+      - content: "from collections import Counter\nfrom collections.abc import Mapping"
+        location:
+          row: 8
+          column: 0
+        end_location:
+          row: 8
+          column: 40
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 10
     column: 42
   fix:
-    content: "from collections import (Counter)\nfrom collections.abc import Mapping"
-    location:
-      row: 10
-      column: 0
-    end_location:
-      row: 10
-      column: 42
+    edits:
+      - content: "from collections import (Counter)\nfrom collections.abc import Mapping"
+        location:
+          row: 10
+          column: 0
+        end_location:
+          row: 10
+          column: 42
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 13
     column: 33
   fix:
-    content: "from collections import (Counter)\nfrom collections.abc import Mapping"
-    location:
-      row: 12
-      column: 0
-    end_location:
-      row: 13
-      column: 33
+    edits:
+      - content: "from collections import (Counter)\nfrom collections.abc import Mapping"
+        location:
+          row: 12
+          column: 0
+        end_location:
+          row: 13
+          column: 33
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 16
     column: 32
   fix:
-    content: "from collections import Counter\nfrom collections.abc import Mapping"
-    location:
-      row: 15
-      column: 0
-    end_location:
-      row: 16
-      column: 32
+    edits:
+      - content: "from collections import Counter\nfrom collections.abc import Mapping"
+        location:
+          row: 15
+          column: 0
+        end_location:
+          row: 16
+          column: 32
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 18
     column: 50
   fix:
-    content: "from collections import Counter\nfrom collections.abc import Mapping, Sequence"
-    location:
-      row: 18
-      column: 0
-    end_location:
-      row: 18
-      column: 50
+    edits:
+      - content: "from collections import Counter\nfrom collections.abc import Mapping, Sequence"
+        location:
+          row: 18
+          column: 0
+        end_location:
+          row: 18
+          column: 50
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 20
     column: 51
   fix:
-    content: "from collections import Counter\nfrom collections.abc import Mapping as mapping"
-    location:
-      row: 20
-      column: 0
-    end_location:
-      row: 20
-      column: 51
+    edits:
+      - content: "from collections import Counter\nfrom collections.abc import Mapping as mapping"
+        location:
+          row: 20
+          column: 0
+        end_location:
+          row: 20
+          column: 51
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 23
     column: 44
   fix:
-    content: "from collections import Counter\n    from collections.abc import Mapping"
-    location:
-      row: 23
-      column: 4
-    end_location:
-      row: 23
-      column: 44
+    edits:
+      - content: "from collections import Counter\n    from collections.abc import Mapping"
+        location:
+          row: 23
+          column: 4
+        end_location:
+          row: 23
+          column: 44
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -214,13 +224,14 @@ expression: diagnostics
     row: 28
     column: 44
   fix:
-    content: "from collections import Counter\n    from collections.abc import Mapping"
-    location:
-      row: 28
-      column: 4
-    end_location:
-      row: 28
-      column: 44
+    edits:
+      - content: "from collections import Counter\n    from collections.abc import Mapping"
+        location:
+          row: 28
+          column: 4
+        end_location:
+          row: 28
+          column: 44
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -234,13 +245,14 @@ expression: diagnostics
     row: 30
     column: 40
   fix:
-    content: from collections.abc import Mapping
-    location:
-      row: 30
-      column: 9
-    end_location:
-      row: 30
-      column: 40
+    edits:
+      - content: from collections.abc import Mapping
+        location:
+          row: 30
+          column: 9
+        end_location:
+          row: 30
+          column: 40
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -254,13 +266,14 @@ expression: diagnostics
     row: 33
     column: 40
   fix:
-    content: "from collections import Counter\nfrom collections.abc import Mapping"
-    location:
-      row: 33
-      column: 0
-    end_location:
-      row: 33
-      column: 40
+    edits:
+      - content: "from collections import Counter\nfrom collections.abc import Mapping"
+        location:
+          row: 33
+          column: 0
+        end_location:
+          row: 33
+          column: 40
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -274,13 +287,14 @@ expression: diagnostics
     row: 42
     column: 5
   fix:
-    content: "from collections import (\n        Bad,\n        Good,\n    )\n    from collections.abc import Mapping, Callable"
-    location:
-      row: 37
-      column: 4
-    end_location:
-      row: 42
-      column: 5
+    edits:
+      - content: "from collections import (\n        Bad,\n        Good,\n    )\n    from collections.abc import Mapping, Callable"
+        location:
+          row: 37
+          column: 4
+        end_location:
+          row: 42
+          column: 5
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -294,13 +308,14 @@ expression: diagnostics
     row: 44
     column: 91
   fix:
-    content: "from typing import Match, Pattern, List, OrderedDict, AbstractSet, ContextManager\nfrom collections.abc import Callable"
-    location:
-      row: 44
-      column: 0
-    end_location:
-      row: 44
-      column: 91
+    edits:
+      - content: "from typing import Match, Pattern, List, OrderedDict, AbstractSet, ContextManager\nfrom collections.abc import Callable"
+        location:
+          row: 44
+          column: 0
+        end_location:
+          row: 44
+          column: 91
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -314,13 +329,14 @@ expression: diagnostics
     row: 44
     column: 91
   fix:
-    content: "from typing import Callable, Match, Pattern, List, AbstractSet, ContextManager\nfrom collections import OrderedDict"
-    location:
-      row: 44
-      column: 0
-    end_location:
-      row: 44
-      column: 91
+    edits:
+      - content: "from typing import Callable, Match, Pattern, List, AbstractSet, ContextManager\nfrom collections import OrderedDict"
+        location:
+          row: 44
+          column: 0
+        end_location:
+          row: 44
+          column: 91
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -334,13 +350,14 @@ expression: diagnostics
     row: 44
     column: 91
   fix:
-    content: "from typing import Callable, List, OrderedDict, AbstractSet, ContextManager\nfrom re import Match, Pattern"
-    location:
-      row: 44
-      column: 0
-    end_location:
-      row: 44
-      column: 91
+    edits:
+      - content: "from typing import Callable, List, OrderedDict, AbstractSet, ContextManager\nfrom re import Match, Pattern"
+        location:
+          row: 44
+          column: 0
+        end_location:
+          row: 44
+          column: 91
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -353,7 +370,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 91
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -366,7 +384,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 91
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -379,7 +398,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 91
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: DeprecatedImport
@@ -392,6 +412,7 @@ expression: diagnostics
   end_location:
     row: 47
     column: 21
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

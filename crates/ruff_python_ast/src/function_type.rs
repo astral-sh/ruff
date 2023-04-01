@@ -7,6 +7,7 @@ use crate::scope::{Scope, ScopeKind};
 const CLASS_METHODS: [&str; 3] = ["__new__", "__init_subclass__", "__class_getitem__"];
 const METACLASS_BASES: [(&str, &str); 2] = [("", "type"), ("abc", "ABCMeta")];
 
+#[derive(Copy, Clone)]
 pub enum FunctionType {
     Function,
     Method,

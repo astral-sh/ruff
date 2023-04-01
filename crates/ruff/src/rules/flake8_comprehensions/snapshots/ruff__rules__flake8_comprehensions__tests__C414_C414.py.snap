@@ -14,13 +14,14 @@ expression: diagnostics
     row: 2
     column: 13
   fix:
-    content: list(x)
-    location:
-      row: 2
-      column: 0
-    end_location:
-      row: 2
-      column: 13
+    edits:
+      - content: list(x)
+        location:
+          row: 2
+          column: 0
+        end_location:
+          row: 2
+          column: 13
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 3
     column: 14
   fix:
-    content: list(x)
-    location:
-      row: 3
-      column: 0
-    end_location:
-      row: 3
-      column: 14
+    edits:
+      - content: list(x)
+        location:
+          row: 3
+          column: 0
+        end_location:
+          row: 3
+          column: 14
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 4
     column: 14
   fix:
-    content: tuple(x)
-    location:
-      row: 4
-      column: 0
-    end_location:
-      row: 4
-      column: 14
+    edits:
+      - content: tuple(x)
+        location:
+          row: 4
+          column: 0
+        end_location:
+          row: 4
+          column: 14
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 5
     column: 15
   fix:
-    content: tuple(x)
-    location:
-      row: 5
-      column: 0
-    end_location:
-      row: 5
-      column: 15
+    edits:
+      - content: tuple(x)
+        location:
+          row: 5
+          column: 0
+        end_location:
+          row: 5
+          column: 15
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 6
     column: 11
   fix:
-    content: set(x)
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 11
+    edits:
+      - content: set(x)
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 6
+          column: 11
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 7
     column: 12
   fix:
-    content: set(x)
-    location:
-      row: 7
-      column: 0
-    end_location:
-      row: 7
-      column: 12
+    edits:
+      - content: set(x)
+        location:
+          row: 7
+          column: 0
+        end_location:
+          row: 7
+          column: 12
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 8
     column: 13
   fix:
-    content: set(x)
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 8
-      column: 13
+    edits:
+      - content: set(x)
+        location:
+          row: 8
+          column: 0
+        end_location:
+          row: 8
+          column: 13
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 9
     column: 14
   fix:
-    content: set(x)
-    location:
-      row: 9
-      column: 0
-    end_location:
-      row: 9
-      column: 14
+    edits:
+      - content: set(x)
+        location:
+          row: 9
+          column: 0
+        end_location:
+          row: 9
+          column: 14
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 10
     column: 16
   fix:
-    content: set(x)
-    location:
-      row: 10
-      column: 0
-    end_location:
-      row: 10
-      column: 16
+    edits:
+      - content: set(x)
+        location:
+          row: 10
+          column: 0
+        end_location:
+          row: 10
+          column: 16
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 11
     column: 15
   fix:
-    content: sorted(x)
-    location:
-      row: 11
-      column: 0
-    end_location:
-      row: 11
-      column: 15
+    edits:
+      - content: sorted(x)
+        location:
+          row: 11
+          column: 0
+        end_location:
+          row: 11
+          column: 15
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -214,13 +224,14 @@ expression: diagnostics
     row: 12
     column: 16
   fix:
-    content: sorted(x)
-    location:
-      row: 12
-      column: 0
-    end_location:
-      row: 12
-      column: 16
+    edits:
+      - content: sorted(x)
+        location:
+          row: 12
+          column: 0
+        end_location:
+          row: 12
+          column: 16
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -234,13 +245,14 @@ expression: diagnostics
     row: 13
     column: 17
   fix:
-    content: sorted(x)
-    location:
-      row: 13
-      column: 0
-    end_location:
-      row: 13
-      column: 17
+    edits:
+      - content: sorted(x)
+        location:
+          row: 13
+          column: 0
+        end_location:
+          row: 13
+          column: 17
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -254,13 +266,14 @@ expression: diagnostics
     row: 14
     column: 19
   fix:
-    content: sorted(x)
-    location:
-      row: 14
-      column: 0
-    end_location:
-      row: 14
-      column: 19
+    edits:
+      - content: sorted(x)
+        location:
+          row: 14
+          column: 0
+        end_location:
+          row: 14
+          column: 19
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -274,12 +287,13 @@ expression: diagnostics
     row: 20
     column: 1
   fix:
-    content: "tuple(\n    [x, 3, \"hell\"\\\n        \"o\"]\n    )"
-    location:
-      row: 15
-      column: 0
-    end_location:
-      row: 20
-      column: 1
+    edits:
+      - content: "tuple(\n    [x, 3, \"hell\"\\\n        \"o\"]\n    )"
+        location:
+          row: 15
+          column: 0
+        end_location:
+          row: 20
+          column: 1
   parent: ~
 

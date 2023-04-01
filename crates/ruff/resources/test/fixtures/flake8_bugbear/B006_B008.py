@@ -1,7 +1,9 @@
 import collections
 import datetime as dt
+from decimal import Decimal
 import logging
 import operator
+from pathlib import Path
 import random
 import re
 import time
@@ -164,6 +166,26 @@ def float_int_is_wrong(value=float(3)):
 def float_str_not_inf_or_nan_is_wrong(value=float("3.14")):
     pass
 
+
+# Allow decimals
+def decimal_okay(value=Decimal("0.1")):
+    pass
+
+# Allow dates
+def date_okay(value=dt.date(2023, 3, 27)):
+    pass
+
+# Allow datetimes
+def datetime_okay(value=dt.datetime(2023, 3, 27, 13, 51, 59)):
+    pass
+
+# Allow timedeltas
+def timedelta_okay(value=dt.timedelta(hours=1)):
+    pass
+
+# Allow paths
+def path_okay(value=Path(".")):
+    pass
 
 # B006 and B008
 # We should handle arbitrary nesting of these B008.

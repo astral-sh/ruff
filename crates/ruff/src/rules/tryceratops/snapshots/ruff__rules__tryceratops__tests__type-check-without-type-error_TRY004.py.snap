@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 37
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 36
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 51
     column: 35
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 58
     column: 35
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 65
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 72
     column: 29
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 79
     column: 32
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -143,7 +153,8 @@ expression: diagnostics
   end_location:
     row: 86
     column: 32
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -156,7 +167,8 @@ expression: diagnostics
   end_location:
     row: 97
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -169,7 +181,8 @@ expression: diagnostics
   end_location:
     row: 104
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -182,7 +195,8 @@ expression: diagnostics
   end_location:
     row: 111
     column: 35
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -195,7 +209,8 @@ expression: diagnostics
   end_location:
     row: 118
     column: 33
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -208,7 +223,8 @@ expression: diagnostics
   end_location:
     row: 125
     column: 32
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -221,7 +237,8 @@ expression: diagnostics
   end_location:
     row: 132
     column: 32
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -234,7 +251,8 @@ expression: diagnostics
   end_location:
     row: 139
     column: 31
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -247,7 +265,8 @@ expression: diagnostics
   end_location:
     row: 146
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -260,7 +279,8 @@ expression: diagnostics
   end_location:
     row: 153
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -273,7 +293,8 @@ expression: diagnostics
   end_location:
     row: 160
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -286,7 +307,8 @@ expression: diagnostics
   end_location:
     row: 167
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -299,7 +321,8 @@ expression: diagnostics
   end_location:
     row: 174
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -312,7 +335,8 @@ expression: diagnostics
   end_location:
     row: 181
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -325,7 +349,8 @@ expression: diagnostics
   end_location:
     row: 188
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -338,7 +363,8 @@ expression: diagnostics
   end_location:
     row: 195
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -351,7 +377,8 @@ expression: diagnostics
   end_location:
     row: 202
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -364,7 +391,8 @@ expression: diagnostics
   end_location:
     row: 209
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -377,7 +405,8 @@ expression: diagnostics
   end_location:
     row: 216
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -390,7 +419,8 @@ expression: diagnostics
   end_location:
     row: 223
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -403,7 +433,8 @@ expression: diagnostics
   end_location:
     row: 230
     column: 30
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -416,7 +447,8 @@ expression: diagnostics
   end_location:
     row: 267
     column: 31
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -429,7 +461,8 @@ expression: diagnostics
   end_location:
     row: 277
     column: 31
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: TypeCheckWithoutTypeError
@@ -442,6 +475,7 @@ expression: diagnostics
   end_location:
     row: 288
     column: 31
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

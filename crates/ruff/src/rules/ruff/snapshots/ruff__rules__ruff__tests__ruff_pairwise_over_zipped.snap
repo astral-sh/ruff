@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 17
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 20
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 21
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PairwiseOverZipped
@@ -130,6 +139,7 @@ expression: diagnostics
   end_location:
     row: 25
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

@@ -14,13 +14,14 @@ expression: diagnostics
     row: 3
     column: 18
   fix:
-    content: "with A() as a, B() as b:\n    print(\"hello\")\n"
-    location:
-      row: 2
-      column: 0
-    end_location:
-      row: 5
-      column: 0
+    edits:
+      - content: "with A() as a, B() as b:\n    print(\"hello\")\n"
+        location:
+          row: 2
+          column: 0
+        end_location:
+          row: 5
+          column: 0
   parent: ~
 - kind:
     name: MultipleWithStatements
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 9
     column: 17
   fix:
-    content: "with A(), B():\n    with C():\n        print(\"hello\")\n"
-    location:
-      row: 7
-      column: 0
-    end_location:
-      row: 11
-      column: 0
+    edits:
+      - content: "with A(), B():\n    with C():\n        print(\"hello\")\n"
+        location:
+          row: 7
+          column: 0
+        end_location:
+          row: 11
+          column: 0
   parent: ~
 - kind:
     name: MultipleWithStatements
@@ -53,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: MultipleWithStatements
@@ -67,13 +70,14 @@ expression: diagnostics
     row: 20
     column: 18
   fix:
-    content: "with A() as a, B() as b:\n    # Fixable due to placement of this comment.\n    print(\"hello\")\n"
-    location:
-      row: 19
-      column: 0
-    end_location:
-      row: 23
-      column: 0
+    edits:
+      - content: "with A() as a, B() as b:\n    # Fixable due to placement of this comment.\n    print(\"hello\")\n"
+        location:
+          row: 19
+          column: 0
+        end_location:
+          row: 23
+          column: 0
   parent: ~
 - kind:
     name: MultipleWithStatements
@@ -87,13 +91,14 @@ expression: diagnostics
     row: 54
     column: 22
   fix:
-    content: "    with A() as a, B() as b:\n        \"\"\"this\nis valid\"\"\"\n\n        \"\"\"the indentation on\n            this line is significant\"\"\"\n\n        \"this is\" \\\n\"allowed too\"\n\n        (\"so is\"\n\"this for some reason\")\n"
-    location:
-      row: 53
-      column: 0
-    end_location:
-      row: 66
-      column: 0
+    edits:
+      - content: "    with A() as a, B() as b:\n        \"\"\"this\nis valid\"\"\"\n\n        \"\"\"the indentation on\n            this line is significant\"\"\"\n\n        \"this is\" \\\n\"allowed too\"\n\n        (\"so is\"\n\"this for some reason\")\n"
+        location:
+          row: 53
+          column: 0
+        end_location:
+          row: 66
+          column: 0
   parent: ~
 - kind:
     name: MultipleWithStatements
@@ -107,13 +112,14 @@ expression: diagnostics
     row: 72
     column: 18
   fix:
-    content: "with (\n    A() as a,\n    B() as b,C() as c\n):\n    print(\"hello\")\n"
-    location:
-      row: 68
-      column: 0
-    end_location:
-      row: 74
-      column: 0
+    edits:
+      - content: "with (\n    A() as a,\n    B() as b,C() as c\n):\n    print(\"hello\")\n"
+        location:
+          row: 68
+          column: 0
+        end_location:
+          row: 74
+          column: 0
   parent: ~
 - kind:
     name: MultipleWithStatements
@@ -127,13 +133,14 @@ expression: diagnostics
     row: 80
     column: 6
   fix:
-    content: "with (\n    A() as a, B() as b,\n    C() as c,\n):\n    print(\"hello\")\n"
-    location:
-      row: 76
-      column: 0
-    end_location:
-      row: 82
-      column: 0
+    edits:
+      - content: "with (\n    A() as a, B() as b,\n    C() as c,\n):\n    print(\"hello\")\n"
+        location:
+          row: 76
+          column: 0
+        end_location:
+          row: 82
+          column: 0
   parent: ~
 - kind:
     name: MultipleWithStatements
@@ -147,12 +154,13 @@ expression: diagnostics
     row: 91
     column: 6
   fix:
-    content: "with (\n    A() as a,\n    B() as b,C() as c,\n    D() as d,\n):\n    print(\"hello\")\n"
-    location:
-      row: 84
-      column: 0
-    end_location:
-      row: 93
-      column: 0
+    edits:
+      - content: "with (\n    A() as a,\n    B() as b,C() as c,\n    D() as d,\n):\n    print(\"hello\")\n"
+        location:
+          row: 84
+          column: 0
+        end_location:
+          row: 93
+          column: 0
   parent: ~
 

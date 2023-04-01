@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 1
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousFunctionName
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 5
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: AmbiguousFunctionName
@@ -39,6 +41,7 @@ expression: diagnostics
   end_location:
     row: 10
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

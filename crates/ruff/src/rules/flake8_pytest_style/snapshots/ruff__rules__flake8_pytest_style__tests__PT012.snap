@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 15
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestRaisesWithMultipleStatements
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 36
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestRaisesWithMultipleStatements
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 40
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestRaisesWithMultipleStatements
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 44
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestRaisesWithMultipleStatements
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 48
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestRaisesWithMultipleStatements
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 52
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestRaisesWithMultipleStatements
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 56
     column: 19
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestRaisesWithMultipleStatements
@@ -104,6 +111,7 @@ expression: diagnostics
   end_location:
     row: 64
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

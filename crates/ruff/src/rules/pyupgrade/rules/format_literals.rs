@@ -101,7 +101,7 @@ fn generate_call(
     };
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -111,7 +111,7 @@ fn generate_call(
     call.func = Box::new(match_expression(&cleaned)?);
 
     let mut state = CodegenState {
-        default_newline: stylist.line_ending(),
+        default_newline: &stylist.line_ending(),
         default_indent: stylist.indentation(),
         ..CodegenState::default()
     };
@@ -146,7 +146,7 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
         if let Ok(contents) =
             generate_call(expr, &summary.indexes, checker.locator, checker.stylist)
         {
-            diagnostic.amend(Edit::replacement(
+            diagnostic.set_fix(Edit::replacement(
                 contents,
                 expr.location,
                 expr.end_location.unwrap(),

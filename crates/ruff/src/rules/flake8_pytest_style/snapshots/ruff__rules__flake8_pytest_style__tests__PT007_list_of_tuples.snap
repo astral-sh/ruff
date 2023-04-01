@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 40
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 25
     column: 5
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 24
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 50
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 51
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 61
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 62
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: PytestParametrizeValuesWrongType
@@ -130,6 +139,7 @@ expression: diagnostics
   end_location:
     row: 81
     column: 53
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

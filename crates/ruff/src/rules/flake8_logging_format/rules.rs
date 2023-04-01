@@ -125,6 +125,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
     }
 }
 
+#[derive(Copy, Clone)]
 enum LoggingCallType {
     /// Logging call with a level method, e.g., `logging.info`.
     LevelCall(LoggingLevel),
@@ -177,7 +178,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.amend(Edit::replacement(
+                    diagnostic.set_fix(Edit::replacement(
                         "warning".to_string(),
                         level_call_range.location,
                         level_call_range.end_location,

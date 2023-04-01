@@ -13,7 +13,6 @@ use rustpython_parser::{lexer, Mode, StringKind, Tok};
 use smallvec::{smallvec, SmallVec};
 
 use crate::context::Context;
-use crate::newlines::StrExt;
 use crate::scope::{Binding, BindingKind};
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
 use crate::types::{CallPath, Range};
@@ -1137,32 +1136,6 @@ pub fn first_colon_range(range: Range, locator: &Locator) -> Option<Range> {
             end_location,
         });
     range
-}
-
-/// Given a statement, find its "logical end".
-///
-/// For example: the statement could be following by a trailing semicolon, by an end-of-line
-/// comment, or by any number of continuation lines (and then by a comment, and so on).
-pub fn end_of_statement(stmt: &Stmt, locator: &Locator) -> Location {
-    let contents = locator.skip(stmt.end_location.unwrap());
-
-    // End-of-file, so just return the end of the statement.
-    if contents.is_empty() {
-        return stmt.end_location.unwrap();
-    }
-
-    // Otherwise, find the end of the last line that's "part of" the statement.
-    for (lineno, line) in contents.universal_newlines().enumerate() {
-        if line.ends_with('\\') {
-            continue;
-        }
-        return to_absolute(
-            Location::new(lineno + 1, line.chars().count()),
-            stmt.end_location.unwrap(),
-        );
-    }
-
-    unreachable!("Expected to find end-of-statement")
 }
 
 /// Return the `Range` of the first `Elif` or `Else` token in an `If` statement.

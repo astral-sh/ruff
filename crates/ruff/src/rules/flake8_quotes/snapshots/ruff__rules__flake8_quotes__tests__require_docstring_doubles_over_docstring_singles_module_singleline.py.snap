@@ -14,12 +14,13 @@ expression: diagnostics
     row: 1
     column: 49
   fix:
-    content: "\"\"\" Double quotes singleline module docstring \"\"\""
-    location:
-      row: 1
-      column: 0
-    end_location:
-      row: 1
-      column: 49
+    edits:
+      - content: "\"\"\" Double quotes singleline module docstring \"\"\""
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 49
   parent: ~
 

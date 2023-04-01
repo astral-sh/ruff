@@ -23,7 +23,7 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 pub fn main() -> ExitCode {
-    let mut args: Vec<_> = std::env::args().collect();
+    let mut args: Vec<_> = wild::args().collect();
 
     // Clap doesn't support default subcommands but we want to run `check` by
     // default for convenience and backwards-compatibility, so we just

@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 58
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: EmptyDocstringSection
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 67
     column: 14
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: EmptyDocstringSection
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 87
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: EmptyDocstringSection
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 87
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: EmptyDocstringSection
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 174
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: EmptyDocstringSection
@@ -78,6 +83,7 @@ expression: diagnostics
   end_location:
     row: 271
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

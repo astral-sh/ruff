@@ -14,12 +14,13 @@ expression: diagnostics
     row: 10
     column: 0
   fix:
-    content: "from __future__ import annotations\n\nfrom typing import Any\n\nfrom my_first_party import my_first_party_object\nfrom requests import Session\n\nfrom . import my_local_folder_object\n\n\n\n"
-    location:
-      row: 1
-      column: 0
-    end_location:
-      row: 10
-      column: 0
+    edits:
+      - content: "from __future__ import annotations\n\nfrom typing import Any\n\nfrom my_first_party import my_first_party_object\nfrom requests import Session\n\nfrom . import my_local_folder_object\n\n\n\n"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 10
+          column: 0
   parent: ~
 

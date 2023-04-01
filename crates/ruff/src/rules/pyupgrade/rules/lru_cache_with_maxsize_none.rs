@@ -59,7 +59,7 @@ pub fn lru_cache_with_maxsize_none(checker: &mut Checker, decorator_list: &[Expr
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     if let ExprKind::Attribute { value, ctx, .. } = &func.node {
-                        diagnostic.amend(Edit::replacement(
+                        diagnostic.set_fix(Edit::replacement(
                             unparse_expr(
                                 &create_expr(ExprKind::Attribute {
                                     value: value.clone(),

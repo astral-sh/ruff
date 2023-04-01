@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 11
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedSpacesAroundKeywordParameterEquals
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 2
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedSpacesAroundKeywordParameterEquals
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 6
     column: 8
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedSpacesAroundKeywordParameterEquals
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 8
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedSpacesAroundKeywordParameterEquals
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedSpacesAroundKeywordParameterEquals
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedSpacesAroundKeywordParameterEquals
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 12
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedSpacesAroundKeywordParameterEquals
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 15
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedSpacesAroundKeywordParameterEquals
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 18
     column: 44
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedSpacesAroundKeywordParameterEquals
@@ -130,7 +139,8 @@ expression: diagnostics
   end_location:
     row: 23
     column: 7
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: UnexpectedSpacesAroundKeywordParameterEquals
@@ -143,6 +153,7 @@ expression: diagnostics
   end_location:
     row: 23
     column: 9
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

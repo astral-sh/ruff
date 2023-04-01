@@ -9,12 +9,15 @@ expression: diagnostics
     fixable: false
   location:
     row: 1
-    column: 0
+    column: 7
   end_location:
     row: 1
     column: 25
-  fix: ~
-  parent: ~
+  fix:
+    edits: []
+  parent:
+    row: 1
+    column: 0
 - kind:
     name: ConstantImportedAsNonConstant
     body: "Constant `CONSTANT` imported as non-constant `constant`"
@@ -22,12 +25,15 @@ expression: diagnostics
     fixable: false
   location:
     row: 2
-    column: 0
+    column: 16
   end_location:
     row: 2
     column: 36
-  fix: ~
-  parent: ~
+  fix:
+    edits: []
+  parent:
+    row: 2
+    column: 0
 - kind:
     name: ConstantImportedAsNonConstant
     body: "Constant `ANOTHER_CONSTANT` imported as non-constant `another_constant`"
@@ -35,10 +41,13 @@ expression: diagnostics
     fixable: false
   location:
     row: 3
-    column: 0
+    column: 16
   end_location:
     row: 3
     column: 52
-  fix: ~
-  parent: ~
+  fix:
+    edits: []
+  parent:
+    row: 3
+    column: 0
 

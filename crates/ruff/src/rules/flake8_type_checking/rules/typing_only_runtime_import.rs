@@ -178,19 +178,15 @@ pub fn typing_only_runtime_import(
         // Extract the module base and level from the full name.
         // Ex) `foo.bar.baz` -> `foo`, `0`
         // Ex) `.foo.bar.baz` -> `foo`, `1`
-        let module_base = full_name.split('.').next().unwrap();
         let level = full_name.chars().take_while(|c| *c == '.').count();
 
         // Categorize the import.
         match categorize(
-            module_base,
+            full_name,
             Some(&level),
             &settings.src,
             package,
-            &settings.isort.known_first_party,
-            &settings.isort.known_third_party,
-            &settings.isort.known_local_folder,
-            &settings.isort.extra_standard_library,
+            &settings.isort.known_modules,
             settings.target_version,
         ) {
             ImportType::LocalFolder | ImportType::FirstParty => Some(Diagnostic::new(

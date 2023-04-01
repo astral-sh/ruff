@@ -10,13 +10,15 @@ use ruff::linter::{check_path, LinterResult};
 use ruff::registry::AsRule;
 use ruff::rules::{
     flake8_annotations, flake8_bandit, flake8_bugbear, flake8_builtins, flake8_comprehensions,
-    flake8_errmsg, flake8_implicit_str_concat, flake8_import_conventions, flake8_pytest_style,
-    flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments,
-    isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint, pyupgrade,
+    flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
+    flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
+    flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
+    pyupgrade,
 };
 use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
+use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
@@ -35,19 +37,27 @@ export interface Diagnostic {
         column: number;
     };
     fix: {
-        content: string;
         message: string | null;
-        location: {
-            row: number;
-            column: number;
-        };
-        end_location: {
-            row: number;
-            column: number;
-        };
+        edits: {
+            content: string;
+            location: {
+                row: number;
+                column: number;
+            };
+            end_location: {
+                row: number;
+                column: number;
+            };
+        }[];
     } | null;
 };
 "#;
+
+#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
+pub struct ExpandedFix {
+    message: Option<String>,
+    edits: Vec<Edit>,
+}
 
 #[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
 pub struct ExpandedMessage {
@@ -56,14 +66,6 @@ pub struct ExpandedMessage {
     pub location: Location,
     pub end_location: Location,
     pub fix: Option<ExpandedFix>,
-}
-
-#[derive(Serialize, Deserialize, Eq, PartialEq, Debug)]
-pub struct ExpandedFix {
-    content: String,
-    message: Option<String>,
-    location: Location,
-    end_location: Location,
 }
 
 #[wasm_bindgen(start)]
@@ -135,6 +137,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         flake8_pytest_style: Some(flake8_pytest_style::settings::Settings::default().into()),
         flake8_quotes: Some(flake8_quotes::settings::Settings::default().into()),
         flake8_self: Some(flake8_self::settings::Settings::default().into()),
+        flake8_gettext: Some(flake8_gettext::settings::Settings::default().into()),
         flake8_implicit_str_concat: Some(
             flake8_implicit_str_concat::settings::Settings::default().into(),
         ),
@@ -172,7 +175,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let locator = Locator::new(contents);
 
     // Detect the current code style (lazily).
-    let stylist = Stylist::from_contents(contents, &locator);
+    let stylist = Stylist::from_tokens(&tokens, &locator);
 
     // Extra indices from the code.
     let indexer: Indexer = tokens.as_slice().into();
@@ -205,12 +208,14 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
             message: message.kind.body,
             location: message.location,
             end_location: message.end_location,
-            fix: message.fix.map(|fix| ExpandedFix {
-                content: fix.content,
-                message: message.kind.suggestion,
-                location: fix.location,
-                end_location: fix.end_location,
-            }),
+            fix: if message.fix.is_empty() {
+                None
+            } else {
+                Some(ExpandedFix {
+                    message: message.kind.suggestion,
+                    edits: message.fix.edits().to_vec(),
+                })
+            },
         })
         .collect();
 

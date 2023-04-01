@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 3
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FStringDocstring
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FStringDocstring
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FStringDocstring
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 30
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FStringDocstring
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 38
     column: 28
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FStringDocstring
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 46
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FStringDocstring
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 54
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FStringDocstring
@@ -104,7 +111,8 @@ expression: diagnostics
   end_location:
     row: 62
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FStringDocstring
@@ -117,7 +125,8 @@ expression: diagnostics
   end_location:
     row: 70
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FStringDocstring
@@ -130,6 +139,7 @@ expression: diagnostics
   end_location:
     row: 74
     column: 48
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

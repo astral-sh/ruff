@@ -14,13 +14,14 @@ expression: diagnostics
     row: 1
     column: 17
   fix:
-    content: "[1, 2]"
-    location:
-      row: 1
-      column: 5
-    end_location:
-      row: 1
-      column: 17
+    edits:
+      - content: "[1, 2]"
+        location:
+          row: 1
+          column: 5
+        end_location:
+          row: 1
+          column: 17
   parent: ~
 - kind:
     name: UnnecessaryLiteralWithinListCall
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 2
     column: 17
   fix:
-    content: "[1, 2]"
-    location:
-      row: 2
-      column: 5
-    end_location:
-      row: 2
-      column: 17
+    edits:
+      - content: "[1, 2]"
+        location:
+          row: 2
+          column: 5
+        end_location:
+          row: 2
+          column: 17
   parent: ~
 - kind:
     name: UnnecessaryLiteralWithinListCall
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 3
     column: 13
   fix:
-    content: "[]"
-    location:
-      row: 3
-      column: 5
-    end_location:
-      row: 3
-      column: 13
+    edits:
+      - content: "[]"
+        location:
+          row: 3
+          column: 5
+        end_location:
+          row: 3
+          column: 13
   parent: ~
 - kind:
     name: UnnecessaryLiteralWithinListCall
@@ -74,12 +77,13 @@ expression: diagnostics
     row: 4
     column: 13
   fix:
-    content: "[]"
-    location:
-      row: 4
-      column: 5
-    end_location:
-      row: 4
-      column: 13
+    edits:
+      - content: "[]"
+        location:
+          row: 4
+          column: 5
+        end_location:
+          row: 4
+          column: 13
   parent: ~
 

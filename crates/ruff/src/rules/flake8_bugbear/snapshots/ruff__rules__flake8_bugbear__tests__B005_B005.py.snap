@@ -13,7 +13,8 @@ expression: diagnostics
   end_location:
     row: 4
     column: 24
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StripWithMultiCharacters
@@ -26,7 +27,8 @@ expression: diagnostics
   end_location:
     row: 7
     column: 17
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StripWithMultiCharacters
@@ -39,7 +41,8 @@ expression: diagnostics
   end_location:
     row: 10
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StripWithMultiCharacters
@@ -52,7 +55,8 @@ expression: diagnostics
   end_location:
     row: 13
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StripWithMultiCharacters
@@ -65,7 +69,8 @@ expression: diagnostics
   end_location:
     row: 16
     column: 25
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StripWithMultiCharacters
@@ -78,7 +83,8 @@ expression: diagnostics
   end_location:
     row: 19
     column: 18
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StripWithMultiCharacters
@@ -91,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 22
     column: 13
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: StripWithMultiCharacters
@@ -104,6 +111,7 @@ expression: diagnostics
   end_location:
     row: 24
     column: 35
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 

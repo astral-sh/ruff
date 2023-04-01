@@ -14,13 +14,14 @@ expression: diagnostics
     row: 6
     column: 19
   fix:
-    content: "\"{}\".format(*args)"
-    location:
-      row: 6
-      column: 0
-    end_location:
-      row: 6
-      column: 19
+    edits:
+      - content: "\"{}\".format(*args)"
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 6
+          column: 19
   parent: ~
 - kind:
     name: FormatLiterals
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 8
     column: 22
   fix:
-    content: "\"{}\".format(**kwargs)"
-    location:
-      row: 8
-      column: 0
-    end_location:
-      row: 8
-      column: 22
+    edits:
+      - content: "\"{}\".format(**kwargs)"
+        location:
+          row: 8
+          column: 0
+        end_location:
+          row: 8
+          column: 22
   parent: ~
 - kind:
     name: FormatLiterals
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 10
     column: 23
   fix:
-    content: "\"{}_{}\".format(*args)"
-    location:
-      row: 10
-      column: 0
-    end_location:
-      row: 10
-      column: 23
+    edits:
+      - content: "\"{}_{}\".format(*args)"
+        location:
+          row: 10
+          column: 0
+        end_location:
+          row: 10
+          column: 23
   parent: ~
 - kind:
     name: FormatLiterals
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 12
     column: 26
   fix:
-    content: "\"{}_{}\".format(1, *args)"
-    location:
-      row: 12
-      column: 0
-    end_location:
-      row: 12
-      column: 26
+    edits:
+      - content: "\"{}_{}\".format(1, *args)"
+        location:
+          row: 12
+          column: 0
+        end_location:
+          row: 12
+          column: 26
   parent: ~
 - kind:
     name: FormatLiterals
@@ -93,7 +97,8 @@ expression: diagnostics
   end_location:
     row: 14
     column: 23
-  fix: ~
+  fix:
+    edits: []
   parent: ~
 - kind:
     name: FormatLiterals
@@ -107,13 +112,14 @@ expression: diagnostics
     row: 16
     column: 26
   fix:
-    content: "\"{}_{}\".format(*args, 1)"
-    location:
-      row: 16
-      column: 0
-    end_location:
-      row: 16
-      column: 26
+    edits:
+      - content: "\"{}_{}\".format(*args, 1)"
+        location:
+          row: 16
+          column: 0
+        end_location:
+          row: 16
+          column: 26
   parent: ~
 - kind:
     name: FormatLiterals
@@ -127,13 +133,14 @@ expression: diagnostics
     row: 18
     column: 29
   fix:
-    content: "\"{}_{}\".format(1, 2, *args)"
-    location:
-      row: 18
-      column: 0
-    end_location:
-      row: 18
-      column: 29
+    edits:
+      - content: "\"{}_{}\".format(1, 2, *args)"
+        location:
+          row: 18
+          column: 0
+        end_location:
+          row: 18
+          column: 29
   parent: ~
 - kind:
     name: FormatLiterals
@@ -147,13 +154,14 @@ expression: diagnostics
     row: 20
     column: 29
   fix:
-    content: "\"{}_{}\".format(*args, 1, 2)"
-    location:
-      row: 20
-      column: 0
-    end_location:
-      row: 20
-      column: 29
+    edits:
+      - content: "\"{}_{}\".format(*args, 1, 2)"
+        location:
+          row: 20
+          column: 0
+        end_location:
+          row: 20
+          column: 29
   parent: ~
 - kind:
     name: FormatLiterals
@@ -167,13 +175,14 @@ expression: diagnostics
     row: 22
     column: 33
   fix:
-    content: "\"{}_{}_{}\".format(1, **kwargs)"
-    location:
-      row: 22
-      column: 0
-    end_location:
-      row: 22
-      column: 33
+    edits:
+      - content: "\"{}_{}_{}\".format(1, **kwargs)"
+        location:
+          row: 22
+          column: 0
+        end_location:
+          row: 22
+          column: 33
   parent: ~
 - kind:
     name: FormatLiterals
@@ -187,13 +196,14 @@ expression: diagnostics
     row: 24
     column: 36
   fix:
-    content: "\"{}_{}_{}\".format(1, 2, **kwargs)"
-    location:
-      row: 24
-      column: 0
-    end_location:
-      row: 24
-      column: 36
+    edits:
+      - content: "\"{}_{}_{}\".format(1, 2, **kwargs)"
+        location:
+          row: 24
+          column: 0
+        end_location:
+          row: 24
+          column: 36
   parent: ~
 - kind:
     name: FormatLiterals
@@ -207,13 +217,14 @@ expression: diagnostics
     row: 26
     column: 39
   fix:
-    content: "\"{}_{}_{}\".format(1, 2, 3, **kwargs)"
-    location:
-      row: 26
-      column: 0
-    end_location:
-      row: 26
-      column: 39
+    edits:
+      - content: "\"{}_{}_{}\".format(1, 2, 3, **kwargs)"
+        location:
+          row: 26
+          column: 0
+        end_location:
+          row: 26
+          column: 39
   parent: ~
 - kind:
     name: FormatLiterals
@@ -227,12 +238,13 @@ expression: diagnostics
     row: 28
     column: 46
   fix:
-    content: "\"{}_{}_{}\".format(1, 2, 3, *args, **kwargs)"
-    location:
-      row: 28
-      column: 0
-    end_location:
-      row: 28
-      column: 46
+    edits:
+      - content: "\"{}_{}_{}\".format(1, 2, 3, *args, **kwargs)"
+        location:
+          row: 28
+          column: 0
+        end_location:
+          row: 28
+          column: 46
   parent: ~
 

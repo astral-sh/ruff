@@ -30,7 +30,7 @@ impl Violation for BadStrStripCall {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum StripKind {
     Strip,
     LStrip,
@@ -59,14 +59,14 @@ impl fmt::Display for StripKind {
     }
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
 pub enum RemovalKind {
     RemovePrefix,
     RemoveSuffix,
 }
 
 impl RemovalKind {
-    pub fn for_strip(s: &StripKind) -> Option<Self> {
+    pub fn for_strip(s: StripKind) -> Option<Self> {
         match s {
             StripKind::Strip => None,
             StripKind::LStrip => Some(Self::RemovePrefix),
@@ -126,7 +126,7 @@ pub fn bad_str_strip_call(checker: &mut Checker, func: &Expr, args: &[Expr]) {
                         if has_duplicates(value) {
                             let removal = if checker.settings.target_version >= PythonVersion::Py39
                             {
-                                RemovalKind::for_strip(&strip)
+                                RemovalKind::for_strip(strip)
                             } else {
                                 None
                             };

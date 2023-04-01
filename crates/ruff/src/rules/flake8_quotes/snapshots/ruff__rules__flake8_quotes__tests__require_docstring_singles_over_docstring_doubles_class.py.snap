@@ -14,13 +14,14 @@ expression: diagnostics
     row: 2
     column: 53
   fix:
-    content: "''' Double quotes single line class docstring '''"
-    location:
-      row: 2
-      column: 4
-    end_location:
-      row: 2
-      column: 53
+    edits:
+      - content: "''' Double quotes single line class docstring '''"
+        location:
+          row: 2
+          column: 4
+        end_location:
+          row: 2
+          column: 53
   parent: ~
 - kind:
     name: BadQuotesDocstring
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 6
     column: 57
   fix:
-    content: "''' Double quotes single line method docstring'''"
-    location:
-      row: 6
-      column: 8
-    end_location:
-      row: 6
-      column: 57
+    edits:
+      - content: "''' Double quotes single line method docstring'''"
+        location:
+          row: 6
+          column: 8
+        end_location:
+          row: 6
+          column: 57
   parent: ~
 - kind:
     name: BadQuotesDocstring
@@ -54,12 +56,13 @@ expression: diagnostics
     row: 9
     column: 52
   fix:
-    content: "''' inline docstring '''"
-    location:
-      row: 9
-      column: 28
-    end_location:
-      row: 9
-      column: 52
+    edits:
+      - content: "''' inline docstring '''"
+        location:
+          row: 9
+          column: 28
+        end_location:
+          row: 9
+          column: 52
   parent: ~
 

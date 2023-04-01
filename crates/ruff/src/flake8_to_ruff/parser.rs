@@ -54,7 +54,7 @@ struct Token {
     src: String,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Copy, Clone)]
 enum TokenType {
     Code,
     File,

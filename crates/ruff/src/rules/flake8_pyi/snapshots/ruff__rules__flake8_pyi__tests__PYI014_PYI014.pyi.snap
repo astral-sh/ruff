@@ -14,13 +14,14 @@ expression: diagnostics
     row: 3
     column: 16
   fix:
-    content: "..."
-    location:
-      row: 3
-      column: 6
-    end_location:
-      row: 3
-      column: 16
+    edits:
+      - content: "..."
+        location:
+          row: 3
+          column: 6
+        end_location:
+          row: 3
+          column: 16
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -34,13 +35,14 @@ expression: diagnostics
     row: 32
     column: 5
   fix:
-    content: "..."
-    location:
-      row: 29
-      column: 6
-    end_location:
-      row: 32
-      column: 5
+    edits:
+      - content: "..."
+        location:
+          row: 29
+          column: 6
+        end_location:
+          row: 32
+          column: 5
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -54,13 +56,14 @@ expression: diagnostics
     row: 47
     column: 5
   fix:
-    content: "..."
-    location:
-      row: 35
-      column: 6
-    end_location:
-      row: 47
-      column: 5
+    edits:
+      - content: "..."
+        location:
+          row: 35
+          column: 6
+        end_location:
+          row: 47
+          column: 5
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -74,13 +77,14 @@ expression: diagnostics
     row: 53
     column: 5
   fix:
-    content: "..."
-    location:
-      row: 50
-      column: 6
-    end_location:
-      row: 53
-      column: 5
+    edits:
+      - content: "..."
+        location:
+          row: 50
+          column: 6
+        end_location:
+          row: 53
+          column: 5
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -94,13 +98,14 @@ expression: diagnostics
     row: 56
     column: 18
   fix:
-    content: "..."
-    location:
-      row: 56
-      column: 6
-    end_location:
-      row: 56
-      column: 18
+    edits:
+      - content: "..."
+        location:
+          row: 56
+          column: 6
+        end_location:
+          row: 56
+          column: 18
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -114,13 +119,14 @@ expression: diagnostics
     row: 59
     column: 21
   fix:
-    content: "..."
-    location:
-      row: 59
-      column: 6
-    end_location:
-      row: 59
-      column: 21
+    edits:
+      - content: "..."
+        location:
+          row: 59
+          column: 6
+        end_location:
+          row: 59
+          column: 21
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -134,13 +140,14 @@ expression: diagnostics
     row: 61
     column: 45
   fix:
-    content: "..."
-    location:
-      row: 61
-      column: 10
-    end_location:
-      row: 61
-      column: 45
+    edits:
+      - content: "..."
+        location:
+          row: 61
+          column: 10
+        end_location:
+          row: 61
+          column: 45
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -154,13 +161,14 @@ expression: diagnostics
     row: 63
     column: 19
   fix:
-    content: "..."
-    location:
-      row: 63
-      column: 6
-    end_location:
-      row: 63
-      column: 19
+    edits:
+      - content: "..."
+        location:
+          row: 63
+          column: 6
+        end_location:
+          row: 63
+          column: 19
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -174,13 +182,14 @@ expression: diagnostics
     row: 66
     column: 21
   fix:
-    content: "..."
-    location:
-      row: 66
-      column: 6
-    end_location:
-      row: 66
-      column: 21
+    edits:
+      - content: "..."
+        location:
+          row: 66
+          column: 6
+        end_location:
+          row: 66
+          column: 21
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -194,13 +203,14 @@ expression: diagnostics
     row: 69
     column: 15
   fix:
-    content: "..."
-    location:
-      row: 69
-      column: 6
-    end_location:
-      row: 69
-      column: 15
+    edits:
+      - content: "..."
+        location:
+          row: 69
+          column: 6
+        end_location:
+          row: 69
+          column: 15
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -214,13 +224,14 @@ expression: diagnostics
     row: 72
     column: 11
   fix:
-    content: "..."
-    location:
-      row: 72
-      column: 6
-    end_location:
-      row: 72
-      column: 11
+    edits:
+      - content: "..."
+        location:
+          row: 72
+          column: 6
+        end_location:
+          row: 72
+          column: 11
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -234,13 +245,14 @@ expression: diagnostics
     row: 75
     column: 13
   fix:
-    content: "..."
-    location:
-      row: 75
-      column: 6
-    end_location:
-      row: 75
-      column: 13
+    edits:
+      - content: "..."
+        location:
+          row: 75
+          column: 6
+        end_location:
+          row: 75
+          column: 13
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -254,12 +266,13 @@ expression: diagnostics
     row: 78
     column: 19
   fix:
-    content: "..."
-    location:
-      row: 78
-      column: 6
-    end_location:
-      row: 78
-      column: 19
+    edits:
+      - content: "..."
+        location:
+          row: 78
+          column: 6
+        end_location:
+          row: 78
+          column: 19
   parent: ~
 
