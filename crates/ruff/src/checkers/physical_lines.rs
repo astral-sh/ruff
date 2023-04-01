@@ -58,7 +58,6 @@ pub fn check_physical_lines(
     let mut commented_lines_iter = commented_lines.iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
     let mut in_quote = false;
-    let _quote_block_delimiter: Option<&str> = None;
 
     for (index, line) in locator.contents().universal_newlines().enumerate() {
         while commented_lines_iter
@@ -200,15 +199,21 @@ pub fn check_physical_lines(
 
 /// Finds the first delimiter which occurs on a line, and returns both the delimiter and how many
 /// times it appears
-fn find_delimiter(line: &str) -> (Option<&str>, i32) {
+fn find_delimiter(line: &str) -> (Option<&str>, i64) {
     let delimiters = vec!["\"\"\"", "'''"];
 
     let mut delimiter_string = None;
     let mut delimiter_count = 0;
     for delimiter in delimiters {
         if line.contains(delimiter) {
-            delimiter_count = line.matches(delimiter).count() as i32;
+            // If something went wrong while parsing, the most common case is one triple-quote occurrence on a
+            // single line
+            delimiter_count = i64::try_from(line.matches(delimiter).count())
+                .ok()
+                .unwrap_or(1i64);
             delimiter_string = Some(delimiter);
+            // Break so we don't overwrite - i.e. """ '''hello''' """
+            break;
         }
     }
 
