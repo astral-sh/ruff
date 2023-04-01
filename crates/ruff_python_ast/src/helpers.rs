@@ -9,7 +9,7 @@ use rustpython_parser::ast::{
     Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
     Located, Location, MatchCase, Pattern, PatternKind, Stmt, StmtKind,
 };
-use rustpython_parser::{lexer, Mode, StringKind, Tok};
+use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::{smallvec, SmallVec};
 
 use crate::context::Context;
@@ -1053,43 +1053,6 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> Range {
         })
         .expect("Failed to find `except` range");
     range
-}
-
-/// Find f-strings that don't contain any formatted values in a `JoinedStr`.
-pub fn find_useless_f_strings(expr: &Expr, locator: &Locator) -> Vec<(Range, Range)> {
-    let contents = locator.slice(expr);
-    lexer::lex_located(contents, Mode::Module, expr.location)
-        .flatten()
-        .filter_map(|(location, tok, end_location)| match tok {
-            Tok::String {
-                kind: StringKind::FString | StringKind::RawFString,
-                ..
-            } => {
-                let first_char = locator.slice(Range {
-                    location,
-                    end_location: Location::new(location.row(), location.column() + 1),
-                });
-                // f"..."  => f_position = 0
-                // fr"..." => f_position = 0
-                // rf"..." => f_position = 1
-                let f_position = usize::from(!(first_char == "f" || first_char == "F"));
-                Some((
-                    Range {
-                        location: Location::new(location.row(), location.column() + f_position),
-                        end_location: Location::new(
-                            location.row(),
-                            location.column() + f_position + 1,
-                        ),
-                    },
-                    Range {
-                        location,
-                        end_location,
-                    },
-                ))
-            }
-            _ => None,
-        })
-        .collect()
 }
 
 /// Return the `Range` of `else` in `For`, `AsyncFor`, and `While` statements.
