@@ -2,7 +2,8 @@ use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::scope::{Binding, BindingKind, Bindings, Scope};
+use ruff_python_ast::binding::{Binding, BindingKind, Bindings};
+use ruff_python_ast::scope::Scope;
 use ruff_python_ast::types::Range;
 
 use crate::autofix::helpers::remove_argument;
