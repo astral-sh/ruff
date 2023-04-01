@@ -1,7 +1,8 @@
 use rustpython_parser::ast::Expr;
 
+use crate::call_path::to_call_path;
 use crate::context::Context;
-use crate::helpers::{map_callable, to_call_path};
+use crate::helpers::map_callable;
 use crate::scope::{Scope, ScopeKind};
 
 const CLASS_METHODS: [&str; 3] = ["__new__", "__init_subclass__", "__class_getitem__"];

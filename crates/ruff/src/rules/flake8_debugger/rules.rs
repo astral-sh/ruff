@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::format_call_path;
+use ruff_python_ast::call_path::format_call_path;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;

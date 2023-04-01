@@ -8,7 +8,7 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::collect_call_path;
+use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::indentation;

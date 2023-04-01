@@ -1,7 +1,8 @@
 use num_traits::identities::Zero;
+use ruff_python_ast::call_path::collect_call_path;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
-use ruff_python_ast::helpers::{collect_call_path, map_callable};
+use ruff_python_ast::helpers::map_callable;
 
 use crate::checkers::ast::Checker;
 

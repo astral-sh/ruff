@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation, CacheKey};
-use ruff_python_ast::types::{CallPath, Range};
+use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 

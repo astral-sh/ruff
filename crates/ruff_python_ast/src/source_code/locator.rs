@@ -208,8 +208,9 @@ impl Utf8Index {
 
 #[cfg(test)]
 mod tests {
-    use crate::source_code::locator::{AsciiIndex, Index, Utf8Index};
     use rustpython_parser::ast::Location;
+
+    use crate::source_code::locator::{AsciiIndex, Index, Utf8Index};
 
     fn index_ascii(content: &str) -> AsciiIndex {
         match Index::from(content) {

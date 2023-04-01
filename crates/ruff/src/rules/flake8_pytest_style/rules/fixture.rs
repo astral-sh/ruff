@@ -4,7 +4,8 @@ use rustpython_parser::ast::{Arguments, Expr, ExprKind, Keyword, Location, Stmt,
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{collect_arg_names, collect_call_path};
+use ruff_python_ast::call_path::collect_call_path;
+use ruff_python_ast::helpers::collect_arg_names;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor;

@@ -1,6 +1,7 @@
-use crate::context::Context;
-use crate::helpers::collect_call_path;
 use rustpython_parser::ast::{Expr, ExprKind};
+
+use crate::call_path::collect_call_path;
+use crate::context::Context;
 
 #[derive(Copy, Clone)]
 pub enum LoggingLevel {
