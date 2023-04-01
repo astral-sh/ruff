@@ -99,6 +99,7 @@ if os.path.exists(os.path.join(path, PEP8_BIN)):
 	       self._pep8_options(targetfile))
 #: W191
 '''     multiline string with tab in it, same lines'''
+"""     here we're using '''different delimiters'''"""
 '''
 	multiline string with tab in it, different lines
 '''
