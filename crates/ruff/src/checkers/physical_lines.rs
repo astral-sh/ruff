@@ -140,7 +140,7 @@ pub fn check_physical_lines(
         }
 
         if enforce_line_too_long
-            && !doc_line_length_takes_precedence(enforce_doc_line_too_long, doc_lines, &index)
+            && !doc_line_length_takes_precedence(enforce_doc_line_too_long, doc_lines, index)
         {
             if let Some(diagnostic) = line_too_long(index, line, settings) {
                 diagnostics.push(diagnostic);

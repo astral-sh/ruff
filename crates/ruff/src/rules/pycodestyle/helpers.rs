@@ -59,7 +59,7 @@ pub fn is_overlong(
 pub fn doc_line_length_takes_precedence(
     doc_line_length_is_set: bool,
     doc_lines: &[usize],
-    idx: &usize,
+    idx: usize,
 ) -> bool {
     doc_line_length_is_set && doc_lines.contains(&(idx + 1))
 }
