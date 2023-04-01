@@ -27,9 +27,7 @@ use ruff_python_ast::typing::{
     match_annotated_subscript, parse_type_annotation, Callable, SubscriptKind,
 };
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
-use ruff_python_ast::{
-    branch_detection, cast, helpers, operations, str, typing, visibility, visitor,
-};
+use ruff_python_ast::{branch_detection, cast, helpers, str, typing, visibility, visitor};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 
@@ -187,7 +185,7 @@ where
                 self.ctx.futures_allowed = false;
                 if !self.ctx.seen_import_boundary
                     && !helpers::is_assignment_to_a_dunder(stmt)
-                    && !operations::in_nested_block(self.ctx.parents.iter().rev().map(Into::into))
+                    && !helpers::in_nested_block(self.ctx.parents.iter().rev().map(Into::into))
                 {
                     self.ctx.seen_import_boundary = true;
                 }
@@ -1904,8 +1902,8 @@ where
                 self.ctx.visible_scope = scope;
 
                 // If any global bindings don't already exist in the global scope, add it.
-                let globals = operations::extract_globals(body);
-                for (name, stmt) in operations::extract_globals(body) {
+                let globals = helpers::extract_globals(body);
+                for (name, stmt) in helpers::extract_globals(body) {
                     if self
                         .ctx
                         .global_scope()
@@ -1967,7 +1965,7 @@ where
                 self.ctx.visible_scope = scope;
 
                 // If any global bindings don't already exist in the global scope, add it.
-                let globals = operations::extract_globals(body);
+                let globals = helpers::extract_globals(body);
                 for (name, stmt) in &globals {
                     if self
                         .ctx
@@ -4401,7 +4399,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        if operations::is_unpacking_assignment(parent, expr) {
+        if helpers::is_unpacking_assignment(parent, expr) {
             self.add_binding(
                 id,
                 Binding {
@@ -4504,7 +4502,7 @@ impl<'a> Checker<'a> {
         let ExprKind::Name { id, .. } = &expr.node else {
             return;
         };
-        if operations::on_conditional_branch(&mut self.ctx.parents.iter().rev().map(Into::into)) {
+        if helpers::on_conditional_branch(&mut self.ctx.parents.iter().rev().map(Into::into)) {
             return;
         }
 

@@ -9,7 +9,6 @@ pub mod helpers;
 pub mod imports;
 pub mod logging;
 pub mod newlines;
-pub mod operations;
 pub mod relocate;
 pub mod scope;
 pub mod source_code;
