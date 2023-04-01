@@ -11,6 +11,7 @@ use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective
 use crate::rules::flake8_executable::rules::{
     shebang_missing, shebang_newline, shebang_not_executable, shebang_python, shebang_whitespace,
 };
+use crate::rules::pycodestyle::helpers::doc_line_length_takes_precedence;
 use crate::rules::pycodestyle::rules::{
     doc_line_too_long, line_too_long, mixed_spaces_and_tabs, no_newline_at_end_of_file,
     tab_indentation, trailing_whitespace,
@@ -138,7 +139,8 @@ pub fn check_physical_lines(
             }
         }
 
-        if enforce_line_too_long {
+        
+        if enforce_line_too_long && !doc_line_length_takes_precedence(enforce_doc_line_too_long, doc_lines, &index) {
             if let Some(diagnostic) = line_too_long(index, line, settings) {
                 diagnostics.push(diagnostic);
             }

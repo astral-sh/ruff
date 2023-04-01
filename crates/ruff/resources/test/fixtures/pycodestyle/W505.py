@@ -11,5 +11,6 @@ def f():
 
     print("Here's a string that's over the limit, but it's not a docstring.")
 
-
-"This is also considered a docstring, and is over the limit."
+qweruyqwoeruiyqweruioqyweroiquwyeroqiuweyrqwoieuryqwoeiruyqweoiruyqweoriuqyweroiuqwyeoriuqwyeroqiweuryqwoeiuryqweoiruyqweioruyqweoriuqyweorqwuyerqowieuryqweoiuryqwoeiry = 10
+# update: let W505 overrides E501
+"This is also considered a docstring, and is over the limit. This is also considered a docstring, and is over the limit. This is also considered a docstring, and is over the limit. This is also considered a docstring, and is over the limit."
