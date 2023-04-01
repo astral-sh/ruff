@@ -9,4 +9,8 @@ def main():
     quit(1)
 
 
-sys.exit(2)
+def main():
+    sys = 1
+
+    exit(1)
+    quit(1)

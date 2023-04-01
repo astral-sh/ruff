@@ -128,4 +128,39 @@ expression: diagnostics
           row: 16
           column: 46
   parent: ~
+- kind:
+    name: DuplicateIsinstanceCall
+    body: "Multiple `isinstance` calls for expression, merge into a single call"
+    suggestion: "Merge `isinstance` calls"
+    fixable: true
+  location:
+    row: 19
+    column: 3
+  end_location:
+    row: 19
+    column: 49
+  fix:
+    edits:
+      - content: "isinstance(a.b, (int, float))"
+        location:
+          row: 19
+          column: 3
+        end_location:
+          row: 19
+          column: 49
+  parent: ~
+- kind:
+    name: DuplicateIsinstanceCall
+    body: "Multiple `isinstance` calls for expression, merge into a single call"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 22
+    column: 3
+  end_location:
+    row: 22
+    column: 49
+  fix:
+    edits: []
+  parent: ~
 

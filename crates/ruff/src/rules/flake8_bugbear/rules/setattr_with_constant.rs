@@ -6,7 +6,6 @@ use ruff_python_ast::helpers::unparse_stmt;
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::types::Range;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
-use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -69,7 +68,7 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     if !is_identifier(name) {
         return;
     }
-    if KWLIST.contains(&name.as_str()) || is_mangled_private(name.as_str()) {
+    if is_mangled_private(name.as_str()) {
         return;
     }
     // We can only replace a `setattr` call (which is an `Expr`) with an assignment

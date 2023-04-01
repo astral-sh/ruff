@@ -55,7 +55,7 @@ pub enum AnnotatedImport<'a> {
     ImportFrom {
         module: Option<&'a str>,
         names: Vec<AnnotatedAliasData<'a>>,
-        level: Option<&'a usize>,
+        level: Option<usize>,
         atop: Vec<Comment<'a>>,
         inline: Vec<Comment<'a>>,
         trailing_comma: TrailingComma,

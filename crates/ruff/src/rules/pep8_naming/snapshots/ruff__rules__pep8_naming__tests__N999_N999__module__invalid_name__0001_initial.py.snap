@@ -1,0 +1,19 @@
+---
+source: crates/ruff/src/rules/pep8_naming/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: InvalidModuleName
+    body: "Invalid module name: '0001_initial'"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 0
+  fix:
+    edits: []
+  parent: ~
+

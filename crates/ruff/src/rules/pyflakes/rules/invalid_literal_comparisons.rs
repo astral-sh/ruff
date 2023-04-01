@@ -23,7 +23,7 @@ impl From<&Cmpop> for IsCmpop {
         match cmpop {
             Cmpop::Is => IsCmpop::Is,
             Cmpop::IsNot => IsCmpop::IsNot,
-            _ => unreachable!("Expected Cmpop::Is | Cmpop::IsNot"),
+            _ => panic!("Expected Cmpop::Is | Cmpop::IsNot"),
         }
     }
 }

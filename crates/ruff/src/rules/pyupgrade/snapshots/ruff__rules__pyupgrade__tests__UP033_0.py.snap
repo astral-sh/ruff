@@ -15,6 +15,13 @@ expression: diagnostics
     column: 34
   fix:
     edits:
+      - content: import functools
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 16
       - content: functools.cache
         location:
           row: 4
@@ -36,6 +43,13 @@ expression: diagnostics
     column: 34
   fix:
     edits:
+      - content: import functools
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 16
       - content: functools.cache
         location:
           row: 10
@@ -57,6 +71,13 @@ expression: diagnostics
     column: 34
   fix:
     edits:
+      - content: import functools
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 16
       - content: functools.cache
         location:
           row: 15

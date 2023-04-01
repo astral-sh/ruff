@@ -42,7 +42,7 @@ fn collect_names(expr: &Expr) -> Vec<&str> {
     match &expr.node {
         ExprKind::Name { id, .. } => vec![id],
         ExprKind::Tuple { elts, .. } => elts.iter().flat_map(collect_names).collect(),
-        _ => unreachable!("Expected: ExprKind::Name | ExprKind::Tuple"),
+        _ => panic!("Expected: ExprKind::Name | ExprKind::Tuple"),
     }
 }
 

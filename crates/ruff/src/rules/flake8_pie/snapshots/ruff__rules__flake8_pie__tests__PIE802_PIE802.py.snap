@@ -8,19 +8,19 @@ expression: diagnostics
     suggestion: Remove unnecessary list comprehension
     fixable: true
   location:
-    row: 9
+    row: 2
     column: 4
   end_location:
-    row: 9
+    row: 2
     column: 23
   fix:
     edits:
       - content: any(x.id for x in bar)
         location:
-          row: 9
+          row: 2
           column: 0
         end_location:
-          row: 9
+          row: 2
           column: 24
   parent: ~
 - kind:
@@ -29,19 +29,19 @@ expression: diagnostics
     suggestion: Remove unnecessary list comprehension
     fixable: true
   location:
-    row: 10
+    row: 3
     column: 4
   end_location:
-    row: 10
+    row: 3
     column: 23
   fix:
     edits:
       - content: all(x.id for x in bar)
         location:
-          row: 10
+          row: 3
           column: 0
         end_location:
-          row: 10
+          row: 3
           column: 24
   parent: ~
 - kind:
@@ -50,19 +50,19 @@ expression: diagnostics
     suggestion: Remove unnecessary list comprehension
     fixable: true
   location:
-    row: 12
+    row: 5
     column: 4
   end_location:
-    row: 12
+    row: 5
     column: 23
   fix:
     edits:
       - content: "any(  # first comment\n    x.id for x in bar  # second comment\n)"
         location:
-          row: 11
+          row: 4
           column: 0
         end_location:
-          row: 13
+          row: 6
           column: 1
   parent: ~
 - kind:
@@ -71,19 +71,33 @@ expression: diagnostics
     suggestion: Remove unnecessary list comprehension
     fixable: true
   location:
-    row: 15
+    row: 8
     column: 4
   end_location:
-    row: 15
+    row: 8
     column: 23
   fix:
     edits:
       - content: "all(  # first comment\n    x.id for x in bar  # second comment\n)"
         location:
-          row: 14
+          row: 7
           column: 0
         end_location:
-          row: 16
+          row: 9
           column: 1
+  parent: ~
+- kind:
+    name: UnnecessaryComprehensionAnyAll
+    body: Unnecessary list comprehension.
+    suggestion: Remove unnecessary list comprehension
+    fixable: true
+  location:
+    row: 10
+    column: 4
+  end_location:
+    row: 10
+    column: 23
+  fix:
+    edits: []
   parent: ~
 

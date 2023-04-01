@@ -183,7 +183,7 @@ pub fn typing_only_runtime_import(
         // Categorize the import.
         match categorize(
             full_name,
-            Some(&level),
+            Some(level),
             &settings.src,
             package,
             &settings.isort.known_modules,

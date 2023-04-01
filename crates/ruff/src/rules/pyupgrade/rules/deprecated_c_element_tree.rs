@@ -66,6 +66,6 @@ pub fn deprecated_c_element_tree(checker: &mut Checker, stmt: &Stmt) {
                 }
             }
         }
-        _ => unreachable!("Expected StmtKind::Import | StmtKind::ImportFrom"),
+        _ => panic!("Expected StmtKind::Import | StmtKind::ImportFrom"),
     }
 }
