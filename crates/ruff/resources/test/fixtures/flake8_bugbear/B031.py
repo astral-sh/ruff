@@ -78,6 +78,29 @@ for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
     for shopper in shoppers:
         collect_shop_items(shopper, section_items)  # B031
 
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    # Mutually exclusive branches shouldn't trigger the warning
+    if _section == "greens":
+        collect_shop_items(shopper, section_items)
+    elif _section == "frozen items":
+        collect_shop_items(shopper, section_items)
+    else:
+        collect_shop_items(shopper, section_items)
+    # Now, it should detect
+    collect_shop_items(shopper, section_items)  # B031
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    # Mutually exclusive branches shouldn't trigger the warning
+    match _section:
+        case "greens":
+            collect_shop_items(shopper, section_items)
+        case "frozen items":
+            collect_shop_items(shopper, section_items)
+        case _:
+            collect_shop_items(shopper, section_items)
+    # Now, it should detect
+    collect_shop_items(shopper, section_items)  # B031
+
 for group in groupby(items, key=lambda p: p[1]):
     # This is bad, but not detected currently
     collect_shop_items("Jane", group[1])

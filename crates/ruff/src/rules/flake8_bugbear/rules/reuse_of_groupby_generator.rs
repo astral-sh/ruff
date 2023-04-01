@@ -43,6 +43,17 @@ impl Violation for ReuseOfGroupbyGenerator {
     }
 }
 
+/// A [`GroupNameFinder`] state inside a mutually exclusive statement such as
+/// `if ... elif ... else ...` or a `match` statement.
+enum MutuallyExclusiveState {
+    /// Visitor is inside a mutually exclusive statement.
+    Inside,
+    /// Visitor has seen the group name atleast once.
+    Seen,
+    /// Visitor is outside a mutually exclusive statement.
+    Outside,
+}
+
 /// A [`Visitor`] that collects all the usage of `group_name` in the body of
 /// a `for` loop.
 struct GroupNameFinder<'a> {
@@ -53,6 +64,9 @@ struct GroupNameFinder<'a> {
     /// A flag indicating that the visitor is inside a nested `for` or `while`
     /// loop or inside a `dict`, `list` or `set` comprehension.
     nested: bool,
+    /// A flag indicating the state of the visitor inside a mutually exclusive
+    /// statement such as `if ... elif ... else ...` or a `match` statement.
+    mutually_exclusive_state: MutuallyExclusiveState,
     /// A flag indicating that the `group_name` variable has been overridden
     /// during the visit.
     overridden: bool,
@@ -66,6 +80,7 @@ impl<'a> GroupNameFinder<'a> {
             group_name,
             usage_count: 0,
             nested: false,
+            mutually_exclusive_state: MutuallyExclusiveState::Outside,
             overridden: false,
             exprs: Vec::new(),
         }
@@ -119,6 +134,21 @@ where
                 visitor::walk_body(self, body);
                 self.nested = false;
             }
+            StmtKind::If { .. } | StmtKind::Match { .. } => {
+                // This is to avoid overriding the `Seen` state. The AST
+                // representation of an `elif` statement is same as that of
+                // an `if` statement. So if we've `Seen` the group name in
+                // the first branch, we shouldn't reset the state. This is
+                // not required for a `match` statement.
+                if matches!(
+                    self.mutually_exclusive_state,
+                    MutuallyExclusiveState::Outside
+                ) {
+                    self.mutually_exclusive_state = MutuallyExclusiveState::Inside;
+                }
+                visitor::walk_stmt(self, stmt);
+                self.mutually_exclusive_state = MutuallyExclusiveState::Outside;
+            }
             StmtKind::Assign { targets, .. } => {
                 if targets.iter().any(|target| self.name_matches(target)) {
                     self.overridden = true;
@@ -150,7 +180,17 @@ where
             visitor::walk_expr(self, expr);
             self.nested = false;
         } else if self.name_matches(expr) {
-            self.usage_count += 1;
+            match self.mutually_exclusive_state {
+                MutuallyExclusiveState::Seen => {
+                    // We've already seen the group name so avoid incrementing
+                    // the count.
+                }
+                MutuallyExclusiveState::Inside => {
+                    self.mutually_exclusive_state = MutuallyExclusiveState::Seen;
+                    self.usage_count += 1;
+                }
+                MutuallyExclusiveState::Outside => self.usage_count += 1,
+            }
             // For nested loops, the variable usage could be once but the
             // loop makes it being used multiple times.
             if self.nested || self.usage_count > 1 {

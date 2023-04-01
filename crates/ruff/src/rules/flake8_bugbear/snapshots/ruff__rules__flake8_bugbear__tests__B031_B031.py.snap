@@ -100,4 +100,32 @@ expression: diagnostics
   fix:
     edits: []
   parent: ~
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 90
+    column: 32
+  end_location:
+    row: 90
+    column: 45
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 102
+    column: 32
+  end_location:
+    row: 102
+    column: 45
+  fix:
+    edits: []
+  parent: ~
 
