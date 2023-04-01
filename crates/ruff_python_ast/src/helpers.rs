@@ -13,7 +13,6 @@ use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::{smallvec, SmallVec};
 
 use crate::context::Context;
-use crate::scope::{Binding, BindingKind};
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
 use crate::types::{CallPath, Range};
 use crate::visitor;
@@ -976,21 +975,6 @@ pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> Range {
         error!("Failed to find identifier for {:?}", stmt);
     }
     Range::from(stmt)
-}
-
-/// Like `identifier_range`, but accepts a `Binding`.
-pub fn binding_range(binding: &Binding, locator: &Locator) -> Range {
-    if matches!(
-        binding.kind,
-        BindingKind::ClassDefinition | BindingKind::FunctionDefinition
-    ) {
-        binding
-            .source
-            .as_ref()
-            .map_or(binding.range, |source| identifier_range(source, locator))
-    } else {
-        binding.range
-    }
 }
 
 /// Return the ranges of [`Tok::Name`] tokens within a specified node.

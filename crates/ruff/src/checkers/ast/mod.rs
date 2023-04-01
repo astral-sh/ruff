@@ -14,7 +14,7 @@ use rustpython_parser::ast::{
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::context::Context;
-use ruff_python_ast::helpers::{binding_range, extract_handled_exceptions, to_module_path};
+use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::operations::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::scope::{
     Binding, BindingId, BindingKind, ClassDef, Exceptions, ExecutionContext, Export,
@@ -4058,7 +4058,16 @@ impl<'a> Checker<'a> {
                                     name: name.to_string(),
                                     line: existing.range.location.row(),
                                 },
-                                binding_range(&binding, self.locator),
+                                matches!(
+                                    binding.kind,
+                                    BindingKind::ClassDefinition | BindingKind::FunctionDefinition
+                                )
+                                .then(|| {
+                                    binding.source.as_ref().map_or(binding.range, |source| {
+                                        helpers::identifier_range(source, self.locator)
+                                    })
+                                })
+                                .unwrap_or(binding.range),
                             );
                             if let Some(parent) = binding.source.as_ref() {
                                 if matches!(parent.node, StmtKind::ImportFrom { .. })
@@ -4904,7 +4913,17 @@ impl<'a> Checker<'a> {
                                         name: (*name).to_string(),
                                         line: binding.range.location.row(),
                                     },
-                                    binding_range(rebound, self.locator),
+                                    matches!(
+                                        rebound.kind,
+                                        BindingKind::ClassDefinition
+                                            | BindingKind::FunctionDefinition
+                                    )
+                                    .then(|| {
+                                        rebound.source.as_ref().map_or(rebound.range, |source| {
+                                            helpers::identifier_range(source, self.locator)
+                                        })
+                                    })
+                                    .unwrap_or(rebound.range),
                                 );
                                 if let Some(parent) = &rebound.source {
                                     if matches!(parent.node, StmtKind::ImportFrom { .. })
