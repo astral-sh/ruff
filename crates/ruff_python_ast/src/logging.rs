@@ -1,3 +1,7 @@
+use crate::context::Context;
+use crate::helpers::collect_call_path;
+use rustpython_parser::ast::{Expr, ExprKind};
+
 #[derive(Copy, Clone)]
 pub enum LoggingLevel {
     Debug,
@@ -22,4 +26,30 @@ impl LoggingLevel {
             _ => None,
         }
     }
+}
+
+/// Return `true` if the given `Expr` is a potential logging call. Matches
+/// `logging.error`, `logger.error`, `self.logger.error`, etc., but not
+/// arbitrary `foo.error` calls.
+///
+/// It even matches direct `logging.error` calls even if the `logging` module
+/// is aliased. Example:
+/// ```python
+/// import logging as bar
+///
+/// # This is detected to be a logger candidate
+/// bar.error()
+/// ```
+pub fn is_logger_candidate(context: &Context, func: &Expr) -> bool {
+    if let ExprKind::Attribute { value, .. } = &func.node {
+        let call_path = context
+            .resolve_call_path(value)
+            .unwrap_or_else(|| collect_call_path(value));
+        if let Some(tail) = call_path.last() {
+            if tail.starts_with("log") || tail.ends_with("logger") || tail.ends_with("logging") {
+                return true;
+            }
+        }
+    }
+    false
 }
