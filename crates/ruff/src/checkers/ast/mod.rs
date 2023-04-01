@@ -13,9 +13,9 @@ use rustpython_parser::ast::{
 };
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
-use ruff_python_ast::operations::{extract_all_names, AllNamesFlags};
 use ruff_python_ast::scope::{
     Binding, BindingId, BindingKind, ClassDef, Exceptions, ExecutionContext, Export,
     FromImportation, FunctionDef, Importation, Lambda, Scope, ScopeId, ScopeKind, ScopeStack,
