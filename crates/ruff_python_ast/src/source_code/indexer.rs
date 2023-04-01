@@ -8,6 +8,7 @@ use rustpython_parser::Tok;
 pub struct Indexer {
     commented_lines: Vec<usize>,
     continuation_lines: Vec<usize>,
+    string_lines: Vec<(usize, usize)>,
 }
 
 impl Indexer {
@@ -18,16 +19,31 @@ impl Indexer {
     pub fn continuation_lines(&self) -> &[usize] {
         &self.continuation_lines
     }
+
+    pub fn string_lines(&self) -> &[(usize, usize)] {
+        &self.string_lines
+    }
 }
 
 impl From<&[LexResult]> for Indexer {
     fn from(lxr: &[LexResult]) -> Self {
         let mut commented_lines = Vec::new();
         let mut continuation_lines = Vec::new();
+        let mut string_lines = Vec::new();
         let mut prev: Option<(&Location, &Tok, &Location)> = None;
         for (start, tok, end) in lxr.iter().flatten() {
             if matches!(tok, Tok::Comment(_)) {
                 commented_lines.push(start.row());
+            }
+            if matches!(
+                tok,
+                Tok::String {
+                    value: _,
+                    kind: _,
+                    triple_quoted: _
+                }
+            ) {
+                string_lines.push((start.row(), end.row()));
             }
             if let Some((.., prev_tok, prev_end)) = prev {
                 if !matches!(
@@ -44,6 +60,7 @@ impl From<&[LexResult]> for Indexer {
         Self {
             commented_lines,
             continuation_lines,
+            string_lines,
         }
     }
 }
@@ -113,5 +130,38 @@ import os
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
         assert_eq!(indexer.continuation_lines(), [9, 12]);
+    }
+
+    #[test]
+    fn string_lines() {
+        let contents = r#""this is a string""#;
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer: Indexer = lxr.as_slice().into();
+        assert_eq!(indexer.string_lines(), [(1, 1)]);
+
+        let contents = r#"
+            """
+            this is a multiline string
+            """
+            "#;
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer: Indexer = lxr.as_slice().into();
+        assert_eq!(indexer.string_lines(), [(2, 4)]);
+
+        let contents = r#"
+            """
+            '''this is a multiline string with multiple delimiter types'''
+            """
+            "#;
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer: Indexer = lxr.as_slice().into();
+        assert_eq!(indexer.string_lines(), [(2, 4)]);
+
+        let contents = r#"
+            """this is a triple-quoted string on one line"""
+            "#;
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer: Indexer = lxr.as_slice().into();
+        assert_eq!(indexer.string_lines(), [(2, 2)]);
     }
 }

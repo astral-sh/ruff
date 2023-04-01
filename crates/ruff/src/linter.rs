@@ -183,13 +183,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         diagnostics.extend(check_physical_lines(
-            path,
-            locator,
-            stylist,
-            indexer.commented_lines(),
-            &doc_lines,
-            settings,
-            autofix,
+            path, locator, stylist, indexer, &doc_lines, settings, autofix,
         ));
     }
 
