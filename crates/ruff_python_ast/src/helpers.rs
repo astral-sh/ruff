@@ -10,11 +10,12 @@ use rustpython_parser::ast::{
     KeywordData, Located, Location, MatchCase, Pattern, PatternKind, Stmt, StmtKind,
 };
 use rustpython_parser::{lexer, Mode, Tok};
-use smallvec::{smallvec, SmallVec};
+use smallvec::SmallVec;
 
+use crate::call_path::CallPath;
 use crate::context::Context;
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
-use crate::types::{CallPath, Range};
+use crate::types::Range;
 use crate::visitor;
 use crate::visitor::Visitor;
 
@@ -47,54 +48,6 @@ pub fn unparse_constant(constant: &Constant, stylist: &Stylist) -> String {
     let mut generator: Generator = stylist.into();
     generator.unparse_constant(constant);
     generator.generate()
-}
-
-fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool {
-    match &expr.node {
-        ExprKind::Attribute { value, attr, .. } => {
-            if collect_call_path_inner(value, parts) {
-                parts.push(attr);
-                true
-            } else {
-                false
-            }
-        }
-        ExprKind::Name { id, .. } => {
-            parts.push(id);
-            true
-        }
-        _ => false,
-    }
-}
-
-/// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
-pub fn collect_call_path(expr: &Expr) -> CallPath {
-    let mut segments = smallvec![];
-    collect_call_path_inner(expr, &mut segments);
-    segments
-}
-
-/// Convert an `Expr` to its call path (like `List`, or `typing.List`).
-pub fn compose_call_path(expr: &Expr) -> Option<String> {
-    let call_path = collect_call_path(expr);
-    if call_path.is_empty() {
-        None
-    } else {
-        Some(format_call_path(&call_path))
-    }
-}
-
-/// Format a call path for display.
-pub fn format_call_path(call_path: &[&str]) -> String {
-    if call_path
-        .first()
-        .expect("Unable to format empty call path")
-        .is_empty()
-    {
-        call_path[1..].join(".")
-    } else {
-        call_path.join(".")
-    }
 }
 
 /// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
@@ -746,15 +699,6 @@ pub fn format_import_from_member(
     }
     full_name.push_str(member);
     full_name
-}
-
-/// Split a target string (like `typing.List`) into (`typing`, `List`).
-pub fn to_call_path(target: &str) -> CallPath {
-    if target.contains('.') {
-        target.split('.').collect()
-    } else {
-        smallvec!["", target]
-    }
 }
 
 /// Create a module path from a (package, path) pair.

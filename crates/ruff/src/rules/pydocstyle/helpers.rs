@@ -1,7 +1,8 @@
+use ruff_python_ast::call_path::to_call_path;
 use std::collections::BTreeSet;
 
 use ruff_python_ast::cast;
-use ruff_python_ast::helpers::{map_callable, to_call_path};
+use ruff_python_ast::helpers::map_callable;
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::str::is_implicit_concatenation;
 

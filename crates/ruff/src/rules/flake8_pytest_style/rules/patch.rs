@@ -3,7 +3,8 @@ use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{collect_arg_names, compose_call_path, SimpleCallArgs};
+use ruff_python_ast::call_path::compose_call_path;
+use ruff_python_ast::helpers::{collect_arg_names, SimpleCallArgs};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;

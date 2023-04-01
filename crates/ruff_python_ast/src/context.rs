@@ -12,9 +12,10 @@ use crate::binding::{
     Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
     Importation, SubmoduleImportation,
 };
-use crate::helpers::{collect_call_path, from_relative_import};
+use crate::call_path::{collect_call_path, CallPath};
+use crate::helpers::from_relative_import;
 use crate::scope::{Scope, ScopeId, ScopeKind, ScopeStack, Scopes};
-use crate::types::{CallPath, RefEquality};
+use crate::types::RefEquality;
 use crate::typing::AnnotationKind;
 use crate::visibility::{module_visibility, Modifier, VisibleScope};
 

@@ -5,10 +5,10 @@ use once_cell::sync::Lazy;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::{to_call_path, CallPath};
 use ruff_python_ast::cast;
-use ruff_python_ast::helpers::to_call_path;
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::types::{CallPath, Range};
+use ruff_python_ast::types::Range;
 use ruff_python_ast::visibility::{is_property, is_test};
 
 use crate::checkers::ast::Checker;
