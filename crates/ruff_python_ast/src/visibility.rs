@@ -2,7 +2,6 @@ use std::path::Path;
 
 use rustpython_parser::ast::{Expr, Stmt, StmtKind};
 
-use crate::call_path::collect_call_path;
 use crate::call_path::CallPath;
 use crate::context::Context;
 use crate::helpers::map_callable;
@@ -183,7 +182,7 @@ pub fn method_visibility(stmt: &Stmt) -> Visibility {
         } => {
             // Is this a setter or deleter?
             if decorator_list.iter().any(|expr| {
-                collect_call_path(expr).map_or(false, |call_path| {
+                CallPath::try_from_expr(expr).map_or(false, |call_path| {
                     call_path.as_slice() == [name, "setter"]
                         || call_path.as_slice() == [name, "deleter"]
                 })

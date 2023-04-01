@@ -3,7 +3,6 @@ use std::path::Path;
 use nohash_hasher::{BuildNoHashHasher, IntMap};
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Stmt};
-use smallvec::smallvec;
 
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
@@ -12,7 +11,7 @@ use crate::binding::{
     Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
     Importation, SubmoduleImportation,
 };
-use crate::call_path::{collect_call_path, from_unqualified_name, CallPath};
+use crate::call_path::CallPath;
 use crate::helpers::from_relative_import;
 use crate::scope::{Scope, ScopeId, ScopeKind, ScopeStack, Scopes};
 use crate::types::RefEquality;
@@ -105,7 +104,7 @@ impl<'a> Context<'a> {
     }
 
     /// Return `true` if the call path is a reference to `typing.${target}`.
-    pub fn match_typing_call_path(&self, call_path: &CallPath, target: &str) -> bool {
+    pub fn match_typing_call_path(&self, call_path: &CallPath<'a>, target: &'a str) -> bool {
         if call_path.as_slice() == ["typing", target] {
             return true;
         }
@@ -117,7 +116,7 @@ impl<'a> Context<'a> {
         }
 
         if self.typing_modules.iter().any(|module| {
-            let mut module: CallPath = from_unqualified_name(module);
+            let mut module = CallPath::from_unqualified_name(module);
             module.push(target);
             *call_path == module
         }) {
@@ -156,7 +155,7 @@ impl<'a> Context<'a> {
     where
         'b: 'a,
     {
-        let Some(call_path) = collect_call_path(value) else {
+        let Some(call_path) = CallPath::try_from_expr(value) else {
             return None;
         };
         let Some(head) = call_path.first() else {
@@ -179,7 +178,7 @@ impl<'a> Context<'a> {
                         None
                     }
                 } else {
-                    let mut source_path: CallPath = from_unqualified_name(name);
+                    let mut source_path = CallPath::from_unqualified_name(name);
                     source_path.extend(call_path.into_iter().skip(1));
                     Some(source_path)
                 }
@@ -196,13 +195,13 @@ impl<'a> Context<'a> {
                         None
                     }
                 } else {
-                    let mut source_path: CallPath = from_unqualified_name(name);
+                    let mut source_path = CallPath::from_unqualified_name(name);
                     source_path.extend(call_path.into_iter().skip(1));
                     Some(source_path)
                 }
             }
             BindingKind::Builtin => {
-                let mut source_path: CallPath = smallvec![];
+                let mut source_path = CallPath::with_capacity(call_path.len() + 1);
                 source_path.push("");
                 source_path.extend(call_path);
                 Some(source_path)

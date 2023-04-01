@@ -717,7 +717,7 @@ pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
 
 /// Create a call path from a relative import.
 pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath<'a> {
-    let mut call_path: CallPath = SmallVec::with_capacity(module.len() + 1);
+    let mut call_path: CallPath = CallPath::with_capacity(module.len() + 1);
 
     // Start with the module path.
     call_path.extend(module.iter().map(String::as_str));

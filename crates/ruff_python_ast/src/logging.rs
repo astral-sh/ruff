@@ -1,6 +1,6 @@
+use crate::call_path::CallPath;
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use crate::call_path::collect_call_path;
 use crate::context::Context;
 
 #[derive(Copy, Clone)]
@@ -43,14 +43,16 @@ impl LoggingLevel {
 /// ```
 pub fn is_logger_candidate(context: &Context, func: &Expr) -> bool {
     if let ExprKind::Attribute { value, .. } = &func.node {
-        let Some(call_path) = context
+        if let Some(call_path) = context
             .resolve_call_path(value)
-            .or_else(|| collect_call_path(value)) else {
-            return false;
-        };
-        if let Some(tail) = call_path.last() {
-            if tail.starts_with("log") || tail.ends_with("logger") || tail.ends_with("logging") {
-                return true;
+            .or_else(|| CallPath::try_from_expr(value))
+        {
+            let tail = call_path.last();
+            if let Some(tail) = call_path.last() {
+                if tail.starts_with("log") || tail.ends_with("logger") || tail.ends_with("logging")
+                {
+                    return true;
+                }
             }
         }
     }
