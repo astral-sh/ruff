@@ -23,20 +23,14 @@ fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool
 }
 
 /// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
-pub fn collect_call_path(expr: &Expr) -> CallPath {
+pub fn collect_call_path(expr: &Expr) -> Option<CallPath> {
     let mut segments = smallvec![];
-    collect_call_path_inner(expr, &mut segments);
-    segments
+    collect_call_path_inner(expr, &mut segments).then_some(segments)
 }
 
 /// Convert an `Expr` to its call path (like `List`, or `typing.List`).
 pub fn compose_call_path(expr: &Expr) -> Option<String> {
-    let call_path = collect_call_path(expr);
-    if call_path.is_empty() {
-        None
-    } else {
-        Some(format_call_path(&call_path))
-    }
+    collect_call_path(expr).map(|call_path| format_call_path(&call_path))
 }
 
 /// Format a call path for display.
@@ -52,12 +46,33 @@ pub fn format_call_path(call_path: &[&str]) -> String {
     }
 }
 
-/// Split a fully-qualified name (like `typing.List`) into (`typing`, `List`).
-pub fn to_call_path(target: &str) -> CallPath {
-    if target.contains('.') {
-        target.split('.').collect()
+/// Create a [`CallPath`] from an unqualified name.
+///
+/// ```rust
+/// # use smallvec::smallvec;
+/// # use ruff_python_ast::call_path::from_unqualified_name;
+///
+/// assert_eq!(from_unqualified_name("typing.List").as_slice(), ["typing", "List"]);
+/// assert_eq!(from_unqualified_name("list").as_slice(), ["list"]);
+/// ```
+pub fn from_unqualified_name(name: &str) -> CallPath {
+    name.split('.').collect()
+}
+
+/// Create a [`CallPath`] from a fully-qualified name.
+///
+/// ```rust
+/// # use smallvec::smallvec;
+/// # use ruff_python_ast::call_path::from_qualified_name;
+///
+/// assert_eq!(from_qualified_name("typing.List").as_slice(), ["typing", "List"]);
+/// assert_eq!(from_qualified_name("list").as_slice(), ["", "list"]);
+/// ```
+pub fn from_qualified_name(name: &str) -> CallPath {
+    if name.contains('.') {
+        name.split('.').collect()
     } else {
         // Special-case: for builtins, return `["", "int"]` instead of `["int"]`.
-        smallvec!["", target]
+        smallvec!["", name]
     }
 }

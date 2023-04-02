@@ -70,8 +70,7 @@ fn duplicate_handler_exceptions<'a>(
     let mut duplicates: FxHashSet<CallPath> = FxHashSet::default();
     let mut unique_elts: Vec<&Expr> = Vec::default();
     for type_ in elts {
-        let call_path = call_path::collect_call_path(type_);
-        if !call_path.is_empty() {
+        if let Some(call_path) = call_path::collect_call_path(type_) {
             if seen.contains_key(&call_path) {
                 duplicates.insert(call_path);
             } else {
@@ -125,8 +124,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
         };
         match &type_.node {
             ExprKind::Attribute { .. } | ExprKind::Name { .. } => {
-                let call_path = call_path::collect_call_path(type_);
-                if !call_path.is_empty() {
+                if let Some(call_path) = call_path::collect_call_path(type_) {
                     if seen.contains(&call_path) {
                         duplicates.entry(call_path).or_default().push(type_);
                     } else {

@@ -4,6 +4,7 @@ use rustpython_parser::ast::{Expr, ExprKind, Location};
 
 use ruff_python_stdlib::typing::{PEP_585_BUILTINS_ELIGIBLE, PEP_593_SUBSCRIPTS, SUBSCRIPTS};
 
+use crate::call_path::{from_unqualified_name, CallPath};
 use crate::context::Context;
 use crate::relocate::relocate_expr;
 use crate::source_code::Locator;
@@ -47,7 +48,7 @@ pub fn match_annotated_subscript<'a>(
         }
 
         for module in typing_modules {
-            let module_call_path = module.split('.').collect::<Vec<_>>();
+            let module_call_path: CallPath = from_unqualified_name(module);
             if call_path.starts_with(&module_call_path) {
                 for subscript in SUBSCRIPTS.iter() {
                     if call_path.last() == subscript.last() {
