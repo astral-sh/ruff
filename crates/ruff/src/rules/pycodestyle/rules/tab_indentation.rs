@@ -15,32 +15,33 @@ impl Violation for TabIndentation {
     }
 }
 
-fn find_closest_string(lineno: &usize, string_lines: &[(usize, usize)]) -> Option<(usize, usize)> {
+/// string_lines is parsed from top to bottom during the tokenization phase, and we know that the
+/// strings aren't overlapping (otherwise there'd only be one string). This function performs a
+/// binary search on string_lines to find the string that contains (or starts just before) lineno
+fn find_closest_string<'a>(lineno: &usize, string_lines: &'a [Range]) -> Option<&'a Range> {
     if string_lines.is_empty() {
         return None;
     }
 
-    Some((0usize, 1usize))
+    let mut left = 0;
+    let mut right = string_lines.len();
 
-    // we know that string_lines is an ordered list since the file is parsed top to bottom, - we can
-    // therefore binary search the list to find the start of the closest string, then check if
-    // this line is in that range
-    // let mut l = 0usize;
-    // let mut h = string_lines.len(); // not using len() - 1 so we can avoid underflow errors
-    // let mut m = 0usize;
+    while left < right {
+        let mid = (left + right) / 2;
+        let curr_range = &string_lines[mid];
+        let start_row = &curr_range.location.row();
+        let end_row = &curr_range.end_location.row();
 
-    // while l <= h {
-    //     m = l + (h - l) / 2;
+        if start_row <= lineno && end_row >= lineno {
+            return Some(curr_range);
+        } else if start_row > lineno {
+            right = mid;
+        } else if end_row < lineno {
+            left = mid + 1;
+        }
+    }
 
-    //     let (m_start, m_end) = string_lines[m];
-    //     if m_start > *lineno {
-    //         h = m;
-    //     } else if m_end < *lineno {
-    //         l = m + 1;
-    //     }
-    // }
-
-    // Some(string_lines[m])
+    return Some(&string_lines[right - 1]);
 }
 
 /// W191
@@ -73,17 +74,44 @@ pub fn tab_indentation(lineno: usize, line: &str, string_lines: &[Range]) -> Opt
 mod tests {
     use super::*;
 
-    #[test]
-    // string contains lineno - don't throw
-    fn test_find_closest_string_contains() {}
+    fn get_string_lines() -> Vec<Range> {
+        vec![
+            Range::new(Location::new(1, 0), Location::new(3, 0)),
+            Range::new(Location::new(5, 0), Location::new(5, 0)),
+            Range::new(Location::new(8, 0), Location::new(10, 0)),
+        ]
+    }
 
     #[test]
-    // string doesn't contain lineno - throw
-    fn test_find_closest_string_found() {}
+    // string contains lineno - returns string range with line
+    fn test_find_closest_string_contains() {
+        let string_lines = get_string_lines();
+
+        let expected = Some(&string_lines[0]);
+        let actual = find_closest_string(&2usize, &string_lines);
+        assert_eq!(expected, actual);
+
+        let expected = Some(&string_lines[0]);
+        let actual = find_closest_string(&3usize, &string_lines);
+        assert_eq!(expected, actual);
+    }
 
     #[test]
-    // no strings
-    fn test_find_closest_string_none() {
+    // string doesn't contain lineno - returns closest string range
+    fn test_find_closest_string_found() {
+        let string_lines = get_string_lines();
+
+        let expected = Some(&string_lines[1]);
+        let actual = find_closest_string(&6usize, &string_lines);
+        assert_eq!(expected, actual);
+
+        let expected = Some(&string_lines[2]);
+        let actual = find_closest_string(&11usize, &string_lines);
+        assert_eq!(expected, actual);
+    }
+
+    #[test]
+    fn test_find_closest_string_empty_array() {
         assert_eq!(None, find_closest_string(&1usize, &[]));
     }
 }
