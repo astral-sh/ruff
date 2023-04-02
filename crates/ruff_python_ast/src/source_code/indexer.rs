@@ -42,7 +42,7 @@ impl From<&[LexResult]> for Indexer {
                 Tok::String {
                     value: _,
                     kind: _,
-                    triple_quoted: _
+                    triple_quoted: true
                 }
             ) {
                 string_lines.push(Range::new(start.clone(), end.clone()));
