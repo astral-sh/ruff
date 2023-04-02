@@ -14,12 +14,10 @@ pub struct Scope<'a> {
     /// A list of star imports in this scope. These represent _module_ imports (e.g., `sys` in
     /// `from sys import *`), rather than individual bindings (e.g., individual members in `sys`).
     star_imports: Vec<StarImportation<'a>>,
-    /// A map from bound name to binding index, for live bindings.
+    /// A map from bound name to binding index, for current bindings.
     bindings: FxHashMap<&'a str, BindingId>,
-    /// A map from bound name to binding index, for bindings that were created
-    /// in the scope but rebound (and thus overridden) later on in the same
-    /// scope.
-    pub rebounds: FxHashMap<&'a str, Vec<BindingId>>,
+    /// A map from bound name to binding index, for bindings that were shadowed later in the scope.
+    shadowed_bindings: FxHashMap<&'a str, Vec<BindingId>>,
 }
 
 impl<'a> Scope<'a> {
@@ -34,18 +32,23 @@ impl<'a> Scope<'a> {
             uses_locals: false,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
-            rebounds: FxHashMap::default(),
+            shadowed_bindings: FxHashMap::default(),
         }
     }
 
-    /// Returns the [id](BindingId) of the binding with the given name.
+    /// Returns the [id](BindingId) of the binding bound to the given name.
     pub fn get(&self, name: &str) -> Option<&BindingId> {
         self.bindings.get(name)
     }
 
     /// Adds a new binding with the given name to this scope.
     pub fn add(&mut self, name: &'a str, id: BindingId) -> Option<BindingId> {
-        self.bindings.insert(name, id)
+        if let Some(id) = self.bindings.insert(name, id) {
+            self.shadowed_bindings.entry(name).or_default().push(id);
+            Some(id)
+        } else {
+            None
+        }
     }
 
     /// Returns `true` if this scope defines a binding with the given name.
@@ -66,6 +69,15 @@ impl<'a> Scope<'a> {
     /// Returns a tuple of the name and id of all bindings defined in this scope.
     pub fn bindings(&self) -> std::collections::hash_map::Iter<&'a str, BindingId> {
         self.bindings.iter()
+    }
+
+    /// Returns an iterator over all [bindings](BindingId) bound to the given name, including
+    /// those that were shadowed by later bindings.
+    pub fn bindings_for_name(&self, name: &str) -> impl Iterator<Item = &BindingId> {
+        self.bindings
+            .get(name)
+            .into_iter()
+            .chain(self.shadowed_bindings.get(name).into_iter().flatten().rev())
     }
 
     /// Adds a reference to a star import (e.g., `from sys import *`) to this scope.

@@ -166,17 +166,13 @@ pub fn unused_loop_control_variable(
             if certainty.into() && checker.patch(diagnostic.kind.rule()) {
                 // Find the `BindingKind::LoopVar` corresponding to the name.
                 let scope = checker.ctx.scope();
-                let binding = scope
-                    .get(name)
-                    .into_iter()
-                    .chain(scope.rebounds.get(name).into_iter().flatten())
-                    .find_map(|index| {
-                        let binding = &checker.ctx.bindings[*index];
-                        binding
-                            .source
-                            .as_ref()
-                            .and_then(|source| (source == &RefEquality(stmt)).then_some(binding))
-                    });
+                let binding = scope.bindings_for_name(name).find_map(|index| {
+                    let binding = &checker.ctx.bindings[*index];
+                    binding
+                        .source
+                        .as_ref()
+                        .and_then(|source| (source == &RefEquality(stmt)).then_some(binding))
+                });
                 if let Some(binding) = binding {
                     if binding.kind.is_loop_var() {
                         if !binding.used() {
