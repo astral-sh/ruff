@@ -227,69 +227,34 @@ impl<'a> Context<'a> {
         member: &str,
     ) -> Option<(&Stmt, String)> {
         self.scopes().enumerate().find_map(|(scope_index, scope)| {
-            scope.binding_ids().find_map(|binding_index| {
-                let binding = &self.bindings[*binding_index];
-                match &binding.kind {
-                    // Ex) Given `module="sys"` and `object="exit"`:
-                    // `import sys`         -> `sys.exit`
-                    // `import sys as sys2` -> `sys2.exit`
-                    BindingKind::Importation(Importation { name, full_name }) => {
-                        if full_name == &module {
-                            // Verify that `sys` isn't bound in an inner scope.
-                            if self
-                                .scopes()
-                                .take(scope_index)
-                                .all(|scope| scope.get(name).is_none())
-                            {
-                                return Some((
-                                    binding.source.as_ref().unwrap().into(),
-                                    format!("{name}.{member}"),
-                                ));
-                            }
-                        }
+            if let Some(id) = scope.lookup(module) {
+                let binding = &self.bindings[*id];
+                if let Some(name) = binding.kind.bound_name() {
+                    if self
+                        .scopes()
+                        .take(scope_index)
+                        .all(|scope| !scope.defines(name))
+                    {
+                        return Some((
+                            binding.source.as_ref().unwrap().into(),
+                            format!("{name}.{member}"),
+                        ));
                     }
-                    // Ex) Given `module="os.path"` and `object="join"`:
-                    // `from os.path import join`          -> `join`
-                    // `from os.path import join as join2` -> `join2`
-                    BindingKind::FromImportation(FromImportation { name, full_name }) => {
-                        if let Some((target_module, target_member)) = full_name.split_once('.') {
-                            if target_module == module && target_member == member {
-                                // Verify that `join` isn't bound in an inner scope.
-                                if self
-                                    .scopes()
-                                    .take(scope_index)
-                                    .all(|scope| scope.get(name).is_none())
-                                {
-                                    return Some((
-                                        binding.source.as_ref().unwrap().into(),
-                                        (*name).to_string(),
-                                    ));
-                                }
-                            }
-                        }
-                    }
-                    // Ex) Given `module="os"` and `object="name"`:
-                    // `import os.path ` -> `os.name`
-                    BindingKind::SubmoduleImportation(SubmoduleImportation { name, .. }) => {
-                        if name == &module {
-                            // Verify that `os` isn't bound in an inner scope.
-                            if self
-                                .scopes()
-                                .take(scope_index)
-                                .all(|scope| scope.get(name).is_none())
-                            {
-                                return Some((
-                                    binding.source.as_ref().unwrap().into(),
-                                    format!("{name}.{member}"),
-                                ));
-                            }
-                        }
-                    }
-                    // Non-imports.
-                    _ => {}
                 }
-                None
-            })
+            }
+            if let Some(id) = scope.lookup(&format!("{module}.{member}")) {
+                let binding = &self.bindings[*id];
+                if let Some(name) = binding.kind.bound_name() {
+                    if self
+                        .scopes()
+                        .take(scope_index)
+                        .all(|scope| !scope.defines(name))
+                    {
+                        return Some((binding.source.as_ref().unwrap().into(), name.to_string()));
+                    }
+                }
+            }
+            None
         })
     }
 

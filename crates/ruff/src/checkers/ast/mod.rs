@@ -4123,12 +4123,10 @@ impl<'a> Checker<'a> {
         // in scope.
         let scope = self.ctx.scope_mut();
         if !(binding.kind.is_annotation() && scope.defines(name)) {
-            if let Some(rebound_index) = scope.add(name, binding_id) {
-                scope
-                    .rebounds
-                    .entry(name)
-                    .or_insert_with(Vec::new)
-                    .push(rebound_index);
+            if let Some(qualified_name) = binding.kind.qualified_name() {
+                scope.add_import(name, qualified_name, binding_id);
+            } else {
+                scope.add(name, binding_id);
             }
         }
 

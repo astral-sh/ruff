@@ -265,6 +265,26 @@ pub enum BindingKind<'a> {
     SubmoduleImportation(SubmoduleImportation<'a>),
 }
 
+impl<'a> BindingKind<'a> {
+    pub fn qualified_name(&self) -> Option<&'a str> {
+        match self {
+            BindingKind::Importation(importation) => Some(importation.full_name),
+            BindingKind::FromImportation(importation) => Some(&importation.full_name),
+            BindingKind::SubmoduleImportation(importation) => Some(importation.name),
+            _ => None,
+        }
+    }
+
+    pub fn bound_name(&self) -> Option<&'a str> {
+        match self {
+            BindingKind::Importation(importation) => Some(importation.name),
+            BindingKind::FromImportation(importation) => Some(importation.name),
+            BindingKind::SubmoduleImportation(importation) => Some(importation.name),
+            _ => None,
+        }
+    }
+}
+
 bitflags! {
     pub struct Exceptions: u32 {
         const NAME_ERROR = 0b0000_0001;

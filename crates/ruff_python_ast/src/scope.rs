@@ -16,6 +16,10 @@ pub struct Scope<'a> {
     star_imports: Vec<StarImportation<'a>>,
     /// A map from bound name to binding index, for live bindings.
     bindings: FxHashMap<&'a str, BindingId>,
+    /// A map from fully-qualified name to binding index, for imported symbol.
+    imports: FxHashMap<&'a str, BindingId>,
+    /// A map from the keys in `bindings` to the keys in `imports`, for imported symbols.
+    name_to_qualified_name: FxHashMap<&'a str, &'a str>,
     /// A map from bound name to binding index, for bindings that were created
     /// in the scope but rebound (and thus overridden) later on in the same
     /// scope.
@@ -34,6 +38,8 @@ impl<'a> Scope<'a> {
             uses_locals: false,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
+            imports: FxHashMap::default(),
+            name_to_qualified_name: FxHashMap::default(),
             rebounds: FxHashMap::default(),
         }
     }
@@ -43,9 +49,33 @@ impl<'a> Scope<'a> {
         self.bindings.get(name)
     }
 
+    /// Returns the [id](BindingId) of the binding with the given name.
+    pub fn lookup(&self, qualified_name: &str) -> Option<&BindingId> {
+        self.imports.get(qualified_name)
+    }
+
     /// Adds a new binding with the given name to this scope.
     pub fn add(&mut self, name: &'a str, id: BindingId) -> Option<BindingId> {
-        self.bindings.insert(name, id)
+        if let Some(id) = self.bindings.insert(name, id) {
+            if let Some(qualified_name) = self.name_to_qualified_name.remove(name) {
+                self.imports.remove(qualified_name);
+            }
+            Some(id)
+        } else {
+            None
+        }
+    }
+
+    /// Adds a new binding with the given name to this scope.
+    pub fn add_import(
+        &mut self,
+        name: &'a str,
+        qualified_name: &'a str,
+        id: BindingId,
+    ) -> Option<BindingId> {
+        self.imports.insert(qualified_name, id);
+        self.name_to_qualified_name.insert(name, qualified_name);
+        self.add(name, id)
     }
 
     /// Returns `true` if this scope defines a binding with the given name.
@@ -55,7 +85,14 @@ impl<'a> Scope<'a> {
 
     /// Removes the binding with the given name
     pub fn remove(&mut self, name: &str) -> Option<BindingId> {
-        self.bindings.remove(name)
+        if let Some(id) = self.bindings.remove(name) {
+            if let Some(qualified_name) = self.name_to_qualified_name.remove(name) {
+                self.imports.remove(qualified_name);
+            }
+            Some(id)
+        } else {
+            None
+        }
     }
 
     /// Returns the ids of all bindings defined in this scope.
