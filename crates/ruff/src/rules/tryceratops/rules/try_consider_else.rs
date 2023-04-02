@@ -28,7 +28,7 @@ pub fn try_consider_else(
         if let Some(stmt) = body.last() {
             if let StmtKind::Return { value } = &stmt.node {
                 if let Some(value) = value {
-                    if contains_effect(&checker.ctx, value) {
+                    if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
                         return;
                     }
                 }
