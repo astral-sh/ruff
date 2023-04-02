@@ -23,14 +23,14 @@ use crate::visibility::{module_visibility, Modifier, VisibleScope};
 pub struct Context<'a> {
     pub typing_modules: &'a [String],
     pub module_path: Option<Vec<String>>,
-    // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
+    // Retain all scopes and parent nodes, along with a stack of indices to track which are active
     // at various points in time.
     pub parents: Vec<RefEquality<'a, Stmt>>,
     pub depths: FxHashMap<RefEquality<'a, Stmt>, usize>,
     pub child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
     // A stack of all bindings created in any scope, at any point in execution.
     pub bindings: Bindings<'a>,
-    // Map from binding index to indexes of bindings that redefine it in other scopes.
+    // Map from binding index to indices of bindings that redefine it in other scopes.
     pub redefinitions:
         std::collections::HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
     pub exprs: Vec<RefEquality<'a, Expr>>,
