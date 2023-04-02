@@ -5,10 +5,12 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
+use crate::types::Range;
+
 pub struct Indexer {
     commented_lines: Vec<usize>,
     continuation_lines: Vec<usize>,
-    string_lines: Vec<(usize, usize)>,
+    string_lines: Vec<Range>,
 }
 
 impl Indexer {
@@ -20,7 +22,7 @@ impl Indexer {
         &self.continuation_lines
     }
 
-    pub fn string_lines(&self) -> &[(usize, usize)] {
+    pub fn string_lines(&self) -> &[Range] {
         &self.string_lines
     }
 }
@@ -43,7 +45,7 @@ impl From<&[LexResult]> for Indexer {
                     triple_quoted: _
                 }
             ) {
-                string_lines.push((start.row(), end.row()));
+                string_lines.push(Range::new(start.clone(), end.clone()));
             }
             if let Some((.., prev_tok, prev_end)) = prev {
                 if !matches!(
@@ -67,10 +69,12 @@ impl From<&[LexResult]> for Indexer {
 
 #[cfg(test)]
 mod tests {
+    use rustpython_parser::ast::Location;
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
     use crate::source_code::Indexer;
+    use crate::types::Range;
 
     #[test]
     fn continuation() {
@@ -137,7 +141,11 @@ import os
         let contents = r#""this is a string""#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
-        assert_eq!(indexer.string_lines(), [(1, 1)]);
+        assert!(
+            indexer.string_lines()[0].location.row() == 1
+                && indexer.string_lines()[0].end_location.row() == 1
+                && indexer.string_lines().len() == 1
+        );
 
         let contents = r#"
             """
@@ -146,7 +154,11 @@ import os
             "#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
-        assert_eq!(indexer.string_lines(), [(2, 4)]);
+        assert!(
+            indexer.string_lines()[0].location.row() == 2
+                && indexer.string_lines()[0].end_location.row() == 4
+                && indexer.string_lines().len() == 1
+        );
 
         let contents = r#"
             """
@@ -155,13 +167,41 @@ import os
             "#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
-        assert_eq!(indexer.string_lines(), [(2, 4)]);
+        assert!(
+            indexer.string_lines()[0].location.row() == 2
+                && indexer.string_lines()[0].end_location.row() == 4
+                && indexer.string_lines().len() == 1
+        );
 
         let contents = r#"
             """this is a triple-quoted string on one line"""
             "#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
-        assert_eq!(indexer.string_lines(), [(2, 2)]);
+        assert!(
+            indexer.string_lines()[0].location.row() == 2
+                && indexer.string_lines()[0].end_location.row() == 2
+                && indexer.string_lines().len() == 1
+        );
+
+        let contents = r#"
+        """
+        this is one 
+        multiline string
+        """
+        """
+        and this is
+        another
+        """
+        "#;
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer: Indexer = lxr.as_slice().into();
+        assert!(
+            indexer.string_lines()[0].location.row() == 2
+                && indexer.string_lines()[0].end_location.row() == 5
+                && indexer.string_lines()[1].location.row() == 6
+                && indexer.string_lines()[1].end_location.row() == 9
+                && indexer.string_lines().len() == 2
+        );
     }
 }

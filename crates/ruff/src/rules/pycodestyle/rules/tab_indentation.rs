@@ -44,19 +44,15 @@ fn find_closest_string(lineno: &usize, string_lines: &[(usize, usize)]) -> Optio
 }
 
 /// W191
-pub fn tab_indentation(
-    lineno: usize,
-    line: &str,
-    string_lines: &[(usize, usize)],
-) -> Option<Diagnostic> {
+pub fn tab_indentation(lineno: usize, line: &str, string_lines: &[Range]) -> Option<Diagnostic> {
     let indent = leading_space(line);
 
     if indent.contains('\t') {
         // If the tab character is contained in a string, don't raise a violation
-        if let Some((closest_string_start, closest_string_end)) =
-            find_closest_string(&lineno, string_lines)
-        {
-            if closest_string_start <= lineno && closest_string_end >= lineno {
+        if let Some(contained_range) = find_closest_string(&lineno, string_lines) {
+            if contained_range.location.row() <= lineno
+                && contained_range.end_location.row() >= lineno
+            {
                 return None;
             }
         }
