@@ -364,6 +364,7 @@ Ruff is used in a number of major open-source projects, including:
 - [Neon](https://github.com/neondatabase/neon)
 - [The Algorithms](https://github.com/TheAlgorithms/Python)
 - [Openverse](https://github.com/WordPress/openverse)
+- [MegaLinter](https://github.com/oxsecurity/megalinter)
 
 ## License
 
