@@ -45,7 +45,7 @@ impl From<&[LexResult]> for Indexer {
                     triple_quoted: true
                 }
             ) {
-                string_lines.push(Range::new(start.clone(), end.clone()));
+                string_lines.push(Range::new(*start, *end));
             }
             if let Some((.., prev_tok, prev_end)) = prev {
                 if !matches!(
@@ -69,12 +69,11 @@ impl From<&[LexResult]> for Indexer {
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::ast::Location;
+
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
     use crate::source_code::Indexer;
-    use crate::types::Range;
 
     #[test]
     fn continuation() {

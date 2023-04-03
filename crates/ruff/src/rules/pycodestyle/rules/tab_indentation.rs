@@ -15,10 +15,10 @@ impl Violation for TabIndentation {
     }
 }
 
-/// string_lines is parsed from top to bottom during the tokenization phase, and we know that the
+/// `string_lines` is parsed from top to bottom during the tokenization phase, and we know that the
 /// strings aren't overlapping (otherwise there'd only be one string). This function performs a
-/// binary search on string_lines to find the string that contains (or starts just before) lineno
-fn find_closest_string<'a>(lineno: &usize, string_lines: &'a [Range]) -> Option<&'a Range> {
+/// binary search on `string_lines` to find the string that contains (or starts just before) lineno
+fn find_closest_string<'a>(lineno: usize, string_lines: &'a [Range]) -> Option<&'a Range> {
     if string_lines.is_empty() {
         return None;
     }
@@ -33,8 +33,8 @@ fn find_closest_string<'a>(lineno: &usize, string_lines: &'a [Range]) -> Option<
         }
 
         let curr = &string_lines[middle];
-        let start = &curr.location.row();
-        let end = &curr.end_location.row();
+        let start = curr.location.row();
+        let end = curr.end_location.row();
 
         if start <= lineno && lineno <= end {
             return Some(curr);
@@ -45,7 +45,7 @@ fn find_closest_string<'a>(lineno: &usize, string_lines: &'a [Range]) -> Option<
         }
     }
 
-    return Some(&string_lines[high]);
+    Some(&string_lines[high])
 }
 
 /// W191
@@ -54,7 +54,7 @@ pub fn tab_indentation(lineno: usize, line: &str, string_lines: &[Range]) -> Opt
 
     if indent.contains('\t') {
         // If the tab character is contained in a string, don't raise a violation
-        if let Some(contained_range) = find_closest_string(&lineno, string_lines) {
+        if let Some(contained_range) = find_closest_string(lineno, string_lines) {
             if contained_range.location.row() <= lineno
                 && contained_range.end_location.row() >= lineno
             {
@@ -92,11 +92,11 @@ mod tests {
         let string_lines = get_string_lines();
 
         let expected = Some(&string_lines[0]);
-        let actual = find_closest_string(&2usize, &string_lines);
+        let actual = find_closest_string(2usize, &string_lines);
         assert_eq!(expected, actual);
 
         let expected = Some(&string_lines[0]);
-        let actual = find_closest_string(&3usize, &string_lines);
+        let actual = find_closest_string(3usize, &string_lines);
         assert_eq!(expected, actual);
     }
 
@@ -106,16 +106,16 @@ mod tests {
         let string_lines = get_string_lines();
 
         let expected = Some(&string_lines[1]);
-        let actual = find_closest_string(&6usize, &string_lines);
+        let actual = find_closest_string(6usize, &string_lines);
         assert_eq!(expected, actual);
 
         let expected = Some(&string_lines[2]);
-        let actual = find_closest_string(&11usize, &string_lines);
+        let actual = find_closest_string(11usize, &string_lines);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn test_find_closest_string_empty_array() {
-        assert_eq!(None, find_closest_string(&1usize, &[]));
+        assert_eq!(None, find_closest_string(1usize, &[]));
     }
 }
