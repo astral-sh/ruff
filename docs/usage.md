@@ -82,7 +82,7 @@ The Ruff action can be customized via optional configuration parameters passed t
   with:
     src: "./src" 
     version: 0.0.259
-    options: --select B
+    args: --select B
 ```
 
 See [Configuring Ruff](https://github.com/charliermarsh/ruff/blob/main/docs/configuration.md) for details
