@@ -12,15 +12,19 @@ import argparse
 import asyncio
 import difflib
 import heapq
+import json
+import logging
 import re
 import tempfile
 from asyncio.subprocess import PIPE, create_subprocess_exec
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple, Self
+from typing import TYPE_CHECKING, NamedTuple, Self, Optional, Dict
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
+
+logger = logging.getLogger(__name__)
 
 
 class Repository(NamedTuple):
@@ -28,7 +32,7 @@ class Repository(NamedTuple):
 
     org: str
     repo: str
-    ref: str
+    ref: Optional[str]
     select: str = ""
     ignore: str = ""
     exclude: str = ""
@@ -37,7 +41,8 @@ class Repository(NamedTuple):
     async def clone(self: Self) -> "AsyncIterator[Path]":
         """Shallow clone this repository to a temporary directory."""
         with tempfile.TemporaryDirectory() as tmpdir:
-            process = await create_subprocess_exec(
+            logger.debug(f"Cloning {self.org}/{self.repo}")
+            git_command = [
                 "git",
                 "clone",
                 "--config",
@@ -46,13 +51,21 @@ class Repository(NamedTuple):
                 "--depth",
                 "1",
                 "--no-tags",
-                "--branch",
-                self.ref,
-                f"https://github.com/{self.org}/{self.repo}",
-                tmpdir,
+            ]
+            if self.ref:
+                git_command.extend(["--branch", self.ref])
+            git_command.extend(
+                [
+                    f"https://github.com/{self.org}/{self.repo}",
+                    tmpdir,
+                ]
             )
 
+            process = await create_subprocess_exec(*git_command)
+
             await process.wait()
+
+            logger.debug(f"Finished cloning {self.org}/{self.repo}")
 
             yield Path(tmpdir)
 
@@ -80,11 +93,13 @@ async def check(
     *,
     ruff: Path,
     path: Path,
+    name: str,
     select: str = "",
     ignore: str = "",
     exclude: str = "",
 ) -> "Sequence[str]":
     """Run the given ruff binary against the specified path."""
+    logger.debug(f"Checking {name} with {ruff}")
     ruff_args = ["check", "--no-cache", "--exit-zero"]
     if select:
         ruff_args.extend(["--select", select])
@@ -102,6 +117,8 @@ async def check(
     )
 
     result, err = await proc.communicate()
+
+    logger.debug(f"Finished checking {name} with {ruff}")
 
     if proc.returncode != 0:
         raise RuffError(err.decode("utf8"))
@@ -145,6 +162,7 @@ async def compare(ruff1: Path, ruff2: Path, repo: Repository) -> Diff | None:
                     check(
                         ruff=ruff1,
                         path=path,
+                        name=f"{repo.org}/{repo.repo}",
                         select=repo.select,
                         ignore=repo.ignore,
                         exclude=repo.exclude,
@@ -154,6 +172,7 @@ async def compare(ruff1: Path, ruff2: Path, repo: Repository) -> Diff | None:
                     check(
                         ruff=ruff2,
                         path=path,
+                        name=f"{repo.org}/{repo.repo}",
                         select=repo.select,
                         ignore=repo.ignore,
                         exclude=repo.exclude,
@@ -171,14 +190,53 @@ async def compare(ruff1: Path, ruff2: Path, repo: Repository) -> Diff | None:
     return Diff(removed, added)
 
 
-async def main(*, ruff1: Path, ruff2: Path) -> None:
+def read_projects_jsonl(projects_jsonl: Path) -> Dict[str, Repository]:
+    repositories = {}
+    for line in projects_jsonl.read_text().splitlines():
+        data = json.loads(line)
+        # Check which format we got
+        if "items" in data:
+            for item in data["items"]:
+                # Pick only the easier case for now
+                if item["path"] != "pyproject.toml":
+                    continue
+                repository = item["repository"]
+                assert re.fullmatch(r"[a-zA-Z0-9_.-]+", repository["name"]), repository[
+                    "name"
+                ]
+                # :/ GitHub doesn't give us any branch or pure rev info
+                # This would give us the revision, but there's no way with git to just
+                # do `git clone --depth 1` with a specific ref
+                # ref = item["url"].split("?ref=")[1]
+                repositories[repository["name"]] = Repository(
+                    repository["owner"]["login"], repository["name"], None
+                )
+        else:
+            assert "owner" in data, "Unknown ruff-usage-aggregate format"
+            # Pick only the easier case for now
+            if data["path"] != "pyproject.toml":
+                continue
+            repositories[data["repo"]] = Repository(
+                data["owner"], data["repo"], data.get("ref")
+            )
+    return repositories
+
+
+async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> None:
     """Check two versions of ruff against a corpus of open-source code."""
+    if projects_jsonl:
+        repositories = read_projects_jsonl(projects_jsonl)
+    else:
+        repositories = REPOSITORIES
+
+    logger.debug(f"Checking {len(repositories)} projects")
+
     results = await asyncio.gather(
-        *[compare(ruff1, ruff2, repo) for repo in REPOSITORIES.values()],
+        *[compare(ruff1, ruff2, repo) for repo in repositories.values()],
         return_exceptions=True,
     )
 
-    diffs = dict(zip(REPOSITORIES, results, strict=True))
+    diffs = dict(zip(repositories, results, strict=True))
 
     total_removed = total_added = 0
     errors = 0
@@ -202,6 +260,11 @@ async def main(*, ruff1: Path, ruff2: Path) -> None:
             if isinstance(diff, Exception):
                 changes = "error"
                 print(f"<details><summary>{name} ({changes})</summary>")
+                repo = repositories[name]
+                print(
+                    f"https://github.com/{repo.org}/{repo.repo} ref {repo.ref} "
+                    f"select {repo.select} ignore {repo.ignore} exclude {repo.exclude}"
+                )
                 print("<p>")
                 print()
 
@@ -230,6 +293,8 @@ async def main(*, ruff1: Path, ruff2: Path) -> None:
             else:
                 continue
 
+    logger.debug(f"Finished {len(repositories)} repositories")
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
@@ -237,6 +302,19 @@ if __name__ == "__main__":
         epilog="scripts/check_ecosystem.py <path/to/ruff1> <path/to/ruff2>",
     )
 
+    parser.add_argument(
+        "--projects",
+        type=Path,
+        help="Optional json files with set of projects from "
+        "https://github.com/akx/ruff-usage-aggregate to use over the default ones "
+        "(supports both github_search_*.jsonl and known-github-tomls.jsonl)",
+    )
+    parser.add_argument(
+        "-v",
+        "--verbose",
+        action="store_true",
+        help="Activate debug logging",
+    )
     parser.add_argument(
         "ruff1",
         type=Path,
@@ -248,4 +326,9 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    asyncio.run(main(ruff1=args.ruff1, ruff2=args.ruff2))
+    if args.verbose:
+        logging.basicConfig(level=logging.DEBUG)
+    else:
+        logging.basicConfig(level=logging.INFO)
+
+    asyncio.run(main(ruff1=args.ruff1, ruff2=args.ruff2, projects_jsonl=args.projects))

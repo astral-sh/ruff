@@ -1,0 +1,14 @@
+# From the project root:
+# ```
+# cargo build
+# docker buildx build -f scripts/Dockerfile.ecosystem -t ruff-ecosystem-checker --load .
+# docker run --rm ruff-ecosystem-checker
+# ```
+
+FROM python:3.11
+RUN python -m venv .venv && .venv/bin/pip install ruff
+ADD scripts/check_ecosystem.py check_ecosystem.py
+ADD github_search.jsonl github_search.jsonl
+ADD target/debug/ruff ruff-new
+
+CMD ["python", "check_ecosystem.py", "--verbose", "--projects", "github_search.jsonl", "ruff-new", ".venv/bin/ruff"]
