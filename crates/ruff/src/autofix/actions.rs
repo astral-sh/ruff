@@ -1,3 +1,4 @@
+//! Interface for generating autofix edits from higher-level actions (e.g., "remove an argument").
 use anyhow::{bail, Result};
 use itertools::Itertools;
 use libcst_native::{
@@ -531,7 +532,7 @@ mod tests {
 
     use ruff_python_ast::source_code::Locator;
 
-    use crate::autofix::helpers::{next_stmt_break, trailing_semicolon};
+    use crate::autofix::actions::{next_stmt_break, trailing_semicolon};
 
     #[test]
     fn find_semicolon() -> Result<()> {

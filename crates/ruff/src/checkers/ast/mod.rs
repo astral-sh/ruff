@@ -5066,7 +5066,7 @@ impl<'a> Checker<'a> {
 
                     let fix = if !in_init && !in_except_handler && self.patch(Rule::UnusedImport) {
                         let deleted: Vec<&Stmt> = self.deletions.iter().map(Into::into).collect();
-                        match autofix::helpers::remove_unused_imports(
+                        match autofix::actions::remove_unused_imports(
                             unused_imports.iter().map(|(full_name, _)| *full_name),
                             child,
                             parent,

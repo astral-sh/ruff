@@ -5,7 +5,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::{Range, RefEquality};
 
-use crate::autofix::helpers::delete_stmt;
+use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 

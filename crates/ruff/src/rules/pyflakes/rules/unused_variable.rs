@@ -10,7 +10,7 @@ use ruff_python_ast::scope::{ScopeId, ScopeKind};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::{Range, RefEquality};
 
-use crate::autofix::helpers::delete_stmt;
+use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
