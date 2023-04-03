@@ -15,6 +15,8 @@ You can run Ruff in `--watch` mode to automatically re-run on-change:
 ruff check path/to/code/ --watch
 ```
 
+## pre-commit
+
 Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 
 ```yaml
@@ -33,7 +35,7 @@ Or, to enable autofix:
   rev: 'v0.0.260'
   hooks:
     - id: ruff
-      args: [--fix, --exit-non-zero-on-fix]
+      args: [ --fix, --exit-non-zero-on-fix ]
 ```
 
 Ruff's pre-commit hook should be placed after other formatting tools, such as Black and isort,
@@ -41,20 +43,29 @@ _unless_ you enable autofix, in which case, Ruff's pre-commit hook should run _b
 and other formatting tools, as Ruff's autofix behavior can output code changes that require
 reformatting.
 
+### VS Code
+
 Ruff can also be used as a [VS Code extension](https://github.com/charliermarsh/ruff-vscode) or
 alongside any other editor through the [Ruff LSP](https://github.com/charliermarsh/ruff-lsp).
 
-Ruff can also be used as a [GitHub Action](https://github.com/features/actions).  Refer to the [Ruff-Action Project](https://github.com/chartboost/ruff-action) for more details.  The action is commonly used as a pass/fail test to ensure your repository stays clean, abiding the [Rules](https://beta.ruff.rs/docs/rules/) specified in your configuration.  Though it runs `ruff` so the action can do anything `ruff` can (ex: fix)
+### GitHub Action
 
-Compatibility
-This action is known to support all GitHub-hosted runner OSes. In addition, only published versions of Ruff are supported (i.e. whatever is available on PyPI).
+Ruff can also be used as a GitHub Action via [`ruff-action`](https://github.com/chartboost/ruff-action).
 
-Usage
-Create a file (ex: `.github/workflows/ruff.yml`) inside your repository with:
+By default, `ruff-action` runs as a pass-fail test to ensure that a given repository doesn't contain
+any lint rule violations as per its [configuration](https://github.com/charliermarsh/ruff/blob/main/docs/configuration.md).
+However, under-the-hood, `ruff-action` installs and runs `ruff` directly, so it can be used to
+execute any supported `ruff` command (e.g., `ruff check --fix`).
+
+`ruff-action` supports all GitHub-hosted runners, and can be used with any published Ruff version
+(i.e., any version available on [PyPI](https://pypi.org/project/ruff/)).
+
+To use `ruff-action`, create a file (e.g., `.github/workflows/ruff.yml`) inside your repository
+with:
 
 ```yaml
 name: Ruff
-on: [push, pull_request]
+on: [ push, pull_request ]
 jobs:
   ruff:
     runs-on: ubuntu-latest
@@ -63,26 +74,24 @@ jobs:
       - uses: chartboost/ruff-action@v1
 ```
 
-Alternatively,
+Alternatively, you can include `ruff-action` as a step in any other workflow file:
 
 ```yaml
       - uses: chartboost/ruff-action@v1
 ```
 
-can be included as a step in any other workflow file.
+`ruff-action` accepts optional configuration parameters via `with:`, including:
 
-The Ruff action can be customized via optional configuration parameters passed to Ruff (using `with:`):
+- `version`: The Ruff version to install (default: latest).
+- `options`: The command-line arguments to pass to Ruff (default: `"check"`).
+- `src`: The source paths to pass to Ruff (default: `"."`).
 
-- version: Must be release available on PyPI. default, latest release of ruff. You can pin a version, or use any valid version specifier.
-- options: default,`check`
-- src: default, '.'
+For example, to run `ruff check --select B ./src` using Ruff version `0.0.259`:
 
 ```yaml
 - uses: chartboost/ruff-action@v1
   with:
-    src: "./src" 
+    src: "./src"
     version: 0.0.259
     args: --select B
 ```
-
-See [Configuring Ruff](https://github.com/charliermarsh/ruff/blob/main/docs/configuration.md) for details
