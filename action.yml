@@ -1,0 +1,36 @@
+name: "Ruff"
+description: "An extremely fast Python linter."
+author: "Ruff Contributor(s)"
+inputs:
+  options:
+    description:
+      "Options passed to Ruff. Use `ruff --help` to see available options. 
+      Default: 'check'"
+    required: false
+    default: "check"
+  src:
+    description: "Source to run ruff. Default: '.'"
+    required: false
+    default: "."
+  version:
+    description: 'The version of ruff to use, e.g. "0.0.259"'
+    required: false
+    default: ""
+branding:
+  color: "black"
+  icon: "code"
+runs:
+  using: composite
+  steps:
+    - run: |
+        if [ "$RUNNER_OS" == "Windows" ]; then
+          python $GITHUB_ACTION_PATH/action/main.py
+        else
+          python3 $GITHUB_ACTION_PATH/action/main.py
+        fi
+      env:
+        INPUT_OPTIONS: ${{ inputs.options }}
+        INPUT_SRC: ${{ inputs.src }}
+        INPUT_VERSION: ${{ inputs.version }}
+        pythonioencoding: utf-8
+      shell: bash
