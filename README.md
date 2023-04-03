@@ -91,13 +91,6 @@ developer of [Zulip](https://github.com/zulip/zulip):
 
 > This is just ridiculously fast... `ruff` is amazing.
 
-[**Nicolas Vuillamy**](https://twitter.com/NicolasVuillamy/status/1642190099860406273),
-creator of [MegaLinter](https://megalinter.io/):
-
-> Million thanks for #ruff @charliermarsh, we just added it in #MegaLinter and it is REALLY fast, it completes its analysis long before the other python linters have even started theirs 🚀 
-> 
-> ![image](https://user-images.githubusercontent.com/17500430/229299671-35b07ec0-e8f7-4cf6-847a-e710c5052e01.png)
-
 <!-- End section: Overview -->
 
 ## Table of Contents
