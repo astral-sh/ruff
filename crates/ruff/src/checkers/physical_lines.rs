@@ -158,24 +158,9 @@ pub fn check_physical_lines(
             }
         }
 
-        // Find the quote delimiter in the line before checking the indentation
-        let (quote_delimiter, occurrences) = find_delimiter(line);
-        if quote_delimiter.is_some() {
-            in_quote = !in_quote;
-        }
         if enforce_tab_indentation {
             if let Some(diagnostic) = tab_indentation(index, line, string_lines) {
-                if !in_quote {
-                    diagnostics.push(diagnostic);
-                }
-            }
-        }
-
-        // If we've found multiple occurrences of a delimiter on the same line, we should flip
-        // in_quote back to its original state
-        if quote_delimiter.is_some() {
-            if occurrences % 2 == 0 {
-                in_quote = !in_quote;
+                diagnostics.push(diagnostic);
             }
         }
     }
@@ -197,29 +182,6 @@ pub fn check_physical_lines(
     }
 
     diagnostics
-}
-
-/// Finds the first delimiter which occurs on a line, and returns both the delimiter and how many
-/// times it appears
-fn find_delimiter(line: &str) -> (Option<&str>, i64) {
-    let delimiters = vec!["\"\"\"", "'''"];
-
-    let mut delimiter_string = None;
-    let mut delimiter_count = 0;
-    for delimiter in delimiters {
-        if line.contains(delimiter) {
-            // If something went wrong while parsing, the most common case is one triple-quote occurrence on a
-            // single line
-            delimiter_count = i64::try_from(line.matches(delimiter).count())
-                .ok()
-                .unwrap_or(1i64);
-            delimiter_string = Some(delimiter);
-            // Break so we don't overwrite - i.e. """ '''hello''' """
-            break;
-        }
-    }
-
-    (delimiter_string, delimiter_count)
 }
 
 #[cfg(test)]
