@@ -651,19 +651,23 @@ pub fn has_comments_in(range: Range, locator: &Locator) -> bool {
 }
 
 /// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
-pub fn uses_magic_variable_access(ctx: &Context, body: &[Stmt]) -> bool {
+///
+/// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
+pub fn uses_magic_variable_access<F>(body: &[Stmt], is_builtin: F) -> bool
+where
+    F: Fn(&str) -> bool,
+{
     any_over_body(body, &|expr| {
         if let ExprKind::Call { func, .. } = &expr.node {
-            ctx.resolve_call_path(func).map_or(false, |call_path| {
-                call_path.as_slice() == ["", "locals"]
-                    || call_path.as_slice() == ["", "globals"]
-                    || call_path.as_slice() == ["", "vars"]
-                    || call_path.as_slice() == ["", "eval"]
-                    || call_path.as_slice() == ["", "exec"]
-            })
-        } else {
-            false
+            if let ExprKind::Name { id, .. } = &func.node {
+                if matches!(id.as_str(), "locals" | "globals" | "vars" | "exec" | "eval") {
+                    if is_builtin(id.as_str()) {
+                        return true;
+                    }
+                }
+            }
         }
+        false
     })
 }
 
