@@ -140,7 +140,9 @@ pub fn unused_loop_control_variable(
         }
 
         // Avoid fixing any variables that _may_ be used, but undetectably so.
-        let certainty = Certainty::from(!helpers::uses_magic_variable_access(&checker.ctx, body));
+        let certainty = Certainty::from(!helpers::uses_magic_variable_access(body, |id| {
+            checker.ctx.is_builtin(id)
+        }));
 
         // Attempt to rename the variable by prepending an underscore, but avoid
         // applying the fix if doing so wouldn't actually cause us to ignore the
