@@ -8,7 +8,6 @@ rust-version = { workspace = true }
 [lib]
 
 [dependencies]
-ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_rustpython = { path = "../ruff_rustpython" }
 
 anyhow = { workspace = true }
@@ -16,7 +15,6 @@ bitflags = { workspace = true }
 is-macro = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
-nohash-hasher = { version = "0.2.0" }
 num-bigint = { version = "0.4.3" }
 num-traits = { version = "0.2.15" }
 once_cell = { workspace = true }
@@ -25,4 +23,4 @@ rustc-hash = { workspace = true }
 rustpython-common = { workspace = true }
 rustpython-parser = { workspace = true }
 serde = { workspace = true }
-smallvec = { version = "1.10.0" }
+smallvec = { workspace = true }

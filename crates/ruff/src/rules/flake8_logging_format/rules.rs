@@ -2,8 +2,9 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Location, Operat
 
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_python_ast::helpers::{find_keyword, SimpleCallArgs};
-use ruff_python_ast::logging;
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::analyze::logging;
+use ruff_python_stdlib::logging::LoggingLevel;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -128,7 +129,7 @@ fn check_log_record_attr_clash(checker: &mut Checker, extra: &Keyword) {
 #[derive(Copy, Clone)]
 enum LoggingCallType {
     /// Logging call with a level method, e.g., `logging.info`.
-    LevelCall(logging::LoggingLevel),
+    LevelCall(LoggingLevel),
     /// Logging call with an integer level as an argument, e.g., `logger.log(level, ...)`.
     LogCall,
 }
@@ -138,7 +139,7 @@ impl LoggingCallType {
         if attr == "log" {
             Some(LoggingCallType::LogCall)
         } else {
-            logging::LoggingLevel::from_attribute(attr).map(LoggingCallType::LevelCall)
+            LoggingLevel::from_attribute(attr).map(LoggingCallType::LevelCall)
         }
     }
 }
@@ -173,7 +174,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             if checker.settings.rules.enabled(Rule::LoggingWarn)
                 && matches!(
                     logging_call_type,
-                    LoggingCallType::LevelCall(logging::LoggingLevel::Warn)
+                    LoggingCallType::LevelCall(LoggingLevel::Warn)
                 )
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
@@ -228,14 +229,14 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
 
                     if let LoggingCallType::LevelCall(logging_level) = logging_call_type {
                         match logging_level {
-                            logging::LoggingLevel::Error => {
+                            LoggingLevel::Error => {
                                 if checker.settings.rules.enabled(Rule::LoggingExcInfo) {
                                     checker
                                         .diagnostics
                                         .push(Diagnostic::new(LoggingExcInfo, level_call_range));
                                 }
                             }
-                            logging::LoggingLevel::Exception => {
+                            LoggingLevel::Exception => {
                                 if checker
                                     .settings
                                     .rules
