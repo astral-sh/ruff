@@ -13,13 +13,15 @@ use rustpython_parser::ast::{
 };
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
+use ruff_python_ast::binding::{
+    Binding, BindingId, BindingKind, Exceptions, ExecutionContext, Export, FromImportation,
+    Importation, StarImportation, SubmoduleImportation,
+};
 use ruff_python_ast::context::Context;
-use ruff_python_ast::helpers::{binding_range, extract_handled_exceptions, to_module_path};
-use ruff_python_ast::operations::{extract_all_names, AllNamesFlags};
+use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
 use ruff_python_ast::scope::{
-    Binding, BindingId, BindingKind, ClassDef, Exceptions, ExecutionContext, Export,
-    FromImportation, FunctionDef, Importation, Lambda, Scope, ScopeId, ScopeKind, ScopeStack,
-    StarImportation, SubmoduleImportation,
+    ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind, ScopeStack,
 };
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::types::{Node, Range, RefEquality};
@@ -27,9 +29,7 @@ use ruff_python_ast::typing::{
     match_annotated_subscript, parse_type_annotation, Callable, SubscriptKind,
 };
 use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
-use ruff_python_ast::{
-    branch_detection, cast, helpers, operations, str, typing, visibility, visitor,
-};
+use ruff_python_ast::{branch_detection, cast, helpers, str, typing, visibility, visitor};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 
@@ -38,6 +38,7 @@ use crate::docstrings::definition::{
     transition_scope, Definition, DefinitionKind, Docstring, Documentable,
 };
 use crate::fs::relativize_path;
+use crate::importer::Importer;
 use crate::registry::{AsRule, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
@@ -70,6 +71,7 @@ pub struct Checker<'a> {
     pub locator: &'a Locator<'a>,
     pub stylist: &'a Stylist<'a>,
     pub indexer: &'a Indexer,
+    pub importer: Importer<'a>,
     // Stateful fields.
     pub ctx: Context<'a>,
     pub deferred: Deferred<'a>,
@@ -92,6 +94,7 @@ impl<'a> Checker<'a> {
         locator: &'a Locator,
         stylist: &'a Stylist,
         indexer: &'a Indexer,
+        importer: Importer<'a>,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -105,6 +108,7 @@ impl<'a> Checker<'a> {
             locator,
             stylist,
             indexer,
+            importer,
             ctx: Context::new(&settings.typing_modules, path, module_path),
             deferred: Deferred::default(),
             diagnostics: Vec::default(),
@@ -183,12 +187,24 @@ where
                 self.ctx.futures_allowed = false;
                 if !self.ctx.seen_import_boundary
                     && !helpers::is_assignment_to_a_dunder(stmt)
-                    && !operations::in_nested_block(self.ctx.parents.iter().rev().map(Into::into))
+                    && !helpers::in_nested_block(self.ctx.parents.iter().rev().map(Into::into))
                 {
                     self.ctx.seen_import_boundary = true;
                 }
             }
         }
+
+        // Track each top-level import, to guide import insertions.
+        if matches!(
+            &stmt.node,
+            StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
+        ) {
+            let scope_index = self.ctx.scope_id();
+            if scope_index.is_global() && self.ctx.current_stmt_parent().is_none() {
+                self.importer.visit_import(stmt);
+            }
+        }
+
         // Pre-visit.
         match &stmt.node {
             StmtKind::Global { names } => {
@@ -1097,7 +1113,7 @@ where
                         stmt,
                         names,
                         module.as_ref().map(String::as_str),
-                        level.as_ref(),
+                        *level,
                     );
                 }
                 if self.settings.rules.enabled(Rule::UnnecessaryBuiltinImport) {
@@ -1136,11 +1152,9 @@ where
                     .rules
                     .enabled(Rule::PytestIncorrectPytestImport)
                 {
-                    if let Some(diagnostic) = flake8_pytest_style::rules::import_from(
-                        stmt,
-                        module.as_deref(),
-                        level.as_ref(),
-                    ) {
+                    if let Some(diagnostic) =
+                        flake8_pytest_style::rules::import_from(stmt, module.as_deref(), *level)
+                    {
                         self.diagnostics.push(diagnostic);
                     }
                 }
@@ -1180,22 +1194,10 @@ where
                             ));
                         }
                     } else if alias.node.name == "*" {
-                        self.add_binding(
-                            "*",
-                            Binding {
-                                kind: BindingKind::StarImportation(StarImportation {
-                                    level: *level,
-                                    module: module.clone(),
-                                }),
-                                runtime_usage: None,
-                                synthetic_usage: None,
-                                typing_usage: None,
-                                range: Range::from(stmt),
-                                source: Some(*self.ctx.current_stmt()),
-                                context: self.ctx.execution_context(),
-                                exceptions: self.ctx.exceptions(),
-                            },
-                        );
+                        self.ctx.scope_mut().add_star_import(StarImportation {
+                            module: module.as_ref().map(String::as_str),
+                            level: *level,
+                        });
 
                         if self
                             .settings
@@ -1207,7 +1209,7 @@ where
                                 self.diagnostics.push(Diagnostic::new(
                                     pyflakes::rules::UndefinedLocalWithNestedImportStarUsage {
                                         name: helpers::format_import_from(
-                                            level.as_ref(),
+                                            *level,
                                             module.as_deref(),
                                         ),
                                     },
@@ -1223,17 +1225,11 @@ where
                         {
                             self.diagnostics.push(Diagnostic::new(
                                 pyflakes::rules::UndefinedLocalWithImportStar {
-                                    name: helpers::format_import_from(
-                                        level.as_ref(),
-                                        module.as_deref(),
-                                    ),
+                                    name: helpers::format_import_from(*level, module.as_deref()),
                                 },
                                 Range::from(stmt),
                             ));
                         }
-
-                        let scope = self.ctx.scope_mut();
-                        scope.import_starred = true;
                     } else {
                         if let Some(asname) = &alias.node.asname {
                             self.check_builtin_shadowing(asname, stmt, false);
@@ -1252,7 +1248,7 @@ where
                         // and `full_name` would be "foo.bar".
                         let name = alias.node.asname.as_ref().unwrap_or(&alias.node.name);
                         let full_name = helpers::format_import_from_member(
-                            level.as_ref(),
+                            *level,
                             module.as_deref(),
                             &alias.node.name,
                         );
@@ -1283,7 +1279,7 @@ where
                             flake8_tidy_imports::relative_imports::banned_relative_import(
                                 self,
                                 stmt,
-                                level.as_ref(),
+                                *level,
                                 module.as_deref(),
                                 self.module_path.as_ref(),
                                 &self.settings.flake8_tidy_imports.ban_relative_imports,
@@ -1306,7 +1302,7 @@ where
 
                     if self.settings.rules.enabled(Rule::UnconventionalImportAlias) {
                         let full_name = helpers::format_import_from_member(
-                            level.as_ref(),
+                            *level,
                             module.as_deref(),
                             &alias.node.name,
                         );
@@ -1908,8 +1904,8 @@ where
                 self.ctx.visible_scope = scope;
 
                 // If any global bindings don't already exist in the global scope, add it.
-                let globals = operations::extract_globals(body);
-                for (name, stmt) in operations::extract_globals(body) {
+                let globals = helpers::extract_globals(body);
+                for (name, stmt) in helpers::extract_globals(body) {
                     if self
                         .ctx
                         .global_scope()
@@ -1971,7 +1967,7 @@ where
                 self.ctx.visible_scope = scope;
 
                 // If any global bindings don't already exist in the global scope, add it.
-                let globals = operations::extract_globals(body);
+                let globals = helpers::extract_globals(body);
                 for (name, stmt) in &globals {
                     if self
                         .ctx
@@ -4038,7 +4034,6 @@ impl<'a> Checker<'a> {
                     BindingKind::Importation(..)
                         | BindingKind::FromImportation(..)
                         | BindingKind::SubmoduleImportation(..)
-                        | BindingKind::StarImportation(..)
                         | BindingKind::FutureImportation
                 );
                 if binding.kind.is_loop_var() && existing_is_import {
@@ -4067,7 +4062,16 @@ impl<'a> Checker<'a> {
                                     name: name.to_string(),
                                     line: existing.range.location.row(),
                                 },
-                                binding_range(&binding, self.locator),
+                                matches!(
+                                    binding.kind,
+                                    BindingKind::ClassDefinition | BindingKind::FunctionDefinition
+                                )
+                                .then(|| {
+                                    binding.source.as_ref().map_or(binding.range, |source| {
+                                        helpers::identifier_range(source, self.locator)
+                                    })
+                                })
+                                .unwrap_or(binding.range),
                             );
                             if let Some(parent) = binding.source.as_ref() {
                                 if matches!(parent.node, StmtKind::ImportFrom { .. })
@@ -4081,7 +4085,7 @@ impl<'a> Checker<'a> {
                     }
                 } else if existing_is_import && binding.redefines(existing) {
                     self.ctx
-                        .redefinitions
+                        .shadowed_bindings
                         .entry(existing_binding_index)
                         .or_insert_with(Vec::new)
                         .push(binding_id);
@@ -4123,13 +4127,7 @@ impl<'a> Checker<'a> {
         // in scope.
         let scope = self.ctx.scope_mut();
         if !(binding.kind.is_annotation() && scope.defines(name)) {
-            if let Some(rebound_index) = scope.add(name, binding_id) {
-                scope
-                    .rebounds
-                    .entry(name)
-                    .or_insert_with(Vec::new)
-                    .push(rebound_index);
-            }
+            scope.add(name, binding_id);
         }
 
         self.ctx.bindings.push(binding);
@@ -4245,35 +4243,31 @@ impl<'a> Checker<'a> {
 
             first_iter = false;
             in_generator = matches!(scope.kind, ScopeKind::Generator);
-            import_starred = import_starred || scope.import_starred;
+            import_starred = import_starred || scope.uses_star_imports();
         }
 
         if import_starred {
+            // F405
             if self
                 .settings
                 .rules
                 .enabled(Rule::UndefinedLocalWithImportStarUsage)
             {
-                let mut from_list = vec![];
-                for scope_index in self.ctx.scope_stack.iter() {
-                    let scope = &self.ctx.scopes[*scope_index];
-                    for binding in scope.binding_ids().map(|index| &self.ctx.bindings[*index]) {
-                        if let BindingKind::StarImportation(StarImportation { level, module }) =
-                            &binding.kind
-                        {
-                            from_list.push(helpers::format_import_from(
-                                level.as_ref(),
-                                module.as_deref(),
-                            ));
-                        }
-                    }
-                }
-                from_list.sort();
-
+                let sources: Vec<String> = self
+                    .ctx
+                    .scopes
+                    .iter()
+                    .flat_map(Scope::star_imports)
+                    .map(|StarImportation { level, module }| {
+                        helpers::format_import_from(*level, *module)
+                    })
+                    .sorted()
+                    .dedup()
+                    .collect();
                 self.diagnostics.push(Diagnostic::new(
                     pyflakes::rules::UndefinedLocalWithImportStarUsage {
                         name: id.to_string(),
-                        sources: from_list,
+                        sources,
                     },
                     Range::from(expr),
                 ));
@@ -4405,7 +4399,7 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        if operations::is_unpacking_assignment(parent, expr) {
+        if helpers::is_unpacking_assignment(parent, expr) {
             self.add_binding(
                 id,
                 Binding {
@@ -4456,7 +4450,23 @@ impl<'a> Checker<'a> {
                 }
                 _ => false,
             } {
-                let (all_names, all_names_flags) = extract_all_names(&self.ctx, parent, current);
+                let (all_names, all_names_flags) = {
+                    let (mut names, flags) =
+                        extract_all_names(parent, |name| self.ctx.is_builtin(name));
+
+                    // Grab the existing bound __all__ values.
+                    if let StmtKind::AugAssign { .. } = &parent.node {
+                        if let Some(index) = current.get("__all__") {
+                            if let BindingKind::Export(Export { names: existing }) =
+                                &self.ctx.bindings[*index].kind
+                            {
+                                names.extend_from_slice(existing);
+                            }
+                        }
+                    }
+
+                    (names, flags)
+                };
 
                 if self.settings.rules.enabled(Rule::InvalidAllFormat) {
                     if matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT) {
@@ -4508,7 +4518,7 @@ impl<'a> Checker<'a> {
         let ExprKind::Name { id, .. } = &expr.node else {
             return;
         };
-        if operations::on_conditional_branch(&mut self.ctx.parents.iter().rev().map(Into::into)) {
+        if helpers::on_conditional_branch(&mut self.ctx.parents.iter().rev().map(Into::into)) {
             return;
         }
 
@@ -4723,7 +4733,7 @@ impl<'a> Checker<'a> {
                         );
                     }
                 } else {
-                    unreachable!("Expected ExprKind::Lambda");
+                    unreachable!("Expected ExprKind::For | ExprKind::AsyncFor");
                 }
             }
         }
@@ -4751,10 +4761,9 @@ impl<'a> Checker<'a> {
         }
 
         // Mark anything referenced in `__all__` as used.
-
         let all_bindings: Option<(Vec<BindingId>, Range)> = {
             let global_scope = self.ctx.global_scope();
-            let all_names: Option<(&Vec<String>, Range)> = global_scope
+            let all_names: Option<(&Vec<&str>, Range)> = global_scope
                 .get("__all__")
                 .map(|index| &self.ctx.bindings[*index])
                 .and_then(|binding| match &binding.kind {
@@ -4766,7 +4775,7 @@ impl<'a> Checker<'a> {
                 (
                     names
                         .iter()
-                        .filter_map(|name| global_scope.get(name.as_str()).copied())
+                        .filter_map(|name| global_scope.get(name).copied())
                         .collect(),
                     range,
                 )
@@ -4784,15 +4793,13 @@ impl<'a> Checker<'a> {
         }
 
         // Extract `__all__` names from the global scope.
-        let all_names: Option<(Vec<&str>, Range)> = self
+        let all_names: Option<(&[&str], Range)> = self
             .ctx
             .global_scope()
             .get("__all__")
             .map(|index| &self.ctx.bindings[*index])
             .and_then(|binding| match &binding.kind {
-                BindingKind::Export(Export { names }) => {
-                    Some((names.iter().map(String::as_str).collect(), binding.range))
-                }
+                BindingKind::Export(Export { names }) => Some((names.as_slice(), binding.range)),
                 _ => None,
             });
 
@@ -4825,13 +4832,45 @@ impl<'a> Checker<'a> {
         for (index, stack) in self.ctx.dead_scopes.iter().rev() {
             let scope = &self.ctx.scopes[*index];
 
-            // F822
             if index.is_global() {
+                // F822
                 if self.settings.rules.enabled(Rule::UndefinedExport) {
+                    if !self.path.ends_with("__init__.py") {
+                        if let Some((names, range)) = &all_names {
+                            diagnostics
+                                .extend(pyflakes::rules::undefined_export(names, range, scope));
+                        }
+                    }
+                }
+
+                // F405
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UndefinedLocalWithImportStarUsage)
+                {
                     if let Some((names, range)) = &all_names {
-                        diagnostics.extend(pyflakes::rules::undefined_export(
-                            names, range, self.path, scope,
-                        ));
+                        let sources: Vec<String> = scope
+                            .star_imports()
+                            .map(|StarImportation { level, module }| {
+                                helpers::format_import_from(*level, *module)
+                            })
+                            .sorted()
+                            .dedup()
+                            .collect();
+                        if !sources.is_empty() {
+                            for &name in names.iter() {
+                                if !scope.defines(name) {
+                                    diagnostics.push(Diagnostic::new(
+                                        pyflakes::rules::UndefinedLocalWithImportStarUsage {
+                                            name: name.to_string(),
+                                            sources: sources.clone(),
+                                        },
+                                        *range,
+                                    ));
+                                }
+                            }
+                        }
                     }
                 }
             }
@@ -4872,14 +4911,13 @@ impl<'a> Checker<'a> {
                         BindingKind::Importation(..)
                             | BindingKind::FromImportation(..)
                             | BindingKind::SubmoduleImportation(..)
-                            | BindingKind::StarImportation(..)
                             | BindingKind::FutureImportation
                     ) {
                         if binding.used() {
                             continue;
                         }
 
-                        if let Some(indices) = self.ctx.redefinitions.get(index) {
+                        if let Some(indices) = self.ctx.shadowed_bindings.get(index) {
                             for index in indices {
                                 let rebound = &self.ctx.bindings[*index];
                                 let mut diagnostic = Diagnostic::new(
@@ -4887,7 +4925,17 @@ impl<'a> Checker<'a> {
                                         name: (*name).to_string(),
                                         line: binding.range.location.row(),
                                     },
-                                    binding_range(rebound, self.locator),
+                                    matches!(
+                                        rebound.kind,
+                                        BindingKind::ClassDefinition
+                                            | BindingKind::FunctionDefinition
+                                    )
+                                    .then(|| {
+                                        rebound.source.as_ref().map_or(rebound.range, |source| {
+                                            helpers::identifier_range(source, self.locator)
+                                        })
+                                    })
+                                    .unwrap_or(rebound.range),
                                 );
                                 if let Some(parent) = &rebound.source {
                                     if matches!(parent.node, StmtKind::ImportFrom { .. })
@@ -4897,41 +4945,6 @@ impl<'a> Checker<'a> {
                                     }
                                 };
                                 diagnostics.push(diagnostic);
-                            }
-                        }
-                    }
-                }
-            }
-
-            if self
-                .settings
-                .rules
-                .enabled(Rule::UndefinedLocalWithImportStarUsage)
-            {
-                if scope.import_starred {
-                    if let Some((names, range)) = &all_names {
-                        let mut from_list = vec![];
-                        for binding in scope.binding_ids().map(|index| &self.ctx.bindings[*index]) {
-                            if let BindingKind::StarImportation(StarImportation { level, module }) =
-                                &binding.kind
-                            {
-                                from_list.push(helpers::format_import_from(
-                                    level.as_ref(),
-                                    module.as_deref(),
-                                ));
-                            }
-                        }
-                        from_list.sort();
-
-                        for &name in names {
-                            if !scope.defines(name) {
-                                diagnostics.push(Diagnostic::new(
-                                    pyflakes::rules::UndefinedLocalWithImportStarUsage {
-                                        name: name.to_string(),
-                                        sources: from_list.clone(),
-                                    },
-                                    *range,
-                                ));
                             }
                         }
                     }
@@ -5051,7 +5064,7 @@ impl<'a> Checker<'a> {
 
                     let fix = if !in_init && !in_except_handler && self.patch(Rule::UnusedImport) {
                         let deleted: Vec<&Stmt> = self.deletions.iter().map(Into::into).collect();
-                        match autofix::helpers::remove_unused_imports(
+                        match autofix::actions::remove_unused_imports(
                             unused_imports.iter().map(|(full_name, _)| *full_name),
                             child,
                             parent,
@@ -5442,6 +5455,7 @@ pub fn check_ast(
         locator,
         stylist,
         indexer,
+        Importer::new(python_ast, locator, stylist),
     );
     checker.bind_builtins();
 

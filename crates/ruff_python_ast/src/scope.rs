@@ -1,22 +1,23 @@
-use crate::types::{Range, RefEquality};
-use bitflags::bitflags;
-use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Arguments, Expr, Keyword, Stmt};
 use std::num::TryFromIntError;
 use std::ops::{Deref, Index, IndexMut};
+
+use rustc_hash::FxHashMap;
+use rustpython_parser::ast::{Arguments, Expr, Keyword, Stmt};
+
+use crate::binding::{BindingId, StarImportation};
 
 #[derive(Debug)]
 pub struct Scope<'a> {
     pub id: ScopeId,
     pub kind: ScopeKind<'a>,
-    pub import_starred: bool,
     pub uses_locals: bool,
-    /// A map from bound name to binding index, for live bindings.
+    /// A list of star imports in this scope. These represent _module_ imports (e.g., `sys` in
+    /// `from sys import *`), rather than individual bindings (e.g., individual members in `sys`).
+    star_imports: Vec<StarImportation<'a>>,
+    /// A map from bound name to binding index, for current bindings.
     bindings: FxHashMap<&'a str, BindingId>,
-    /// A map from bound name to binding index, for bindings that were created
-    /// in the scope but rebound (and thus overridden) later on in the same
-    /// scope.
-    pub rebounds: FxHashMap<&'a str, Vec<BindingId>>,
+    /// A map from bound name to binding index, for bindings that were shadowed later in the scope.
+    shadowed_bindings: FxHashMap<&'a str, Vec<BindingId>>,
 }
 
 impl<'a> Scope<'a> {
@@ -28,21 +29,26 @@ impl<'a> Scope<'a> {
         Scope {
             id,
             kind,
-            import_starred: false,
             uses_locals: false,
+            star_imports: Vec::default(),
             bindings: FxHashMap::default(),
-            rebounds: FxHashMap::default(),
+            shadowed_bindings: FxHashMap::default(),
         }
     }
 
-    /// Returns the [id](BindingId) of the binding with the given name.
+    /// Returns the [id](BindingId) of the binding bound to the given name.
     pub fn get(&self, name: &str) -> Option<&BindingId> {
         self.bindings.get(name)
     }
 
     /// Adds a new binding with the given name to this scope.
     pub fn add(&mut self, name: &'a str, id: BindingId) -> Option<BindingId> {
-        self.bindings.insert(name, id)
+        if let Some(id) = self.bindings.insert(name, id) {
+            self.shadowed_bindings.entry(name).or_default().push(id);
+            Some(id)
+        } else {
+            None
+        }
     }
 
     /// Returns `true` if this scope defines a binding with the given name.
@@ -60,8 +66,33 @@ impl<'a> Scope<'a> {
         self.bindings.values()
     }
 
+    /// Returns a tuple of the name and id of all bindings defined in this scope.
     pub fn bindings(&self) -> std::collections::hash_map::Iter<&'a str, BindingId> {
         self.bindings.iter()
+    }
+
+    /// Returns an iterator over all [bindings](BindingId) bound to the given name, including
+    /// those that were shadowed by later bindings.
+    pub fn bindings_for_name(&self, name: &str) -> impl Iterator<Item = &BindingId> {
+        self.bindings
+            .get(name)
+            .into_iter()
+            .chain(self.shadowed_bindings.get(name).into_iter().flatten().rev())
+    }
+
+    /// Adds a reference to a star import (e.g., `from sys import *`) to this scope.
+    pub fn add_star_import(&mut self, import: StarImportation<'a>) {
+        self.star_imports.push(import);
+    }
+
+    /// Returns `true` if this scope contains a star import (e.g., `from sys import *`).
+    pub fn uses_star_imports(&self) -> bool {
+        !self.star_imports.is_empty()
+    }
+
+    /// Returns an iterator over all star imports (e.g., `from sys import *`) in this scope.
+    pub fn star_imports(&self) -> impl Iterator<Item = &StarImportation<'a>> {
+        self.star_imports.iter()
     }
 }
 
@@ -231,283 +262,5 @@ pub struct ScopeStackSnapshot(usize);
 impl Default for ScopeStack {
     fn default() -> Self {
         Self(vec![ScopeId::global()])
-    }
-}
-
-bitflags! {
-    pub struct Exceptions: u32 {
-        const NAME_ERROR = 0b0000_0001;
-        const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
-        const IMPORT_ERROR = 0b0000_0100;
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct Binding<'a> {
-    pub kind: BindingKind<'a>,
-    pub range: Range,
-    /// The context in which the binding was created.
-    pub context: ExecutionContext,
-    /// The statement in which the [`Binding`] was defined.
-    pub source: Option<RefEquality<'a, Stmt>>,
-    /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used in a runtime context.
-    pub runtime_usage: Option<(ScopeId, Range)>,
-    /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used in a typing-time context.
-    pub typing_usage: Option<(ScopeId, Range)>,
-    /// Tuple of (scope index, range) indicating the scope and range at which
-    /// the binding was last used in a synthetic context. This is used for
-    /// (e.g.) `__future__` imports, explicit re-exports, and other bindings
-    /// that should be considered used even if they're never referenced.
-    pub synthetic_usage: Option<(ScopeId, Range)>,
-    /// The exceptions that were handled when the binding was defined.
-    pub exceptions: Exceptions,
-}
-
-impl<'a> Binding<'a> {
-    pub fn mark_used(&mut self, scope: ScopeId, range: Range, context: ExecutionContext) {
-        match context {
-            ExecutionContext::Runtime => self.runtime_usage = Some((scope, range)),
-            ExecutionContext::Typing => self.typing_usage = Some((scope, range)),
-        }
-    }
-
-    pub const fn used(&self) -> bool {
-        self.runtime_usage.is_some()
-            || self.synthetic_usage.is_some()
-            || self.typing_usage.is_some()
-    }
-
-    pub const fn is_definition(&self) -> bool {
-        matches!(
-            self.kind,
-            BindingKind::ClassDefinition
-                | BindingKind::FunctionDefinition
-                | BindingKind::Builtin
-                | BindingKind::FutureImportation
-                | BindingKind::StarImportation(..)
-                | BindingKind::Importation(..)
-                | BindingKind::FromImportation(..)
-                | BindingKind::SubmoduleImportation(..)
-        )
-    }
-
-    pub fn redefines(&self, existing: &'a Binding) -> bool {
-        match &self.kind {
-            BindingKind::Importation(Importation { full_name, .. }) => {
-                if let BindingKind::SubmoduleImportation(SubmoduleImportation {
-                    full_name: existing,
-                    ..
-                }) = &existing.kind
-                {
-                    return full_name == existing;
-                }
-            }
-            BindingKind::FromImportation(FromImportation { full_name, .. }) => {
-                if let BindingKind::SubmoduleImportation(SubmoduleImportation {
-                    full_name: existing,
-                    ..
-                }) = &existing.kind
-                {
-                    return full_name == existing;
-                }
-            }
-            BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => {
-                match &existing.kind {
-                    BindingKind::Importation(Importation {
-                        full_name: existing,
-                        ..
-                    })
-                    | BindingKind::SubmoduleImportation(SubmoduleImportation {
-                        full_name: existing,
-                        ..
-                    }) => {
-                        return full_name == existing;
-                    }
-                    BindingKind::FromImportation(FromImportation {
-                        full_name: existing,
-                        ..
-                    }) => {
-                        return full_name == existing;
-                    }
-                    _ => {}
-                }
-            }
-            BindingKind::Annotation => {
-                return false;
-            }
-            BindingKind::FutureImportation => {
-                return false;
-            }
-            BindingKind::StarImportation(..) => {
-                return false;
-            }
-            _ => {}
-        }
-        existing.is_definition()
-    }
-}
-
-#[derive(Copy, Debug, Clone)]
-pub enum ExecutionContext {
-    Runtime,
-    Typing,
-}
-
-/// ID uniquely identifying a [Binding] in a program.
-///
-/// Using a `u32` to identify [Binding]s should is sufficient because Ruff only supports documents with a
-/// size smaller than or equal to `u32::max`. A document with the size of `u32::max` must have fewer than `u32::max`
-/// bindings because bindings must be separated by whitespace (and have an assignment).
-#[derive(Debug, Copy, Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
-pub struct BindingId(u32);
-
-impl From<BindingId> for usize {
-    fn from(value: BindingId) -> Self {
-        value.0 as usize
-    }
-}
-
-impl TryFrom<usize> for BindingId {
-    type Error = TryFromIntError;
-
-    fn try_from(value: usize) -> Result<Self, Self::Error> {
-        Ok(Self(u32::try_from(value)?))
-    }
-}
-
-impl nohash_hasher::IsEnabled for BindingId {}
-
-// Pyflakes defines the following binding hierarchy (via inheritance):
-//   Binding
-//    ExportBinding
-//    Annotation
-//    Argument
-//    Assignment
-//      NamedExprAssignment
-//    Definition
-//      FunctionDefinition
-//      ClassDefinition
-//      Builtin
-//      Importation
-//        SubmoduleImportation
-//        ImportationFrom
-//        StarImportation
-//        FutureImportation
-
-#[derive(Clone, Debug)]
-pub struct Export {
-    /// The names of the bindings exported via `__all__`.
-    pub names: Vec<String>,
-}
-
-#[derive(Clone, Debug)]
-pub struct StarImportation {
-    /// The level of the import. `None` or `Some(0)` indicate an absolute import.
-    pub level: Option<usize>,
-    /// The module being imported. `None` indicates a wildcard import.
-    pub module: Option<String>,
-}
-
-#[derive(Clone, Debug)]
-pub struct Importation<'a> {
-    /// The name to which the import is bound.
-    /// Given `import foo`, `name` would be "foo".
-    /// Given `import foo as bar`, `name` would be "bar".
-    pub name: &'a str,
-    /// The full name of the module being imported.
-    /// Given `import foo`, `full_name` would be "foo".
-    /// Given `import foo as bar`, `full_name` would be "foo".
-    pub full_name: &'a str,
-}
-
-#[derive(Clone, Debug)]
-pub struct FromImportation<'a> {
-    /// The name to which the import is bound.
-    /// Given `from foo import bar`, `name` would be "bar".
-    /// Given `from foo import bar as baz`, `name` would be "baz".
-    pub name: &'a str,
-    /// The full name of the module being imported.
-    /// Given `from foo import bar`, `full_name` would be "foo.bar".
-    /// Given `from foo import bar as baz`, `full_name` would be "foo.bar".
-    pub full_name: String,
-}
-
-#[derive(Clone, Debug)]
-pub struct SubmoduleImportation<'a> {
-    /// The parent module imported by the submodule import.
-    /// Given `import foo.bar`, `module` would be "foo".
-    pub name: &'a str,
-    /// The full name of the submodule being imported.
-    /// Given `import foo.bar`, `full_name` would be "foo.bar".
-    pub full_name: &'a str,
-}
-
-#[derive(Clone, Debug, is_macro::Is)]
-pub enum BindingKind<'a> {
-    Annotation,
-    Argument,
-    Assignment,
-    Binding,
-    LoopVar,
-    Global,
-    Nonlocal,
-    Builtin,
-    ClassDefinition,
-    FunctionDefinition,
-    Export(Export),
-    FutureImportation,
-    StarImportation(StarImportation),
-    Importation(Importation<'a>),
-    FromImportation(FromImportation<'a>),
-    SubmoduleImportation(SubmoduleImportation<'a>),
-}
-
-/// The bindings in a program.
-///
-/// Bindings are indexed by [`BindingId`]
-#[derive(Debug, Clone, Default)]
-pub struct Bindings<'a>(Vec<Binding<'a>>);
-
-impl<'a> Bindings<'a> {
-    /// Pushes a new binding and returns its id
-    pub fn push(&mut self, binding: Binding<'a>) -> BindingId {
-        let id = self.next_id();
-        self.0.push(binding);
-        id
-    }
-
-    /// Returns the id that will be assigned when pushing the next binding
-    pub fn next_id(&self) -> BindingId {
-        BindingId::try_from(self.0.len()).unwrap()
-    }
-}
-
-impl<'a> Index<BindingId> for Bindings<'a> {
-    type Output = Binding<'a>;
-
-    fn index(&self, index: BindingId) -> &Self::Output {
-        &self.0[usize::from(index)]
-    }
-}
-
-impl<'a> IndexMut<BindingId> for Bindings<'a> {
-    fn index_mut(&mut self, index: BindingId) -> &mut Self::Output {
-        &mut self.0[usize::from(index)]
-    }
-}
-
-impl<'a> Deref for Bindings<'a> {
-    type Target = [Binding<'a>];
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl<'a> FromIterator<Binding<'a>> for Bindings<'a> {
-    fn from_iter<T: IntoIterator<Item = Binding<'a>>>(iter: T) -> Self {
-        Self(Vec::from_iter(iter))
     }
 }

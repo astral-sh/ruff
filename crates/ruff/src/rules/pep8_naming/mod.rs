@@ -41,9 +41,10 @@ mod tests {
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/no_module/test.txt"); "N999_8")]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/file-with-dashes.py"); "N999_9")]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__main__.py"); "N999_10")]
-    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/0001_initial.py"); "N999_11")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/invalid_name/0001_initial.py"); "N999_11")]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__setup__.py"); "N999_12")]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/file-with-dashes"); "N999_13")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/invalid_name/import.py"); "N999_14")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

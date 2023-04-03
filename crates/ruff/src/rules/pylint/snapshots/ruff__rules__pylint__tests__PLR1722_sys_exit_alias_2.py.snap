@@ -15,6 +15,13 @@ expression: diagnostics
     column: 4
   fix:
     edits:
+      - content: import sys as sys2
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 18
       - content: sys2.exit
         location:
           row: 3
@@ -36,6 +43,13 @@ expression: diagnostics
     column: 4
   fix:
     edits:
+      - content: import sys as sys2
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 18
       - content: sys2.exit
         location:
           row: 4
@@ -57,6 +71,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
+      - content: import sys as sys2
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 18
       - content: sys2.exit
         location:
           row: 8
@@ -78,6 +99,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
+      - content: import sys as sys2
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 18
       - content: sys2.exit
         location:
           row: 9

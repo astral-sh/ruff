@@ -32,86 +32,91 @@ pub struct StateMachine {
 
 impl StateMachine {
     pub fn consume(&mut self, tok: &Tok) -> bool {
-        if matches!(
-            tok,
-            Tok::NonLogicalNewline | Tok::Newline | Tok::Indent | Tok::Dedent | Tok::Comment(..)
-        ) {
-            return false;
-        }
+        match tok {
+            Tok::NonLogicalNewline
+            | Tok::Newline
+            | Tok::Indent
+            | Tok::Dedent
+            | Tok::Comment(..) => false,
 
-        if matches!(tok, Tok::String { .. }) {
-            return if matches!(
-                self.state,
-                State::ExpectModuleDocstring
-                    | State::ExpectClassDocstring
-                    | State::ExpectFunctionDocstring
-            ) {
-                self.state = State::Other;
-                true
-            } else {
-                false
-            };
-        }
-
-        if matches!(tok, Tok::Class) {
-            self.state = State::ExpectClassColon;
-            self.bracket_count = 0;
-            return false;
-        }
-
-        if matches!(tok, Tok::Def) {
-            self.state = State::ExpectFunctionColon;
-            self.bracket_count = 0;
-            return false;
-        }
-
-        if matches!(tok, Tok::Colon) {
-            if self.bracket_count == 0 {
-                if matches!(self.state, State::ExpectClassColon) {
-                    self.state = State::ExpectClassDocstring;
-                } else if matches!(self.state, State::ExpectFunctionColon) {
-                    self.state = State::ExpectFunctionDocstring;
+            Tok::String { .. } => {
+                if matches!(
+                    self.state,
+                    State::ExpectModuleDocstring
+                        | State::ExpectClassDocstring
+                        | State::ExpectFunctionDocstring
+                ) {
+                    self.state = State::Other;
+                    true
+                } else {
+                    false
                 }
             }
-            return false;
-        }
+            Tok::Class => {
+                self.state = State::ExpectClassColon;
+                self.bracket_count = 0;
 
-        if matches!(tok, Tok::Lpar | Tok::Lbrace | Tok::Lsqb) {
-            self.bracket_count += 1;
-            if matches!(
-                self.state,
-                State::ExpectModuleDocstring
-                    | State::ExpectClassDocstring
-                    | State::ExpectFunctionDocstring
-            ) {
-                self.state = State::Other;
+                false
             }
-            return false;
-        }
 
-        if matches!(tok, Tok::Rpar | Tok::Rbrace | Tok::Rsqb) {
-            self.bracket_count -= 1;
-            if matches!(
-                self.state,
-                State::ExpectModuleDocstring
-                    | State::ExpectClassDocstring
-                    | State::ExpectFunctionDocstring
-            ) {
-                self.state = State::Other;
+            Tok::Def => {
+                self.state = State::ExpectFunctionColon;
+                self.bracket_count = 0;
+
+                false
             }
-            return false;
-        }
 
-        if matches!(
-            self.state,
-            State::ExpectModuleDocstring
-                | State::ExpectClassDocstring
-                | State::ExpectFunctionDocstring
-        ) {
-            self.state = State::Other;
-            return false;
-        }
+            Tok::Colon => {
+                if self.bracket_count == 0 {
+                    if matches!(self.state, State::ExpectClassColon) {
+                        self.state = State::ExpectClassDocstring;
+                    } else if matches!(self.state, State::ExpectFunctionColon) {
+                        self.state = State::ExpectFunctionDocstring;
+                    }
+                }
 
-        false
+                false
+            }
+
+            Tok::Lpar | Tok::Lbrace | Tok::Lsqb => {
+                self.bracket_count += 1;
+                if matches!(
+                    self.state,
+                    State::ExpectModuleDocstring
+                        | State::ExpectClassDocstring
+                        | State::ExpectFunctionDocstring
+                ) {
+                    self.state = State::Other;
+                }
+                false
+            }
+
+            Tok::Rpar | Tok::Rbrace | Tok::Rsqb => {
+                self.bracket_count -= 1;
+                if matches!(
+                    self.state,
+                    State::ExpectModuleDocstring
+                        | State::ExpectClassDocstring
+                        | State::ExpectFunctionDocstring
+                ) {
+                    self.state = State::Other;
+                }
+
+                false
+            }
+
+            _ => {
+                if matches!(
+                    self.state,
+                    State::ExpectModuleDocstring
+                        | State::ExpectClassDocstring
+                        | State::ExpectFunctionDocstring
+                ) {
+                    self.state = State::Other;
+                }
+
+                false
+            }
+        }
     }
 }

@@ -1,7 +1,7 @@
-use itertools::Either::{Left, Right};
 use std::collections::BTreeMap;
 use std::iter;
 
+use itertools::Either::{Left, Right};
 use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{
@@ -12,12 +12,11 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{create_expr, match_trailing_comment, unparse_expr};
+use ruff_python_ast::helpers::{any_over_expr, create_expr, match_trailing_comment, unparse_expr};
 use ruff_python_ast::types::{Range, RefEquality};
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_python_stdlib::keyword::KWLIST;
 
-use crate::autofix::helpers::delete_stmt;
+use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::message::Location;
 use crate::registry::AsRule;
@@ -332,6 +331,11 @@ pub fn unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: 
     }
 }
 
+/// Return `true` if the `Expr` contains an `await` expression.
+fn is_async_generator(expr: &Expr) -> bool {
+    any_over_expr(expr, &|expr| matches!(expr.node, ExprKind::Await { .. }))
+}
+
 /// PIE802
 pub fn unnecessary_comprehension_any_all(
     checker: &mut Checker,
@@ -339,26 +343,26 @@ pub fn unnecessary_comprehension_any_all(
     func: &Expr,
     args: &[Expr],
 ) {
-    if let ExprKind::Name { id, .. } = &func.node {
-        if (id == "all" || id == "any") && args.len() == 1 {
-            if !checker.ctx.is_builtin(id) {
-                return;
-            }
-            if let ExprKind::ListComp { .. } = args[0].node {
-                let mut diagnostic =
-                    Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from(&args[0]));
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.try_set_fix(|| {
-                        fixes::fix_unnecessary_comprehension_any_all(
-                            checker.locator,
-                            checker.stylist,
-                            expr,
-                        )
-                    });
-                }
-                checker.diagnostics.push(diagnostic);
-            }
+    let ExprKind::Name { id, .. } = &func.node  else {
+        return;
+    };
+    if (matches!(id.as_str(), "all" | "any")) && args.len() == 1 {
+        let (ExprKind::ListComp { elt, .. } | ExprKind::SetComp { elt, .. }) = &args[0].node else {
+            return;
+        };
+        if is_async_generator(elt) {
+            return;
         }
+        if !checker.ctx.is_builtin(id) {
+            return;
+        }
+        let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from(&args[0]));
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.try_set_fix(|| {
+                fixes::fix_unnecessary_comprehension_any_all(checker.locator, checker.stylist, expr)
+            });
+        }
+        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -369,7 +373,7 @@ fn is_valid_kwarg_name(key: &Expr) -> bool {
         ..
     } = &key.node
     {
-        is_identifier(value) && !KWLIST.contains(&value.as_str())
+        is_identifier(value)
     } else {
         false
     }
@@ -512,7 +516,7 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
 /// PIE807
 pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Lambda { args, body } = &expr.node else {
-        unreachable!("Expected ExprKind::Lambda");
+        panic!("Expected ExprKind::Lambda");
     };
     if args.args.is_empty()
         && args.kwonlyargs.is_empty()

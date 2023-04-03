@@ -8,7 +8,6 @@ use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::types::Range;
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -135,7 +134,7 @@ fn create_properties_from_args(args: &[Expr], defaults: &[Expr]) -> Result<Vec<S
             } = &field_name.node else {
                 bail!("Expected `field_name` to be `Constant::Str`")
             };
-            if !is_identifier(property) || KWLIST.contains(&property.as_str()) {
+            if !is_identifier(property) {
                 bail!("Invalid property name: {}", property)
             }
             Ok(create_property_assignment_stmt(

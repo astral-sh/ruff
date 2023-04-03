@@ -1,8 +1,8 @@
-use rustc_hash::FxHashMap;
-use serde::{Deserialize, Serialize};
 use std::{collections::hash_map::Iter as HashMapIter, ops::Deref};
 
+use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Located, Location, Stmt};
+use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 pub enum Node<'a> {
@@ -99,8 +99,6 @@ impl<'a> From<&RefEquality<'a, Expr>> for &'a Expr {
         r.0
     }
 }
-
-pub type CallPath<'a> = smallvec::SmallVec<[&'a str; 8]>;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Import {

@@ -8,9 +8,9 @@ use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
-use crate::source_code::Locator;
 use ruff_rustpython::vendor;
 
+use crate::source_code::Locator;
 use crate::str::leading_quote;
 use crate::types::Range;
 
@@ -213,10 +213,11 @@ fn detect_line_ending(contents: &str) -> Option<LineEnding> {
 
 #[cfg(test)]
 mod tests {
-    use crate::source_code::stylist::{detect_line_ending, Indentation, LineEnding, Quote};
-    use crate::source_code::{Locator, Stylist};
     use rustpython_parser::lexer::lex;
     use rustpython_parser::Mode;
+
+    use crate::source_code::stylist::{detect_line_ending, Indentation, LineEnding, Quote};
+    use crate::source_code::{Locator, Stylist};
 
     #[test]
     fn indentation() {

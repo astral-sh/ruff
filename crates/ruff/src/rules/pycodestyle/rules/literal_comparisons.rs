@@ -22,7 +22,7 @@ impl From<&Cmpop> for EqCmpop {
         match cmpop {
             Cmpop::Eq => EqCmpop::Eq,
             Cmpop::NotEq => EqCmpop::NotEq,
-            _ => unreachable!("Expected Cmpop::Eq | Cmpop::NotEq"),
+            _ => panic!("Expected Cmpop::Eq | Cmpop::NotEq"),
         }
     }
 }

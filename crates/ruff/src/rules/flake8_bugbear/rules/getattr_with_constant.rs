@@ -5,7 +5,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::Range;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
-use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -58,7 +57,7 @@ pub fn getattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     if !is_identifier(value) {
         return;
     }
-    if KWLIST.contains(&value.as_str()) || is_mangled_private(value.as_str()) {
+    if is_mangled_private(value.as_str()) {
         return;
     }
 

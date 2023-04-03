@@ -1,0 +1,19 @@
+---
+source: crates/ruff/src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: UndocumentedPublicModule
+    body: Missing docstring in public module
+    suggestion: ~
+    fixable: false
+  location:
+    row: 1
+    column: 0
+  end_location:
+    row: 1
+    column: 0
+  fix:
+    edits: []
+  parent: ~
+

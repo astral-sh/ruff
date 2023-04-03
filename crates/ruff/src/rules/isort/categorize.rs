@@ -54,7 +54,7 @@ enum Reason<'a> {
 #[allow(clippy::too_many_arguments)]
 pub fn categorize(
     module_name: &str,
-    level: Option<&usize>,
+    level: Option<usize>,
     src: &[PathBuf],
     package: Option<&Path>,
     known_modules: &KnownModules,
@@ -62,7 +62,7 @@ pub fn categorize(
 ) -> ImportType {
     let module_base = module_name.split('.').next().unwrap();
     let (import_type, reason) = {
-        if level.map_or(false, |level| *level > 0) {
+        if level.map_or(false, |level| level > 0) {
             (ImportType::LocalFolder, Reason::NonZeroLevel)
         } else if module_base == "__future__" {
             (ImportType::Future, Reason::Future)

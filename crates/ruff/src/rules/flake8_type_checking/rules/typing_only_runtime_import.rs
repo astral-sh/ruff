@@ -2,7 +2,7 @@ use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::scope::{
+use ruff_python_ast::binding::{
     Binding, BindingKind, ExecutionContext, FromImportation, Importation, SubmoduleImportation,
 };
 
@@ -183,7 +183,7 @@ pub fn typing_only_runtime_import(
         // Categorize the import.
         match categorize(
             full_name,
-            Some(&level),
+            Some(level),
             &settings.src,
             package,
             &settings.isort.known_modules,

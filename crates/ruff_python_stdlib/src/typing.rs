@@ -198,7 +198,7 @@ pub const PEP_585_BUILTINS_ELIGIBLE: &[&[&str]] = &[
     &["typing_extensions", "Type"],
 ];
 
-// See: https://github.com/JelleZijlstra/autotyping/blob/f65b5ee3a8fdb77999f84b4c87edb996e25269a5/autotyping/autotyping.py#L69-L84
+// See: https://github.com/JelleZijlstra/autotyping/blob/0adba5ba0eee33c1de4ad9d0c79acfd737321dd9/autotyping/autotyping.py#L69-L91
 pub static SIMPLE_MAGIC_RETURN_TYPES: Lazy<FxHashMap<&'static str, &'static str>> =
     Lazy::new(|| {
         FxHashMap::from_iter([
@@ -216,5 +216,12 @@ pub static SIMPLE_MAGIC_RETURN_TYPES: Lazy<FxHashMap<&'static str, &'static str>
             ("__int__", "int"),
             ("__float__", "float"),
             ("__index__", "int"),
+            ("__setattr__", "None"),
+            ("__delattr__", "None"),
+            ("__setitem__", "None"),
+            ("__delitem__", "None"),
+            ("__set__", "None"),
+            ("__instancecheck__", "bool"),
+            ("__subclasscheck__", "bool"),
         ])
     });

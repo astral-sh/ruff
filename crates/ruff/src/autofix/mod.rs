@@ -11,7 +11,7 @@ use ruff_python_ast::types::Range;
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
 
-pub mod helpers;
+pub mod actions;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
 pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String, FixTable)> {
@@ -81,24 +81,6 @@ fn apply_fixes<'a>(
     (output, fixed)
 }
 
-/// Apply a single fix.
-pub(crate) fn apply_fix(fix: &Edit, locator: &Locator) -> String {
-    let mut output = String::with_capacity(locator.len());
-
-    // Add all contents from `last_pos` to `fix.location`.
-    let slice = locator.slice(Range::new(Location::new(1, 0), fix.location));
-    output.push_str(slice);
-
-    // Add the patch itself.
-    output.push_str(&fix.content);
-
-    // Add the remaining content.
-    let slice = locator.skip(fix.end_location);
-    output.push_str(slice);
-
-    output
-}
-
 /// Compare two fixes.
 fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
     fix1.location()
@@ -119,7 +101,7 @@ mod tests {
     use ruff_diagnostics::Edit;
     use ruff_python_ast::source_code::Locator;
 
-    use crate::autofix::{apply_fix, apply_fixes};
+    use crate::autofix::apply_fixes;
     use crate::rules::pycodestyle::rules::MissingNewlineAtEndOfFile;
 
     fn create_diagnostics(edit: impl IntoIterator<Item = Edit>) -> Vec<Diagnostic> {
@@ -261,32 +243,5 @@ class A:
             .trim(),
         );
         assert_eq!(fixed.values().sum::<usize>(), 1);
-    }
-
-    #[test]
-    fn apply_single_fix() {
-        let locator = Locator::new(
-            r#"
-class A(object):
-    ...
-"#
-            .trim(),
-        );
-        let contents = apply_fix(
-            &Edit {
-                content: String::new(),
-                location: Location::new(1, 7),
-                end_location: Location::new(1, 15),
-            },
-            &locator,
-        );
-        assert_eq!(
-            contents,
-            r#"
-class A:
-    ...
-"#
-            .trim()
-        );
     }
 }

@@ -2,8 +2,9 @@ use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::context::Context;
-use ruff_python_ast::helpers::{compose_call_path, create_expr, unparse_expr};
+use ruff_python_ast::helpers::{create_expr, unparse_expr};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -77,7 +78,7 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
     let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, Range::from(target));
     if checker.patch(diagnostic.kind.rule()) {
         let ExprKind::Tuple { elts, ..} = &target.node else {
-            unreachable!("expected ExprKind::Tuple");
+            panic!("Expected ExprKind::Tuple");
         };
 
         // Filter out any `OSErrors` aliases.
