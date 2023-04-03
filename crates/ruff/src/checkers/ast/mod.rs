@@ -4452,7 +4452,23 @@ impl<'a> Checker<'a> {
                 }
                 _ => false,
             } {
-                let (all_names, all_names_flags) = extract_all_names(&self.ctx, parent, current);
+                let (all_names, all_names_flags) = {
+                    let (mut names, flags) =
+                        extract_all_names(parent, |name| self.ctx.is_builtin(name));
+
+                    // Grab the existing bound __all__ values.
+                    if let StmtKind::AugAssign { .. } = &parent.node {
+                        if let Some(index) = current.get("__all__") {
+                            if let BindingKind::Export(Export { names: existing }) =
+                                &self.ctx.bindings[*index].kind
+                            {
+                                names.extend_from_slice(existing);
+                            }
+                        }
+                    }
+
+                    (names, flags)
+                };
 
                 if self.settings.rules.enabled(Rule::InvalidAllFormat) {
                     if matches!(all_names_flags, AllNamesFlags::INVALID_FORMAT) {
@@ -4749,7 +4765,7 @@ impl<'a> Checker<'a> {
         // Mark anything referenced in `__all__` as used.
         let all_bindings: Option<(Vec<BindingId>, Range)> = {
             let global_scope = self.ctx.global_scope();
-            let all_names: Option<(&Vec<String>, Range)> = global_scope
+            let all_names: Option<(&Vec<&str>, Range)> = global_scope
                 .get("__all__")
                 .map(|index| &self.ctx.bindings[*index])
                 .and_then(|binding| match &binding.kind {
@@ -4761,7 +4777,7 @@ impl<'a> Checker<'a> {
                 (
                     names
                         .iter()
-                        .filter_map(|name| global_scope.get(name.as_str()).copied())
+                        .filter_map(|name| global_scope.get(name).copied())
                         .collect(),
                     range,
                 )
@@ -4779,15 +4795,13 @@ impl<'a> Checker<'a> {
         }
 
         // Extract `__all__` names from the global scope.
-        let all_names: Option<(Vec<&str>, Range)> = self
+        let all_names: Option<(&[&str], Range)> = self
             .ctx
             .global_scope()
             .get("__all__")
             .map(|index| &self.ctx.bindings[*index])
             .and_then(|binding| match &binding.kind {
-                BindingKind::Export(Export { names }) => {
-                    Some((names.iter().map(String::as_str).collect(), binding.range))
-                }
+                BindingKind::Export(Export { names }) => Some((names.as_slice(), binding.range)),
                 _ => None,
             });
 
@@ -4847,7 +4861,7 @@ impl<'a> Checker<'a> {
                             .dedup()
                             .collect();
                         if !sources.is_empty() {
-                            for &name in names {
+                            for &name in names.iter() {
                                 if !scope.defines(name) {
                                     diagnostics.push(Diagnostic::new(
                                         pyflakes::rules::UndefinedLocalWithImportStarUsage {
