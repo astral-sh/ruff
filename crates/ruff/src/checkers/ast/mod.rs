@@ -4081,7 +4081,7 @@ impl<'a> Checker<'a> {
                     }
                 } else if existing_is_import && binding.redefines(existing) {
                     self.ctx
-                        .redefinitions
+                        .shadowed_bindings
                         .entry(existing_binding_index)
                         .or_insert_with(Vec::new)
                         .push(binding_id);
@@ -4123,13 +4123,7 @@ impl<'a> Checker<'a> {
         // in scope.
         let scope = self.ctx.scope_mut();
         if !(binding.kind.is_annotation() && scope.defines(name)) {
-            if let Some(rebound_index) = scope.add(name, binding_id) {
-                scope
-                    .rebounds
-                    .entry(name)
-                    .or_insert_with(Vec::new)
-                    .push(rebound_index);
-            }
+            scope.add(name, binding_id);
         }
 
         self.ctx.bindings.push(binding);
@@ -4919,7 +4913,7 @@ impl<'a> Checker<'a> {
                             continue;
                         }
 
-                        if let Some(indices) = self.ctx.redefinitions.get(index) {
+                        if let Some(indices) = self.ctx.shadowed_bindings.get(index) {
                             for index in indices {
                                 let rebound = &self.ctx.bindings[*index];
                                 let mut diagnostic = Diagnostic::new(

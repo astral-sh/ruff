@@ -30,8 +30,8 @@ pub struct Context<'a> {
     pub child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
     // A stack of all bindings created in any scope, at any point in execution.
     pub bindings: Bindings<'a>,
-    // Map from binding index to indices of bindings that redefine it in other scopes.
-    pub redefinitions:
+    // Map from binding index to indexes of bindings that shadow it in other scopes.
+    pub shadowed_bindings:
         std::collections::HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
     pub exprs: Vec<RefEquality<'a, Expr>>,
     pub scopes: Scopes<'a>,
@@ -71,7 +71,7 @@ impl<'a> Context<'a> {
             depths: FxHashMap::default(),
             child_to_parent: FxHashMap::default(),
             bindings: Bindings::default(),
-            redefinitions: IntMap::default(),
+            shadowed_bindings: IntMap::default(),
             exprs: Vec::default(),
             scopes: Scopes::default(),
             scope_stack: ScopeStack::default(),
