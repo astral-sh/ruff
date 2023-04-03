@@ -6,6 +6,7 @@ Example usage:
     scripts/check_ecosystem.py <path/to/ruff1> <path/to/ruff2>
 """
 
+# ruff: noqa: G004
 # ruff: noqa: T201
 
 import argparse
@@ -19,7 +20,7 @@ import tempfile
 from asyncio.subprocess import PIPE, create_subprocess_exec
 from contextlib import asynccontextmanager
 from pathlib import Path
-from typing import TYPE_CHECKING, NamedTuple, Self, Optional, Dict
+from typing import TYPE_CHECKING, NamedTuple, Optional, Self
 
 if TYPE_CHECKING:
     from collections.abc import AsyncIterator, Iterator, Sequence
@@ -58,7 +59,7 @@ class Repository(NamedTuple):
                 [
                     f"https://github.com/{self.org}/{self.repo}",
                     tmpdir,
-                ]
+                ],
             )
 
             process = await create_subprocess_exec(*git_command)
@@ -190,7 +191,8 @@ async def compare(ruff1: Path, ruff2: Path, repo: Repository) -> Diff | None:
     return Diff(removed, added)
 
 
-def read_projects_jsonl(projects_jsonl: Path) -> Dict[str, Repository]:
+def read_projects_jsonl(projects_jsonl: Path) -> dict[str, Repository]:
+    """Read either of the two formats of https://github.com/akx/ruff-usage-aggregate."""
     repositories = {}
     for line in projects_jsonl.read_text().splitlines():
         data = json.loads(line)
@@ -207,9 +209,11 @@ def read_projects_jsonl(projects_jsonl: Path) -> Dict[str, Repository]:
                 # :/ GitHub doesn't give us any branch or pure rev info
                 # This would give us the revision, but there's no way with git to just
                 # do `git clone --depth 1` with a specific ref
-                # ref = item["url"].split("?ref=")[1]
+                # `ref = item["url"].split("?ref=")[1]` would be exact
                 repositories[repository["name"]] = Repository(
-                    repository["owner"]["login"], repository["name"], None
+                    repository["owner"]["login"],
+                    repository["name"],
+                    None,
                 )
         else:
             assert "owner" in data, "Unknown ruff-usage-aggregate format"
@@ -217,7 +221,9 @@ def read_projects_jsonl(projects_jsonl: Path) -> Dict[str, Repository]:
             if data["path"] != "pyproject.toml":
                 continue
             repositories[data["repo"]] = Repository(
-                data["owner"], data["repo"], data.get("ref")
+                data["owner"],
+                data["repo"],
+                data.get("ref"),
             )
     return repositories
 
@@ -263,7 +269,7 @@ async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> N
                 repo = repositories[name]
                 print(
                     f"https://github.com/{repo.org}/{repo.repo} ref {repo.ref} "
-                    f"select {repo.select} ignore {repo.ignore} exclude {repo.exclude}"
+                    f"select {repo.select} ignore {repo.ignore} exclude {repo.exclude}",
                 )
                 print("<p>")
                 print()
