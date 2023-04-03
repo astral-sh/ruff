@@ -1,6 +1,6 @@
 import builtins
 import typing
-from typing import TypeAlias, Final
+from typing import TypeAlias, Final, NewType, TypeVar, TypeVarTuple, ParamSpec
 
 # We shouldn't emit Y015 for simple default values
 field1: int
@@ -26,6 +26,10 @@ field9 = None  # Y026 Use typing_extensions.TypeAlias for type aliases, e.g. "fi
 Field95: TypeAlias = None
 Field96: TypeAlias = int | None
 Field97: TypeAlias = None | typing.SupportsInt | builtins.str | float | bool
+Field98 = NewType('MyInt', int)
+Field99 = TypeVar('Field99')
+Field100 = TypeVarTuple('Field100')
+Field101 = ParamSpec('Field101')
 field19 = [1, 2, 3]  # Y052 Need type annotation for "field19"
 field191: list[int] = [1, 2, 3]
 field20 = (1, 2, 3)  # Y052 Need type annotation for "field20"

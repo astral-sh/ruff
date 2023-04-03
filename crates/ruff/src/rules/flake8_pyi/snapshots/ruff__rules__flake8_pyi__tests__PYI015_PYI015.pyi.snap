@@ -8,19 +8,19 @@ expression: diagnostics
     suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 40
+    row: 44
     column: 22
   end_location:
-    row: 40
+    row: 44
     column: 57
   fix:
     edits:
       - content: "..."
         location:
-          row: 40
+          row: 44
           column: 22
         end_location:
-          row: 40
+          row: 44
           column: 57
   parent: ~
 - kind:
@@ -29,19 +29,19 @@ expression: diagnostics
     suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 41
+    row: 45
     column: 22
   end_location:
-    row: 41
+    row: 45
     column: 34
   fix:
     edits:
       - content: "..."
         location:
-          row: 41
+          row: 45
           column: 22
         end_location:
-          row: 41
+          row: 45
           column: 34
   parent: ~
 - kind:
@@ -50,19 +50,19 @@ expression: diagnostics
     suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 42
+    row: 46
     column: 22
   end_location:
-    row: 42
+    row: 46
     column: 37
   fix:
     edits:
       - content: "..."
         location:
-          row: 42
+          row: 46
           column: 22
         end_location:
-          row: 42
+          row: 46
           column: 37
   parent: ~
 - kind:
@@ -71,19 +71,19 @@ expression: diagnostics
     suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 43
+    row: 47
     column: 25
   end_location:
-    row: 43
+    row: 47
     column: 35
   fix:
     edits:
       - content: "..."
         location:
-          row: 43
+          row: 47
           column: 25
         end_location:
-          row: 43
+          row: 47
           column: 35
   parent: ~
 - kind:
@@ -92,19 +92,19 @@ expression: diagnostics
     suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 44
+    row: 48
     column: 46
   end_location:
-    row: 44
+    row: 48
     column: 69
   fix:
     edits:
       - content: "..."
         location:
-          row: 44
+          row: 48
           column: 46
         end_location:
-          row: 44
+          row: 48
           column: 69
   parent: ~
 - kind:
@@ -113,19 +113,19 @@ expression: diagnostics
     suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 45
+    row: 49
     column: 30
   end_location:
-    row: 45
+    row: 49
     column: 53
   fix:
     edits:
       - content: "..."
         location:
-          row: 45
+          row: 49
           column: 30
         end_location:
-          row: 45
+          row: 49
           column: 53
   parent: ~
 - kind:
@@ -134,19 +134,19 @@ expression: diagnostics
     suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 46
+    row: 50
     column: 36
   end_location:
-    row: 46
+    row: 50
     column: 47
   fix:
     edits:
       - content: "..."
         location:
-          row: 46
+          row: 50
           column: 36
         end_location:
-          row: 46
+          row: 50
           column: 47
   parent: ~
 - kind:
@@ -155,19 +155,19 @@ expression: diagnostics
     suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 48
+    row: 52
     column: 27
   end_location:
-    row: 48
+    row: 52
     column: 43
   fix:
     edits:
       - content: "..."
         location:
-          row: 48
+          row: 52
           column: 27
         end_location:
-          row: 48
+          row: 52
           column: 43
   parent: ~
 - kind:
@@ -176,19 +176,19 @@ expression: diagnostics
     suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 49
+    row: 53
     column: 10
   end_location:
-    row: 49
+    row: 53
     column: 23
   fix:
     edits:
       - content: "..."
         location:
-          row: 49
+          row: 53
           column: 10
         end_location:
-          row: 49
+          row: 53
           column: 23
   parent: ~
 - kind:
@@ -197,19 +197,19 @@ expression: diagnostics
     suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 50
+    row: 54
     column: 10
   end_location:
-    row: 50
+    row: 54
     column: 25
   fix:
     edits:
       - content: "..."
         location:
-          row: 50
+          row: 54
           column: 10
         end_location:
-          row: 50
+          row: 54
           column: 25
   parent: ~
 - kind:
@@ -218,19 +218,19 @@ expression: diagnostics
     suggestion: "Replace default value with `...`"
     fixable: true
   location:
-    row: 51
+    row: 55
     column: 10
   end_location:
-    row: 51
+    row: 55
     column: 15
   fix:
     edits:
       - content: "..."
         location:
-          row: 51
+          row: 55
           column: 10
         end_location:
-          row: 51
+          row: 55
           column: 15
   parent: ~
 
