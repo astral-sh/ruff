@@ -63,6 +63,7 @@ impl<'a> Context<'a> {
         path: &'a Path,
         module_path: Option<Vec<String>>,
     ) -> Self {
+        let visibility = module_visibility(module_path.as_deref(), path);
         Self {
             typing_modules,
             module_path,
@@ -79,7 +80,7 @@ impl<'a> Context<'a> {
             body_index: 0,
             visible_scope: VisibleScope {
                 modifier: Modifier::Module,
-                visibility: module_visibility(path),
+                visibility,
             },
             in_annotation: false,
             in_type_definition: false,
