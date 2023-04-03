@@ -43,17 +43,6 @@ impl Violation for ReuseOfGroupbyGenerator {
     }
 }
 
-/// A [`GroupNameFinder`] state inside a mutually exclusive statement such as
-/// `if ... elif ... else ...` or a `match` statement.
-enum MutuallyExclusiveState {
-    /// Visitor is inside a mutually exclusive statement.
-    Inside,
-    /// Visitor has seen the group name atleast once.
-    Seen,
-    /// Visitor is outside a mutually exclusive statement.
-    Outside,
-}
-
 /// A [`Visitor`] that collects all the usage of `group_name` in the body of
 /// a `for` loop.
 struct GroupNameFinder<'a> {
@@ -64,12 +53,20 @@ struct GroupNameFinder<'a> {
     /// A flag indicating that the visitor is inside a nested `for` or `while`
     /// loop or inside a `dict`, `list` or `set` comprehension.
     nested: bool,
-    /// A flag indicating the state of the visitor inside a mutually exclusive
-    /// statement such as `if ... elif ... else ...` or a `match` statement.
-    mutually_exclusive_state: MutuallyExclusiveState,
     /// A flag indicating that the `group_name` variable has been overridden
     /// during the visit.
     overridden: bool,
+    /// A stack of `if` statements.
+    parent_ifs: Vec<&'a Stmt>,
+    /// A stack of counters where each counter is itself a list of usage count.
+    /// This is used specifically for mutually exclusive statements such as an
+    /// `if` or `match`.
+    ///
+    /// The stack element represents an entire `if` or `match` statement while
+    /// the number inside the element represents the usage count for one of
+    /// the branches of the statement. The order of the count corresponds the
+    /// branch order.
+    counter_stack: Vec<Vec<u8>>,
     /// A list of reused expressions.
     exprs: Vec<&'a Expr>,
 }
@@ -80,8 +77,9 @@ impl<'a> GroupNameFinder<'a> {
             group_name,
             usage_count: 0,
             nested: false,
-            mutually_exclusive_state: MutuallyExclusiveState::Outside,
             overridden: false,
+            parent_ifs: Vec::new(),
+            counter_stack: Vec::new(),
             exprs: Vec::new(),
         }
     }
@@ -134,20 +132,75 @@ where
                 visitor::walk_body(self, body);
                 self.nested = false;
             }
-            StmtKind::If { .. } | StmtKind::Match { .. } => {
-                // This is to avoid overriding the `Seen` state. The AST
-                // representation of an `elif` statement is same as that of
-                // an `if` statement. So if we've `Seen` the group name in
-                // the first branch, we shouldn't reset the state. This is
-                // not required for a `match` statement.
-                if matches!(
-                    self.mutually_exclusive_state,
-                    MutuallyExclusiveState::Outside
-                ) {
-                    self.mutually_exclusive_state = MutuallyExclusiveState::Inside;
+            StmtKind::If { test, body, orelse } => {
+                let is_if_arm = !self.parent_ifs.iter().any(|parent| {
+                    if let StmtKind::If { orelse, .. } = &parent.node {
+                        orelse.len() == 1 && &orelse[0] == stmt
+                    } else {
+                        false
+                    }
+                });
+
+                if is_if_arm {
+                    // Initialize the vector with the count for current branch.
+                    self.counter_stack.push(vec![0]);
+                } else {
+                    // Here, `unwrap` is safe because we're either in `elif` or
+                    // `else` branch which can come only after an `if` branch.
+                    // When inside an `if` branch, a new vector will be pushed
+                    // onto the stack.
+                    self.counter_stack.last_mut().unwrap().push(0);
                 }
-                visitor::walk_stmt(self, stmt);
-                self.mutually_exclusive_state = MutuallyExclusiveState::Outside;
+
+                let has_else = !is_if_arm
+                    && !orelse.is_empty()
+                    && !matches!(orelse.first().unwrap().node, StmtKind::If { .. });
+
+                self.parent_ifs.push(stmt);
+                if has_else {
+                    // There's no `else` node, it's directly in an `if` node.
+                    // So, we'll have to visit the `if` parts manually.
+                    self.visit_expr(test);
+                    self.visit_body(body);
+
+                    // Now, we're in an `else` block.
+                    self.counter_stack.last_mut().unwrap().push(0);
+                    self.visit_body(orelse);
+                } else {
+                    visitor::walk_stmt(self, stmt);
+                }
+                self.parent_ifs.pop();
+
+                if is_if_arm {
+                    if let Some(last) = self.counter_stack.pop() {
+                        // This is the max number of group usage from all the
+                        // branches of this `if` statement.
+                        let max_count = last.into_iter().max().unwrap_or(0);
+                        if let Some(current_last) = self.counter_stack.last_mut() {
+                            *current_last.last_mut().unwrap() += max_count;
+                        } else {
+                            self.usage_count += max_count;
+                        }
+                    }
+                }
+            }
+            StmtKind::Match { subject, cases } => {
+                self.counter_stack.push(Vec::new());
+                self.visit_expr(subject);
+                for match_case in cases {
+                    self.counter_stack.last_mut().unwrap().push(0);
+                    self.visit_match_case(match_case);
+                }
+                if let Some(last) = self.counter_stack.pop() {
+                    // This is the max number of group usage from all the
+                    // branches of this `match` statement.
+                    let max_count = last.into_iter().max().unwrap_or(0);
+                    if let Some(current_last) = self.counter_stack.last_mut() {
+                        *current_last.last_mut().unwrap() += max_count;
+                    } else {
+                        self.usage_count += max_count;
+                    }
+                }
             }
             StmtKind::Assign { targets, .. } => {
                 if targets.iter().any(|target| self.name_matches(target)) {
@@ -180,20 +233,31 @@ where
             visitor::walk_expr(self, expr);
             self.nested = false;
         } else if self.name_matches(expr) {
-            match self.mutually_exclusive_state {
-                MutuallyExclusiveState::Seen => {
-                    // We've already seen the group name so avoid incrementing
-                    // the count.
-                }
-                MutuallyExclusiveState::Inside => {
-                    self.mutually_exclusive_state = MutuallyExclusiveState::Seen;
-                    self.usage_count += 1;
-                }
-                MutuallyExclusiveState::Outside => self.usage_count += 1,
+            // If the stack isn't empty, then we're in one of the branches of
+            // a mutually exclusive statement. Otherwise, we'll add it to the
+            // global count.
+            if let Some(last) = self.counter_stack.last_mut() {
+                *last.last_mut().unwrap() += 1;
+            } else {
+                self.usage_count += 1;
             }
+
+            let current_usage_count = self.usage_count
+                + self
+                    .counter_stack
+                    .iter()
+                    .map(|v| {
+                        if let Some(&value) = v.last() {
+                            value
+                        } else {
+                            0
+                        }
+                    })
+                    .sum::<u8>();
+
             // For nested loops, the variable usage could be once but the
             // loop makes it being used multiple times.
-            if self.nested || self.usage_count > 1 {
+            if self.nested || current_usage_count > 1 {
                 self.exprs.push(expr);
             }
         } else {

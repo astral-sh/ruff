@@ -82,8 +82,22 @@ for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
     # Mutually exclusive branches shouldn't trigger the warning
     if _section == "greens":
         collect_shop_items(shopper, section_items)
+        if _section == "greens":
+            collect_shop_items(shopper, section_items)  # B031
+        elif _section == "frozen items":
+            collect_shop_items(shopper, section_items)  # B031
+        else:
+            collect_shop_items(shopper, section_items)  # B031
+        collect_shop_items(shopper, section_items)  # B031
     elif _section == "frozen items":
-        collect_shop_items(shopper, section_items)
+        # Mix `match` and `if` statements
+        match shopper:
+            case "Jane":
+                collect_shop_items(shopper, section_items)
+                if _section == "fourth":
+                    collect_shop_items(shopper, section_items)  # B031
+            case _:
+                collect_shop_items(shopper, section_items)
     else:
         collect_shop_items(shopper, section_items)
     # Now, it should detect
@@ -94,8 +108,14 @@ for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
     match _section:
         case "greens":
             collect_shop_items(shopper, section_items)
+            match shopper:
+                case "Jane":
+                    collect_shop_items(shopper, section_items)  # B031
+                case _:
+                    collect_shop_items(shopper, section_items)  # B031
         case "frozen items":
             collect_shop_items(shopper, section_items)
+            collect_shop_items(shopper, section_items)  # B031
         case _:
             collect_shop_items(shopper, section_items)
     # Now, it should detect
