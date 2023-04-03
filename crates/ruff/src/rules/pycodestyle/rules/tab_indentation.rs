@@ -20,13 +20,16 @@ impl Violation for TabIndentation {
 /// binary search on string_lines to find the string that contains (or starts just before) lineno
 fn find_closest_string<'a>(lineno: &usize, string_lines: &'a [Range]) -> Option<&'a Range> {
     // TODO: change this to a binary search
+    let mut curr_range = None;
     for range in string_lines {
-        if &range.location.row() <= lineno && &range.end_location.row() >= lineno {
-            return Some(range);
+        if &range.location.row() > lineno {
+            break;
         }
+
+        curr_range = Some(range);
     }
 
-    return None;
+    return curr_range;
 }
 
 /// W191
