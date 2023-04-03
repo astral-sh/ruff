@@ -2283,11 +2283,7 @@ where
                     pylint::rules::load_before_global_declaration(self, id, expr);
                 }
             }
-            ExprKind::Attribute {
-                attr,
-                value,
-                ctx: _,
-            } => {
+            ExprKind::Attribute { attr, value, .. } => {
                 // Ex) typing.List[...]
                 if !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(Rule::NonPEP585Annotation)
