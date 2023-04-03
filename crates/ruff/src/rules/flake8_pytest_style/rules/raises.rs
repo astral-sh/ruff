@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Expr, ExprKind, Keyword, Stmt, StmtKind, Withitem};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::format_call_path;
-use ruff_python_ast::call_path::to_call_path;
+use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -157,7 +157,7 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
                         .flake8_pytest_style
                         .raises_extend_require_match_for,
                 )
-                .any(|target| call_path == to_call_path(target));
+                .any(|target| call_path == from_qualified_name(target));
             if is_broad_exception {
                 Some(format_call_path(&call_path))
             } else {

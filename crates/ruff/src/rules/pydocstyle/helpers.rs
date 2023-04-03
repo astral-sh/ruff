@@ -1,4 +1,4 @@
-use ruff_python_ast::call_path::to_call_path;
+use ruff_python_ast::call_path::from_qualified_name;
 use std::collections::BTreeSet;
 
 use ruff_python_ast::cast;
@@ -53,7 +53,7 @@ pub(crate) fn should_ignore_definition(
             if let Some(call_path) = checker.ctx.resolve_call_path(map_callable(decorator)) {
                 if ignore_decorators
                     .iter()
-                    .any(|decorator| to_call_path(decorator) == call_path)
+                    .any(|decorator| from_qualified_name(decorator) == call_path)
                 {
                     return true;
                 }

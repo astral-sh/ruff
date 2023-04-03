@@ -39,7 +39,9 @@ pub fn datetime_utc_alias(checker: &mut Checker, expr: &Expr) {
             call_path.as_slice() == ["datetime", "timezone", "utc"]
         })
     {
-        let straight_import = collect_call_path(expr).as_slice() == ["datetime", "timezone", "utc"];
+        let straight_import = collect_call_path(expr).map_or(false, |call_path| {
+            call_path.as_slice() == ["datetime", "timezone", "utc"]
+        });
         let mut diagnostic =
             Diagnostic::new(DatetimeTimezoneUTC { straight_import }, Range::from(expr));
         if checker.patch(diagnostic.kind.rule()) {

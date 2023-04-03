@@ -2,12 +2,13 @@ use rustpython_parser::ast::{Expr, ExprKind, Location};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 
-use super::helpers::{get_mark_decorators, get_mark_name};
+use super::helpers::get_mark_decorators;
 
 #[violation]
 pub struct PytestIncorrectMarkParenthesesStyle {
@@ -52,13 +53,14 @@ impl AlwaysAutofixableViolation for PytestUseFixturesWithoutParameters {
 fn pytest_mark_parentheses(
     checker: &mut Checker,
     decorator: &Expr,
+    call_path: &CallPath,
     fix: Edit,
     preferred: &str,
     actual: &str,
 ) {
     let mut diagnostic = Diagnostic::new(
         PytestIncorrectMarkParenthesesStyle {
-            mark_name: get_mark_name(decorator).to_string(),
+            mark_name: (*call_path.last().unwrap()).to_string(),
             expected_parens: preferred.to_string(),
             actual_parens: actual.to_string(),
         },
@@ -70,7 +72,7 @@ fn pytest_mark_parentheses(
     checker.diagnostics.push(diagnostic);
 }
 
-fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr) {
+fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr, call_path: &CallPath) {
     match &decorator.node {
         ExprKind::Call {
             func,
@@ -84,20 +86,20 @@ fn check_mark_parentheses(checker: &mut Checker, decorator: &Expr) {
             {
                 let fix =
                     Edit::deletion(func.end_location.unwrap(), decorator.end_location.unwrap());
-                pytest_mark_parentheses(checker, decorator, fix, "", "()");
+                pytest_mark_parentheses(checker, decorator, call_path, fix, "", "()");
             }
         }
         _ => {
             if checker.settings.flake8_pytest_style.mark_parentheses {
                 let fix = Edit::insertion("()".to_string(), decorator.end_location.unwrap());
-                pytest_mark_parentheses(checker, decorator, fix, "()", "");
+                pytest_mark_parentheses(checker, decorator, call_path, fix, "()", "");
             }
         }
     }
 }
 
-fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr) {
-    if get_mark_name(decorator) != "usefixtures" {
+fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr, call_path: &CallPath) {
+    if *call_path.last().unwrap() != "usefixtures" {
         return;
     }
 
@@ -130,12 +132,12 @@ pub fn marks(checker: &mut Checker, decorators: &[Expr]) {
         .rules
         .enabled(Rule::PytestUseFixturesWithoutParameters);
 
-    for mark in get_mark_decorators(decorators) {
+    for (expr, call_path) in get_mark_decorators(decorators) {
         if enforce_parentheses {
-            check_mark_parentheses(checker, mark);
+            check_mark_parentheses(checker, expr, &call_path);
         }
         if enforce_useless_usefixtures {
-            check_useless_usefixtures(checker, mark);
+            check_useless_usefixtures(checker, expr, &call_path);
         }
     }
 }

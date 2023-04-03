@@ -12,7 +12,7 @@ use crate::binding::{
     Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
     Importation, SubmoduleImportation,
 };
-use crate::call_path::{collect_call_path, CallPath};
+use crate::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use crate::helpers::from_relative_import;
 use crate::scope::{Scope, ScopeId, ScopeKind, ScopeStack, Scopes};
 use crate::types::RefEquality;
@@ -23,14 +23,14 @@ use crate::visibility::{module_visibility, Modifier, VisibleScope};
 pub struct Context<'a> {
     pub typing_modules: &'a [String],
     pub module_path: Option<Vec<String>>,
-    // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
+    // Retain all scopes and parent nodes, along with a stack of indices to track which are active
     // at various points in time.
     pub parents: Vec<RefEquality<'a, Stmt>>,
     pub depths: FxHashMap<RefEquality<'a, Stmt>, usize>,
     pub child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
     // A stack of all bindings created in any scope, at any point in execution.
     pub bindings: Bindings<'a>,
-    // Map from binding index to indexes of bindings that redefine it in other scopes.
+    // Map from binding index to indices of bindings that redefine it in other scopes.
     pub redefinitions:
         std::collections::HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
     pub exprs: Vec<RefEquality<'a, Expr>>,
@@ -117,7 +117,7 @@ impl<'a> Context<'a> {
         }
 
         if self.typing_modules.iter().any(|module| {
-            let mut module: CallPath = module.split('.').collect();
+            let mut module: CallPath = from_unqualified_name(module);
             module.push(target);
             *call_path == module
         }) {
@@ -156,7 +156,9 @@ impl<'a> Context<'a> {
     where
         'b: 'a,
     {
-        let call_path = collect_call_path(value);
+        let Some(call_path) = collect_call_path(value) else {
+            return None;
+        };
         let Some(head) = call_path.first() else {
             return None;
         };
@@ -177,7 +179,7 @@ impl<'a> Context<'a> {
                         None
                     }
                 } else {
-                    let mut source_path: CallPath = name.split('.').collect();
+                    let mut source_path: CallPath = from_unqualified_name(name);
                     source_path.extend(call_path.into_iter().skip(1));
                     Some(source_path)
                 }
@@ -194,7 +196,7 @@ impl<'a> Context<'a> {
                         None
                     }
                 } else {
-                    let mut source_path: CallPath = name.split('.').collect();
+                    let mut source_path: CallPath = from_unqualified_name(name);
                     source_path.extend(call_path.into_iter().skip(1));
                     Some(source_path)
                 }

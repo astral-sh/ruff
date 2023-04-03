@@ -5,7 +5,7 @@ use once_cell::sync::Lazy;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::call_path::{to_call_path, CallPath};
+use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use ruff_python_ast::cast;
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::Range;
@@ -33,7 +33,7 @@ pub fn non_imperative_mood(
 
     let property_decorators = property_decorators
         .iter()
-        .map(|decorator| to_call_path(decorator))
+        .map(|decorator| from_qualified_name(decorator))
         .collect::<Vec<CallPath>>();
 
     if is_test(cast::name(parent))
