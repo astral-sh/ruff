@@ -60,7 +60,12 @@ pub fn contains_call_path(ctx: &Context, expr: &Expr, target: &[&str]) -> bool {
 
 /// Return `true` if the `Expr` contains an expression that appears to include a
 /// side-effect (like a function call).
-pub fn contains_effect(ctx: &Context, expr: &Expr) -> bool {
+///
+/// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
+pub fn contains_effect<F>(expr: &Expr, is_builtin: F) -> bool
+where
+    F: Fn(&str) -> bool,
+{
     any_over_expr(expr, &|expr| {
         // Accept empty initializers.
         if let ExprKind::Call {
@@ -71,13 +76,13 @@ pub fn contains_effect(ctx: &Context, expr: &Expr) -> bool {
         {
             if args.is_empty() && keywords.is_empty() {
                 if let ExprKind::Name { id, .. } = &func.node {
-                    let is_empty_initializer = (id == "set"
-                        || id == "list"
-                        || id == "tuple"
-                        || id == "dict"
-                        || id == "frozenset")
-                        && ctx.is_builtin(id);
-                    return !is_empty_initializer;
+                    if !matches!(id.as_str(), "set" | "list" | "tuple" | "dict" | "frozenset") {
+                        return true;
+                    }
+                    if !is_builtin(id) {
+                        return true;
+                    }
+                    return false;
                 }
             }
         }

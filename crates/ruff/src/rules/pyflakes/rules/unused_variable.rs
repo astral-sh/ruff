@@ -202,7 +202,9 @@ fn remove_unused_variable(
             range.location == target.location && range.end_location == target.end_location.unwrap()
         }) {
             if matches!(target.node, ExprKind::Name { .. }) {
-                return if targets.len() > 1 || contains_effect(&checker.ctx, value) {
+                return if targets.len() > 1
+                    || contains_effect(value, |id| checker.ctx.is_builtin(id))
+                {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
                     Some((
@@ -248,7 +250,7 @@ fn remove_unused_variable(
     } = &stmt.node
     {
         if matches!(target.node, ExprKind::Name { .. }) {
-            return if contains_effect(&checker.ctx, value) {
+            return if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
                 Some((
