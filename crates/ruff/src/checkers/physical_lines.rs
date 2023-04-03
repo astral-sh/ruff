@@ -240,23 +240,24 @@ mod tests {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
         let locator = Locator::new(line);
         let tokens: Vec<_> = lex(line, Mode::Module).collect();
+        let indexer: Indexer = tokens.as_slice().into();
         let stylist = Stylist::from_tokens(&tokens, &locator);
 
-    //     let check_with_max_line_length = |line_length: usize| {
-    //         check_physical_lines(
-    //             Path::new("foo.py"),
-    //             &locator,
-    //             &stylist,
-    //             &indexer,
-    //             &[],
-    //             &Settings {
-    //                 line_length,
-    //                 ..Settings::for_rule(Rule::LineTooLong)
-    //             },
-    //             flags::Autofix::Enabled,
-    //         )
-    //     };
-    //     assert_eq!(check_with_max_line_length(8), vec![]);
-    //     assert_eq!(check_with_max_line_length(8), vec![]);
-    // }
+        let check_with_max_line_length = |line_length: usize| {
+            check_physical_lines(
+                Path::new("foo.py"),
+                &locator,
+                &stylist,
+                &indexer,
+                &[],
+                &Settings {
+                    line_length,
+                    ..Settings::for_rule(Rule::LineTooLong)
+                },
+                flags::Autofix::Enabled,
+            )
+        };
+        assert_eq!(check_with_max_line_length(8), vec![]);
+        assert_eq!(check_with_max_line_length(8), vec![]);
+    }
 }
