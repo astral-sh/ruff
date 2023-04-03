@@ -58,4 +58,18 @@ expression: diagnostics
   fix:
     edits: []
   parent: ~
+- kind:
+    name: ExceptWithNonExceptionClasses
+    body: "`except` handlers should only be exception classes or tuples of exception classes"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 33
+    column: 28
+  end_location:
+    row: 33
+    column: 49
+  fix:
+    edits: []
+  parent: ~
 
