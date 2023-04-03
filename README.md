@@ -145,6 +145,20 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 Ruff can also be used as a [VS Code extension](https://github.com/charliermarsh/ruff-vscode) or
 alongside any other editor through the [Ruff LSP](https://github.com/charliermarsh/ruff-lsp).
 
+Ruff can also be used as a [GitHub Action](https://github.com/features/actions) via
+[`ruff-action`](https://github.com/chartboost/ruff-action):
+
+```yaml
+name: Ruff
+on: [ push, pull_request ]
+jobs:
+  ruff:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - uses: chartboost/ruff-action@v1
+```
+
 ### Configuration
 
 Ruff can be configured through a `pyproject.toml`, `ruff.toml`, or `.ruff.toml` file (see:
