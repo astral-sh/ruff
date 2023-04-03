@@ -106,7 +106,7 @@ pub fn annotate_imports<'a>(
                 annotated.push(AnnotatedImport::ImportFrom {
                     module: module.as_deref(),
                     names: aliases,
-                    level: level.as_ref(),
+                    level: *level,
                     trailing_comma: if split_on_trailing_comma {
                         trailing_comma(import, locator)
                     } else {

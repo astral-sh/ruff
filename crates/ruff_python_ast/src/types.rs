@@ -97,5 +97,3 @@ impl<'a> From<&RefEquality<'a, Expr>> for &'a Expr {
         r.0
     }
 }
-
-pub type CallPath<'a> = smallvec::SmallVec<[&'a str; 8]>;

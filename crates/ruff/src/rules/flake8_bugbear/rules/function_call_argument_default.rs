@@ -3,8 +3,9 @@ use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{compose_call_path, to_call_path};
-use ruff_python_ast::types::{CallPath, Range};
+use ruff_python_ast::call_path::from_qualified_name;
+use ruff_python_ast::call_path::{compose_call_path, CallPath};
+use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
@@ -122,7 +123,7 @@ pub fn function_call_argument_default(checker: &mut Checker, arguments: &Argumen
         .flake8_bugbear
         .extend_immutable_calls
         .iter()
-        .map(|target| to_call_path(target))
+        .map(|target| from_qualified_name(target))
         .collect();
     let diagnostics = {
         let mut visitor = ArgumentDefaultVisitor {

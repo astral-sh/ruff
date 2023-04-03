@@ -6,16 +6,16 @@ use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
-    Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
-    Located, Location, MatchCase, Pattern, PatternKind, Stmt, StmtKind,
+    Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword,
+    KeywordData, Located, Location, MatchCase, Pattern, PatternKind, Stmt, StmtKind,
 };
-use rustpython_parser::{lexer, Mode, StringKind, Tok};
-use smallvec::{smallvec, SmallVec};
+use rustpython_parser::{lexer, Mode, Tok};
+use smallvec::SmallVec;
 
+use crate::call_path::CallPath;
 use crate::context::Context;
-use crate::scope::{Binding, BindingKind};
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
-use crate::types::{CallPath, Range};
+use crate::types::Range;
 use crate::visitor;
 use crate::visitor::Visitor;
 
@@ -48,54 +48,6 @@ pub fn unparse_constant(constant: &Constant, stylist: &Stylist) -> String {
     let mut generator: Generator = stylist.into();
     generator.unparse_constant(constant);
     generator.generate()
-}
-
-fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool {
-    match &expr.node {
-        ExprKind::Attribute { value, attr, .. } => {
-            if collect_call_path_inner(value, parts) {
-                parts.push(attr);
-                true
-            } else {
-                false
-            }
-        }
-        ExprKind::Name { id, .. } => {
-            parts.push(id);
-            true
-        }
-        _ => false,
-    }
-}
-
-/// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
-pub fn collect_call_path(expr: &Expr) -> CallPath {
-    let mut segments = smallvec![];
-    collect_call_path_inner(expr, &mut segments);
-    segments
-}
-
-/// Convert an `Expr` to its call path (like `List`, or `typing.List`).
-pub fn compose_call_path(expr: &Expr) -> Option<String> {
-    let call_path = collect_call_path(expr);
-    if call_path.is_empty() {
-        None
-    } else {
-        Some(format_call_path(&call_path))
-    }
-}
-
-/// Format a call path for display.
-pub fn format_call_path(call_path: &[&str]) -> String {
-    if call_path
-        .first()
-        .expect("Unable to format empty call path")
-        .is_empty()
-    {
-        call_path[1..].join(".")
-    } else {
-        call_path.join(".")
-    }
 }
 
 /// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
@@ -711,10 +663,10 @@ pub fn uses_magic_variable_access(ctx: &Context, body: &[Stmt]) -> bool {
 }
 
 /// Format the module name for a relative import.
-pub fn format_import_from(level: Option<&usize>, module: Option<&str>) -> String {
+pub fn format_import_from(level: Option<usize>, module: Option<&str>) -> String {
     let mut module_name = String::with_capacity(16);
     if let Some(level) = level {
-        for _ in 0..*level {
+        for _ in 0..level {
             module_name.push('.');
         }
     }
@@ -726,18 +678,18 @@ pub fn format_import_from(level: Option<&usize>, module: Option<&str>) -> String
 
 /// Format the member reference name for a relative import.
 pub fn format_import_from_member(
-    level: Option<&usize>,
+    level: Option<usize>,
     module: Option<&str>,
     member: &str,
 ) -> String {
     let mut full_name = String::with_capacity(
-        level.map_or(0, |level| *level)
+        level.map_or(0, |level| level)
             + module.as_ref().map_or(0, |module| module.len())
             + 1
             + member.len(),
     );
     if let Some(level) = level {
-        for _ in 0..*level {
+        for _ in 0..level {
             full_name.push('.');
         }
     }
@@ -747,15 +699,6 @@ pub fn format_import_from_member(
     }
     full_name.push_str(member);
     full_name
-}
-
-/// Split a target string (like `typing.List`) into (`typing`, `List`).
-pub fn to_call_path(target: &str) -> CallPath {
-    if target.contains('.') {
-        target.split('.').collect()
-    } else {
-        smallvec!["", target]
-    }
 }
 
 /// Create a module path from a (package, path) pair.
@@ -851,6 +794,38 @@ where
             _ => {}
         }
     }
+}
+
+#[derive(Default)]
+struct GlobalStatementVisitor<'a> {
+    globals: FxHashMap<&'a str, &'a Stmt>,
+}
+
+impl<'a> Visitor<'a> for GlobalStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        match &stmt.node {
+            StmtKind::Global { names } => {
+                for name in names {
+                    self.globals.insert(name, stmt);
+                }
+            }
+            StmtKind::FunctionDef { .. }
+            | StmtKind::AsyncFunctionDef { .. }
+            | StmtKind::ClassDef { .. } => {
+                // Don't recurse.
+            }
+            _ => visitor::walk_stmt(self, stmt),
+        }
+    }
+}
+
+/// Extract a map from global name to its last-defining [`Stmt`].
+pub fn extract_globals(body: &[Stmt]) -> FxHashMap<&str, &Stmt> {
+    let mut visitor = GlobalStatementVisitor::default();
+    for stmt in body {
+        visitor.visit_stmt(stmt);
+    }
+    visitor.globals
 }
 
 /// Convert a location within a file (relative to `base`) to an absolute
@@ -978,21 +953,6 @@ pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> Range {
     Range::from(stmt)
 }
 
-/// Like `identifier_range`, but accepts a `Binding`.
-pub fn binding_range(binding: &Binding, locator: &Locator) -> Range {
-    if matches!(
-        binding.kind,
-        BindingKind::ClassDefinition | BindingKind::FunctionDefinition
-    ) {
-        binding
-            .source
-            .as_ref()
-            .map_or(binding.range, |source| identifier_range(source, locator))
-    } else {
-        binding.range
-    }
-}
-
 /// Return the ranges of [`Tok::Name`] tokens within a specified node.
 pub fn find_names<'a, T>(
     located: &'a Located<T>,
@@ -1053,43 +1013,6 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> Range {
         })
         .expect("Failed to find `except` range");
     range
-}
-
-/// Find f-strings that don't contain any formatted values in a `JoinedStr`.
-pub fn find_useless_f_strings(expr: &Expr, locator: &Locator) -> Vec<(Range, Range)> {
-    let contents = locator.slice(expr);
-    lexer::lex_located(contents, Mode::Module, expr.location)
-        .flatten()
-        .filter_map(|(location, tok, end_location)| match tok {
-            Tok::String {
-                kind: StringKind::FString | StringKind::RawFString,
-                ..
-            } => {
-                let first_char = locator.slice(Range {
-                    location,
-                    end_location: Location::new(location.row(), location.column() + 1),
-                });
-                // f"..."  => f_position = 0
-                // fr"..." => f_position = 0
-                // rf"..." => f_position = 1
-                let f_position = usize::from(!(first_char == "f" || first_char == "F"));
-                Some((
-                    Range {
-                        location: Location::new(location.row(), location.column() + f_position),
-                        end_location: Location::new(
-                            location.row(),
-                            location.column() + f_position + 1,
-                        ),
-                    },
-                    Range {
-                        location,
-                        end_location,
-                    },
-                ))
-            }
-            _ => None,
-        })
-        .collect()
 }
 
 /// Return the `Range` of `else` in `For`, `AsyncFor`, and `While` statements.
@@ -1258,40 +1181,182 @@ impl<'a> SimpleCallArgs<'a> {
     }
 }
 
-/// Return `true` if the given `Expr` is a potential logging call. Matches
-/// `logging.error`, `logger.error`, `self.logger.error`, etc., but not
-/// arbitrary `foo.error` calls.
-///
-/// It even matches direct `logging.error` calls even if the `logging` module
-/// is aliased. Example:
-/// ```python
-/// import logging as bar
-///
-/// # This is detected to be a logger candidate
-/// bar.error()
-/// ```
-pub fn is_logger_candidate(context: &Context, func: &Expr) -> bool {
-    if let ExprKind::Attribute { value, .. } = &func.node {
-        let call_path = context
-            .resolve_call_path(value)
-            .unwrap_or_else(|| collect_call_path(value));
-        if let Some(tail) = call_path.last() {
-            if tail.starts_with("log") || tail.ends_with("logger") || tail.ends_with("logging") {
+/// Check if a node is parent of a conditional branch.
+pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
+    parents.any(|parent| {
+        if matches!(
+            parent.node,
+            StmtKind::If { .. } | StmtKind::While { .. } | StmtKind::Match { .. }
+        ) {
+            return true;
+        }
+        if let StmtKind::Expr { value } = &parent.node {
+            if matches!(value.node, ExprKind::IfExp { .. }) {
                 return true;
             }
         }
+        false
+    })
+}
+
+/// Check if a node is in a nested block.
+pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool {
+    parents.any(|parent| {
+        matches!(
+            parent.node,
+            StmtKind::Try { .. }
+                | StmtKind::TryStar { .. }
+                | StmtKind::If { .. }
+                | StmtKind::With { .. }
+                | StmtKind::Match { .. }
+        )
+    })
+}
+
+/// Check if a node represents an unpacking assignment.
+pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
+    match &parent.node {
+        StmtKind::With { items, .. } => items.iter().any(|item| {
+            if let Some(optional_vars) = &item.optional_vars {
+                if matches!(optional_vars.node, ExprKind::Tuple { .. }) {
+                    if any_over_expr(optional_vars, &|expr| expr == child) {
+                        return true;
+                    }
+                }
+            }
+            false
+        }),
+        StmtKind::Assign { targets, value, .. } => {
+            // In `(a, b) = (1, 2)`, `(1, 2)` is the target, and it is a tuple.
+            let value_is_tuple = matches!(
+                &value.node,
+                ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+            );
+            // In `(a, b) = coords = (1, 2)`, `(a, b)` and `coords` are the targets, and
+            // `(a, b)` is a tuple. (We use "tuple" as a placeholder for any
+            // unpackable expression.)
+            let targets_are_tuples = targets.iter().all(|item| {
+                matches!(
+                    item.node,
+                    ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+                )
+            });
+            // If we're looking at `a` in `(a, b) = coords = (1, 2)`, then we should
+            // identify that the current expression is in a tuple.
+            let child_in_tuple = targets_are_tuples
+                || targets.iter().any(|item| {
+                    matches!(
+                        item.node,
+                        ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+                    ) && any_over_expr(item, &|expr| expr == child)
+                });
+
+            // If our child is a tuple, and value is not, it's always an unpacking
+            // expression. Ex) `x, y = tup`
+            if child_in_tuple && !value_is_tuple {
+                return true;
+            }
+
+            // If our child isn't a tuple, but value is, it's never an unpacking expression.
+            // Ex) `coords = (1, 2)`
+            if !child_in_tuple && value_is_tuple {
+                return false;
+            }
+
+            // If our target and the value are both tuples, then it's an unpacking
+            // expression assuming there's at least one non-tuple child.
+            // Ex) Given `(x, y) = coords = 1, 2`, `(x, y)` is considered an unpacking
+            // expression. Ex) Given `(x, y) = (a, b) = 1, 2`, `(x, y)` isn't
+            // considered an unpacking expression.
+            if child_in_tuple && value_is_tuple {
+                return !targets_are_tuples;
+            }
+
+            false
+        }
+        _ => false,
     }
-    false
+}
+
+pub type LocatedCmpop<U = ()> = Located<Cmpop, U>;
+
+/// Extract all [`Cmpop`] operators from a source code snippet, with appropriate
+/// ranges.
+///
+/// `RustPython` doesn't include line and column information on [`Cmpop`] nodes.
+/// `CPython` doesn't either. This method iterates over the token stream and
+/// re-identifies [`Cmpop`] nodes, annotating them with valid ranges.
+pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
+    let mut tok_iter = lexer::lex(contents, Mode::Module).flatten().peekable();
+    let mut ops: Vec<LocatedCmpop> = vec![];
+    let mut count: usize = 0;
+    loop {
+        let Some((start, tok, end)) = tok_iter.next() else {
+            break;
+        };
+        if matches!(tok, Tok::Lpar) {
+            count += 1;
+            continue;
+        } else if matches!(tok, Tok::Rpar) {
+            count -= 1;
+            continue;
+        }
+        if count == 0 {
+            match tok {
+                Tok::Not => {
+                    if let Some((_, _, end)) =
+                        tok_iter.next_if(|(_, tok, _)| matches!(tok, Tok::In))
+                    {
+                        ops.push(LocatedCmpop::new(start, end, Cmpop::NotIn));
+                    }
+                }
+                Tok::In => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::In));
+                }
+                Tok::Is => {
+                    let op = if let Some((_, _, end)) =
+                        tok_iter.next_if(|(_, tok, _)| matches!(tok, Tok::Not))
+                    {
+                        LocatedCmpop::new(start, end, Cmpop::IsNot)
+                    } else {
+                        LocatedCmpop::new(start, end, Cmpop::Is)
+                    };
+                    ops.push(op);
+                }
+                Tok::NotEqual => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::NotEq));
+                }
+                Tok::EqEqual => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::Eq));
+                }
+                Tok::GreaterEqual => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::GtE));
+                }
+                Tok::Greater => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::Gt));
+                }
+                Tok::LessEqual => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::LtE));
+                }
+                Tok::Less => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::Lt));
+                }
+                _ => {}
+            }
+        }
+    }
+    ops
 }
 
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
     use rustpython_parser as parser;
-    use rustpython_parser::ast::Location;
+    use rustpython_parser::ast::{Cmpop, Location};
 
     use crate::helpers::{
-        elif_else_range, else_range, first_colon_range, identifier_range, match_trailing_content,
+        elif_else_range, else_range, first_colon_range, identifier_range, locate_cmpops,
+        match_trailing_content, LocatedCmpop,
     };
     use crate::source_code::Locator;
     use crate::types::Range;
@@ -1405,7 +1470,7 @@ class Class():
     }
 
     #[test]
-    fn test_else_range() -> Result<()> {
+    fn extract_else_range() -> Result<()> {
         let contents = r#"
 for x in y:
     pass
@@ -1425,7 +1490,7 @@ else:
     }
 
     #[test]
-    fn test_first_colon_range() {
+    fn extract_first_colon_range() {
         let contents = "with a: pass";
         let locator = Locator::new(contents);
         let range = first_colon_range(
@@ -1440,7 +1505,7 @@ else:
     }
 
     #[test]
-    fn test_elif_else_range() -> Result<()> {
+    fn extract_elif_else_range() -> Result<()> {
         let contents = "
 if a:
     ...
@@ -1472,5 +1537,71 @@ else:
         assert_eq!(range.end_location.row(), 3);
         assert_eq!(range.end_location.column(), 4);
         Ok(())
+    }
+
+    #[test]
+    fn extract_cmpop_location() {
+        assert_eq!(
+            locate_cmpops("x == 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::Eq
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x != 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::NotEq
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x is 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::Is
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x is not 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 8),
+                Cmpop::IsNot
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x in 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::In
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x not in 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 8),
+                Cmpop::NotIn
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x != (1 is not 2)"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::NotEq
+            )]
+        );
     }
 }

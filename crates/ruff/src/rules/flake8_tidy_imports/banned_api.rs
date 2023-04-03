@@ -5,7 +5,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation, CacheKey};
-use ruff_python_ast::types::{CallPath, Range};
+use ruff_python_ast::call_path::from_qualified_name;
+use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -102,7 +103,7 @@ pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
             .flake8_tidy_imports
             .banned_api
             .iter()
-            .find(|(banned_path, ..)| call_path == banned_path.split('.').collect::<CallPath>())
+            .find(|(banned_path, ..)| call_path == from_qualified_name(banned_path))
     }) {
         checker.diagnostics.push(Diagnostic::new(
             BannedApi {

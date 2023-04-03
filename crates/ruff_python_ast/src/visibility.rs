@@ -2,9 +2,10 @@ use std::path::Path;
 
 use rustpython_parser::ast::{Expr, Stmt, StmtKind};
 
+use crate::call_path::collect_call_path;
+use crate::call_path::CallPath;
 use crate::context::Context;
-use crate::helpers::{collect_call_path, map_callable};
-use crate::types::CallPath;
+use crate::helpers::map_callable;
 
 #[derive(Debug, Clone, Copy)]
 pub enum Modifier {
@@ -182,9 +183,10 @@ pub fn method_visibility(stmt: &Stmt) -> Visibility {
         } => {
             // Is this a setter or deleter?
             if decorator_list.iter().any(|expr| {
-                let call_path = collect_call_path(expr);
-                call_path.as_slice() == [name, "setter"]
-                    || call_path.as_slice() == [name, "deleter"]
+                collect_call_path(expr).map_or(false, |call_path| {
+                    call_path.as_slice() == [name, "setter"]
+                        || call_path.as_slice() == [name, "deleter"]
+                })
             }) {
                 return Visibility::Private;
             }

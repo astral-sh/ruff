@@ -2,7 +2,8 @@ use std::string::ToString;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::scope::{Bindings, Scope, ScopeKind};
+use ruff_python_ast::binding::Bindings;
+use ruff_python_ast::scope::{Scope, ScopeKind};
 
 #[violation]
 pub struct UndefinedLocal {
