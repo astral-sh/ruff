@@ -19,17 +19,33 @@ impl Violation for TabIndentation {
 /// strings aren't overlapping (otherwise there'd only be one string). This function performs a
 /// binary search on string_lines to find the string that contains (or starts just before) lineno
 fn find_closest_string<'a>(lineno: &usize, string_lines: &'a [Range]) -> Option<&'a Range> {
-    // TODO: change this to a binary search
-    let mut curr_range = None;
-    for range in string_lines {
-        if &range.location.row() > lineno {
+    if string_lines.is_empty() {
+        return None;
+    }
+
+    let mut low = 0;
+    let mut high = string_lines.len() - 1;
+
+    while low <= high {
+        let middle = low + (high - low) / 2;
+        if middle == 0 {
             break;
         }
 
-        curr_range = Some(range);
+        let curr = &string_lines[middle];
+        let start = &curr.location.row();
+        let end = &curr.end_location.row();
+
+        if start <= lineno && lineno <= end {
+            return Some(curr);
+        } else if start > lineno {
+            high = middle - 1;
+        } else if end < lineno {
+            low = middle + 1;
+        }
     }
 
-    return curr_range;
+    return Some(&string_lines[high]);
 }
 
 /// W191
