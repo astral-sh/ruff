@@ -14,10 +14,10 @@ use similar::TextDiff;
 
 use ruff::fs;
 use ruff::jupyter::{is_jupyter_notebook, JupyterIndex, JupyterNotebook};
-use ruff::linter::{lint_fix, lint_only, FixTable, LinterResult};
+use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
-use ruff_python_ast::types::Imports;
+use ruff_python_ast::imports::ImportMap;
 
 use crate::cache;
 
@@ -25,14 +25,14 @@ use crate::cache;
 pub struct Diagnostics {
     pub messages: Vec<Message>,
     pub fixed: FxHashMap<String, FixTable>,
-    pub imports: Imports,
+    pub imports: ImportMap,
     /// Jupyter notebook indexing table for each input file that is a jupyter notebook
     /// so we can rewrite the diagnostics in the end
     pub jupyter_index: FxHashMap<String, JupyterIndex>,
 }
 
 impl Diagnostics {
-    pub fn new(messages: Vec<Message>, imports: Imports) -> Self {
+    pub fn new(messages: Vec<Message>, imports: ImportMap) -> Self {
         Self {
             messages,
             fixed: FxHashMap::default(),
@@ -148,8 +148,11 @@ pub fn lint_path(
         },
         fixed,
     ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
-        if let Ok((result, transformed, fixed)) =
-            lint_fix(&contents, path, package, noqa, &settings.lib)
+        if let Ok(FixerResult {
+            result,
+            transformed,
+            fixed,
+        }) = lint_fix(&contents, path, package, noqa, &settings.lib)
         {
             if !fixed.is_empty() {
                 if matches!(autofix, flags::FixMode::Apply) {
@@ -190,6 +193,8 @@ pub fn lint_path(
         let fixed = FxHashMap::default();
         (result, fixed)
     };
+
+    let imports = imports.unwrap_or_default();
 
     if let Some(err) = parse_error {
         // Notify the user of any parse errors.
@@ -259,7 +264,11 @@ pub fn lint_stdin(
         },
         fixed,
     ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
-        if let Ok((result, transformed, fixed)) = lint_fix(
+        if let Ok(FixerResult {
+            result,
+            transformed,
+            fixed,
+        }) = lint_fix(
             contents,
             path.unwrap_or_else(|| Path::new("-")),
             package,
@@ -317,6 +326,8 @@ pub fn lint_stdin(
         let fixed = FxHashMap::default();
         (result, fixed)
     };
+
+    let imports = imports.unwrap_or_default();
 
     if let Some(err) = parse_error {
         error!(

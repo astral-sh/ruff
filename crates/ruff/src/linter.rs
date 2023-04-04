@@ -9,8 +9,8 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::ParseError;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::types::Imports;
 use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::autofix::fix_file;
@@ -50,9 +50,16 @@ impl<T> LinterResult<T> {
     }
 }
 
-type DiagnosticsAndImports = (Vec<Diagnostic>, Imports);
-pub type MessagesAndImports = (Vec<Message>, Imports);
 pub type FixTable = FxHashMap<Rule, usize>;
+
+pub struct FixerResult<'a> {
+    /// The result returned by the linter, after applying any fixes.
+    pub result: LinterResult<(Vec<Message>, Option<ImportMap>)>,
+    /// The resulting source code, after applying any fixes.
+    pub transformed: Cow<'a, str>,
+    /// The number of fixes applied for each [`Rule`].
+    pub fixed: FixTable,
+}
 
 /// Generate `Diagnostic`s from the source code contents at the
 /// given `Path`.
@@ -69,10 +76,10 @@ pub fn check_path(
     settings: &Settings,
     noqa: flags::Noqa,
     autofix: flags::Autofix,
-) -> LinterResult<DiagnosticsAndImports> {
+) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
-    let mut imports = Imports::default();
+    let mut imports = None;
     let mut error = None;
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
@@ -320,7 +327,7 @@ pub fn lint_only(
     settings: &Settings,
     noqa: flags::Noqa,
     autofix: flags::Autofix,
-) -> LinterResult<MessagesAndImports> {
+) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
     // Tokenize once.
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
 
@@ -382,7 +389,7 @@ pub fn lint_fix<'a>(
     package: Option<&Path>,
     noqa: flags::Noqa,
     settings: &Settings,
-) -> Result<(LinterResult<MessagesAndImports>, Cow<'a, str>, FixTable)> {
+) -> Result<FixerResult<'a>> {
     let mut transformed = Cow::Borrowed(contents);
 
     // Track the number of fixed errors across iterations.
@@ -497,8 +504,8 @@ This indicates a bug in `{}`. If you could open an issue at:
 
         // Convert to messages.
         let path_lossy = path.to_string_lossy();
-        return Ok((
-            result.map(|(messages, imports)| {
+        return Ok(FixerResult {
+            result: result.map(|(messages, imports)| {
                 (
                     messages
                         .into_iter()
@@ -524,6 +531,6 @@ This indicates a bug in `{}`. If you could open an issue at:
             }),
             transformed,
             fixed,
-        ));
+        });
     }
 }

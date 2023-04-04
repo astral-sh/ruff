@@ -9,18 +9,18 @@ use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 
-use crate::panic::catch_unwind;
 use ruff::message::{Location, Message};
 use ruff::registry::Rule;
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::{flags, AllSettings};
 use ruff::{fs, packaging, resolver, warn_user_once, IOError, Range};
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::types::Imports;
+use ruff_python_ast::imports::ImportMap;
 
 use crate::args::Overrides;
 use crate::cache;
 use crate::diagnostics::Diagnostics;
+use crate::panic::catch_unwind;
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -44,7 +44,7 @@ pub fn run(
 
     // Initialize the cache.
     if cache.into() {
-        fn init_cache(path: &std::path::Path) {
+        fn init_cache(path: &Path) {
             if let Err(e) = cache::init(path) {
                 error!("Failed to initialize cache at {}: {e:?}", path.display());
             }
@@ -126,7 +126,7 @@ pub fn run(
                                 None,
                                 1,
                             )],
-                            Imports::default(),
+                            ImportMap::default(),
                         )
                     } else {
                         Diagnostics::default()

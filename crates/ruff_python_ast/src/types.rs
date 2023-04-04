@@ -1,8 +1,6 @@
-use std::{collections::hash_map::Iter as HashMapIter, ops::Deref};
+use std::ops::Deref;
 
-use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Located, Location, Stmt};
-use serde::{Deserialize, Serialize};
 
 #[derive(Clone)]
 pub enum Node<'a> {
@@ -97,59 +95,5 @@ impl<'a> From<&RefEquality<'a, Stmt>> for &'a Stmt {
 impl<'a> From<&RefEquality<'a, Expr>> for &'a Expr {
     fn from(r: &RefEquality<'a, Expr>) -> Self {
         r.0
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Import {
-    pub name: String,
-    location: Location,
-    end_location: Location,
-}
-
-impl Import {
-    pub fn new(name: String, location: Location, end_location: Location) -> Self {
-        Self {
-            name,
-            location,
-            end_location,
-        }
-    }
-}
-
-impl From<&Import> for Range {
-    fn from(import: &Import) -> Range {
-        Range::new(import.location, import.end_location)
-    }
-}
-
-impl From<Import> for Range {
-    fn from(import: Import) -> Range {
-        Range::new(import.location, import.end_location)
-    }
-}
-
-#[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Imports {
-    pub imports_per_module: FxHashMap<String, Vec<Import>>,
-}
-
-impl Imports {
-    pub fn insert(&mut self, module: &str, imports_vec: Vec<Import>) {
-        self.imports_per_module
-            .insert(module.to_owned(), imports_vec);
-    }
-
-    pub fn extend(&mut self, other: Self) {
-        self.imports_per_module.extend(other.imports_per_module);
-    }
-}
-
-impl<'a> IntoIterator for &'a Imports {
-    type Item = (&'a String, &'a Vec<Import>);
-    type IntoIter = HashMapIter<'a, String, Vec<Import>>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        self.imports_per_module.iter()
     }
 }
