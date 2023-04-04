@@ -79,6 +79,13 @@ for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
         collect_shop_items(shopper, section_items)  # B031
 
 for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    if _section == "greens":
+        collect_shop_items(shopper, section_items)
+    else:
+        collect_shop_items(shopper, section_items)
+        collect_shop_items(shopper, section_items)  # B031
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
     # Mutually exclusive branches shouldn't trigger the warning
     if _section == "greens":
         collect_shop_items(shopper, section_items)

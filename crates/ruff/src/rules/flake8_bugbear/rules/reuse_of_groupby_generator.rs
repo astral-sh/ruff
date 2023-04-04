@@ -153,10 +153,9 @@ where
                     self.counter_stack.last_mut().unwrap().push(0);
                 }
 
-                let has_else = !is_if_arm
-                    && orelse
-                        .first()
-                        .map_or(false, |expr| !matches!(expr.node, StmtKind::If { .. }));
+                let has_else = orelse
+                    .first()
+                    .map_or(false, |expr| !matches!(expr.node, StmtKind::If { .. }));
 
                 self.parent_ifs.push(stmt);
                 if has_else {
