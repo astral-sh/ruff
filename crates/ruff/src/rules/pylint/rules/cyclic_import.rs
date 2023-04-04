@@ -20,7 +20,6 @@ impl Violation for CyclicImport {
         format!("Cyclic import ({}) (cyclic-import)", self.cycle)
     }
 }
-
 struct CyclicImportChecker<'a> {
     imports: &'a FxHashMap<String, Vec<ModuleImport>>,
 }
@@ -93,7 +92,6 @@ pub fn cyclic_import(
                 .map(|cycle| {
                     Diagnostic::new(
                         CyclicImport {
-                            // need to reorder the detected cycle
                             cycle: cycle.join(" -> "),
                         },
                         imports.module_to_imports[&module_name][1].as_ref().into(),
@@ -130,6 +128,7 @@ pub fn cyclic_import(
                     }
                 }
                 for involved_module in new_cycle.iter() {
+                    // we re-order the cycles for the modules involved here
                     let pos = new_cycle.iter().position(|s| s == involved_module).unwrap();
                     let cycle_to_insert = new_cycle[pos..]
                         .iter()
@@ -165,7 +164,8 @@ mod tests {
 
     use super::*;
 
-    fn test_simple_cycle_helper() -> ImportMap {
+    #[test]
+    fn cyclic_import_simple_one() {
         let mut map = FxHashMap::default();
         let location = Location::new(1, 1);
         map.insert(
@@ -179,14 +179,7 @@ mod tests {
             "grand.b".to_string(),
             vec![ModuleImport::new("grand.a".to_string(), location, location)],
         );
-        ImportMap {
-            module_to_imports: map,
-        }
-    }
-
-    #[test]
-    fn cyclic_import_simple_one() {
-        let imports = test_simple_cycle_helper();
+        let imports = ImportMap::new(map);
         let cyclic_checker = CyclicImportChecker {
             imports: &imports.module_to_imports,
         };
