@@ -43,9 +43,19 @@ impl LoggingLevel {
 /// ```
 pub fn is_logger_candidate(context: &Context, func: &Expr) -> bool {
     if let ExprKind::Attribute { value, .. } = &func.node {
-        let Some(call_path) = context
-            .resolve_call_path(value)
-            .or_else(|| collect_call_path(value)) else {
+        let Some(call_path) = (if let Some(call_path) = context.resolve_call_path(value) {
+            if let Some(&module) = call_path.first() {
+                if module == "logging" {
+                    Some(call_path)
+                } else {
+                    None
+                }
+            } else {
+                None
+            }
+        } else {
+            collect_call_path(value)
+        }) else {
             return false;
         };
         if let Some(tail) = call_path.last() {

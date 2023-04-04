@@ -8,19 +8,19 @@ expression: diagnostics
     suggestion: "Convert to `warn`"
     fixable: true
   location:
-    row: 3
+    row: 4
     column: 8
   end_location:
-    row: 3
+    row: 4
     column: 12
   fix:
     edits:
       - content: warning
         location:
-          row: 3
+          row: 4
           column: 8
         end_location:
-          row: 3
+          row: 4
           column: 12
   parent: ~
 
