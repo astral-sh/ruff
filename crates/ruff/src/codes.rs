@@ -356,7 +356,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Simplify, "223") => Rule::ExprAndFalse,
         (Flake8Simplify, "300") => Rule::YodaConditions,
         (Flake8Simplify, "401") => Rule::IfElseBlockInsteadOfDictGet,
-        (Flake8Simplify, "910") => Rule::AvoidableUseDictGetWithNone,
+        (Flake8Simplify, "910") => Rule::DictGetWithNoneDefault,
 
         // pyupgrade
         (Pyupgrade, "001") => Rule::UselessMetaclassType,

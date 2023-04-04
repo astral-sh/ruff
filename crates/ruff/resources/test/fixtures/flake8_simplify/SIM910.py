@@ -22,3 +22,6 @@ if a := {}.get(key, None):
 
 # SIM910
 a = {}.get(key, None)
+
+# SIM910
+({}).get(key, None)

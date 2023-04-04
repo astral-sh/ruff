@@ -2918,12 +2918,8 @@ where
                     flake8_simplify::rules::open_file_with_context_handler(self, func);
                 }
 
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::AvoidableUseDictGetWithNone)
-                {
-                    flake8_simplify::rules::avoid_to_use_dict_get_with_none(self, expr);
+                if self.settings.rules.enabled(Rule::DictGetWithNoneDefault) {
+                    flake8_simplify::rules::dict_get_with_none_default(self, expr);
                 }
 
                 // flake8-use-pathlib

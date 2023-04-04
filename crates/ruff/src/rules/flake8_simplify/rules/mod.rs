@@ -4,8 +4,8 @@ pub use ast_bool_op::{
     ExprAndNotExpr, ExprOrNotExpr, ExprOrTrue,
 };
 pub use ast_expr::{
-    avoid_to_use_dict_get_with_none, use_capital_environment_variables,
-    AvoidableUseDictGetWithNone, UncapitalizedEnvironmentVariables,
+    dict_get_with_none_default, use_capital_environment_variables, DictGetWithNoneDefault,
+    UncapitalizedEnvironmentVariables,
 };
 pub use ast_if::{
     if_with_same_arms, manual_dict_lookup, needless_bool, nested_if_statements,

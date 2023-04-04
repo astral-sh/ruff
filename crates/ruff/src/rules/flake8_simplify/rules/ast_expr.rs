@@ -28,20 +28,20 @@ impl AlwaysAutofixableViolation for UncapitalizedEnvironmentVariables {
 }
 
 #[violation]
-pub struct AvoidableUseDictGetWithNone {
+pub struct DictGetWithNoneDefault {
     pub expected: String,
     pub original: String,
 }
 
-impl AlwaysAutofixableViolation for AvoidableUseDictGetWithNone {
+impl AlwaysAutofixableViolation for DictGetWithNoneDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let AvoidableUseDictGetWithNone { expected, original } = self;
+        let DictGetWithNoneDefault { expected, original } = self;
         format!("Use `{expected}` instead of `{original}`")
     }
 
     fn autofix_title(&self) -> String {
-        let AvoidableUseDictGetWithNone { expected, original } = self;
+        let DictGetWithNoneDefault { expected, original } = self;
         format!("Replace `{original}` with `{expected}`")
     }
 }
@@ -144,34 +144,40 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
 }
 
 /// SIM910
-pub fn avoid_to_use_dict_get_with_none(checker: &mut Checker, expr: &Expr) {
-    let ExprKind::Call { func, args, .. } = &expr.node else {
+pub fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::Call { func, args, keywords } = &expr.node else {
         return;
     };
-
-    let Some(default) = args.get(1) else {
+    if !keywords.is_empty() {
         return;
-    };
-
-    let ExprKind::Constant { value: Constant::None, kind: _ } = &default.node else {
-        return;
-    };
-
+    }
     let ExprKind::Attribute { value, attr, .. } = &func.node else {
         return;
     };
-
-    if !(attr == "get" && matches!(value.node, ExprKind::Dict { .. })) {
+    if !matches!(value.node, ExprKind::Dict { .. }) {
         return;
     }
-
+    if attr != "get" {
+        return;
+    }
     let Some(key) = args.get(0) else {
         return;
     };
-
     if !matches!(key.node, ExprKind::Constant { .. } | ExprKind::Name { .. }) {
         return;
     }
+    let Some(default) = args.get(1) else {
+        return;
+    };
+    if !matches!(
+        default.node,
+        ExprKind::Constant {
+            value: Constant::None,
+            ..
+        }
+    ) {
+        return;
+    };
 
     let expected = format!(
         "{}({})",
@@ -181,7 +187,7 @@ pub fn avoid_to_use_dict_get_with_none(checker: &mut Checker, expr: &Expr) {
     let original = checker.locator.slice(expr).to_string();
 
     let mut diagnostic = Diagnostic::new(
-        AvoidableUseDictGetWithNone {
+        DictGetWithNoneDefault {
             expected: expected.clone(),
             original,
         },
