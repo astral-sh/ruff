@@ -213,7 +213,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
             } else {
                 Some(ExpandedFix {
                     message: message.kind.suggestion,
-                    edits: message.fix.edits().to_vec(),
+                    edits: message.fix.into_edits(),
                 })
             },
         })

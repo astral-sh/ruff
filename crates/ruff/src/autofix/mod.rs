@@ -15,10 +15,15 @@ pub mod actions;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
 pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String, FixTable)> {
-    if diagnostics.iter().all(|check| check.fix.is_empty()) {
+    let mut with_fixes = diagnostics
+        .iter()
+        .filter(|diag| !diag.fix.is_empty())
+        .peekable();
+
+    if with_fixes.peek().is_none() {
         None
     } else {
-        Some(apply_fixes(diagnostics.iter(), locator))
+        Some(apply_fixes(with_fixes, locator))
     }
 }
 

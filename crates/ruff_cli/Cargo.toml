@@ -45,7 +45,6 @@ itertools = { workspace = true }
 log = { workspace = true }
 notify = { version = "5.1.0" }
 path-absolutize = { workspace = true, features = ["once_cell_cache"] }
-quick-junit = { version = "0.3.2" }
 rayon = { version = "1.7.0" }
 regex = { workspace = true }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
