@@ -27,6 +27,25 @@ impl AlwaysAutofixableViolation for UncapitalizedEnvironmentVariables {
     }
 }
 
+#[violation]
+pub struct DictGetWithNoneDefault {
+    pub expected: String,
+    pub original: String,
+}
+
+impl AlwaysAutofixableViolation for DictGetWithNoneDefault {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let DictGetWithNoneDefault { expected, original } = self;
+        format!("Use `{expected}` instead of `{original}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let DictGetWithNoneDefault { expected, original } = self;
+        format!("Replace `{original}` with `{expected}`")
+    }
+}
+
 /// SIM112
 pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
     // check `os.environ['foo']`
@@ -119,6 +138,67 @@ fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
             unparse_expr(&new_env_var, checker.stylist),
             slice.location,
             slice.end_location.unwrap(),
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
+/// SIM910
+pub fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
+    let ExprKind::Call { func, args, keywords } = &expr.node else {
+        return;
+    };
+    if !keywords.is_empty() {
+        return;
+    }
+    let ExprKind::Attribute { value, attr, .. } = &func.node else {
+        return;
+    };
+    if !matches!(value.node, ExprKind::Dict { .. }) {
+        return;
+    }
+    if attr != "get" {
+        return;
+    }
+    let Some(key) = args.get(0) else {
+        return;
+    };
+    if !matches!(key.node, ExprKind::Constant { .. } | ExprKind::Name { .. }) {
+        return;
+    }
+    let Some(default) = args.get(1) else {
+        return;
+    };
+    if !matches!(
+        default.node,
+        ExprKind::Constant {
+            value: Constant::None,
+            ..
+        }
+    ) {
+        return;
+    };
+
+    let expected = format!(
+        "{}({})",
+        checker.locator.slice(func),
+        checker.locator.slice(key)
+    );
+    let original = checker.locator.slice(expr).to_string();
+
+    let mut diagnostic = Diagnostic::new(
+        DictGetWithNoneDefault {
+            expected: expected.clone(),
+            original,
+        },
+        Range::from(expr),
+    );
+
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.set_fix(Edit::replacement(
+            expected,
+            expr.location,
+            expr.end_location.unwrap(),
         ));
     }
     checker.diagnostics.push(diagnostic);
