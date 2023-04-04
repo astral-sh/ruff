@@ -213,7 +213,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
             };
-            let fixable = !contains_effect(&checker.ctx, target);
+            let fixable = !contains_effect(target, |id| checker.ctx.is_builtin(id));
             let mut diagnostic = Diagnostic::new(
                 DuplicateIsinstanceCall {
                     name: if let ExprKind::Name { id, .. } = &target.node {
@@ -341,7 +341,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         // Avoid rewriting (e.g.) `a == "foo" or a == f()`.
         if comparators
             .iter()
-            .any(|expr| contains_effect(&checker.ctx, expr))
+            .any(|expr| contains_effect(expr, |id| checker.ctx.is_builtin(id)))
         {
             continue;
         }
@@ -423,7 +423,7 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(&checker.ctx, expr) {
+    if contains_effect(expr, |id| checker.ctx.is_builtin(id)) {
         return;
     }
 
@@ -477,7 +477,7 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(&checker.ctx, expr) {
+    if contains_effect(expr, |id| checker.ctx.is_builtin(id)) {
         return;
     }
 
@@ -503,10 +503,17 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-pub fn is_short_circuit(ctx: &Context, expr: &Expr) -> Option<(Location, Location)> {
+pub fn is_short_circuit(
+    ctx: &Context,
+    expr: &Expr,
+    expected_op: &Boolop,
+) -> Option<(Location, Location)> {
     let ExprKind::BoolOp { op, values, } = &expr.node else {
         return None;
     };
+    if op != expected_op {
+        return None;
+    }
     let short_circuit_value = match op {
         Boolop::And => false,
         Boolop::Or => true,
@@ -515,7 +522,7 @@ pub fn is_short_circuit(ctx: &Context, expr: &Expr) -> Option<(Location, Locatio
     let mut location = expr.location;
     for (value, next_value) in values.iter().tuple_windows() {
         // Keep track of the location of the furthest-right, non-effectful expression.
-        if contains_effect(ctx, value) {
+        if contains_effect(value, |id| ctx.is_builtin(id)) {
             location = next_value.location;
             continue;
         }
@@ -551,7 +558,7 @@ pub fn is_short_circuit(ctx: &Context, expr: &Expr) -> Option<(Location, Locatio
 
 /// SIM222
 pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
-    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr) else {
+    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr, &Boolop::Or) else {
         return;
     };
     let mut diagnostic = Diagnostic::new(
@@ -573,7 +580,7 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
 
 /// SIM223
 pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
-    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr) else {
+    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr, &Boolop::And) else {
         return;
     };
     let mut diagnostic = Diagnostic::new(

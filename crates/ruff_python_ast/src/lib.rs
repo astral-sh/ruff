@@ -1,4 +1,7 @@
+pub mod all;
+pub mod binding;
 pub mod branch_detection;
+pub mod call_path;
 pub mod cast;
 pub mod comparable;
 pub mod context;
@@ -8,7 +11,6 @@ pub mod helpers;
 pub mod imports;
 pub mod logging;
 pub mod newlines;
-pub mod operations;
 pub mod relocate;
 pub mod scope;
 pub mod source_code;

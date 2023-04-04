@@ -639,10 +639,9 @@ pub fn manual_dict_lookup(
     let StmtKind::Return { value, .. } = &body[0].node else {
         return;
     };
-    if value
-        .as_ref()
-        .map_or(false, |value| contains_effect(&checker.ctx, value))
-    {
+    if value.as_ref().map_or(false, |value| {
+        contains_effect(value, |id| checker.ctx.is_builtin(id))
+    }) {
         return;
     }
 
@@ -712,10 +711,9 @@ pub fn manual_dict_lookup(
         let StmtKind::Return { value, .. } = &body[0].node else {
             return;
         };
-        if value
-            .as_ref()
-            .map_or(false, |value| contains_effect(&checker.ctx, value))
-        {
+        if value.as_ref().map_or(false, |value| {
+            contains_effect(value, |id| checker.ctx.is_builtin(id))
+        }) {
             return;
         };
 
@@ -757,13 +755,13 @@ pub fn use_dict_get_with_default(
     if body.len() != 1 || orelse.len() != 1 {
         return;
     }
-    let StmtKind::Assign { targets: body_var, value: body_val, ..} = &body[0].node else {
+    let StmtKind::Assign { targets: body_var, value: body_value, ..} = &body[0].node else {
         return;
     };
     if body_var.len() != 1 {
         return;
     };
-    let StmtKind::Assign { targets: orelse_var, value: orelse_val, .. } = &orelse[0].node else {
+    let StmtKind::Assign { targets: orelse_var, value: orelse_value, .. } = &orelse[0].node else {
         return;
     };
     if orelse_var.len() != 1 {
@@ -775,15 +773,15 @@ pub fn use_dict_get_with_default(
     if test_dict.len() != 1 {
         return;
     }
-    let (expected_var, expected_val, default_var, default_val) = match ops[..] {
-        [Cmpop::In] => (&body_var[0], body_val, &orelse_var[0], orelse_val),
-        [Cmpop::NotIn] => (&orelse_var[0], orelse_val, &body_var[0], body_val),
+    let (expected_var, expected_value, default_var, default_value) = match ops[..] {
+        [Cmpop::In] => (&body_var[0], body_value, &orelse_var[0], orelse_value),
+        [Cmpop::NotIn] => (&orelse_var[0], orelse_value, &body_var[0], body_value),
         _ => {
             return;
         }
     };
     let test_dict = &test_dict[0];
-    let ExprKind::Subscript { value: expected_subscript, slice: expected_slice, .. }  =  &expected_val.node else {
+    let ExprKind::Subscript { value: expected_subscript, slice: expected_slice, .. }  =  &expected_value.node else {
         return;
     };
 
@@ -797,7 +795,7 @@ pub fn use_dict_get_with_default(
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(&checker.ctx, default_val) {
+    if contains_effect(default_value, |id| checker.ctx.is_builtin(id)) {
         return;
     }
 
@@ -842,7 +840,7 @@ pub fn use_dict_get_with_default(
                 })),
                 args: vec![
                     create_expr(test_key.node.clone()),
-                    create_expr(default_val.node.clone()),
+                    create_expr(default_value.node.clone()),
                 ],
                 keywords: vec![],
             })),

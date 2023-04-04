@@ -516,10 +516,10 @@ pub fn deprecated_import(
     stmt: &Stmt,
     names: &[Alias],
     module: Option<&str>,
-    level: Option<&usize>,
+    level: Option<usize>,
 ) {
     // Avoid relative and star imports.
-    if level.map_or(false, |level| *level > 0) {
+    if level.map_or(false, |level| level > 0) {
         return;
     }
     if names.first().map_or(false, |name| name.node.name == "*") {

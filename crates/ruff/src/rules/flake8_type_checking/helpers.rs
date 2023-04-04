@@ -1,9 +1,11 @@
 use num_traits::Zero;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
+use ruff_python_ast::binding::{Binding, BindingKind, ExecutionContext};
+use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::context::Context;
-use ruff_python_ast::helpers::{map_callable, to_call_path};
-use ruff_python_ast::scope::{Binding, BindingKind, ExecutionContext, ScopeKind};
+use ruff_python_ast::helpers::map_callable;
+use ruff_python_ast::scope::ScopeKind;
 
 /// Return `true` if [`Expr`] is a guard for a type-checking block.
 pub fn is_type_checking_block(context: &Context, test: &Expr) -> bool {
@@ -76,7 +78,7 @@ fn runtime_evaluated_base_class(context: &Context, base_classes: &[String]) -> b
             if let Some(call_path) = context.resolve_call_path(base) {
                 if base_classes
                     .iter()
-                    .any(|base_class| to_call_path(base_class) == call_path)
+                    .any(|base_class| from_qualified_name(base_class) == call_path)
                 {
                     return true;
                 }
@@ -92,7 +94,7 @@ fn runtime_evaluated_decorators(context: &Context, decorators: &[String]) -> boo
             if let Some(call_path) = context.resolve_call_path(map_callable(decorator)) {
                 if decorators
                     .iter()
-                    .any(|decorator| to_call_path(decorator) == call_path)
+                    .any(|decorator| from_qualified_name(decorator) == call_path)
                 {
                     return true;
                 }

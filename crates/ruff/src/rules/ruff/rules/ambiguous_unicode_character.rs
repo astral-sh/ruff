@@ -1698,45 +1698,47 @@ pub fn ambiguous_unicode_character(
     let mut col_offset = 0;
     let mut row_offset = 0;
     for current_char in text.chars() {
-        // Search for confusing characters.
-        if let Some(representant) = CONFUSABLES.get(&(current_char as u32)) {
-            if !settings.allowed_confusables.contains(&current_char) {
-                let col = if row_offset == 0 {
-                    start.column() + col_offset
-                } else {
-                    col_offset
-                };
-                let location = Location::new(start.row() + row_offset, col);
-                let end_location = Location::new(location.row(), location.column() + 1);
-                let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
-                    match context {
-                        Context::String => AmbiguousUnicodeCharacterString {
-                            confusable: current_char,
-                            representant: *representant as char,
+        if !current_char.is_ascii() {
+            // Search for confusing characters.
+            if let Some(representant) = CONFUSABLES.get(&(current_char as u32)).copied() {
+                if !settings.allowed_confusables.contains(&current_char) {
+                    let col = if row_offset == 0 {
+                        start.column() + col_offset
+                    } else {
+                        col_offset
+                    };
+                    let location = Location::new(start.row() + row_offset, col);
+                    let end_location = Location::new(location.row(), location.column() + 1);
+                    let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
+                        match context {
+                            Context::String => AmbiguousUnicodeCharacterString {
+                                confusable: current_char,
+                                representant: representant as char,
+                            }
+                            .into(),
+                            Context::Docstring => AmbiguousUnicodeCharacterDocstring {
+                                confusable: current_char,
+                                representant: representant as char,
+                            }
+                            .into(),
+                            Context::Comment => AmbiguousUnicodeCharacterComment {
+                                confusable: current_char,
+                                representant: representant as char,
+                            }
+                            .into(),
+                        },
+                        Range::new(location, end_location),
+                    );
+                    if settings.rules.enabled(diagnostic.kind.rule()) {
+                        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
+                            diagnostic.set_fix(Edit::replacement(
+                                (representant as char).to_string(),
+                                location,
+                                end_location,
+                            ));
                         }
-                        .into(),
-                        Context::Docstring => AmbiguousUnicodeCharacterDocstring {
-                            confusable: current_char,
-                            representant: *representant as char,
-                        }
-                        .into(),
-                        Context::Comment => AmbiguousUnicodeCharacterComment {
-                            confusable: current_char,
-                            representant: *representant as char,
-                        }
-                        .into(),
-                    },
-                    Range::new(location, end_location),
-                );
-                if settings.rules.enabled(diagnostic.kind.rule()) {
-                    if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-                        diagnostic.set_fix(Edit::replacement(
-                            (*representant as char).to_string(),
-                            location,
-                            end_location,
-                        ));
+                        diagnostics.push(diagnostic);
                     }
-                    diagnostics.push(diagnostic);
                 }
             }
         }
