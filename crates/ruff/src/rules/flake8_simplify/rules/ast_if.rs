@@ -7,11 +7,12 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{
-    contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
+    any_over_expr, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
     has_comments_in, unparse_expr, unparse_stmt,
 };
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -412,6 +413,14 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
             orelse: Box::new(orelse_value.clone()),
         })),
         type_comment: None,
+    })
+}
+
+/// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
+fn contains_call_path(ctx: &Context, expr: &Expr, target: &[&str]) -> bool {
+    any_over_expr(expr, &|expr| {
+        ctx.resolve_call_path(expr)
+            .map_or(false, |call_path| call_path.as_slice() == target)
     })
 }
 

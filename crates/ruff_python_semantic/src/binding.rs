@@ -4,8 +4,9 @@ use std::ops::{Deref, Index, IndexMut};
 use bitflags::bitflags;
 use rustpython_parser::ast::Stmt;
 
+use ruff_python_ast::types::{Range, RefEquality};
+
 use crate::scope::ScopeId;
-use crate::types::{Range, RefEquality};
 
 #[derive(Debug, Clone)]
 pub struct Binding<'a> {

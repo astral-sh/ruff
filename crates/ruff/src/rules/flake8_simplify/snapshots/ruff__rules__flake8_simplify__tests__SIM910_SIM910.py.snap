@@ -1,0 +1,110 @@
+---
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: DictGetWithNoneDefault
+    body: "Use `{}.get(key)` instead of `{}.get(key, None)`"
+    suggestion: "Replace `{}.get(key, None)` with `{}.get(key)`"
+    fixable: true
+  location:
+    row: 2
+    column: 0
+  end_location:
+    row: 2
+    column: 17
+  fix:
+    edits:
+      - content: "{}.get(key)"
+        location:
+          row: 2
+          column: 0
+        end_location:
+          row: 2
+          column: 17
+  parent: ~
+- kind:
+    name: DictGetWithNoneDefault
+    body: "Use `{}.get(\"key\")` instead of `{}.get(\"key\", None)`"
+    suggestion: "Replace `{}.get(\"key\", None)` with `{}.get(\"key\")`"
+    fixable: true
+  location:
+    row: 5
+    column: 0
+  end_location:
+    row: 5
+    column: 19
+  fix:
+    edits:
+      - content: "{}.get(\"key\")"
+        location:
+          row: 5
+          column: 0
+        end_location:
+          row: 5
+          column: 19
+  parent: ~
+- kind:
+    name: DictGetWithNoneDefault
+    body: "Use `{}.get(key)` instead of `{}.get(key, None)`"
+    suggestion: "Replace `{}.get(key, None)` with `{}.get(key)`"
+    fixable: true
+  location:
+    row: 20
+    column: 8
+  end_location:
+    row: 20
+    column: 25
+  fix:
+    edits:
+      - content: "{}.get(key)"
+        location:
+          row: 20
+          column: 8
+        end_location:
+          row: 20
+          column: 25
+  parent: ~
+- kind:
+    name: DictGetWithNoneDefault
+    body: "Use `{}.get(key)` instead of `{}.get(key, None)`"
+    suggestion: "Replace `{}.get(key, None)` with `{}.get(key)`"
+    fixable: true
+  location:
+    row: 24
+    column: 4
+  end_location:
+    row: 24
+    column: 21
+  fix:
+    edits:
+      - content: "{}.get(key)"
+        location:
+          row: 24
+          column: 4
+        end_location:
+          row: 24
+          column: 21
+  parent: ~
+- kind:
+    name: DictGetWithNoneDefault
+    body: "Use `({}).get(key)` instead of `({}).get(key, None)`"
+    suggestion: "Replace `({}).get(key, None)` with `({}).get(key)`"
+    fixable: true
+  location:
+    row: 27
+    column: 0
+  end_location:
+    row: 27
+    column: 19
+  fix:
+    edits:
+      - content: "({}).get(key)"
+        location:
+          row: 27
+          column: 0
+        end_location:
+          row: 27
+          column: 19
+  parent: ~
+

@@ -2010,6 +2010,7 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_macros",
  "ruff_python_ast",
+ "ruff_python_semantic",
  "ruff_python_stdlib",
  "ruff_rustpython",
  "rustc-hash",
@@ -2170,12 +2171,10 @@ dependencies = [
  "is-macro",
  "itertools",
  "log",
- "nohash-hasher",
  "num-bigint",
  "num-traits",
  "once_cell",
  "regex",
- "ruff_python_stdlib",
  "ruff_rustpython",
  "rustc-hash",
  "rustpython-common",
@@ -2196,7 +2195,6 @@ dependencies = [
  "once_cell",
  "ruff_formatter",
  "ruff_python_ast",
- "ruff_python_stdlib",
  "ruff_rustpython",
  "ruff_testing_macros",
  "ruff_text_size",
@@ -2205,6 +2203,20 @@ dependencies = [
  "rustpython-parser",
  "similar",
  "test-case",
+]
+
+[[package]]
+name = "ruff_python_semantic"
+version = "0.0.0"
+dependencies = [
+ "bitflags",
+ "is-macro",
+ "nohash-hasher",
+ "ruff_python_ast",
+ "ruff_python_stdlib",
+ "rustc-hash",
+ "rustpython-parser",
+ "smallvec",
 ]
 
 [[package]]

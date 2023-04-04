@@ -24,6 +24,7 @@ is-macro = { version = "0.2.2" }
 itertools = { version = "0.10.5" }
 libcst = { git = "https://github.com/charliermarsh/LibCST", rev = "80e4c1399f95e5beb532fdd1e209ad2dbb470438" }
 log = { version = "0.4.17" }
+nohash-hasher = { version = "0.2.0" }
 once_cell = { version = "1.17.1" }
 path-absolutize = { version = "3.0.14" }
 proc-macro2 = { version = "1.0.51" }
@@ -40,6 +41,7 @@ serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93", features = ["preserve_order"] }
 shellexpand = { version = "3.0.0" }
 similar = { version = "2.2.1" }
+smallvec = { version = "1.10.0" }
 strum = { version = "0.24.1", features = ["strum_macros"] }
 strum_macros = { version = "0.24.3" }
 syn = { version = "1.0.109" }
