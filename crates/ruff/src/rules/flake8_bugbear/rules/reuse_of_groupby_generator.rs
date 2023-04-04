@@ -49,7 +49,7 @@ struct GroupNameFinder<'a> {
     /// Variable name for the group.
     group_name: &'a str,
     /// Number of times the `group_name` variable was seen during the visit.
-    usage_count: u8,
+    usage_count: u32,
     /// A flag indicating that the visitor is inside a nested `for` or `while`
     /// loop or inside a `dict`, `list` or `set` comprehension.
     nested: bool,
@@ -66,7 +66,7 @@ struct GroupNameFinder<'a> {
     /// the number inside the element represents the usage count for one of
     /// the branches of the statement. The order of the count corresponds the
     /// branch order.
-    counter_stack: Vec<Vec<u8>>,
+    counter_stack: Vec<Vec<u32>>,
     /// A list of reused expressions.
     exprs: Vec<&'a Expr>,
 }
@@ -133,6 +133,7 @@ where
                 self.nested = false;
             }
             StmtKind::If { test, body, orelse } => {
+                // Determine whether we're on an `if` arm (as opposed to an `elif`).
                 let is_if_arm = !self.parent_ifs.iter().any(|parent| {
                     if let StmtKind::If { orelse, .. } = &parent.node {
                         orelse.len() == 1 && &orelse[0] == stmt
@@ -145,7 +146,7 @@ where
                     // Initialize the vector with the count for current branch.
                     self.counter_stack.push(vec![0]);
                 } else {
-                    // Here, `unwrap` is safe because we're either in `elif` or
+                    // SAFETY: `unwrap` is safe because we're either in `elif` or
                     // `else` branch which can come only after an `if` branch.
                     // When inside an `if` branch, a new vector will be pushed
                     // onto the stack.
@@ -153,13 +154,15 @@ where
                 }
 
                 let has_else = !is_if_arm
-                    && !orelse.is_empty()
-                    && !matches!(orelse.first().unwrap().node, StmtKind::If { .. });
+                    && orelse
+                        .first()
+                        .map_or(false, |expr| !matches!(expr.node, StmtKind::If { .. }));
 
                 self.parent_ifs.push(stmt);
                 if has_else {
-                    // There's no `else` node, it's directly in an `if` node.
-                    // So, we'll have to visit the `if` parts manually.
+                    // There's no `StmtKind::Else`; instead, the `else` contents are directly on
+                    // the `orelse` of the `StmtKind::If` node. We want to add a new counter for
+                    // the `orelse` branch, but first, we need to visit the `if` body manually.
                     self.visit_expr(test);
                     self.visit_body(body);
 
@@ -185,7 +188,7 @@ where
                 }
             }
             StmtKind::Match { subject, cases } => {
-                self.counter_stack.push(Vec::new());
+                self.counter_stack.push(Vec::with_capacity(cases.len()));
                 self.visit_expr(subject);
                 for match_case in cases {
                     self.counter_stack.last_mut().unwrap().push(0);
@@ -246,14 +249,8 @@ where
                 + self
                     .counter_stack
                     .iter()
-                    .map(|v| {
-                        if let Some(&value) = v.last() {
-                            value
-                        } else {
-                            0
-                        }
-                    })
-                    .sum::<u8>();
+                    .map(|count| count.last().unwrap_or(&0))
+                    .sum::<u32>();
 
             // For nested loops, the variable usage could be once but the
             // loop makes it being used multiple times.
