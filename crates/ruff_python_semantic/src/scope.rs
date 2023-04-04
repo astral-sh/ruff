@@ -189,7 +189,7 @@ impl<'a> Scopes<'a> {
     }
 
     /// Pushes a new scope and returns its unique id
-    pub(crate) fn push_scope(&mut self, kind: ScopeKind<'a>) -> ScopeId {
+    pub fn push_scope(&mut self, kind: ScopeKind<'a>) -> ScopeId {
         let next_id = ScopeId::try_from(self.0.len()).unwrap();
         self.0.push(Scope::local(next_id, kind));
         next_id

@@ -13,7 +13,6 @@ use rustpython_parser::{lexer, Mode, Tok};
 use smallvec::SmallVec;
 
 use crate::call_path::CallPath;
-use crate::context::Context;
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
 use crate::types::Range;
 use crate::visitor;
@@ -48,14 +47,6 @@ pub fn unparse_constant(constant: &Constant, stylist: &Stylist) -> String {
     let mut generator: Generator = stylist.into();
     generator.unparse_constant(constant);
     generator.generate()
-}
-
-/// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
-pub fn contains_call_path(ctx: &Context, expr: &Expr, target: &[&str]) -> bool {
-    any_over_expr(expr, &|expr| {
-        ctx.resolve_call_path(expr)
-            .map_or(false, |call_path| call_path.as_slice() == target)
-    })
 }
 
 /// Return `true` if the `Expr` contains an expression that appears to include a

@@ -1,8 +1,9 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_python_ast::context::Context;
+use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_ast::{logging, visitor};
+use ruff_python_semantic::analyze::logging;
+use ruff_python_semantic::context::Context;
 
 /// Collect `logging`-like calls from an AST.
 pub struct LoggerCandidateVisitor<'a> {

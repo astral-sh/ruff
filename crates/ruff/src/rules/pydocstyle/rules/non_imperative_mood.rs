@@ -9,7 +9,7 @@ use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use ruff_python_ast::cast;
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::Range;
-use ruff_python_ast::visibility::{is_property, is_test};
+use ruff_python_semantic::analyze::visibility::{is_property, is_test};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};

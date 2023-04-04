@@ -1,9 +1,9 @@
-use ruff_python_ast::scope::ScopeStack;
+use ruff_python_semantic::scope::ScopeStack;
 use rustpython_parser::ast::{Expr, Stmt};
 
 use ruff_python_ast::types::Range;
 use ruff_python_ast::types::RefEquality;
-use ruff_python_ast::visibility::{Visibility, VisibleScope};
+use ruff_python_semantic::analyze::visibility::{Visibility, VisibleScope};
 
 use crate::checkers::ast::AnnotationContext;
 use crate::docstrings::definition::Definition;

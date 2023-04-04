@@ -1,10 +1,15 @@
 use std::path::Path;
 
 use nohash_hasher::{BuildNoHashHasher, IntMap};
+use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
+use ruff_python_ast::helpers::from_relative_import;
+use ruff_python_ast::types::RefEquality;
+use ruff_python_ast::typing::AnnotationKind;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
 
+use crate::analyze::visibility::{module_visibility, Modifier, VisibleScope};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
@@ -12,12 +17,7 @@ use crate::binding::{
     Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
     Importation, SubmoduleImportation,
 };
-use crate::call_path::{collect_call_path, from_unqualified_name, CallPath};
-use crate::helpers::from_relative_import;
 use crate::scope::{Scope, ScopeId, ScopeKind, ScopeStack, Scopes};
-use crate::types::RefEquality;
-use crate::typing::AnnotationKind;
-use crate::visibility::{module_visibility, Modifier, VisibleScope};
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Context<'a> {
