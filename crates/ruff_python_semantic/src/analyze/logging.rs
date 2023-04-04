@@ -19,12 +19,8 @@ use crate::context::Context;
 pub fn is_logger_candidate(context: &Context, func: &Expr) -> bool {
     if let ExprKind::Attribute { value, .. } = &func.node {
         let Some(call_path) = (if let Some(call_path) = context.resolve_call_path(value) {
-            if let Some(&module) = call_path.first() {
-                if module == "logging" {
-                    Some(call_path)
-                } else {
-                    None
-                }
+            if call_path.first().map_or(false, |module| *module == "logging") {
+                Some(call_path)
             } else {
                 None
             }
