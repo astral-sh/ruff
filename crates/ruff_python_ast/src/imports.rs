@@ -78,7 +78,7 @@ impl std::fmt::Display for ImportFrom<'_> {
 /// A representation of a module reference in an import statement.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModuleImport {
-    module: String,
+    pub module: String,
     location: Location,
     end_location: Location,
 }
@@ -93,6 +93,12 @@ impl ModuleImport {
     }
 }
 
+impl AsRef<ModuleImport> for ModuleImport {
+    fn as_ref(&self) -> &ModuleImport {
+        self
+    }
+}
+
 impl From<&ModuleImport> for Range {
     fn from(import: &ModuleImport) -> Range {
         Range::new(import.location, import.end_location)
@@ -103,14 +109,12 @@ impl From<&ModuleImport> for Range {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImportMap {
     /// A map from dot-delimited module name to the list of imports in that module.
-    module_to_imports: FxHashMap<String, Vec<ModuleImport>>,
+    pub module_to_imports: FxHashMap<String, Vec<ModuleImport>>,
 }
 
 impl ImportMap {
-    pub fn new() -> Self {
-        Self {
-            module_to_imports: FxHashMap::default(),
-        }
+    pub fn new(module_to_imports: FxHashMap<String, Vec<ModuleImport>>) -> Self {
+        Self { module_to_imports }
     }
 
     pub fn insert(&mut self, module: String, imports_vec: Vec<ModuleImport>) {

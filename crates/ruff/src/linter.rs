@@ -51,7 +51,6 @@ impl<T> LinterResult<T> {
     }
 }
 
-type DiagnosticsAndImports = (Vec<Diagnostic>, Imports);
 pub type MessagesAndImports = (Vec<Message>, Imports);
 pub type FixTable = FxHashMap<Rule, usize>;
 

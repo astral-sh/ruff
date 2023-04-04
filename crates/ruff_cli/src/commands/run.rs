@@ -177,7 +177,7 @@ pub fn run(
                             )
                         })
                         .collect::<Vec<_>>(),
-                    Imports::default(),
+                    ImportMap::default(),
                 );
             }
         }

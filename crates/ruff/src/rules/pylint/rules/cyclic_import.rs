@@ -6,10 +6,8 @@ use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{
-    helpers::to_module_path,
-    types::{Import, Imports},
-};
+use ruff_python_ast::helpers::to_module_path;
+use ruff_python_ast::imports::{ImportMap, ModuleImport};
 
 #[violation]
 pub struct CyclicImport {
@@ -24,7 +22,7 @@ impl Violation for CyclicImport {
 }
 
 struct CyclicImportChecker<'a> {
-    imports: &'a FxHashMap<String, Vec<Import>>,
+    imports: &'a FxHashMap<String, Vec<ModuleImport>>,
 }
 
 impl CyclicImportChecker<'_> {
@@ -55,8 +53,8 @@ impl CyclicImportChecker<'_> {
             let tabs = "\t".repeat(level);
             debug!("{tabs}{name}");
             for import in imports.iter() {
-                debug!("{tabs}\timport: {}", import.name);
-                if let Some(idx) = stack.iter().position(|&s| s == import.name) {
+                debug!("{tabs}\timport: {}", import.module);
+                if let Some(idx) = stack.iter().position(|&s| s == import.module) {
                     debug!("{tabs}\t\t cycles: {:?}", stack[idx..].to_vec());
                     cycles.insert(
                         stack[idx..]
@@ -65,8 +63,8 @@ impl CyclicImportChecker<'_> {
                             .collect::<Vec<String>>(),
                     );
                 } else {
-                    stack.push(&import.name);
-                    self.has_cycles_helper(&import.name, stack, cycles, fully_visited, level + 1);
+                    stack.push(&import.module);
+                    self.has_cycles_helper(&import.module, stack, cycles, fully_visited, level + 1);
                     stack.pop();
                 }
             }
@@ -79,7 +77,7 @@ impl CyclicImportChecker<'_> {
 pub fn cyclic_import(
     path: &Path,
     package: Option<&Path>,
-    imports: &Imports,
+    imports: &ImportMap,
     cycles: &mut FxHashMap<String, FxHashSet<Vec<String>>>,
 ) -> Option<Vec<Diagnostic>> {
     let module_name = to_module_path(package.unwrap(), path).unwrap().join(".");
@@ -98,14 +96,14 @@ pub fn cyclic_import(
                             // need to reorder the detected cycle
                             cycle: cycle.join(" -> "),
                         },
-                        imports.imports_per_module[&module_name][1].as_ref().into(),
+                        imports.module_to_imports[&module_name][1].as_ref().into(),
                     )
                 })
                 .collect::<Vec<Diagnostic>>(),
         )
     } else {
         let cyclic_import_checker = CyclicImportChecker {
-            imports: &imports.imports_per_module,
+            imports: &imports.module_to_imports,
         };
         let (mut visited, new_cycles) = cyclic_import_checker.has_cycles(&module_name);
         // we'll always have new visited stuff if we have
@@ -123,9 +121,9 @@ pub fn cyclic_import(
                                     .collect::<Vec<_>>()
                                     .join(" -> "),
                             },
-                            imports.imports_per_module[&module_name]
+                            imports.module_to_imports[&module_name]
                                 .iter()
-                                .find(|m| &m.name == the_rest.first().unwrap())
+                                .find(|m| &m.module == the_rest.first().unwrap())
                                 .unwrap()
                                 .into(),
                         ));
@@ -167,22 +165,22 @@ mod tests {
 
     use super::*;
 
-    fn test_simple_cycle_helper() -> Imports {
+    fn test_simple_cycle_helper() -> ImportMap {
         let mut map = FxHashMap::default();
         let location = Location::new(1, 1);
         map.insert(
             "grand.a".to_string(),
             vec![
-                Import::new("grand.b", location, location),
-                Import::new("grand.parent.a", location, location),
+                ModuleImport::new("grand.b".to_string(), location, location),
+                ModuleImport::new("grand.parent.a".to_string(), location, location),
             ],
         );
         map.insert(
             "grand.b".to_string(),
-            vec![Import::new("grand.a", location, location)],
+            vec![ModuleImport::new("grand.a".to_string(), location, location)],
         );
-        Imports {
-            imports_per_module: map,
+        ImportMap {
+            module_to_imports: map,
         }
     }
 
@@ -190,7 +188,7 @@ mod tests {
     fn cyclic_import_simple_one() {
         let imports = test_simple_cycle_helper();
         let cyclic_checker = CyclicImportChecker {
-            imports: &imports.imports_per_module,
+            imports: &imports.module_to_imports,
         };
         let (visited, cycles) = cyclic_checker.has_cycles("grand.a");
 

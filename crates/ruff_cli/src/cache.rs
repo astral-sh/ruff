@@ -7,7 +7,7 @@ use anyhow::Result;
 use filetime::FileTime;
 use log::error;
 use path_absolutize::Absolutize;
-use ruff::linter::MessagesAndImports;
+
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff_cache::{CacheKey, CacheKeyHasher};
