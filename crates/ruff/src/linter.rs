@@ -9,6 +9,7 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::ParseError;
 
 use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_stdlib::path::is_python_stub_file;
 
@@ -51,6 +52,15 @@ impl<T> LinterResult<T> {
 
 pub type FixTable = FxHashMap<Rule, usize>;
 
+pub struct FixerResult<'a> {
+    /// The result returned by the linter, after applying any fixes.
+    pub result: LinterResult<(Vec<Message>, Option<ImportMap>)>,
+    /// The resulting source code, after applying any fixes.
+    pub transformed: Cow<'a, str>,
+    /// The number of fixes applied for each [`Rule`].
+    pub fixed: FixTable,
+}
+
 /// Generate `Diagnostic`s from the source code contents at the
 /// given `Path`.
 #[allow(clippy::too_many_arguments)]
@@ -66,9 +76,10 @@ pub fn check_path(
     settings: &Settings,
     noqa: flags::Noqa,
     autofix: flags::Autofix,
-) -> LinterResult<Vec<Diagnostic>> {
+) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
+    let mut imports = None;
     let mut error = None;
 
     // Collect doc lines. This requires a rare mix of tokens (for comments) and AST
@@ -142,7 +153,7 @@ pub fn check_path(
                     ));
                 }
                 if use_imports {
-                    diagnostics.extend(check_imports(
+                    let (import_diagnostics, module_imports) = check_imports(
                         &python_ast,
                         locator,
                         indexer,
@@ -152,7 +163,9 @@ pub fn check_path(
                         autofix,
                         path,
                         package,
-                    ));
+                    );
+                    imports = module_imports;
+                    diagnostics.extend(import_diagnostics);
                 }
                 if use_doc_lines {
                     doc_lines.extend(doc_lines_from_ast(&python_ast));
@@ -240,7 +253,7 @@ pub fn check_path(
         }
     }
 
-    LinterResult::new(diagnostics, error)
+    LinterResult::new((diagnostics, imports), error)
 }
 
 const MAX_ITERATIONS: usize = 100;
@@ -297,7 +310,7 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
     // Add any missing `# noqa` pragmas.
     add_noqa(
         path,
-        &diagnostics,
+        &diagnostics.0,
         &contents,
         indexer.commented_lines(),
         &directives.noqa_line_for,
@@ -314,7 +327,7 @@ pub fn lint_only(
     settings: &Settings,
     noqa: flags::Noqa,
     autofix: flags::Autofix,
-) -> LinterResult<Vec<Message>> {
+) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
     // Tokenize once.
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
 
@@ -348,20 +361,23 @@ pub fn lint_only(
 
     // Convert from diagnostics to messages.
     let path_lossy = path.to_string_lossy();
-    result.map(|diagnostics| {
-        diagnostics
-            .into_iter()
-            .map(|diagnostic| {
-                let source = if settings.show_source {
-                    Some(Source::from_diagnostic(&diagnostic, &locator))
-                } else {
-                    None
-                };
-                let lineno = diagnostic.location.row();
-                let noqa_row = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-                Message::from_diagnostic(diagnostic, path_lossy.to_string(), source, noqa_row)
-            })
-            .collect()
+    result.map(|(messages, imports)| {
+        (
+            messages
+                .into_iter()
+                .map(|diagnostic| {
+                    let source = if settings.show_source {
+                        Some(Source::from_diagnostic(&diagnostic, &locator))
+                    } else {
+                        None
+                    };
+                    let lineno = diagnostic.location.row();
+                    let noqa_row = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
+                    Message::from_diagnostic(diagnostic, path_lossy.to_string(), source, noqa_row)
+                })
+                .collect(),
+            imports,
+        )
     })
 }
 
@@ -373,7 +389,7 @@ pub fn lint_fix<'a>(
     package: Option<&Path>,
     noqa: flags::Noqa,
     settings: &Settings,
-) -> Result<(LinterResult<Vec<Message>>, Cow<'a, str>, FixTable)> {
+) -> Result<FixerResult<'a>> {
     let mut transformed = Cow::Borrowed(contents);
 
     // Track the number of fixed errors across iterations.
@@ -448,7 +464,7 @@ This indicates a bug in `{}`. If you could open an issue at:
         }
 
         // Apply autofix.
-        if let Some((fixed_contents, applied)) = fix_file(&result.data, &locator) {
+        if let Some((fixed_contents, applied)) = fix_file(&result.data.0, &locator) {
             if iterations < MAX_ITERATIONS {
                 // Count the number of fixed errors.
                 for (rule, count) in applied {
@@ -488,29 +504,33 @@ This indicates a bug in `{}`. If you could open an issue at:
 
         // Convert to messages.
         let path_lossy = path.to_string_lossy();
-        return Ok((
-            result.map(|diagnostics| {
-                diagnostics
-                    .into_iter()
-                    .map(|diagnostic| {
-                        let source = if settings.show_source {
-                            Some(Source::from_diagnostic(&diagnostic, &locator))
-                        } else {
-                            None
-                        };
-                        let lineno = diagnostic.location.row();
-                        let noqa_row = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-                        Message::from_diagnostic(
-                            diagnostic,
-                            path_lossy.to_string(),
-                            source,
-                            noqa_row,
-                        )
-                    })
-                    .collect()
+        return Ok(FixerResult {
+            result: result.map(|(messages, imports)| {
+                (
+                    messages
+                        .into_iter()
+                        .map(|diagnostic| {
+                            let source = if settings.show_source {
+                                Some(Source::from_diagnostic(&diagnostic, &locator))
+                            } else {
+                                None
+                            };
+                            let lineno = diagnostic.location.row();
+                            let noqa_row =
+                                *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
+                            Message::from_diagnostic(
+                                diagnostic,
+                                path_lossy.to_string(),
+                                source,
+                                noqa_row,
+                            )
+                        })
+                        .collect(),
+                    imports,
+                )
             }),
             transformed,
             fixed,
-        ));
+        });
     }
 }
