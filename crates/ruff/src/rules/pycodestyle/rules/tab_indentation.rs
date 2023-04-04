@@ -17,20 +17,13 @@ impl Violation for TabIndentation {
 
 /// `string_lines` is parsed from top to bottom during the tokenization phase, and we know that the
 /// strings aren't overlapping (otherwise there'd only be one string). This function performs a
-/// binary search on `string_lines` to find the string that contains (or starts just before) lineno
+/// binary search on `string_lines` to find the string range that contains lineno
 fn find_closest_string<'a>(lineno: usize, string_lines: &'a [Range]) -> Option<&'a Range> {
-    if string_lines.is_empty() {
-        return None;
-    }
-
     let mut low = 0;
-    let mut high = string_lines.len() - 1;
+    let mut high = string_lines.len();
 
-    while low <= high {
+    while low < high {
         let middle = low + (high - low) / 2;
-        if middle == 0 {
-            break;
-        }
 
         let curr = &string_lines[middle];
         let start = curr.location.row();
@@ -39,13 +32,13 @@ fn find_closest_string<'a>(lineno: usize, string_lines: &'a [Range]) -> Option<&
         if start <= lineno && lineno <= end {
             return Some(curr);
         } else if start > lineno {
-            high = middle - 1;
+            high = middle;
         } else if end < lineno {
             low = middle + 1;
         }
     }
 
-    Some(&string_lines[high])
+    None
 }
 
 /// W191
@@ -54,12 +47,8 @@ pub fn tab_indentation(lineno: usize, line: &str, string_lines: &[Range]) -> Opt
 
     if indent.contains('\t') {
         // If the tab character is contained in a string, don't raise a violation
-        if let Some(contained_range) = find_closest_string(lineno, string_lines) {
-            if contained_range.location.row() <= lineno
-                && contained_range.end_location.row() >= lineno
-            {
-                return None;
-            }
+        if let Some(_contained_range) = find_closest_string(lineno, string_lines) {
+            return None;
         }
 
         Some(Diagnostic::new(
@@ -102,14 +91,14 @@ mod tests {
 
     #[test]
     // string doesn't contain lineno - returns closest string range
-    fn test_find_closest_string_found() {
+    fn test_find_closest_string_not_found() {
         let string_lines = get_string_lines();
 
-        let expected = Some(&string_lines[1]);
+        let expected = None;
         let actual = find_closest_string(6usize, &string_lines);
         assert_eq!(expected, actual);
 
-        let expected = Some(&string_lines[2]);
+        let expected = None;
         let actual = find_closest_string(11usize, &string_lines);
         assert_eq!(expected, actual);
     }
