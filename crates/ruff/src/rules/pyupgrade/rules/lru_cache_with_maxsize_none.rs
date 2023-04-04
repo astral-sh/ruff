@@ -4,7 +4,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
-use crate::autofix::helpers::get_or_import_symbol;
+use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 

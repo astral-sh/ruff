@@ -207,9 +207,9 @@ pub struct StarImportation<'a> {
 //        FutureImportation
 
 #[derive(Clone, Debug)]
-pub struct Export {
+pub struct Export<'a> {
     /// The names of the bindings exported via `__all__`.
-    pub names: Vec<String>,
+    pub names: Vec<&'a str>,
 }
 
 #[derive(Clone, Debug)]
@@ -258,7 +258,7 @@ pub enum BindingKind<'a> {
     Builtin,
     ClassDefinition,
     FunctionDefinition,
-    Export(Export),
+    Export(Export<'a>),
     FutureImportation,
     Importation(Importation<'a>),
     FromImportation(FromImportation<'a>),

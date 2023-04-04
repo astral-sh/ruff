@@ -1,0 +1,6 @@
+---
+source: crates/ruff/src/rules/pydocstyle/mod.rs
+expression: diagnostics
+---
+[]
+

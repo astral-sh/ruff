@@ -1,4 +1,4 @@
-use crate::autofix::helpers::delete_stmt;
+use crate::autofix::actions::delete_stmt;
 use log::error;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};

@@ -258,7 +258,7 @@ mod tests {
         let directives =
             directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
         let LinterResult {
-            data: mut diagnostics,
+            data: (mut diagnostics, _imports),
             ..
         } = check_path(
             Path::new("<filename>"),

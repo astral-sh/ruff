@@ -1,10 +1,6 @@
 use bitflags::bitflags;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
-use crate::binding::{BindingKind, Export};
-use crate::context::Context;
-use crate::scope::Scope;
-
 bitflags! {
     #[derive(Default)]
     pub struct AllNamesFlags: u32 {
@@ -14,29 +10,30 @@ bitflags! {
 }
 
 /// Extract the names bound to a given __all__ assignment.
-pub fn extract_all_names(
-    ctx: &Context,
-    stmt: &Stmt,
-    scope: &Scope,
-) -> (Vec<String>, AllNamesFlags) {
-    fn add_to_names(names: &mut Vec<String>, elts: &[Expr], flags: &mut AllNamesFlags) {
+///
+/// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
+pub fn extract_all_names<F>(stmt: &Stmt, is_builtin: F) -> (Vec<&str>, AllNamesFlags)
+where
+    F: Fn(&str) -> bool,
+{
+    fn add_to_names<'a>(elts: &'a [Expr], names: &mut Vec<&'a str>, flags: &mut AllNamesFlags) {
         for elt in elts {
             if let ExprKind::Constant {
                 value: Constant::Str(value),
                 ..
             } = &elt.node
             {
-                names.push(value.to_string());
+                names.push(value);
             } else {
                 *flags |= AllNamesFlags::INVALID_OBJECT;
             }
         }
     }
 
-    fn extract_elts<'a>(
-        ctx: &'a Context,
-        expr: &'a Expr,
-    ) -> (Option<&'a Vec<Expr>>, AllNamesFlags) {
+    fn extract_elts<F>(expr: &Expr, is_builtin: F) -> (Option<&Vec<Expr>>, AllNamesFlags)
+    where
+        F: Fn(&str) -> bool,
+    {
         match &expr.node {
             ExprKind::List { elts, .. } => {
                 return (Some(elts), AllNamesFlags::empty());
@@ -56,27 +53,28 @@ pub fn extract_all_names(
             } => {
                 // Allow `tuple()` and `list()` calls.
                 if keywords.is_empty() && args.len() <= 1 {
-                    if ctx.resolve_call_path(func).map_or(false, |call_path| {
-                        call_path.as_slice() == ["", "tuple"]
-                            || call_path.as_slice() == ["", "list"]
-                    }) {
-                        if args.is_empty() {
-                            return (None, AllNamesFlags::empty());
-                        }
-                        match &args[0].node {
-                            ExprKind::List { elts, .. }
-                            | ExprKind::Set { elts, .. }
-                            | ExprKind::Tuple { elts, .. } => {
-                                return (Some(elts), AllNamesFlags::empty());
+                    if let ExprKind::Name { id, .. } = &func.node {
+                        if id == "tuple" || id == "list" {
+                            if is_builtin(id) {
+                                if args.is_empty() {
+                                    return (None, AllNamesFlags::empty());
+                                }
+                                match &args[0].node {
+                                    ExprKind::List { elts, .. }
+                                    | ExprKind::Set { elts, .. }
+                                    | ExprKind::Tuple { elts, .. } => {
+                                        return (Some(elts), AllNamesFlags::empty());
+                                    }
+                                    ExprKind::ListComp { .. }
+                                    | ExprKind::SetComp { .. }
+                                    | ExprKind::GeneratorExp { .. } => {
+                                        // Allow comprehensions, even though we can't statically analyze
+                                        // them.
+                                        return (None, AllNamesFlags::empty());
+                                    }
+                                    _ => {}
+                                }
                             }
-                            ExprKind::ListComp { .. }
-                            | ExprKind::SetComp { .. }
-                            | ExprKind::GeneratorExp { .. } => {
-                                // Allow comprehensions, even though we can't statically analyze
-                                // them.
-                                return (None, AllNamesFlags::empty());
-                            }
-                            _ => {}
                         }
                     }
                 }
@@ -86,17 +84,8 @@ pub fn extract_all_names(
         (None, AllNamesFlags::INVALID_FORMAT)
     }
 
-    let mut names: Vec<String> = vec![];
+    let mut names: Vec<&str> = vec![];
     let mut flags = AllNamesFlags::empty();
-
-    // Grab the existing bound __all__ values.
-    if let StmtKind::AugAssign { .. } = &stmt.node {
-        if let Some(index) = scope.get("__all__") {
-            if let BindingKind::Export(Export { names: existing }) = &ctx.bindings[*index].kind {
-                names.extend_from_slice(existing);
-            }
-        }
-    }
 
     if let Some(value) = match &stmt.node {
         StmtKind::Assign { value, .. } => Some(value),
@@ -109,10 +98,10 @@ pub fn extract_all_names(
             let mut current_right = right;
             loop {
                 // Process the right side, which should be a "real" value.
-                let (elts, new_flags) = extract_elts(ctx, current_right);
+                let (elts, new_flags) = extract_elts(current_right, |expr| is_builtin(expr));
                 flags |= new_flags;
                 if let Some(elts) = elts {
-                    add_to_names(&mut names, elts, &mut flags);
+                    add_to_names(elts, &mut names, &mut flags);
                 }
 
                 // Process the left side, which can be a "real" value or the "rest" of the
@@ -121,19 +110,19 @@ pub fn extract_all_names(
                     current_left = left;
                     current_right = right;
                 } else {
-                    let (elts, new_flags) = extract_elts(ctx, current_left);
+                    let (elts, new_flags) = extract_elts(current_left, |expr| is_builtin(expr));
                     flags |= new_flags;
                     if let Some(elts) = elts {
-                        add_to_names(&mut names, elts, &mut flags);
+                        add_to_names(elts, &mut names, &mut flags);
                     }
                     break;
                 }
             }
         } else {
-            let (elts, new_flags) = extract_elts(ctx, value);
+            let (elts, new_flags) = extract_elts(value, |expr| is_builtin(expr));
             flags |= new_flags;
             if let Some(elts) = elts {
-                add_to_names(&mut names, elts, &mut flags);
+                add_to_names(elts, &mut names, &mut flags);
             }
         }
     }

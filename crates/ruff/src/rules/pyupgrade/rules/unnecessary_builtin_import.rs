@@ -112,7 +112,7 @@ pub fn unnecessary_builtin_import(
             .iter()
             .map(|alias| format!("{module}.{}", alias.node.name))
             .collect();
-        match autofix::helpers::remove_unused_imports(
+        match autofix::actions::remove_unused_imports(
             unused_imports.iter().map(String::as_str),
             defined_by.into(),
             defined_in.map(Into::into),

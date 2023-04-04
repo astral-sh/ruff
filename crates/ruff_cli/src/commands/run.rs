@@ -9,17 +9,18 @@ use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
 
-use crate::panic::catch_unwind;
 use ruff::message::{Location, Message};
 use ruff::registry::Rule;
 use ruff::resolver::PyprojectDiscovery;
 use ruff::settings::{flags, AllSettings};
 use ruff::{fs, packaging, resolver, warn_user_once, IOError, Range};
 use ruff_diagnostics::Diagnostic;
+use ruff_python_ast::imports::ImportMap;
 
 use crate::args::Overrides;
 use crate::cache;
 use crate::diagnostics::Diagnostics;
+use crate::panic::catch_unwind;
 
 /// Run the linter over a collection of files.
 pub fn run(
@@ -43,7 +44,7 @@ pub fn run(
 
     // Initialize the cache.
     if cache.into() {
-        fn init_cache(path: &std::path::Path) {
+        fn init_cache(path: &Path) {
             if let Err(e) = cache::init(path) {
                 error!("Failed to initialize cache at {}: {e:?}", path.display());
             }
@@ -115,15 +116,18 @@ pub fn run(
                     );
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.rules.enabled(Rule::IOError) {
-                        Diagnostics::new(vec![Message::from_diagnostic(
-                            Diagnostic::new(
-                                IOError { message },
-                                Range::new(Location::default(), Location::default()),
-                            ),
-                            format!("{}", path.display()),
-                            None,
-                            1,
-                        )])
+                        Diagnostics::new(
+                            vec![Message::from_diagnostic(
+                                Diagnostic::new(
+                                    IOError { message },
+                                    Range::new(Location::default(), Location::default()),
+                                ),
+                                format!("{}", path.display()),
+                                None,
+                                1,
+                            )],
+                            ImportMap::default(),
+                        )
                     } else {
                         Diagnostics::default()
                     }
@@ -137,7 +141,8 @@ pub fn run(
             acc += item;
             acc
         });
-
+    // TODO(chris): actually check the imports?
+    debug!("{:#?}", diagnostics.imports);
     diagnostics.messages.sort_unstable();
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);

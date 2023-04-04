@@ -131,28 +131,24 @@ fn stem(path: &str) -> &str {
 }
 
 /// Return the `Visibility` of the Python file at `Path` based on its name.
-pub fn module_visibility(path: &Path) -> Visibility {
-    let mut components = path.iter().rev();
-
-    // Is the module itself private?
-    // Ex) `_foo.py` (but not `__init__.py`)
-    if let Some(filename) = components.next() {
-        let module_name = filename.to_string_lossy();
-        let module_name = stem(&module_name);
-        if is_private_module(module_name) {
+pub fn module_visibility(module_path: Option<&[String]>, path: &Path) -> Visibility {
+    if let Some(module_path) = module_path {
+        if module_path.iter().any(|m| is_private_module(m)) {
             return Visibility::Private;
         }
-    }
-
-    // Is the module in a private parent?
-    // Ex) `_foo/bar.py`
-    for component in components {
-        let module_name = component.to_string_lossy();
-        if is_private_module(&module_name) {
-            return Visibility::Private;
+    } else {
+        // When module_path is None, path is a script outside a package, so just
+        // check to see if the module name itself is private.
+        // Ex) `_foo.py` (but not `__init__.py`)
+        let mut components = path.iter().rev();
+        if let Some(filename) = components.next() {
+            let module_name = filename.to_string_lossy();
+            let module_name = stem(&module_name);
+            if is_private_module(module_name) {
+                return Visibility::Private;
+            }
         }
     }
-
     Visibility::Public
 }
 
