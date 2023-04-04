@@ -1847,13 +1847,6 @@ where
                 if self.settings.rules.enabled(Rule::UselessExpression) {
                     flake8_bugbear::rules::useless_expression(self, value);
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::UncapitalizedEnvironmentVariables)
-                {
-                    flake8_simplify::rules::use_capital_environment_variables(self, value);
-                }
                 if self.settings.rules.enabled(Rule::AsyncioDanglingTask) {
                     if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
                         self.ctx.resolve_call_path(expr)
@@ -2209,6 +2202,14 @@ where
                     Rule::SysVersionSlice1,
                 ]) {
                     flake8_2020::rules::subscript(self, value, slice);
+                }
+
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UncapitalizedEnvironmentVariables)
+                {
+                    flake8_simplify::rules::use_capital_environment_variables(self, expr);
                 }
             }
             ExprKind::Tuple { elts, ctx } | ExprKind::List { elts, ctx } => {
@@ -2910,6 +2911,14 @@ where
                 }
 
                 // flake8-simplify
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UncapitalizedEnvironmentVariables)
+                {
+                    flake8_simplify::rules::use_capital_environment_variables(self, expr);
+                }
+
                 if self
                     .settings
                     .rules

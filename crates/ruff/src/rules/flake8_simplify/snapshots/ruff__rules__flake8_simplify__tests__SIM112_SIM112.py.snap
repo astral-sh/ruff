@@ -86,4 +86,88 @@ expression: diagnostics
           row: 10
           column: 15
   parent: ~
+- kind:
+    name: UncapitalizedEnvironmentVariables
+    body: "Use capitalized environment variable `FOO` instead of `foo`"
+    suggestion: "Replace `foo` with `FOO`"
+    fixable: true
+  location:
+    row: 12
+    column: 21
+  end_location:
+    row: 12
+    column: 26
+  fix:
+    edits:
+      - content: "'FOO'"
+        location:
+          row: 12
+          column: 21
+        end_location:
+          row: 12
+          column: 26
+  parent: ~
+- kind:
+    name: UncapitalizedEnvironmentVariables
+    body: "Use capitalized environment variable `FOO` instead of `foo`"
+    suggestion: "Replace `foo` with `FOO`"
+    fixable: true
+  location:
+    row: 14
+    column: 17
+  end_location:
+    row: 14
+    column: 22
+  fix:
+    edits:
+      - content: "'FOO'"
+        location:
+          row: 14
+          column: 17
+        end_location:
+          row: 14
+          column: 22
+  parent: ~
+- kind:
+    name: UncapitalizedEnvironmentVariables
+    body: "Use capitalized environment variable `FOO` instead of `foo`"
+    suggestion: "Replace `foo` with `FOO`"
+    fixable: true
+  location:
+    row: 16
+    column: 25
+  end_location:
+    row: 16
+    column: 30
+  fix:
+    edits:
+      - content: "'FOO'"
+        location:
+          row: 16
+          column: 25
+        end_location:
+          row: 16
+          column: 30
+  parent: ~
+- kind:
+    name: UncapitalizedEnvironmentVariables
+    body: "Use capitalized environment variable `FOO` instead of `foo`"
+    suggestion: "Replace `foo` with `FOO`"
+    fixable: true
+  location:
+    row: 19
+    column: 21
+  end_location:
+    row: 19
+    column: 26
+  fix:
+    edits:
+      - content: "'FOO'"
+        location:
+          row: 19
+          column: 21
+        end_location:
+          row: 19
+          column: 26
+  parent: ~
 
