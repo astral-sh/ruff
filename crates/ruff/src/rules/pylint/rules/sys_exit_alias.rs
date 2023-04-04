@@ -1,11 +1,10 @@
 use rustpython_parser::ast::{Expr, ExprKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::context::Context;
-use ruff_python_ast::scope::{BindingKind, FromImportation, Importation, SubmoduleImportation};
 use ruff_python_ast::types::Range;
 
+use crate::autofix::helpers::get_or_import_symbol;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -28,52 +27,6 @@ impl Violation for SysExitAlias {
     }
 }
 
-/// Return the appropriate `sys.exit` reference based on the current set of
-/// imports, or `None` is `sys.exit` hasn't been imported.
-fn get_member_import_name_alias(context: &Context, module: &str, member: &str) -> Option<String> {
-    context.scopes().find_map(|scope| {
-        scope
-            .binding_ids()
-            .find_map(|index| match &context.bindings[*index].kind {
-                // e.g. module=sys object=exit
-                // `import sys`         -> `sys.exit`
-                // `import sys as sys2` -> `sys2.exit`
-                BindingKind::Importation(Importation { name, full_name }) => {
-                    if full_name == &module {
-                        Some(format!("{name}.{member}"))
-                    } else {
-                        None
-                    }
-                }
-                // e.g. module=os.path object=join
-                // `from os.path import join`          -> `join`
-                // `from os.path import join as join2` -> `join2`
-                BindingKind::FromImportation(FromImportation { name, full_name }) => {
-                    let mut parts = full_name.split('.');
-                    if parts.next() == Some(module)
-                        && parts.next() == Some(member)
-                        && parts.next().is_none()
-                    {
-                        Some((*name).to_string())
-                    } else {
-                        None
-                    }
-                }
-                // e.g. module=os.path object=join
-                // `import os.path ` -> `os.path.join`
-                BindingKind::SubmoduleImportation(SubmoduleImportation { full_name, .. }) => {
-                    if full_name == &module {
-                        Some(format!("{full_name}.{member}"))
-                    } else {
-                        None
-                    }
-                }
-                // Non-imports.
-                _ => None,
-            })
-    })
-}
-
 /// PLR1722
 pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
     let ExprKind::Name { id, .. } = &func.node else {
@@ -93,13 +46,18 @@ pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
             Range::from(func),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            if let Some(content) = get_member_import_name_alias(&checker.ctx, "sys", "exit") {
-                diagnostic.set_fix(Edit::replacement(
-                    content,
-                    func.location,
-                    func.end_location.unwrap(),
-                ));
-            }
+            diagnostic.try_set_fix(|| {
+                let (import_edit, binding) = get_or_import_symbol(
+                    "sys",
+                    "exit",
+                    &checker.ctx,
+                    &checker.importer,
+                    checker.locator,
+                )?;
+                let reference_edit =
+                    Edit::replacement(binding, func.location, func.end_location.unwrap());
+                Ok(Fix::from_iter([import_edit, reference_edit]))
+            });
         }
         checker.diagnostics.push(diagnostic);
     }

@@ -1,40 +1,37 @@
 use rustpython_parser::ast::{Expr, ExprKind, Keyword, Location};
 
-use ruff_diagnostics::Edit;
-use ruff_python_ast::helpers;
+use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
-use crate::autofix::apply_fix;
 use crate::autofix::helpers::remove_argument;
 
 fn match_name(expr: &Expr) -> Option<&str> {
     if let ExprKind::Call { func, .. } = &expr.node {
         if let ExprKind::Attribute { value, .. } = &func.node {
             if let ExprKind::Name { id, .. } = &value.node {
-                Some(id)
-            } else {
-                None
+                return Some(id);
             }
-        } else {
-            None
         }
-    } else {
-        None
     }
+    None
 }
 
 /// Remove the `inplace` argument from a function call and replace it with an
 /// assignment.
-pub fn fix_inplace_argument(
+pub(super) fn convert_inplace_argument_to_assignment(
     locator: &Locator,
     expr: &Expr,
     violation_at: Location,
     violation_end: Location,
     args: &[Expr],
     keywords: &[Keyword],
-) -> Option<Edit> {
-    if let Ok(fix) = remove_argument(
+) -> Option<Fix> {
+    // Add the assignment.
+    let name = match_name(expr)?;
+    let insert_assignment = Edit::insertion(format!("{name} = "), expr.location);
+
+    // Remove the `inplace` argument.
+    let remove_argument = remove_argument(
         locator,
         expr.location,
         violation_at,
@@ -42,31 +39,8 @@ pub fn fix_inplace_argument(
         args,
         keywords,
         false,
-    ) {
-        // Reset the line index.
-        let fix_me = Edit::deletion(
-            helpers::to_relative(fix.location, expr.location),
-            helpers::to_relative(fix.end_location, expr.location),
-        );
+    )
+    .ok()?;
 
-        // Apply the deletion step.
-        // TODO(charlie): Find a way to
-        let contents = locator.slice(Range::new(expr.location, expr.end_location.unwrap()));
-        let output = apply_fix(&fix_me, &Locator::new(contents));
-
-        // Obtain the name prefix.
-        let name = match_name(expr)?;
-
-        // Apply the assignment.
-        let new_contents = format!("{name} = {output}");
-
-        // Create the new fix.
-        Some(Edit::replacement(
-            new_contents,
-            expr.location,
-            expr.end_location.unwrap(),
-        ))
-    } else {
-        None
-    }
+    Some(Fix::from_iter([insert_assignment, remove_argument]))
 }

@@ -1,10 +1,4 @@
-import functools
 from functools import lru_cache
-
-
-@functools.lru_cache(maxsize=None)
-def fixme():
-    pass
 
 
 @lru_cache(maxsize=None)
@@ -13,28 +7,18 @@ def fixme():
 
 
 @other_decorator
-@functools.lru_cache(maxsize=None)
+@lru_cache(maxsize=None)
 def fixme():
     pass
 
 
-@functools.lru_cache(maxsize=None)
+@lru_cache(maxsize=None)
 @other_decorator
 def fixme():
     pass
 
 
-@functools.lru_cache()
-def ok():
-    pass
-
-
 @lru_cache()
-def ok():
-    pass
-
-
-@functools.lru_cache(maxsize=64)
 def ok():
     pass
 

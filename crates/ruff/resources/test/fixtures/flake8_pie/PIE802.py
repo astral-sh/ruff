@@ -1,11 +1,4 @@
-# no error
-all((x.id for x in bar))
-all(x.id for x in bar)
-all(x.id for x in bar)
-any(x.id for x in bar)
-any({x.id for x in bar})
-
-# PIE 802
+# PIE802
 any([x.id for x in bar])
 all([x.id for x in bar])
 any(  # first comment
@@ -14,3 +7,14 @@ any(  # first comment
 all(  # first comment
     [x.id for x in bar],  # second comment
 )  # third comment
+
+# OK
+all((x.id for x in bar))
+all(x.id for x in bar)
+all(x.id for x in bar)
+any(x.id for x in bar)
+any({x.id for x in bar})
+
+
+async def f() -> bool:
+    return all([await use_greeting(greeting) for greeting in await greetings()])

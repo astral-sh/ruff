@@ -253,7 +253,19 @@ pub fn nested_if_statements(
         return;
     }
 
+    // Allow `if __name__ == "__main__":` statements.
     if is_main_check(test) {
+        return;
+    }
+
+    // Allow `if True:` and `if False:` statements.
+    if matches!(
+        test.node,
+        ExprKind::Constant {
+            value: Constant::Bool(..),
+            ..
+        }
+    ) {
         return;
     }
 

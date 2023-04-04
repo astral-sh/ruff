@@ -38,6 +38,7 @@ use crate::docstrings::definition::{
     transition_scope, Definition, DefinitionKind, Docstring, Documentable,
 };
 use crate::fs::relativize_path;
+use crate::importer::Importer;
 use crate::registry::{AsRule, Rule};
 use crate::rules::{
     flake8_2020, flake8_annotations, flake8_bandit, flake8_blind_except, flake8_boolean_trap,
@@ -70,6 +71,7 @@ pub struct Checker<'a> {
     pub locator: &'a Locator<'a>,
     pub stylist: &'a Stylist<'a>,
     pub indexer: &'a Indexer,
+    pub importer: Importer<'a>,
     // Stateful fields.
     pub ctx: Context<'a>,
     pub deferred: Deferred<'a>,
@@ -92,6 +94,7 @@ impl<'a> Checker<'a> {
         locator: &'a Locator,
         stylist: &'a Stylist,
         indexer: &'a Indexer,
+        importer: Importer<'a>,
     ) -> Checker<'a> {
         Checker {
             settings,
@@ -105,6 +108,7 @@ impl<'a> Checker<'a> {
             locator,
             stylist,
             indexer,
+            importer,
             ctx: Context::new(&settings.typing_modules, path, module_path),
             deferred: Deferred::default(),
             diagnostics: Vec::default(),
@@ -189,6 +193,18 @@ where
                 }
             }
         }
+
+        // Track each top-level import, to guide import insertions.
+        if matches!(
+            &stmt.node,
+            StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
+        ) {
+            let scope_index = self.ctx.scope_id();
+            if scope_index.is_global() && self.ctx.current_stmt_parent().is_none() {
+                self.importer.visit_import(stmt);
+            }
+        }
+
         // Pre-visit.
         match &stmt.node {
             StmtKind::Global { names } => {
@@ -4723,7 +4739,7 @@ impl<'a> Checker<'a> {
                         );
                     }
                 } else {
-                    unreachable!("Expected ExprKind::Lambda");
+                    unreachable!("Expected ExprKind::For | ExprKind::AsyncFor");
                 }
             }
         }
@@ -5442,6 +5458,7 @@ pub fn check_ast(
         locator,
         stylist,
         indexer,
+        Importer::new(python_ast, locator, stylist),
     );
     checker.bind_builtins();
 
