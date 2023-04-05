@@ -184,7 +184,20 @@ where
                     ),
                 );
             }
-            StmtKind::AugAssign { target, .. } | StmtKind::AnnAssign { target, .. } => {
+            StmtKind::AugAssign { target, .. } => {
+                self.assignment_targets.extend(
+                    assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
+                        ExprWithInnerBindingKind {
+                            expr,
+                            binding_kind: InnerBindingKind::Assignment,
+                        }
+                    }),
+                );
+            }
+            StmtKind::AnnAssign { target, value, .. } => {
+                if value.is_none() {
+                    return;
+                }
                 self.assignment_targets.extend(
                     assignment_targets_from_expr(target, self.dummy_variable_rgx).map(|expr| {
                         ExprWithInnerBindingKind {

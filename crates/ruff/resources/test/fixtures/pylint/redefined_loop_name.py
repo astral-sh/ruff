@@ -53,6 +53,10 @@ for i in []:
 for i in []:
     i: int = 5  # error
 
+# For -> annotated assignment without value
+for i in []:
+    i: int  # no error
+
 # Async for -> for, variable reused
 async for i in []:
     for i in []:  # error
