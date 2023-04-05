@@ -60,16 +60,13 @@ pub fn tab_indentation(lineno: usize, line: &str, string_lines: &[Range]) -> Opt
             // the subset of the line that's in quotes
             let line_is_start = lineno == start.row();
             let line_is_end = lineno == end.row();
-            let tab_in_start = start.column() <= tab_index;
-            let tab_in_end = tab_index <= end.column();
-
             // Tab bounded by start/end quotes on the same line. Putting this first means that it
             // won't short-circuit other evaluations
-            if (line_is_start && line_is_end && tab_in_start && tab_in_end)
-                // tab at start of line, outside of quotes 
-                || (line_is_start && tab_in_start)
-                // tab at end of line, outside of quote 
-                || (line_is_end && tab_in_end)
+            if (line_is_start && line_is_end && start.column() < tab_index && tab_index < end.column())
+                // tab on first line of quoted range, inside of quote
+                || (line_is_start && start.column() < tab_index)
+                // tab on last line of quoted range, inside of quote 
+                || (line_is_end && tab_index < end.column())
             {
                 return None;
             }

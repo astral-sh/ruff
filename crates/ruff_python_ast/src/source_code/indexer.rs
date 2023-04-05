@@ -136,13 +136,10 @@ import os
 
     #[test]
     fn string_lines() {
-        let contents = r#""this is a string""#;
+        let contents = r#""this is a single-quoted string""#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
-        assert_eq!(
-            indexer.string_lines(),
-            &vec![Range::new(Location::new(1, 0), Location::new(1, 17))]
-        );
+        assert_eq!(indexer.string_lines(), &vec![]);
 
         let contents = r#"
             """
@@ -151,10 +148,9 @@ import os
             "#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
-        assert!(
-            indexer.string_lines()[0].location.row() == 2
-                && indexer.string_lines()[0].end_location.row() == 4
-                && indexer.string_lines().len() == 1
+        assert_eq!(
+            indexer.string_lines(),
+            &vec![Range::new(Location::new(2, 12), Location::new(4, 15))]
         );
 
         let contents = r#"
@@ -164,39 +160,29 @@ import os
             "#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
-        assert!(
-            indexer.string_lines()[0].location.row() == 2
-                && indexer.string_lines()[0].end_location.row() == 4
-                && indexer.string_lines().len() == 1
-        );
-
-        let contents = r#""this is a non-triple-quoted single line string""#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer: Indexer = lxr.as_slice().into();
-        assert!(
-            indexer.string_lines()[0].location.row() == 2
-                && indexer.string_lines()[0].end_location.row() == 2
-                && indexer.string_lines().len() == 1
+        assert_eq!(
+            indexer.string_lines(),
+            &vec![Range::new(Location::new(2, 12), Location::new(4, 15))]
         );
 
         let contents = r#"
-        """
-        this is one 
-        multiline string
-        """
-        """
-        and this is
-        another
-        """
-        "#;
+            """
+            this is one 
+            multiline string
+            """
+            """
+            and this is
+            another
+            """
+            "#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
-        assert!(
-            indexer.string_lines()[0].location.row() == 2
-                && indexer.string_lines()[0].end_location.row() == 5
-                && indexer.string_lines()[1].location.row() == 6
-                && indexer.string_lines()[1].end_location.row() == 9
-                && indexer.string_lines().len() == 2
+        assert_eq!(
+            indexer.string_lines(),
+            &vec![
+                Range::new(Location::new(2, 12), Location::new(5, 15)),
+                Range::new(Location::new(6, 12), Location::new(9, 15))
+            ]
         );
     }
 }
