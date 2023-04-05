@@ -4,10 +4,10 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{match_leading_content, match_trailing_content, unparse_stmt};
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::scope::ScopeKind;
 use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::leading_space;
+use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;

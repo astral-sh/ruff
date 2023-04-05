@@ -8,12 +8,12 @@ use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Location, Stmt, S
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
-use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::to_absolute;
 use ruff_python_ast::imports::{AnyImport, Import};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_semantic::context::Context;
 
 use crate::cst::helpers::compose_module_path;
 use crate::cst::matchers::match_module;

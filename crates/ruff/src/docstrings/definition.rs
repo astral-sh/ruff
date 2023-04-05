@@ -1,7 +1,8 @@
-use ruff_python_ast::visibility::{
+use rustpython_parser::ast::{Expr, Stmt};
+
+use ruff_python_semantic::analyze::visibility::{
     class_visibility, function_visibility, method_visibility, Modifier, Visibility, VisibleScope,
 };
-use rustpython_parser::ast::{Expr, Stmt};
 
 #[derive(Debug, Clone)]
 pub enum DefinitionKind<'a> {

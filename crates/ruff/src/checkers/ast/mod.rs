@@ -14,22 +14,22 @@ use rustpython_parser::ast::{
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::all::{extract_all_names, AllNamesFlags};
-use ruff_python_ast::binding::{
+use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::types::{Node, Range, RefEquality};
+use ruff_python_ast::typing::parse_type_annotation;
+use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
+use ruff_python_ast::{branch_detection, cast, helpers, str, visitor};
+use ruff_python_semantic::analyze;
+use ruff_python_semantic::analyze::typing::{Callable, SubscriptKind};
+use ruff_python_semantic::binding::{
     Binding, BindingId, BindingKind, Exceptions, ExecutionContext, Export, FromImportation,
     Importation, StarImportation, SubmoduleImportation,
 };
-use ruff_python_ast::context::Context;
-use ruff_python_ast::helpers::{extract_handled_exceptions, to_module_path};
-use ruff_python_ast::scope::{
+use ruff_python_semantic::context::Context;
+use ruff_python_semantic::scope::{
     ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind, ScopeStack,
 };
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
-use ruff_python_ast::types::{Node, Range, RefEquality};
-use ruff_python_ast::typing::{
-    match_annotated_subscript, parse_type_annotation, Callable, SubscriptKind,
-};
-use ruff_python_ast::visitor::{walk_excepthandler, walk_pattern, Visitor};
-use ruff_python_ast::{branch_detection, cast, helpers, str, typing, visibility, visitor};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 
@@ -1847,13 +1847,6 @@ where
                 if self.settings.rules.enabled(Rule::UselessExpression) {
                     flake8_bugbear::rules::useless_expression(self, value);
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::UncapitalizedEnvironmentVariables)
-                {
-                    flake8_simplify::rules::use_capital_environment_variables(self, value);
-                }
                 if self.settings.rules.enabled(Rule::AsyncioDanglingTask) {
                     if let Some(diagnostic) = ruff::rules::asyncio_dangling_task(value, |expr| {
                         self.ctx.resolve_call_path(expr)
@@ -2210,6 +2203,14 @@ where
                 ]) {
                     flake8_2020::rules::subscript(self, value, slice);
                 }
+
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UncapitalizedEnvironmentVariables)
+                {
+                    flake8_simplify::rules::use_capital_environment_variables(self, expr);
+                }
             }
             ExprKind::Tuple { elts, ctx } | ExprKind::List { elts, ctx } => {
                 if matches!(ctx, ExprContext::Store) {
@@ -2248,7 +2249,7 @@ where
                                 || (self.settings.target_version >= PythonVersion::Py37
                                     && self.ctx.annotations_future_enabled
                                     && self.ctx.in_annotation))
-                            && typing::is_pep585_builtin(expr, &self.ctx)
+                            && analyze::typing::is_pep585_builtin(expr, &self.ctx)
                         {
                             pyupgrade::rules::use_pep585_annotation(self, expr);
                         }
@@ -2295,7 +2296,7 @@ where
                         || (self.settings.target_version >= PythonVersion::Py37
                             && self.ctx.annotations_future_enabled
                             && self.ctx.in_annotation))
-                    && typing::is_pep585_builtin(expr, &self.ctx)
+                    && analyze::typing::is_pep585_builtin(expr, &self.ctx)
                 {
                     pyupgrade::rules::use_pep585_annotation(self, expr);
                 }
@@ -2914,6 +2915,14 @@ where
                 }
 
                 // flake8-simplify
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UncapitalizedEnvironmentVariables)
+                {
+                    flake8_simplify::rules::use_capital_environment_variables(self, expr);
+                }
+
                 if self
                     .settings
                     .rules
@@ -3636,7 +3645,7 @@ where
                     self.ctx.in_subscript = true;
                     visitor::walk_expr(self, expr);
                 } else {
-                    match match_annotated_subscript(
+                    match analyze::typing::match_annotated_subscript(
                         value,
                         &self.ctx,
                         self.settings.typing_modules.iter().map(String::as_str),
@@ -4055,7 +4064,7 @@ impl<'a> Checker<'a> {
                         && binding.redefines(existing)
                         && (!self.settings.dummy_variable_rgx.is_match(name) || existing_is_import)
                         && !(existing.kind.is_function_definition()
-                            && visibility::is_overload(
+                            && analyze::visibility::is_overload(
                                 &self.ctx,
                                 cast::decorator_list(existing.source.as_ref().unwrap()),
                             ))

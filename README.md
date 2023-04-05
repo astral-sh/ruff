@@ -379,6 +379,8 @@ Ruff is used in a number of major open-source projects, including:
 - [The Algorithms](https://github.com/TheAlgorithms/Python)
 - [Openverse](https://github.com/WordPress/openverse)
 - [MegaLinter](https://github.com/oxsecurity/megalinter)
+- [LangChain](https://github.com/hwchase17/langchain)
+- [LlamaIndex](https://github.com/jerryjliu/llama_index)
 
 ## License
 
