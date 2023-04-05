@@ -43,12 +43,12 @@ _unless_ you enable autofix, in which case, Ruff's pre-commit hook should run _b
 and other formatting tools, as Ruff's autofix behavior can output code changes that require
 reformatting.
 
-### VS Code
+## VS Code
 
 Ruff can also be used as a [VS Code extension](https://github.com/charliermarsh/ruff-vscode) or
 alongside any other editor through the [Ruff LSP](https://github.com/charliermarsh/ruff-lsp).
 
-### GitHub Action
+## GitHub Action
 
 Ruff can also be used as a GitHub Action via [`ruff-action`](https://github.com/chartboost/ruff-action).
 
