@@ -10,14 +10,19 @@ use crate::rules::isort::{categorize, ImportType};
 use crate::settings::Settings;
 
 /// ## What it does
-/// Checks for first-party imports used only for type annotation that are not in a type-checking block.
+/// Checks for first-party imports that are only used for type annotations, but
+/// aren't defined in a type-checking block.
 ///
 /// ## Why is this bad?
-/// Unused imports will add a performance overhead at runtime. They also risk circular imports.
+/// Unused imports add a performance overhead at runtime, and risk creating
+/// import cycles.
 ///
 /// ## Example
 /// ```python
+/// from __future__ import annotations
+///
 /// import A
+///
 ///
 /// def foo(a: A) -> int:
 ///     return len(a)
@@ -25,10 +30,13 @@ use crate::settings::Settings;
 ///
 /// Use instead:
 /// ```python
+/// from __future__ import annotations
+///
 /// from typing import TYPE_CHECKING
 ///
 /// if TYPE_CHECKING:
 ///     import A
+///
 ///
 /// def foo(a: A) -> int:
 ///     return len(a)
@@ -52,27 +60,35 @@ impl Violation for TypingOnlyFirstPartyImport {
 }
 
 /// ## What it does
-/// Checks for third-party imports used only for type annotation that are not in a type-checking block.
+/// Checks for third-party imports that are only used for type annotations, but
+/// aren't defined in a type-checking block.
 ///
 /// ## Why is this bad?
-/// Unused imports will add a performance overhead at runtime. They also risk circular imports.
+/// Unused imports add a performance overhead at runtime, and risk creating
+/// import cycles.
 ///
 /// ## Example
 /// ```python
-/// import pandas
+/// from __future__ import annotations
 ///
-/// def foo(df: pandas.DataFrame) -> int:
+/// import pandas as pd
+///
+///
+/// def foo(df: pd.DataFrame) -> int:
 ///     return len(df)
 /// ```
 ///
 /// Use instead:
 /// ```python
+/// from __future__ import annotations
+///
 /// from typing import TYPE_CHECKING
 ///
 /// if TYPE_CHECKING:
-///     import pandas
+///     import pandas as pd
 ///
-/// def foo(df: pandas.DataFrame) -> int:
+///
+/// def foo(df: pd.DataFrame) -> int:
 ///     return len(df)
 /// ```
 ///
@@ -94,14 +110,19 @@ impl Violation for TypingOnlyThirdPartyImport {
 }
 
 /// ## What it does
-/// Checks for standard library imports used only for type annotation that are not in a type-checking block.
+/// Checks for standard library imports that are only used for type
+/// annotations, but aren't defined in a type-checking block.
 ///
 /// ## Why is this bad?
-/// Unused imports will add a performance overhead at runtime. They also risk circular imports.
+/// Unused imports add a performance overhead at runtime, and risk creating
+/// import cycles.
 ///
 /// ## Example
 /// ```python
+/// from __future__ import annotations
+///
 /// from pathlib import Path
+///
 ///
 /// def foo(path: Path) -> str:
 ///     return str(path)
@@ -109,10 +130,13 @@ impl Violation for TypingOnlyThirdPartyImport {
 ///
 /// Use instead:
 /// ```python
+/// /// from __future__ import annotations
+///
 /// from typing import TYPE_CHECKING
 ///
 /// if TYPE_CHECKING:
 ///     from pathlib import Path
+///
 ///
 /// def foo(path: Path) -> str:
 ///     return str(path)
