@@ -1,13 +1,13 @@
 use crate::fs::relativize_path;
-use crate::message::{Emitter, EmitterContext, Location, Message};
+use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use colored::Colorize;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_python_ast::source_code::OneIndexed;
-use ruff_python_ast::types::Range;
 use ruff_text_size::TextRange;
+use std::cmp;
 use std::fmt::{Display, Formatter};
 use std::io::Write;
 
@@ -139,31 +139,54 @@ impl Display for MessageCodeFrame<'_> {
                 Vec::new()
             };
 
-            let source_code_start =
-                source_code.line_start(OneIndexed::new(location.row()).unwrap());
+            let mut start_index =
+                OneIndexed::new(cmp::max(1, location.row().saturating_sub(2))).unwrap();
+            let content_start_index = OneIndexed::new(location.row()).unwrap();
 
-            let source_code_end = source_code.line_start(
-                OneIndexed::new(
-                    end_location
-                        .row()
-                        .saturating_add(1)
-                        .min(source_code.line_count() + 1),
-                )
-                .unwrap(),
-            );
+            // Trim leading empty lines.
+            while start_index < content_start_index {
+                if !source_code.line_text(start_index).trim().is_empty() {
+                    break;
+                }
+                start_index = start_index.saturating_add(1);
+            }
 
-            let source_text =
-                &source_code.text()[TextRange::new(source_code_start, source_code_end)];
+            let mut end_index = OneIndexed::new(cmp::min(
+                end_location.row().saturating_add(2),
+                source_code.line_count() + 1,
+            ))
+            .unwrap();
 
-            let content_range = source_code.text_range(Range::new(
-                // Subtract 1 because message column indices are 1 based but the index columns are 1 based.
-                Location::new(location.row(), location.column().saturating_sub(1)),
-                Location::new(end_location.row(), end_location.column().saturating_sub(1)),
-            ));
+            let content_end_index = OneIndexed::new(end_location.row()).unwrap();
 
-            let annotation_length = &source_text[content_range - source_code_start]
+            // Trim trailing empty lines
+            while end_index > content_end_index {
+                if !source_code.line_text(end_index).trim().is_empty() {
+                    break;
+                }
+
+                end_index = end_index.saturating_sub(1);
+            }
+
+            let start_offset = source_code.line_start(start_index);
+            let end_offset = source_code.line_end(end_index);
+
+            let source_text = &source_code.text()[TextRange::new(start_offset, end_offset)];
+
+            let annotation_start_offset =
+                // Message columns are one indexed
+                source_code.offset(location.with_col_offset(-1)) - start_offset;
+            let annotation_end_offset =
+                source_code.offset(end_location.with_col_offset(-1)) - start_offset;
+
+            let start_char = source_text[TextRange::up_to(annotation_start_offset)]
                 .chars()
                 .count();
+
+            let char_length = source_text
+                [TextRange::new(annotation_start_offset, annotation_end_offset)]
+            .chars()
+            .count();
 
             let label = kind.rule().noqa_code().to_string();
 
@@ -175,10 +198,7 @@ impl Display for MessageCodeFrame<'_> {
                     annotations: vec![SourceAnnotation {
                         label: &label,
                         annotation_type: AnnotationType::Error,
-                        range: (
-                            location.column() - 1,
-                            location.column() + annotation_length - 1,
-                        ),
+                        range: (start_char, start_char + char_length),
                     }],
                     // The origin (file name, line number, and column number) is already encoded
                     // in the `label`.

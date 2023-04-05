@@ -1,6 +1,6 @@
 ---
 source: crates/ruff/src/message/gitlab.rs
-expression: output
+expression: redact_fingerprint(&content)
 ---
 [
   {
@@ -22,8 +22,8 @@ expression: output
     "location": {
       "path": "fib.py",
       "lines": {
-        "begin": 5,
-        "end": 5
+        "begin": 6,
+        "end": 6
       }
     }
   },

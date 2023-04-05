@@ -27,22 +27,22 @@ expression: content
         {
           "content": "",
           "location": {
-            "row": 5,
+            "row": 6,
             "column": 4
           },
           "end_location": {
-            "row": 5,
+            "row": 6,
             "column": 9
           }
         }
       ]
     },
     "location": {
-      "row": 5,
+      "row": 6,
       "column": 5
     },
     "end_location": {
-      "row": 5,
+      "row": 6,
       "column": 6
     },
     "filename": "fib.py",
