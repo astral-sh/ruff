@@ -79,6 +79,21 @@ for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
         collect_shop_items(shopper, section_items)  # B031
 
 for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    _ = [collect_shop_items(shopper, section_items) for shopper in shoppers]  # B031
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    # The variable is overridden, skip checking.
+    _ = [_ for section_items in range(3)]
+    _ = [collect_shop_items(shopper, section_items) for shopper in shoppers]
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    _ = [item for item in section_items]
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    # The iterator is being used for the second time.
+    _ = [(item1, item2) for item1 in section_items for item2 in section_items]  # B031
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
     if _section == "greens":
         collect_shop_items(shopper, section_items)
     else:
