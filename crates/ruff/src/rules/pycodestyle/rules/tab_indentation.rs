@@ -18,7 +18,7 @@ impl Violation for TabIndentation {
 /// `string_lines` is parsed from top to bottom during the tokenization phase, and we know that the
 /// strings aren't overlapping (otherwise there'd only be one string). This function performs a
 /// binary search on `string_lines` to find the string range that contains lineno
-fn is_line_in_string<'a>(lineno: usize, string_lines: &'a [Range]) -> Option<&'a Range> {
+fn is_line_in_string(lineno: usize, string_lines: &[Range]) -> Option<&Range> {
     let mut low = 0;
     let mut high = string_lines.len();
 
@@ -45,10 +45,34 @@ fn is_line_in_string<'a>(lineno: usize, string_lines: &'a [Range]) -> Option<&'a
 pub fn tab_indentation(lineno: usize, line: &str, string_lines: &[Range]) -> Option<Diagnostic> {
     let indent = leading_space(line);
 
-    if indent.contains('\t') {
+    if let Some(tab_index) = indent.find('\t') {
         // If the tab character is contained in a string, don't raise a violation
-        if is_line_in_string(lineno, string_lines).is_some() {
-            return None;
+        if let Some(string_range) = is_line_in_string(lineno, string_lines) {
+            let start = string_range.location;
+            let end = string_range.end_location;
+
+            // Tab is contained in the string range by virtue of lines
+            if lineno != start.row() && lineno != end.row() {
+                return None;
+            }
+
+            // if the tab occurs on the start/end row, we'll skip throwing a diagnostic if it occurs inside
+            // the subset of the line that's in quotes
+            let line_is_start = lineno == start.row();
+            let line_is_end = lineno == end.row();
+            let tab_in_start = start.column() <= tab_index;
+            let tab_in_end = tab_index <= end.column();
+
+            // Tab bounded by start/end quotes on the same line. Putting this first means that it
+            // won't short-circuit other evaluations
+            if (line_is_start && line_is_end && tab_in_start && tab_in_end)
+                // tab at start of line, outside of quotes 
+                || (line_is_start && tab_in_start)
+                // tab at end of line, outside of quote 
+                || (line_is_end && tab_in_end)
+            {
+                return None;
+            }
         }
 
         Some(Diagnostic::new(
