@@ -354,6 +354,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [LangChain](https://github.com/hwchase17/langchain)
 - [LlamaIndex](https://github.com/jerryjliu/llama_index)
 - Matrix ([Synapse](https://github.com/matrix-org/synapse))
+- Meltano ([Meltano CLI](https://github.com/meltano/meltano), [Singer SDK](https://github.com/meltano/sdk))
 - Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
 - Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
 - [MegaLinter](https://github.com/oxsecurity/megalinter)
