@@ -84,7 +84,10 @@ pub fn cyclic_import(
     imports: &ImportMap,
     cycles: &mut FxHashMap<Arc<str>, FxHashSet<Vec<Arc<str>>>>,
 ) -> Option<Vec<Diagnostic>> {
-    let module_name = to_module_path(package.unwrap(), path).unwrap().join(".");
+    let Some(package) = package else {
+        return None;
+    };
+    let module_name = to_module_path(package, path).unwrap().join(".");
     // if the module name isn't in the import map, it can't possibly have cycles
     debug!("Checking module {module_name}");
     let Some((module_name, _)) = imports.module_to_imports.get_key_value(&module_name as &str) else {
