@@ -1,13 +1,16 @@
 mod generator;
 mod indexer;
+mod line_index;
 mod locator;
 mod stylist;
 
+pub use crate::source_code::line_index::{LineIndex, OneIndexed};
 pub use generator::Generator;
 pub use indexer::Indexer;
 pub use locator::Locator;
 use rustpython_parser as parser;
 use rustpython_parser::{lexer, Mode, ParseError};
+
 pub use stylist::{LineEnding, Stylist};
 
 /// Run round-trip source code generation on a given Python code.
