@@ -204,14 +204,18 @@ where
                     }
                 }
             }
-            StmtKind::Assign { targets, .. } => {
+            StmtKind::Assign { targets, value, .. } => {
                 if targets.iter().any(|target| self.name_matches(target)) {
                     self.overridden = true;
+                } else {
+                    self.visit_expr(value);
                 }
             }
-            StmtKind::AnnAssign { target, .. } => {
+            StmtKind::AnnAssign { target, value, .. } => {
                 if self.name_matches(target) {
                     self.overridden = true;
+                } else if let Some(expr) = value {
+                    self.visit_expr(expr);
                 }
             }
             _ => visitor::walk_stmt(self, stmt),
