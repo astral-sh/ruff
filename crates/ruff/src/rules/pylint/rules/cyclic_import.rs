@@ -30,9 +30,15 @@ struct VisitedAndCycles {
 impl VisitedAndCycles {
     fn new(fully_visited: FxHashSet<Arc<str>>, cycles: FxHashSet<Vec<Arc<str>>>) -> Self {
         if cycles.is_empty() {
-            Self { fully_visited, cycles: None }
+            Self {
+                fully_visited,
+                cycles: None,
+            }
         } else {
-            Self { fully_visited, cycles: Some(cycles)}
+            Self {
+                fully_visited,
+                cycles: Some(cycles),
+            }
         }
     }
 }
@@ -192,22 +198,16 @@ mod tests {
         let grand_parent_a = ModuleImport::new("grand.parent.a".to_string(), location, location);
         map.insert(
             grand_a.module.clone(),
-            vec![
-                grand_b.clone(),
-                grand_parent_a.clone(),
-            ],
+            vec![grand_b.clone(), grand_parent_a.clone()],
         );
-        map.insert(
-            grand_b.module.clone(),
-            vec![grand_a.clone()],
-        );
+        map.insert(grand_b.module.clone(), vec![grand_a.clone()]);
         let imports = ImportMap::new(map);
         let cyclic_checker = CyclicImportChecker {
             imports: &imports.module_to_imports,
         };
         let VisitedAndCycles {
             fully_visited: visited,
-            cycles
+            cycles,
         } = cyclic_checker.has_cycles(&grand_a.module);
 
         let mut check_visited = FxHashSet::default();
@@ -221,11 +221,11 @@ mod tests {
 
         let VisitedAndCycles {
             fully_visited: visited,
-            cycles
-        } = cyclic_checker.has_cycles(&grand_b.module);        // assert_eq!(visited, check_visited);
+            cycles,
+        } = cyclic_checker.has_cycles(&grand_b.module); // assert_eq!(visited, check_visited);
         let mut check_cycles = FxHashSet::default();
-        check_cycles.insert(vec![grand_b.module.clone(), grand_a.module.clone()]);
+        check_cycles.insert(vec![grand_b.module, grand_a.module]);
         assert_eq!(cycles, Some(check_cycles));
-        assert_eq!(visited.contains(&grand_parent_a.module), true);
+        assert!(visited.contains(&grand_parent_a.module));
     }
 }
