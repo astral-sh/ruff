@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
@@ -78,7 +80,7 @@ impl std::fmt::Display for ImportFrom<'_> {
 /// A representation of a module reference in an import statement.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModuleImport {
-    pub module: String,
+    pub module: Arc<str>,
     location: Location,
     end_location: Location,
 }
@@ -86,7 +88,7 @@ pub struct ModuleImport {
 impl ModuleImport {
     pub fn new(module: String, location: Location, end_location: Location) -> Self {
         Self {
-            module,
+            module: Arc::from(module),
             location,
             end_location,
         }
@@ -109,16 +111,17 @@ impl From<&ModuleImport> for Range {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImportMap {
     /// A map from dot-delimited module name to the list of imports in that module.
-    pub module_to_imports: FxHashMap<String, Vec<ModuleImport>>,
+    pub module_to_imports: FxHashMap<Arc<str>, Vec<ModuleImport>>,
 }
 
 impl ImportMap {
-    pub fn new(module_to_imports: FxHashMap<String, Vec<ModuleImport>>) -> Self {
+    pub fn new(module_to_imports: FxHashMap<Arc<str>, Vec<ModuleImport>>) -> Self {
         Self { module_to_imports }
     }
 
     pub fn insert(&mut self, module: String, imports_vec: Vec<ModuleImport>) {
-        self.module_to_imports.insert(module, imports_vec);
+        self.module_to_imports
+            .insert(Arc::from(module), imports_vec);
     }
 
     pub fn extend(&mut self, other: Self) {
@@ -127,8 +130,8 @@ impl ImportMap {
 }
 
 impl<'a> IntoIterator for &'a ImportMap {
-    type Item = (&'a String, &'a Vec<ModuleImport>);
-    type IntoIter = std::collections::hash_map::Iter<'a, String, Vec<ModuleImport>>;
+    type Item = (&'a Arc<str>, &'a Vec<ModuleImport>);
+    type IntoIter = std::collections::hash_map::Iter<'a, Arc<str>, Vec<ModuleImport>>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.module_to_imports.iter()

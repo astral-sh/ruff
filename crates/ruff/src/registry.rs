@@ -916,7 +916,9 @@ impl Rule {
             | Rule::ProhibitedTrailingComma
             | Rule::TypeCommentInStub => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
-            Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
+            Rule::UnsortedImports | Rule::MissingRequiredImport | Rule::CyclicImport => {
+                LintSource::Imports
+            }
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
             #[cfg(feature = "logical_lines")]
             Rule::IndentationWithInvalidMultiple

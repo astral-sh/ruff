@@ -1,5 +1,6 @@
 use std::io;
 use std::path::{Path, PathBuf};
+use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::Result;
@@ -145,7 +146,7 @@ pub fn run(
         });
 
     debug!("{:#?}", diagnostics.imports);
-    let mut cycles: FxHashMap<String, FxHashSet<Vec<String>>> = FxHashMap::default();
+    let mut cycles: FxHashMap<Arc<str>, FxHashSet<Vec<Arc<str>>>> = FxHashMap::default();
 
     for (path, package, settings) in
         paths
