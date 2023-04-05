@@ -106,10 +106,38 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 86
+    row: 82
+    column: 37
+  end_location:
+    row: 82
+    column: 50
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 94
+    column: 64
+  end_location:
+    row: 94
+    column: 77
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: ReuseOfGroupbyGenerator
+    body: "Using the generator returned from `itertools.groupby()` more than once will do nothing on the second usage"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 101
     column: 36
   end_location:
-    row: 86
+    row: 101
     column: 49
   fix:
     edits: []
@@ -120,10 +148,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 93
+    row: 108
     column: 40
   end_location:
-    row: 93
+    row: 108
     column: 53
   fix:
     edits: []
@@ -134,10 +162,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 95
+    row: 110
     column: 40
   end_location:
-    row: 95
+    row: 110
     column: 53
   fix:
     edits: []
@@ -148,10 +176,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 97
+    row: 112
     column: 40
   end_location:
-    row: 97
+    row: 112
     column: 53
   fix:
     edits: []
@@ -162,10 +190,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 98
+    row: 113
     column: 36
   end_location:
-    row: 98
+    row: 113
     column: 49
   fix:
     edits: []
@@ -176,10 +204,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 105
+    row: 120
     column: 48
   end_location:
-    row: 105
+    row: 120
     column: 61
   fix:
     edits: []
@@ -190,10 +218,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 111
+    row: 126
     column: 32
   end_location:
-    row: 111
+    row: 126
     column: 45
   fix:
     edits: []
@@ -204,10 +232,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 120
+    row: 135
     column: 48
   end_location:
-    row: 120
+    row: 135
     column: 61
   fix:
     edits: []
@@ -218,10 +246,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 122
+    row: 137
     column: 48
   end_location:
-    row: 122
+    row: 137
     column: 61
   fix:
     edits: []
@@ -232,10 +260,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 125
+    row: 140
     column: 40
   end_location:
-    row: 125
+    row: 140
     column: 53
   fix:
     edits: []
@@ -246,10 +274,10 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 129
+    row: 144
     column: 32
   end_location:
-    row: 129
+    row: 144
     column: 45
   fix:
     edits: []
