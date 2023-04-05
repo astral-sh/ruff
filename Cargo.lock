@@ -2015,6 +2015,7 @@ dependencies = [
  "ruff_python_semantic",
  "ruff_python_stdlib",
  "ruff_rustpython",
+ "ruff_text_size",
  "rustc-hash",
  "rustpython-common",
  "rustpython-parser",

@@ -1,11 +1,14 @@
 use crate::fs::relativize_path;
-use crate::message::{Emitter, EmitterContext, Message};
+use crate::message::{Emitter, EmitterContext, Location, Message};
 use crate::registry::AsRule;
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use colored::Colorize;
 use ruff_diagnostics::DiagnosticKind;
-use std::fmt::Display;
+use ruff_python_ast::source_code::OneIndexed;
+use ruff_python_ast::types::Range;
+use ruff_text_size::TextRange;
+use std::fmt::{Display, Formatter};
 use std::io::Write;
 
 #[derive(Default)]
@@ -63,45 +66,8 @@ impl Emitter for TextEmitter {
                 }
             )?;
 
-            if let Some(source) = &message.source {
-                let suggestion = message.kind.suggestion.clone();
-                let footer = if suggestion.is_some() {
-                    vec![Annotation {
-                        id: None,
-                        label: suggestion.as_deref(),
-                        annotation_type: AnnotationType::Help,
-                    }]
-                } else {
-                    Vec::new()
-                };
-
-                let label = message.kind.rule().noqa_code().to_string();
-                let snippet = Snippet {
-                    title: None,
-                    slices: vec![Slice {
-                        source: &source.contents,
-                        line_start: message.location.row(),
-                        annotations: vec![SourceAnnotation {
-                            label: &label,
-                            annotation_type: AnnotationType::Error,
-                            range: source.range,
-                        }],
-                        // The origin (file name, line number, and column number) is already encoded
-                        // in the `label`.
-                        origin: None,
-                        fold: false,
-                    }],
-                    footer,
-                    opt: FormatOptions {
-                        #[cfg(test)]
-                        color: false,
-                        #[cfg(not(test))]
-                        color: colored::control::SHOULD_COLORIZE.should_colorize(),
-                        ..FormatOptions::default()
-                    },
-                };
-
-                writeln!(writer, "{message}\n", message = DisplayList::from(snippet))?;
+            if message.source.is_some() {
+                writeln!(writer, "{}", MessageCodeFrame { message })?;
             }
         }
 
@@ -144,6 +110,95 @@ impl Display for RuleCodeAndBody<'_> {
                 body = self.message_kind.body,
             )
         }
+    }
+}
+
+pub(super) struct MessageCodeFrame<'a> {
+    pub message: &'a Message,
+}
+
+impl Display for MessageCodeFrame<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let Message {
+            kind,
+            source,
+            location,
+            end_location,
+            ..
+        } = self.message;
+
+        if let Some(source_code) = source {
+            let suggestion = kind.suggestion.as_deref();
+            let footer = if suggestion.is_some() {
+                vec![Annotation {
+                    id: None,
+                    label: suggestion,
+                    annotation_type: AnnotationType::Help,
+                }]
+            } else {
+                Vec::new()
+            };
+
+            let source_code_start =
+                source_code.line_start(OneIndexed::new(location.row()).unwrap());
+
+            let source_code_end = source_code.line_start(
+                OneIndexed::new(
+                    end_location
+                        .row()
+                        .saturating_add(1)
+                        .min(source_code.line_count() + 1),
+                )
+                .unwrap(),
+            );
+
+            let source_text =
+                &source_code.text()[TextRange::new(source_code_start, source_code_end)];
+
+            let content_range = source_code.text_range(Range::new(
+                // Subtract 1 because message column indices are 1 based but the index columns are 1 based.
+                Location::new(location.row(), location.column().saturating_sub(1)),
+                Location::new(end_location.row(), end_location.column().saturating_sub(1)),
+            ));
+
+            let annotation_length = &source_text[content_range - source_code_start]
+                .chars()
+                .count();
+
+            let label = kind.rule().noqa_code().to_string();
+
+            let snippet = Snippet {
+                title: None,
+                slices: vec![Slice {
+                    source: source_text,
+                    line_start: location.row(),
+                    annotations: vec![SourceAnnotation {
+                        label: &label,
+                        annotation_type: AnnotationType::Error,
+                        range: (
+                            location.column() - 1,
+                            location.column() + annotation_length - 1,
+                        ),
+                    }],
+                    // The origin (file name, line number, and column number) is already encoded
+                    // in the `label`.
+                    origin: None,
+                    fold: false,
+                }],
+                footer,
+                opt: FormatOptions {
+                    #[cfg(test)]
+                    color: false,
+                    #[cfg(not(test))]
+                    color: colored::control::SHOULD_COLORIZE.should_colorize(),
+                    ..FormatOptions::default()
+                },
+            };
+
+            writeln!(f, "{message}", message = DisplayList::from(snippet))?;
+        }
+
+        Ok(())
     }
 }
 

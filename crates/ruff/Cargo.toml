@@ -21,6 +21,7 @@ ruff_python_ast = { path = "../ruff_python_ast" }
 ruff_python_semantic = { path = "../ruff_python_semantic" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_rustpython = { path = "../ruff_rustpython" }
+ruff_text_size = { path = "../ruff_text_size" }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }

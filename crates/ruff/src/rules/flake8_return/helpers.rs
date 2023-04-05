@@ -29,7 +29,7 @@ pub fn result_exists(returns: &[(&Stmt, Option<&Expr>)]) -> bool {
 /// This method assumes that the statement is the last statement in its body; specifically, that
 /// the statement isn't followed by a semicolon, followed by a multi-line statement.
 pub fn end_of_last_statement(stmt: &Stmt, locator: &Locator) -> Location {
-    let contents = locator.skip(stmt.end_location.unwrap());
+    let contents = locator.after(stmt.end_location.unwrap());
 
     // End-of-file, so just return the end of the statement.
     if contents.is_empty() {

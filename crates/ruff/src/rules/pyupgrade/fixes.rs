@@ -142,7 +142,7 @@ pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
     }
 
     // Add the remaining content.
-    let slice = locator.skip(last_pos);
+    let slice = locator.after(last_pos);
     output.push_str(slice);
     output
 }

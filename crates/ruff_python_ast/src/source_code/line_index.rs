@@ -83,12 +83,12 @@ impl LineIndex {
     }
 
     /// Return the number of lines in the source code.
-    pub(crate) fn lines_count(&self) -> usize {
+    pub(crate) fn line_count(&self) -> usize {
         self.line_starts().len()
     }
 
     /// Returns the [byte offset](TextSize) for the `line` with the given index.
-    fn line_start(&self, line: OneIndexed, contents: &str) -> TextSize {
+    pub(crate) fn line_start(&self, line: OneIndexed, contents: &str) -> TextSize {
         let row_index = line.to_zero_indexed();
         let starts = self.line_starts();
 
@@ -103,7 +103,7 @@ impl LineIndex {
     /// Returns the [`TextRange`] of the `line` with the given index.
     /// The start points to the first character's [byte offset](TextSize), the end up to, and including
     /// the newline character ending the line (if any).
-    fn line_range(&self, line: OneIndexed, contents: &str) -> TextRange {
+    pub(crate) fn line_range(&self, line: OneIndexed, contents: &str) -> TextRange {
         let starts = self.line_starts();
 
         if starts.len() == line.to_zero_indexed() {
@@ -173,6 +173,11 @@ impl OneIndexed {
     /// Construct a new [`OneIndexed`] from a zero-indexed value
     pub const fn from_zero_indexed(value: usize) -> Self {
         Self(ONE.saturating_add(value))
+    }
+
+    /// Returns the value as a primitive type.
+    pub const fn get(self) -> usize {
+        self.0.get()
     }
 
     /// Return the zero-indexed primitive value for this [`OneIndexed`]
@@ -306,18 +311,18 @@ mod tests {
     #[test]
     fn utf8_index() {
         let index = LineIndex::from_source_text("x = '🫣'");
-        assert_eq!(index.lines_count(), 1);
+        assert_eq!(index.line_count(), 1);
         assert_eq!(index.line_starts(), &[TextSize::from(0)]);
 
         let index = LineIndex::from_source_text("x = '🫣'\n");
-        assert_eq!(index.lines_count(), 2);
+        assert_eq!(index.line_count(), 2);
         assert_eq!(
             index.line_starts(),
             &[TextSize::from(0), TextSize::from(11)]
         );
 
         let index = LineIndex::from_source_text("x = '🫣'\ny = 2\nz = x + y\n");
-        assert_eq!(index.lines_count(), 4);
+        assert_eq!(index.line_count(), 4);
         assert_eq!(
             index.line_starts(),
             &[
@@ -329,7 +334,7 @@ mod tests {
         );
 
         let index = LineIndex::from_source_text("# 🫣\nclass Foo:\n    \"\"\".\"\"\"");
-        assert_eq!(index.lines_count(), 3);
+        assert_eq!(index.line_count(), 3);
         assert_eq!(
             index.line_starts(),
             &[TextSize::from(0), TextSize::from(7), TextSize::from(18)]
@@ -340,7 +345,7 @@ mod tests {
     fn utf8_carriage_return() {
         let contents = "x = '🫣'\ry = 3";
         let index = LineIndex::from_source_text(contents);
-        assert_eq!(index.lines_count(), 2);
+        assert_eq!(index.line_count(), 2);
         assert_eq!(
             index.line_starts(),
             &[TextSize::from(0), TextSize::from(11)]
@@ -365,7 +370,7 @@ mod tests {
     fn utf8_carriage_return_newline() {
         let contents = "x = '🫣'\r\ny = 3";
         let index = LineIndex::from_source_text(contents);
-        assert_eq!(index.lines_count(), 2);
+        assert_eq!(index.line_count(), 2);
         assert_eq!(
             index.line_starts(),
             &[TextSize::from(0), TextSize::from(12)]

@@ -5,13 +5,18 @@ use std::path::Path;
 
 use anyhow::Result;
 use filetime::FileTime;
+use itertools::Itertools;
 use log::error;
 use path_absolutize::Absolutize;
-use ruff::message::Message;
+use ruff::message::{Location, Message};
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff_cache::{CacheKey, CacheKeyHasher};
+use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_python_ast::imports::ImportMap;
-use serde::{Deserialize, Serialize};
+use ruff_python_ast::source_code::{LineIndex, SourceCodeBuf};
+use rustc_hash::FxHashMap;
+use serde::ser::{SerializeSeq, SerializeStruct};
+use serde::{Deserialize, Serialize, Serializer};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
 
@@ -19,33 +24,90 @@ const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Serialize)]
 struct CheckResultRef<'a> {
+    #[serde(serialize_with = "serialize_messages")]
     messages: &'a [Message],
     imports: &'a ImportMap,
+    sources: Vec<(&'a str, &'a str)>,
+}
+
+fn serialize_messages<S>(messages: &[Message], serializer: S) -> Result<S::Ok, S::Error>
+where
+    S: Serializer,
+{
+    let mut s = serializer.serialize_seq(Some(messages.len()))?;
+
+    for message in messages {
+        s.serialize_element(&SerializeMessage(message))?;
+    }
+
+    s.end()
+}
+
+struct SerializeMessage<'a>(&'a Message);
+
+impl Serialize for SerializeMessage<'_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let Message {
+            kind,
+            location,
+            end_location,
+            fix,
+            filename,
+            // Serialized manually for all files
+            source: _source,
+            noqa_row,
+        } = self.0;
+
+        let mut s = serializer.serialize_struct("Message", 6)?;
+
+        s.serialize_field("kind", &kind)?;
+        s.serialize_field("location", &location)?;
+        s.serialize_field("end_location", &end_location)?;
+        s.serialize_field("fix", &fix)?;
+        s.serialize_field("filename", &filename)?;
+        s.serialize_field("noqa_row", &noqa_row)?;
+
+        s.end()
+    }
+}
+
+#[derive(Deserialize)]
+struct MessageHeader {
+    kind: DiagnosticKind,
+    location: Location,
+    end_location: Location,
+    fix: Fix,
+    filename: String,
+    noqa_row: usize,
 }
 
 #[derive(Deserialize)]
 struct CheckResult {
-    messages: Vec<Message>,
+    messages: Vec<MessageHeader>,
     imports: ImportMap,
+    sources: Vec<(String, String)>,
 }
 
 fn content_dir() -> &'static Path {
     Path::new("content")
 }
 
-fn cache_key<P: AsRef<Path>>(
-    path: P,
-    package: Option<&P>,
+fn cache_key(
+    path: &Path,
+    package: Option<&Path>,
     metadata: &fs::Metadata,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> u64 {
     let mut hasher = CacheKeyHasher::new();
     CARGO_PKG_VERSION.cache_key(&mut hasher);
-    path.as_ref().absolutize().unwrap().cache_key(&mut hasher);
+    path.absolutize().unwrap().cache_key(&mut hasher);
     package
         .as_ref()
-        .map(|path| path.as_ref().absolutize().unwrap())
+        .map(|path| path.absolutize().unwrap())
         .cache_key(&mut hasher);
     FileTime::from_last_modification_time(metadata).cache_key(&mut hasher);
     #[cfg(unix)]
@@ -92,9 +154,9 @@ fn del_sync(cache_dir: &Path, key: u64) -> Result<(), std::io::Error> {
 }
 
 /// Get a value from the cache.
-pub fn get<P: AsRef<Path>>(
-    path: P,
-    package: Option<&P>,
+pub fn get(
+    path: &Path,
+    package: Option<&Path>,
     metadata: &fs::Metadata,
     settings: &AllSettings,
     autofix: flags::Autofix,
@@ -105,7 +167,34 @@ pub fn get<P: AsRef<Path>>(
     )
     .ok()?;
     match bincode::deserialize::<CheckResult>(&encoded[..]) {
-        Ok(CheckResult { messages, imports }) => Some((messages, imports)),
+        Ok(CheckResult {
+            messages: headers,
+            imports,
+            sources,
+        }) => {
+            let mut messages = Vec::with_capacity(headers.len());
+            let sources: FxHashMap<_, _> = sources
+                .into_iter()
+                .map(|(filename, content)| {
+                    let index = LineIndex::from_source_text(&content);
+                    (filename, SourceCodeBuf::new(&content, index))
+                })
+                .collect();
+
+            for header in headers {
+                messages.push(Message {
+                    kind: header.kind,
+                    location: header.location,
+                    end_location: header.end_location,
+                    fix: header.fix,
+                    source: sources.get(&header.filename).cloned(),
+                    filename: header.filename,
+                    noqa_row: header.noqa_row,
+                });
+            }
+
+            Some((messages, imports))
+        }
         Err(e) => {
             error!("Failed to deserialize encoded cache entry: {e:?}");
             None
@@ -114,16 +203,32 @@ pub fn get<P: AsRef<Path>>(
 }
 
 /// Set a value in the cache.
-pub fn set<P: AsRef<Path>>(
-    path: P,
-    package: Option<&P>,
+pub fn set(
+    path: &Path,
+    package: Option<&Path>,
     metadata: &fs::Metadata,
     settings: &AllSettings,
     autofix: flags::Autofix,
     messages: &[Message],
     imports: &ImportMap,
 ) {
-    let check_result = CheckResultRef { messages, imports };
+    // Store the content of the source files, assuming that all files with the same name have the same content
+    let sources: Vec<_> = messages
+        .iter()
+        .filter_map(|message| {
+            message
+                .source
+                .as_ref()
+                .map(|source| (&*message.filename, source.text()))
+        })
+        .unique_by(|(filename, _)| *filename)
+        .collect();
+
+    let check_result = CheckResultRef {
+        messages,
+        imports,
+        sources,
+    };
     if let Err(e) = write_sync(
         &settings.cli.cache_dir,
         cache_key(path, package, metadata, &settings.lib, autofix),
@@ -134,9 +239,9 @@ pub fn set<P: AsRef<Path>>(
 }
 
 /// Delete a value from the cache.
-pub fn del<P: AsRef<Path>>(
-    path: P,
-    package: Option<&P>,
+pub fn del(
+    path: &Path,
+    package: Option<&Path>,
     metadata: &fs::Metadata,
     settings: &AllSettings,
     autofix: flags::Autofix,
