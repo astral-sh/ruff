@@ -10,6 +10,7 @@ use ruff_python_ast::helpers::unparse_expr;
 use ruff_python_ast::types::{Node, Range};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 
@@ -140,6 +141,7 @@ struct ExprWithInnerBindingKind<'a> {
 }
 
 struct InnerForWithAssignTargetsVisitor<'a> {
+    context: &'a Context<'a>,
     dummy_variable_rgx: &'a Regex,
     assignment_targets: Vec<ExprWithInnerBindingKind<'a>>,
 }
@@ -174,7 +176,14 @@ where
                 );
             }
             // Assignment, augmented assignment, and annotated assignment.
-            StmtKind::Assign { targets, .. } => {
+            StmtKind::Assign { targets, value, .. } => {
+                // Check for single-target assignments which are of the
+                // form `x = cast(..., x)`.
+                if targets.first().map_or(false, |target| {
+                    assignment_is_cast_expr(self.context, value, target)
+                }) {
+                    return;
+                }
                 self.assignment_targets.extend(
                     assignment_targets_from_assign_targets(targets, self.dummy_variable_rgx).map(
                         |expr| ExprWithInnerBindingKind {
@@ -220,6 +229,34 @@ where
             }
         }
     }
+}
+
+/// Checks whether the given assignment value is a `typing.cast` expression
+/// and that the target name is the same as the argument name.
+///
+/// Example:
+/// ```python
+/// from typing import cast
+///
+/// x = cast(int, x)
+/// ```
+fn assignment_is_cast_expr(context: &Context, value: &Expr, target: &Expr) -> bool {
+    let ExprKind::Call { func, args, .. } = &value.node else {
+        return false;
+    };
+    let ExprKind::Name { id: target_id, .. } = &target.node else {
+        return false;
+    };
+    if args.len() != 2 {
+        return false;
+    }
+    let ExprKind::Name { id: arg_id, .. } = &args[1].node else {
+        return false;
+    };
+    if arg_id != target_id {
+        return false;
+    }
+    context.match_typing_expr(func, "cast")
 }
 
 fn assignment_targets_from_expr<'a, U>(
@@ -312,6 +349,7 @@ pub fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>
                         })
                         .collect();
                 let mut visitor = InnerForWithAssignTargetsVisitor {
+                    context: &checker.ctx,
                     dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
                     assignment_targets: vec![],
                 };
@@ -330,6 +368,7 @@ pub fn redefined_loop_name<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>
                         })
                         .collect();
                 let mut visitor = InnerForWithAssignTargetsVisitor {
+                    context: &checker.ctx,
                     dummy_variable_rgx: &checker.settings.dummy_variable_rgx,
                     assignment_targets: vec![],
                 };
