@@ -1,3 +1,6 @@
+import typing
+from typing import cast
+
 # For -> for, variable reused
 for i in []:
     for i in []:  # error
@@ -43,6 +46,9 @@ for i in []:
 
 # For -> assignment
 for i in []:
+    # ignore typing cast
+    i = cast(int, i)
+    i = typing.cast(int, i)
     i = 5  # error
 
 # For -> augmented assignment
@@ -52,6 +58,10 @@ for i in []:
 # For -> annotated assignment
 for i in []:
     i: int = 5  # error
+
+# For -> annotated assignment without value
+for i in []:
+    i: int  # no error
 
 # Async for -> for, variable reused
 async for i in []:
