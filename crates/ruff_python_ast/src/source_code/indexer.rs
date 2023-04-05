@@ -34,19 +34,16 @@ impl From<&[LexResult]> for Indexer {
         let mut string_lines = Vec::new();
         let mut prev: Option<(&Location, &Tok, &Location)> = None;
         for (start, tok, end) in lxr.iter().flatten() {
-            if matches!(tok, Tok::Comment(_)) {
-                commented_lines.push(start.row());
-            }
-            if matches!(
-                tok,
+            match tok {
+                Tok::Comment(_) => commented_lines.push(start.row()),
                 Tok::String {
                     value: _,
                     kind: _,
-                    triple_quoted: true
-                }
-            ) {
-                string_lines.push(Range::new(*start, *end));
+                    triple_quoted: true,
+                } => string_lines.push(Range::new(*start, *end)),
+                _ => (),
             }
+
             if let Some((.., prev_tok, prev_end)) = prev {
                 if !matches!(
                     prev_tok,
@@ -70,6 +67,8 @@ impl From<&[LexResult]> for Indexer {
 #[cfg(test)]
 mod tests {
 
+    use crate::types::Range;
+    use rustpython_parser::ast::Location;
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
@@ -140,10 +139,9 @@ import os
         let contents = r#""this is a string""#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
-        assert!(
-            indexer.string_lines()[0].location.row() == 1
-                && indexer.string_lines()[0].end_location.row() == 1
-                && indexer.string_lines().len() == 1
+        assert_eq!(
+            indexer.string_lines(),
+            &vec![Range::new(Location::new(1, 0), Location::new(1, 17))]
         );
 
         let contents = r#"
@@ -172,9 +170,7 @@ import os
                 && indexer.string_lines().len() == 1
         );
 
-        let contents = r#"
-            """this is a triple-quoted string on one line"""
-            "#;
+        let contents = r#""this is a non-triple-quoted single line string""#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer: Indexer = lxr.as_slice().into();
         assert!(

@@ -158,7 +158,7 @@ pub fn check_physical_lines(
         }
 
         if enforce_tab_indentation {
-            if let Some(diagnostic) = tab_indentation(index, line, string_lines) {
+            if let Some(diagnostic) = tab_indentation(index + 1, line, string_lines) {
                 diagnostics.push(diagnostic);
             }
         }

@@ -18,7 +18,7 @@ impl Violation for TabIndentation {
 /// `string_lines` is parsed from top to bottom during the tokenization phase, and we know that the
 /// strings aren't overlapping (otherwise there'd only be one string). This function performs a
 /// binary search on `string_lines` to find the string range that contains lineno
-fn find_closest_string<'a>(lineno: usize, string_lines: &'a [Range]) -> Option<&'a Range> {
+fn is_line_in_string<'a>(lineno: usize, string_lines: &'a [Range]) -> Option<&'a Range> {
     let mut low = 0;
     let mut high = string_lines.len();
 
@@ -47,15 +47,15 @@ pub fn tab_indentation(lineno: usize, line: &str, string_lines: &[Range]) -> Opt
 
     if indent.contains('\t') {
         // If the tab character is contained in a string, don't raise a violation
-        if let Some(_contained_range) = find_closest_string(lineno, string_lines) {
+        if is_line_in_string(lineno, string_lines).is_some() {
             return None;
         }
 
         Some(Diagnostic::new(
             TabIndentation,
             Range::new(
-                Location::new(lineno + 1, 0),
-                Location::new(lineno + 1, indent.chars().count()),
+                Location::new(lineno, 0),
+                Location::new(lineno, indent.chars().count()),
             ),
         ))
     } else {
@@ -81,11 +81,11 @@ mod tests {
         let string_lines = get_string_lines();
 
         let expected = Some(&string_lines[0]);
-        let actual = find_closest_string(2usize, &string_lines);
+        let actual = is_line_in_string(2usize, &string_lines);
         assert_eq!(expected, actual);
 
         let expected = Some(&string_lines[0]);
-        let actual = find_closest_string(3usize, &string_lines);
+        let actual = is_line_in_string(3usize, &string_lines);
         assert_eq!(expected, actual);
     }
 
@@ -95,16 +95,16 @@ mod tests {
         let string_lines = get_string_lines();
 
         let expected = None;
-        let actual = find_closest_string(6usize, &string_lines);
+        let actual = is_line_in_string(6usize, &string_lines);
         assert_eq!(expected, actual);
 
         let expected = None;
-        let actual = find_closest_string(11usize, &string_lines);
+        let actual = is_line_in_string(11usize, &string_lines);
         assert_eq!(expected, actual);
     }
 
     #[test]
     fn test_find_closest_string_empty_array() {
-        assert_eq!(None, find_closest_string(1usize, &[]));
+        assert_eq!(None, is_line_in_string(1usize, &[]));
     }
 }
