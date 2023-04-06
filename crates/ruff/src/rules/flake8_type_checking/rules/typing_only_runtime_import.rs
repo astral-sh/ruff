@@ -6,7 +6,7 @@ use ruff_python_semantic::binding::{
     Binding, BindingKind, ExecutionContext, FromImportation, Importation, SubmoduleImportation,
 };
 
-use crate::rules::isort::{categorize, ImportType};
+use crate::rules::isort::{categorize, ImportSection, ImportType};
 use crate::settings::Settings;
 
 /// ## What it does
@@ -294,25 +294,31 @@ pub fn typing_only_runtime_import(
             &settings.isort.known_modules,
             settings.target_version,
         ) {
-            ImportType::LocalFolder | ImportType::FirstParty => Some(Diagnostic::new(
-                TypingOnlyFirstPartyImport {
-                    full_name: full_name.to_string(),
-                },
-                binding.range,
-            )),
-            ImportType::ThirdParty => Some(Diagnostic::new(
-                TypingOnlyThirdPartyImport {
-                    full_name: full_name.to_string(),
-                },
-                binding.range,
-            )),
-            ImportType::StandardLibrary => Some(Diagnostic::new(
+            ImportSection::Known(ImportType::LocalFolder | ImportType::FirstParty) => {
+                Some(Diagnostic::new(
+                    TypingOnlyFirstPartyImport {
+                        full_name: full_name.to_string(),
+                    },
+                    binding.range,
+                ))
+            }
+            ImportSection::Known(ImportType::ThirdParty) | ImportSection::UserDefined(_) => {
+                Some(Diagnostic::new(
+                    TypingOnlyThirdPartyImport {
+                        full_name: full_name.to_string(),
+                    },
+                    binding.range,
+                ))
+            }
+            ImportSection::Known(ImportType::StandardLibrary) => Some(Diagnostic::new(
                 TypingOnlyStandardLibraryImport {
                     full_name: full_name.to_string(),
                 },
                 binding.range,
             )),
-            ImportType::Future => unreachable!("`__future__` imports should be marked as used"),
+            ImportSection::Known(ImportType::Future) => {
+                unreachable!("`__future__` imports should be marked as used")
+            }
         }
     } else {
         None

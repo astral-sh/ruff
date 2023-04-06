@@ -1019,6 +1019,16 @@
       },
       "additionalProperties": false
     },
+    "ImportSection": {
+      "anyOf": [
+        {
+          "$ref": "#/definitions/ImportType"
+        },
+        {
+          "type": "string"
+        }
+      ]
+    },
     "ImportType": {
       "type": "string",
       "enum": [
@@ -1164,7 +1174,7 @@
             "null"
           ],
           "items": {
-            "$ref": "#/definitions/ImportType"
+            "$ref": "#/definitions/ImportSection"
           }
         },
         "order-by-type": {
@@ -1193,6 +1203,29 @@
           ],
           "items": {
             "type": "string"
+          }
+        },
+        "section-order": {
+          "description": "Override in which order the sections should be output. Can be used to move custom sections.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "$ref": "#/definitions/ImportSection"
+          }
+        },
+        "sections": {
+          "description": "A list of mappings from section names to modules. By default custom sections are output last, but this can be overridden with `section-order`.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
           }
         },
         "single-line-exclusions": {

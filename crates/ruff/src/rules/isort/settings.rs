@@ -1,5 +1,6 @@
 //! Settings for the `isort` plugin.
 
+use rustc_hash::FxHashMap;
 use std::collections::BTreeSet;
 
 use schemars::JsonSchema;
@@ -8,7 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::rules::isort::categorize::KnownModules;
 use ruff_macros::{CacheKey, ConfigurationOptions};
 
-use super::categorize::ImportType;
+use super::categorize::ImportSection;
 
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Serialize, Deserialize, CacheKey, JsonSchema)]
 #[serde(deny_unknown_fields, rename_all = "kebab-case")]
@@ -226,14 +227,14 @@ pub struct Options {
     pub variables: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
-        value_type = r#"list["future" | "standard-library" | "third-party" | "first-party" | "local-folder"]"#,
+        value_type = r#"list[str]"#,
         example = r#"
             no-lines-before = ["future", "standard-library"]
         "#
     )]
     /// A list of sections that should _not_ be delineated from the previous
     /// section via empty lines.
-    pub no_lines_before: Option<Vec<ImportType>>,
+    pub no_lines_before: Option<Vec<ImportSection>>,
     #[option(
         default = r#"-1"#,
         value_type = "int",
@@ -265,6 +266,28 @@ pub struct Options {
     /// A list of modules to separate into auxiliary block(s) of imports,
     /// in the order specified.
     pub forced_separate: Option<Vec<String>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            section-order = ["future", "standard-library", "first-party", "local-folder", "third-party"]
+        "#
+    )]
+    /// Override in which order the sections should be output. Can be used to move custom sections.
+    pub section_order: Option<Vec<ImportSection>>,
+    // Tables are required to go last.
+    #[option(
+        default = "{}",
+        value_type = "dict[str, list[str]]",
+        example = r#"
+            # Group all Django imports into a separate section.
+            [tool.ruff.isort.sections]
+            "django" = ["django"]
+        "#
+    )]
+    /// A list of mappings from section names to modules.
+    /// By default custom sections are output last, but this can be overridden with `section-order`.
+    pub sections: Option<FxHashMap<String, Vec<String>>>,
 }
 
 #[derive(Debug, CacheKey)]
@@ -284,10 +307,11 @@ pub struct Settings {
     pub classes: BTreeSet<String>,
     pub constants: BTreeSet<String>,
     pub variables: BTreeSet<String>,
-    pub no_lines_before: BTreeSet<ImportType>,
+    pub no_lines_before: BTreeSet<ImportSection>,
     pub lines_after_imports: isize,
     pub lines_between_types: usize,
     pub forced_separate: Vec<String>,
+    pub section_order: Vec<ImportSection>,
 }
 
 impl Default for Settings {
@@ -311,6 +335,7 @@ impl Default for Settings {
             lines_after_imports: -1,
             lines_between_types: 0,
             forced_separate: Vec::new(),
+            section_order: Vec::new(),
         }
     }
 }
@@ -329,6 +354,7 @@ impl From<Options> for Settings {
                 options.known_third_party.unwrap_or_default(),
                 options.known_local_folder.unwrap_or_default(),
                 options.extra_standard_library.unwrap_or_default(),
+                options.sections.unwrap_or_default(),
             ),
             order_by_type: options.order_by_type.unwrap_or(true),
             relative_imports_order: options.relative_imports_order.unwrap_or_default(),
@@ -343,6 +369,7 @@ impl From<Options> for Settings {
             lines_after_imports: options.lines_after_imports.unwrap_or(-1),
             lines_between_types: options.lines_between_types.unwrap_or_default(),
             forced_separate: Vec::from_iter(options.forced_separate.unwrap_or_default()),
+            section_order: Vec::from_iter(options.section_order.unwrap_or_default()),
         }
     }
 }
@@ -377,6 +404,15 @@ impl From<Settings> for Options {
             lines_after_imports: Some(settings.lines_after_imports),
             lines_between_types: Some(settings.lines_between_types),
             forced_separate: Some(settings.forced_separate.into_iter().collect()),
+            section_order: Some(settings.section_order.into_iter().collect()),
+            sections: Some(
+                settings
+                    .known_modules
+                    .sections
+                    .into_iter()
+                    .map(|(k, v)| (k, v.into_iter().collect()))
+                    .collect(),
+            ),
         }
     }
 }
