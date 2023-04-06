@@ -5,7 +5,6 @@ use crate::message::{group_messages_by_filename, Emitter, EmitterContext, Messag
 use crate::registry::AsRule;
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
-use colored::control::SHOULD_COLORIZE;
 use colored::Colorize;
 use std::fmt::{Display, Formatter, Write as fmtWrite};
 use std::io::Write;
@@ -146,7 +145,10 @@ impl Display for DisplayGroupedMessage<'_> {
                     fold: false,
                 }],
                 opt: FormatOptions {
-                    color: SHOULD_COLORIZE.should_colorize(),
+                    #[cfg(test)]
+                    color: false,
+                    #[cfg(not(test))]
+                    color: colored::control::SHOULD_COLORIZE.should_colorize(),
                     ..FormatOptions::default()
                 },
             };

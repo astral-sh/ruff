@@ -3,7 +3,6 @@ use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
-use colored::control::SHOULD_COLORIZE;
 use colored::Colorize;
 use ruff_diagnostics::DiagnosticKind;
 use std::fmt::Display;
@@ -94,7 +93,10 @@ impl Emitter for TextEmitter {
                     }],
                     footer,
                     opt: FormatOptions {
-                        color: SHOULD_COLORIZE.should_colorize(),
+                        #[cfg(test)]
+                        color: false,
+                        #[cfg(not(test))]
+                        color: colored::control::SHOULD_COLORIZE.should_colorize(),
                         ..FormatOptions::default()
                     },
                 };

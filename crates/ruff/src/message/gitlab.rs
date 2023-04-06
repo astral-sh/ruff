@@ -124,12 +124,16 @@ mod tests {
 
     #[test]
     fn output() {
-        static FINGERPRINT_HAY_KEY: &str = r#""fingerprint": ""#;
-
         let mut emitter = GitlabEmitter::default();
         let content = capture_emitter_output(&mut emitter, &create_messages());
 
-        // Redact the fingerprint because the default hasher isn't stable across platforms.
+        assert_snapshot!(redact_fingerprint(&content));
+    }
+
+    // Redact the fingerprint because the default hasher isn't stable across platforms.
+    fn redact_fingerprint(content: &str) -> String {
+        static FINGERPRINT_HAY_KEY: &str = r#""fingerprint": ""#;
+
         let mut output = String::with_capacity(content.len());
         let mut last = 0;
 
@@ -137,11 +141,14 @@ mod tests {
             let fingerprint_hash_start = start + FINGERPRINT_HAY_KEY.len();
             output.push_str(&content[last..fingerprint_hash_start]);
             output.push_str("<redacted>");
-            last = fingerprint_hash_start + 16;
+            last = fingerprint_hash_start
+                + content[fingerprint_hash_start..]
+                    .find('"')
+                    .expect("Expected terminating quote");
         }
 
         output.push_str(&content[last..]);
 
-        assert_snapshot!(output);
+        output
     }
 }
