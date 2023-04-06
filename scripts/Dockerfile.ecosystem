@@ -1,3 +1,10 @@
+# [crates](https://github.com/rust-lang/crater) inspired check that tests against a large number of projects, mainly
+# from https://github.com/akx/ruff-usage-aggregate.
+# We run this in a Docker container because ruff isn't designed for untrusted inputs
+#
+# Either download https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl as
+# `github_search.jsonl` or follow the instructions in the readme to scrape your own dataset.
+#
 # From the project root:
 # ```
 # cargo build

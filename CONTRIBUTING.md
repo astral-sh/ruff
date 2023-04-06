@@ -81,6 +81,16 @@ pre-commit run --all-files
 Your Pull Request will be reviewed by a maintainer, which may involve a few rounds of iteration
 prior to merging.
 
+### Ecosystem CI
+
+One GitHub actions job will check your changes against a number of real projects from GitHub and report the differences. You can also run those checks locally:
+
+```shell
+python scripts/check_ecosystem.py path/to/your/ruff path/to/older/ruff
+```
+
+Optionally, it is possible to run a docker container that checks against as many projects from GitHub as possible. To do so grab [known-github-tomls.json](https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl) as `github_search.jsonl` and follow the instructions in [scripts/Dockerfile.ecosystem](scripts/Dockerfile.ecosystem). This will check will take a long time and has high CPU and network usage.
+
 ### Project Structure
 
 Ruff is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
