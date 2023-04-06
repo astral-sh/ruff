@@ -81,16 +81,6 @@ pre-commit run --all-files
 Your Pull Request will be reviewed by a maintainer, which may involve a few rounds of iteration
 prior to merging.
 
-### Ecosystem CI
-
-One GitHub actions job will check your changes against a number of real projects from GitHub and report the differences. You can also run those checks locally:
-
-```shell
-python scripts/check_ecosystem.py path/to/your/ruff path/to/older/ruff
-```
-
-Optionally, it is possible to run a docker container that checks against as many projects from GitHub as possible. To do so grab [known-github-tomls.json](https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl) as `github_search.jsonl` and follow the instructions in [scripts/Dockerfile.ecosystem](scripts/Dockerfile.ecosystem). This will check will take a long time and has high CPU and network usage.
-
 ### Project Structure
 
 Ruff is structured as a monorepo with a [flat crate structure](https://matklad.github.io/2021/08/22/large-rust-workspaces.html),
@@ -224,6 +214,20 @@ them to [PyPI](https://pypi.org/project/ruff/).
 
 Ruff follows the [semver](https://semver.org/) versioning standard. However, as pre-1.0 software,
 even patch releases may contain [non-backwards-compatible changes](https://semver.org/#spec-item-4).
+
+## Ecosystem CI
+
+GitHub Actions will run your changes against a number of real-world projects from GitHub and
+report on any diagnostic differences. You can also run those checks locally via:
+
+```shell
+python scripts/check_ecosystem.py path/to/your/ruff path/to/older/ruff
+```
+
+You can also run the Ecosystem CI check in a Docker container across a larger set of projects by
+downloading the [`known-github-tomls.json`](https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl)
+as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](scripts/Dockerfile.ecosystem).
+Note that this check will take a while to run.
 
 ## Benchmarks
 

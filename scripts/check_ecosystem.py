@@ -6,9 +6,6 @@ Example usage:
     scripts/check_ecosystem.py <path/to/ruff1> <path/to/ruff2>
 """
 
-# ruff: noqa: G004
-# ruff: noqa: T201
-
 import argparse
 import asyncio
 import difflib
@@ -197,19 +194,19 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[str, Repository]:
     repositories = {}
     for line in projects_jsonl.read_text().splitlines():
         data = json.loads(line)
-        # Check which format we got
+        # Check the input format.
         if "items" in data:
             for item in data["items"]:
-                # Pick only the easier case for now
+                # Pick only the easier case for now.
                 if item["path"] != "pyproject.toml":
                     continue
                 repository = item["repository"]
                 assert re.fullmatch(r"[a-zA-Z0-9_.-]+", repository["name"]), repository[
                     "name"
                 ]
-                # :/ GitHub doesn't give us any branch or pure rev info
-                # This would give us the revision, but there's no way with git to just
-                # do `git clone --depth 1` with a specific ref
+                # GitHub doesn't give us any branch or pure rev info.  This would give
+                # us the revision, but there's no way with git to just do
+                # `git clone --depth 1` with a specific ref.
                 # `ref = item["url"].split("?ref=")[1]` would be exact
                 repositories[repository["name"]] = Repository(
                     repository["owner"]["login"],
@@ -218,7 +215,7 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[str, Repository]:
                 )
         else:
             assert "owner" in data, "Unknown ruff-usage-aggregate format"
-            # Pick only the easier case for now
+            # Pick only the easier case for now.
             if data["path"] != "pyproject.toml":
                 continue
             repositories[data["repo"]] = Repository(
@@ -312,9 +309,10 @@ if __name__ == "__main__":
     parser.add_argument(
         "--projects",
         type=Path,
-        help="Optional json files with set of projects from "
-        "https://github.com/akx/ruff-usage-aggregate to use over the default ones "
-        "(supports both github_search_*.jsonl and known-github-tomls.jsonl)",
+        help=(
+            "Optional JSON files to use over the default repositories. "
+            "Supports both github_search_*.jsonl and known-github-tomls.jsonl."
+        ),
     )
     parser.add_argument(
         "-v",
