@@ -1,7 +1,7 @@
 use rustpython_parser::ast::{Arguments, Expr, Stmt, StmtKind};
 
 use ruff_python_ast::cast;
-use ruff_python_ast::visibility;
+use ruff_python_semantic::analyze::visibility;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{Definition, DefinitionKind};

@@ -14,9 +14,10 @@ use similar::TextDiff;
 
 use ruff::fs;
 use ruff::jupyter::{is_jupyter_notebook, JupyterIndex, JupyterNotebook};
-use ruff::linter::{lint_fix, lint_only, FixTable, LinterResult};
+use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
+use ruff_python_ast::imports::ImportMap;
 
 use crate::cache;
 
@@ -24,16 +25,18 @@ use crate::cache;
 pub struct Diagnostics {
     pub messages: Vec<Message>,
     pub fixed: FxHashMap<String, FixTable>,
+    pub imports: ImportMap,
     /// Jupyter notebook indexing table for each input file that is a jupyter notebook
     /// so we can rewrite the diagnostics in the end
     pub jupyter_index: FxHashMap<String, JupyterIndex>,
 }
 
 impl Diagnostics {
-    pub fn new(messages: Vec<Message>) -> Self {
+    pub fn new(messages: Vec<Message>, imports: ImportMap) -> Self {
         Self {
             messages,
             fixed: FxHashMap::default(),
+            imports,
             jupyter_index: FxHashMap::default(),
         }
     }
@@ -42,6 +45,7 @@ impl Diagnostics {
 impl AddAssign for Diagnostics {
     fn add_assign(&mut self, other: Self) {
         self.messages.extend(other.messages);
+        self.imports.extend(other.imports);
         for (filename, fixed) in other.fixed {
             if fixed.is_empty() {
                 continue;
@@ -58,7 +62,7 @@ impl AddAssign for Diagnostics {
 }
 
 /// Returns either an indexed python jupyter notebook or a diagnostic (which is empty if we skip)
-fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Diagnostics> {
+fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Box<Diagnostics>> {
     let notebook = match JupyterNotebook::read(path) {
         Ok(notebook) => {
             if !notebook
@@ -72,13 +76,13 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Diagnost
                     "Skipping {} because it's not a Python notebook",
                     path.display()
                 );
-                return Err(Diagnostics::default());
+                return Err(Box::default());
             }
             notebook
         }
         Err(diagnostic) => {
             // Failed to read the jupyter notebook
-            return Err(Diagnostics {
+            return Err(Box::new(Diagnostics {
                 messages: vec![Message::from_diagnostic(
                     *diagnostic,
                     path.to_string_lossy().to_string(),
@@ -86,7 +90,7 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Diagnost
                     1,
                 )],
                 ..Diagnostics::default()
-            });
+            }));
         }
     };
 
@@ -113,11 +117,11 @@ pub fn lint_path(
         && matches!(autofix, flags::FixMode::None | flags::FixMode::Generate)
     {
         let metadata = path.metadata()?;
-        if let Some(messages) =
+        if let Some((messages, imports)) =
             cache::get(path, package.as_ref(), &metadata, settings, autofix.into())
         {
             debug!("Cache hit for: {}", path.display());
-            return Ok(Diagnostics::new(messages));
+            return Ok(Diagnostics::new(messages, imports));
         }
         Some(metadata)
     } else {
@@ -130,7 +134,7 @@ pub fn lint_path(
     let (contents, jupyter_index) = if is_jupyter_notebook(path) {
         match load_jupyter_notebook(path) {
             Ok((contents, jupyter_index)) => (contents, Some(jupyter_index)),
-            Err(diagnostics) => return Ok(diagnostics),
+            Err(diagnostics) => return Ok(*diagnostics),
         }
     } else {
         (std::fs::read_to_string(path)?, None)
@@ -139,13 +143,16 @@ pub fn lint_path(
     // Lint the file.
     let (
         LinterResult {
-            data: messages,
+            data: (messages, imports),
             error: parse_error,
         },
         fixed,
     ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
-        if let Ok((result, transformed, fixed)) =
-            lint_fix(&contents, path, package, noqa, &settings.lib)
+        if let Ok(FixerResult {
+            result,
+            transformed,
+            fixed,
+        }) = lint_fix(&contents, path, package, noqa, &settings.lib)
         {
             if !fixed.is_empty() {
                 if matches!(autofix, flags::FixMode::Apply) {
@@ -187,6 +194,8 @@ pub fn lint_path(
         (result, fixed)
     };
 
+    let imports = imports.unwrap_or_default();
+
     if let Some(err) = parse_error {
         // Notify the user of any parse errors.
         error!(
@@ -210,6 +219,7 @@ pub fn lint_path(
                 settings,
                 autofix.into(),
                 &messages,
+                &imports,
             );
         }
     }
@@ -231,6 +241,7 @@ pub fn lint_path(
     Ok(Diagnostics {
         messages,
         fixed: FxHashMap::from_iter([(fs::relativize_path(path), fixed)]),
+        imports,
         jupyter_index,
     })
 }
@@ -248,12 +259,16 @@ pub fn lint_stdin(
     // Lint the inputs.
     let (
         LinterResult {
-            data: messages,
+            data: (messages, imports),
             error: parse_error,
         },
         fixed,
     ) = if matches!(autofix, flags::FixMode::Apply | flags::FixMode::Diff) {
-        if let Ok((result, transformed, fixed)) = lint_fix(
+        if let Ok(FixerResult {
+            result,
+            transformed,
+            fixed,
+        }) = lint_fix(
             contents,
             path.unwrap_or_else(|| Path::new("-")),
             package,
@@ -312,6 +327,8 @@ pub fn lint_stdin(
         (result, fixed)
     };
 
+    let imports = imports.unwrap_or_default();
+
     if let Some(err) = parse_error {
         error!(
             "Failed to parse {}: {err}",
@@ -325,6 +342,7 @@ pub fn lint_stdin(
             fs::relativize_path(path.unwrap_or_else(|| Path::new("-"))),
             fixed,
         )]),
+        imports,
         jupyter_index: FxHashMap::default(),
     })
 }
@@ -341,7 +359,7 @@ mod test {
         // No diagnostics is used as skip signal
         assert_eq!(
             load_jupyter_notebook(path).unwrap_err(),
-            Diagnostics::default()
+            Box::<Diagnostics>::default()
         );
     }
 }

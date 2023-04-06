@@ -1,5 +1,6 @@
-use ruff_python_ast::context::Context;
 use rustpython_parser::ast::Expr;
+
+use ruff_python_semantic::context::Context;
 
 /// Return `true` if a Python class appears to be a Django model, based on its base classes.
 pub fn is_model(context: &Context, base: &Expr) -> bool {

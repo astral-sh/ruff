@@ -6,7 +6,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
-use crate::autofix::helpers::remove_argument;
+use crate::autofix::actions::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 

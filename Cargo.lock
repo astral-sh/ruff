@@ -774,7 +774,7 @@ checksum = "0ce7134b9999ecaf8bcd65542e436736ef32ddca1b3e06094cb6ec5755203b80"
 
 [[package]]
 name = "flake8-to-ruff"
-version = "0.0.260"
+version = "0.0.261"
 dependencies = [
  "anyhow",
  "clap 4.1.8",
@@ -1977,7 +1977,7 @@ dependencies = [
 
 [[package]]
 name = "ruff"
-version = "0.0.260"
+version = "0.0.261"
 dependencies = [
  "anyhow",
  "bitflags",
@@ -2010,6 +2010,7 @@ dependencies = [
  "ruff_diagnostics",
  "ruff_macros",
  "ruff_python_ast",
+ "ruff_python_semantic",
  "ruff_python_stdlib",
  "ruff_rustpython",
  "rustc-hash",
@@ -2059,7 +2060,7 @@ dependencies = [
 
 [[package]]
 name = "ruff_cli"
-version = "0.0.260"
+version = "0.0.261"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
@@ -2087,6 +2088,7 @@ dependencies = [
  "ruff",
  "ruff_cache",
  "ruff_diagnostics",
+ "ruff_python_ast",
  "ruff_python_stdlib",
  "rustc-hash",
  "serde",
@@ -2169,16 +2171,15 @@ dependencies = [
  "is-macro",
  "itertools",
  "log",
- "nohash-hasher",
  "num-bigint",
  "num-traits",
  "once_cell",
  "regex",
- "ruff_python_stdlib",
  "ruff_rustpython",
  "rustc-hash",
  "rustpython-common",
  "rustpython-parser",
+ "serde",
  "smallvec",
 ]
 
@@ -2194,7 +2195,6 @@ dependencies = [
  "once_cell",
  "ruff_formatter",
  "ruff_python_ast",
- "ruff_python_stdlib",
  "ruff_rustpython",
  "ruff_testing_macros",
  "ruff_text_size",
@@ -2203,6 +2203,20 @@ dependencies = [
  "rustpython-parser",
  "similar",
  "test-case",
+]
+
+[[package]]
+name = "ruff_python_semantic"
+version = "0.0.0"
+dependencies = [
+ "bitflags",
+ "is-macro",
+ "nohash-hasher",
+ "ruff_python_ast",
+ "ruff_python_stdlib",
+ "rustc-hash",
+ "rustpython-parser",
+ "smallvec",
 ]
 
 [[package]]

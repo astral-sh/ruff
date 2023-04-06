@@ -6,7 +6,6 @@ use rustpython_parser::ast::{Cmpop, Expr};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers;
-use ruff_python_ast::operations::locate_cmpops;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -60,7 +59,7 @@ pub fn invalid_literal_comparison(
     comparators: &[Expr],
     location: Range,
 ) {
-    let located = Lazy::new(|| locate_cmpops(checker.locator.slice(location)));
+    let located = Lazy::new(|| helpers::locate_cmpops(checker.locator.slice(location)));
     let mut left = left;
     for (index, (op, right)) in izip!(ops, comparators).enumerate() {
         if matches!(op, Cmpop::Is | Cmpop::IsNot)

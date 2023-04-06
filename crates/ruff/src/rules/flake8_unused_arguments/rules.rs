@@ -5,10 +5,11 @@ use rustpython_parser::ast::{Arg, Arguments};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::function_type;
-use ruff_python_ast::function_type::FunctionType;
-use ruff_python_ast::scope::{Bindings, FunctionDef, Lambda, Scope, ScopeKind};
-use ruff_python_ast::visibility;
+use ruff_python_semantic::analyze::function_type;
+use ruff_python_semantic::analyze::function_type::FunctionType;
+use ruff_python_semantic::analyze::visibility;
+use ruff_python_semantic::binding::Bindings;
+use ruff_python_semantic::scope::{FunctionDef, Lambda, Scope, ScopeKind};
 
 use crate::checkers::ast::Checker;
 

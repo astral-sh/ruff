@@ -30,6 +30,11 @@ except (ValueError, *(RuntimeError, (KeyError, TypeError))):  # error
 
 try:
     pass
+except (*a, *(RuntimeError, (KeyError, TypeError))):  # error
+    pass
+
+try:
+    pass
 except (ValueError, *(RuntimeError, TypeError)):  # ok
     pass
 
@@ -38,8 +43,34 @@ try:
 except (ValueError, *[RuntimeError, *(TypeError,)]):  # ok
     pass
 
+
+try:
+    pass
+except (*a, *b):  # ok
+    pass
+
+
+try:
+    pass
+except (*a, *(RuntimeError, TypeError)):  # ok
+    pass
+
+
+try:
+    pass
+except (*a, *(b, c)):  # ok
+    pass
+
+
+try:
+    pass
+except (*a, *(*b, *c)):  # ok
+    pass
+
+
 def what_to_catch():
     return ...
+
 
 try:
     pass

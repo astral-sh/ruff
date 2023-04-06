@@ -2,14 +2,11 @@ use rustpython_parser::ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::format_call_path;
+use ruff_python_ast::call_path::{format_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
-
-use super::types::DebuggerUsingType;
-
-// flake8-debugger
+use crate::rules::flake8_debugger::types::DebuggerUsingType;
 
 #[violation]
 pub struct Debugger {
@@ -70,9 +67,12 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
     }
 
     if let Some(module) = module {
-        let mut call_path = module.split('.').collect::<Vec<_>>();
+        let mut call_path: CallPath = from_unqualified_name(module);
         call_path.push(name);
-        if DEBUGGERS.iter().any(|target| call_path == **target) {
+        if DEBUGGERS
+            .iter()
+            .any(|target| call_path.as_slice() == *target)
+        {
             return Some(Diagnostic::new(
                 Debugger {
                     using_type: DebuggerUsingType::Import(format_call_path(&call_path)),
@@ -81,10 +81,10 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
             ));
         }
     } else {
-        let parts = name.split('.').collect::<Vec<_>>();
+        let parts: CallPath = from_unqualified_name(name);
         if DEBUGGERS
             .iter()
-            .any(|call_path| call_path[..call_path.len() - 1] == parts)
+            .any(|call_path| &call_path[..call_path.len() - 1] == parts.as_slice())
         {
             return Some(Diagnostic::new(
                 Debugger {

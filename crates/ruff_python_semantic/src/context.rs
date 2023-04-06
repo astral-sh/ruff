@@ -1,35 +1,37 @@
 use std::path::Path;
 
 use nohash_hasher::{BuildNoHashHasher, IntMap};
+use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
+use ruff_python_ast::helpers::from_relative_import;
+use ruff_python_ast::types::RefEquality;
+use ruff_python_ast::typing::AnnotationKind;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
 
+use crate::analyze::visibility::{module_visibility, Modifier, VisibleScope};
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
-use crate::helpers::{collect_call_path, from_relative_import};
-use crate::scope::{
+use crate::binding::{
     Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
-    Importation, Scope, ScopeId, ScopeKind, ScopeStack, Scopes, SubmoduleImportation,
+    Importation, SubmoduleImportation,
 };
-use crate::types::{CallPath, RefEquality};
-use crate::typing::AnnotationKind;
-use crate::visibility::{module_visibility, Modifier, VisibleScope};
+use crate::scope::{Scope, ScopeId, ScopeKind, ScopeStack, Scopes};
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Context<'a> {
     pub typing_modules: &'a [String],
     pub module_path: Option<Vec<String>>,
-    // Retain all scopes and parent nodes, along with a stack of indexes to track which are active
+    // Retain all scopes and parent nodes, along with a stack of indices to track which are active
     // at various points in time.
     pub parents: Vec<RefEquality<'a, Stmt>>,
     pub depths: FxHashMap<RefEquality<'a, Stmt>, usize>,
     pub child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
     // A stack of all bindings created in any scope, at any point in execution.
     pub bindings: Bindings<'a>,
-    // Map from binding index to indexes of bindings that redefine it in other scopes.
-    pub redefinitions:
+    // Map from binding index to indexes of bindings that shadow it in other scopes.
+    pub shadowed_bindings:
         std::collections::HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
     pub exprs: Vec<RefEquality<'a, Expr>>,
     pub scopes: Scopes<'a>,
@@ -61,6 +63,7 @@ impl<'a> Context<'a> {
         path: &'a Path,
         module_path: Option<Vec<String>>,
     ) -> Self {
+        let visibility = module_visibility(module_path.as_deref(), path);
         Self {
             typing_modules,
             module_path,
@@ -68,7 +71,7 @@ impl<'a> Context<'a> {
             depths: FxHashMap::default(),
             child_to_parent: FxHashMap::default(),
             bindings: Bindings::default(),
-            redefinitions: IntMap::default(),
+            shadowed_bindings: IntMap::default(),
             exprs: Vec::default(),
             scopes: Scopes::default(),
             scope_stack: ScopeStack::default(),
@@ -77,7 +80,7 @@ impl<'a> Context<'a> {
             body_index: 0,
             visible_scope: VisibleScope {
                 modifier: Modifier::Module,
-                visibility: module_visibility(path),
+                visibility,
             },
             in_annotation: false,
             in_type_definition: false,
@@ -115,7 +118,7 @@ impl<'a> Context<'a> {
         }
 
         if self.typing_modules.iter().any(|module| {
-            let mut module: CallPath = module.split('.').collect();
+            let mut module: CallPath = from_unqualified_name(module);
             module.push(target);
             *call_path == module
         }) {
@@ -154,7 +157,9 @@ impl<'a> Context<'a> {
     where
         'b: 'a,
     {
-        let call_path = collect_call_path(value);
+        let Some(call_path) = collect_call_path(value) else {
+            return None;
+        };
         let Some(head) = call_path.first() else {
             return None;
         };
@@ -175,7 +180,7 @@ impl<'a> Context<'a> {
                         None
                     }
                 } else {
-                    let mut source_path: CallPath = name.split('.').collect();
+                    let mut source_path: CallPath = from_unqualified_name(name);
                     source_path.extend(call_path.into_iter().skip(1));
                     Some(source_path)
                 }
@@ -192,7 +197,7 @@ impl<'a> Context<'a> {
                         None
                     }
                 } else {
-                    let mut source_path: CallPath = name.split('.').collect();
+                    let mut source_path: CallPath = from_unqualified_name(name);
                     source_path.extend(call_path.into_iter().skip(1));
                     Some(source_path)
                 }

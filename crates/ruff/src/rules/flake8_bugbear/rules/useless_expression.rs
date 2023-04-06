@@ -54,7 +54,7 @@ pub fn useless_expression(checker: &mut Checker, value: &Expr) {
     }
 
     // Ignore statements that have side effects.
-    if contains_effect(&checker.ctx, value) {
+    if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
         // Flag attributes as useless expressions, even if they're attached to calls or other
         // expressions.
         if matches!(value.node, ExprKind::Attribute { .. }) {

@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, ExprKind, Location};
+use rustpython_parser::{lexer, Mode, StringKind, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::find_useless_f_strings;
+use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
@@ -45,6 +46,45 @@ impl AlwaysAutofixableViolation for FStringMissingPlaceholders {
     fn autofix_title(&self) -> String {
         "Remove extraneous `f` prefix".to_string()
     }
+}
+
+/// Find f-strings that don't contain any formatted values in a `JoinedStr`.
+fn find_useless_f_strings<'a>(
+    expr: &'a Expr,
+    locator: &'a Locator,
+) -> impl Iterator<Item = (Range, Range)> + 'a {
+    let contents = locator.slice(expr);
+    lexer::lex_located(contents, Mode::Module, expr.location)
+        .flatten()
+        .filter_map(|(location, tok, end_location)| match tok {
+            Tok::String {
+                kind: StringKind::FString | StringKind::RawFString,
+                ..
+            } => {
+                let first_char = locator.slice(Range {
+                    location,
+                    end_location: Location::new(location.row(), location.column() + 1),
+                });
+                // f"..."  => f_position = 0
+                // fr"..." => f_position = 0
+                // rf"..." => f_position = 1
+                let f_position = usize::from(!(first_char == "f" || first_char == "F"));
+                Some((
+                    Range {
+                        location: Location::new(location.row(), location.column() + f_position),
+                        end_location: Location::new(
+                            location.row(),
+                            location.column() + f_position + 1,
+                        ),
+                    },
+                    Range {
+                        location,
+                        end_location,
+                    },
+                ))
+            }
+            _ => None,
+        })
 }
 
 fn unescape_f_string(content: &str) -> String {
