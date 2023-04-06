@@ -184,7 +184,9 @@ pub fn invalid_string_characters(
     let text = locator.slice(Range::new(start, end));
 
     for (row, line) in UniversalNewlineIterator::from(text).enumerate() {
-        for (column, match_) in line.match_indices(&['\x08', '\x1A', '\x1B', '\0', '\u{200b}']) {
+        for (column_bytes, match_) in
+            line.match_indices(&['\x08', '\x1A', '\x1B', '\0', '\u{200b}'])
+        {
             let (replacement, rule): (&str, DiagnosticKind) = match match_.chars().next().unwrap() {
                 '\x08' => ("\\b", InvalidCharacterBackspace.into()),
                 '\x1A' => ("\\x1A", InvalidCharacterSub.into()),
@@ -193,7 +195,8 @@ pub fn invalid_string_characters(
                 '\u{200b}' => ("\\u200b", InvalidCharacterZeroWidthSpace.into()),
                 _ => unreachable!(),
             };
-            let location = helpers::to_absolute(Location::new(row + 1, column), start);
+            let column_chars = line[..column_bytes].chars().count();
+            let location = helpers::to_absolute(Location::new(row + 1, column_chars), start);
             let end_location = Location::new(location.row(), location.column() + 1);
             let mut diagnostic = Diagnostic::new(rule, Range::new(location, end_location));
             if autofix {
