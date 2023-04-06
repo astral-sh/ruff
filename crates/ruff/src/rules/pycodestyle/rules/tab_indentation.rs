@@ -15,59 +15,40 @@ impl Violation for TabIndentation {
     }
 }
 
-/// `string_lines` is parsed from top to bottom during the tokenization phase, and we know that the
-/// strings aren't overlapping (otherwise there'd only be one string). This function performs a
-/// binary search on `string_lines` to find the string range that contains lineno
-fn is_line_in_string(lineno: usize, string_lines: &[Range]) -> Option<&Range> {
-    let mut low = 0;
-    let mut high = string_lines.len();
-
-    while low < high {
-        let middle = low + (high - low) / 2;
-
-        let curr = &string_lines[middle];
-        let start = curr.location.row();
-        let end = curr.end_location.row();
-
-        if start <= lineno && lineno <= end {
-            return Some(curr);
-        } else if start > lineno {
-            high = middle;
-        } else if end < lineno {
-            low = middle + 1;
-        }
-    }
-
-    None
-}
-
 /// W191
-pub fn tab_indentation(lineno: usize, line: &str, string_lines: &[Range]) -> Option<Diagnostic> {
+pub fn tab_indentation(lineno: usize, line: &str, string_ranges: &[Range]) -> Option<Diagnostic> {
     let indent = leading_space(line);
-
     if let Some(tab_index) = indent.find('\t') {
-        // If the tab character is contained in a string, don't raise a violation
-        if let Some(string_range) = is_line_in_string(lineno, string_lines) {
+        // If the tab character is within a multi-line string, abort.
+        if let Ok(range_index) = string_ranges.binary_search_by(|range| {
+            let start = range.location.row();
+            let end = range.end_location.row();
+            if start > lineno {
+                std::cmp::Ordering::Greater
+            } else if end < lineno {
+                std::cmp::Ordering::Less
+            } else {
+                std::cmp::Ordering::Equal
+            }
+        }) {
+            let string_range = &string_ranges[range_index];
             let start = string_range.location;
             let end = string_range.end_location;
 
-            // Tab is contained in the string range by virtue of lines
+            // Tab is contained in the string range by virtue of lines.
             if lineno != start.row() && lineno != end.row() {
                 return None;
             }
 
-            // if the tab occurs on the start/end row, we'll skip throwing a diagnostic if it occurs inside
-            // the subset of the line that's in quotes
-            let line_is_start = lineno == start.row();
-            let line_is_end = lineno == end.row();
-            // Tab bounded by start/end quotes on the same line. Putting this first means that it
-            // won't short-circuit other evaluations
-            if (line_is_start && line_is_end && start.column() < tab_index && tab_index < end.column())
-                // tab on first line of quoted range, inside of quote
-                || (line_is_start && start.column() < tab_index)
-                // tab on last line of quoted range, inside of quote 
-                || (line_is_end && tab_index < end.column())
-            {
+            let tab_column = line[..tab_index].chars().count();
+
+            // Tab on first line of the quoted range, following the quote.
+            if lineno == start.row() && tab_column > start.column() {
+                return None;
+            }
+
+            // Tab on last line of the quoted range, preceding the quote.
+            if lineno == end.row() && tab_column < end.column() {
                 return None;
             }
         }
@@ -81,51 +62,5 @@ pub fn tab_indentation(lineno: usize, line: &str, string_lines: &[Range]) -> Opt
         ))
     } else {
         None
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    fn get_string_lines() -> Vec<Range> {
-        vec![
-            Range::new(Location::new(1, 0), Location::new(3, 0)),
-            Range::new(Location::new(5, 0), Location::new(5, 0)),
-            Range::new(Location::new(8, 0), Location::new(10, 0)),
-        ]
-    }
-
-    #[test]
-    // string contains lineno - returns string range with line
-    fn test_find_closest_string_contains() {
-        let string_lines = get_string_lines();
-
-        let expected = Some(&string_lines[0]);
-        let actual = is_line_in_string(2usize, &string_lines);
-        assert_eq!(expected, actual);
-
-        let expected = Some(&string_lines[0]);
-        let actual = is_line_in_string(3usize, &string_lines);
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    // string doesn't contain lineno - returns closest string range
-    fn test_find_closest_string_not_found() {
-        let string_lines = get_string_lines();
-
-        let expected = None;
-        let actual = is_line_in_string(6usize, &string_lines);
-        assert_eq!(expected, actual);
-
-        let expected = None;
-        let actual = is_line_in_string(11usize, &string_lines);
-        assert_eq!(expected, actual);
-    }
-
-    #[test]
-    fn test_find_closest_string_empty_array() {
-        assert_eq!(None, is_line_in_string(1usize, &[]));
     }
 }

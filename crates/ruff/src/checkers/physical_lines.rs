@@ -58,7 +58,7 @@ pub fn check_physical_lines(
     let mut commented_lines_iter = indexer.commented_lines().iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
 
-    let string_lines = indexer.string_lines();
+    let string_lines = indexer.string_ranges();
 
     for (index, line) in locator.contents().universal_newlines().enumerate() {
         while commented_lines_iter

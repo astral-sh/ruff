@@ -99,7 +99,7 @@ if os.path.exists(os.path.join(path, PEP8_BIN)):
 	       self._pep8_options(targetfile))
 #: W191 - okay
 '''
-    multiline string with tab in it'''
+	multiline string with tab in it'''
 #: E101 (W191 okay)
 '''multiline string
 	with tabs
@@ -143,8 +143,9 @@ x = [
 	'abc'
 ]
 #: W191 - okay
-'''     multiline string with tab in it, same lines'''
-"""     here we're using '''different delimiters'''"""
+'''	multiline string with tab in it, same lines'''
+"""	here we're using '''different delimiters'''"""
 '''
 	multiline string with tab in it, different lines
 '''
+"	single line string with tab in it"
