@@ -68,13 +68,12 @@ impl From<&[LexResult]> for Indexer {
 
 #[cfg(test)]
 mod tests {
-
-    use crate::types::Range;
     use rustpython_parser::ast::Location;
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
     use crate::source_code::Indexer;
+    use crate::types::Range;
 
     #[test]
     fn continuation() {
