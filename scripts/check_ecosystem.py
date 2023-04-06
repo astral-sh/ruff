@@ -56,7 +56,7 @@ class Repository(NamedTuple):
             if self.ref:
                 git_command.extend(["--branch", self.ref])
 
-          	git_command.extend(
+            git_command.extend(
                 [
                     f"https://github.com/{self.org}/{self.repo}",
                     tmpdir,
