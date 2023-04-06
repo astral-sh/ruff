@@ -221,6 +221,23 @@ fn is_valid_default_value_with_annotation(
     false
 }
 
+pub fn is_type_var_call(checker: &Checker, expr: &Expr) -> bool {
+    let ExprKind::Call {func, ..} = &expr.node else {
+        return false;
+    };
+    checker
+        .ctx
+        .resolve_call_path(func)
+        .map_or(false, |call_path| {
+            call_path.as_slice() == ["typing", "TypeVar"]
+                || call_path.as_slice() == ["typing", "TypeVarTuple"]
+                || call_path.as_slice() == ["typing_extensions", "TypeVarTuple"]
+                || call_path.as_slice() == ["typing", "NewType"]
+                || call_path.as_slice() == ["typing", "ParamSpec"]
+                || call_path.as_slice() == ["typing_extensions", "ParamSpec"]
+        })
+}
+
 /// PYI011
 pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
     if !args.defaults.is_empty() {
@@ -340,6 +357,9 @@ pub fn assignment_default_in_stub(checker: &mut Checker, value: &Expr, annotatio
     if annotation.map_or(false, |annotation| {
         checker.ctx.match_typing_expr(annotation, "TypeAlias")
     }) {
+        return;
+    }
+    if is_type_var_call(checker, value) {
         return;
     }
     if !is_valid_default_value_with_annotation(value, checker, true) {

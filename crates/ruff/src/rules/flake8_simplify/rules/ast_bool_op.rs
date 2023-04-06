@@ -11,9 +11,9 @@ use rustpython_parser::ast::{
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers::{contains_effect, create_expr, has_comments, unparse_expr};
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -213,7 +213,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
             } else {
                 unreachable!("Indices should only contain `isinstance` calls")
             };
-            let fixable = !contains_effect(&checker.ctx, target);
+            let fixable = !contains_effect(target, |id| checker.ctx.is_builtin(id));
             let mut diagnostic = Diagnostic::new(
                 DuplicateIsinstanceCall {
                     name: if let ExprKind::Name { id, .. } = &target.node {
@@ -341,7 +341,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         // Avoid rewriting (e.g.) `a == "foo" or a == f()`.
         if comparators
             .iter()
-            .any(|expr| contains_effect(&checker.ctx, expr))
+            .any(|expr| contains_effect(expr, |id| checker.ctx.is_builtin(id)))
         {
             continue;
         }
@@ -423,7 +423,7 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(&checker.ctx, expr) {
+    if contains_effect(expr, |id| checker.ctx.is_builtin(id)) {
         return;
     }
 
@@ -477,7 +477,7 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(&checker.ctx, expr) {
+    if contains_effect(expr, |id| checker.ctx.is_builtin(id)) {
         return;
     }
 
@@ -522,7 +522,7 @@ pub fn is_short_circuit(
     let mut location = expr.location;
     for (value, next_value) in values.iter().tuple_windows() {
         // Keep track of the location of the furthest-right, non-effectful expression.
-        if contains_effect(ctx, value) {
+        if contains_effect(value, |id| ctx.is_builtin(id)) {
             location = next_value.location;
             continue;
         }

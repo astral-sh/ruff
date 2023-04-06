@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
-use ruff_python_ast::visibility::{is_abstract, is_overload};
+use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;

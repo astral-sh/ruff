@@ -33,7 +33,7 @@ fn flatten_starred_iterables(expr: &Expr) -> Vec<&Expr> {
                 ExprKind::Tuple { elts, .. } | ExprKind::List { elts, .. } => {
                     exprs_to_process.append(&mut elts.iter().collect());
                 }
-                _ => flattened_exprs.push(expr),
+                _ => flattened_exprs.push(value),
             },
             _ => flattened_exprs.push(expr),
         }
@@ -48,12 +48,17 @@ pub fn except_with_non_exception_classes(checker: &mut Checker, excepthandler: &
         return;
     };
     for expr in flatten_starred_iterables(type_) {
-        match expr.node {
-            ExprKind::Attribute { .. } | ExprKind::Name { .. } | ExprKind::Call { .. } => (),
-            _ => checker.diagnostics.push(Diagnostic::new(
+        if !matches!(
+            &expr.node,
+            ExprKind::Subscript { .. }
+                | ExprKind::Attribute { .. }
+                | ExprKind::Name { .. }
+                | ExprKind::Call { .. },
+        ) {
+            checker.diagnostics.push(Diagnostic::new(
                 ExceptWithNonExceptionClasses,
                 Range::from(expr),
-            )),
+            ));
         }
     }
 }

@@ -11,7 +11,7 @@ use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
-use crate::autofix::helpers::remove_argument;
+use crate::autofix::actions::remove_argument;
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
 

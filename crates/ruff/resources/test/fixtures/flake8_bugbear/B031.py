@@ -78,6 +78,71 @@ for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
     for shopper in shoppers:
         collect_shop_items(shopper, section_items)  # B031
 
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    _ = [collect_shop_items(shopper, section_items) for shopper in shoppers]  # B031
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    # The variable is overridden, skip checking.
+    _ = [_ for section_items in range(3)]
+    _ = [collect_shop_items(shopper, section_items) for shopper in shoppers]
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    _ = [item for item in section_items]
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    # The iterator is being used for the second time.
+    _ = [(item1, item2) for item1 in section_items for item2 in section_items]  # B031
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    if _section == "greens":
+        collect_shop_items(shopper, section_items)
+    else:
+        collect_shop_items(shopper, section_items)
+        collect_shop_items(shopper, section_items)  # B031
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    # Mutually exclusive branches shouldn't trigger the warning
+    if _section == "greens":
+        collect_shop_items(shopper, section_items)
+        if _section == "greens":
+            collect_shop_items(shopper, section_items)  # B031
+        elif _section == "frozen items":
+            collect_shop_items(shopper, section_items)  # B031
+        else:
+            collect_shop_items(shopper, section_items)  # B031
+        collect_shop_items(shopper, section_items)  # B031
+    elif _section == "frozen items":
+        # Mix `match` and `if` statements
+        match shopper:
+            case "Jane":
+                collect_shop_items(shopper, section_items)
+                if _section == "fourth":
+                    collect_shop_items(shopper, section_items)  # B031
+            case _:
+                collect_shop_items(shopper, section_items)
+    else:
+        collect_shop_items(shopper, section_items)
+    # Now, it should detect
+    collect_shop_items(shopper, section_items)  # B031
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    # Mutually exclusive branches shouldn't trigger the warning
+    match _section:
+        case "greens":
+            collect_shop_items(shopper, section_items)
+            match shopper:
+                case "Jane":
+                    collect_shop_items(shopper, section_items)  # B031
+                case _:
+                    collect_shop_items(shopper, section_items)  # B031
+        case "frozen items":
+            collect_shop_items(shopper, section_items)
+            collect_shop_items(shopper, section_items)  # B031
+        case _:
+            collect_shop_items(shopper, section_items)
+    # Now, it should detect
+    collect_shop_items(shopper, section_items)  # B031
+
 for group in groupby(items, key=lambda p: p[1]):
     # This is bad, but not detected currently
     collect_shop_items("Jane", group[1])

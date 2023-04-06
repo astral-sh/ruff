@@ -16,7 +16,7 @@ use ruff_python_ast::helpers::{any_over_expr, create_expr, match_trailing_commen
 use ruff_python_ast::types::{Range, RefEquality};
 use ruff_python_stdlib::identifiers::is_identifier;
 
-use crate::autofix::helpers::delete_stmt;
+use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::message::Location;
 use crate::registry::AsRule;

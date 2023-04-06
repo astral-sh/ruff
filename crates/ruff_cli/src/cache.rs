@@ -10,6 +10,7 @@ use path_absolutize::Absolutize;
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff_cache::{CacheKey, CacheKeyHasher};
+use ruff_python_ast::imports::ImportMap;
 use serde::{Deserialize, Serialize};
 #[cfg(unix)]
 use std::os::unix::fs::PermissionsExt;
@@ -19,11 +20,13 @@ const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 #[derive(Serialize)]
 struct CheckResultRef<'a> {
     messages: &'a [Message],
+    imports: &'a ImportMap,
 }
 
 #[derive(Deserialize)]
 struct CheckResult {
     messages: Vec<Message>,
+    imports: ImportMap,
 }
 
 fn content_dir() -> &'static Path {
@@ -95,14 +98,14 @@ pub fn get<P: AsRef<Path>>(
     metadata: &fs::Metadata,
     settings: &AllSettings,
     autofix: flags::Autofix,
-) -> Option<Vec<Message>> {
+) -> Option<(Vec<Message>, ImportMap)> {
     let encoded = read_sync(
         &settings.cli.cache_dir,
         cache_key(path, package, metadata, &settings.lib, autofix),
     )
     .ok()?;
     match bincode::deserialize::<CheckResult>(&encoded[..]) {
-        Ok(CheckResult { messages }) => Some(messages),
+        Ok(CheckResult { messages, imports }) => Some((messages, imports)),
         Err(e) => {
             error!("Failed to deserialize encoded cache entry: {e:?}");
             None
@@ -118,8 +121,9 @@ pub fn set<P: AsRef<Path>>(
     settings: &AllSettings,
     autofix: flags::Autofix,
     messages: &[Message],
+    imports: &ImportMap,
 ) {
-    let check_result = CheckResultRef { messages };
+    let check_result = CheckResultRef { messages, imports };
     if let Err(e) = write_sync(
         &settings.cli.cache_dir,
         cache_key(path, package, metadata, &settings.lib, autofix),

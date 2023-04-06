@@ -11,7 +11,7 @@ use ruff_python_ast::types::Range;
 use crate::linter::FixTable;
 use crate::registry::{AsRule, Rule};
 
-pub mod helpers;
+pub mod actions;
 
 /// Auto-fix errors in a file, and write the fixed source code to disk.
 pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String, FixTable)> {

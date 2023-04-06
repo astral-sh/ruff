@@ -11,7 +11,7 @@ use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::{Range, RefEquality};
 use ruff_python_ast::whitespace::indentation;
 
-use crate::autofix::helpers::delete_stmt;
+use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::pyupgrade::fixes::adjust_indentation;

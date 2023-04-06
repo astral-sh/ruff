@@ -215,6 +215,20 @@ them to [PyPI](https://pypi.org/project/ruff/).
 Ruff follows the [semver](https://semver.org/) versioning standard. However, as pre-1.0 software,
 even patch releases may contain [non-backwards-compatible changes](https://semver.org/#spec-item-4).
 
+## Ecosystem CI
+
+GitHub Actions will run your changes against a number of real-world projects from GitHub and
+report on any diagnostic differences. You can also run those checks locally via:
+
+```shell
+python scripts/check_ecosystem.py path/to/your/ruff path/to/older/ruff
+```
+
+You can also run the Ecosystem CI check in a Docker container across a larger set of projects by
+downloading the [`known-github-tomls.json`](https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl)
+as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](scripts/Dockerfile.ecosystem).
+Note that this check will take a while to run.
+
 ## Benchmarks
 
 First, clone [CPython](https://github.com/python/cpython). It's a large and diverse Python codebase,

@@ -322,6 +322,7 @@ ruff_macros::register_rules!(
     rules::flake8_simplify::rules::ExprAndFalse,
     rules::flake8_simplify::rules::YodaConditions,
     rules::flake8_simplify::rules::IfElseBlockInsteadOfDictGet,
+    rules::flake8_simplify::rules::DictGetWithNoneDefault,
     // pyupgrade
     rules::pyupgrade::rules::UselessMetaclassType,
     rules::pyupgrade::rules::TypeOfPrimitive,

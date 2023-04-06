@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.260"
+version = "0.0.261"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -18,6 +18,7 @@ ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
 ruff_macros = { path = "../ruff_macros" }
 ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_semantic = { path = "../ruff_python_semantic" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_rustpython = { path = "../ruff_rustpython" }
 
@@ -37,7 +38,7 @@ itertools = { workspace = true }
 libcst = { workspace = true }
 log = { workspace = true }
 natord = { version = "1.0.9" }
-nohash-hasher = { version = "0.2.0" }
+nohash-hasher = { workspace = true }
 num-bigint = { version = "0.4.3" }
 num-traits = { version = "0.2.15" }
 once_cell = { workspace = true }
@@ -57,7 +58,7 @@ semver = { version = "1.0.16" }
 serde = { workspace = true }
 serde_json = { workspace = true }
 shellexpand = { workspace = true }
-smallvec = { version = "1.10.0" }
+smallvec = { workspace = true }
 strum = { workspace = true }
 strum_macros = { workspace = true }
 textwrap = { workspace = true }
