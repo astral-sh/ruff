@@ -742,6 +742,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         // Reserved: (Flynt, "001") => Rule::StringConcatenationToFString,
         (Flynt, "002") => Rule::StaticJoinToFString,
 
+        // flake8-todo
+        (Flake8Todo, "001") => Rule::InvalidTODOTag,
+        (Flake8Todo, "002") => Rule::TODOMissingAuthor,
+        (Flake8Todo, "004") => Rule::TODOMissingColon,
+        (Flake8Todo, "005") => Rule::TODOMissingText,
+        (Flake8Todo, "007") => Rule::TODOMissingSpaceAfterColon,
         _ => return None,
     })
 }

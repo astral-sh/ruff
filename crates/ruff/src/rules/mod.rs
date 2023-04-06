@@ -29,6 +29,7 @@ pub mod flake8_return;
 pub mod flake8_self;
 pub mod flake8_simplify;
 pub mod flake8_tidy_imports;
+pub mod flake8_todo;
 pub mod flake8_type_checking;
 pub mod flake8_unused_arguments;
 pub mod flake8_use_pathlib;

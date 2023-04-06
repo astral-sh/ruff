@@ -673,6 +673,12 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::DjangoNonLeadingReceiverDecorator,
     // flynt
     rules::flynt::rules::StaticJoinToFString,
+    // flake8-todo
+    rules::flake8_todo::rules::InvalidTODOTag,
+    rules::flake8_todo::rules::TODOMissingAuthor,
+    rules::flake8_todo::rules::TODOMissingColon,
+    rules::flake8_todo::rules::TODOMissingSpaceAfterColon,
+    rules::flake8_todo::rules::TODOMissingText,
 );
 
 pub trait AsRule {
@@ -813,6 +819,9 @@ pub enum Linter {
     /// [flake8-use-pathlib](https://pypi.org/project/flake8-use-pathlib/)
     #[prefix = "PTH"]
     Flake8UsePathlib,
+    /// [flake8-todos](https://github.com/orsinium-labs/flake8-todos/)
+    #[prefix = "T"]
+    Flake8Todo,
     /// [eradicate](https://pypi.org/project/eradicate/)
     #[prefix = "ERA"]
     Eradicate,
@@ -937,7 +946,12 @@ impl Rule {
             | Rule::UselessSemicolon
             | Rule::MultipleStatementsOnOneLineSemicolon
             | Rule::ProhibitedTrailingComma
-            | Rule::TypeCommentInStub => LintSource::Tokens,
+            | Rule::TypeCommentInStub
+            | Rule::InvalidTODOTag
+            | Rule::TODOMissingAuthor
+            | Rule::TODOMissingSpaceAfterColon
+            | Rule::TODOMissingText
+            | Rule::TODOMissingColon => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
