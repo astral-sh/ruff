@@ -15,12 +15,12 @@ expression: diagnostics
     column: 0
   fix:
     edits:
-      - content: "from __future__ import annotations\n\nimport datetime\nimport json\n\n\nfrom binascii import hexlify\n\nimport requests\n\n\nfrom loguru import Logger\nfrom sanic import Sanic\n\nfrom . import config\nfrom .data import Data\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 17
           column: 0
+        content: "from __future__ import annotations\n\nimport datetime\nimport json\n\n\nfrom binascii import hexlify\n\nimport requests\n\n\nfrom loguru import Logger\nfrom sanic import Sanic\n\nfrom . import config\nfrom .data import Data\n"
   parent: ~
 

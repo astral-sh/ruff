@@ -15,13 +15,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "[1, 2, 3, *foo]"
-        location:
+      - location:
           row: 10
           column: 6
         end_location:
           row: 10
           column: 21
+        content: "[1, 2, 3, *foo]"
   parent: ~
 - kind:
     name: CollectionLiteralConcatenation
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: "(7, 8, 9, *zoob)"
-        location:
+      - location:
           row: 12
           column: 7
         end_location:
           row: 12
           column: 23
+        content: "(7, 8, 9, *zoob)"
   parent: ~
 - kind:
     name: CollectionLiteralConcatenation
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 26
   fix:
     edits:
-      - content: "(*quux, 10, 11, 12)"
-        location:
+      - location:
           row: 13
           column: 7
         end_location:
           row: 13
           column: 26
+        content: "(*quux, 10, 11, 12)"
   parent: ~
 - kind:
     name: CollectionLiteralConcatenation
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 26
   fix:
     edits:
-      - content: "[*spom, 13, 14, 15]"
-        location:
+      - location:
           row: 15
           column: 7
         end_location:
           row: 15
           column: 26
+        content: "[*spom, 13, 14, 15]"
   parent: ~
 - kind:
     name: CollectionLiteralConcatenation
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 36
   fix:
     edits:
-      - content: "(\"we all say\", *yay())"
-        location:
+      - location:
           row: 16
           column: 12
         end_location:
           row: 16
           column: 36
+        content: "(\"we all say\", *yay())"
   parent: ~
 - kind:
     name: CollectionLiteralConcatenation
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 45
   fix:
     edits:
-      - content: "(\"we all think\", *Fun().yay())"
-        location:
+      - location:
           row: 17
           column: 13
         end_location:
           row: 17
           column: 45
+        content: "(\"we all think\", *Fun().yay())"
   parent: ~
 - kind:
     name: CollectionLiteralConcatenation
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 44
   fix:
     edits:
-      - content: "(\"we all feel\", *Fun.words)"
-        location:
+      - location:
           row: 18
           column: 15
         end_location:
           row: 18
           column: 44
+        content: "(\"we all feel\", *Fun.words)"
   parent: ~
 - kind:
     name: CollectionLiteralConcatenation
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 30
   fix:
     edits:
-      - content: "[\"a\", \"b\", \"c\", *eggs]"
-        location:
+      - location:
           row: 20
           column: 8
         end_location:
           row: 20
           column: 30
+        content: "[\"a\", \"b\", \"c\", *eggs]"
   parent: ~
 - kind:
     name: CollectionLiteralConcatenation
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 67
   fix:
     edits:
-      - content: "(\"yes\", \"no\", \"pants\", *zoob)"
-        location:
+      - location:
           row: 20
           column: 38
         end_location:
           row: 20
           column: 67
+        content: "(\"yes\", \"no\", \"pants\", *zoob)"
   parent: ~
 - kind:
     name: CollectionLiteralConcatenation
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: "(*zoob,)"
-        location:
+      - location:
           row: 22
           column: 6
         end_location:
           row: 22
           column: 15
+        content: "(*zoob,)"
   parent: ~
 - kind:
     name: CollectionLiteralConcatenation
@@ -239,13 +239,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: "[*foo]"
-        location:
+      - location:
           row: 41
           column: 0
         end_location:
           row: 41
           column: 8
+        content: "[*foo]"
   parent: ~
 - kind:
     name: CollectionLiteralConcatenation
@@ -260,12 +260,12 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: "[*foo]"
-        location:
+      - location:
           row: 44
           column: 0
         end_location:
           row: 44
           column: 8
+        content: "[*foo]"
   parent: ~
 

@@ -57,7 +57,7 @@ fn apply_fixes<'a>(
         // Best-effort approach: if this fix overlaps with a fix we've already applied,
         // skip it.
         if last_pos.map_or(false, |last_pos| {
-            fix.location()
+            fix.min_location()
                 .map_or(false, |fix_location| last_pos >= fix_location)
         }) {
             continue;
@@ -65,14 +65,14 @@ fn apply_fixes<'a>(
 
         for edit in fix.edits() {
             // Add all contents from `last_pos` to `fix.location`.
-            let slice = locator.slice(Range::new(last_pos.unwrap_or_default(), edit.location));
+            let slice = locator.slice(Range::new(last_pos.unwrap_or_default(), edit.location()));
             output.push_str(slice);
 
             // Add the patch itself.
-            output.push_str(&edit.content);
+            output.push_str(edit.content().unwrap_or_default());
 
             // Track that the edit was applied.
-            last_pos = Some(edit.end_location);
+            last_pos = Some(edit.end_location());
             applied.insert(edit);
         }
 
@@ -88,8 +88,8 @@ fn apply_fixes<'a>(
 
 /// Compare two fixes.
 fn cmp_fix(rule1: Rule, rule2: Rule, fix1: &Fix, fix2: &Fix) -> std::cmp::Ordering {
-    fix1.location()
-        .cmp(&fix2.location())
+    fix1.min_location()
+        .cmp(&fix2.min_location())
         .then_with(|| match (&rule1, &rule2) {
             // Apply `EndsInPeriod` fixes before `NewLineAfterLastParagraph` fixes.
             (Rule::EndsInPeriod, Rule::NewLineAfterLastParagraph) => std::cmp::Ordering::Less,
@@ -114,8 +114,8 @@ mod tests {
             .map(|edit| Diagnostic {
                 // The choice of rule here is arbitrary.
                 kind: MissingNewlineAtEndOfFile.into(),
-                location: edit.location,
-                end_location: edit.end_location,
+                location: edit.location(),
+                end_location: edit.end_location(),
                 fix: edit.into(),
                 parent: None,
             })
@@ -140,11 +140,11 @@ class A(object):
 "#
             .trim(),
         );
-        let diagnostics = create_diagnostics([Edit {
-            content: "Bar".to_string(),
-            location: Location::new(1, 8),
-            end_location: Location::new(1, 14),
-        }]);
+        let diagnostics = create_diagnostics([Edit::replacement(
+            "Bar".to_string(),
+            Location::new(1, 8),
+            Location::new(1, 14),
+        )]);
         let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             contents,
@@ -166,11 +166,8 @@ class A(object):
 "#
             .trim(),
         );
-        let diagnostics = create_diagnostics([Edit {
-            content: String::new(),
-            location: Location::new(1, 7),
-            end_location: Location::new(1, 15),
-        }]);
+        let diagnostics =
+            create_diagnostics([Edit::deletion(Location::new(1, 7), Location::new(1, 15))]);
         let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(
             contents,
@@ -193,16 +190,8 @@ class A(object, object, object):
             .trim(),
         );
         let diagnostics = create_diagnostics([
-            Edit {
-                content: String::new(),
-                location: Location::new(1, 8),
-                end_location: Location::new(1, 16),
-            },
-            Edit {
-                content: String::new(),
-                location: Location::new(1, 22),
-                end_location: Location::new(1, 30),
-            },
+            Edit::deletion(Location::new(1, 8), Location::new(1, 16)),
+            Edit::deletion(Location::new(1, 22), Location::new(1, 30)),
         ]);
         let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
 
@@ -227,16 +216,12 @@ class A(object):
             .trim(),
         );
         let diagnostics = create_diagnostics([
-            Edit {
-                content: String::new(),
-                location: Location::new(1, 7),
-                end_location: Location::new(1, 15),
-            },
-            Edit {
-                content: "ignored".to_string(),
-                location: Location::new(1, 9),
-                end_location: Location::new(1, 11),
-            },
+            Edit::deletion(Location::new(1, 7), Location::new(1, 15)),
+            Edit::replacement(
+                "ignored".to_string(),
+                Location::new(1, 9),
+                Location::new(1, 11),
+            ),
         ]);
         let (contents, fixed) = apply_fixes(diagnostics.iter(), &locator);
         assert_eq!(

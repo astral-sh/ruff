@@ -15,12 +15,12 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: "<LineEnding>"
-        location:
+      - location:
           row: 1
           column: 1
         end_location:
           row: 1
           column: 1
+        content: "<LineEnding>"
   parent: ~
 

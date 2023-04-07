@@ -15,13 +15,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 5
           column: 0
         end_location:
           row: 6
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 6
           column: 0
         end_location:
           row: 7
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 13
           column: 0
         end_location:
           row: 14
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 14
           column: 0
         end_location:
           row: 15
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 21
           column: 14
         end_location:
           row: 21
           column: 20
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 27
           column: 15
         end_location:
           row: 27
           column: 21
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 27
           column: 28
         end_location:
           row: 27
           column: 34
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 47
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 27
           column: 41
         end_location:
           row: 27
           column: 47
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -211,13 +211,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 33
           column: 15
         end_location:
           row: 33
           column: 25
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -232,13 +232,13 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 34
           column: 4
         end_location:
           row: 34
           column: 14
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -253,13 +253,13 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 40
           column: 21
         end_location:
           row: 40
           column: 27
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -274,13 +274,13 @@ expression: diagnostics
     column: 48
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 45
           column: 42
         end_location:
           row: 45
           column: 48
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -295,13 +295,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 50
           column: 4
         end_location:
           row: 50
           column: 8
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -316,13 +316,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 56
           column: 4
         end_location:
           row: 57
           column: 8
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -337,13 +337,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: pass
-        location:
+      - location:
           row: 61
           column: 4
         end_location:
           row: 65
           column: 5
+        content: pass
   parent: ~
 - kind:
     name: UnusedVariable
@@ -358,13 +358,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 67
           column: 0
         end_location:
           row: 69
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -379,13 +379,13 @@ expression: diagnostics
     column: 25
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 72
           column: 18
         end_location:
           row: 72
           column: 26
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -400,13 +400,13 @@ expression: diagnostics
     column: 26
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 77
           column: 19
         end_location:
           row: 77
           column: 27
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -421,13 +421,13 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 87
           column: 4
         end_location:
           row: 87
           column: 15
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -442,13 +442,13 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 93
           column: 4
         end_location:
           row: 93
           column: 15
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -463,13 +463,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 93
           column: 15
         end_location:
           row: 93
           column: 20
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -484,13 +484,13 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 97
           column: 4
         end_location:
           row: 97
           column: 15
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -505,13 +505,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 101
           column: 13
         end_location:
           row: 101
           column: 24
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -526,13 +526,13 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 105
           column: 4
         end_location:
           row: 105
           column: 15
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -547,12 +547,12 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 105
           column: 15
         end_location:
           row: 105
           column: 20
+        content: ~
   parent: ~
 

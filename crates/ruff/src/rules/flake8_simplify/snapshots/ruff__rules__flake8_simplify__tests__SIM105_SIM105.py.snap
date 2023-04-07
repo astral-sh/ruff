@@ -15,27 +15,27 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: "import contextlib\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 0
-      - content: with contextlib.suppress(ValueError)
-        location:
+        content: "import contextlib\n"
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 3
-      - content: ""
-        location:
+        content: with contextlib.suppress(ValueError)
+      - location:
           row: 6
           column: 0
         end_location:
           row: 7
           column: 8
+        content: ~
   parent: ~
 - kind:
     name: SuppressibleException
@@ -50,27 +50,27 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: "import contextlib\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 0
-      - content: "with contextlib.suppress(ValueError, OSError)"
-        location:
+        content: "import contextlib\n"
+      - location:
           row: 9
           column: 0
         end_location:
           row: 9
           column: 3
-      - content: ""
-        location:
+        content: "with contextlib.suppress(ValueError, OSError)"
+      - location:
           row: 11
           column: 0
         end_location:
           row: 12
           column: 8
+        content: ~
   parent: ~
 - kind:
     name: SuppressibleException
@@ -85,27 +85,27 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: "import contextlib\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 0
-      - content: with contextlib.suppress(Exception)
-        location:
+        content: "import contextlib\n"
+      - location:
           row: 14
           column: 0
         end_location:
           row: 14
           column: 3
-      - content: ""
-        location:
+        content: with contextlib.suppress(Exception)
+      - location:
           row: 16
           column: 0
         end_location:
           row: 17
           column: 8
+        content: ~
   parent: ~
 - kind:
     name: SuppressibleException
@@ -120,27 +120,27 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: "import contextlib\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 0
-      - content: "with contextlib.suppress(a.Error, b.Error)"
-        location:
+        content: "import contextlib\n"
+      - location:
           row: 19
           column: 0
         end_location:
           row: 19
           column: 3
-      - content: ""
-        location:
+        content: "with contextlib.suppress(a.Error, b.Error)"
+      - location:
           row: 21
           column: 0
         end_location:
           row: 22
           column: 8
+        content: ~
   parent: ~
 - kind:
     name: SuppressibleException
@@ -155,26 +155,26 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: "import contextlib\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 0
-      - content: with contextlib.suppress(ValueError)
-        location:
+        content: "import contextlib\n"
+      - location:
           row: 64
           column: 4
         end_location:
           row: 64
           column: 7
-      - content: ""
-        location:
+        content: with contextlib.suppress(ValueError)
+      - location:
           row: 66
           column: 0
         end_location:
           row: 67
           column: 11
+        content: ~
   parent: ~
 

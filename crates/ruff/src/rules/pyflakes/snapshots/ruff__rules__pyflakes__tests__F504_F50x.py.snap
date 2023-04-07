@@ -15,12 +15,12 @@ expression: diagnostics
     column: 32
   fix:
     edits:
-      - content: "{'bar': 1, }"
-        location:
+      - location:
           row: 8
           column: 12
         end_location:
           row: 8
           column: 32
+        content: "{'bar': 1, }"
   parent: ~
 

@@ -15,20 +15,20 @@ expression: diagnostics
     column: 69
   fix:
     edits:
-      - content: capture_output=True
-        location:
+      - location:
           row: 4
           column: 22
         end_location:
           row: 4
           column: 44
-      - content: ""
-        location:
+        content: capture_output=True
+      - location:
           row: 4
           column: 44
         end_location:
           row: 4
           column: 68
+        content: ~
   parent: ~
 - kind:
     name: ReplaceStdoutStderr
@@ -43,20 +43,20 @@ expression: diagnostics
     column: 80
   fix:
     edits:
-      - content: capture_output=True
-        location:
+      - location:
           row: 6
           column: 33
         end_location:
           row: 6
           column: 55
-      - content: ""
-        location:
+        content: capture_output=True
+      - location:
           row: 6
           column: 55
         end_location:
           row: 6
           column: 79
+        content: ~
   parent: ~
 - kind:
     name: ReplaceStdoutStderr
@@ -71,20 +71,20 @@ expression: diagnostics
     column: 86
   fix:
     edits:
-      - content: capture_output=True
-        location:
+      - location:
           row: 8
           column: 24
         end_location:
           row: 8
           column: 46
-      - content: ""
-        location:
+        content: capture_output=True
+      - location:
           row: 8
           column: 60
         end_location:
           row: 8
           column: 85
+        content: ~
   parent: ~
 - kind:
     name: ReplaceStdoutStderr
@@ -99,20 +99,20 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: capture_output=True
-        location:
+      - location:
           row: 11
           column: 13
         end_location:
           row: 11
           column: 35
-      - content: ""
-        location:
+        content: capture_output=True
+      - location:
           row: 11
           column: 47
         end_location:
           row: 11
           column: 71
+        content: ~
   parent: ~
 - kind:
     name: ReplaceStdoutStderr
@@ -127,20 +127,20 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: capture_output=True
-        location:
+      - location:
           row: 15
           column: 13
         end_location:
           row: 15
           column: 35
-      - content: ""
-        location:
+        content: capture_output=True
+      - location:
           row: 15
           column: 47
         end_location:
           row: 15
           column: 71
+        content: ~
   parent: ~
 - kind:
     name: ReplaceStdoutStderr
@@ -155,20 +155,20 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: capture_output=True
-        location:
+      - location:
           row: 20
           column: 4
         end_location:
           row: 20
           column: 26
-      - content: ""
-        location:
+        content: capture_output=True
+      - location:
           row: 22
           column: 4
         end_location:
           row: 23
           column: 4
+        content: ~
   parent: ~
 - kind:
     name: ReplaceStdoutStderr
@@ -183,19 +183,19 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: capture_output=True
-        location:
+      - location:
           row: 31
           column: 8
         end_location:
           row: 31
           column: 30
-      - content: ""
-        location:
+        content: capture_output=True
+      - location:
           row: 33
           column: 8
         end_location:
           row: 34
           column: 8
+        content: ~
   parent: ~
 

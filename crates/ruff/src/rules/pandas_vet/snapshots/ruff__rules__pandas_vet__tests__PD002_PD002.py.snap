@@ -15,20 +15,20 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: "x = "
-        location:
+      - location:
           row: 5
           column: 0
         end_location:
           row: 5
           column: 0
-      - content: ""
-        location:
+        content: "x = "
+      - location:
           row: 5
           column: 20
         end_location:
           row: 5
           column: 34
+        content: ~
   parent: ~
 - kind:
     name: PandasUseOfInplaceArgument
@@ -43,20 +43,20 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: "x = "
-        location:
+      - location:
           row: 7
           column: 0
         end_location:
           row: 7
           column: 0
-      - content: ""
-        location:
+        content: "x = "
+      - location:
           row: 7
           column: 20
         end_location:
           row: 7
           column: 34
+        content: ~
   parent: ~
 - kind:
     name: PandasUseOfInplaceArgument
@@ -71,20 +71,20 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "x = "
-        location:
+      - location:
           row: 9
           column: 0
         end_location:
           row: 9
           column: 0
-      - content: ""
-        location:
+        content: "x = "
+      - location:
           row: 10
           column: 4
         end_location:
           row: 11
           column: 4
+        content: ~
   parent: ~
 - kind:
     name: PandasUseOfInplaceArgument
@@ -99,20 +99,20 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "x = "
-        location:
+      - location:
           row: 16
           column: 4
         end_location:
           row: 16
           column: 4
-      - content: ""
-        location:
+        content: "x = "
+      - location:
           row: 17
           column: 8
         end_location:
           row: 18
           column: 8
+        content: ~
   parent: ~
 - kind:
     name: PandasUseOfInplaceArgument
@@ -127,20 +127,20 @@ expression: diagnostics
     column: 44
   fix:
     edits:
-      - content: "x = "
-        location:
+      - location:
           row: 22
           column: 0
         end_location:
           row: 22
           column: 0
-      - content: ""
-        location:
+        content: "x = "
+      - location:
           row: 22
           column: 30
         end_location:
           row: 22
           column: 44
+        content: ~
   parent: ~
 - kind:
     name: PandasUseOfInplaceArgument

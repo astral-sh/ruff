@@ -15,13 +15,13 @@ expression: diagnostics
     column: 67
   fix:
     edits:
-      - content: "class MyType(NamedTuple):\n    a: int\n    b: tuple[str, ...]"
-        location:
+      - location:
           row: 5
           column: 0
         end_location:
           row: 5
           column: 67
+        content: "class MyType(NamedTuple):\n    a: int\n    b: tuple[str, ...]"
   parent: ~
 - kind:
     name: ConvertNamedTupleFunctionalToClass
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: "class MyType(NamedTuple):\n    a: int\n    b: str = \"foo\"\n    c: list[bool] = [True]"
-        location:
+      - location:
           row: 8
           column: 0
         end_location:
           row: 12
           column: 1
+        content: "class MyType(NamedTuple):\n    a: int\n    b: str = \"foo\"\n    c: list[bool] = [True]"
   parent: ~
 - kind:
     name: ConvertNamedTupleFunctionalToClass
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 62
   fix:
     edits:
-      - content: "class MyType(typing.NamedTuple):\n    a: int\n    b: str"
-        location:
+      - location:
           row: 15
           column: 0
         end_location:
           row: 15
           column: 62
+        content: "class MyType(typing.NamedTuple):\n    a: int\n    b: str"
   parent: ~
 - kind:
     name: ConvertNamedTupleFunctionalToClass
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 36
   fix:
     edits:
-      - content: "class MyType(typing.NamedTuple):\n    pass"
-        location:
+      - location:
           row: 28
           column: 0
         end_location:
           row: 28
           column: 36
+        content: "class MyType(typing.NamedTuple):\n    pass"
   parent: ~
 - kind:
     name: ConvertNamedTupleFunctionalToClass
@@ -99,12 +99,12 @@ expression: diagnostics
     column: 40
   fix:
     edits:
-      - content: "class MyType(typing.NamedTuple):\n    pass"
-        location:
+      - location:
           row: 31
           column: 0
         end_location:
           row: 31
           column: 40
+        content: "class MyType(typing.NamedTuple):\n    pass"
   parent: ~
 

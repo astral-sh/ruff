@@ -61,7 +61,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
             checker.stylist,
         ) {
             Ok(fix) => {
-                if fix.content.is_empty() || fix.content == "pass" {
+                if fix.is_deletion() || fix.content() == Some("pass") {
                     checker.deletions.insert(*defined_by);
                 }
                 diagnostic.set_fix(fix);

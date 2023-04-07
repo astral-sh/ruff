@@ -15,13 +15,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: bool
-        location:
+      - location:
           row: 6
           column: 0
         end_location:
           row: 6
           column: 8
+        content: bool
   parent: ~
 - kind:
     name: NumpyDeprecatedTypeAlias
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: int
-        location:
+      - location:
           row: 7
           column: 0
         end_location:
           row: 7
           column: 7
+        content: int
   parent: ~
 - kind:
     name: NumpyDeprecatedTypeAlias
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: object
-        location:
+      - location:
           row: 9
           column: 12
         end_location:
           row: 9
           column: 21
+        content: object
   parent: ~
 - kind:
     name: NumpyDeprecatedTypeAlias
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 77
   fix:
     edits:
-      - content: int
-        location:
+      - location:
           row: 12
           column: 71
         end_location:
           row: 12
           column: 77
+        content: int
   parent: ~
 - kind:
     name: NumpyDeprecatedTypeAlias
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 86
   fix:
     edits:
-      - content: int
-        location:
+      - location:
           row: 12
           column: 79
         end_location:
           row: 12
           column: 86
+        content: int
   parent: ~
 - kind:
     name: NumpyDeprecatedTypeAlias
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: object
-        location:
+      - location:
           row: 17
           column: 10
         end_location:
           row: 17
           column: 22
+        content: object
   parent: ~
 - kind:
     name: NumpyDeprecatedTypeAlias
@@ -141,12 +141,12 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: int
-        location:
+      - location:
           row: 20
           column: 15
         end_location:
           row: 20
           column: 21
+        content: int
   parent: ~
 

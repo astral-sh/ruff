@@ -15,13 +15,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 5
           column: 20
         end_location:
           row: 5
           column: 22
+        content: ~
   parent: ~
 - kind:
     name: UnnecessaryParenOnRaiseException
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 13
           column: 15
         end_location:
           row: 13
           column: 17
+        content: ~
   parent: ~
 - kind:
     name: UnnecessaryParenOnRaiseException
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 16
           column: 15
         end_location:
           row: 16
           column: 18
+        content: ~
   parent: ~
 - kind:
     name: UnnecessaryParenOnRaiseException
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 6
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 19
           column: 15
         end_location:
           row: 20
           column: 6
+        content: ~
   parent: ~
 - kind:
     name: UnnecessaryParenOnRaiseException
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 23
           column: 15
         end_location:
           row: 25
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UnnecessaryParenOnRaiseException
@@ -120,12 +120,12 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 28
           column: 15
         end_location:
           row: 30
           column: 1
+        content: ~
   parent: ~
 

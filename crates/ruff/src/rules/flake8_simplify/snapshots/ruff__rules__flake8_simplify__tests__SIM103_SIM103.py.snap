@@ -15,13 +15,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: return bool(a)
-        location:
+      - location:
           row: 3
           column: 4
         end_location:
           row: 6
           column: 20
+        content: return bool(a)
   parent: ~
 - kind:
     name: NeedlessBool
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: return a == b
-        location:
+      - location:
           row: 11
           column: 4
         end_location:
           row: 14
           column: 20
+        content: return a == b
   parent: ~
 - kind:
     name: NeedlessBool
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: return bool(b)
-        location:
+      - location:
           row: 21
           column: 4
         end_location:
           row: 24
           column: 20
+        content: return bool(b)
   parent: ~
 - kind:
     name: NeedlessBool
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: return bool(b)
-        location:
+      - location:
           row: 32
           column: 8
         end_location:
           row: 35
           column: 24
+        content: return bool(b)
   parent: ~
 - kind:
     name: NeedlessBool

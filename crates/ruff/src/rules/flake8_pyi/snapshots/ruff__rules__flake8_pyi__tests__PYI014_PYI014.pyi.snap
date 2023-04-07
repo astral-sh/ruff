@@ -15,13 +15,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 3
           column: 6
         end_location:
           row: 3
           column: 16
+        content: "..."
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 29
           column: 6
         end_location:
           row: 32
           column: 5
+        content: "..."
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 35
           column: 6
         end_location:
           row: 47
           column: 5
+        content: "..."
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 50
           column: 6
         end_location:
           row: 53
           column: 5
+        content: "..."
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 56
           column: 6
         end_location:
           row: 56
           column: 18
+        content: "..."
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 59
           column: 6
         end_location:
           row: 59
           column: 21
+        content: "..."
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 45
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 61
           column: 10
         end_location:
           row: 61
           column: 45
+        content: "..."
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 63
           column: 6
         end_location:
           row: 63
           column: 19
+        content: "..."
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 66
           column: 6
         end_location:
           row: 66
           column: 21
+        content: "..."
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 69
           column: 6
         end_location:
           row: 69
           column: 15
+        content: "..."
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 72
           column: 6
         end_location:
           row: 72
           column: 11
+        content: "..."
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -246,13 +246,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 75
           column: 6
         end_location:
           row: 75
           column: 13
+        content: "..."
   parent: ~
 - kind:
     name: ArgumentDefaultInStub
@@ -267,12 +267,12 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "..."
-        location:
+      - location:
           row: 78
           column: 6
         end_location:
           row: 78
           column: 19
+        content: "..."
   parent: ~
 

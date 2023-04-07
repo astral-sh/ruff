@@ -15,13 +15,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "b\"foo\""
-        location:
+      - location:
           row: 2
           column: 0
         end_location:
           row: 2
           column: 21
+        content: "b\"foo\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: "b\"foo\""
-        location:
+      - location:
           row: 3
           column: 0
         end_location:
           row: 3
           column: 18
+        content: "b\"foo\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 14
   fix:
     edits:
-      - content: "b\"foo\""
-        location:
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 14
+        content: "b\"foo\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "b\"foo\""
-        location:
+      - location:
           row: 5
           column: 0
         end_location:
           row: 5
           column: 20
+        content: "b\"foo\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: "b\"foo\""
-        location:
+      - location:
           row: 6
           column: 0
         end_location:
           row: 6
           column: 22
+        content: "b\"foo\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 30
   fix:
     edits:
-      - content: "b\"foo\""
-        location:
+      - location:
           row: 7
           column: 0
         end_location:
           row: 7
           column: 30
+        content: "b\"foo\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: "b\"\"\"\nLorem\n\nIpsum\n\"\"\""
-        location:
+      - location:
           row: 8
           column: 0
         end_location:
           row: 14
           column: 1
+        content: "b\"\"\"\nLorem\n\nIpsum\n\"\"\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "b\"Lorem \"\n    b\"Ipsum\""
-        location:
+      - location:
           row: 16
           column: 4
         end_location:
           row: 17
           column: 20
+        content: "b\"Lorem \"\n    b\"Ipsum\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "b\"Lorem \"  # Comment\n    b\"Ipsum\""
-        location:
+      - location:
           row: 20
           column: 4
         end_location:
           row: 21
           column: 20
+        content: "b\"Lorem \"  # Comment\n    b\"Ipsum\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 29
   fix:
     edits:
-      - content: "b\"Lorem \" b\"Ipsum\""
-        location:
+      - location:
           row: 24
           column: 4
         end_location:
           row: 24
           column: 29
+        content: "b\"Lorem \" b\"Ipsum\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 32
           column: 19
         end_location:
           row: 32
           column: 26
+        content: ~
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -246,13 +246,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 36
           column: 20
         end_location:
           row: 38
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -267,13 +267,13 @@ expression: diagnostics
     column: 31
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 53
           column: 23
         end_location:
           row: 53
           column: 30
+        content: ~
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -288,13 +288,13 @@ expression: diagnostics
     column: 39
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 55
           column: 23
         end_location:
           row: 55
           column: 38
+        content: ~
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -309,13 +309,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: "br\"foo\\o\""
-        location:
+      - location:
           row: 57
           column: 0
         end_location:
           row: 57
           column: 24
+        content: "br\"foo\\o\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -330,13 +330,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: "b\"foo\""
-        location:
+      - location:
           row: 58
           column: 0
         end_location:
           row: 58
           column: 22
+        content: "b\"foo\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -351,13 +351,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: "bR\"foo\\o\""
-        location:
+      - location:
           row: 59
           column: 0
         end_location:
           row: 59
           column: 24
+        content: "bR\"foo\\o\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -372,13 +372,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: "b\"foo\""
-        location:
+      - location:
           row: 60
           column: 0
         end_location:
           row: 60
           column: 22
+        content: "b\"foo\""
   parent: ~
 - kind:
     name: UnnecessaryEncodeUTF8
@@ -393,12 +393,12 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "b\"foo\""
-        location:
+      - location:
           row: 61
           column: 6
         end_location:
           row: 61
           column: 20
+        content: "b\"foo\""
   parent: ~
 

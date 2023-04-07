@@ -15,13 +15,13 @@ expression: diagnostics
     column: 14
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 5
           column: 7
         end_location:
           row: 5
           column: 15
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 9
           column: 7
         end_location:
           row: 11
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 15
           column: 7
         end_location:
           row: 18
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 22
           column: 7
         end_location:
           row: 25
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 29
           column: 7
         end_location:
           row: 32
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 36
           column: 7
         end_location:
           row: 39
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 43
           column: 7
         end_location:
           row: 47
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 51
           column: 7
         end_location:
           row: 55
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 59
           column: 7
         end_location:
           row: 63
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 67
           column: 7
         end_location:
           row: 71
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 75
           column: 9
         end_location:
           row: 75
           column: 17
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -246,13 +246,13 @@ expression: diagnostics
     column: 14
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 79
           column: 8
         end_location:
           row: 79
           column: 16
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -267,13 +267,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 84
           column: 4
         end_location:
           row: 85
           column: 4
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -288,13 +288,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 91
           column: 5
         end_location:
           row: 92
           column: 10
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -309,13 +309,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 98
           column: 4
         end_location:
           row: 99
           column: 4
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -330,13 +330,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 107
           column: 5
         end_location:
           row: 108
           column: 10
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -351,13 +351,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 114
           column: 11
         end_location:
           row: 114
           column: 19
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -372,13 +372,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 118
           column: 7
         end_location:
           row: 120
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -393,13 +393,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 124
           column: 7
         end_location:
           row: 126
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UselessObjectInheritance
@@ -414,12 +414,12 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 130
           column: 7
         end_location:
           row: 133
           column: 1
+        content: ~
   parent: ~
 

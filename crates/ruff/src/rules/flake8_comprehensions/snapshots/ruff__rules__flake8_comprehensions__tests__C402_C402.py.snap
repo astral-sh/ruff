@@ -15,13 +15,13 @@ expression: diagnostics
     column: 30
   fix:
     edits:
-      - content: "{x: x for x in range(3)}"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 30
+        content: "{x: x for x in range(3)}"
   parent: ~
 - kind:
     name: UnnecessaryGeneratorDict
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: "{\n    x: x for x in range(3)\n}"
-        location:
+      - location:
           row: 2
           column: 0
         end_location:
           row: 4
           column: 1
+        content: "{\n    x: x for x in range(3)\n}"
   parent: ~
 - kind:
     name: UnnecessaryGeneratorDict
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 37
   fix:
     edits:
-      - content: " {x: x for x in range(3)} "
-        location:
+      - location:
           row: 6
           column: 7
         end_location:
           row: 6
           column: 37
+        content: " {x: x for x in range(3)} "
   parent: ~
 - kind:
     name: UnnecessaryGeneratorDict
@@ -78,12 +78,12 @@ expression: diagnostics
     column: 45
   fix:
     edits:
-      - content: " {x: x for x in range(3)} "
-        location:
+      - location:
           row: 7
           column: 15
         end_location:
           row: 7
           column: 45
+        content: " {x: x for x in range(3)} "
   parent: ~
 

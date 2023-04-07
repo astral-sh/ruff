@@ -15,13 +15,13 @@ expression: diagnostics
     column: 6
   fix:
     edits:
-      - content: " "
-        location:
+      - location:
           row: 2
           column: 7
         end_location:
           row: 2
           column: 7
+        content: " "
   parent: ~
 - kind:
     name: MissingWhitespace
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 4
   fix:
     edits:
-      - content: " "
-        location:
+      - location:
           row: 4
           column: 5
         end_location:
           row: 4
           column: 5
+        content: " "
   parent: ~
 - kind:
     name: MissingWhitespace
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: " "
-        location:
+      - location:
           row: 6
           column: 10
         end_location:
           row: 6
           column: 10
+        content: " "
   parent: ~
 - kind:
     name: MissingWhitespace
@@ -78,12 +78,12 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: " "
-        location:
+      - location:
           row: 19
           column: 10
         end_location:
           row: 19
           column: 10
+        content: " "
   parent: ~
 

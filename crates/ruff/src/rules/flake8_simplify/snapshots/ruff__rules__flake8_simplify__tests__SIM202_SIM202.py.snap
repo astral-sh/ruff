@@ -15,13 +15,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: a == b
-        location:
+      - location:
           row: 2
           column: 3
         end_location:
           row: 2
           column: 13
+        content: a == b
   parent: ~
 - kind:
     name: NegateNotEqualOp
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: a == b + c
-        location:
+      - location:
           row: 6
           column: 3
         end_location:
           row: 6
           column: 19
+        content: a == b + c
   parent: ~
 - kind:
     name: NegateNotEqualOp
@@ -57,12 +57,12 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: a + b == c
-        location:
+      - location:
           row: 10
           column: 3
         end_location:
           row: 10
           column: 19
+        content: a + b == c
   parent: ~
 

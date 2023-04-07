@@ -15,13 +15,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 14
           column: 15
         end_location:
           row: 14
           column: 17
+        content: ~
   parent: ~
 - kind:
     name: PytestFixtureIncorrectParenthesesStyle
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 24
           column: 15
         end_location:
           row: 26
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: PytestFixtureIncorrectParenthesesStyle
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 39
           column: 8
         end_location:
           row: 39
           column: 10
+        content: ~
   parent: ~
 - kind:
     name: PytestFixtureIncorrectParenthesesStyle
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 49
           column: 8
         end_location:
           row: 51
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: PytestFixtureIncorrectParenthesesStyle
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 64
           column: 8
         end_location:
           row: 64
           column: 10
+        content: ~
   parent: ~
 - kind:
     name: PytestFixtureIncorrectParenthesesStyle
@@ -120,12 +120,12 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 74
           column: 8
         end_location:
           row: 76
           column: 1
+        content: ~
   parent: ~
 

@@ -15,13 +15,13 @@ expression: diagnostics
     column: 3
   fix:
     edits:
-      - content: "\"\"\"\nthis is not a docstring\n\"\"\""
-        location:
+      - location:
           row: 5
           column: 0
         end_location:
           row: 7
           column: 3
+        content: "\"\"\"\nthis is not a docstring\n\"\"\""
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 3
   fix:
     edits:
-      - content: "\"\"\"\n    class params \\t not a docstring\n\"\"\""
-        location:
+      - location:
           row: 11
           column: 20
         end_location:
           row: 13
           column: 3
+        content: "\"\"\"\n    class params \\t not a docstring\n\"\"\""
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: "\"\"\"\n    this is not a docstring\n    \"\"\""
-        location:
+      - location:
           row: 18
           column: 4
         end_location:
           row: 20
           column: 7
+        content: "\"\"\"\n    this is not a docstring\n    \"\"\""
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 37
   fix:
     edits:
-      - content: "\"\"\"\n        definitely not a docstring\"\"\""
-        location:
+      - location:
           row: 23
           column: 20
         end_location:
           row: 24
           column: 37
+        content: "\"\"\"\n        definitely not a docstring\"\"\""
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: "\"\"\"\n        this is not a docstring\n        \"\"\""
-        location:
+      - location:
           row: 32
           column: 8
         end_location:
           row: 34
           column: 11
+        content: "\"\"\"\n        this is not a docstring\n        \"\"\""
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -120,12 +120,12 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: "\"\"\"\n            Looks like a docstring, but in reality it isn't - only modules, classes and functions\n            \"\"\""
-        location:
+      - location:
           row: 37
           column: 12
         end_location:
           row: 39
           column: 15
+        content: "\"\"\"\n            Looks like a docstring, but in reality it isn't - only modules, classes and functions\n            \"\"\""
   parent: ~
 

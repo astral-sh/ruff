@@ -15,13 +15,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 3
           column: 4
         end_location:
           row: 3
           column: 17
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 4
           column: 4
         end_location:
           row: 4
           column: 21
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 7
           column: 4
         end_location:
           row: 8
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 11
           column: 4
         end_location:
           row: 12
           column: 10
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 16
           column: 11
         end_location:
           row: 16
           column: 22
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 21
           column: 9
         end_location:
           row: 21
           column: 20
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 26
           column: 10
         end_location:
           row: 26
           column: 21
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 30
           column: 11
         end_location:
           row: 30
           column: 24
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 26
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 31
           column: 15
         end_location:
           row: 31
           column: 32
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 35
           column: 8
         end_location:
           row: 36
           column: 4
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 40
           column: 9
         end_location:
           row: 41
           column: 9
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -246,13 +246,13 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 46
           column: 0
         end_location:
           row: 46
           column: 12
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -267,12 +267,12 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 51
           column: 0
         end_location:
           row: 51
           column: 12
+        content: ~
   parent: ~
 

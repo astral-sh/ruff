@@ -15,20 +15,20 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: "from functools import lru_cache, cache"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 31
-      - content: cache
-        location:
+        content: "from functools import lru_cache, cache"
+      - location:
           row: 4
           column: 1
         end_location:
           row: 4
           column: 24
+        content: cache
   parent: ~
 - kind:
     name: LRUCacheWithMaxsizeNone
@@ -43,20 +43,20 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: "from functools import lru_cache, cache"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 31
-      - content: cache
-        location:
+        content: "from functools import lru_cache, cache"
+      - location:
           row: 10
           column: 1
         end_location:
           row: 10
           column: 24
+        content: cache
   parent: ~
 - kind:
     name: LRUCacheWithMaxsizeNone
@@ -71,19 +71,19 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: "from functools import lru_cache, cache"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 31
-      - content: cache
-        location:
+        content: "from functools import lru_cache, cache"
+      - location:
           row: 15
           column: 1
         end_location:
           row: 15
           column: 24
+        content: cache
   parent: ~
 

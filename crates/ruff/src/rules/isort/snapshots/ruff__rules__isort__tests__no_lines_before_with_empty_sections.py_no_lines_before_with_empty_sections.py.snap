@@ -15,12 +15,12 @@ expression: diagnostics
     column: 0
   fix:
     edits:
-      - content: "from __future__ import annotations\nfrom typing import Any\n\nfrom . import my_local_folder_object\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 4
           column: 0
+        content: "from __future__ import annotations\nfrom typing import Any\n\nfrom . import my_local_folder_object\n"
   parent: ~
 

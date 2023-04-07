@@ -15,12 +15,12 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: int | None
-        location:
+      - location:
           row: 40
           column: 3
         end_location:
           row: 40
           column: 16
+        content: int | None
   parent: ~
 

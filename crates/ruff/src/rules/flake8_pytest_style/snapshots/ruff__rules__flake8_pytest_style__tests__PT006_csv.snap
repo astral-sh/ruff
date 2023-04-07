@@ -15,13 +15,13 @@ expression: diagnostics
     column: 45
   fix:
     edits:
-      - content: "\"param1,param2\""
-        location:
+      - location:
           row: 24
           column: 25
         end_location:
           row: 24
           column: 45
+        content: "\"param1,param2\""
   parent: ~
 - kind:
     name: PytestParametrizeNamesWrongType
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 36
   fix:
     edits:
-      - content: "\"param1\""
-        location:
+      - location:
           row: 29
           column: 25
         end_location:
           row: 29
           column: 36
+        content: "\"param1\""
   parent: ~
 - kind:
     name: PytestParametrizeNamesWrongType
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 45
   fix:
     edits:
-      - content: "\"param1,param2\""
-        location:
+      - location:
           row: 34
           column: 25
         end_location:
           row: 34
           column: 45
+        content: "\"param1,param2\""
   parent: ~
 - kind:
     name: PytestParametrizeNamesWrongType
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 35
   fix:
     edits:
-      - content: "\"param1\""
-        location:
+      - location:
           row: 39
           column: 25
         end_location:
           row: 39
           column: 35
+        content: "\"param1\""
   parent: ~
 - kind:
     name: PytestParametrizeNamesWrongType

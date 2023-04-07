@@ -15,13 +15,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: from foo import bar
-        location:
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 24
+        content: from foo import bar
   parent:
     row: 4
     column: 0

@@ -15,13 +15,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: "    -------\n"
-        location:
+      - location:
           row: 111
           column: 0
         end_location:
           row: 112
           column: 0
+        content: "    -------\n"
   parent: ~
 - kind:
     name: SectionUnderlineMatchesSectionLength
@@ -36,12 +36,12 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: "    -------\n"
-        location:
+      - location:
           row: 225
           column: 0
         end_location:
           row: 226
           column: 0
+        content: "    -------\n"
   parent: ~
 

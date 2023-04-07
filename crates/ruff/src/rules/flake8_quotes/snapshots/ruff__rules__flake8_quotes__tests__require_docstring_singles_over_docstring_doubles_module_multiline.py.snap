@@ -15,12 +15,12 @@ expression: diagnostics
     column: 3
   fix:
     edits:
-      - content: "'''\nDouble quotes multiline module docstring\n'''"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 3
           column: 3
+        content: "'''\nDouble quotes multiline module docstring\n'''"
   parent: ~
 

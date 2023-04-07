@@ -15,13 +15,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: "if a and b:\n    c\n"
-        location:
+      - location:
           row: 2
           column: 0
         end_location:
           row: 5
           column: 0
+        content: "if a and b:\n    c\n"
   parent: ~
 - kind:
     name: CollapsibleIf
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: "if a and b:\n    if c:\n        d\n"
-        location:
+      - location:
           row: 7
           column: 0
         end_location:
           row: 11
           column: 0
+        content: "if a and b:\n    if c:\n        d\n"
   parent: ~
 - kind:
     name: CollapsibleIf
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: "elif b and c:\n    d\n"
-        location:
+      - location:
           row: 15
           column: 0
         end_location:
           row: 18
           column: 0
+        content: "elif b and c:\n    d\n"
   parent: ~
 - kind:
     name: CollapsibleIf
@@ -92,13 +92,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: "if a and b:\n    # Fixable due to placement of this comment.\n    c\n"
-        location:
+      - location:
           row: 26
           column: 0
         end_location:
           row: 30
           column: 0
+        content: "if a and b:\n    # Fixable due to placement of this comment.\n    c\n"
   parent: ~
 - kind:
     name: CollapsibleIf
@@ -113,13 +113,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: "    if y > 0 and z > 0:\n        \"\"\"this\nis valid\"\"\"\n\n        \"\"\"the indentation on\n            this line is significant\"\"\"\n\n        \"this is\" \\\n\"allowed too\"\n\n        (\"so is\"\n\"this for some reason\")\n"
-        location:
+      - location:
           row: 51
           column: 0
         end_location:
           row: 64
           column: 0
+        content: "    if y > 0 and z > 0:\n        \"\"\"this\nis valid\"\"\"\n\n        \"\"\"the indentation on\n            this line is significant\"\"\"\n\n        \"this is\" \\\n\"allowed too\"\n\n        (\"so is\"\n\"this for some reason\")\n"
   parent: ~
 - kind:
     name: CollapsibleIf
@@ -134,13 +134,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: "if x > 0 and y > 0:\n    \"\"\"this\nis valid\"\"\"\n\n    \"\"\"the indentation on\n        this line is significant\"\"\"\n\n    \"this is\" \\\n\"allowed too\"\n\n    (\"so is\"\n\"this for some reason\")\n"
-        location:
+      - location:
           row: 67
           column: 0
         end_location:
           row: 80
           column: 0
+        content: "if x > 0 and y > 0:\n    \"\"\"this\nis valid\"\"\"\n\n    \"\"\"the indentation on\n        this line is significant\"\"\"\n\n    \"this is\" \\\n\"allowed too\"\n\n    (\"so is\"\n\"this for some reason\")\n"
   parent: ~
 - kind:
     name: CollapsibleIf
@@ -155,13 +155,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: "    if node.module and (node.module == \"multiprocessing\" or node.module.startswith(\n        \"multiprocessing.\"\n    )):\n        print(\"Bad module!\")\n"
-        location:
+      - location:
           row: 83
           column: 0
         end_location:
           row: 88
           column: 0
+        content: "    if node.module and (node.module == \"multiprocessing\" or node.module.startswith(\n        \"multiprocessing.\"\n    )):\n        print(\"Bad module!\")\n"
   parent: ~
 - kind:
     name: CollapsibleIf
@@ -176,13 +176,13 @@ expression: diagnostics
     column: 6
   fix:
     edits:
-      - content: "if node.module and (node.module == \"multiprocessing\" or node.module.startswith(\n    \"multiprocessing.\"\n)):\n    print(\"Bad module!\")\n"
-        location:
+      - location:
           row: 90
           column: 0
         end_location:
           row: 95
           column: 0
+        content: "if node.module and (node.module == \"multiprocessing\" or node.module.startswith(\n    \"multiprocessing.\"\n)):\n    print(\"Bad module!\")\n"
   parent: ~
 - kind:
     name: CollapsibleIf
@@ -197,12 +197,12 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: "    if b and c:\n        print(\"foo\")\n"
-        location:
+      - location:
           row: 117
           column: 0
         end_location:
           row: 120
           column: 0
+        content: "    if b and c:\n        print(\"foo\")\n"
   parent: ~
 

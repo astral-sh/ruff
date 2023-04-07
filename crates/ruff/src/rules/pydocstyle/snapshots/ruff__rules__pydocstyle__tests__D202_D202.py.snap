@@ -15,13 +15,13 @@ expression: diagnostics
     column: 30
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 58
           column: 0
         end_location:
           row: 60
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: NoBlankLineAfterFunction
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 30
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 69
           column: 0
         end_location:
           row: 71
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: NoBlankLineAfterFunction
@@ -57,12 +57,12 @@ expression: diagnostics
     column: 30
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 81
           column: 0
         end_location:
           row: 82
           column: 0
+        content: ~
   parent: ~
 

@@ -15,12 +15,12 @@ expression: diagnostics
     column: 0
   fix:
     edits:
-      - content: "import math\nimport sys\nfrom json import detect_encoding\nfrom json import dump\nfrom json import dumps as json_dumps\nfrom json import load\nfrom json import loads as json_loads\nfrom logging.handlers import FileHandler, StreamHandler\nfrom os import path, uname\n\n# comment 6\nfrom bar import a  # comment 7\nfrom bar import b  # comment 8\nfrom foo import bar  # comment 3\nfrom foo2 import bar2  # comment 4\nfrom foo3 import bar3  # comment 5\nfrom foo3 import baz3  # comment 5\n\n# comment 1\n# comment 2\nfrom third_party import lib1\nfrom third_party import lib2\nfrom third_party import lib3\nfrom third_party import lib4\nfrom third_party import lib5\nfrom third_party import lib6\nfrom third_party import lib7\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 25
           column: 0
+        content: "import math\nimport sys\nfrom json import detect_encoding\nfrom json import dump\nfrom json import dumps as json_dumps\nfrom json import load\nfrom json import loads as json_loads\nfrom logging.handlers import FileHandler, StreamHandler\nfrom os import path, uname\n\n# comment 6\nfrom bar import a  # comment 7\nfrom bar import b  # comment 8\nfrom foo import bar  # comment 3\nfrom foo2 import bar2  # comment 4\nfrom foo3 import bar3  # comment 5\nfrom foo3 import baz3  # comment 5\n\n# comment 1\n# comment 2\nfrom third_party import lib1\nfrom third_party import lib2\nfrom third_party import lib3\nfrom third_party import lib4\nfrom third_party import lib5\nfrom third_party import lib6\nfrom third_party import lib7\n"
   parent: ~
 

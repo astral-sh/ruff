@@ -15,13 +15,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: "from typing import (\n        Mapping,  # noqa: F401\n        )"
-        location:
+      - location:
           row: 35
           column: 4
         end_location:
           row: 38
           column: 5
+        content: "from typing import (\n        Mapping,  # noqa: F401\n        )"
   parent:
     row: 35
     column: 4
@@ -38,13 +38,13 @@ expression: diagnostics
     column: 31
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 52
           column: 17
         end_location:
           row: 52
           column: 31
+        content: ~
   parent: ~
 - kind:
     name: UnusedNOQA
@@ -59,13 +59,13 @@ expression: diagnostics
     column: 31
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 59
           column: 17
         end_location:
           row: 59
           column: 31
+        content: ~
   parent: ~
 - kind:
     name: UnusedNOQA
@@ -80,13 +80,13 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 66
           column: 13
         end_location:
           row: 66
           column: 27
+        content: ~
   parent: ~
 - kind:
     name: UnusedNOQA
@@ -101,13 +101,13 @@ expression: diagnostics
     column: 38
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 72
           column: 24
         end_location:
           row: 72
           column: 38
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -122,13 +122,13 @@ expression: diagnostics
     column: 32
   fix:
     edits:
-      - content: pass
-        location:
+      - location:
           row: 89
           column: 4
         end_location:
           row: 89
           column: 52
+        content: pass
   parent:
     row: 89
     column: 4
@@ -145,13 +145,13 @@ expression: diagnostics
     column: 52
   fix:
     edits:
-      - content: pass
-        location:
+      - location:
           row: 89
           column: 4
         end_location:
           row: 89
           column: 52
+        content: pass
   parent:
     row: 89
     column: 4
@@ -168,12 +168,12 @@ expression: diagnostics
     column: 66
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 89
           column: 52
         end_location:
           row: 89
           column: 66
+        content: ~
   parent: ~
 

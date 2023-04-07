@@ -15,13 +15,13 @@ expression: diagnostics
     column: 33
   fix:
     edits:
-      - content: collections
-        location:
+      - location:
           row: 6
           column: 7
         end_location:
           row: 6
           column: 33
+        content: collections
   parent: ~
 - kind:
     name: UselessImportAlias
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 50
   fix:
     edits:
-      - content: OrderedDict
-        location:
+      - location:
           row: 7
           column: 24
         end_location:
           row: 7
           column: 50
+        content: OrderedDict
   parent: ~
 - kind:
     name: UselessImportAlias
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: bar
-        location:
+      - location:
           row: 16
           column: 14
         end_location:
           row: 16
           column: 24
+        content: bar
   parent: ~
 - kind:
     name: UselessImportAlias
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 28
   fix:
     edits:
-      - content: bar
-        location:
+      - location:
           row: 19
           column: 18
         end_location:
           row: 19
           column: 28
+        content: bar
   parent: ~
 - kind:
     name: UselessImportAlias
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 38
   fix:
     edits:
-      - content: foobar
-        location:
+      - location:
           row: 20
           column: 22
         end_location:
           row: 20
           column: 38
+        content: foobar
   parent: ~
 - kind:
     name: UselessImportAlias
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: foo
-        location:
+      - location:
           row: 22
           column: 14
         end_location:
           row: 22
           column: 24
+        content: foo
   parent: ~
 - kind:
     name: UselessImportAlias
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 38
   fix:
     edits:
-      - content: foo2
-        location:
+      - location:
           row: 23
           column: 26
         end_location:
           row: 23
           column: 38
+        content: foo2
   parent: ~
 - kind:
     name: UselessImportAlias
@@ -162,12 +162,12 @@ expression: diagnostics
     column: 36
   fix:
     edits:
-      - content: foobar
-        location:
+      - location:
           row: 25
           column: 20
         end_location:
           row: 25
           column: 36
+        content: foobar
   parent: ~
 

@@ -15,13 +15,13 @@ expression: diagnostics
     column: 14
   fix:
     edits:
-      - content: res is True
-        location:
+      - location:
           row: 2
           column: 3
         end_location:
           row: 2
           column: 14
+        content: res is True
   parent: ~
 - kind:
     name: TrueFalseComparison
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: res is not False
-        location:
+      - location:
           row: 5
           column: 3
         end_location:
           row: 5
           column: 15
+        content: res is not False
   parent: ~
 - kind:
     name: TrueFalseComparison
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: True is not res
-        location:
+      - location:
           row: 8
           column: 3
         end_location:
           row: 8
           column: 14
+        content: True is not res
   parent: ~
 - kind:
     name: TrueFalseComparison
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: False is res
-        location:
+      - location:
           row: 11
           column: 3
         end_location:
           row: 11
           column: 15
+        content: False is res
   parent: ~
 - kind:
     name: TrueFalseComparison
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: "res[1] is True"
-        location:
+      - location:
           row: 14
           column: 3
         end_location:
           row: 14
           column: 17
+        content: "res[1] is True"
   parent: ~
 - kind:
     name: TrueFalseComparison
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: "res[1] is not False"
-        location:
+      - location:
           row: 17
           column: 3
         end_location:
           row: 17
           column: 18
+        content: "res[1] is not False"
   parent: ~
 - kind:
     name: TrueFalseComparison
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: cond is True
-        location:
+      - location:
           row: 20
           column: 11
         end_location:
           row: 20
           column: 23
+        content: cond is True
   parent: ~
 - kind:
     name: TrueFalseComparison
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 48
   fix:
     edits:
-      - content: cond is False
-        location:
+      - location:
           row: 20
           column: 35
         end_location:
           row: 20
           column: 48
+        content: cond is False
   parent: ~
 - kind:
     name: TrueFalseComparison
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: True is TrueElement
-        location:
+      - location:
           row: 22
           column: 3
         end_location:
           row: 22
           column: 24
+        content: True is TrueElement
   parent: ~
 - kind:
     name: TrueFalseComparison
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 14
   fix:
     edits:
-      - content: res is True is not False
-        location:
+      - location:
           row: 25
           column: 3
         end_location:
           row: 25
           column: 23
+        content: res is True is not False
   parent: ~
 - kind:
     name: TrueFalseComparison
@@ -225,12 +225,12 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: res is True is not False
-        location:
+      - location:
           row: 25
           column: 3
         end_location:
           row: 25
           column: 23
+        content: res is True is not False
   parent: ~
 

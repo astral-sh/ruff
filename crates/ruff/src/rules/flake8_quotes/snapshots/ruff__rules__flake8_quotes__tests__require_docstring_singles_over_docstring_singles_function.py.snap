@@ -15,13 +15,13 @@ expression: diagnostics
     column: 26
   fix:
     edits:
-      - content: "\"\"\" not a docstring\"\"\""
-        location:
+      - location:
           row: 3
           column: 4
         end_location:
           row: 3
           column: 26
+        content: "\"\"\" not a docstring\"\"\""
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 26
   fix:
     edits:
-      - content: "\"\"\" not a docstring\"\"\""
-        location:
+      - location:
           row: 11
           column: 4
         end_location:
           row: 11
           column: 26
+        content: "\"\"\" not a docstring\"\"\""
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 3
   fix:
     edits:
-      - content: "\"\"\"\n    not a\n\"\"\""
-        location:
+      - location:
           row: 15
           column: 38
         end_location:
           row: 17
           column: 3
+        content: "\"\"\"\n    not a\n\"\"\""
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "\"\"\"docstring\"\"\""
-        location:
+      - location:
           row: 17
           column: 4
         end_location:
           row: 17
           column: 19
+        content: "\"\"\"docstring\"\"\""
   parent: ~
 - kind:
     name: BadQuotesMultilineString
@@ -99,12 +99,12 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: "\"\"\" not a docstring \"\"\""
-        location:
+      - location:
           row: 22
           column: 4
         end_location:
           row: 22
           column: 27
+        content: "\"\"\" not a docstring \"\"\""
   parent: ~
 

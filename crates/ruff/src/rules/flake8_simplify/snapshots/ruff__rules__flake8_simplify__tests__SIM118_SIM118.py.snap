@@ -15,13 +15,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: obj
-        location:
+      - location:
           row: 1
           column: 7
         end_location:
           row: 1
           column: 17
+        content: obj
   parent: ~
 - kind:
     name: InDictKeys
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: obj
-        location:
+      - location:
           row: 3
           column: 14
         end_location:
           row: 3
           column: 24
+        content: obj
   parent: ~
 - kind:
     name: InDictKeys
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: obj
-        location:
+      - location:
           row: 5
           column: 14
         end_location:
           row: 5
           column: 24
+        content: obj
   parent: ~
 - kind:
     name: InDictKeys
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: obj
-        location:
+      - location:
           row: 7
           column: 9
         end_location:
           row: 7
           column: 19
+        content: obj
   parent: ~
 - kind:
     name: InDictKeys
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: obj
-        location:
+      - location:
           row: 9
           column: 11
         end_location:
           row: 9
           column: 21
+        content: obj
   parent: ~
 - kind:
     name: InDictKeys
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: obj
-        location:
+      - location:
           row: 16
           column: 12
         end_location:
           row: 16
           column: 22
+        content: obj
   parent: ~
 - kind:
     name: InDictKeys
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: obj
-        location:
+      - location:
           row: 18
           column: 12
         end_location:
           row: 18
           column: 22
+        content: obj
   parent: ~
 - kind:
     name: InDictKeys
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 25
   fix:
     edits:
-      - content: obj
-        location:
+      - location:
           row: 20
           column: 15
         end_location:
           row: 20
           column: 25
+        content: obj
   parent: ~
 - kind:
     name: InDictKeys
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: obj
-        location:
+      - location:
           row: 22
           column: 12
         end_location:
           row: 22
           column: 22
+        content: obj
   parent: ~
 - kind:
     name: InDictKeys
@@ -204,12 +204,12 @@ expression: diagnostics
     column: 25
   fix:
     edits:
-      - content: "(obj or {})"
-        location:
+      - location:
           row: 24
           column: 7
         end_location:
           row: 24
           column: 25
+        content: "(obj or {})"
   parent: ~
 

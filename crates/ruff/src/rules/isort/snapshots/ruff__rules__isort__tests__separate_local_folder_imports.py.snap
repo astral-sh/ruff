@@ -15,12 +15,12 @@ expression: diagnostics
     column: 0
   fix:
     edits:
-      - content: "import os\nimport sys\n\nimport ruff\n\nimport leading_prefix\n\nfrom . import leading_prefix\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 6
           column: 0
+        content: "import os\nimport sys\n\nimport ruff\n\nimport leading_prefix\n\nfrom . import leading_prefix\n"
   parent: ~
 

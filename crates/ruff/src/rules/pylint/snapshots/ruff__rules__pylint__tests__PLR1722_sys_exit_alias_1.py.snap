@@ -15,20 +15,20 @@ expression: diagnostics
     column: 4
   fix:
     edits:
-      - content: import sys
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 10
-      - content: sys.exit
-        location:
+        content: import sys
+      - location:
           row: 3
           column: 0
         end_location:
           row: 3
           column: 4
+        content: sys.exit
   parent: ~
 - kind:
     name: SysExitAlias
@@ -43,20 +43,20 @@ expression: diagnostics
     column: 4
   fix:
     edits:
-      - content: import sys
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 10
-      - content: sys.exit
-        location:
+        content: import sys
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 4
+        content: sys.exit
   parent: ~
 - kind:
     name: SysExitAlias
@@ -71,20 +71,20 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: import sys
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 10
-      - content: sys.exit
-        location:
+        content: import sys
+      - location:
           row: 8
           column: 4
         end_location:
           row: 8
           column: 8
+        content: sys.exit
   parent: ~
 - kind:
     name: SysExitAlias
@@ -99,20 +99,20 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: import sys
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 10
-      - content: sys.exit
-        location:
+        content: import sys
+      - location:
           row: 9
           column: 4
         end_location:
           row: 9
           column: 8
+        content: sys.exit
   parent: ~
 - kind:
     name: SysExitAlias

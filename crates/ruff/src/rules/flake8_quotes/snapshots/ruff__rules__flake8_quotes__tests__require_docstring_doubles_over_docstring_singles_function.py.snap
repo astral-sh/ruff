@@ -15,13 +15,13 @@ expression: diagnostics
     column: 56
   fix:
     edits:
-      - content: "\"\"\"function without params, single line docstring\"\"\""
-        location:
+      - location:
           row: 2
           column: 4
         end_location:
           row: 2
           column: 56
+        content: "\"\"\"function without params, single line docstring\"\"\""
   parent: ~
 - kind:
     name: BadQuotesDocstring
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: "\"\"\"\n        function without params, multiline docstring\n    \"\"\""
-        location:
+      - location:
           row: 8
           column: 4
         end_location:
           row: 10
           column: 7
+        content: "\"\"\"\n        function without params, multiline docstring\n    \"\"\""
   parent: ~
 - kind:
     name: BadQuotesDocstring
@@ -57,12 +57,12 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: "\"Single line docstring\""
-        location:
+      - location:
           row: 27
           column: 4
         end_location:
           row: 27
           column: 27
+        content: "\"Single line docstring\""
   parent: ~
 

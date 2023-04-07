@@ -15,13 +15,13 @@ expression: diagnostics
     column: 53
   fix:
     edits:
-      - content: "\"\"\" Double quotes single line class docstring \"\"\""
-        location:
+      - location:
           row: 2
           column: 4
         end_location:
           row: 2
           column: 53
+        content: "\"\"\" Double quotes single line class docstring \"\"\""
   parent: ~
 - kind:
     name: BadQuotesDocstring
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 57
   fix:
     edits:
-      - content: "\"\"\" Double quotes single line method docstring\"\"\""
-        location:
+      - location:
           row: 6
           column: 8
         end_location:
           row: 6
           column: 57
+        content: "\"\"\" Double quotes single line method docstring\"\"\""
   parent: ~
 - kind:
     name: BadQuotesDocstring
@@ -57,12 +57,12 @@ expression: diagnostics
     column: 52
   fix:
     edits:
-      - content: "\"\"\" inline docstring \"\"\""
-        location:
+      - location:
           row: 9
           column: 28
         end_location:
           row: 9
           column: 52
+        content: "\"\"\" inline docstring \"\"\""
   parent: ~
 

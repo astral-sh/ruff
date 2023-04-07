@@ -29,13 +29,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: _k
-        location:
+      - location:
           row: 18
           column: 12
         end_location:
           row: 18
           column: 13
+        content: _k
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -64,13 +64,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: _k
-        location:
+      - location:
           row: 30
           column: 12
         end_location:
           row: 30
           column: 13
+        content: _k
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: _bar
-        location:
+      - location:
           row: 52
           column: 13
         end_location:
           row: 52
           column: 16
+        content: _bar
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -176,13 +176,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: _bar
-        location:
+      - location:
           row: 68
           column: 13
         end_location:
           row: 68
           column: 16
+        content: _bar
   parent: ~
 - kind:
     name: UnusedLoopControlVariable
@@ -197,13 +197,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: _bar
-        location:
+      - location:
           row: 77
           column: 13
         end_location:
           row: 77
           column: 16
+        content: _bar
   parent: ~
 - kind:
     name: UnusedLoopControlVariable

@@ -15,13 +15,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: str | None
-        location:
+      - location:
           row: 6
           column: 9
         end_location:
           row: 6
           column: 22
+        content: str | None
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 29
   fix:
     edits:
-      - content: str | None
-        location:
+      - location:
           row: 10
           column: 9
         end_location:
           row: 10
           column: 29
+        content: str | None
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 45
   fix:
     edits:
-      - content: "str | int | Union[float, bytes]"
-        location:
+      - location:
           row: 14
           column: 9
         end_location:
           row: 14
           column: 45
+        content: "str | int | Union[float, bytes]"
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 44
   fix:
     edits:
-      - content: float | bytes
-        location:
+      - location:
           row: 14
           column: 25
         end_location:
           row: 14
           column: 44
+        content: float | bytes
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 31
   fix:
     edits:
-      - content: str | int
-        location:
+      - location:
           row: 18
           column: 9
         end_location:
           row: 18
           column: 31
+        content: str | int
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 33
   fix:
     edits:
-      - content: str | int
-        location:
+      - location:
           row: 22
           column: 9
         end_location:
           row: 22
           column: 33
+        content: str | int
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 40
   fix:
     edits:
-      - content: "(str, int) | float"
-        location:
+      - location:
           row: 26
           column: 9
         end_location:
           row: 26
           column: 40
+        content: "(str, int) | float"
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 46
   fix:
     edits:
-      - content: "str | int | Union[float, bytes]"
-        location:
+      - location:
           row: 30
           column: 10
         end_location:
           row: 30
           column: 46
+        content: "str | int | Union[float, bytes]"
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 45
   fix:
     edits:
-      - content: float | bytes
-        location:
+      - location:
           row: 30
           column: 26
         end_location:
           row: 30
           column: 45
+        content: float | bytes
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 32
   fix:
     edits:
-      - content: str | int
-        location:
+      - location:
           row: 34
           column: 10
         end_location:
           row: 34
           column: 32
+        content: str | int
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: str | None
-        location:
+      - location:
           row: 47
           column: 7
         end_location:
           row: 47
           column: 20
+        content: str | None
   parent: ~
 - kind:
     name: NonPEP604Annotation
@@ -246,12 +246,12 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: str | int
-        location:
+      - location:
           row: 52
           column: 7
         end_location:
           row: 52
           column: 22
+        content: str | int
   parent: ~
 
