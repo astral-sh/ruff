@@ -14,7 +14,6 @@ use rustpython_parser as parser;
 use rustpython_parser::ast::Location;
 use rustpython_parser::{lexer, Mode, ParseError};
 use std::fmt::{Debug, Formatter};
-use std::ops::Deref;
 
 use std::sync::Arc;
 pub use stylist::{LineEnding, Stylist};
@@ -155,13 +154,13 @@ impl SourceFileBuilder {
     /// Consumes `self` and returns a builder for a file with the source text and the [`LineIndex`] copied
     /// from `source`.
     #[must_use]
-    pub fn source_code(mut self, source: SourceCode) -> Self {
+    pub fn source_code(mut self, source: &SourceCode) -> Self {
         self.set_source_code(source);
         self
     }
 
     /// Copies the source text and [`LineIndex`] from `source`.
-    pub fn set_source_code(&mut self, source: SourceCode) {
+    pub fn set_source_code(&mut self, source: &SourceCode) {
         self.code = Some(FileSourceCode {
             text: Box::from(source.text()),
             index: source.index.clone(),
@@ -171,7 +170,7 @@ impl SourceFileBuilder {
     /// Consumes `self` and returns a builder for a file with the source text `text`. Builds the [`LineIndex`] from `text`.
     #[must_use]
     pub fn source_text(self, text: &str) -> Self {
-        self.source_code(SourceCode::new(text, &LineIndex::from_source_text(text)))
+        self.source_code(&SourceCode::new(text, &LineIndex::from_source_text(text)))
     }
 
     /// Consumes `self` and returns a builder for a file with the source text `text`. Builds the [`LineIndex`] from `text`.
@@ -233,10 +232,10 @@ impl SourceFile {
         })
     }
 
-    /// Returns `Some` with the source text if set, or `None.
+    /// Returns `Some` with the source text if set, or `None`.
     #[inline]
     pub fn source_text(&self) -> Option<&str> {
-        self.inner.code.as_ref().map(|code| code.text.deref())
+        self.inner.code.as_ref().map(|code| &*code.text)
     }
 }
 

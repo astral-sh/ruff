@@ -373,7 +373,7 @@ fn diagnostics_to_messages(
     let file = once_cell::unsync::Lazy::new(|| {
         let mut builder = SourceFileBuilder::new(&path.to_string_lossy());
         if settings.show_source {
-            builder.set_source_code(locator.to_source_code());
+            builder.set_source_code(&locator.to_source_code());
         }
 
         builder.finish()

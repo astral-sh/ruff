@@ -39,7 +39,7 @@ impl Emitter for GithubEmitter {
             writeln!(
                 writer,
                 "{path}:{row}:{column}: {code} {body}",
-                path = relativize_path(&message.filename()),
+                path = relativize_path(message.filename()),
                 code = message.kind.rule().noqa_code(),
                 body = message.kind.body,
             )?;

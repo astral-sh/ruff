@@ -40,7 +40,7 @@ impl Serialize for CheckResultRef<'_> {
         s.serialize_field("imports", &self.imports)?;
 
         let serialize_messages = SerializeMessages {
-            messages: &self.messages,
+            messages: self.messages,
             files: RefCell::default(),
         };
 
@@ -70,16 +70,15 @@ impl Serialize for SerializeMessages<'_> {
         for message in self.messages {
             // Using a Vec instead of a HashMap because the cache is per file and the large majority of
             // files have exactly one source file.
-            let file_id = match files
+            let file_id = if let Some(position) = files
                 .iter()
                 .position(|(filename, _)| *filename == message.filename())
             {
-                Some(position) => position,
-                None => {
-                    let index = files.len();
-                    files.push((message.filename(), message.file.source_text()));
-                    index
-                }
+                position
+            } else {
+                let index = files.len();
+                files.push((message.filename(), message.file.source_text()));
+                index
             };
 
             s.serialize_element(&SerializeMessage { message, file_id })?;
@@ -270,7 +269,7 @@ pub fn set(
     messages: &[Message],
     imports: &ImportMap,
 ) {
-    let check_result = CheckResultRef { messages, imports };
+    let check_result = CheckResultRef { imports, messages };
     if let Err(e) = write_sync(
         &settings.cli.cache_dir,
         cache_key(path, package, metadata, &settings.lib, autofix),
