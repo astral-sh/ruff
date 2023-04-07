@@ -1,47 +1,30 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DocstringInStub
-    body: Docstrings should not be included in stubs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DocstringInStub
-    body: Docstrings should not be included in stubs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DocstringInStub
-    body: Docstrings should not be included in stubs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 4
-  end_location:
-    row: 7
-    column: 13
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_pyi/PYI021.pyi:1:1: PYI021 Docstrings should not be included in stubs
+  |
+1 | """foo"""  # ERROR PYI021
+  | ^^^^^^^^^ PYI021
+2 | 
+3 | def foo():
+  |
+
+./resources/test/fixtures/flake8_pyi/PYI021.pyi:4:5: PYI021 Docstrings should not be included in stubs
+  |
+4 | def foo():
+5 |     """foo"""  # ERROR PYI021
+  |     ^^^^^^^^^ PYI021
+6 | 
+7 | class Bar:
+  |
+
+./resources/test/fixtures/flake8_pyi/PYI021.pyi:7:5: PYI021 Docstrings should not be included in stubs
+   |
+ 7 | class Bar:
+ 8 |     """bar"""  # ERROR PYI021
+   |     ^^^^^^^^^ PYI021
+ 9 | 
+10 | def bar():
+   |
+
 

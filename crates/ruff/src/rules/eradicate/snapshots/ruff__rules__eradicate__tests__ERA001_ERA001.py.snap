@@ -1,110 +1,93 @@
 ---
 source: crates/ruff/src/rules/eradicate/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CommentedOutCode
-    body: Found commented-out code
-    suggestion: Remove commented-out code
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 0
-        end_location:
-          row: 2
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: CommentedOutCode
-    body: Found commented-out code
-    suggestion: Remove commented-out code
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 22
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 3
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: CommentedOutCode
-    body: Found commented-out code
-    suggestion: Remove commented-out code
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 6
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 0
-        end_location:
-          row: 4
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: CommentedOutCode
-    body: Found commented-out code
-    suggestion: Remove commented-out code
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 13
-  fix:
-    edits:
-      - location:
-          row: 5
-          column: 0
-        end_location:
-          row: 6
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: CommentedOutCode
-    body: Found commented-out code
-    suggestion: Remove commented-out code
-    fixable: true
-  location:
-    row: 12
-    column: 4
-  end_location:
-    row: 12
-    column: 16
-  fix:
-    edits:
-      - location:
-          row: 12
-          column: 0
-        end_location:
-          row: 13
-          column: 0
-        content: ~
-  parent: ~
+./resources/test/fixtures/eradicate/ERA001.py:1:1: ERA001 [*] Found commented-out code
+  |
+1 | #import os
+  | ^^^^^^^^^^ ERA001
+2 | # from foo import junk
+3 | #a = 3
+  |
+  = help: Remove commented-out code
+
+ℹ Suggested fix
+1   |-#import os
+2 1 | # from foo import junk
+3 2 | #a = 3
+4 3 | a = 4
+
+./resources/test/fixtures/eradicate/ERA001.py:2:1: ERA001 [*] Found commented-out code
+  |
+2 | #import os
+3 | # from foo import junk
+  | ^^^^^^^^^^^^^^^^^^^^^^ ERA001
+4 | #a = 3
+5 | a = 4
+  |
+  = help: Remove commented-out code
+
+ℹ Suggested fix
+1 1 | #import os
+2   |-# from foo import junk
+3 2 | #a = 3
+4 3 | a = 4
+5 4 | #foo(1, 2, 3)
+
+./resources/test/fixtures/eradicate/ERA001.py:3:1: ERA001 [*] Found commented-out code
+  |
+3 | #import os
+4 | # from foo import junk
+5 | #a = 3
+  | ^^^^^^ ERA001
+6 | a = 4
+7 | #foo(1, 2, 3)
+  |
+  = help: Remove commented-out code
+
+ℹ Suggested fix
+1 1 | #import os
+2 2 | # from foo import junk
+3   |-#a = 3
+4 3 | a = 4
+5 4 | #foo(1, 2, 3)
+6 5 | 
+
+./resources/test/fixtures/eradicate/ERA001.py:5:1: ERA001 [*] Found commented-out code
+  |
+5 | #a = 3
+6 | a = 4
+7 | #foo(1, 2, 3)
+  | ^^^^^^^^^^^^^ ERA001
+8 | 
+9 | def foo(x, y, z):
+  |
+  = help: Remove commented-out code
+
+ℹ Suggested fix
+2 2 | # from foo import junk
+3 3 | #a = 3
+4 4 | a = 4
+5   |-#foo(1, 2, 3)
+6 5 | 
+7 6 | def foo(x, y, z):
+8 7 |     content = 1 # print('hello')
+
+./resources/test/fixtures/eradicate/ERA001.py:12:5: ERA001 [*] Found commented-out code
+   |
+12 |     # This is a real comment.
+13 |     #return True
+   |     ^^^^^^^^^^^^ ERA001
+14 |     return False
+   |
+   = help: Remove commented-out code
+
+ℹ Suggested fix
+9  9  |     print(x, y, z)
+10 10 | 
+11 11 |     # This is a real comment.
+12    |-    #return True
+13 12 |     return False
+14 13 | 
+15 14 | #import os  # noqa: ERA001
+
 

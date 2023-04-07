@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndocumentedPublicMethod
-    body: Missing docstring in public method
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 8
-  end_location:
-    row: 16
-    column: 11
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pydocstyle/setter.py:16:9: D102 Missing docstring in public method
+   |
+16 |     @foo
+17 |     def foo(self, value: str) -> None:
+   |         ^^^ D102
+18 |         pass
+   |
+
 

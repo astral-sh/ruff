@@ -1,33 +1,22 @@
 ---
 source: crates/ruff/src/rules/tryceratops/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: RaiseVanillaClass
-    body: Create your own exception
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 14
-  end_location:
-    row: 13
-    column: 41
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RaiseVanillaClass
-    body: Create your own exception
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 14
-  end_location:
-    row: 17
-    column: 23
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/tryceratops/TRY002.py:13:15: TRY002 Create your own exception
+   |
+13 |     a = 1
+14 |     if a == 1:
+15 |         raise Exception("Custom message")
+   |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY002
+16 | 
+17 |     b = 1
+   |
+
+./resources/test/fixtures/tryceratops/TRY002.py:17:15: TRY002 Create your own exception
+   |
+17 |     b = 1
+18 |     if b == 1:
+19 |         raise Exception
+   |               ^^^^^^^^^ TRY002
+   |
+
 

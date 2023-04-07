@@ -1,117 +1,131 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NeedlessBool
-    body: "Return the condition `a` directly"
-    suggestion: "Replace with `return a`"
-    fixable: true
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 6
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 4
-        end_location:
-          row: 6
-          column: 20
-        content: return bool(a)
-  parent: ~
-- kind:
-    name: NeedlessBool
-    body: "Return the condition `a == b` directly"
-    suggestion: "Replace with `return a == b`"
-    fixable: true
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 14
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 11
-          column: 4
-        end_location:
-          row: 14
-          column: 20
-        content: return a == b
-  parent: ~
-- kind:
-    name: NeedlessBool
-    body: "Return the condition `b` directly"
-    suggestion: "Replace with `return b`"
-    fixable: true
-  location:
-    row: 21
-    column: 4
-  end_location:
-    row: 24
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 21
-          column: 4
-        end_location:
-          row: 24
-          column: 20
-        content: return bool(b)
-  parent: ~
-- kind:
-    name: NeedlessBool
-    body: "Return the condition `b` directly"
-    suggestion: "Replace with `return b`"
-    fixable: true
-  location:
-    row: 32
-    column: 8
-  end_location:
-    row: 35
-    column: 24
-  fix:
-    edits:
-      - location:
-          row: 32
-          column: 8
-        end_location:
-          row: 35
-          column: 24
-        content: return bool(b)
-  parent: ~
-- kind:
-    name: NeedlessBool
-    body: "Return the condition `a` directly"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 57
-    column: 4
-  end_location:
-    row: 60
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NeedlessBool
-    body: "Return the condition `a` directly"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 83
-    column: 4
-  end_location:
-    row: 86
-    column: 20
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_simplify/SIM103.py:3:5: SIM103 [*] Return the condition `a` directly
+  |
+3 |   def f():
+4 |       # SIM103
+5 |       if a:
+  |  _____^
+6 | |         return True
+7 | |     else:
+8 | |         return False
+  | |____________________^ SIM103
+  |
+  = help: Replace with `return a`
+
+ℹ Suggested fix
+1 1 | def f():
+2 2 |     # SIM103
+3   |-    if a:
+4   |-        return True
+5   |-    else:
+6   |-        return False
+  3 |+    return bool(a)
+7 4 | 
+8 5 | 
+9 6 | def f():
+
+./resources/test/fixtures/flake8_simplify/SIM103.py:11:5: SIM103 [*] Return the condition `a == b` directly
+   |
+11 |   def f():
+12 |       # SIM103
+13 |       if a == b:
+   |  _____^
+14 | |         return True
+15 | |     else:
+16 | |         return False
+   | |____________________^ SIM103
+   |
+   = help: Replace with `return a == b`
+
+ℹ Suggested fix
+8  8  | 
+9  9  | def f():
+10 10 |     # SIM103
+11    |-    if a == b:
+12    |-        return True
+13    |-    else:
+14    |-        return False
+   11 |+    return a == b
+15 12 | 
+16 13 | 
+17 14 | def f():
+
+./resources/test/fixtures/flake8_simplify/SIM103.py:21:5: SIM103 [*] Return the condition `b` directly
+   |
+21 |       if a:
+22 |           return 1
+23 |       elif b:
+   |  _____^
+24 | |         return True
+25 | |     else:
+26 | |         return False
+   | |____________________^ SIM103
+   |
+   = help: Replace with `return b`
+
+ℹ Suggested fix
+18 18 |     # SIM103
+19 19 |     if a:
+20 20 |         return 1
+21    |-    elif b:
+22    |-        return True
+23    |-    else:
+24    |-        return False
+   21 |+    return bool(b)
+25 22 | 
+26 23 | 
+27 24 | def f():
+
+./resources/test/fixtures/flake8_simplify/SIM103.py:32:9: SIM103 [*] Return the condition `b` directly
+   |
+32 |           return 1
+33 |       else:
+34 |           if b:
+   |  _________^
+35 | |             return True
+36 | |         else:
+37 | |             return False
+   | |________________________^ SIM103
+   |
+   = help: Replace with `return b`
+
+ℹ Suggested fix
+29 29 |     if a:
+30 30 |         return 1
+31 31 |     else:
+32    |-        if b:
+33    |-            return True
+34    |-        else:
+35    |-            return False
+   32 |+        return bool(b)
+36 33 | 
+37 34 | 
+38 35 | def f():
+
+./resources/test/fixtures/flake8_simplify/SIM103.py:57:5: SIM103 Return the condition `a` directly
+   |
+57 |   def f():
+58 |       # SIM103 (but not fixable)
+59 |       if a:
+   |  _____^
+60 | |         return False
+61 | |     else:
+62 | |         return True
+   | |___________________^ SIM103
+   |
+
+./resources/test/fixtures/flake8_simplify/SIM103.py:83:5: SIM103 Return the condition `a` directly
+   |
+83 |       def bool():
+84 |           return False
+85 |       if a:
+   |  _____^
+86 | |         return True
+87 | |     else:
+88 | |         return False
+   | |____________________^ SIM103
+   |
+
 

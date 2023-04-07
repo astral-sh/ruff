@@ -1,19 +1,14 @@
 ---
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: LoggingExtraAttrClash
-    body: "Logging statement uses an extra field that clashes with a LogRecord field: `name`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 8
-  end_location:
-    row: 6
-    column: 14
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_logging_format/G101_1.py:6:9: G101 Logging statement uses an extra field that clashes with a LogRecord field: `name`
+   |
+ 6 |     "Hello world!",
+ 7 |     extra={
+ 8 |         "name": "foobar",
+   |         ^^^^^^ G101
+ 9 |     },
+10 | )
+   |
+
 

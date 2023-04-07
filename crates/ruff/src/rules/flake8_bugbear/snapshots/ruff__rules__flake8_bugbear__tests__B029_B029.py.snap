@@ -1,33 +1,24 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ExceptWithEmptyTuple
-    body: "Using `except ():` with an empty tuple does not catch anything; add exceptions to handle"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 9
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ExceptWithEmptyTuple
-    body: "Using `except ():` with an empty tuple does not catch anything; add exceptions to handle"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 14
-    column: 8
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bugbear/B029.py:8:1: B029 Using `except ():` with an empty tuple does not catch anything; add exceptions to handle
+   |
+ 8 |   try:
+ 9 |       pass
+10 | / except ():
+11 | |     pass
+   | |________^ B029
+12 |   
+13 |   try:
+   |
+
+./resources/test/fixtures/flake8_bugbear/B029.py:13:1: B029 Using `except ():` with an empty tuple does not catch anything; add exceptions to handle
+   |
+13 |   try:
+14 |       pass
+15 | / except () as e:
+16 | |     pass
+   | |________^ B029
+   |
+
 

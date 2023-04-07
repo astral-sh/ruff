@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `List`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 18
-  end_location:
-    row: 8
-    column: 22
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F821_13.py:8:19: F821 Undefined name `List`
+   |
+ 8 | Y: ForwardRef("List[int]")
+ 9 | 
+10 | Z = TypeVar("X", "List[int]", "int")
+   |                   ^^^^ F821
+   |
+
 

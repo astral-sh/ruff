@@ -1,61 +1,35 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: YieldOutsideFunction
-    body: "`yield` statement outside of a function"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 4
-  end_location:
-    row: 6
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: YieldOutsideFunction
-    body: "`yield` statement outside of a function"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: YieldOutsideFunction
-    body: "`yield from` statement outside of a function"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: YieldOutsideFunction
-    body: "`await` statement outside of a function"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 9
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F704.py:6:5: F704 `yield` statement outside of a function
+  |
+6 | class Foo:
+7 |     yield 2
+  |     ^^^^^^^ F704
+  |
+
+./resources/test/fixtures/pyflakes/F704.py:9:1: F704 `yield` statement outside of a function
+   |
+ 9 | yield 3
+   | ^^^^^^^ F704
+10 | yield from 3
+11 | await f()
+   |
+
+./resources/test/fixtures/pyflakes/F704.py:10:1: F704 `yield from` statement outside of a function
+   |
+10 | yield 3
+11 | yield from 3
+   | ^^^^^^^^^^^^ F704
+12 | await f()
+   |
+
+./resources/test/fixtures/pyflakes/F704.py:11:1: F704 `await` statement outside of a function
+   |
+11 | yield 3
+12 | yield from 3
+13 | await f()
+   | ^^^^^^^^^ F704
+   |
+
 

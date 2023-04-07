@@ -1,21 +1,13 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: RedefinedWhileUnused
-    body: "Redefinition of unused `Sequence` from line 26"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 4
-  end_location:
-    row: 32
-    column: 12
-  fix:
-    edits: []
-  parent:
-    row: 30
-    column: 0
+./resources/test/fixtures/pyflakes/F811_21.py:32:5: F811 Redefinition of unused `Sequence` from line 26
+   |
+32 | from typing import (
+33 |     List,  # noqa: F811
+34 |     Sequence,
+   |     ^^^^^^^^ F811
+35 | )
+   |
+
 

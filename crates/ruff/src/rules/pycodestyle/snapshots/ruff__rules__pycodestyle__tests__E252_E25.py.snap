@@ -1,61 +1,44 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MissingWhitespaceAroundParameterEquals
-    body: Missing whitespace around parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 14
-  end_location:
-    row: 46
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundParameterEquals
-    body: Missing whitespace around parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 15
-  end_location:
-    row: 46
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundParameterEquals
-    body: Missing whitespace around parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 26
-  end_location:
-    row: 46
-    column: 26
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundParameterEquals
-    body: Missing whitespace around parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 35
-  end_location:
-    row: 46
-    column: 35
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E25.py:46:15: E252 Missing whitespace around parameter equals
+   |
+46 |     return a + b
+47 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
+48 | def add(a: int=0, b: int =0, c: int= 0) -> int:
+   |                E252
+49 |     return a + b + c
+50 | #: Okay
+   |
+
+./resources/test/fixtures/pycodestyle/E25.py:46:16: E252 Missing whitespace around parameter equals
+   |
+46 |     return a + b
+47 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
+48 | def add(a: int=0, b: int =0, c: int= 0) -> int:
+   |                 E252
+49 |     return a + b + c
+50 | #: Okay
+   |
+
+./resources/test/fixtures/pycodestyle/E25.py:46:27: E252 Missing whitespace around parameter equals
+   |
+46 |     return a + b
+47 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
+48 | def add(a: int=0, b: int =0, c: int= 0) -> int:
+   |                            E252
+49 |     return a + b + c
+50 | #: Okay
+   |
+
+./resources/test/fixtures/pycodestyle/E25.py:46:36: E252 Missing whitespace around parameter equals
+   |
+46 |     return a + b
+47 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
+48 | def add(a: int=0, b: int =0, c: int= 0) -> int:
+   |                                     E252
+49 |     return a + b + c
+50 | #: Okay
+   |
+
 

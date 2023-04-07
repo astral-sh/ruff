@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DocstringStartsWithThis
-    body: "First word of the docstring should not be \"This\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 631
-    column: 4
-  end_location:
-    row: 631
-    column: 30
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DocstringStartsWithThis
-    body: "First word of the docstring should not be \"This\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 636
-    column: 4
-  end_location:
-    row: 636
-    column: 56
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pydocstyle/D.py:631:5: D404 First word of the docstring should not be "This"
+    |
+631 | @expect('D404: First word of the docstring should not be "This"')
+632 | def starts_with_this():
+633 |     """This is a docstring."""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D404
+    |
+
+./resources/test/fixtures/pydocstyle/D.py:636:5: D404 First word of the docstring should not be "This"
+    |
+636 | @expect('D404: First word of the docstring should not be "This"')
+637 | def starts_with_space_then_this():
+638 |     """ This is a docstring that starts with a space."""  # noqa: D210
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D404
+    |
+
 

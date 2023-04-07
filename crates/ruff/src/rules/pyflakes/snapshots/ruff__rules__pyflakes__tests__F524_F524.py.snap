@@ -1,89 +1,58 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: StringDotFormatMissingArguments
-    body: "`.format` call is missing argument(s) for placeholder(s): 1"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StringDotFormatMissingArguments
-    body: "`.format` call is missing argument(s) for placeholder(s): 2"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StringDotFormatMissingArguments
-    body: "`.format` call is missing argument(s) for placeholder(s): bar"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StringDotFormatMissingArguments
-    body: "`.format` call is missing argument(s) for placeholder(s): bar"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StringDotFormatMissingArguments
-    body: "`.format` call is missing argument(s) for placeholder(s): 0, bar"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StringDotFormatMissingArguments
-    body: "`.format` call is missing argument(s) for placeholder(s): 0, bar"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 20
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F524.py:1:1: F524 `.format` call is missing argument(s) for placeholder(s): 1
+  |
+1 | "{} {}".format(1)  # F524
+  | ^^^^^^^^^^^^^^^^^ F524
+2 | "{2}".format()  # F524
+3 | "{bar}".format()  # F524
+  |
+
+./resources/test/fixtures/pyflakes/F524.py:2:1: F524 `.format` call is missing argument(s) for placeholder(s): 2
+  |
+2 | "{} {}".format(1)  # F524
+3 | "{2}".format()  # F524
+  | ^^^^^^^^^^^^^^ F524
+4 | "{bar}".format()  # F524
+5 | "{0} {bar}".format(1)  # F524
+  |
+
+./resources/test/fixtures/pyflakes/F524.py:3:1: F524 `.format` call is missing argument(s) for placeholder(s): bar
+  |
+3 | "{} {}".format(1)  # F524
+4 | "{2}".format()  # F524
+5 | "{bar}".format()  # F524
+  | ^^^^^^^^^^^^^^^^ F524
+6 | "{0} {bar}".format(1)  # F524
+7 | "{0} {bar}".format()  # F524
+  |
+
+./resources/test/fixtures/pyflakes/F524.py:4:1: F524 `.format` call is missing argument(s) for placeholder(s): bar
+  |
+4 | "{2}".format()  # F524
+5 | "{bar}".format()  # F524
+6 | "{0} {bar}".format(1)  # F524
+  | ^^^^^^^^^^^^^^^^^^^^^ F524
+7 | "{0} {bar}".format()  # F524
+8 | "{bar} {0}".format()  # F524
+  |
+
+./resources/test/fixtures/pyflakes/F524.py:5:1: F524 `.format` call is missing argument(s) for placeholder(s): 0, bar
+  |
+5 | "{bar}".format()  # F524
+6 | "{0} {bar}".format(1)  # F524
+7 | "{0} {bar}".format()  # F524
+  | ^^^^^^^^^^^^^^^^^^^^ F524
+8 | "{bar} {0}".format()  # F524
+  |
+
+./resources/test/fixtures/pyflakes/F524.py:6:1: F524 `.format` call is missing argument(s) for placeholder(s): 0, bar
+  |
+6 | "{0} {bar}".format(1)  # F524
+7 | "{0} {bar}".format()  # F524
+8 | "{bar} {0}".format()  # F524
+  | ^^^^^^^^^^^^^^^^^^^^ F524
+  |
+
 

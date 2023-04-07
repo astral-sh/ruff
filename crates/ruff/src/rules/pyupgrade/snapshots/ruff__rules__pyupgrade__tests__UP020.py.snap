@@ -1,40 +1,32 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: OpenAlias
-    body: "Use builtin `open`"
-    suggestion: "Replace with builtin `open`"
-    fixable: true
-  location:
-    row: 3
-    column: 5
-  end_location:
-    row: 3
-    column: 55
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 5
-        end_location:
-          row: 3
-          column: 12
-        content: open
-  parent: ~
-- kind:
-    name: OpenAlias
-    body: "Use builtin `open`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 5
-  end_location:
-    row: 8
-    column: 18
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyupgrade/UP020.py:3:6: UP020 [*] Use builtin `open`
+  |
+3 | import io
+4 | 
+5 | with io.open("f.txt", mode="r", buffering=-1, **kwargs) as f:
+  |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP020
+6 |     print(f.read())
+  |
+  = help: Replace with builtin `open`
+
+ℹ Suggested fix
+1 1 | import io
+2 2 | 
+3   |-with io.open("f.txt", mode="r", buffering=-1, **kwargs) as f:
+  3 |+with open("f.txt", mode="r", buffering=-1, **kwargs) as f:
+4 4 |     print(f.read())
+5 5 | 
+6 6 | from io import open
+
+./resources/test/fixtures/pyupgrade/UP020.py:8:6: UP020 Use builtin `open`
+   |
+ 8 | from io import open
+ 9 | 
+10 | with open("f.txt") as f:
+   |      ^^^^^^^^^^^^^ UP020
+11 |     print(f.read())
+   |
+
 

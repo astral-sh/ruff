@@ -1,131 +1,120 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SetAttrWithConstant
-    body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `setattr` with assignment"
-    fixable: true
-  location:
-    row: 40
-    column: 0
-  end_location:
-    row: 40
-    column: 25
-  fix:
-    edits:
-      - location:
-          row: 40
-          column: 0
-        end_location:
-          row: 40
-          column: 25
-        content: foo.bar = None
-  parent: ~
-- kind:
-    name: SetAttrWithConstant
-    body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `setattr` with assignment"
-    fixable: true
-  location:
-    row: 41
-    column: 0
-  end_location:
-    row: 41
-    column: 29
-  fix:
-    edits:
-      - location:
-          row: 41
-          column: 0
-        end_location:
-          row: 41
-          column: 29
-        content: foo._123abc = None
-  parent: ~
-- kind:
-    name: SetAttrWithConstant
-    body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `setattr` with assignment"
-    fixable: true
-  location:
-    row: 42
-    column: 0
-  end_location:
-    row: 42
-    column: 32
-  fix:
-    edits:
-      - location:
-          row: 42
-          column: 0
-        end_location:
-          row: 42
-          column: 32
-        content: foo.__123abc__ = None
-  parent: ~
-- kind:
-    name: SetAttrWithConstant
-    body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `setattr` with assignment"
-    fixable: true
-  location:
-    row: 43
-    column: 0
-  end_location:
-    row: 43
-    column: 28
-  fix:
-    edits:
-      - location:
-          row: 43
-          column: 0
-        end_location:
-          row: 43
-          column: 28
-        content: foo.abc123 = None
-  parent: ~
-- kind:
-    name: SetAttrWithConstant
-    body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `setattr` with assignment"
-    fixable: true
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 29
-  fix:
-    edits:
-      - location:
-          row: 44
-          column: 0
-        end_location:
-          row: 44
-          column: 29
-        content: foo.abc123 = None
-  parent: ~
-- kind:
-    name: SetAttrWithConstant
-    body: "Do not call `setattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `setattr` with assignment"
-    fixable: true
-  location:
-    row: 45
-    column: 0
-  end_location:
-    row: 45
-    column: 30
-  fix:
-    edits:
-      - location:
-          row: 45
-          column: 0
-        end_location:
-          row: 45
-          column: 30
-        content: foo.bar.baz = None
-  parent: ~
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:40:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+40 | # Invalid usage
+41 | setattr(foo, "bar", None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+42 | setattr(foo, "_123abc", None)
+43 | setattr(foo, "__123abc__", None)
+   |
+   = help: Replace `setattr` with assignment
+
+ℹ Suggested fix
+37 37 |     pass
+38 38 | 
+39 39 | # Invalid usage
+40    |-setattr(foo, "bar", None)
+   40 |+foo.bar = None
+41 41 | setattr(foo, "_123abc", None)
+42 42 | setattr(foo, "__123abc__", None)
+43 43 | setattr(foo, "abc123", None)
+
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:41:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+41 | # Invalid usage
+42 | setattr(foo, "bar", None)
+43 | setattr(foo, "_123abc", None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+44 | setattr(foo, "__123abc__", None)
+45 | setattr(foo, "abc123", None)
+   |
+   = help: Replace `setattr` with assignment
+
+ℹ Suggested fix
+38 38 | 
+39 39 | # Invalid usage
+40 40 | setattr(foo, "bar", None)
+41    |-setattr(foo, "_123abc", None)
+   41 |+foo._123abc = None
+42 42 | setattr(foo, "__123abc__", None)
+43 43 | setattr(foo, "abc123", None)
+44 44 | setattr(foo, r"abc123", None)
+
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:42:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+42 | setattr(foo, "bar", None)
+43 | setattr(foo, "_123abc", None)
+44 | setattr(foo, "__123abc__", None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+45 | setattr(foo, "abc123", None)
+46 | setattr(foo, r"abc123", None)
+   |
+   = help: Replace `setattr` with assignment
+
+ℹ Suggested fix
+39 39 | # Invalid usage
+40 40 | setattr(foo, "bar", None)
+41 41 | setattr(foo, "_123abc", None)
+42    |-setattr(foo, "__123abc__", None)
+   42 |+foo.__123abc__ = None
+43 43 | setattr(foo, "abc123", None)
+44 44 | setattr(foo, r"abc123", None)
+45 45 | setattr(foo.bar, r"baz", None)
+
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:43:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+43 | setattr(foo, "_123abc", None)
+44 | setattr(foo, "__123abc__", None)
+45 | setattr(foo, "abc123", None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+46 | setattr(foo, r"abc123", None)
+47 | setattr(foo.bar, r"baz", None)
+   |
+   = help: Replace `setattr` with assignment
+
+ℹ Suggested fix
+40 40 | setattr(foo, "bar", None)
+41 41 | setattr(foo, "_123abc", None)
+42 42 | setattr(foo, "__123abc__", None)
+43    |-setattr(foo, "abc123", None)
+   43 |+foo.abc123 = None
+44 44 | setattr(foo, r"abc123", None)
+45 45 | setattr(foo.bar, r"baz", None)
+
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:44:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+44 | setattr(foo, "__123abc__", None)
+45 | setattr(foo, "abc123", None)
+46 | setattr(foo, r"abc123", None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+47 | setattr(foo.bar, r"baz", None)
+   |
+   = help: Replace `setattr` with assignment
+
+ℹ Suggested fix
+41 41 | setattr(foo, "_123abc", None)
+42 42 | setattr(foo, "__123abc__", None)
+43 43 | setattr(foo, "abc123", None)
+44    |-setattr(foo, r"abc123", None)
+   44 |+foo.abc123 = None
+45 45 | setattr(foo.bar, r"baz", None)
+
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:45:1: B010 [*] Do not call `setattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+45 | setattr(foo, "abc123", None)
+46 | setattr(foo, r"abc123", None)
+47 | setattr(foo.bar, r"baz", None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B010
+   |
+   = help: Replace `setattr` with assignment
+
+ℹ Suggested fix
+42 42 | setattr(foo, "__123abc__", None)
+43 43 | setattr(foo, "abc123", None)
+44 44 | setattr(foo, r"abc123", None)
+45    |-setattr(foo.bar, r"baz", None)
+   45 |+foo.bar.baz = None
+
 

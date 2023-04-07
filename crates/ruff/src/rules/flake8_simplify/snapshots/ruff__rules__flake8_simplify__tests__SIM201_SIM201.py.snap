@@ -1,68 +1,59 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NegateEqualOp
-    body: "Use `a != b` instead of `not a == b`"
-    suggestion: "Replace with `!=` operator"
-    fixable: true
-  location:
-    row: 2
-    column: 3
-  end_location:
-    row: 2
-    column: 13
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 3
-        end_location:
-          row: 2
-          column: 13
-        content: a != b
-  parent: ~
-- kind:
-    name: NegateEqualOp
-    body: "Use `a != b + c` instead of `not a == b + c`"
-    suggestion: "Replace with `!=` operator"
-    fixable: true
-  location:
-    row: 6
-    column: 3
-  end_location:
-    row: 6
-    column: 19
-  fix:
-    edits:
-      - location:
-          row: 6
-          column: 3
-        end_location:
-          row: 6
-          column: 19
-        content: a != b + c
-  parent: ~
-- kind:
-    name: NegateEqualOp
-    body: "Use `a + b != c` instead of `not a + b == c`"
-    suggestion: "Replace with `!=` operator"
-    fixable: true
-  location:
-    row: 10
-    column: 3
-  end_location:
-    row: 10
-    column: 19
-  fix:
-    edits:
-      - location:
-          row: 10
-          column: 3
-        end_location:
-          row: 10
-          column: 19
-        content: a + b != c
-  parent: ~
+./resources/test/fixtures/flake8_simplify/SIM201.py:2:4: SIM201 [*] Use `a != b` instead of `not a == b`
+  |
+2 | # SIM201
+3 | if not a == b:
+  |    ^^^^^^^^^^ SIM201
+4 |     pass
+  |
+  = help: Replace with `!=` operator
+
+ℹ Suggested fix
+1 1 | # SIM201
+2   |-if not a == b:
+  2 |+if a != b:
+3 3 |     pass
+4 4 | 
+5 5 | # SIM201
+
+./resources/test/fixtures/flake8_simplify/SIM201.py:6:4: SIM201 [*] Use `a != b + c` instead of `not a == b + c`
+  |
+6 | # SIM201
+7 | if not a == (b + c):
+  |    ^^^^^^^^^^^^^^^^ SIM201
+8 |     pass
+  |
+  = help: Replace with `!=` operator
+
+ℹ Suggested fix
+3 3 |     pass
+4 4 | 
+5 5 | # SIM201
+6   |-if not a == (b + c):
+  6 |+if a != b + c:
+7 7 |     pass
+8 8 | 
+9 9 | # SIM201
+
+./resources/test/fixtures/flake8_simplify/SIM201.py:10:4: SIM201 [*] Use `a + b != c` instead of `not a + b == c`
+   |
+10 | # SIM201
+11 | if not (a + b) == c:
+   |    ^^^^^^^^^^^^^^^^ SIM201
+12 |     pass
+   |
+   = help: Replace with `!=` operator
+
+ℹ Suggested fix
+7  7  |     pass
+8  8  | 
+9  9  | # SIM201
+10    |-if not (a + b) == c:
+   10 |+if a + b != c:
+11 11 |     pass
+12 12 | 
+13 13 | # OK
+
 

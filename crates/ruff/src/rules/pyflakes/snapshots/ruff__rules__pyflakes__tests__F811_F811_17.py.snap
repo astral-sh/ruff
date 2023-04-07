@@ -1,33 +1,21 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: RedefinedWhileUnused
-    body: "Redefinition of unused `fu` from line 2"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 11
-  end_location:
-    row: 6
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RedefinedWhileUnused
-    body: "Redefinition of unused `fu` from line 6"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 12
-  end_location:
-    row: 9
-    column: 14
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F811_17.py:6:12: F811 Redefinition of unused `fu` from line 2
+  |
+6 | def bar():
+7 |     import fu
+  |            ^^ F811
+8 | 
+9 |     def baz():
+  |
+
+./resources/test/fixtures/pyflakes/F811_17.py:9:13: F811 Redefinition of unused `fu` from line 6
+   |
+ 9 |     def baz():
+10 |         def fu():
+   |             ^^ F811
+11 |             pass
+   |
+
 

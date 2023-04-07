@@ -1,89 +1,78 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CompareWithTuple
-    body: "Use `a in (b, c)` instead of multiple equality comparisons"
-    suggestion: "Replace with `a in (b, c)`"
-    fixable: true
-  location:
-    row: 2
-    column: 3
-  end_location:
-    row: 2
-    column: 19
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 3
-        end_location:
-          row: 2
-          column: 19
-        content: "a in (b, c)"
-  parent: ~
-- kind:
-    name: CompareWithTuple
-    body: "Use `a in (b, c)` instead of multiple equality comparisons"
-    suggestion: "Replace with `a in (b, c)`"
-    fixable: true
-  location:
-    row: 6
-    column: 4
-  end_location:
-    row: 6
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 6
-          column: 4
-        end_location:
-          row: 6
-          column: 20
-        content: "a in (b, c)"
-  parent: ~
-- kind:
-    name: CompareWithTuple
-    body: "Use `a in (b, c)` instead of multiple equality comparisons"
-    suggestion: "Replace with `a in (b, c)`"
-    fixable: true
-  location:
-    row: 10
-    column: 3
-  end_location:
-    row: 10
-    column: 27
-  fix:
-    edits:
-      - location:
-          row: 10
-          column: 3
-        end_location:
-          row: 10
-          column: 27
-        content: "a in (b, c) or None"
-  parent: ~
-- kind:
-    name: CompareWithTuple
-    body: "Use `a in (b, c)` instead of multiple equality comparisons"
-    suggestion: "Replace with `a in (b, c)`"
-    fixable: true
-  location:
-    row: 14
-    column: 3
-  end_location:
-    row: 14
-    column: 27
-  fix:
-    edits:
-      - location:
-          row: 14
-          column: 3
-        end_location:
-          row: 14
-          column: 27
-        content: "a in (b, c) or None"
-  parent: ~
+./resources/test/fixtures/flake8_simplify/SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+  |
+2 | # SIM109
+3 | if a == b or a == c:
+  |    ^^^^^^^^^^^^^^^^ SIM109
+4 |     d
+  |
+  = help: Replace with `a in (b, c)`
+
+ℹ Suggested fix
+1 1 | # SIM109
+2   |-if a == b or a == c:
+  2 |+if a in (b, c):
+3 3 |     d
+4 4 | 
+5 5 | # SIM109
+
+./resources/test/fixtures/flake8_simplify/SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+  |
+6 | # SIM109
+7 | if (a == b or a == c) and None:
+  |     ^^^^^^^^^^^^^^^^ SIM109
+8 |     d
+  |
+  = help: Replace with `a in (b, c)`
+
+ℹ Suggested fix
+3 3 |     d
+4 4 | 
+5 5 | # SIM109
+6   |-if (a == b or a == c) and None:
+  6 |+if (a in (b, c)) and None:
+7 7 |     d
+8 8 | 
+9 9 | # SIM109
+
+./resources/test/fixtures/flake8_simplify/SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+   |
+10 | # SIM109
+11 | if a == b or a == c or None:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^ SIM109
+12 |     d
+   |
+   = help: Replace with `a in (b, c)`
+
+ℹ Suggested fix
+7  7  |     d
+8  8  | 
+9  9  | # SIM109
+10    |-if a == b or a == c or None:
+   10 |+if a in (b, c) or None:
+11 11 |     d
+12 12 | 
+13 13 | # SIM109
+
+./resources/test/fixtures/flake8_simplify/SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+   |
+14 | # SIM109
+15 | if a == b or None or a == c:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^ SIM109
+16 |     d
+   |
+   = help: Replace with `a in (b, c)`
+
+ℹ Suggested fix
+11 11 |     d
+12 12 | 
+13 13 | # SIM109
+14    |-if a == b or None or a == c:
+   14 |+if a in (b, c) or None:
+15 15 |     d
+16 16 | 
+17 17 | # OK
+
 

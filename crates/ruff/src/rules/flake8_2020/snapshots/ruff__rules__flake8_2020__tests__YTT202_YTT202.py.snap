@@ -1,33 +1,23 @@
 ---
 source: crates/ruff/src/rules/flake8_2020/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SixPY3
-    body: "`six.PY3` referenced (python4), use `not six.PY2`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 3
-  end_location:
-    row: 4
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SixPY3
-    body: "`six.PY3` referenced (python4), use `not six.PY2`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 3
-  end_location:
-    row: 6
-    column: 6
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_2020/YTT202.py:4:4: YTT202 `six.PY3` referenced (python4), use `not six.PY2`
+  |
+4 | from six import PY3
+5 | 
+6 | if six.PY3:
+  |    ^^^^^^^ YTT202
+7 |     print("3")
+8 | if PY3:
+  |
+
+./resources/test/fixtures/flake8_2020/YTT202.py:6:4: YTT202 `six.PY3` referenced (python4), use `not six.PY2`
+  |
+6 | if six.PY3:
+7 |     print("3")
+8 | if PY3:
+  |    ^^^ YTT202
+9 |     print("3")
+  |
+
 

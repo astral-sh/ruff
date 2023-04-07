@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: LoggingFString
-    body: Logging statement uses f-string
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 13
-  end_location:
-    row: 4
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: LoggingFString
-    body: Logging statement uses f-string
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 26
-  end_location:
-    row: 5
-    column: 41
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_logging_format/G004.py:4:14: G004 Logging statement uses f-string
+  |
+4 | name = "world"
+5 | logging.info(f"Hello {name}")
+  |              ^^^^^^^^^^^^^^^ G004
+6 | logging.log(logging.INFO, f"Hello {name}")
+  |
+
+./resources/test/fixtures/flake8_logging_format/G004.py:5:27: G004 Logging statement uses f-string
+  |
+5 | name = "world"
+6 | logging.info(f"Hello {name}")
+7 | logging.log(logging.INFO, f"Hello {name}")
+  |                           ^^^^^^^^^^^^^^^ G004
+  |
+
 

@@ -1,33 +1,24 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `key`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 9
-  end_location:
-    row: 11
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `value`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 16
-  end_location:
-    row: 11
-    column: 21
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F821_3.py:11:10: F821 Undefined name `key`
+   |
+11 | # F821 Undefined name `key`
+12 | # F821 Undefined name `value`
+13 | x: dict["key", "value"]
+   |          ^^^ F821
+14 | 
+15 | # OK
+   |
+
+./resources/test/fixtures/pyflakes/F821_3.py:11:17: F821 Undefined name `value`
+   |
+11 | # F821 Undefined name `key`
+12 | # F821 Undefined name `value`
+13 | x: dict["key", "value"]
+   |                 ^^^^^ F821
+14 | 
+15 | # OK
+   |
+
 

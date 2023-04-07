@@ -1,47 +1,31 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: OverloadWithDocstring
-    body: "Function decorated with `@overload` shouldn't contain a docstring"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 34
-    column: 8
-  end_location:
-    row: 34
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: OverloadWithDocstring
-    body: "Function decorated with `@overload` shouldn't contain a docstring"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 90
-    column: 8
-  end_location:
-    row: 90
-    column: 30
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: OverloadWithDocstring
-    body: "Function decorated with `@overload` shouldn't contain a docstring"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 110
-    column: 4
-  end_location:
-    row: 110
-    column: 19
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pydocstyle/D.py:34:9: D418 Function decorated with `@overload` shouldn't contain a docstring
+   |
+34 |     @overload
+35 |     def overloaded_method(self, a: str) -> str:
+   |         ^^^^^^^^^^^^^^^^^ D418
+36 |         """Foo bar documentation."""
+37 |         ...
+   |
+
+./resources/test/fixtures/pydocstyle/D.py:90:9: D418 Function decorated with `@overload` shouldn't contain a docstring
+   |
+90 |     @overload
+91 |     def nested_overloaded_func(a: str) -> str:
+   |         ^^^^^^^^^^^^^^^^^^^^^^ D418
+92 |         """Foo bar documentation."""
+93 |         ...
+   |
+
+./resources/test/fixtures/pydocstyle/D.py:110:5: D418 Function decorated with `@overload` shouldn't contain a docstring
+    |
+110 | @overload
+111 | def overloaded_func(a: str) -> str:
+    |     ^^^^^^^^^^^^^^^ D418
+112 |     """Foo bar documentation."""
+113 |     ...
+    |
+
 

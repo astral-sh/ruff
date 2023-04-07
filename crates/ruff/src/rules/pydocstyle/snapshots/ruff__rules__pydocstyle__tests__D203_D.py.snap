@@ -1,68 +1,66 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: OneBlankLineBeforeClass
-    body: 1 blank line required before class docstring
-    suggestion: Insert 1 blank line before class docstring
-    fixable: true
-  location:
-    row: 161
-    column: 4
-  end_location:
-    row: 161
-    column: 32
-  fix:
-    edits:
-      - location:
-          row: 161
-          column: 0
-        end_location:
-          row: 161
-          column: 0
-        content: "\n"
-  parent: ~
-- kind:
-    name: OneBlankLineBeforeClass
-    body: 1 blank line required before class docstring
-    suggestion: Insert 1 blank line before class docstring
-    fixable: true
-  location:
-    row: 192
-    column: 4
-  end_location:
-    row: 192
-    column: 45
-  fix:
-    edits:
-      - location:
-          row: 192
-          column: 0
-        end_location:
-          row: 192
-          column: 0
-        content: "\n"
-  parent: ~
-- kind:
-    name: OneBlankLineBeforeClass
-    body: 1 blank line required before class docstring
-    suggestion: Insert 1 blank line before class docstring
-    fixable: true
-  location:
-    row: 526
-    column: 4
-  end_location:
-    row: 532
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 526
-          column: 0
-        end_location:
-          row: 526
-          column: 0
-        content: "\n"
-  parent: ~
+./resources/test/fixtures/pydocstyle/D.py:161:5: D203 [*] 1 blank line required before class docstring
+    |
+161 | class LeadingSpaceMissing:
+162 |     """Leading space missing."""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D203
+    |
+    = help: Insert 1 blank line before class docstring
+
+ℹ Suggested fix
+158 158 | 
+159 159 | 
+160 160 | class LeadingSpaceMissing:
+    161 |+
+161 162 |     """Leading space missing."""
+162 163 | 
+163 164 | 
+
+./resources/test/fixtures/pydocstyle/D.py:192:5: D203 [*] 1 blank line required before class docstring
+    |
+192 | class LeadingAndTrailingSpaceMissing:
+193 |     """Leading and trailing space missing."""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D203
+194 |     pass
+    |
+    = help: Insert 1 blank line before class docstring
+
+ℹ Suggested fix
+189 189 | 
+190 190 | 
+191 191 | class LeadingAndTrailingSpaceMissing:
+    192 |+
+192 193 |     """Leading and trailing space missing."""
+193 194 |     pass
+194 195 | 
+
+./resources/test/fixtures/pydocstyle/D.py:526:5: D203 [*] 1 blank line required before class docstring
+    |
+526 |   # parameters as functions for Google / Numpy conventions.
+527 |   class Blah:  # noqa: D203,D213
+528 |       """A Blah.
+    |  _____^
+529 | | 
+530 | |     Parameters
+531 | |     ----------
+532 | |     x : int
+533 | | 
+534 | |     """
+    | |_______^ D203
+535 |   
+536 |       def __init__(self, x):
+    |
+    = help: Insert 1 blank line before class docstring
+
+ℹ Suggested fix
+523 523 | # This is reproducing a bug where AttributeError is raised when parsing class
+524 524 | # parameters as functions for Google / Numpy conventions.
+525 525 | class Blah:  # noqa: D203,D213
+    526 |+
+526 527 |     """A Blah.
+527 528 | 
+528 529 |     Parameters
+
 

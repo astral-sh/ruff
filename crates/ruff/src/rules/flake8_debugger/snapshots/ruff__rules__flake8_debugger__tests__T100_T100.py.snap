@@ -1,131 +1,88 @@
 ---
 source: crates/ruff/src/rules/flake8_debugger/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: Debugger
-    body: "Trace found: `breakpoint` used"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Import for `pdb` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Import for `builtins.breakpoint` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 31
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Import for `pdb.set_trace` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 31
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Import for `celery.contrib.rdb.set_trace` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 40
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Import for `celery.contrib.rdb` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Trace found: `builtins.breakpoint` used"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Trace found: `pdb.set_trace` used"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 12
-    column: 4
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Debugger
-    body: "Trace found: `celery.contrib.rdb.set_trace` used"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 11
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_debugger/T100.py:1:1: T100 Trace found: `breakpoint` used
+  |
+1 | breakpoint()
+  | ^^^^^^^^^^^^ T100
+2 | 
+3 | import pdb
+  |
+
+./resources/test/fixtures/flake8_debugger/T100.py:3:1: T100 Import for `pdb` found
+  |
+3 | breakpoint()
+4 | 
+5 | import pdb
+  | ^^^^^^^^^^ T100
+6 | import builtins
+7 | from builtins import breakpoint
+  |
+
+./resources/test/fixtures/flake8_debugger/T100.py:5:1: T100 Import for `builtins.breakpoint` found
+  |
+5 | import pdb
+6 | import builtins
+7 | from builtins import breakpoint
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+8 | from pdb import set_trace as st
+9 | from celery.contrib.rdb import set_trace
+  |
+
+./resources/test/fixtures/flake8_debugger/T100.py:6:1: T100 Import for `pdb.set_trace` found
+   |
+ 6 | import builtins
+ 7 | from builtins import breakpoint
+ 8 | from pdb import set_trace as st
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+ 9 | from celery.contrib.rdb import set_trace
+10 | from celery.contrib import rdb
+   |
+
+./resources/test/fixtures/flake8_debugger/T100.py:7:1: T100 Import for `celery.contrib.rdb.set_trace` found
+   |
+ 7 | from builtins import breakpoint
+ 8 | from pdb import set_trace as st
+ 9 | from celery.contrib.rdb import set_trace
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+10 | from celery.contrib import rdb
+11 | import celery.contrib.rdb
+   |
+
+./resources/test/fixtures/flake8_debugger/T100.py:9:1: T100 Import for `celery.contrib.rdb` found
+   |
+ 9 | from celery.contrib.rdb import set_trace
+10 | from celery.contrib import rdb
+11 | import celery.contrib.rdb
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ T100
+12 | 
+13 | breakpoint()
+   |
+
+./resources/test/fixtures/flake8_debugger/T100.py:11:1: T100 Trace found: `builtins.breakpoint` used
+   |
+11 | import celery.contrib.rdb
+12 | 
+13 | breakpoint()
+   | ^^^^^^^^^^^^ T100
+14 | st()
+15 | set_trace()
+   |
+
+./resources/test/fixtures/flake8_debugger/T100.py:12:1: T100 Trace found: `pdb.set_trace` used
+   |
+12 | breakpoint()
+13 | st()
+   | ^^^^ T100
+14 | set_trace()
+   |
+
+./resources/test/fixtures/flake8_debugger/T100.py:13:1: T100 Trace found: `celery.contrib.rdb.set_trace` used
+   |
+13 | breakpoint()
+14 | st()
+15 | set_trace()
+   | ^^^^^^^^^^^ T100
+   |
+
 

@@ -1,89 +1,78 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryGeneratorDict
-    body: "Unnecessary generator (rewrite as a `dict` comprehension)"
-    suggestion: "Rewrite as a `dict` comprehension"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 30
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 0
-        end_location:
-          row: 1
-          column: 30
-        content: "{x: x for x in range(3)}"
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorDict
-    body: "Unnecessary generator (rewrite as a `dict` comprehension)"
-    suggestion: "Rewrite as a `dict` comprehension"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 4
-    column: 1
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 4
-          column: 1
-        content: "{\n    x: x for x in range(3)\n}"
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorDict
-    body: "Unnecessary generator (rewrite as a `dict` comprehension)"
-    suggestion: "Rewrite as a `dict` comprehension"
-    fixable: true
-  location:
-    row: 6
-    column: 7
-  end_location:
-    row: 6
-    column: 37
-  fix:
-    edits:
-      - location:
-          row: 6
-          column: 7
-        end_location:
-          row: 6
-          column: 37
-        content: " {x: x for x in range(3)} "
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorDict
-    body: "Unnecessary generator (rewrite as a `dict` comprehension)"
-    suggestion: "Rewrite as a `dict` comprehension"
-    fixable: true
-  location:
-    row: 7
-    column: 15
-  end_location:
-    row: 7
-    column: 45
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 15
-        end_location:
-          row: 7
-          column: 45
-        content: " {x: x for x in range(3)} "
-  parent: ~
+./resources/test/fixtures/flake8_comprehensions/C402.py:1:1: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+  |
+1 | dict((x, x) for x in range(3))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C402
+2 | dict(
+3 |     (x, x) for x in range(3)
+  |
+  = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+1   |-dict((x, x) for x in range(3))
+  1 |+{x: x for x in range(3)}
+2 2 | dict(
+3 3 |     (x, x) for x in range(3)
+4 4 | )
+
+./resources/test/fixtures/flake8_comprehensions/C402.py:2:1: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+  |
+2 |   dict((x, x) for x in range(3))
+3 | / dict(
+4 | |     (x, x) for x in range(3)
+5 | | )
+  | |_^ C402
+6 |   dict(((x, x) for x in range(3)), z=3)
+7 |   y = f'{dict((x, x) for x in range(3))}'
+  |
+  = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+1 1 | dict((x, x) for x in range(3))
+2   |-dict(
+3   |-    (x, x) for x in range(3)
+4   |-)
+  2 |+{
+  3 |+    x: x for x in range(3)
+  4 |+}
+5 5 | dict(((x, x) for x in range(3)), z=3)
+6 6 | y = f'{dict((x, x) for x in range(3))}'
+7 7 | print(f'Hello {dict((x, x) for x in range(3))} World')
+
+./resources/test/fixtures/flake8_comprehensions/C402.py:6:8: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+  |
+6 | )
+7 | dict(((x, x) for x in range(3)), z=3)
+8 | y = f'{dict((x, x) for x in range(3))}'
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C402
+9 | print(f'Hello {dict((x, x) for x in range(3))} World')
+  |
+  = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+3 3 |     (x, x) for x in range(3)
+4 4 | )
+5 5 | dict(((x, x) for x in range(3)), z=3)
+6   |-y = f'{dict((x, x) for x in range(3))}'
+  6 |+y = f'{ {x: x for x in range(3)} }'
+7 7 | print(f'Hello {dict((x, x) for x in range(3))} World')
+
+./resources/test/fixtures/flake8_comprehensions/C402.py:7:16: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+  |
+7 | dict(((x, x) for x in range(3)), z=3)
+8 | y = f'{dict((x, x) for x in range(3))}'
+9 | print(f'Hello {dict((x, x) for x in range(3))} World')
+  |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C402
+  |
+  = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+4 4 | )
+5 5 | dict(((x, x) for x in range(3)), z=3)
+6 6 | y = f'{dict((x, x) for x in range(3))}'
+7   |-print(f'Hello {dict((x, x) for x in range(3))} World')
+  7 |+print(f'Hello { {x: x for x in range(3)} } World')
+
 

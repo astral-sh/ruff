@@ -1,28 +1,22 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedImport
-    body: "`pathlib.PurePath` imported but unused"
-    suggestion: "Remove unused import: `pathlib.PurePath`"
-    fixable: true
-  location:
-    row: 4
-    column: 26
-  end_location:
-    row: 4
-    column: 34
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 0
-        end_location:
-          row: 4
-          column: 34
-        content: from pathlib import Path
-  parent:
-    row: 4
-    column: 0
+./resources/test/fixtures/pyflakes/F401_11.py:4:27: F401 [*] `pathlib.PurePath` imported but unused
+  |
+4 | from typing import List
+5 | from pathlib import Path, PurePath
+  |                           ^^^^^^^^ F401
+  |
+  = help: Remove unused import: `pathlib.PurePath`
+
+ℹ Suggested fix
+1 1 | """Test: parsing of nested string annotations."""
+2 2 | 
+3 3 | from typing import List
+4   |-from pathlib import Path, PurePath
+  4 |+from pathlib import Path
+5 5 | 
+6 6 | 
+7 7 | x: """List['Path']""" = []
+
 

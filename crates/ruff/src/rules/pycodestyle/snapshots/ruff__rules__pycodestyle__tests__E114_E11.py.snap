@@ -1,19 +1,14 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: IndentationWithInvalidMultipleComment
-    body: Indentation is not a multiple of 4 (comment)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 5
-  end_location:
-    row: 15
-    column: 5
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E11.py:15:6: E114 Indentation is not a multiple of 4 (comment)
+   |
+15 | #: E114 E116
+16 | mimetype = 'application/x-directory'
+17 |      # 'httpd/unix-directory'
+   |       E114
+18 | create_date = False
+19 | #: E116 E116 E116
+   |
+
 

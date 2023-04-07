@@ -1,19 +1,8 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: InvalidModuleName
-    body: "Invalid module name: 'file-with-dashes'"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 0
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pep8_naming/N999/module/valid_name/file-with-dashes.py:1:1: N999 Invalid module name: 'file-with-dashes'
+ |
+ |
+
 

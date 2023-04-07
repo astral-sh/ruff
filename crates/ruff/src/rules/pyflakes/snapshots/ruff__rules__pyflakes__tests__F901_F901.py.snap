@@ -1,47 +1,35 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: RaiseNotImplemented
-    body: "`raise NotImplemented` should be `raise NotImplementedError`"
-    suggestion: "Use `raise NotImplementedError`"
-    fixable: true
-  location:
-    row: 2
-    column: 10
-  end_location:
-    row: 2
-    column: 24
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 10
-        end_location:
-          row: 2
-          column: 24
-        content: NotImplementedError
-  parent: ~
-- kind:
-    name: RaiseNotImplemented
-    body: "`raise NotImplemented` should be `raise NotImplementedError`"
-    suggestion: "Use `raise NotImplementedError`"
-    fixable: true
-  location:
-    row: 6
-    column: 10
-  end_location:
-    row: 6
-    column: 24
-  fix:
-    edits:
-      - location:
-          row: 6
-          column: 10
-        end_location:
-          row: 6
-          column: 24
-        content: NotImplementedError
-  parent: ~
+./resources/test/fixtures/pyflakes/F901.py:2:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
+  |
+2 | def f() -> None:
+3 |     raise NotImplemented()
+  |           ^^^^^^^^^^^^^^ F901
+  |
+  = help: Use `raise NotImplementedError`
+
+ℹ Suggested fix
+1 1 | def f() -> None:
+2   |-    raise NotImplemented()
+  2 |+    raise NotImplementedError()
+3 3 | 
+4 4 | 
+5 5 | def g() -> None:
+
+./resources/test/fixtures/pyflakes/F901.py:6:11: F901 [*] `raise NotImplemented` should be `raise NotImplementedError`
+  |
+6 | def g() -> None:
+7 |     raise NotImplemented
+  |           ^^^^^^^^^^^^^^ F901
+  |
+  = help: Use `raise NotImplementedError`
+
+ℹ Suggested fix
+3 3 | 
+4 4 | 
+5 5 | def g() -> None:
+6   |-    raise NotImplemented
+  6 |+    raise NotImplementedError
+
 

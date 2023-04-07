@@ -1,173 +1,116 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 35
-    column: 0
-  end_location:
-    row: 35
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 36
-    column: 0
-  end_location:
-    row: 36
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 37
-    column: 0
-  end_location:
-    row: 37
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 0
-  end_location:
-    row: 38
-    column: 26
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 0
-  end_location:
-    row: 40
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 41
-    column: 0
-  end_location:
-    row: 41
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 42
-    column: 0
-  end_location:
-    row: 42
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 0
-  end_location:
-    row: 43
-    column: 26
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 45
-    column: 0
-  end_location:
-    row: 45
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 0
-  end_location:
-    row: 46
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 47
-    column: 0
-  end_location:
-    row: 47
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestPatchWithLambda
-    body: "Use `return_value=` instead of patching with `lambda`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 48
-    column: 0
-  end_location:
-    row: 48
-    column: 26
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_pytest_style/PT008.py:35:1: PT008 Use `return_value=` instead of patching with `lambda`
+   |
+35 | # Error
+36 | 
+37 | mocker.patch("module.name", lambda: None)
+   | ^^^^^^^^^^^^ PT008
+38 | module_mocker.patch("module.name", lambda: None)
+39 | mocker.patch.object(obj, "attr", lambda: None)
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT008.py:36:1: PT008 Use `return_value=` instead of patching with `lambda`
+   |
+36 | mocker.patch("module.name", lambda: None)
+37 | module_mocker.patch("module.name", lambda: None)
+   | ^^^^^^^^^^^^^^^^^^^ PT008
+38 | mocker.patch.object(obj, "attr", lambda: None)
+39 | module_mocker.patch.object(obj, "attr", lambda: None)
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT008.py:37:1: PT008 Use `return_value=` instead of patching with `lambda`
+   |
+37 | mocker.patch("module.name", lambda: None)
+38 | module_mocker.patch("module.name", lambda: None)
+39 | mocker.patch.object(obj, "attr", lambda: None)
+   | ^^^^^^^^^^^^^^^^^^^ PT008
+40 | module_mocker.patch.object(obj, "attr", lambda: None)
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT008.py:38:1: PT008 Use `return_value=` instead of patching with `lambda`
+   |
+38 | module_mocker.patch("module.name", lambda: None)
+39 | mocker.patch.object(obj, "attr", lambda: None)
+40 | module_mocker.patch.object(obj, "attr", lambda: None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PT008
+41 | 
+42 | mocker.patch("module.name", lambda x, y: None)
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT008.py:40:1: PT008 Use `return_value=` instead of patching with `lambda`
+   |
+40 | module_mocker.patch.object(obj, "attr", lambda: None)
+41 | 
+42 | mocker.patch("module.name", lambda x, y: None)
+   | ^^^^^^^^^^^^ PT008
+43 | module_mocker.patch("module.name", lambda x, y: None)
+44 | mocker.patch.object(obj, "attr", lambda x, y: None)
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT008.py:41:1: PT008 Use `return_value=` instead of patching with `lambda`
+   |
+41 | mocker.patch("module.name", lambda x, y: None)
+42 | module_mocker.patch("module.name", lambda x, y: None)
+   | ^^^^^^^^^^^^^^^^^^^ PT008
+43 | mocker.patch.object(obj, "attr", lambda x, y: None)
+44 | module_mocker.patch.object(obj, "attr", lambda x, y: None)
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT008.py:42:1: PT008 Use `return_value=` instead of patching with `lambda`
+   |
+42 | mocker.patch("module.name", lambda x, y: None)
+43 | module_mocker.patch("module.name", lambda x, y: None)
+44 | mocker.patch.object(obj, "attr", lambda x, y: None)
+   | ^^^^^^^^^^^^^^^^^^^ PT008
+45 | module_mocker.patch.object(obj, "attr", lambda x, y: None)
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT008.py:43:1: PT008 Use `return_value=` instead of patching with `lambda`
+   |
+43 | module_mocker.patch("module.name", lambda x, y: None)
+44 | mocker.patch.object(obj, "attr", lambda x, y: None)
+45 | module_mocker.patch.object(obj, "attr", lambda x, y: None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PT008
+46 | 
+47 | mocker.patch("module.name", lambda *args, **kwargs: None)
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT008.py:45:1: PT008 Use `return_value=` instead of patching with `lambda`
+   |
+45 | module_mocker.patch.object(obj, "attr", lambda x, y: None)
+46 | 
+47 | mocker.patch("module.name", lambda *args, **kwargs: None)
+   | ^^^^^^^^^^^^ PT008
+48 | module_mocker.patch("module.name", lambda *args, **kwargs: None)
+49 | mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT008.py:46:1: PT008 Use `return_value=` instead of patching with `lambda`
+   |
+46 | mocker.patch("module.name", lambda *args, **kwargs: None)
+47 | module_mocker.patch("module.name", lambda *args, **kwargs: None)
+   | ^^^^^^^^^^^^^^^^^^^ PT008
+48 | mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
+49 | module_mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT008.py:47:1: PT008 Use `return_value=` instead of patching with `lambda`
+   |
+47 | mocker.patch("module.name", lambda *args, **kwargs: None)
+48 | module_mocker.patch("module.name", lambda *args, **kwargs: None)
+49 | mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
+   | ^^^^^^^^^^^^^^^^^^^ PT008
+50 | module_mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT008.py:48:1: PT008 Use `return_value=` instead of patching with `lambda`
+   |
+48 | module_mocker.patch("module.name", lambda *args, **kwargs: None)
+49 | mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
+50 | module_mocker.patch.object(obj, "attr", lambda *args, **kwargs: None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ PT008
+   |
+
 

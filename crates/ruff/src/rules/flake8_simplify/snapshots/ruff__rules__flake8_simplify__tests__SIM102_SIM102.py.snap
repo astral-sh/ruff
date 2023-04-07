@@ -1,208 +1,271 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CollapsibleIf
-    body: "Use a single `if` statement instead of nested `if` statements"
-    suggestion: "Combine `if` statements using `and`"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 3
-    column: 9
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 5
-          column: 0
-        content: "if a and b:\n    c\n"
-  parent: ~
-- kind:
-    name: CollapsibleIf
-    body: "Use a single `if` statement instead of nested `if` statements"
-    suggestion: "Combine `if` statements using `and`"
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 9
-    column: 13
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 0
-        end_location:
-          row: 11
-          column: 0
-        content: "if a and b:\n    if c:\n        d\n"
-  parent: ~
-- kind:
-    name: CollapsibleIf
-    body: "Use a single `if` statement instead of nested `if` statements"
-    suggestion: "Combine `if` statements using `and`"
-    fixable: true
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 16
-    column: 9
-  fix:
-    edits:
-      - location:
-          row: 15
-          column: 0
-        end_location:
-          row: 18
-          column: 0
-        content: "elif b and c:\n    d\n"
-  parent: ~
-- kind:
-    name: CollapsibleIf
-    body: "Use a single `if` statement instead of nested `if` statements"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 0
-  end_location:
-    row: 22
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CollapsibleIf
-    body: "Use a single `if` statement instead of nested `if` statements"
-    suggestion: "Combine `if` statements using `and`"
-    fixable: true
-  location:
-    row: 26
-    column: 0
-  end_location:
-    row: 27
-    column: 9
-  fix:
-    edits:
-      - location:
-          row: 26
-          column: 0
-        end_location:
-          row: 30
-          column: 0
-        content: "if a and b:\n    # Fixable due to placement of this comment.\n    c\n"
-  parent: ~
-- kind:
-    name: CollapsibleIf
-    body: "Use a single `if` statement instead of nested `if` statements"
-    suggestion: "Combine `if` statements using `and`"
-    fixable: true
-  location:
-    row: 51
-    column: 4
-  end_location:
-    row: 52
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 51
-          column: 0
-        end_location:
-          row: 64
-          column: 0
-        content: "    if y > 0 and z > 0:\n        \"\"\"this\nis valid\"\"\"\n\n        \"\"\"the indentation on\n            this line is significant\"\"\"\n\n        \"this is\" \\\n\"allowed too\"\n\n        (\"so is\"\n\"this for some reason\")\n"
-  parent: ~
-- kind:
-    name: CollapsibleIf
-    body: "Use a single `if` statement instead of nested `if` statements"
-    suggestion: "Combine `if` statements using `and`"
-    fixable: true
-  location:
-    row: 67
-    column: 0
-  end_location:
-    row: 68
-    column: 13
-  fix:
-    edits:
-      - location:
-          row: 67
-          column: 0
-        end_location:
-          row: 80
-          column: 0
-        content: "if x > 0 and y > 0:\n    \"\"\"this\nis valid\"\"\"\n\n    \"\"\"the indentation on\n        this line is significant\"\"\"\n\n    \"this is\" \\\n\"allowed too\"\n\n    (\"so is\"\n\"this for some reason\")\n"
-  parent: ~
-- kind:
-    name: CollapsibleIf
-    body: "Use a single `if` statement instead of nested `if` statements"
-    suggestion: "Combine `if` statements using `and`"
-    fixable: true
-  location:
-    row: 83
-    column: 4
-  end_location:
-    row: 86
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 83
-          column: 0
-        end_location:
-          row: 88
-          column: 0
-        content: "    if node.module and (node.module == \"multiprocessing\" or node.module.startswith(\n        \"multiprocessing.\"\n    )):\n        print(\"Bad module!\")\n"
-  parent: ~
-- kind:
-    name: CollapsibleIf
-    body: "Use a single `if` statement instead of nested `if` statements"
-    suggestion: "Combine `if` statements using `and`"
-    fixable: true
-  location:
-    row: 90
-    column: 0
-  end_location:
-    row: 93
-    column: 6
-  fix:
-    edits:
-      - location:
-          row: 90
-          column: 0
-        end_location:
-          row: 95
-          column: 0
-        content: "if node.module and (node.module == \"multiprocessing\" or node.module.startswith(\n    \"multiprocessing.\"\n)):\n    print(\"Bad module!\")\n"
-  parent: ~
-- kind:
-    name: CollapsibleIf
-    body: "Use a single `if` statement instead of nested `if` statements"
-    suggestion: "Combine `if` statements using `and`"
-    fixable: true
-  location:
-    row: 117
-    column: 4
-  end_location:
-    row: 118
-    column: 13
-  fix:
-    edits:
-      - location:
-          row: 117
-          column: 0
-        end_location:
-          row: 120
-          column: 0
-        content: "    if b and c:\n        print(\"foo\")\n"
-  parent: ~
+./resources/test/fixtures/flake8_simplify/SIM102.py:2:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+  |
+2 |   # SIM102
+3 | / if a:
+4 | |     if b:
+  | |_________^ SIM102
+5 |           c
+  |
+  = help: Combine `if` statements using `and`
+
+ℹ Suggested fix
+1 1 | # SIM102
+2   |-if a:
+3   |-    if b:
+4   |-        c
+  2 |+if a and b:
+  3 |+    c
+5 4 | 
+6 5 | # SIM102
+7 6 | if a:
+
+./resources/test/fixtures/flake8_simplify/SIM102.py:7:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+ 7 |   # SIM102
+ 8 | / if a:
+ 9 | |     if b:
+10 | |         if c:
+   | |_____________^ SIM102
+11 |               d
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Suggested fix
+4  4  |         c
+5  5  | 
+6  6  | # SIM102
+7     |-if a:
+8     |-    if b:
+9     |-        if c:
+10    |-            d
+   7  |+if a and b:
+   8  |+    if c:
+   9  |+        d
+11 10 | 
+12 11 | # SIM102
+13 12 | if a:
+
+./resources/test/fixtures/flake8_simplify/SIM102.py:15:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+15 |   if a:
+16 |       pass
+17 | / elif b:
+18 | |     if c:
+   | |_________^ SIM102
+19 |           d
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Suggested fix
+12 12 | # SIM102
+13 13 | if a:
+14 14 |     pass
+15    |-elif b:
+16    |-    if c:
+17    |-        d
+   15 |+elif b and c:
+   16 |+    d
+18 17 | 
+19 18 | # SIM102
+20 19 | if a:
+
+./resources/test/fixtures/flake8_simplify/SIM102.py:20:1: SIM102 Use a single `if` statement instead of nested `if` statements
+   |
+20 |   # SIM102
+21 | / if a:
+22 | |     # Unfixable due to placement of this comment.
+23 | |     if b:
+   | |_________^ SIM102
+24 |           c
+   |
+
+./resources/test/fixtures/flake8_simplify/SIM102.py:26:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+26 |   # SIM102
+27 | / if a:
+28 | |     if b:
+   | |_________^ SIM102
+29 |           # Fixable due to placement of this comment.
+30 |           c
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Suggested fix
+23 23 |         c
+24 24 | 
+25 25 | # SIM102
+26    |-if a:
+27    |-    if b:
+28    |-        # Fixable due to placement of this comment.
+29    |-        c
+   26 |+if a and b:
+   27 |+    # Fixable due to placement of this comment.
+   28 |+    c
+30 29 | 
+31 30 | # OK
+32 31 | if a:
+
+./resources/test/fixtures/flake8_simplify/SIM102.py:51:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+51 |   while x > 0:
+52 |       # SIM102
+53 |       if y > 0:
+   |  _____^
+54 | |         if z > 0:
+   | |_________________^ SIM102
+55 |               """this
+56 |   is valid"""
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Suggested fix
+48 48 | 
+49 49 | while x > 0:
+50 50 |     # SIM102
+51    |-    if y > 0:
+52    |-        if z > 0:
+53    |-            """this
+   51 |+    if y > 0 and z > 0:
+   52 |+        """this
+54 53 | is valid"""
+55 54 | 
+56    |-            """the indentation on
+   55 |+        """the indentation on
+57 56 |             this line is significant"""
+58 57 | 
+59    |-            "this is" \
+   58 |+        "this is" \
+60 59 | "allowed too"
+61 60 | 
+62    |-            ("so is"
+   61 |+        ("so is"
+63 62 | "this for some reason")
+64 63 | 
+65 64 | 
+
+./resources/test/fixtures/flake8_simplify/SIM102.py:67:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+67 |   # SIM102
+68 | / if x > 0:
+69 | |     if y > 0:
+   | |_____________^ SIM102
+70 |           """this
+71 |   is valid"""
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Suggested fix
+64 64 | 
+65 65 | 
+66 66 | # SIM102
+67    |-if x > 0:
+68    |-    if y > 0:
+69    |-        """this
+   67 |+if x > 0 and y > 0:
+   68 |+    """this
+70 69 | is valid"""
+71 70 | 
+72    |-        """the indentation on
+   71 |+    """the indentation on
+73 72 |         this line is significant"""
+74 73 | 
+75    |-        "this is" \
+   74 |+    "this is" \
+76 75 | "allowed too"
+77 76 | 
+78    |-        ("so is"
+   77 |+    ("so is"
+79 78 | "this for some reason")
+80 79 | 
+81 80 | while x > 0:
+
+./resources/test/fixtures/flake8_simplify/SIM102.py:83:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+83 |   while x > 0:
+84 |       # SIM102
+85 |       if node.module:
+   |  _____^
+86 | |         if node.module == "multiprocessing" or node.module.startswith(
+87 | |             "multiprocessing."
+88 | |         ):
+   | |__________^ SIM102
+89 |               print("Bad module!")
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Suggested fix
+80 80 | 
+81 81 | while x > 0:
+82 82 |     # SIM102
+83    |-    if node.module:
+84    |-        if node.module == "multiprocessing" or node.module.startswith(
+85    |-            "multiprocessing."
+86    |-        ):
+87    |-            print("Bad module!")
+   83 |+    if node.module and (node.module == "multiprocessing" or node.module.startswith(
+   84 |+        "multiprocessing."
+   85 |+    )):
+   86 |+        print("Bad module!")
+88 87 | 
+89 88 | # SIM102
+90 89 | if node.module:
+
+./resources/test/fixtures/flake8_simplify/SIM102.py:90:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+   |
+90 |   # SIM102
+91 | / if node.module:
+92 | |     if node.module == "multiprocessing" or node.module.startswith(
+93 | |         "multiprocessing."
+94 | |     ):
+   | |______^ SIM102
+95 |           print("Bad module!")
+   |
+   = help: Combine `if` statements using `and`
+
+ℹ Suggested fix
+87 87 |             print("Bad module!")
+88 88 | 
+89 89 | # SIM102
+90    |-if node.module:
+91    |-    if node.module == "multiprocessing" or node.module.startswith(
+92    |-        "multiprocessing."
+93    |-    ):
+94    |-        print("Bad module!")
+   90 |+if node.module and (node.module == "multiprocessing" or node.module.startswith(
+   91 |+    "multiprocessing."
+   92 |+)):
+   93 |+    print("Bad module!")
+95 94 | 
+96 95 | 
+97 96 | # OK
+
+./resources/test/fixtures/flake8_simplify/SIM102.py:117:5: SIM102 [*] Use a single `if` statement instead of nested `if` statements
+    |
+117 |   if a:
+118 |       # SIM 102
+119 |       if b:
+    |  _____^
+120 | |         if c:
+    | |_____________^ SIM102
+121 |               print("foo")
+122 |   else:
+    |
+    = help: Combine `if` statements using `and`
+
+ℹ Suggested fix
+114 114 | # OK
+115 115 | if a:
+116 116 |     # SIM 102
+117     |-    if b:
+118     |-        if c:
+119     |-            print("foo")
+    117 |+    if b and c:
+    118 |+        print("foo")
+120 119 | else:
+121 120 |     print("bar")
+122 121 | 
+
 

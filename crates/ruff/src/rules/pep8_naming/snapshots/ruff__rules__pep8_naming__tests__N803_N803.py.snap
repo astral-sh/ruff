@@ -1,33 +1,19 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: InvalidArgumentName
-    body: "Argument name `A` should be lowercase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 15
-  end_location:
-    row: 1
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: InvalidArgumentName
-    body: "Argument name `A` should be lowercase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 27
-  end_location:
-    row: 6
-    column: 28
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pep8_naming/N803.py:1:16: N803 Argument name `A` should be lowercase
+  |
+1 | def func(_, a, A):
+  |                ^ N803
+2 |     return _, a, A
+  |
+
+./resources/test/fixtures/pep8_naming/N803.py:6:28: N803 Argument name `A` should be lowercase
+  |
+6 | class Class:
+7 |     def method(self, _, a, A):
+  |                            ^ N803
+8 |         return _, a, A
+  |
+
 

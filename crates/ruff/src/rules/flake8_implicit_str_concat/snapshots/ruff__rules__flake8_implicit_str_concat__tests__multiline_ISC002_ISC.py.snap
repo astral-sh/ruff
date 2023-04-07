@@ -1,61 +1,46 @@
 ---
 source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MultiLineImplicitStringConcatenation
-    body: Implicitly concatenated string literals over multiple lines
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 4
-  end_location:
-    row: 6
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultiLineImplicitStringConcatenation
-    body: Implicitly concatenated string literals over multiple lines
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 2
-  end_location:
-    row: 25
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultiLineImplicitStringConcatenation
-    body: Implicitly concatenated string literals over multiple lines
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 2
-  end_location:
-    row: 30
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultiLineImplicitStringConcatenation
-    body: Implicitly concatenated string literals over multiple lines
-    suggestion: ~
-    fixable: false
-  location:
-    row: 34
-    column: 2
-  end_location:
-    row: 35
-    column: 8
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:5:5: ISC002 Implicitly concatenated string literals over multiple lines
+   |
+ 5 |   _ = "abc" + "def"
+ 6 |   
+ 7 |   _ = "abc" \
+   |  _____^
+ 8 | |     "def"
+   | |_________^ ISC002
+ 9 |   
+10 |   _ = (
+   |
+
+./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:24:3: ISC002 Implicitly concatenated string literals over multiple lines
+   |
+24 |   _ = (
+25 |     "abc"
+   |  ___^
+26 | |   "def"
+   | |_______^ ISC002
+27 |   )
+   |
+
+./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:29:3: ISC002 Implicitly concatenated string literals over multiple lines
+   |
+29 |   _ = (
+30 |     f"abc"
+   |  ___^
+31 | |   "def"
+   | |_______^ ISC002
+32 |   )
+   |
+
+./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:34:3: ISC002 Implicitly concatenated string literals over multiple lines
+   |
+34 |   _ = (
+35 |     b"abc"
+   |  ___^
+36 | |   b"def"
+   | |________^ ISC002
+37 |   )
+   |
+
 

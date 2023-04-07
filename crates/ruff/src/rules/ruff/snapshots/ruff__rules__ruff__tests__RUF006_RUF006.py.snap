@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: AsyncioDanglingTask
-    body: "Store a reference to the return value of `asyncio.create_task`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 4
-  end_location:
-    row: 6
-    column: 49
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AsyncioDanglingTask
-    body: "Store a reference to the return value of `asyncio.ensure_future`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 11
-    column: 51
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/ruff/RUF006.py:6:5: RUF006 Store a reference to the return value of `asyncio.create_task`
+  |
+6 | # Error
+7 | def f():
+8 |     asyncio.create_task(coordinator.ws_connect())  # Error
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
+  |
+
+./resources/test/fixtures/ruff/RUF006.py:11:5: RUF006 Store a reference to the return value of `asyncio.ensure_future`
+   |
+11 | # Error
+12 | def f():
+13 |     asyncio.ensure_future(coordinator.ws_connect())  # Error
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
+   |
+
 

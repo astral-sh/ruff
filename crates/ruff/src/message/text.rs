@@ -1,4 +1,5 @@
 use crate::fs::relativize_path;
+use crate::message::diff::Diff;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
 use annotate_snippets::display_list::{DisplayList, FormatOptions};
@@ -14,12 +15,19 @@ use std::io::Write;
 #[derive(Default)]
 pub struct TextEmitter {
     show_fix_status: bool,
+    show_fix: bool,
 }
 
 impl TextEmitter {
     #[must_use]
     pub fn with_show_fix_status(mut self, show_fix_status: bool) -> Self {
         self.show_fix_status = show_fix_status;
+        self
+    }
+
+    #[must_use]
+    pub fn with_show_fix(mut self, show_fix: bool) -> Self {
+        self.show_fix = show_fix;
         self
     }
 }
@@ -69,6 +77,12 @@ impl Emitter for TextEmitter {
 
             if message.file.source_code().is_some() {
                 writeln!(writer, "{}", MessageCodeFrame { message })?;
+
+                if self.show_fix {
+                    if let Some(diff) = Diff::from_message(message) {
+                        writeln!(writer, "{diff}")?;
+                    }
+                }
             }
         }
 

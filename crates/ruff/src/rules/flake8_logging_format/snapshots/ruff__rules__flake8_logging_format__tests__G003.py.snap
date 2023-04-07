@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: LoggingStringConcat
-    body: "Logging statement uses `+`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 13
-  end_location:
-    row: 3
-    column: 37
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: LoggingStringConcat
-    body: "Logging statement uses `+`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 26
-  end_location:
-    row: 4
-    column: 50
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_logging_format/G003.py:3:14: G003 Logging statement uses `+`
+  |
+3 | import logging
+4 | 
+5 | logging.info("Hello" + " " + "World!")
+  |              ^^^^^^^^^^^^^^^^^^^^^^^^ G003
+6 | logging.log(logging.INFO, "Hello" + " " + "World!")
+  |
+
+./resources/test/fixtures/flake8_logging_format/G003.py:4:27: G003 Logging statement uses `+`
+  |
+4 | logging.info("Hello" + " " + "World!")
+5 | logging.log(logging.INFO, "Hello" + " " + "World!")
+  |                           ^^^^^^^^^^^^^^^^^^^^^^^^ G003
+  |
+
 

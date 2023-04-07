@@ -1,33 +1,17 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ReturnOutsideFunction
-    body: "`return` statement outside of a function/method"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 4
-  end_location:
-    row: 6
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ReturnOutsideFunction
-    body: "`return` statement outside of a function/method"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 8
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F706.py:6:5: F706 `return` statement outside of a function/method
+  |
+6 | class Foo:
+7 |     return 2
+  |     ^^^^^^^^ F706
+  |
+
+./resources/test/fixtures/pyflakes/F706.py:9:1: F706 `return` statement outside of a function/method
+  |
+9 | return 3
+  | ^^^^^^^^ F706
+  |
+
 

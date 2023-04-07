@@ -1,103 +1,70 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: StarArgUnpackingAfterKeywordArg
-    body: Star-arg unpacking after a keyword argument is strongly discouraged
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 15
-  end_location:
-    row: 16
-    column: 30
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StarArgUnpackingAfterKeywordArg
-    body: Star-arg unpacking after a keyword argument is strongly discouraged
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 15
-  end_location:
-    row: 17
-    column: 23
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StarArgUnpackingAfterKeywordArg
-    body: Star-arg unpacking after a keyword argument is strongly discouraged
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 26
-  end_location:
-    row: 18
-    column: 34
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StarArgUnpackingAfterKeywordArg
-    body: Star-arg unpacking after a keyword argument is strongly discouraged
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 37
-  end_location:
-    row: 19
-    column: 40
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StarArgUnpackingAfterKeywordArg
-    body: Star-arg unpacking after a keyword argument is strongly discouraged
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 15
-  end_location:
-    row: 20
-    column: 23
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StarArgUnpackingAfterKeywordArg
-    body: Star-arg unpacking after a keyword argument is strongly discouraged
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 25
-  end_location:
-    row: 20
-    column: 33
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StarArgUnpackingAfterKeywordArg
-    body: Star-arg unpacking after a keyword argument is strongly discouraged
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 25
-  end_location:
-    row: 21
-    column: 33
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bugbear/B026.py:16:16: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+   |
+16 | foo("bar", baz="baz", bam="bam")
+17 | foo(bar="bar", baz="baz", bam="bam")
+18 | foo(bam="bam", *["bar", "baz"])
+   |                ^^^^^^^^^^^^^^^ B026
+19 | foo(bam="bam", *bar_baz)
+20 | foo(baz="baz", bam="bam", *["bar"])
+   |
+
+./resources/test/fixtures/flake8_bugbear/B026.py:17:16: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+   |
+17 | foo(bar="bar", baz="baz", bam="bam")
+18 | foo(bam="bam", *["bar", "baz"])
+19 | foo(bam="bam", *bar_baz)
+   |                ^^^^^^^^ B026
+20 | foo(baz="baz", bam="bam", *["bar"])
+21 | foo(bar="bar", baz="baz", bam="bam", *[])
+   |
+
+./resources/test/fixtures/flake8_bugbear/B026.py:18:27: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+   |
+18 | foo(bam="bam", *["bar", "baz"])
+19 | foo(bam="bam", *bar_baz)
+20 | foo(baz="baz", bam="bam", *["bar"])
+   |                           ^^^^^^^^ B026
+21 | foo(bar="bar", baz="baz", bam="bam", *[])
+22 | foo(bam="bam", *["bar"], *["baz"])
+   |
+
+./resources/test/fixtures/flake8_bugbear/B026.py:19:38: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+   |
+19 | foo(bam="bam", *bar_baz)
+20 | foo(baz="baz", bam="bam", *["bar"])
+21 | foo(bar="bar", baz="baz", bam="bam", *[])
+   |                                      ^^^ B026
+22 | foo(bam="bam", *["bar"], *["baz"])
+23 | foo(*["bar"], bam="bam", *["baz"])
+   |
+
+./resources/test/fixtures/flake8_bugbear/B026.py:20:16: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+   |
+20 | foo(baz="baz", bam="bam", *["bar"])
+21 | foo(bar="bar", baz="baz", bam="bam", *[])
+22 | foo(bam="bam", *["bar"], *["baz"])
+   |                ^^^^^^^^ B026
+23 | foo(*["bar"], bam="bam", *["baz"])
+   |
+
+./resources/test/fixtures/flake8_bugbear/B026.py:20:26: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+   |
+20 | foo(baz="baz", bam="bam", *["bar"])
+21 | foo(bar="bar", baz="baz", bam="bam", *[])
+22 | foo(bam="bam", *["bar"], *["baz"])
+   |                          ^^^^^^^^ B026
+23 | foo(*["bar"], bam="bam", *["baz"])
+   |
+
+./resources/test/fixtures/flake8_bugbear/B026.py:21:26: B026 Star-arg unpacking after a keyword argument is strongly discouraged
+   |
+21 | foo(bar="bar", baz="baz", bam="bam", *[])
+22 | foo(bam="bam", *["bar"], *["baz"])
+23 | foo(*["bar"], bam="bam", *["baz"])
+   |                          ^^^^^^^^ B026
+   |
+
 

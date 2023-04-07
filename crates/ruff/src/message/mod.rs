@@ -1,4 +1,5 @@
 mod azure;
+mod diff;
 mod github;
 mod gitlab;
 mod grouped;

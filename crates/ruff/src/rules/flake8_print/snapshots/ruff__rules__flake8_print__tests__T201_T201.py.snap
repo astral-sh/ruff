@@ -1,61 +1,42 @@
 ---
 source: crates/ruff/src/rules/flake8_print/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: Print
-    body: "`print` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Print
-    body: "`print` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Print
-    body: "`print` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Print
-    body: "`print` found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 5
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_print/T201.py:4:1: T201 `print` found
+  |
+4 | import tempfile
+5 | 
+6 | print("Hello, world!")  # T201
+  | ^^^^^ T201
+7 | print("Hello, world!", file=None)  # T201
+8 | print("Hello, world!", file=sys.stdout)  # T201
+  |
+
+./resources/test/fixtures/flake8_print/T201.py:5:1: T201 `print` found
+  |
+5 | print("Hello, world!")  # T201
+6 | print("Hello, world!", file=None)  # T201
+  | ^^^^^ T201
+7 | print("Hello, world!", file=sys.stdout)  # T201
+8 | print("Hello, world!", file=sys.stderr)  # T201
+  |
+
+./resources/test/fixtures/flake8_print/T201.py:6:1: T201 `print` found
+  |
+6 | print("Hello, world!")  # T201
+7 | print("Hello, world!", file=None)  # T201
+8 | print("Hello, world!", file=sys.stdout)  # T201
+  | ^^^^^ T201
+9 | print("Hello, world!", file=sys.stderr)  # T201
+  |
+
+./resources/test/fixtures/flake8_print/T201.py:7:1: T201 `print` found
+   |
+ 7 | print("Hello, world!", file=None)  # T201
+ 8 | print("Hello, world!", file=sys.stdout)  # T201
+ 9 | print("Hello, world!", file=sys.stderr)  # T201
+   | ^^^^^ T201
+10 | 
+11 | with tempfile.NamedTemporaryFile() as fp:
+   |
+
 

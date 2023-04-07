@@ -1,47 +1,30 @@
 ---
 source: crates/ruff/src/rules/pygrep_hooks/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BlanketTypeIgnore
-    body: Use specific rule codes when ignoring type issues
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 7
-  end_location:
-    row: 1
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BlanketTypeIgnore
-    body: Use specific rule codes when ignoring type issues
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 7
-  end_location:
-    row: 2
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BlanketTypeIgnore
-    body: Use specific rule codes when ignoring type issues
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 7
-  end_location:
-    row: 3
-    column: 20
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pygrep-hooks/PGH003_0.py:1:8: PGH003 Use specific rule codes when ignoring type issues
+  |
+1 | x = 1  # type: ignore
+  |        ^^^^^^^^^^^^^^ PGH003
+2 | x = 1  # type ignore
+3 | x = 1  # type:ignore
+  |
+
+./resources/test/fixtures/pygrep-hooks/PGH003_0.py:2:8: PGH003 Use specific rule codes when ignoring type issues
+  |
+2 | x = 1  # type: ignore
+3 | x = 1  # type ignore
+  |        ^^^^^^^^^^^^^ PGH003
+4 | x = 1  # type:ignore
+  |
+
+./resources/test/fixtures/pygrep-hooks/PGH003_0.py:3:8: PGH003 Use specific rule codes when ignoring type issues
+  |
+3 | x = 1  # type: ignore
+4 | x = 1  # type ignore
+5 | x = 1  # type:ignore
+  |        ^^^^^^^^^^^^^ PGH003
+6 | 
+7 | x = 1
+  |
+
 

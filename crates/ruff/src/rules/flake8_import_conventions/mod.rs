@@ -6,8 +6,9 @@ pub mod settings;
 mod tests {
     use std::path::Path;
 
+    use crate::assert_messages;
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use rustc_hash::FxHashMap;
 
     use crate::registry::Rule;
@@ -20,7 +21,7 @@ mod tests {
             Path::new("flake8_import_conventions/defaults.py"),
             &Settings::for_rule(Rule::UnconventionalImportAlias),
         )?;
-        assert_yaml_snapshot!("defaults", diagnostics);
+        assert_messages!("defaults", diagnostics);
         Ok(())
     }
 
@@ -40,7 +41,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_yaml_snapshot!("custom", diagnostics);
+        assert_messages!("custom", diagnostics);
         Ok(())
     }
 
@@ -62,7 +63,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_yaml_snapshot!("remove_default", diagnostics);
+        assert_messages!("remove_default", diagnostics);
         Ok(())
     }
 
@@ -82,7 +83,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_yaml_snapshot!("override_default", diagnostics);
+        assert_messages!("override_default", diagnostics);
         Ok(())
     }
 
@@ -105,7 +106,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_yaml_snapshot!("from_imports", diagnostics);
+        assert_messages!("from_imports", diagnostics);
         Ok(())
     }
 }

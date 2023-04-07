@@ -1,75 +1,44 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: TripleSingleQuotes
-    body: "Use triple double quotes `\"\"\"`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 307
-    column: 4
-  end_location:
-    row: 307
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TripleSingleQuotes
-    body: "Use triple double quotes `\"\"\"`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 312
-    column: 4
-  end_location:
-    row: 312
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TripleSingleQuotes
-    body: "Use triple double quotes `\"\"\"`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 317
-    column: 4
-  end_location:
-    row: 317
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TripleSingleQuotes
-    body: "Use triple double quotes `\"\"\"`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 322
-    column: 4
-  end_location:
-    row: 322
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TripleSingleQuotes
-    body: "Use triple double quotes `\"\"\"`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 328
-    column: 4
-  end_location:
-    row: 328
-    column: 16
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pydocstyle/D.py:307:5: D300 Use triple double quotes `"""`
+    |
+307 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
+308 | def triple_single_quotes_raw():
+309 |     r'''Summary.'''
+    |     ^^^^^^^^^^^^^^^ D300
+    |
+
+./resources/test/fixtures/pydocstyle/D.py:312:5: D300 Use triple double quotes `"""`
+    |
+312 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
+313 | def triple_single_quotes_raw_uppercase():
+314 |     R'''Summary.'''
+    |     ^^^^^^^^^^^^^^^ D300
+    |
+
+./resources/test/fixtures/pydocstyle/D.py:317:5: D300 Use triple double quotes `"""`
+    |
+317 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
+318 | def single_quotes_raw():
+319 |     r'Summary.'
+    |     ^^^^^^^^^^^ D300
+    |
+
+./resources/test/fixtures/pydocstyle/D.py:322:5: D300 Use triple double quotes `"""`
+    |
+322 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
+323 | def single_quotes_raw_uppercase():
+324 |     R'Summary.'
+    |     ^^^^^^^^^^^ D300
+    |
+
+./resources/test/fixtures/pydocstyle/D.py:328:5: D300 Use triple double quotes `"""`
+    |
+328 | @expect('D301: Use r""" if any backslashes in a docstring')
+329 | def single_quotes_raw_uppercase_backslash():
+330 |     R'Sum\mary.'
+    |     ^^^^^^^^^^^^ D300
+    |
+
 

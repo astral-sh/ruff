@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/flake8_datetimez/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CallDatetimeUtcfromtimestamp
-    body: "The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=)` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 40
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CallDatetimeUtcfromtimestamp
-    body: "The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=)` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 31
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_datetimez/DTZ004.py:4:1: DTZ004 The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=)` instead
+  |
+4 | # qualified
+5 | datetime.datetime.utcfromtimestamp(1234)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ004
+6 | 
+7 | from datetime import datetime
+  |
+
+./resources/test/fixtures/flake8_datetimez/DTZ004.py:9:1: DTZ004 The use of `datetime.datetime.utcfromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=)` instead
+   |
+ 9 | # unqualified
+10 | datetime.utcfromtimestamp(1234)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ004
+   |
+
 

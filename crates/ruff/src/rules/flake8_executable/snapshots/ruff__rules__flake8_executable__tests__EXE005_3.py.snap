@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/flake8_executable/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ShebangNotFirstLine
-    body: Shebang should be at the beginning of the file
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 2
-  end_location:
-    row: 6
-    column: 17
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_executable/EXE005_3.py:6:3: EXE005 Shebang should be at the beginning of the file
+  |
+6 | """
+7 | # A python comment
+8 | #!/usr/bin/python
+  |   ^^^^^^^^^^^^^^^ EXE005
+  |
+
 

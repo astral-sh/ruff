@@ -1,33 +1,21 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestMissingFixtureNameUnderscore
-    body: "Fixture `patch_something` does not return anything, add leading underscore"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 51
-    column: 0
-  end_location:
-    row: 52
-    column: 30
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestMissingFixtureNameUnderscore
-    body: "Fixture `activate_context` does not return anything, add leading underscore"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 56
-    column: 0
-  end_location:
-    row: 58
-    column: 13
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_pytest_style/PT004.py:51:1: PT004 Fixture `patch_something` does not return anything, add leading underscore
+   |
+51 |   @pytest.fixture()
+52 | / def patch_something(mocker):  # Error simple
+53 | |     mocker.patch("some.thing")
+   | |______________________________^ PT004
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT004.py:56:1: PT004 Fixture `activate_context` does not return anything, add leading underscore
+   |
+56 |   @pytest.fixture()
+57 | / def activate_context():  # Error with yield
+58 | |     with context:
+59 | |         yield
+   | |_____________^ PT004
+   |
+
 

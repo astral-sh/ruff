@@ -1,26 +1,25 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BadQuotesDocstring
-    body: Double quote docstring found but single quotes preferred
-    suggestion: Replace double quotes docstring with single quotes
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 3
-    column: 3
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 0
-        end_location:
-          row: 3
-          column: 3
-        content: "'''\nDouble quotes multiline module docstring\n'''"
-  parent: ~
+./resources/test/fixtures/flake8_quotes/docstring_doubles_module_multiline.py:1:1: Q002 [*] Double quote docstring found but single quotes preferred
+  |
+1 | / """
+2 | | Double quotes multiline module docstring
+3 | | """
+  | |___^ Q002
+4 |   """
+5 |   this is not a docstring
+  |
+  = help: Replace double quotes docstring with single quotes
+
+ℹ Suggested fix
+1   |-"""
+  1 |+'''
+2 2 | Double quotes multiline module docstring
+3   |-"""
+  3 |+'''
+4 4 | """
+5 5 | this is not a docstring
+6 6 | """
+
 

@@ -1,75 +1,50 @@
 ---
 source: crates/ruff/src/rules/flake8_2020/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SysVersionCmpStr3
-    body: "`sys.version` compared to string (python3.10), use `sys.version_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SysVersionCmpStr3
-    body: "`sys.version` compared to string (python3.10), use `sys.version_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SysVersionCmpStr3
-    body: "`sys.version` compared to string (python3.10), use `sys.version_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SysVersionCmpStr3
-    body: "`sys.version` compared to string (python3.10), use `sys.version_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SysVersionCmpStr3
-    body: "`sys.version` compared to string (python3.10), use `sys.version_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 11
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_2020/YTT103.py:4:1: YTT103 `sys.version` compared to string (python3.10), use `sys.version_info`
+  |
+4 | from sys import version
+5 | 
+6 | version < "3.5"
+  | ^^^^^^^ YTT103
+7 | sys.version < "3.5"
+8 | sys.version <= "3.5"
+  |
+
+./resources/test/fixtures/flake8_2020/YTT103.py:5:1: YTT103 `sys.version` compared to string (python3.10), use `sys.version_info`
+  |
+5 | version < "3.5"
+6 | sys.version < "3.5"
+  | ^^^^^^^^^^^ YTT103
+7 | sys.version <= "3.5"
+8 | sys.version > "3.5"
+  |
+
+./resources/test/fixtures/flake8_2020/YTT103.py:6:1: YTT103 `sys.version` compared to string (python3.10), use `sys.version_info`
+   |
+ 6 | version < "3.5"
+ 7 | sys.version < "3.5"
+ 8 | sys.version <= "3.5"
+   | ^^^^^^^^^^^ YTT103
+ 9 | sys.version > "3.5"
+10 | sys.version >= "3.5"
+   |
+
+./resources/test/fixtures/flake8_2020/YTT103.py:7:1: YTT103 `sys.version` compared to string (python3.10), use `sys.version_info`
+   |
+ 7 | sys.version < "3.5"
+ 8 | sys.version <= "3.5"
+ 9 | sys.version > "3.5"
+   | ^^^^^^^^^^^ YTT103
+10 | sys.version >= "3.5"
+   |
+
+./resources/test/fixtures/flake8_2020/YTT103.py:8:1: YTT103 `sys.version` compared to string (python3.10), use `sys.version_info`
+   |
+ 8 | sys.version <= "3.5"
+ 9 | sys.version > "3.5"
+10 | sys.version >= "3.5"
+   | ^^^^^^^^^^^ YTT103
+   |
+
 

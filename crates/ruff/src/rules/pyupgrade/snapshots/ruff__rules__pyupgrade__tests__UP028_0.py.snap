@@ -1,257 +1,274 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: YieldInForLoop
-    body: "Replace `yield` over `for` loop with `yield from`"
-    suggestion: "Replace with `yield from`"
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 3
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 4
-        end_location:
-          row: 3
-          column: 15
-        content: yield from y
-  parent: ~
-- kind:
-    name: YieldInForLoop
-    body: "Replace `yield` over `for` loop with `yield from`"
-    suggestion: "Replace with `yield from`"
-    fixable: true
-  location:
-    row: 7
-    column: 4
-  end_location:
-    row: 8
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 4
-        end_location:
-          row: 8
-          column: 20
-        content: yield from z
-  parent: ~
-- kind:
-    name: YieldInForLoop
-    body: "Replace `yield` over `for` loop with `yield from`"
-    suggestion: "Replace with `yield from`"
-    fixable: true
-  location:
-    row: 12
-    column: 4
-  end_location:
-    row: 13
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 12
-          column: 4
-        end_location:
-          row: 13
-          column: 15
-        content: "yield from [1, 2, 3]"
-  parent: ~
-- kind:
-    name: YieldInForLoop
-    body: "Replace `yield` over `for` loop with `yield from`"
-    suggestion: "Replace with `yield from`"
-    fixable: true
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 18
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 17
-          column: 4
-        end_location:
-          row: 18
-          column: 15
-        content: "yield from {x for x in y}"
-  parent: ~
-- kind:
-    name: YieldInForLoop
-    body: "Replace `yield` over `for` loop with `yield from`"
-    suggestion: "Replace with `yield from`"
-    fixable: true
-  location:
-    row: 22
-    column: 4
-  end_location:
-    row: 23
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 22
-          column: 4
-        end_location:
-          row: 23
-          column: 15
-        content: "yield from (1, 2, 3)"
-  parent: ~
-- kind:
-    name: YieldInForLoop
-    body: "Replace `yield` over `for` loop with `yield from`"
-    suggestion: "Replace with `yield from`"
-    fixable: true
-  location:
-    row: 27
-    column: 4
-  end_location:
-    row: 28
-    column: 18
-  fix:
-    edits:
-      - location:
-          row: 27
-          column: 4
-        end_location:
-          row: 28
-          column: 18
-        content: "yield from {3: \"x\", 6: \"y\"}"
-  parent: ~
-- kind:
-    name: YieldInForLoop
-    body: "Replace `yield` over `for` loop with `yield from`"
-    suggestion: "Replace with `yield from`"
-    fixable: true
-  location:
-    row: 33
-    column: 4
-  end_location:
-    row: 39
-    column: 18
-  fix:
-    edits:
-      - location:
-          row: 33
-          column: 4
-        end_location:
-          row: 39
-          column: 18
-        content: "yield from {  # Comment three\\n'\n        3: \"x\",  # Comment four\\n'\n        # Comment five\\n'\n        6: \"y\",  # Comment six\\n'\n    }"
-  parent: ~
-- kind:
-    name: YieldInForLoop
-    body: "Replace `yield` over `for` loop with `yield from`"
-    suggestion: "Replace with `yield from`"
-    fixable: true
-  location:
-    row: 44
-    column: 4
-  end_location:
-    row: 45
-    column: 18
-  fix:
-    edits:
-      - location:
-          row: 44
-          column: 4
-        end_location:
-          row: 45
-          column: 18
-        content: "yield from [{3: (3, [44, \"long ss\"]), 6: \"y\"}]"
-  parent: ~
-- kind:
-    name: YieldInForLoop
-    body: "Replace `yield` over `for` loop with `yield from`"
-    suggestion: "Replace with `yield from`"
-    fixable: true
-  location:
-    row: 49
-    column: 4
-  end_location:
-    row: 50
-    column: 18
-  fix:
-    edits:
-      - location:
-          row: 49
-          column: 4
-        end_location:
-          row: 50
-          column: 18
-        content: yield from z()
-  parent: ~
-- kind:
-    name: YieldInForLoop
-    body: "Replace `yield` over `for` loop with `yield from`"
-    suggestion: "Replace with `yield from`"
-    fixable: true
-  location:
-    row: 55
-    column: 8
-  end_location:
-    row: 57
-    column: 22
-  fix:
-    edits:
-      - location:
-          row: 55
-          column: 8
-        end_location:
-          row: 57
-          column: 22
-        content: yield from z()
-  parent: ~
-- kind:
-    name: YieldInForLoop
-    body: "Replace `yield` over `for` loop with `yield from`"
-    suggestion: "Replace with `yield from`"
-    fixable: true
-  location:
-    row: 67
-    column: 4
-  end_location:
-    row: 68
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 67
-          column: 4
-        end_location:
-          row: 68
-          column: 15
-        content: yield from x
-  parent: ~
-- kind:
-    name: YieldInForLoop
-    body: "Replace `yield` over `for` loop with `yield from`"
-    suggestion: "Replace with `yield from`"
-    fixable: true
-  location:
-    row: 72
-    column: 4
-  end_location:
-    row: 73
-    column: 18
-  fix:
-    edits:
-      - location:
-          row: 72
-          column: 4
-        end_location:
-          row: 73
-          column: 18
-        content: yield from z()
-  parent: ~
+./resources/test/fixtures/pyupgrade/UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+  |
+2 |   def f():
+3 |       for x in y:
+  |  _____^
+4 | |         yield x
+  | |_______________^ UP028
+  |
+  = help: Replace with `yield from`
+
+ℹ Suggested fix
+1 1 | def f():
+2   |-    for x in y:
+3   |-        yield x
+  2 |+    yield from y
+4 3 | 
+5 4 | 
+6 5 | def g():
+
+./resources/test/fixtures/pyupgrade/UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+  |
+7 |   def g():
+8 |       for x, y in z:
+  |  _____^
+9 | |         yield (x, y)
+  | |____________________^ UP028
+  |
+  = help: Replace with `yield from`
+
+ℹ Suggested fix
+4 4 | 
+5 5 | 
+6 6 | def g():
+7   |-    for x, y in z:
+8   |-        yield (x, y)
+  7 |+    yield from z
+9 8 | 
+10 9 | 
+11 10 | def h():
+
+./resources/test/fixtures/pyupgrade/UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+12 |   def h():
+13 |       for x in [1, 2, 3]:
+   |  _____^
+14 | |         yield x
+   | |_______________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Suggested fix
+9  9  | 
+10 10 | 
+11 11 | def h():
+12    |-    for x in [1, 2, 3]:
+13    |-        yield x
+   12 |+    yield from [1, 2, 3]
+14 13 | 
+15 14 | 
+16 15 | def i():
+
+./resources/test/fixtures/pyupgrade/UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+17 |   def i():
+18 |       for x in {x for x in y}:
+   |  _____^
+19 | |         yield x
+   | |_______________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Suggested fix
+14 14 | 
+15 15 | 
+16 16 | def i():
+17    |-    for x in {x for x in y}:
+18    |-        yield x
+   17 |+    yield from {x for x in y}
+19 18 | 
+20 19 | 
+21 20 | def j():
+
+./resources/test/fixtures/pyupgrade/UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+22 |   def j():
+23 |       for x in (1, 2, 3):
+   |  _____^
+24 | |         yield x
+   | |_______________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Suggested fix
+19 19 | 
+20 20 | 
+21 21 | def j():
+22    |-    for x in (1, 2, 3):
+23    |-        yield x
+   22 |+    yield from (1, 2, 3)
+24 23 | 
+25 24 | 
+26 25 | def k():
+
+./resources/test/fixtures/pyupgrade/UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+27 |   def k():
+28 |       for x, y in {3: "x", 6: "y"}:
+   |  _____^
+29 | |         yield x, y
+   | |__________________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Suggested fix
+24 24 | 
+25 25 | 
+26 26 | def k():
+27    |-    for x, y in {3: "x", 6: "y"}:
+28    |-        yield x, y
+   27 |+    yield from {3: "x", 6: "y"}
+29 28 | 
+30 29 | 
+31 30 | def f():  # Comment one\n'
+
+./resources/test/fixtures/pyupgrade/UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+33 |   def f():  # Comment one\n'
+34 |       # Comment two\n'
+35 |       for x, y in {  # Comment three\n'
+   |  _____^
+36 | |         3: "x",  # Comment four\n'
+37 | |         # Comment five\n'
+38 | |         6: "y",  # Comment six\n'
+39 | |     }:  # Comment seven\n'
+40 | |         # Comment eight\n'
+41 | |         yield x, y  # Comment nine\n'
+   | |__________________^ UP028
+42 |           # Comment ten',
+   |
+   = help: Replace with `yield from`
+
+ℹ Suggested fix
+30 30 | 
+31 31 | def f():  # Comment one\n'
+32 32 |     # Comment two\n'
+33    |-    for x, y in {  # Comment three\n'
+   33 |+    yield from {  # Comment three\n'
+34 34 |         3: "x",  # Comment four\n'
+35 35 |         # Comment five\n'
+36 36 |         6: "y",  # Comment six\n'
+37    |-    }:  # Comment seven\n'
+38    |-        # Comment eight\n'
+39    |-        yield x, y  # Comment nine\n'
+   37 |+    }  # Comment nine\n'
+40 38 |         # Comment ten',
+41 39 | 
+42 40 | 
+
+./resources/test/fixtures/pyupgrade/UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+44 |   def f():
+45 |       for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
+   |  _____^
+46 | |         yield x, y
+   | |__________________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Suggested fix
+41 41 | 
+42 42 | 
+43 43 | def f():
+44    |-    for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
+45    |-        yield x, y
+   44 |+    yield from [{3: (3, [44, "long ss"]), 6: "y"}]
+46 45 | 
+47 46 | 
+48 47 | def f():
+
+./resources/test/fixtures/pyupgrade/UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+49 |   def f():
+50 |       for x, y in z():
+   |  _____^
+51 | |         yield x, y
+   | |__________________^ UP028
+52 |   
+53 |   def f():
+   |
+   = help: Replace with `yield from`
+
+ℹ Suggested fix
+46 46 | 
+47 47 | 
+48 48 | def f():
+49    |-    for x, y in z():
+50    |-        yield x, y
+   49 |+    yield from z()
+51 50 | 
+52 51 | def f():
+53 52 |     def func():
+
+./resources/test/fixtures/pyupgrade/UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+55 |       def func():
+56 |           # This comment is preserved\n'
+57 |           for x, y in z():  # Comment one\n'
+   |  _________^
+58 | |             # Comment two\n'
+59 | |             yield x, y  # Comment three\n'
+   | |______________________^ UP028
+60 |               # Comment four\n'
+61 |   # Comment\n'
+   |
+   = help: Replace with `yield from`
+
+ℹ Suggested fix
+52 52 | def f():
+53 53 |     def func():
+54 54 |         # This comment is preserved\n'
+55    |-        for x, y in z():  # Comment one\n'
+56    |-            # Comment two\n'
+57    |-            yield x, y  # Comment three\n'
+   55 |+        yield from z()  # Comment three\n'
+58 56 |             # Comment four\n'
+59 57 | # Comment\n'
+60 58 | def g():
+
+./resources/test/fixtures/pyupgrade/UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+67 |       for x in y:
+68 |           yield x
+69 |       for z in x:
+   |  _____^
+70 | |         yield z
+   | |_______________^ UP028
+   |
+   = help: Replace with `yield from`
+
+ℹ Suggested fix
+64 64 | def f():
+65 65 |     for x in y:
+66 66 |         yield x
+67    |-    for z in x:
+68    |-        yield z
+   67 |+    yield from x
+69 68 | 
+70 69 | 
+71 70 | def f():
+
+./resources/test/fixtures/pyupgrade/UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+   |
+72 |   def f():
+73 |       for x, y in z():
+   |  _____^
+74 | |         yield x, y
+   | |__________________^ UP028
+75 |       x = 1
+   |
+   = help: Replace with `yield from`
+
+ℹ Suggested fix
+69 69 | 
+70 70 | 
+71 71 | def f():
+72    |-    for x, y in z():
+73    |-        yield x, y
+   72 |+    yield from z()
+74 73 |     x = 1
+
 

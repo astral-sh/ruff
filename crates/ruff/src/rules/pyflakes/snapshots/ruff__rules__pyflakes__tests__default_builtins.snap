@@ -1,19 +1,10 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `_`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 1
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/builtins.py:1:1: F821 Undefined name `_`
+  |
+1 | _("Translations")
+  | ^ F821
+  |
+
 

@@ -1,299 +1,275 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 355
-    column: 4
-  end_location:
-    row: 355
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 355
-          column: 14
-        end_location:
-          row: 355
-          column: 14
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 406
-    column: 24
-  end_location:
-    row: 406
-    column: 39
-  fix:
-    edits:
-      - location:
-          row: 406
-          column: 36
-        end_location:
-          row: 406
-          column: 36
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 410
-    column: 4
-  end_location:
-    row: 410
-    column: 24
-  fix:
-    edits:
-      - location:
-          row: 410
-          column: 21
-        end_location:
-          row: 410
-          column: 21
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 416
-    column: 4
-  end_location:
-    row: 416
-    column: 24
-  fix:
-    edits:
-      - location:
-          row: 416
-          column: 21
-        end_location:
-          row: 416
-          column: 21
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 422
-    column: 34
-  end_location:
-    row: 422
-    column: 49
-  fix:
-    edits:
-      - location:
-          row: 422
-          column: 46
-        end_location:
-          row: 422
-          column: 46
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 429
-    column: 48
-  end_location:
-    row: 429
-    column: 63
-  fix:
-    edits:
-      - location:
-          row: 429
-          column: 60
-        end_location:
-          row: 429
-          column: 60
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 470
-    column: 4
-  end_location:
-    row: 470
-    column: 24
-  fix:
-    edits:
-      - location:
-          row: 470
-          column: 21
-        end_location:
-          row: 470
-          column: 21
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 475
-    column: 4
-  end_location:
-    row: 475
-    column: 24
-  fix:
-    edits:
-      - location:
-          row: 475
-          column: 21
-        end_location:
-          row: 475
-          column: 21
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 480
-    column: 4
-  end_location:
-    row: 480
-    column: 24
-  fix:
-    edits:
-      - location:
-          row: 480
-          column: 21
-        end_location:
-          row: 480
-          column: 21
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 487
-    column: 4
-  end_location:
-    row: 487
-    column: 24
-  fix:
-    edits:
-      - location:
-          row: 487
-          column: 21
-        end_location:
-          row: 487
-          column: 21
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 514
-    column: 4
-  end_location:
-    row: 514
-    column: 33
-  fix:
-    edits:
-      - location:
-          row: 514
-          column: 30
-        end_location:
-          row: 514
-          column: 30
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 520
-    column: 4
-  end_location:
-    row: 520
-    column: 32
-  fix:
-    edits:
-      - location:
-          row: 520
-          column: 29
-        end_location:
-          row: 520
-          column: 29
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 581
-    column: 4
-  end_location:
-    row: 581
-    column: 51
-  fix:
-    edits:
-      - location:
-          row: 581
-          column: 47
-        end_location:
-          row: 581
-          column: 47
-        content: "."
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 615
-    column: 4
-  end_location:
-    row: 617
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 615
-          column: 14
-        end_location:
-          row: 615
-          column: 14
-        content: "."
-  parent: ~
+./resources/test/fixtures/pydocstyle/D.py:355:5: D400 [*] First line should end with a period
+    |
+355 |         "or exclamation point (not 'y')")
+356 | def lwnlkjl():
+357 |     """Summary"""
+    |     ^^^^^^^^^^^^^ D400
+    |
+    = help: Add period
+
+ℹ Suggested fix
+352 352 | @expect("D415: First line should end with a period, question mark, "
+353 353 |         "or exclamation point (not 'y')")
+354 354 | def lwnlkjl():
+355     |-    """Summary"""
+    355 |+    """Summary."""
+356 356 | 
+357 357 | 
+358 358 | @expect("D401: First line should be in imperative mood "
+
+./resources/test/fixtures/pydocstyle/D.py:406:25: D400 [*] First line should end with a period
+    |
+406 | @expect("D415: First line should end with a period, question mark,"
+407 |         " or exclamation point (not 'r')")
+408 | def oneliner_withdoc(): """One liner"""
+    |                         ^^^^^^^^^^^^^^^ D400
+    |
+    = help: Add period
+
+ℹ Suggested fix
+403 403 | @expect("D400: First line should end with a period (not 'r')")
+404 404 | @expect("D415: First line should end with a period, question mark,"
+405 405 |         " or exclamation point (not 'r')")
+406     |-def oneliner_withdoc(): """One liner"""
+    406 |+def oneliner_withdoc(): """One liner."""
+407 407 | 
+408 408 | 
+409 409 | def ignored_decorator(func):   # noqa: D400,D401,D415
+
+./resources/test/fixtures/pydocstyle/D.py:410:5: D400 [*] First line should end with a period
+    |
+410 | def ignored_decorator(func):   # noqa: D400,D401,D415
+411 |     """Runs something"""
+    |     ^^^^^^^^^^^^^^^^^^^^ D400
+412 |     func()
+413 |     pass
+    |
+    = help: Add period
+
+ℹ Suggested fix
+407 407 | 
+408 408 | 
+409 409 | def ignored_decorator(func):   # noqa: D400,D401,D415
+410     |-    """Runs something"""
+    410 |+    """Runs something."""
+411 411 |     func()
+412 412 |     pass
+413 413 | 
+
+./resources/test/fixtures/pydocstyle/D.py:416:5: D400 [*] First line should end with a period
+    |
+416 | def decorator_for_test(func):   # noqa: D400,D401,D415
+417 |     """Runs something"""
+    |     ^^^^^^^^^^^^^^^^^^^^ D400
+418 |     func()
+419 |     pass
+    |
+    = help: Add period
+
+ℹ Suggested fix
+413 413 | 
+414 414 | 
+415 415 | def decorator_for_test(func):   # noqa: D400,D401,D415
+416     |-    """Runs something"""
+    416 |+    """Runs something."""
+417 417 |     func()
+418 418 |     pass
+419 419 | 
+
+./resources/test/fixtures/pydocstyle/D.py:422:35: D400 [*] First line should end with a period
+    |
+422 | @ignored_decorator
+423 | def oneliner_ignored_decorator(): """One liner"""
+    |                                   ^^^^^^^^^^^^^^^ D400
+    |
+    = help: Add period
+
+ℹ Suggested fix
+419 419 | 
+420 420 | 
+421 421 | @ignored_decorator
+422     |-def oneliner_ignored_decorator(): """One liner"""
+    422 |+def oneliner_ignored_decorator(): """One liner."""
+423 423 | 
+424 424 | 
+425 425 | @decorator_for_test
+
+./resources/test/fixtures/pydocstyle/D.py:429:49: D400 [*] First line should end with a period
+    |
+429 | @expect("D415: First line should end with a period, question mark,"
+430 |         " or exclamation point (not 'r')")
+431 | def oneliner_with_decorator_expecting_errors(): """One liner"""
+    |                                                 ^^^^^^^^^^^^^^^ D400
+    |
+    = help: Add period
+
+ℹ Suggested fix
+426 426 | @expect("D400: First line should end with a period (not 'r')")
+427 427 | @expect("D415: First line should end with a period, question mark,"
+428 428 |         " or exclamation point (not 'r')")
+429     |-def oneliner_with_decorator_expecting_errors(): """One liner"""
+    429 |+def oneliner_with_decorator_expecting_errors(): """One liner."""
+430 430 | 
+431 431 | 
+432 432 | @decorator_for_test
+
+./resources/test/fixtures/pydocstyle/D.py:470:5: D400 [*] First line should end with a period
+    |
+470 |         "or exclamation point (not 'g')")
+471 | def docstring_bad():
+472 |     """Runs something"""
+    |     ^^^^^^^^^^^^^^^^^^^^ D400
+473 |     pass
+    |
+    = help: Add period
+
+ℹ Suggested fix
+467 467 | @expect("D415: First line should end with a period, question mark, "
+468 468 |         "or exclamation point (not 'g')")
+469 469 | def docstring_bad():
+470     |-    """Runs something"""
+    470 |+    """Runs something."""
+471 471 |     pass
+472 472 | 
+473 473 | 
+
+./resources/test/fixtures/pydocstyle/D.py:475:5: D400 [*] First line should end with a period
+    |
+475 | def docstring_bad_ignore_all():  # noqa
+476 |     """Runs something"""
+    |     ^^^^^^^^^^^^^^^^^^^^ D400
+477 |     pass
+    |
+    = help: Add period
+
+ℹ Suggested fix
+472 472 | 
+473 473 | 
+474 474 | def docstring_bad_ignore_all():  # noqa
+475     |-    """Runs something"""
+    475 |+    """Runs something."""
+476 476 |     pass
+477 477 | 
+478 478 | 
+
+./resources/test/fixtures/pydocstyle/D.py:480:5: D400 [*] First line should end with a period
+    |
+480 | def docstring_bad_ignore_one():  # noqa: D400,D401,D415
+481 |     """Runs something"""
+    |     ^^^^^^^^^^^^^^^^^^^^ D400
+482 |     pass
+    |
+    = help: Add period
+
+ℹ Suggested fix
+477 477 | 
+478 478 | 
+479 479 | def docstring_bad_ignore_one():  # noqa: D400,D401,D415
+480     |-    """Runs something"""
+    480 |+    """Runs something."""
+481 481 |     pass
+482 482 | 
+483 483 | 
+
+./resources/test/fixtures/pydocstyle/D.py:487:5: D400 [*] First line should end with a period
+    |
+487 |         "(perhaps 'Run', not 'Runs')")
+488 | def docstring_ignore_some_violations_but_catch_D401():  # noqa: E501,D400,D415
+489 |     """Runs something"""
+    |     ^^^^^^^^^^^^^^^^^^^^ D400
+490 |     pass
+    |
+    = help: Add period
+
+ℹ Suggested fix
+484 484 | @expect("D401: First line should be in imperative mood "
+485 485 |         "(perhaps 'Run', not 'Runs')")
+486 486 | def docstring_ignore_some_violations_but_catch_D401():  # noqa: E501,D400,D415
+487     |-    """Runs something"""
+    487 |+    """Runs something."""
+488 488 |     pass
+489 489 | 
+490 490 | 
+
+./resources/test/fixtures/pydocstyle/D.py:514:5: D400 [*] First line should end with a period
+    |
+514 | def valid_google_string():  # noqa: D400
+515 |     """Test a valid something!"""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
+    |
+    = help: Add period
+
+ℹ Suggested fix
+511 511 | 
+512 512 | 
+513 513 | def valid_google_string():  # noqa: D400
+514     |-    """Test a valid something!"""
+    514 |+    """Test a valid something!."""
+515 515 | 
+516 516 | 
+517 517 | @expect("D415: First line should end with a period, question mark, "
+
+./resources/test/fixtures/pydocstyle/D.py:520:5: D400 [*] First line should end with a period
+    |
+520 |         "or exclamation point (not 'g')")
+521 | def bad_google_string():  # noqa: D400
+522 |     """Test a valid something"""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
+    |
+    = help: Add period
+
+ℹ Suggested fix
+517 517 | @expect("D415: First line should end with a period, question mark, "
+518 518 |         "or exclamation point (not 'g')")
+519 519 | def bad_google_string():  # noqa: D400
+520     |-    """Test a valid something"""
+    520 |+    """Test a valid something."""
+521 521 | 
+522 522 | 
+523 523 | # This is reproducing a bug where AttributeError is raised when parsing class
+
+./resources/test/fixtures/pydocstyle/D.py:581:5: D400 [*] First line should end with a period
+    |
+581 |         "or exclamation point (not '\"')")
+582 | def endswith_quote():
+583 |     """Whitespace at the end, but also a quote" """
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D400
+    |
+    = help: Add period
+
+ℹ Suggested fix
+578 578 | @expect("D415: First line should end with a period, question mark, "
+579 579 |         "or exclamation point (not '\"')")
+580 580 | def endswith_quote():
+581     |-    """Whitespace at the end, but also a quote" """
+    581 |+    """Whitespace at the end, but also a quote". """
+582 582 | 
+583 583 | 
+584 584 | @expect('D209: Multi-line docstring closing quotes should be on a separate '
+
+./resources/test/fixtures/pydocstyle/D.py:615:5: D400 [*] First line should end with a period
+    |
+615 |   @expect('D212: Multi-line docstring summary should start at the first line')
+616 |   def one_liner():
+617 |       """Wrong."
+    |  _____^
+618 | | 
+619 | |     """
+    | |_______^ D400
+    |
+    = help: Add period
+
+ℹ Suggested fix
+612 612 |         '(found 3)')
+613 613 | @expect('D212: Multi-line docstring summary should start at the first line')
+614 614 | def one_liner():
+615     |-    """Wrong."
+    615 |+    """Wrong.".
+616 616 | 
+617 617 |     """
+618 618 | 
+
 

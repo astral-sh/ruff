@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/flake8_datetimez/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CallDateFromtimestamp
-    body: "The use of `datetime.date.fromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=).date()` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 33
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CallDateFromtimestamp
-    body: "The use of `datetime.date.fromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=).date()` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 24
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_datetimez/DTZ012.py:4:1: DTZ012 The use of `datetime.date.fromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=).date()` instead
+  |
+4 | # qualified
+5 | datetime.date.fromtimestamp(1234)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ012
+6 | 
+7 | from datetime import date
+  |
+
+./resources/test/fixtures/flake8_datetimez/DTZ012.py:9:1: DTZ012 The use of `datetime.date.fromtimestamp()` is not allowed, use `datetime.datetime.fromtimestamp(ts, tz=).date()` instead
+   |
+ 9 | # unqualified
+10 | date.fromtimestamp(1234)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ DTZ012
+   |
+
 

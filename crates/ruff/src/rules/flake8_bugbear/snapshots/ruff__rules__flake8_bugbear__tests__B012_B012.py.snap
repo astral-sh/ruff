@@ -1,159 +1,104 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: JumpStatementInFinally
-    body: "`return` inside `finally` blocks cause exceptions to be silenced"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 8
-  end_location:
-    row: 5
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: JumpStatementInFinally
-    body: "`return` inside `finally` blocks cause exceptions to be silenced"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 12
-  end_location:
-    row: 13
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: JumpStatementInFinally
-    body: "`return` inside `finally` blocks cause exceptions to be silenced"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 12
-  end_location:
-    row: 21
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: JumpStatementInFinally
-    body: "`return` inside `finally` blocks cause exceptions to be silenced"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 31
-    column: 12
-  end_location:
-    row: 31
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: JumpStatementInFinally
-    body: "`return` inside `finally` blocks cause exceptions to be silenced"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 20
-  end_location:
-    row: 44
-    column: 26
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: JumpStatementInFinally
-    body: "`break` inside `finally` blocks cause exceptions to be silenced"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 66
-    column: 12
-  end_location:
-    row: 66
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: JumpStatementInFinally
-    body: "`continue` inside `finally` blocks cause exceptions to be silenced"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 78
-    column: 12
-  end_location:
-    row: 78
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: JumpStatementInFinally
-    body: "`return` inside `finally` blocks cause exceptions to be silenced"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 94
-    column: 12
-  end_location:
-    row: 94
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: JumpStatementInFinally
-    body: "`continue` inside `finally` blocks cause exceptions to be silenced"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 101
-    column: 8
-  end_location:
-    row: 101
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: JumpStatementInFinally
-    body: "`break` inside `finally` blocks cause exceptions to be silenced"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 107
-    column: 8
-  end_location:
-    row: 107
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: JumpStatementInFinally
-    body: "`break` inside `finally` blocks cause exceptions to be silenced"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 118
-    column: 16
-  end_location:
-    row: 118
-    column: 21
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bugbear/B012.py:5:9: B012 `return` inside `finally` blocks cause exceptions to be silenced
+  |
+5 |         pass
+6 |     finally:
+7 |         return  # warning
+  |         ^^^^^^ B012
+  |
+
+./resources/test/fixtures/flake8_bugbear/B012.py:13:13: B012 `return` inside `finally` blocks cause exceptions to be silenced
+   |
+13 |     finally:
+14 |         if 1 + 0 == 2 - 1:
+15 |             return  # warning
+   |             ^^^^^^ B012
+   |
+
+./resources/test/fixtures/flake8_bugbear/B012.py:21:13: B012 `return` inside `finally` blocks cause exceptions to be silenced
+   |
+21 |     finally:
+22 |         try:
+23 |             return  # warning
+   |             ^^^^^^ B012
+24 |         except Exception:
+25 |             pass
+   |
+
+./resources/test/fixtures/flake8_bugbear/B012.py:31:13: B012 `return` inside `finally` blocks cause exceptions to be silenced
+   |
+31 |             pass
+32 |         finally:
+33 |             return  # warning
+   |             ^^^^^^ B012
+34 |     finally:
+35 |         pass
+   |
+
+./resources/test/fixtures/flake8_bugbear/B012.py:44:21: B012 `return` inside `finally` blocks cause exceptions to be silenced
+   |
+44 |                     pass
+45 |                 finally:
+46 |                     return  # warning
+   |                     ^^^^^^ B012
+47 | 
+48 |         finally:
+   |
+
+./resources/test/fixtures/flake8_bugbear/B012.py:66:13: B012 `break` inside `finally` blocks cause exceptions to be silenced
+   |
+66 |             pass
+67 |         finally:
+68 |             break  # warning
+   |             ^^^^^ B012
+69 | 
+70 |             def j():
+   |
+
+./resources/test/fixtures/flake8_bugbear/B012.py:78:13: B012 `continue` inside `finally` blocks cause exceptions to be silenced
+   |
+78 |             pass
+79 |         finally:
+80 |             continue  # warning
+   |             ^^^^^^^^ B012
+81 | 
+82 |             def j():
+   |
+
+./resources/test/fixtures/flake8_bugbear/B012.py:94:13: B012 `return` inside `finally` blocks cause exceptions to be silenced
+   |
+94 |             continue  # no warning
+95 |         while True:
+96 |             return  # warning
+   |             ^^^^^^ B012
+   |
+
+./resources/test/fixtures/flake8_bugbear/B012.py:101:9: B012 `continue` inside `finally` blocks cause exceptions to be silenced
+    |
+101 |         pass
+102 |     finally:
+103 |         continue  # warning
+    |         ^^^^^^^^ B012
+104 | 
+105 | while True:
+    |
+
+./resources/test/fixtures/flake8_bugbear/B012.py:107:9: B012 `break` inside `finally` blocks cause exceptions to be silenced
+    |
+107 |         pass
+108 |     finally:
+109 |         break  # warning
+    |         ^^^^^ B012
+    |
+
+./resources/test/fixtures/flake8_bugbear/B012.py:118:17: B012 `break` inside `finally` blocks cause exceptions to be silenced
+    |
+118 |                 y = 0
+119 |             case 0, *x:
+120 |                 break  # warning
+    |                 ^^^^^ B012
+    |
+
 

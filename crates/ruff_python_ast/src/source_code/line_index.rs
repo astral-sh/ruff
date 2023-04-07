@@ -167,14 +167,14 @@ enum IndexKind {
 #[derive(Debug, Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct OneIndexed(NonZeroUsize);
 
-const ONE: NonZeroUsize = unwrap(NonZeroUsize::new(1));
-
 impl OneIndexed {
     // SAFETY: These constants are being initialized with non-zero values
     /// The smallest value that can be represented by this integer type.
     pub const MIN: Self = unwrap(Self::new(1));
     /// The largest value that can be represented by this integer type
     pub const MAX: Self = unwrap(Self::new(usize::MAX));
+
+    pub const ONE: NonZeroUsize = unwrap(NonZeroUsize::new(1));
 
     /// Creates a non-zero if the given value is not zero.
     pub const fn new(value: usize) -> Option<Self> {
@@ -186,7 +186,7 @@ impl OneIndexed {
 
     /// Construct a new [`OneIndexed`] from a zero-indexed value
     pub const fn from_zero_indexed(value: usize) -> Self {
-        Self(ONE.saturating_add(value))
+        Self(Self::ONE.saturating_add(value))
     }
 
     /// Returns the value as a primitive type.

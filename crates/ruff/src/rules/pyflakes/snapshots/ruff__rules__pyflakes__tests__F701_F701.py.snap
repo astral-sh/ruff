@@ -1,61 +1,35 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BreakOutsideLoop
-    body: "`break` outside loop"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BreakOutsideLoop
-    body: "`break` outside loop"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 4
-  end_location:
-    row: 16
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BreakOutsideLoop
-    body: "`break` outside loop"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 4
-  end_location:
-    row: 20
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BreakOutsideLoop
-    body: "`break` outside loop"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 0
-  end_location:
-    row: 23
-    column: 5
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F701.py:4:5: F701 `break` outside loop
+  |
+4 |     break
+5 | else:
+6 |     break
+  |     ^^^^^ F701
+7 | 
+8 | i = 0
+  |
+
+./resources/test/fixtures/pyflakes/F701.py:16:5: F701 `break` outside loop
+   |
+16 |         break
+17 | 
+18 |     break
+   |     ^^^^^ F701
+   |
+
+./resources/test/fixtures/pyflakes/F701.py:20:5: F701 `break` outside loop
+   |
+20 | class Foo:
+21 |     break
+   |     ^^^^^ F701
+   |
+
+./resources/test/fixtures/pyflakes/F701.py:23:1: F701 `break` outside loop
+   |
+23 | break
+   | ^^^^^ F701
+   |
+
 

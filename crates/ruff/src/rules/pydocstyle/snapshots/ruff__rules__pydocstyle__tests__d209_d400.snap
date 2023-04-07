@@ -1,47 +1,37 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NewLineAfterLastParagraph
-    body: Multi-line docstring closing quotes should be on a separate line
-    suggestion: Move closing quotes to new line
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 3
-    column: 72
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 69
-        end_location:
-          row: 3
-          column: 69
-        content: "\n    "
-  parent: ~
-- kind:
-    name: EndsInPeriod
-    body: First line should end with a period
-    suggestion: Add period
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 3
-    column: 72
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 69
-        end_location:
-          row: 3
-          column: 69
-        content: "."
-  parent: ~
+./resources/test/fixtures/pydocstyle/D209_D400.py:2:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
+  |
+2 |   def lorem():
+3 |       """lorem ipsum dolor sit amet consectetur adipiscing elit
+  |  _____^
+4 | |     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
+  | |________________________________________________________________________^ D209
+  |
+  = help: Move closing quotes to new line
+
+ℹ Suggested fix
+1 1 | def lorem():
+2 2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
+3   |-    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
+  3 |+    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
+  4 |+    """
+
+./resources/test/fixtures/pydocstyle/D209_D400.py:2:5: D400 [*] First line should end with a period
+  |
+2 |   def lorem():
+3 |       """lorem ipsum dolor sit amet consectetur adipiscing elit
+  |  _____^
+4 | |     sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
+  | |________________________________________________________________________^ D400
+  |
+  = help: Add period
+
+ℹ Suggested fix
+1 1 | def lorem():
+2 2 |     """lorem ipsum dolor sit amet consectetur adipiscing elit
+3   |-    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua"""
+  3 |+    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua."""
+
 

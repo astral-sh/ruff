@@ -1,33 +1,21 @@
 ---
 source: crates/ruff/src/rules/pygrep_hooks/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: Eval
-    body: "No builtin `eval()` allowed"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 4
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Eval
-    body: "No builtin `eval()` allowed"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 4
-  end_location:
-    row: 9
-    column: 8
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pygrep-hooks/PGH001_0.py:3:1: PGH001 No builtin `eval()` allowed
+  |
+3 | from ast import literal_eval
+4 | 
+5 | eval("3 + 4")
+  | ^^^^ PGH001
+6 | 
+7 | literal_eval({1: 2})
+  |
+
+./resources/test/fixtures/pygrep-hooks/PGH001_0.py:9:5: PGH001 No builtin `eval()` allowed
+   |
+ 9 | def fn() -> None:
+10 |     eval("3 + 4")
+   |     ^^^^ PGH001
+   |
+
 

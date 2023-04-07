@@ -1,61 +1,32 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 10
-  end_location:
-    row: 11
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 17
-  end_location:
-    row: 18
-    column: 22
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 13
-  end_location:
-    row: 24
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 30
-    column: 11
-  end_location:
-    row: 30
-    column: 16
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F821_1.py:11:11: F821 Undefined name `Model`
+   |
+11 | # F821 Undefined name `Model`
+12 | x = cast("Model", x)
+   |           ^^^^^ F821
+   |
+
+./resources/test/fixtures/pyflakes/F821_1.py:18:18: F821 Undefined name `Model`
+   |
+18 | # F821 Undefined name `Model`
+19 | x = typing.cast("Model", x)
+   |                  ^^^^^ F821
+   |
+
+./resources/test/fixtures/pyflakes/F821_1.py:24:14: F821 Undefined name `Model`
+   |
+24 | # F821 Undefined name `Model`
+25 | x = Pattern["Model"]
+   |              ^^^^^ F821
+   |
+
+./resources/test/fixtures/pyflakes/F821_1.py:30:12: F821 Undefined name `Model`
+   |
+30 | # F821 Undefined name `Model`
+31 | x = Match["Model"]
+   |            ^^^^^ F821
+   |
+
 

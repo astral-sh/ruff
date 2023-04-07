@@ -1,19 +1,11 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: HardcodedPasswordFuncArg
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 8
-  end_location:
-    row: 14
-    column: 25
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bandit/S106.py:14:9: S106 Possible hardcoded password: "s3cr3t"
+   |
+14 | # Error
+15 | func(1, password="s3cr3t")
+   |         ^^^^^^^^^^^^^^^^^ S106
+   |
+
 

@@ -1,117 +1,83 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CachedInstanceMethod
-    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 78
-    column: 5
-  end_location:
-    row: 78
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CachedInstanceMethod
-    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 82
-    column: 5
-  end_location:
-    row: 82
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CachedInstanceMethod
-    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 86
-    column: 5
-  end_location:
-    row: 86
-    column: 22
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CachedInstanceMethod
-    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 90
-    column: 5
-  end_location:
-    row: 90
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CachedInstanceMethod
-    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 94
-    column: 5
-  end_location:
-    row: 94
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CachedInstanceMethod
-    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 98
-    column: 5
-  end_location:
-    row: 98
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CachedInstanceMethod
-    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 102
-    column: 5
-  end_location:
-    row: 102
-    column: 26
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CachedInstanceMethod
-    body: "Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 106
-    column: 5
-  end_location:
-    row: 106
-    column: 16
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bugbear/B019.py:78:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+   |
+78 |     # Remaining methods should emit B019
+79 |     @functools.cache
+   |      ^^^^^^^^^^^^^^^ B019
+80 |     def cached_instance_method(self, y):
+81 |         ...
+   |
+
+./resources/test/fixtures/flake8_bugbear/B019.py:82:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+   |
+82 |         ...
+83 | 
+84 |     @cache
+   |      ^^^^^ B019
+85 |     def another_cached_instance_method(self, y):
+86 |         ...
+   |
+
+./resources/test/fixtures/flake8_bugbear/B019.py:86:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+   |
+86 |         ...
+87 | 
+88 |     @functools.cache()
+   |      ^^^^^^^^^^^^^^^^^ B019
+89 |     def called_cached_instance_method(self, y):
+90 |         ...
+   |
+
+./resources/test/fixtures/flake8_bugbear/B019.py:90:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+   |
+90 |         ...
+91 | 
+92 |     @cache()
+   |      ^^^^^^^ B019
+93 |     def another_called_cached_instance_method(self, y):
+94 |         ...
+   |
+
+./resources/test/fixtures/flake8_bugbear/B019.py:94:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+   |
+94 |         ...
+95 | 
+96 |     @functools.lru_cache
+   |      ^^^^^^^^^^^^^^^^^^^ B019
+97 |     def lru_cached_instance_method(self, y):
+98 |         ...
+   |
+
+./resources/test/fixtures/flake8_bugbear/B019.py:98:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+    |
+ 98 |         ...
+ 99 | 
+100 |     @lru_cache
+    |      ^^^^^^^^^ B019
+101 |     def another_lru_cached_instance_method(self, y):
+102 |         ...
+    |
+
+./resources/test/fixtures/flake8_bugbear/B019.py:102:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+    |
+102 |         ...
+103 | 
+104 |     @functools.lru_cache()
+    |      ^^^^^^^^^^^^^^^^^^^^^ B019
+105 |     def called_lru_cached_instance_method(self, y):
+106 |         ...
+    |
+
+./resources/test/fixtures/flake8_bugbear/B019.py:106:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+    |
+106 |         ...
+107 | 
+108 |     @lru_cache()
+    |      ^^^^^^^^^^^ B019
+109 |     def another_called_lru_cached_instance_method(self, y):
+110 |         ...
+    |
+
 

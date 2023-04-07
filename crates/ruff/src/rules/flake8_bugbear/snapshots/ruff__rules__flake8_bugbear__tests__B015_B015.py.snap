@@ -1,61 +1,37 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UselessComparison
-    body: "Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 6
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UselessComparison
-    body: "Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UselessComparison
-    body: "Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 17
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UselessComparison
-    body: "Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 4
-  end_location:
-    row: 24
-    column: 10
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bugbear/B015.py:3:1: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+  |
+3 | assert 1 == 1
+4 | 
+5 | 1 == 1
+  | ^^^^^^ B015
+6 | 
+7 | assert 1 in (1, 2)
+  |
+
+./resources/test/fixtures/flake8_bugbear/B015.py:7:1: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+  |
+7 | assert 1 in (1, 2)
+8 | 
+9 | 1 in (1, 2)
+  | ^^^^^^^^^^^ B015
+  |
+
+./resources/test/fixtures/flake8_bugbear/B015.py:17:5: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+   |
+17 |     assert 1 in (1, 2)
+18 | 
+19 |     1 in (1, 2)
+   |     ^^^^^^^^^^^ B015
+   |
+
+./resources/test/fixtures/flake8_bugbear/B015.py:24:5: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+   |
+24 | class TestClass:
+25 |     1 == 1
+   |     ^^^^^^ B015
+   |
+
 

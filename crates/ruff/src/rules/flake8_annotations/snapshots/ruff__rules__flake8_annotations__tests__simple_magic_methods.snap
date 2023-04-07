@@ -1,299 +1,279 @@
 ---
 source: crates/ruff/src/rules/flake8_annotations/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__str__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 2
-    column: 8
-  end_location:
-    row: 2
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 21
-        end_location:
-          row: 2
-          column: 21
-        content: " -> str"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__repr__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 5
-    column: 8
-  end_location:
-    row: 5
-    column: 16
-  fix:
-    edits:
-      - location:
-          row: 5
-          column: 22
-        end_location:
-          row: 5
-          column: 22
-        content: " -> str"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__len__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 8
-    column: 8
-  end_location:
-    row: 8
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 8
-          column: 21
-        end_location:
-          row: 8
-          column: 21
-        content: " -> int"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__length_hint__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 11
-    column: 8
-  end_location:
-    row: 11
-    column: 23
-  fix:
-    edits:
-      - location:
-          row: 11
-          column: 29
-        end_location:
-          row: 11
-          column: 29
-        content: " -> int"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__init__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 14
-    column: 8
-  end_location:
-    row: 14
-    column: 16
-  fix:
-    edits:
-      - location:
-          row: 14
-          column: 22
-        end_location:
-          row: 14
-          column: 22
-        content: " -> None"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__del__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 17
-    column: 8
-  end_location:
-    row: 17
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 17
-          column: 21
-        end_location:
-          row: 17
-          column: 21
-        content: " -> None"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__bool__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 20
-    column: 8
-  end_location:
-    row: 20
-    column: 16
-  fix:
-    edits:
-      - location:
-          row: 20
-          column: 22
-        end_location:
-          row: 20
-          column: 22
-        content: " -> bool"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__bytes__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 23
-    column: 8
-  end_location:
-    row: 23
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 23
-          column: 23
-        end_location:
-          row: 23
-          column: 23
-        content: " -> bytes"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__format__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 26
-    column: 8
-  end_location:
-    row: 26
-    column: 18
-  fix:
-    edits:
-      - location:
-          row: 26
-          column: 37
-        end_location:
-          row: 26
-          column: 37
-        content: " -> str"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__contains__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 29
-    column: 8
-  end_location:
-    row: 29
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 29
-          column: 32
-        end_location:
-          row: 29
-          column: 32
-        content: " -> bool"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__complex__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 32
-    column: 8
-  end_location:
-    row: 32
-    column: 19
-  fix:
-    edits:
-      - location:
-          row: 32
-          column: 25
-        end_location:
-          row: 32
-          column: 25
-        content: " -> complex"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__int__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 35
-    column: 8
-  end_location:
-    row: 35
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 35
-          column: 21
-        end_location:
-          row: 35
-          column: 21
-        content: " -> int"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__float__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 38
-    column: 8
-  end_location:
-    row: 38
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 38
-          column: 23
-        end_location:
-          row: 38
-          column: 23
-        content: " -> float"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__index__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 41
-    column: 8
-  end_location:
-    row: 41
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 41
-          column: 23
-        end_location:
-          row: 41
-          column: 23
-        content: " -> int"
-  parent: ~
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:2:9: ANN204 [*] Missing return type annotation for special method `__str__`
+  |
+2 | class Foo:
+3 |     def __str__(self):
+  |         ^^^^^^^ ANN204
+4 |         ...
+  |
+  = help: Add `None` return type
+
+ℹ Suggested fix
+1 1 | class Foo:
+2   |-    def __str__(self):
+  2 |+    def __str__(self) -> str:
+3 3 |         ...
+4 4 | 
+5 5 |     def __repr__(self):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:5:9: ANN204 [*] Missing return type annotation for special method `__repr__`
+  |
+5 |         ...
+6 | 
+7 |     def __repr__(self):
+  |         ^^^^^^^^ ANN204
+8 |         ...
+  |
+  = help: Add `None` return type
+
+ℹ Suggested fix
+2 2 |     def __str__(self):
+3 3 |         ...
+4 4 | 
+5   |-    def __repr__(self):
+  5 |+    def __repr__(self) -> str:
+6 6 |         ...
+7 7 | 
+8 8 |     def __len__(self):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:8:9: ANN204 [*] Missing return type annotation for special method `__len__`
+   |
+ 8 |         ...
+ 9 | 
+10 |     def __len__(self):
+   |         ^^^^^^^ ANN204
+11 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+5 5 |     def __repr__(self):
+6 6 |         ...
+7 7 | 
+8   |-    def __len__(self):
+  8 |+    def __len__(self) -> int:
+9 9 |         ...
+10 10 | 
+11 11 |     def __length_hint__(self):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:11:9: ANN204 [*] Missing return type annotation for special method `__length_hint__`
+   |
+11 |         ...
+12 | 
+13 |     def __length_hint__(self):
+   |         ^^^^^^^^^^^^^^^ ANN204
+14 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+8  8  |     def __len__(self):
+9  9  |         ...
+10 10 | 
+11    |-    def __length_hint__(self):
+   11 |+    def __length_hint__(self) -> int:
+12 12 |         ...
+13 13 | 
+14 14 |     def __init__(self):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:14:9: ANN204 [*] Missing return type annotation for special method `__init__`
+   |
+14 |         ...
+15 | 
+16 |     def __init__(self):
+   |         ^^^^^^^^ ANN204
+17 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+11 11 |     def __length_hint__(self):
+12 12 |         ...
+13 13 | 
+14    |-    def __init__(self):
+   14 |+    def __init__(self) -> None:
+15 15 |         ...
+16 16 | 
+17 17 |     def __del__(self):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:17:9: ANN204 [*] Missing return type annotation for special method `__del__`
+   |
+17 |         ...
+18 | 
+19 |     def __del__(self):
+   |         ^^^^^^^ ANN204
+20 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+14 14 |     def __init__(self):
+15 15 |         ...
+16 16 | 
+17    |-    def __del__(self):
+   17 |+    def __del__(self) -> None:
+18 18 |         ...
+19 19 | 
+20 20 |     def __bool__(self):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:20:9: ANN204 [*] Missing return type annotation for special method `__bool__`
+   |
+20 |         ...
+21 | 
+22 |     def __bool__(self):
+   |         ^^^^^^^^ ANN204
+23 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+17 17 |     def __del__(self):
+18 18 |         ...
+19 19 | 
+20    |-    def __bool__(self):
+   20 |+    def __bool__(self) -> bool:
+21 21 |         ...
+22 22 | 
+23 23 |     def __bytes__(self):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:23:9: ANN204 [*] Missing return type annotation for special method `__bytes__`
+   |
+23 |         ...
+24 | 
+25 |     def __bytes__(self):
+   |         ^^^^^^^^^ ANN204
+26 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+20 20 |     def __bool__(self):
+21 21 |         ...
+22 22 | 
+23    |-    def __bytes__(self):
+   23 |+    def __bytes__(self) -> bytes:
+24 24 |         ...
+25 25 | 
+26 26 |     def __format__(self, format_spec):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:26:9: ANN204 [*] Missing return type annotation for special method `__format__`
+   |
+26 |         ...
+27 | 
+28 |     def __format__(self, format_spec):
+   |         ^^^^^^^^^^ ANN204
+29 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+23 23 |     def __bytes__(self):
+24 24 |         ...
+25 25 | 
+26    |-    def __format__(self, format_spec):
+   26 |+    def __format__(self, format_spec) -> str:
+27 27 |         ...
+28 28 | 
+29 29 |     def __contains__(self, item):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:29:9: ANN204 [*] Missing return type annotation for special method `__contains__`
+   |
+29 |         ...
+30 | 
+31 |     def __contains__(self, item):
+   |         ^^^^^^^^^^^^ ANN204
+32 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+26 26 |     def __format__(self, format_spec):
+27 27 |         ...
+28 28 | 
+29    |-    def __contains__(self, item):
+   29 |+    def __contains__(self, item) -> bool:
+30 30 |         ...
+31 31 | 
+32 32 |     def __complex__(self):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:32:9: ANN204 [*] Missing return type annotation for special method `__complex__`
+   |
+32 |         ...
+33 | 
+34 |     def __complex__(self):
+   |         ^^^^^^^^^^^ ANN204
+35 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+29 29 |     def __contains__(self, item):
+30 30 |         ...
+31 31 | 
+32    |-    def __complex__(self):
+   32 |+    def __complex__(self) -> complex:
+33 33 |         ...
+34 34 | 
+35 35 |     def __int__(self):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:35:9: ANN204 [*] Missing return type annotation for special method `__int__`
+   |
+35 |         ...
+36 | 
+37 |     def __int__(self):
+   |         ^^^^^^^ ANN204
+38 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+32 32 |     def __complex__(self):
+33 33 |         ...
+34 34 | 
+35    |-    def __int__(self):
+   35 |+    def __int__(self) -> int:
+36 36 |         ...
+37 37 | 
+38 38 |     def __float__(self):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:38:9: ANN204 [*] Missing return type annotation for special method `__float__`
+   |
+38 |         ...
+39 | 
+40 |     def __float__(self):
+   |         ^^^^^^^^^ ANN204
+41 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+35 35 |     def __int__(self):
+36 36 |         ...
+37 37 | 
+38    |-    def __float__(self):
+   38 |+    def __float__(self) -> float:
+39 39 |         ...
+40 40 | 
+41 41 |     def __index__(self):
+
+./resources/test/fixtures/flake8_annotations/simple_magic_methods.py:41:9: ANN204 [*] Missing return type annotation for special method `__index__`
+   |
+41 |         ...
+42 | 
+43 |     def __index__(self):
+   |         ^^^^^^^^^ ANN204
+44 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+38 38 |     def __float__(self):
+39 39 |         ...
+40 40 | 
+41    |-    def __index__(self):
+   41 |+    def __index__(self) -> int:
+42 42 |         ...
+
 

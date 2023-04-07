@@ -1,26 +1,25 @@
 ---
 source: crates/ruff/src/rules/isort/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnsortedImports
-    body: Import block is un-sorted or un-formatted
-    suggestion: Organize imports
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 6
-    column: 0
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 0
-        end_location:
-          row: 6
-          column: 0
-        content: "import os\nimport sys\n\nimport leading_prefix\n\nimport ruff\nfrom . import leading_prefix\n"
-  parent: ~
+./resources/test/fixtures/isort/separate_local_folder_imports.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+1 | / import sys
+2 | | import ruff
+3 | | import leading_prefix
+4 | | import os
+5 | | from . import leading_prefix
+  |
+  = help: Organize imports
+
+ℹ Suggested fix
+  1 |+import os
+1 2 | import sys
+  3 |+
+  4 |+import leading_prefix
+  5 |+
+2 6 | import ruff
+3   |-import leading_prefix
+4   |-import os
+5 7 | from . import leading_prefix
+
 

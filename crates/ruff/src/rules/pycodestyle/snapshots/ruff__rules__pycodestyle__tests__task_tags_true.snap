@@ -1,6 +1,4 @@
 ---
-source: src/rules/pycodestyle/mod.rs
-expression: diagnostics
+source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-[]
 

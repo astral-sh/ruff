@@ -1,320 +1,314 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `compare == \"yoda\"` instead"
-    suggestion: "Replace Yoda condition with `compare == \"yoda\"`"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 17
-        content: "compare == \"yoda\""
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `compare == \"yoda\"` instead"
-    suggestion: "Replace Yoda condition with `compare == \"yoda\"`"
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 0
-        end_location:
-          row: 3
-          column: 17
-        content: "compare == \"yoda\""
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `age == 42` instead"
-    suggestion: "Replace Yoda condition with `age == 42`"
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 9
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 0
-        end_location:
-          row: 4
-          column: 9
-        content: age == 42
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `compare == (\"a\", \"b\")` instead"
-    suggestion: "Replace Yoda condition with `compare == (\"a\", \"b\")`"
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 21
-  fix:
-    edits:
-      - location:
-          row: 5
-          column: 0
-        end_location:
-          row: 5
-          column: 21
-        content: "compare == (\"a\", \"b\")"
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `compare >= \"yoda\"` instead"
-    suggestion: "Replace Yoda condition with `compare >= \"yoda\"`"
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 6
-          column: 0
-        end_location:
-          row: 6
-          column: 17
-        content: "compare >= \"yoda\""
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `compare > \"yoda\"` instead"
-    suggestion: "Replace Yoda condition with `compare > \"yoda\"`"
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 16
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 0
-        end_location:
-          row: 7
-          column: 16
-        content: "compare > \"yoda\""
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `age < 42` instead"
-    suggestion: "Replace Yoda condition with `age < 42`"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 8
-  fix:
-    edits:
-      - location:
-          row: 8
-          column: 0
-        end_location:
-          row: 8
-          column: 8
-        content: age < 42
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `age < -42` instead"
-    suggestion: "Replace Yoda condition with `age < -42`"
-    fixable: true
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 9
-  fix:
-    edits:
-      - location:
-          row: 9
-          column: 0
-        end_location:
-          row: 9
-          column: 9
-        content: age < -42
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `age < +42` instead"
-    suggestion: "Replace Yoda condition with `age < +42`"
-    fixable: true
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 9
-  fix:
-    edits:
-      - location:
-          row: 10
-          column: 0
-        end_location:
-          row: 10
-          column: 9
-        content: age < +42
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `age == YODA` instead"
-    suggestion: "Replace Yoda condition with `age == YODA`"
-    fixable: true
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 11
-  fix:
-    edits:
-      - location:
-          row: 11
-          column: 0
-        end_location:
-          row: 11
-          column: 11
-        content: age == YODA
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `age < YODA` instead"
-    suggestion: "Replace Yoda condition with `age < YODA`"
-    fixable: true
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 12
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 12
-          column: 0
-        end_location:
-          row: 12
-          column: 10
-        content: age < YODA
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `age <= YODA` instead"
-    suggestion: "Replace Yoda condition with `age <= YODA`"
-    fixable: true
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 11
-  fix:
-    edits:
-      - location:
-          row: 13
-          column: 0
-        end_location:
-          row: 13
-          column: 11
-        content: age <= YODA
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `age == JediOrder.YODA` instead"
-    suggestion: "Replace Yoda condition with `age == JediOrder.YODA`"
-    fixable: true
-  location:
-    row: 14
-    column: 0
-  end_location:
-    row: 14
-    column: 21
-  fix:
-    edits:
-      - location:
-          row: 14
-          column: 0
-        end_location:
-          row: 14
-          column: 21
-        content: age == JediOrder.YODA
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `(number - 100) > 0` instead"
-    suggestion: "Replace Yoda condition with `(number - 100) > 0`"
-    fixable: true
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 15
-    column: 18
-  fix:
-    edits:
-      - location:
-          row: 15
-          column: 0
-        end_location:
-          row: 15
-          column: 18
-        content: (number - 100) > 0
-  parent: ~
-- kind:
-    name: YodaConditions
-    body: "Yoda conditions are discouraged, use `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE` instead"
-    suggestion: "Replace Yoda condition with `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE`"
-    fixable: true
-  location:
-    row: 16
-    column: 0
-  end_location:
-    row: 16
-    column: 52
-  fix:
-    edits:
-      - location:
-          row: 16
-          column: 0
-        end_location:
-          row: 16
-          column: 52
-        content: (60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE
-  parent: ~
+./resources/test/fixtures/flake8_simplify/SIM300.py:2:1: SIM300 [*] Yoda conditions are discouraged, use `compare == "yoda"` instead
+  |
+2 | # Errors
+3 | "yoda" == compare  # SIM300
+  | ^^^^^^^^^^^^^^^^^ SIM300
+4 | "yoda" == compare  # SIM300
+5 | 42 == age  # SIM300
+  |
+  = help: Replace Yoda condition with `compare == "yoda"`
+
+ℹ Suggested fix
+1 1 | # Errors
+2   |-"yoda" == compare  # SIM300
+  2 |+compare == "yoda"  # SIM300
+3 3 | "yoda" == compare  # SIM300
+4 4 | 42 == age  # SIM300
+5 5 | ("a", "b") == compare  # SIM300
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:3:1: SIM300 [*] Yoda conditions are discouraged, use `compare == "yoda"` instead
+  |
+3 | # Errors
+4 | "yoda" == compare  # SIM300
+5 | "yoda" == compare  # SIM300
+  | ^^^^^^^^^^^^^^^^^ SIM300
+6 | 42 == age  # SIM300
+7 | ("a", "b") == compare  # SIM300
+  |
+  = help: Replace Yoda condition with `compare == "yoda"`
+
+ℹ Suggested fix
+1 1 | # Errors
+2 2 | "yoda" == compare  # SIM300
+3   |-"yoda" == compare  # SIM300
+  3 |+compare == "yoda"  # SIM300
+4 4 | 42 == age  # SIM300
+5 5 | ("a", "b") == compare  # SIM300
+6 6 | "yoda" <= compare  # SIM300
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:4:1: SIM300 [*] Yoda conditions are discouraged, use `age == 42` instead
+  |
+4 | "yoda" == compare  # SIM300
+5 | "yoda" == compare  # SIM300
+6 | 42 == age  # SIM300
+  | ^^^^^^^^^ SIM300
+7 | ("a", "b") == compare  # SIM300
+8 | "yoda" <= compare  # SIM300
+  |
+  = help: Replace Yoda condition with `age == 42`
+
+ℹ Suggested fix
+1 1 | # Errors
+2 2 | "yoda" == compare  # SIM300
+3 3 | "yoda" == compare  # SIM300
+4   |-42 == age  # SIM300
+  4 |+age == 42  # SIM300
+5 5 | ("a", "b") == compare  # SIM300
+6 6 | "yoda" <= compare  # SIM300
+7 7 | "yoda" < compare  # SIM300
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:5:1: SIM300 [*] Yoda conditions are discouraged, use `compare == ("a", "b")` instead
+  |
+5 | "yoda" == compare  # SIM300
+6 | 42 == age  # SIM300
+7 | ("a", "b") == compare  # SIM300
+  | ^^^^^^^^^^^^^^^^^^^^^ SIM300
+8 | "yoda" <= compare  # SIM300
+9 | "yoda" < compare  # SIM300
+  |
+  = help: Replace Yoda condition with `compare == ("a", "b")`
+
+ℹ Suggested fix
+2 2 | "yoda" == compare  # SIM300
+3 3 | "yoda" == compare  # SIM300
+4 4 | 42 == age  # SIM300
+5   |-("a", "b") == compare  # SIM300
+  5 |+compare == ("a", "b")  # SIM300
+6 6 | "yoda" <= compare  # SIM300
+7 7 | "yoda" < compare  # SIM300
+8 8 | 42 > age  # SIM300
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:6:1: SIM300 [*] Yoda conditions are discouraged, use `compare >= "yoda"` instead
+   |
+ 6 | 42 == age  # SIM300
+ 7 | ("a", "b") == compare  # SIM300
+ 8 | "yoda" <= compare  # SIM300
+   | ^^^^^^^^^^^^^^^^^ SIM300
+ 9 | "yoda" < compare  # SIM300
+10 | 42 > age  # SIM300
+   |
+   = help: Replace Yoda condition with `compare >= "yoda"`
+
+ℹ Suggested fix
+3 3 | "yoda" == compare  # SIM300
+4 4 | 42 == age  # SIM300
+5 5 | ("a", "b") == compare  # SIM300
+6   |-"yoda" <= compare  # SIM300
+  6 |+compare >= "yoda"  # SIM300
+7 7 | "yoda" < compare  # SIM300
+8 8 | 42 > age  # SIM300
+9 9 | -42 > age  # SIM300
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:7:1: SIM300 [*] Yoda conditions are discouraged, use `compare > "yoda"` instead
+   |
+ 7 | ("a", "b") == compare  # SIM300
+ 8 | "yoda" <= compare  # SIM300
+ 9 | "yoda" < compare  # SIM300
+   | ^^^^^^^^^^^^^^^^ SIM300
+10 | 42 > age  # SIM300
+11 | -42 > age  # SIM300
+   |
+   = help: Replace Yoda condition with `compare > "yoda"`
+
+ℹ Suggested fix
+4 4 | 42 == age  # SIM300
+5 5 | ("a", "b") == compare  # SIM300
+6 6 | "yoda" <= compare  # SIM300
+7   |-"yoda" < compare  # SIM300
+  7 |+compare > "yoda"  # SIM300
+8 8 | 42 > age  # SIM300
+9 9 | -42 > age  # SIM300
+10 10 | +42 > age  # SIM300
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:8:1: SIM300 [*] Yoda conditions are discouraged, use `age < 42` instead
+   |
+ 8 | "yoda" <= compare  # SIM300
+ 9 | "yoda" < compare  # SIM300
+10 | 42 > age  # SIM300
+   | ^^^^^^^^ SIM300
+11 | -42 > age  # SIM300
+12 | +42 > age  # SIM300
+   |
+   = help: Replace Yoda condition with `age < 42`
+
+ℹ Suggested fix
+5 5 | ("a", "b") == compare  # SIM300
+6 6 | "yoda" <= compare  # SIM300
+7 7 | "yoda" < compare  # SIM300
+8   |-42 > age  # SIM300
+  8 |+age < 42  # SIM300
+9 9 | -42 > age  # SIM300
+10 10 | +42 > age  # SIM300
+11 11 | YODA == age  # SIM300
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:9:1: SIM300 [*] Yoda conditions are discouraged, use `age < -42` instead
+   |
+ 9 | "yoda" < compare  # SIM300
+10 | 42 > age  # SIM300
+11 | -42 > age  # SIM300
+   | ^^^^^^^^^ SIM300
+12 | +42 > age  # SIM300
+13 | YODA == age  # SIM300
+   |
+   = help: Replace Yoda condition with `age < -42`
+
+ℹ Suggested fix
+6  6  | "yoda" <= compare  # SIM300
+7  7  | "yoda" < compare  # SIM300
+8  8  | 42 > age  # SIM300
+9     |--42 > age  # SIM300
+   9  |+age < -42  # SIM300
+10 10 | +42 > age  # SIM300
+11 11 | YODA == age  # SIM300
+12 12 | YODA > age  # SIM300
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:10:1: SIM300 [*] Yoda conditions are discouraged, use `age < +42` instead
+   |
+10 | 42 > age  # SIM300
+11 | -42 > age  # SIM300
+12 | +42 > age  # SIM300
+   | ^^^^^^^^^ SIM300
+13 | YODA == age  # SIM300
+14 | YODA > age  # SIM300
+   |
+   = help: Replace Yoda condition with `age < +42`
+
+ℹ Suggested fix
+7  7  | "yoda" < compare  # SIM300
+8  8  | 42 > age  # SIM300
+9  9  | -42 > age  # SIM300
+10    |-+42 > age  # SIM300
+   10 |+age < +42  # SIM300
+11 11 | YODA == age  # SIM300
+12 12 | YODA > age  # SIM300
+13 13 | YODA >= age  # SIM300
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:11:1: SIM300 [*] Yoda conditions are discouraged, use `age == YODA` instead
+   |
+11 | -42 > age  # SIM300
+12 | +42 > age  # SIM300
+13 | YODA == age  # SIM300
+   | ^^^^^^^^^^^ SIM300
+14 | YODA > age  # SIM300
+15 | YODA >= age  # SIM300
+   |
+   = help: Replace Yoda condition with `age == YODA`
+
+ℹ Suggested fix
+8  8  | 42 > age  # SIM300
+9  9  | -42 > age  # SIM300
+10 10 | +42 > age  # SIM300
+11    |-YODA == age  # SIM300
+   11 |+age == YODA  # SIM300
+12 12 | YODA > age  # SIM300
+13 13 | YODA >= age  # SIM300
+14 14 | JediOrder.YODA == age  # SIM300
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:12:1: SIM300 [*] Yoda conditions are discouraged, use `age < YODA` instead
+   |
+12 | +42 > age  # SIM300
+13 | YODA == age  # SIM300
+14 | YODA > age  # SIM300
+   | ^^^^^^^^^^ SIM300
+15 | YODA >= age  # SIM300
+16 | JediOrder.YODA == age  # SIM300
+   |
+   = help: Replace Yoda condition with `age < YODA`
+
+ℹ Suggested fix
+9  9  | -42 > age  # SIM300
+10 10 | +42 > age  # SIM300
+11 11 | YODA == age  # SIM300
+12    |-YODA > age  # SIM300
+   12 |+age < YODA  # SIM300
+13 13 | YODA >= age  # SIM300
+14 14 | JediOrder.YODA == age  # SIM300
+15 15 | 0 < (number - 100)  # SIM300
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:13:1: SIM300 [*] Yoda conditions are discouraged, use `age <= YODA` instead
+   |
+13 | YODA == age  # SIM300
+14 | YODA > age  # SIM300
+15 | YODA >= age  # SIM300
+   | ^^^^^^^^^^^ SIM300
+16 | JediOrder.YODA == age  # SIM300
+17 | 0 < (number - 100)  # SIM300
+   |
+   = help: Replace Yoda condition with `age <= YODA`
+
+ℹ Suggested fix
+10 10 | +42 > age  # SIM300
+11 11 | YODA == age  # SIM300
+12 12 | YODA > age  # SIM300
+13    |-YODA >= age  # SIM300
+   13 |+age <= YODA  # SIM300
+14 14 | JediOrder.YODA == age  # SIM300
+15 15 | 0 < (number - 100)  # SIM300
+16 16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:14:1: SIM300 [*] Yoda conditions are discouraged, use `age == JediOrder.YODA` instead
+   |
+14 | YODA > age  # SIM300
+15 | YODA >= age  # SIM300
+16 | JediOrder.YODA == age  # SIM300
+   | ^^^^^^^^^^^^^^^^^^^^^ SIM300
+17 | 0 < (number - 100)  # SIM300
+18 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
+   |
+   = help: Replace Yoda condition with `age == JediOrder.YODA`
+
+ℹ Suggested fix
+11 11 | YODA == age  # SIM300
+12 12 | YODA > age  # SIM300
+13 13 | YODA >= age  # SIM300
+14    |-JediOrder.YODA == age  # SIM300
+   14 |+age == JediOrder.YODA  # SIM300
+15 15 | 0 < (number - 100)  # SIM300
+16 16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
+17 17 | 
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:15:1: SIM300 [*] Yoda conditions are discouraged, use `(number - 100) > 0` instead
+   |
+15 | YODA >= age  # SIM300
+16 | JediOrder.YODA == age  # SIM300
+17 | 0 < (number - 100)  # SIM300
+   | ^^^^^^^^^^^^^^^^^^ SIM300
+18 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
+   |
+   = help: Replace Yoda condition with `(number - 100) > 0`
+
+ℹ Suggested fix
+12 12 | YODA > age  # SIM300
+13 13 | YODA >= age  # SIM300
+14 14 | JediOrder.YODA == age  # SIM300
+15    |-0 < (number - 100)  # SIM300
+   15 |+(number - 100) > 0  # SIM300
+16 16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
+17 17 | 
+18 18 | # OK
+
+./resources/test/fixtures/flake8_simplify/SIM300.py:16:1: SIM300 [*] Yoda conditions are discouraged, use `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE` instead
+   |
+16 | JediOrder.YODA == age  # SIM300
+17 | 0 < (number - 100)  # SIM300
+18 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM300
+19 | 
+20 | # OK
+   |
+   = help: Replace Yoda condition with `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE`
+
+ℹ Suggested fix
+13 13 | YODA >= age  # SIM300
+14 14 | JediOrder.YODA == age  # SIM300
+15 15 | 0 < (number - 100)  # SIM300
+16    |-SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
+   16 |+(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE  # SIM300
+17 17 | 
+18 18 | # OK
+19 19 | compare == "yoda"
+
 

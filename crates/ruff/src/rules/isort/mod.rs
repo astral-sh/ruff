@@ -330,8 +330,9 @@ mod tests {
     use std::collections::BTreeSet;
     use std::path::Path;
 
+    use crate::assert_messages;
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use test_case::test_case;
 
     use crate::registry::Rule;
@@ -396,7 +397,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -419,7 +420,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -442,7 +443,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -460,7 +461,7 @@ mod tests {
     //             ..Settings::for_rule(Rule::UnsortedImports)
     //         },
     //     )?;
-    //     insta::assert_yaml_snapshot!(snapshot, diagnostics);
+    //     crate::assert_messages!(snapshot, diagnostics);
     //     Ok(())
     // }
 
@@ -483,7 +484,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -507,7 +508,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -525,7 +526,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -544,7 +545,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -562,7 +563,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -583,7 +584,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -602,7 +603,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -630,7 +631,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -660,7 +661,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -688,7 +689,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -708,7 +709,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -731,7 +732,7 @@ mod tests {
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -754,7 +755,7 @@ mod tests {
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -776,7 +777,7 @@ mod tests {
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -796,7 +797,7 @@ mod tests {
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -814,7 +815,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -839,7 +840,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -864,7 +865,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -885,7 +886,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -904,7 +905,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -927,7 +928,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

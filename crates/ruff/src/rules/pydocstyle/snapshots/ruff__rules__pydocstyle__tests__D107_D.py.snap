@@ -1,33 +1,21 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndocumentedPublicInit
-    body: "Missing docstring in `__init__`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 60
-    column: 8
-  end_location:
-    row: 60
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndocumentedPublicInit
-    body: "Missing docstring in `__init__`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 534
-    column: 8
-  end_location:
-    row: 534
-    column: 16
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pydocstyle/D.py:60:9: D107 Missing docstring in `__init__`
+   |
+60 |     @expect('D107: Missing docstring in __init__')
+61 |     def __init__(self=None):
+   |         ^^^^^^^^ D107
+62 |         pass
+   |
+
+./resources/test/fixtures/pydocstyle/D.py:534:9: D107 Missing docstring in `__init__`
+    |
+534 |     """
+535 | 
+536 |     def __init__(self, x):
+    |         ^^^^^^^^ D107
+537 |         pass
+    |
+
 

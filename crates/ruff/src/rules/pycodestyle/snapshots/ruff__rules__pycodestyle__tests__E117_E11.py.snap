@@ -1,47 +1,32 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: OverIndented
-    body: Over-indented
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 5
-  end_location:
-    row: 6
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: OverIndented
-    body: Over-indented
-    suggestion: ~
-    fixable: false
-  location:
-    row: 39
-    column: 8
-  end_location:
-    row: 39
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: OverIndented
-    body: Over-indented
-    suggestion: ~
-    fixable: false
-  location:
-    row: 42
-    column: 2
-  end_location:
-    row: 42
-    column: 2
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E11.py:6:6: E117 Over-indented
+   |
+ 6 | #: E111 E117
+ 7 | if True:
+ 8 |      print()
+   |       E117
+ 9 | #: E112
+10 | if False:
+   |
+
+./resources/test/fixtures/pycodestyle/E11.py:39:9: E117 Over-indented
+   |
+39 | #: E117
+40 | def start():
+41 |         print()
+   |          E117
+42 | #: E117 W191
+43 | def start():
+   |
+
+./resources/test/fixtures/pycodestyle/E11.py:42:3: E117 Over-indented
+   |
+42 | #: E117 W191
+43 | def start():
+44 | 		print()
+   |  E117
+   |
+
 

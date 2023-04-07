@@ -1,53 +1,28 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ConstantImportedAsNonConstant
-    body: "Constant `CONST` imported as non-constant `const`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 7
-  end_location:
-    row: 1
-    column: 25
-  fix:
-    edits: []
-  parent:
-    row: 1
-    column: 0
-- kind:
-    name: ConstantImportedAsNonConstant
-    body: "Constant `CONSTANT` imported as non-constant `constant`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 16
-  end_location:
-    row: 2
-    column: 36
-  fix:
-    edits: []
-  parent:
-    row: 2
-    column: 0
-- kind:
-    name: ConstantImportedAsNonConstant
-    body: "Constant `ANOTHER_CONSTANT` imported as non-constant `another_constant`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 16
-  end_location:
-    row: 3
-    column: 52
-  fix:
-    edits: []
-  parent:
-    row: 3
-    column: 0
+./resources/test/fixtures/pep8_naming/N811.py:1:8: N811 Constant `CONST` imported as non-constant `const`
+  |
+1 | import mod.CONST as const
+  |        ^^^^^^^^^^^^^^^^^^ N811
+2 | from mod import CONSTANT as constant
+3 | from mod import ANOTHER_CONSTANT as another_constant
+  |
+
+./resources/test/fixtures/pep8_naming/N811.py:2:17: N811 Constant `CONSTANT` imported as non-constant `constant`
+  |
+2 | import mod.CONST as const
+3 | from mod import CONSTANT as constant
+  |                 ^^^^^^^^^^^^^^^^^^^^ N811
+4 | from mod import ANOTHER_CONSTANT as another_constant
+  |
+
+./resources/test/fixtures/pep8_naming/N811.py:3:17: N811 Constant `ANOTHER_CONSTANT` imported as non-constant `another_constant`
+  |
+3 | import mod.CONST as const
+4 | from mod import CONSTANT as constant
+5 | from mod import ANOTHER_CONSTANT as another_constant
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N811
+  |
+
 

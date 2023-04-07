@@ -1,103 +1,95 @@
 ---
 source: crates/ruff/src/rules/flake8_pie/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryComprehensionAnyAll
-    body: Unnecessary list comprehension.
-    suggestion: Remove unnecessary list comprehension
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 23
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 24
-        content: any(x.id for x in bar)
-  parent: ~
-- kind:
-    name: UnnecessaryComprehensionAnyAll
-    body: Unnecessary list comprehension.
-    suggestion: Remove unnecessary list comprehension
-    fixable: true
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 23
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 0
-        end_location:
-          row: 3
-          column: 24
-        content: all(x.id for x in bar)
-  parent: ~
-- kind:
-    name: UnnecessaryComprehensionAnyAll
-    body: Unnecessary list comprehension.
-    suggestion: Remove unnecessary list comprehension
-    fixable: true
-  location:
-    row: 5
-    column: 4
-  end_location:
-    row: 5
-    column: 23
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 0
-        end_location:
-          row: 6
-          column: 1
-        content: "any(  # first comment\n    x.id for x in bar  # second comment\n)"
-  parent: ~
-- kind:
-    name: UnnecessaryComprehensionAnyAll
-    body: Unnecessary list comprehension.
-    suggestion: Remove unnecessary list comprehension
-    fixable: true
-  location:
-    row: 8
-    column: 4
-  end_location:
-    row: 8
-    column: 23
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 0
-        end_location:
-          row: 9
-          column: 1
-        content: "all(  # first comment\n    x.id for x in bar  # second comment\n)"
-  parent: ~
-- kind:
-    name: UnnecessaryComprehensionAnyAll
-    body: Unnecessary list comprehension.
-    suggestion: Remove unnecessary list comprehension
-    fixable: true
-  location:
-    row: 10
-    column: 4
-  end_location:
-    row: 10
-    column: 23
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_pie/PIE802.py:2:5: PIE802 [*] Unnecessary list comprehension.
+  |
+2 | # PIE802
+3 | any([x.id for x in bar])
+  |     ^^^^^^^^^^^^^^^^^^^ PIE802
+4 | all([x.id for x in bar])
+5 | any(  # first comment
+  |
+  = help: Remove unnecessary list comprehension
+
+ℹ Suggested fix
+1 1 | # PIE802
+2   |-any([x.id for x in bar])
+  2 |+any(x.id for x in bar)
+3 3 | all([x.id for x in bar])
+4 4 | any(  # first comment
+5 5 |     [x.id for x in bar],  # second comment
+
+./resources/test/fixtures/flake8_pie/PIE802.py:3:5: PIE802 [*] Unnecessary list comprehension.
+  |
+3 | # PIE802
+4 | any([x.id for x in bar])
+5 | all([x.id for x in bar])
+  |     ^^^^^^^^^^^^^^^^^^^ PIE802
+6 | any(  # first comment
+7 |     [x.id for x in bar],  # second comment
+  |
+  = help: Remove unnecessary list comprehension
+
+ℹ Suggested fix
+1 1 | # PIE802
+2 2 | any([x.id for x in bar])
+3   |-all([x.id for x in bar])
+  3 |+all(x.id for x in bar)
+4 4 | any(  # first comment
+5 5 |     [x.id for x in bar],  # second comment
+6 6 | )  # third comment
+
+./resources/test/fixtures/flake8_pie/PIE802.py:5:5: PIE802 [*] Unnecessary list comprehension.
+  |
+5 | all([x.id for x in bar])
+6 | any(  # first comment
+7 |     [x.id for x in bar],  # second comment
+  |     ^^^^^^^^^^^^^^^^^^^ PIE802
+8 | )  # third comment
+9 | all(  # first comment
+  |
+  = help: Remove unnecessary list comprehension
+
+ℹ Suggested fix
+2 2 | any([x.id for x in bar])
+3 3 | all([x.id for x in bar])
+4 4 | any(  # first comment
+5   |-    [x.id for x in bar],  # second comment
+  5 |+    x.id for x in bar  # second comment
+6 6 | )  # third comment
+7 7 | all(  # first comment
+8 8 |     [x.id for x in bar],  # second comment
+
+./resources/test/fixtures/flake8_pie/PIE802.py:8:5: PIE802 [*] Unnecessary list comprehension.
+   |
+ 8 | )  # third comment
+ 9 | all(  # first comment
+10 |     [x.id for x in bar],  # second comment
+   |     ^^^^^^^^^^^^^^^^^^^ PIE802
+11 | )  # third comment
+12 | any({x.id for x in bar})
+   |
+   = help: Remove unnecessary list comprehension
+
+ℹ Suggested fix
+5 5 |     [x.id for x in bar],  # second comment
+6 6 | )  # third comment
+7 7 | all(  # first comment
+8   |-    [x.id for x in bar],  # second comment
+  8 |+    x.id for x in bar  # second comment
+9 9 | )  # third comment
+10 10 | any({x.id for x in bar})
+11 11 | 
+
+./resources/test/fixtures/flake8_pie/PIE802.py:10:5: PIE802 [*] Unnecessary list comprehension.
+   |
+10 |     [x.id for x in bar],  # second comment
+11 | )  # third comment
+12 | any({x.id for x in bar})
+   |     ^^^^^^^^^^^^^^^^^^^ PIE802
+13 | 
+14 | # OK
+   |
+   = help: Remove unnecessary list comprehension
+
 

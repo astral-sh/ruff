@@ -1,19 +1,11 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `db`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 35
-  end_location:
-    row: 6
-    column: 37
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/typing_modules.py:6:36: F821 Undefined name `db`
+  |
+6 | X = Union[Literal[False], Literal["db"]]
+  |                                    ^^ F821
+7 | y = Optional["Class"]
+  |
+
 

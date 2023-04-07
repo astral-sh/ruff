@@ -1,47 +1,34 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MixedCaseVariableInGlobalScope
-    body: "Variable `mixedCase` in global scope should not be mixedCase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MixedCaseVariableInGlobalScope
-    body: "Variable `_mixedCase` in global scope should not be mixedCase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MixedCaseVariableInGlobalScope
-    body: "Variable `mixed_Case` in global scope should not be mixedCase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 10
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pep8_naming/N816.py:7:1: N816 Variable `mixedCase` in global scope should not be mixedCase
+   |
+ 7 | lower = 0
+ 8 | CONSTANT = 0
+ 9 | mixedCase = 0
+   | ^^^^^^^^^ N816
+10 | _mixedCase = 0
+11 | mixed_Case = 0
+   |
+
+./resources/test/fixtures/pep8_naming/N816.py:8:1: N816 Variable `_mixedCase` in global scope should not be mixedCase
+   |
+ 8 | CONSTANT = 0
+ 9 | mixedCase = 0
+10 | _mixedCase = 0
+   | ^^^^^^^^^^ N816
+11 | mixed_Case = 0
+12 | myObj1 = collections.namedtuple("MyObj1", ["a", "b"])
+   |
+
+./resources/test/fixtures/pep8_naming/N816.py:9:1: N816 Variable `mixed_Case` in global scope should not be mixedCase
+   |
+ 9 | mixedCase = 0
+10 | _mixedCase = 0
+11 | mixed_Case = 0
+   | ^^^^^^^^^^ N816
+12 | myObj1 = collections.namedtuple("MyObj1", ["a", "b"])
+13 | myObj2 = namedtuple("MyObj2", ["a", "b"])
+   |
+
 

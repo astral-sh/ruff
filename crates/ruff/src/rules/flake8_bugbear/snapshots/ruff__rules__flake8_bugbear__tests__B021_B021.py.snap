@@ -1,145 +1,80 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 4
-    column: 3
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 4
-  end_location:
-    row: 14
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 4
-  end_location:
-    row: 22
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 30
-    column: 4
-  end_location:
-    row: 30
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 4
-  end_location:
-    row: 38
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 4
-  end_location:
-    row: 46
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 4
-  end_location:
-    row: 54
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 62
-    column: 4
-  end_location:
-    row: 62
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 70
-    column: 4
-  end_location:
-    row: 70
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: FStringDocstring
-    body: f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
-    suggestion: ~
-    fixable: false
-  location:
-    row: 74
-    column: 4
-  end_location:
-    row: 74
-    column: 48
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bugbear/B021.py:1:1: B021 f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+  |
+1 | / f"""
+2 | | Should emit:
+3 | | B021 - on lines 14, 22, 30, 38, 46, 54, 62, 70, 73
+4 | | """
+  | |___^ B021
+5 |   
+6 |   VARIABLE = "world"
+  |
+
+./resources/test/fixtures/flake8_bugbear/B021.py:14:5: B021 f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+   |
+14 | def foo2():
+15 |     f"""hello {VARIABLE}!"""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ B021
+   |
+
+./resources/test/fixtures/flake8_bugbear/B021.py:22:5: B021 f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+   |
+22 | class bar2:
+23 |     f"""hello {VARIABLE}!"""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ B021
+   |
+
+./resources/test/fixtures/flake8_bugbear/B021.py:30:5: B021 f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+   |
+30 | def foo2():
+31 |     f"""hello {VARIABLE}!"""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ B021
+   |
+
+./resources/test/fixtures/flake8_bugbear/B021.py:38:5: B021 f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+   |
+38 | class bar2:
+39 |     f"""hello {VARIABLE}!"""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^ B021
+   |
+
+./resources/test/fixtures/flake8_bugbear/B021.py:46:5: B021 f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+   |
+46 | def foo2():
+47 |     f"hello {VARIABLE}!"
+   |     ^^^^^^^^^^^^^^^^^^^^ B021
+   |
+
+./resources/test/fixtures/flake8_bugbear/B021.py:54:5: B021 f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+   |
+54 | class bar2:
+55 |     f"hello {VARIABLE}!"
+   |     ^^^^^^^^^^^^^^^^^^^^ B021
+   |
+
+./resources/test/fixtures/flake8_bugbear/B021.py:62:5: B021 f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+   |
+62 | def foo2():
+63 |     f"hello {VARIABLE}!"
+   |     ^^^^^^^^^^^^^^^^^^^^ B021
+   |
+
+./resources/test/fixtures/flake8_bugbear/B021.py:70:5: B021 f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+   |
+70 | class bar2:
+71 |     f"hello {VARIABLE}!"
+   |     ^^^^^^^^^^^^^^^^^^^^ B021
+   |
+
+./resources/test/fixtures/flake8_bugbear/B021.py:74:5: B021 f-string used as docstring. This will be interpreted by python as a joined string rather than a docstring.
+   |
+74 | def baz():
+75 |     f"""I'm probably a docstring: {VARIABLE}!"""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B021
+76 |     print(f"""I'm a normal string""")
+77 |     f"""Don't detect me!"""
+   |
+
 

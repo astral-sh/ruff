@@ -1,131 +1,119 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ExprAndFalse
-    body: "Use `False` instead of `... and False`"
-    suggestion: "Replace with `False`"
-    fixable: true
-  location:
-    row: 1
-    column: 3
-  end_location:
-    row: 1
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 3
-        end_location:
-          row: 1
-          column: 14
-        content: "False"
-  parent: ~
-- kind:
-    name: ExprAndFalse
-    body: "Use `False` instead of `... and False`"
-    suggestion: "Replace with `False`"
-    fixable: true
-  location:
-    row: 4
-    column: 3
-  end_location:
-    row: 4
-    column: 21
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 3
-        end_location:
-          row: 4
-          column: 21
-        content: "False"
-  parent: ~
-- kind:
-    name: ExprAndFalse
-    body: "Use `False` instead of `... and False`"
-    suggestion: "Replace with `False`"
-    fixable: true
-  location:
-    row: 7
-    column: 9
-  end_location:
-    row: 7
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 9
-        end_location:
-          row: 7
-          column: 20
-        content: "False"
-  parent: ~
-- kind:
-    name: ExprAndFalse
-    body: "Use `False` instead of `... and False`"
-    suggestion: "Replace with `False`"
-    fixable: true
-  location:
-    row: 19
-    column: 17
-  end_location:
-    row: 19
-    column: 36
-  fix:
-    edits:
-      - location:
-          row: 19
-          column: 17
-        end_location:
-          row: 19
-          column: 36
-        content: "False"
-  parent: ~
-- kind:
-    name: ExprAndFalse
-    body: "Use `False` instead of `... and False`"
-    suggestion: "Replace with `False`"
-    fixable: true
-  location:
-    row: 22
-    column: 3
-  end_location:
-    row: 22
-    column: 36
-  fix:
-    edits:
-      - location:
-          row: 22
-          column: 3
-        end_location:
-          row: 22
-          column: 36
-        content: "False"
-  parent: ~
-- kind:
-    name: ExprAndFalse
-    body: "Use `False` instead of `... and False`"
-    suggestion: "Replace with `False`"
-    fixable: true
-  location:
-    row: 25
-    column: 3
-  end_location:
-    row: 25
-    column: 36
-  fix:
-    edits:
-      - location:
-          row: 25
-          column: 3
-        end_location:
-          row: 25
-          column: 36
-        content: "False"
-  parent: ~
+./resources/test/fixtures/flake8_simplify/SIM223.py:1:4: SIM223 [*] Use `False` instead of `... and False`
+  |
+1 | if a and False:  # SIM223
+  |    ^^^^^^^^^^^ SIM223
+2 |     pass
+  |
+  = help: Replace with `False`
+
+ℹ Suggested fix
+1   |-if a and False:  # SIM223
+  1 |+if False:  # SIM223
+2 2 |     pass
+3 3 | 
+4 4 | if (a or b) and False:  # SIM223
+
+./resources/test/fixtures/flake8_simplify/SIM223.py:4:4: SIM223 [*] Use `False` instead of `... and False`
+  |
+4 |     pass
+5 | 
+6 | if (a or b) and False:  # SIM223
+  |    ^^^^^^^^^^^^^^^^^^ SIM223
+7 |     pass
+  |
+  = help: Replace with `False`
+
+ℹ Suggested fix
+1 1 | if a and False:  # SIM223
+2 2 |     pass
+3 3 | 
+4   |-if (a or b) and False:  # SIM223
+  4 |+if False:  # SIM223
+5 5 |     pass
+6 6 | 
+7 7 | if a or (b and False):  # SIM223
+
+./resources/test/fixtures/flake8_simplify/SIM223.py:7:10: SIM223 [*] Use `False` instead of `... and False`
+   |
+ 7 |     pass
+ 8 | 
+ 9 | if a or (b and False):  # SIM223
+   |          ^^^^^^^^^^^ SIM223
+10 |     pass
+   |
+   = help: Replace with `False`
+
+ℹ Suggested fix
+4 4 | if (a or b) and False:  # SIM223
+5 5 |     pass
+6 6 | 
+7   |-if a or (b and False):  # SIM223
+  7 |+if a or (False):  # SIM223
+8 8 |     pass
+9 9 | 
+10 10 | if a or False:
+
+./resources/test/fixtures/flake8_simplify/SIM223.py:19:18: SIM223 [*] Use `False` instead of `... and False`
+   |
+19 |     pass
+20 | 
+21 | if a and f() and False and g() and b:  # SIM223
+   |                  ^^^^^^^^^^^^^^^^^^^ SIM223
+22 |     pass
+   |
+   = help: Replace with `False`
+
+ℹ Suggested fix
+16 16 | if a and f() and b and g() and False:  # OK
+17 17 |     pass
+18 18 | 
+19    |-if a and f() and False and g() and b:  # SIM223
+   19 |+if a and f() and False:  # SIM223
+20 20 |     pass
+21 21 | 
+22 22 | if False and f() and a and g() and b:  # SIM223
+
+./resources/test/fixtures/flake8_simplify/SIM223.py:22:4: SIM223 [*] Use `False` instead of `... and False`
+   |
+22 |     pass
+23 | 
+24 | if False and f() and a and g() and b:  # SIM223
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+25 |     pass
+   |
+   = help: Replace with `False`
+
+ℹ Suggested fix
+19 19 | if a and f() and False and g() and b:  # SIM223
+20 20 |     pass
+21 21 | 
+22    |-if False and f() and a and g() and b:  # SIM223
+   22 |+if False:  # SIM223
+23 23 |     pass
+24 24 | 
+25 25 | if a and False and f() and b and g():  # SIM223
+
+./resources/test/fixtures/flake8_simplify/SIM223.py:25:4: SIM223 [*] Use `False` instead of `... and False`
+   |
+25 |     pass
+26 | 
+27 | if a and False and f() and b and g():  # SIM223
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
+28 |     pass
+   |
+   = help: Replace with `False`
+
+ℹ Suggested fix
+22 22 | if False and f() and a and g() and b:  # SIM223
+23 23 |     pass
+24 24 | 
+25    |-if a and False and f() and b and g():  # SIM223
+   25 |+if False:  # SIM223
+26 26 |     pass
+27 27 | 
+28 28 | 
+
 

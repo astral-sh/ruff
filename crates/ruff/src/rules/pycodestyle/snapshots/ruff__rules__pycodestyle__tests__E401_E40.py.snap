@@ -1,19 +1,13 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MultipleImportsOnOneLine
-    body: Multiple imports on one line
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 14
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E40.py:2:1: E401 Multiple imports on one line
+  |
+2 | #: E401
+3 | import os, sys
+  | ^^^^^^^^^^^^^^ E401
+4 | #: Okay
+5 | import os
+  |
+
 

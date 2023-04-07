@@ -1,19 +1,13 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: RedefinedWhileUnused
-    body: "Redefinition of unused `os` from line 5"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 11
-  end_location:
-    row: 6
-    column: 13
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F811_6.py:6:12: F811 Redefinition of unused `os` from line 5
+  |
+6 | if i == 1:
+7 |     import os
+8 |     import os
+  |            ^^ F811
+9 | os.path
+  |
+
 

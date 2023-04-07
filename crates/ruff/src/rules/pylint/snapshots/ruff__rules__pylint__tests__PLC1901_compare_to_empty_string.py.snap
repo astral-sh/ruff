@@ -1,75 +1,47 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CompareToEmptyString
-    body: "`x is \"\"` can be simplified to `not x` as an empty string is falsey"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 12
-  end_location:
-    row: 7
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CompareToEmptyString
-    body: "`x == \"\"` can be simplified to `not x` as an empty string is falsey"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 23
-  end_location:
-    row: 7
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CompareToEmptyString
-    body: "`y is not \"\"` can be simplified to `y` as an empty string is falsey"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 16
-  end_location:
-    row: 10
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CompareToEmptyString
-    body: "`y != \"\"` can be simplified to `y` as an empty string is falsey"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 27
-  end_location:
-    row: 10
-    column: 29
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CompareToEmptyString
-    body: "`\"\" != z` can be simplified to `z` as an empty string is falsey"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 7
-  end_location:
-    row: 13
-    column: 9
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pylint/compare_to_empty_string.py:7:13: PLC1901 `x is ""` can be simplified to `not x` as an empty string is falsey
+  |
+7 | def errors():
+8 |     if x is "" or x == "":
+  |             ^^ PLC1901
+9 |         print("x is an empty string")
+  |
+
+./resources/test/fixtures/pylint/compare_to_empty_string.py:7:24: PLC1901 `x == ""` can be simplified to `not x` as an empty string is falsey
+  |
+7 | def errors():
+8 |     if x is "" or x == "":
+  |                        ^^ PLC1901
+9 |         print("x is an empty string")
+  |
+
+./resources/test/fixtures/pylint/compare_to_empty_string.py:10:17: PLC1901 `y is not ""` can be simplified to `y` as an empty string is falsey
+   |
+10 |         print("x is an empty string")
+11 | 
+12 |     if y is not "" or y != "":
+   |                 ^^ PLC1901
+13 |         print("y is not an empty string")
+   |
+
+./resources/test/fixtures/pylint/compare_to_empty_string.py:10:28: PLC1901 `y != ""` can be simplified to `y` as an empty string is falsey
+   |
+10 |         print("x is an empty string")
+11 | 
+12 |     if y is not "" or y != "":
+   |                            ^^ PLC1901
+13 |         print("y is not an empty string")
+   |
+
+./resources/test/fixtures/pylint/compare_to_empty_string.py:13:8: PLC1901 `"" != z` can be simplified to `z` as an empty string is falsey
+   |
+13 |         print("y is not an empty string")
+14 | 
+15 |     if "" != z:
+   |        ^^ PLC1901
+16 |         print("z is an empty string")
+   |
+
 

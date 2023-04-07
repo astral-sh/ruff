@@ -1,117 +1,84 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `elif` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 4
-  end_location:
-    row: 8
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `elif` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 4
-  end_location:
-    row: 23
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `elif` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 41
-    column: 4
-  end_location:
-    row: 41
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `else` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 53
-    column: 4
-  end_location:
-    row: 53
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `else` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 64
-    column: 8
-  end_location:
-    row: 64
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `else` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 79
-    column: 4
-  end_location:
-    row: 79
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `else` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 89
-    column: 8
-  end_location:
-    row: 89
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseReturn
-    body: "Unnecessary `else` after `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 99
-    column: 4
-  end_location:
-    row: 99
-    column: 8
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_return/RET505.py:8:5: RET505 Unnecessary `elif` after `return` statement
+   |
+ 8 |         a = 1
+ 9 |         return y
+10 |     elif z:
+   |     ^^^^ RET505
+11 |         b = 2
+12 |         return w
+   |
+
+./resources/test/fixtures/flake8_return/RET505.py:23:5: RET505 Unnecessary `elif` after `return` statement
+   |
+23 |             b = 2
+24 |         return
+25 |     elif z:
+   |     ^^^^ RET505
+26 |         c = 2
+27 |     else:
+   |
+
+./resources/test/fixtures/flake8_return/RET505.py:41:5: RET505 Unnecessary `elif` after `return` statement
+   |
+41 |         a = 1
+42 |         return y
+43 |     elif z:
+   |     ^^^^ RET505
+44 |         b = 2
+45 |         return w
+   |
+
+./resources/test/fixtures/flake8_return/RET505.py:53:5: RET505 Unnecessary `else` after `return` statement
+   |
+53 |         a = 1
+54 |         return y
+55 |     else:
+   |     ^^^^ RET505
+56 |         b = 2
+57 |         return z
+   |
+
+./resources/test/fixtures/flake8_return/RET505.py:64:9: RET505 Unnecessary `else` after `return` statement
+   |
+64 |             b = 2
+65 |             return y
+66 |         else:
+   |         ^^^^ RET505
+67 |             c = 3
+68 |             return x
+   |
+
+./resources/test/fixtures/flake8_return/RET505.py:79:5: RET505 Unnecessary `else` after `return` statement
+   |
+79 |             b = 2
+80 |         return
+81 |     else:
+   |     ^^^^ RET505
+82 |         c = 3
+83 |     return
+   |
+
+./resources/test/fixtures/flake8_return/RET505.py:89:9: RET505 Unnecessary `else` after `return` statement
+   |
+89 |             a = 4
+90 |             return
+91 |         else:
+   |         ^^^^ RET505
+92 |             b = 2
+93 |     else:
+   |
+
+./resources/test/fixtures/flake8_return/RET505.py:99:5: RET505 Unnecessary `else` after `return` statement
+    |
+ 99 |     if x:  # [no-else-return]
+100 |         return True
+101 |     else:
+    |     ^^^^ RET505
+102 |         try:
+103 |             return False
+    |
+
 

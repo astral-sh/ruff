@@ -1,33 +1,24 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: IndentationWithInvalidMultiple
-    body: Indentation is not a multiple of 4
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 2
-  end_location:
-    row: 3
-    column: 2
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: IndentationWithInvalidMultiple
-    body: Indentation is not a multiple of 4
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 5
-  end_location:
-    row: 6
-    column: 5
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E11.py:3:3: E111 Indentation is not a multiple of 4
+  |
+3 | #: E111
+4 | if x > 2:
+5 |   print(x)
+  |    E111
+6 | #: E111 E117
+7 | if True:
+  |
+
+./resources/test/fixtures/pycodestyle/E11.py:6:6: E111 Indentation is not a multiple of 4
+   |
+ 6 | #: E111 E117
+ 7 | if True:
+ 8 |      print()
+   |       E111
+ 9 | #: E112
+10 | if False:
+   |
+
 

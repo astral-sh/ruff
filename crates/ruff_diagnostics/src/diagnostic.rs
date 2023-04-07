@@ -22,7 +22,6 @@ pub struct DiagnosticKind {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub location: Location,

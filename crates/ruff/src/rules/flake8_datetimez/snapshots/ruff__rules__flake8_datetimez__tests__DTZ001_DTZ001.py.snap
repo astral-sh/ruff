@@ -1,75 +1,47 @@
 ---
 source: crates/ruff/src/rules/flake8_datetimez/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CallDatetimeWithoutTzinfo
-    body: "The use of `datetime.datetime()` without `tzinfo` argument is not allowed"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 38
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CallDatetimeWithoutTzinfo
-    body: "The use of `datetime.datetime()` without `tzinfo` argument is not allowed"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 47
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CallDatetimeWithoutTzinfo
-    body: "The use of `datetime.datetime()` without `tzinfo` argument is not allowed"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 37
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CallDatetimeWithoutTzinfo
-    body: "The use of `datetime.datetime()` without `tzinfo` argument is not allowed"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 0
-  end_location:
-    row: 16
-    column: 42
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CallDatetimeWithoutTzinfo
-    body: "The use of `datetime.datetime()` without `tzinfo` argument is not allowed"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 0
-  end_location:
-    row: 21
-    column: 29
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_datetimez/DTZ001.py:4:1: DTZ001 The use of `datetime.datetime()` without `tzinfo` argument is not allowed
+  |
+4 | # no args
+5 | datetime.datetime(2000, 1, 1, 0, 0, 0)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ001
+6 | 
+7 | # none args
+  |
+
+./resources/test/fixtures/flake8_datetimez/DTZ001.py:7:1: DTZ001 The use of `datetime.datetime()` without `tzinfo` argument is not allowed
+   |
+ 7 | # none args
+ 8 | datetime.datetime(2000, 1, 1, 0, 0, 0, 0, None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ001
+ 9 | 
+10 | # not none arg
+   |
+
+./resources/test/fixtures/flake8_datetimez/DTZ001.py:13:1: DTZ001 The use of `datetime.datetime()` without `tzinfo` argument is not allowed
+   |
+13 | # no kwargs
+14 | datetime.datetime(2000, 1, 1, fold=1)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ001
+15 | 
+16 | # none kwargs
+   |
+
+./resources/test/fixtures/flake8_datetimez/DTZ001.py:16:1: DTZ001 The use of `datetime.datetime()` without `tzinfo` argument is not allowed
+   |
+16 | # none kwargs
+17 | datetime.datetime(2000, 1, 1, tzinfo=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ001
+18 | 
+19 | from datetime import datetime
+   |
+
+./resources/test/fixtures/flake8_datetimez/DTZ001.py:21:1: DTZ001 The use of `datetime.datetime()` without `tzinfo` argument is not allowed
+   |
+21 | # no args unqualified
+22 | datetime(2000, 1, 1, 0, 0, 0)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ001
+   |
+
 

@@ -1,89 +1,86 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryComprehension
-    body: "Unnecessary `list` comprehension (rewrite using `list()`)"
-    suggestion: "Rewrite using `list()`"
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 6
-          column: 0
-        end_location:
-          row: 6
-          column: 14
-        content: list(x)
-  parent: ~
-- kind:
-    name: UnnecessaryComprehension
-    body: "Unnecessary `set` comprehension (rewrite using `set()`)"
-    suggestion: "Rewrite using `set()`"
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 0
-        end_location:
-          row: 7
-          column: 14
-        content: set(x)
-  parent: ~
-- kind:
-    name: UnnecessaryComprehension
-    body: "Unnecessary `dict` comprehension (rewrite using `dict()`)"
-    suggestion: "Rewrite using `dict()`"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 8
-          column: 0
-        end_location:
-          row: 8
-          column: 20
-        content: dict(y)
-  parent: ~
-- kind:
-    name: UnnecessaryComprehension
-    body: "Unnecessary `dict` comprehension (rewrite using `dict()`)"
-    suggestion: "Rewrite using `dict()`"
-    fixable: true
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 28
-  fix:
-    edits:
-      - location:
-          row: 9
-          column: 0
-        end_location:
-          row: 9
-          column: 28
-        content: dict(d.items())
-  parent: ~
+./resources/test/fixtures/flake8_comprehensions/C416.py:6:1: C416 [*] Unnecessary `list` comprehension (rewrite using `list()`)
+   |
+ 6 | d = {"a": 1, "b": 2, "c": 3}
+ 7 | 
+ 8 | [i for i in x]
+   | ^^^^^^^^^^^^^^ C416
+ 9 | {i for i in x}
+10 | {k: v for k, v in y}
+   |
+   = help: Rewrite using `list()`
+
+ℹ Suggested fix
+3 3 | z = [(1,), (2,), (3,)]
+4 4 | d = {"a": 1, "b": 2, "c": 3}
+5 5 | 
+6   |-[i for i in x]
+  6 |+list(x)
+7 7 | {i for i in x}
+8 8 | {k: v for k, v in y}
+9 9 | {k: v for k, v in d.items()}
+
+./resources/test/fixtures/flake8_comprehensions/C416.py:7:1: C416 [*] Unnecessary `set` comprehension (rewrite using `set()`)
+   |
+ 7 | [i for i in x]
+ 8 | {i for i in x}
+   | ^^^^^^^^^^^^^^ C416
+ 9 | {k: v for k, v in y}
+10 | {k: v for k, v in d.items()}
+   |
+   = help: Rewrite using `set()`
+
+ℹ Suggested fix
+4 4 | d = {"a": 1, "b": 2, "c": 3}
+5 5 | 
+6 6 | [i for i in x]
+7   |-{i for i in x}
+  7 |+set(x)
+8 8 | {k: v for k, v in y}
+9 9 | {k: v for k, v in d.items()}
+10 10 | 
+
+./resources/test/fixtures/flake8_comprehensions/C416.py:8:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
+   |
+ 8 | [i for i in x]
+ 9 | {i for i in x}
+10 | {k: v for k, v in y}
+   | ^^^^^^^^^^^^^^^^^^^^ C416
+11 | {k: v for k, v in d.items()}
+   |
+   = help: Rewrite using `dict()`
+
+ℹ Suggested fix
+5 5 | 
+6 6 | [i for i in x]
+7 7 | {i for i in x}
+8   |-{k: v for k, v in y}
+  8 |+dict(y)
+9 9 | {k: v for k, v in d.items()}
+10 10 | 
+11 11 | [i for i, in z]
+
+./resources/test/fixtures/flake8_comprehensions/C416.py:9:1: C416 [*] Unnecessary `dict` comprehension (rewrite using `dict()`)
+   |
+ 9 | {i for i in x}
+10 | {k: v for k, v in y}
+11 | {k: v for k, v in d.items()}
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C416
+12 | 
+13 | [i for i, in z]
+   |
+   = help: Rewrite using `dict()`
+
+ℹ Suggested fix
+6  6  | [i for i in x]
+7  7  | {i for i in x}
+8  8  | {k: v for k, v in y}
+9     |-{k: v for k, v in d.items()}
+   9  |+dict(d.items())
+10 10 | 
+11 11 | [i for i, in z]
+12 12 | [i for i, j in y]
+
 

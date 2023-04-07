@@ -1,75 +1,39 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: InvalidClassName
-    body: "Class name `bad` should use CapWords convention "
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 6
-  end_location:
-    row: 1
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: InvalidClassName
-    body: "Class name `_bad` should use CapWords convention "
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 6
-  end_location:
-    row: 5
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: InvalidClassName
-    body: "Class name `bad_class` should use CapWords convention "
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 6
-  end_location:
-    row: 9
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: InvalidClassName
-    body: "Class name `Bad_Class` should use CapWords convention "
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 6
-  end_location:
-    row: 13
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: InvalidClassName
-    body: "Class name `BAD_CLASS` should use CapWords convention "
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 6
-  end_location:
-    row: 17
-    column: 15
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pep8_naming/N801.py:1:7: N801 Class name `bad` should use CapWords convention 
+  |
+1 | class bad:
+  |       ^^^ N801
+2 |     pass
+  |
+
+./resources/test/fixtures/pep8_naming/N801.py:5:7: N801 Class name `_bad` should use CapWords convention 
+  |
+5 | class _bad:
+  |       ^^^^ N801
+6 |     pass
+  |
+
+./resources/test/fixtures/pep8_naming/N801.py:9:7: N801 Class name `bad_class` should use CapWords convention 
+   |
+ 9 | class bad_class:
+   |       ^^^^^^^^^ N801
+10 |     pass
+   |
+
+./resources/test/fixtures/pep8_naming/N801.py:13:7: N801 Class name `Bad_Class` should use CapWords convention 
+   |
+13 | class Bad_Class:
+   |       ^^^^^^^^^ N801
+14 |     pass
+   |
+
+./resources/test/fixtures/pep8_naming/N801.py:17:7: N801 Class name `BAD_CLASS` should use CapWords convention 
+   |
+17 | class BAD_CLASS:
+   |       ^^^^^^^^^ N801
+18 |     pass
+   |
+
 

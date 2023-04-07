@@ -1,26 +1,37 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BlankLinesBetweenHeaderAndContent
-    body: "No blank lines allowed between a section header and its content (\"Short summary\")"
-    suggestion: Remove blank line(s)
-    fixable: true
-  location:
-    row: 216
-    column: 4
-  end_location:
-    row: 230
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 220
-          column: 0
-        end_location:
-          row: 221
-          column: 0
-        content: ~
-  parent: ~
+./resources/test/fixtures/pydocstyle/sections.py:216:5: D412 [*] No blank lines allowed between a section header and its content ("Short summary")
+    |
+216 |   @expect("D407: Missing dashed underline after section ('Raises')")
+217 |   def multiple_sections():  # noqa: D416
+218 |       """Toggle the gizmo.
+    |  _____^
+219 | | 
+220 | |     Short summary
+221 | |     -------------
+222 | | 
+223 | |     This is the function's description, which will also specify what it
+224 | |     returns.
+225 | | 
+226 | |     Returns
+227 | |     ------
+228 | |     Many many wonderful things.
+229 | |     Raises:
+230 | |     My attention.
+231 | | 
+232 | |     """
+    | |_______^ D412
+    |
+    = help: Remove blank line(s)
+
+ℹ Suggested fix
+217 217 | 
+218 218 |     Short summary
+219 219 |     -------------
+220     |-
+221 220 |     This is the function's description, which will also specify what it
+222 221 |     returns.
+223 222 | 
+
 

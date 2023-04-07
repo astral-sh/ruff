@@ -1,159 +1,112 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnexpectedSpacesAroundKeywordParameterEquals
-    body: Unexpected spaces around keyword / parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 11
-  end_location:
-    row: 2
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedSpacesAroundKeywordParameterEquals
-    body: Unexpected spaces around keyword / parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 13
-  end_location:
-    row: 2
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedSpacesAroundKeywordParameterEquals
-    body: Unexpected spaces around keyword / parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 8
-  end_location:
-    row: 6
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedSpacesAroundKeywordParameterEquals
-    body: Unexpected spaces around keyword / parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 7
-  end_location:
-    row: 8
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedSpacesAroundKeywordParameterEquals
-    body: Unexpected spaces around keyword / parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 7
-  end_location:
-    row: 10
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedSpacesAroundKeywordParameterEquals
-    body: Unexpected spaces around keyword / parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 9
-  end_location:
-    row: 10
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedSpacesAroundKeywordParameterEquals
-    body: Unexpected spaces around keyword / parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 13
-  end_location:
-    row: 12
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedSpacesAroundKeywordParameterEquals
-    body: Unexpected spaces around keyword / parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 28
-  end_location:
-    row: 15
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedSpacesAroundKeywordParameterEquals
-    body: Unexpected spaces around keyword / parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 44
-  end_location:
-    row: 18
-    column: 44
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedSpacesAroundKeywordParameterEquals
-    body: Unexpected spaces around keyword / parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 7
-  end_location:
-    row: 23
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedSpacesAroundKeywordParameterEquals
-    body: Unexpected spaces around keyword / parameter equals
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 9
-  end_location:
-    row: 23
-    column: 9
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E25.py:2:12: E251 Unexpected spaces around keyword / parameter equals
+  |
+2 | #: E251 E251
+3 | def foo(bar = False):
+  |             E251
+4 |     '''Test function with an error in declaration'''
+5 |     pass
+  |
+
+./resources/test/fixtures/pycodestyle/E25.py:2:14: E251 Unexpected spaces around keyword / parameter equals
+  |
+2 | #: E251 E251
+3 | def foo(bar = False):
+  |               E251
+4 |     '''Test function with an error in declaration'''
+5 |     pass
+  |
+
+./resources/test/fixtures/pycodestyle/E25.py:6:9: E251 Unexpected spaces around keyword / parameter equals
+   |
+ 6 |     pass
+ 7 | #: E251
+ 8 | foo(bar= True)
+   |          E251
+ 9 | #: E251
+10 | foo(bar =True)
+   |
+
+./resources/test/fixtures/pycodestyle/E25.py:8:8: E251 Unexpected spaces around keyword / parameter equals
+   |
+ 8 | foo(bar= True)
+ 9 | #: E251
+10 | foo(bar =True)
+   |         E251
+11 | #: E251 E251
+12 | foo(bar = True)
+   |
+
+./resources/test/fixtures/pycodestyle/E25.py:10:8: E251 Unexpected spaces around keyword / parameter equals
+   |
+10 | foo(bar =True)
+11 | #: E251 E251
+12 | foo(bar = True)
+   |         E251
+13 | #: E251
+14 | y = bar(root= "sdasd")
+   |
+
+./resources/test/fixtures/pycodestyle/E25.py:10:10: E251 Unexpected spaces around keyword / parameter equals
+   |
+10 | foo(bar =True)
+11 | #: E251 E251
+12 | foo(bar = True)
+   |           E251
+13 | #: E251
+14 | y = bar(root= "sdasd")
+   |
+
+./resources/test/fixtures/pycodestyle/E25.py:12:14: E251 Unexpected spaces around keyword / parameter equals
+   |
+12 | foo(bar = True)
+13 | #: E251
+14 | y = bar(root= "sdasd")
+   |               E251
+15 | #: E251:2:29
+16 | parser.add_argument('--long-option',
+   |
+
+./resources/test/fixtures/pycodestyle/E25.py:15:29: E251 Unexpected spaces around keyword / parameter equals
+   |
+15 | #: E251:2:29
+16 | parser.add_argument('--long-option',
+17 |                     default=
+   |                              E251
+18 |                     "/rather/long/filesystem/path/here/blah/blah/blah")
+19 | #: E251:1:45
+   |
+
+./resources/test/fixtures/pycodestyle/E25.py:18:45: E251 Unexpected spaces around keyword / parameter equals
+   |
+18 |                     "/rather/long/filesystem/path/here/blah/blah/blah")
+19 | #: E251:1:45
+20 | parser.add_argument('--long-option', default
+   |                                              E251
+21 |                     ="/rather/long/filesystem/path/here/blah/blah/blah")
+22 | #: E251:3:8 E251:3:10
+   |
+
+./resources/test/fixtures/pycodestyle/E25.py:23:8: E251 Unexpected spaces around keyword / parameter equals
+   |
+23 | foo(True,
+24 |     baz=(1, 2),
+25 |     biz = 'foo'
+   |         E251
+26 |     )
+27 | #: Okay
+   |
+
+./resources/test/fixtures/pycodestyle/E25.py:23:10: E251 Unexpected spaces around keyword / parameter equals
+   |
+23 | foo(True,
+24 |     baz=(1, 2),
+25 |     biz = 'foo'
+   |           E251
+26 |     )
+27 | #: Okay
+   |
+
 

@@ -1,215 +1,158 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 3
-  end_location:
-    row: 2
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 3
-  end_location:
-    row: 5
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 3
-  end_location:
-    row: 10
-    column: 23
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 3
-  end_location:
-    row: 15
-    column: 34
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 7
-  end_location:
-    row: 18
-    column: 31
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 7
-  end_location:
-    row: 20
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 7
-  end_location:
-    row: 22
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 7
-  end_location:
-    row: 24
-    column: 30
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 7
-  end_location:
-    row: 26
-    column: 29
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 28
-    column: 7
-  end_location:
-    row: 28
-    column: 30
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 30
-    column: 7
-  end_location:
-    row: 30
-    column: 30
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 7
-  end_location:
-    row: 32
-    column: 34
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 34
-    column: 7
-  end_location:
-    row: 38
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 7
-  end_location:
-    row: 40
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeComparison
-    body: "Do not compare types, use `isinstance()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 42
-    column: 7
-  end_location:
-    row: 42
-    column: 30
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E721.py:2:4: E721 Do not compare types, use `isinstance()`
+  |
+2 | #: E721
+3 | if type(res) == type(42):
+  |    ^^^^^^^^^^^^^^^^^^^^^ E721
+4 |     pass
+5 | #: E721
+  |
+
+./resources/test/fixtures/pycodestyle/E721.py:5:4: E721 Do not compare types, use `isinstance()`
+  |
+5 |     pass
+6 | #: E721
+7 | if type(res) != type(""):
+  |    ^^^^^^^^^^^^^^^^^^^^^ E721
+8 |     pass
+9 | #: E721
+  |
+
+./resources/test/fixtures/pycodestyle/E721.py:10:4: E721 Do not compare types, use `isinstance()`
+   |
+10 | import types
+11 | 
+12 | if res == types.IntType:
+   |    ^^^^^^^^^^^^^^^^^^^^ E721
+13 |     pass
+14 | #: E721
+   |
+
+./resources/test/fixtures/pycodestyle/E721.py:15:4: E721 Do not compare types, use `isinstance()`
+   |
+15 | import types
+16 | 
+17 | if type(res) is not types.ListType:
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E721
+18 |     pass
+19 | #: E721
+   |
+
+./resources/test/fixtures/pycodestyle/E721.py:18:8: E721 Do not compare types, use `isinstance()`
+   |
+18 |     pass
+19 | #: E721
+20 | assert type(res) == type(False)
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^ E721
+21 | #: E721
+22 | assert type(res) == type([])
+   |
+
+./resources/test/fixtures/pycodestyle/E721.py:20:8: E721 Do not compare types, use `isinstance()`
+   |
+20 | assert type(res) == type(False)
+21 | #: E721
+22 | assert type(res) == type([])
+   |        ^^^^^^^^^^^^^^^^^^^^^ E721
+23 | #: E721
+24 | assert type(res) == type(())
+   |
+
+./resources/test/fixtures/pycodestyle/E721.py:22:8: E721 Do not compare types, use `isinstance()`
+   |
+22 | assert type(res) == type([])
+23 | #: E721
+24 | assert type(res) == type(())
+   |        ^^^^^^^^^^^^^^^^^^^^^ E721
+25 | #: E721
+26 | assert type(res) == type((0,))
+   |
+
+./resources/test/fixtures/pycodestyle/E721.py:24:8: E721 Do not compare types, use `isinstance()`
+   |
+24 | assert type(res) == type(())
+25 | #: E721
+26 | assert type(res) == type((0,))
+   |        ^^^^^^^^^^^^^^^^^^^^^^^ E721
+27 | #: E721
+28 | assert type(res) == type((0))
+   |
+
+./resources/test/fixtures/pycodestyle/E721.py:26:8: E721 Do not compare types, use `isinstance()`
+   |
+26 | assert type(res) == type((0,))
+27 | #: E721
+28 | assert type(res) == type((0))
+   |        ^^^^^^^^^^^^^^^^^^^^^^ E721
+29 | #: E721
+30 | assert type(res) != type((1,))
+   |
+
+./resources/test/fixtures/pycodestyle/E721.py:28:8: E721 Do not compare types, use `isinstance()`
+   |
+28 | assert type(res) == type((0))
+29 | #: E721
+30 | assert type(res) != type((1,))
+   |        ^^^^^^^^^^^^^^^^^^^^^^^ E721
+31 | #: E721
+32 | assert type(res) is type((1,))
+   |
+
+./resources/test/fixtures/pycodestyle/E721.py:30:8: E721 Do not compare types, use `isinstance()`
+   |
+30 | assert type(res) != type((1,))
+31 | #: E721
+32 | assert type(res) is type((1,))
+   |        ^^^^^^^^^^^^^^^^^^^^^^^ E721
+33 | #: E721
+34 | assert type(res) is not type((1,))
+   |
+
+./resources/test/fixtures/pycodestyle/E721.py:32:8: E721 Do not compare types, use `isinstance()`
+   |
+32 | assert type(res) is type((1,))
+33 | #: E721
+34 | assert type(res) is not type((1,))
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ E721
+35 | #: E211 E721
+36 | assert type(res) == type(
+   |
+
+./resources/test/fixtures/pycodestyle/E721.py:34:8: E721 Do not compare types, use `isinstance()`
+   |
+34 |   assert type(res) is not type((1,))
+35 |   #: E211 E721
+36 |   assert type(res) == type(
+   |  ________^
+37 | |     [
+38 | |         2,
+39 | |     ]
+40 | | )
+   | |_^ E721
+41 |   #: E201 E201 E202 E721
+42 |   assert type(res) == type(())
+   |
+
+./resources/test/fixtures/pycodestyle/E721.py:40:8: E721 Do not compare types, use `isinstance()`
+   |
+40 | )
+41 | #: E201 E201 E202 E721
+42 | assert type(res) == type(())
+   |        ^^^^^^^^^^^^^^^^^^^^^ E721
+43 | #: E201 E202 E721
+44 | assert type(res) == type((0,))
+   |
+
+./resources/test/fixtures/pycodestyle/E721.py:42:8: E721 Do not compare types, use `isinstance()`
+   |
+42 | assert type(res) == type(())
+43 | #: E201 E202 E721
+44 | assert type(res) == type((0,))
+   |        ^^^^^^^^^^^^^^^^^^^^^^^ E721
+45 | 
+46 | #: Okay
+   |
+
 

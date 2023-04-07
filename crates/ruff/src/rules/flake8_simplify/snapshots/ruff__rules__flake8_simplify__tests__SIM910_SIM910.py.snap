@@ -1,110 +1,96 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DictGetWithNoneDefault
-    body: "Use `{}.get(key)` instead of `{}.get(key, None)`"
-    suggestion: "Replace `{}.get(key, None)` with `{}.get(key)`"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 17
-        content: "{}.get(key)"
-  parent: ~
-- kind:
-    name: DictGetWithNoneDefault
-    body: "Use `{}.get(\"key\")` instead of `{}.get(\"key\", None)`"
-    suggestion: "Replace `{}.get(\"key\", None)` with `{}.get(\"key\")`"
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 19
-  fix:
-    edits:
-      - location:
-          row: 5
-          column: 0
-        end_location:
-          row: 5
-          column: 19
-        content: "{}.get(\"key\")"
-  parent: ~
-- kind:
-    name: DictGetWithNoneDefault
-    body: "Use `{}.get(key)` instead of `{}.get(key, None)`"
-    suggestion: "Replace `{}.get(key, None)` with `{}.get(key)`"
-    fixable: true
-  location:
-    row: 20
-    column: 8
-  end_location:
-    row: 20
-    column: 25
-  fix:
-    edits:
-      - location:
-          row: 20
-          column: 8
-        end_location:
-          row: 20
-          column: 25
-        content: "{}.get(key)"
-  parent: ~
-- kind:
-    name: DictGetWithNoneDefault
-    body: "Use `{}.get(key)` instead of `{}.get(key, None)`"
-    suggestion: "Replace `{}.get(key, None)` with `{}.get(key)`"
-    fixable: true
-  location:
-    row: 24
-    column: 4
-  end_location:
-    row: 24
-    column: 21
-  fix:
-    edits:
-      - location:
-          row: 24
-          column: 4
-        end_location:
-          row: 24
-          column: 21
-        content: "{}.get(key)"
-  parent: ~
-- kind:
-    name: DictGetWithNoneDefault
-    body: "Use `({}).get(key)` instead of `({}).get(key, None)`"
-    suggestion: "Replace `({}).get(key, None)` with `({}).get(key)`"
-    fixable: true
-  location:
-    row: 27
-    column: 0
-  end_location:
-    row: 27
-    column: 19
-  fix:
-    edits:
-      - location:
-          row: 27
-          column: 0
-        end_location:
-          row: 27
-          column: 19
-        content: "({}).get(key)"
-  parent: ~
+./resources/test/fixtures/flake8_simplify/SIM910.py:2:1: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+  |
+2 | # SIM910
+3 | {}.get(key, None)
+  | ^^^^^^^^^^^^^^^^^ SIM910
+4 | 
+5 | # SIM910
+  |
+  = help: Replace `{}.get(key, None)` with `{}.get(key)`
+
+ℹ Suggested fix
+1 1 | # SIM910
+2   |-{}.get(key, None)
+  2 |+{}.get(key)
+3 3 | 
+4 4 | # SIM910
+5 5 | {}.get("key", None)
+
+./resources/test/fixtures/flake8_simplify/SIM910.py:5:1: SIM910 [*] Use `{}.get("key")` instead of `{}.get("key", None)`
+  |
+5 | # SIM910
+6 | {}.get("key", None)
+  | ^^^^^^^^^^^^^^^^^^^ SIM910
+7 | 
+8 | # OK
+  |
+  = help: Replace `{}.get("key", None)` with `{}.get("key")`
+
+ℹ Suggested fix
+2 2 | {}.get(key, None)
+3 3 | 
+4 4 | # SIM910
+5   |-{}.get("key", None)
+  5 |+{}.get("key")
+6 6 | 
+7 7 | # OK
+8 8 | {}.get(key)
+
+./resources/test/fixtures/flake8_simplify/SIM910.py:20:9: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+   |
+20 | # SIM910
+21 | if a := {}.get(key, None):
+   |         ^^^^^^^^^^^^^^^^^ SIM910
+22 |     pass
+   |
+   = help: Replace `{}.get(key, None)` with `{}.get(key)`
+
+ℹ Suggested fix
+17 17 | {}.get("key", False)
+18 18 | 
+19 19 | # SIM910
+20    |-if a := {}.get(key, None):
+   20 |+if a := {}.get(key):
+21 21 |     pass
+22 22 | 
+23 23 | # SIM910
+
+./resources/test/fixtures/flake8_simplify/SIM910.py:24:5: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+   |
+24 | # SIM910
+25 | a = {}.get(key, None)
+   |     ^^^^^^^^^^^^^^^^^ SIM910
+26 | 
+27 | # SIM910
+   |
+   = help: Replace `{}.get(key, None)` with `{}.get(key)`
+
+ℹ Suggested fix
+21 21 |     pass
+22 22 | 
+23 23 | # SIM910
+24    |-a = {}.get(key, None)
+   24 |+a = {}.get(key)
+25 25 | 
+26 26 | # SIM910
+27 27 | ({}).get(key, None)
+
+./resources/test/fixtures/flake8_simplify/SIM910.py:27:1: SIM910 [*] Use `({}).get(key)` instead of `({}).get(key, None)`
+   |
+27 | # SIM910
+28 | ({}).get(key, None)
+   | ^^^^^^^^^^^^^^^^^^^ SIM910
+   |
+   = help: Replace `({}).get(key, None)` with `({}).get(key)`
+
+ℹ Suggested fix
+24 24 | a = {}.get(key, None)
+25 25 | 
+26 26 | # SIM910
+27    |-({}).get(key, None)
+   27 |+({}).get(key)
+
 

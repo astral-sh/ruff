@@ -1,89 +1,77 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestUnnecessaryAsyncioMarkOnFixture
-    body: "`pytest.mark.asyncio` is unnecessary for fixtures"
-    suggestion: "Remove `pytest.mark.asyncio`"
-    fixable: true
-  location:
-    row: 14
-    column: 1
-  end_location:
-    row: 14
-    column: 22
-  fix:
-    edits:
-      - location:
-          row: 14
-          column: 0
-        end_location:
-          row: 15
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: PytestUnnecessaryAsyncioMarkOnFixture
-    body: "`pytest.mark.asyncio` is unnecessary for fixtures"
-    suggestion: "Remove `pytest.mark.asyncio`"
-    fixable: true
-  location:
-    row: 20
-    column: 1
-  end_location:
-    row: 20
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 20
-          column: 0
-        end_location:
-          row: 21
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: PytestUnnecessaryAsyncioMarkOnFixture
-    body: "`pytest.mark.asyncio` is unnecessary for fixtures"
-    suggestion: "Remove `pytest.mark.asyncio`"
-    fixable: true
-  location:
-    row: 27
-    column: 1
-  end_location:
-    row: 27
-    column: 22
-  fix:
-    edits:
-      - location:
-          row: 27
-          column: 0
-        end_location:
-          row: 28
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: PytestUnnecessaryAsyncioMarkOnFixture
-    body: "`pytest.mark.asyncio` is unnecessary for fixtures"
-    suggestion: "Remove `pytest.mark.asyncio`"
-    fixable: true
-  location:
-    row: 33
-    column: 1
-  end_location:
-    row: 33
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 33
-          column: 0
-        end_location:
-          row: 34
-          column: 0
-        content: ~
-  parent: ~
+./resources/test/fixtures/flake8_pytest_style/PT024.py:14:2: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+   |
+14 | @pytest.mark.asyncio()
+   |  ^^^^^^^^^^^^^^^^^^^^^ PT024
+15 | @pytest.fixture()
+16 | async def my_fixture():  # Error before
+   |
+   = help: Remove `pytest.mark.asyncio`
+
+ℹ Suggested fix
+11 11 |     pass
+12 12 | 
+13 13 | 
+14    |-@pytest.mark.asyncio()
+15 14 | @pytest.fixture()
+16 15 | async def my_fixture():  # Error before
+17 16 |     return 0
+
+./resources/test/fixtures/flake8_pytest_style/PT024.py:20:2: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+   |
+20 | @pytest.mark.asyncio
+   |  ^^^^^^^^^^^^^^^^^^^ PT024
+21 | @pytest.fixture()
+22 | async def my_fixture():  # Error before no parens
+   |
+   = help: Remove `pytest.mark.asyncio`
+
+ℹ Suggested fix
+17 17 |     return 0
+18 18 | 
+19 19 | 
+20    |-@pytest.mark.asyncio
+21 20 | @pytest.fixture()
+22 21 | async def my_fixture():  # Error before no parens
+23 22 |     return 0
+
+./resources/test/fixtures/flake8_pytest_style/PT024.py:27:2: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+   |
+27 | @pytest.fixture()
+28 | @pytest.mark.asyncio()
+   |  ^^^^^^^^^^^^^^^^^^^^^ PT024
+29 | async def my_fixture():  # Error after
+30 |     return 0
+   |
+   = help: Remove `pytest.mark.asyncio`
+
+ℹ Suggested fix
+24 24 | 
+25 25 | 
+26 26 | @pytest.fixture()
+27    |-@pytest.mark.asyncio()
+28 27 | async def my_fixture():  # Error after
+29 28 |     return 0
+30 29 | 
+
+./resources/test/fixtures/flake8_pytest_style/PT024.py:33:2: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+   |
+33 | @pytest.fixture()
+34 | @pytest.mark.asyncio
+   |  ^^^^^^^^^^^^^^^^^^^ PT024
+35 | async def my_fixture():  # Error after no parens
+36 |     return 0
+   |
+   = help: Remove `pytest.mark.asyncio`
+
+ℹ Suggested fix
+30 30 | 
+31 31 | 
+32 32 | @pytest.fixture()
+33    |-@pytest.mark.asyncio
+34 33 | async def my_fixture():  # Error after no parens
+35 34 |     return 0
+
 

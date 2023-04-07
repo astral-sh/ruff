@@ -1,26 +1,20 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UTF8EncodingDeclaration
-    body: UTF-8 encoding declaration is unnecessary
-    suggestion: Remove unnecessary coding comment
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 3
-    column: 0
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 3
-          column: 0
-        content: ~
-  parent: ~
+./resources/test/fixtures/pyupgrade/UP009_1.py:2:1: UP009 [*] UTF-8 encoding declaration is unnecessary
+  |
+2 |   #!/usr/bin/python
+3 | / # -*- coding: utf-8 -*-
+4 | | 
+  | |_^ UP009
+5 |   print('Hello world')
+  |
+  = help: Remove unnecessary coding comment
+
+ℹ Suggested fix
+1 1 | #!/usr/bin/python
+2   |-# -*- coding: utf-8 -*-
+3 2 | 
+4 3 | print('Hello world')
+
 

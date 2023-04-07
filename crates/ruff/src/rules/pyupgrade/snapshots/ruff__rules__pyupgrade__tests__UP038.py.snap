@@ -1,47 +1,37 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NonPEP604Isinstance
-    body: "Use `X | Y` in `isinstance` call instead of `(X, Y)`"
-    suggestion: "Convert to `X | Y`"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 27
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 14
-        end_location:
-          row: 1
-          column: 26
-        content: int | float
-  parent: ~
-- kind:
-    name: NonPEP604Isinstance
-    body: "Use `X | Y` in `issubclass` call instead of `(X, Y)`"
-    suggestion: "Convert to `X | Y`"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 36
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 18
-        end_location:
-          row: 2
-          column: 35
-        content: int | float | str
-  parent: ~
+./resources/test/fixtures/pyupgrade/UP038.py:1:1: UP038 [*] Use `X | Y` in `isinstance` call instead of `(X, Y)`
+  |
+1 | isinstance(1, (int, float))  # UP038
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP038
+2 | issubclass("yes", (int, float, str))  # UP038
+  |
+  = help: Convert to `X | Y`
+
+ℹ Suggested fix
+1   |-isinstance(1, (int, float))  # UP038
+  1 |+isinstance(1, int | float)  # UP038
+2 2 | issubclass("yes", (int, float, str))  # UP038
+3 3 | 
+4 4 | isinstance(1, int)  # OK
+
+./resources/test/fixtures/pyupgrade/UP038.py:2:1: UP038 [*] Use `X | Y` in `issubclass` call instead of `(X, Y)`
+  |
+2 | isinstance(1, (int, float))  # UP038
+3 | issubclass("yes", (int, float, str))  # UP038
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP038
+4 | 
+5 | isinstance(1, int)  # OK
+  |
+  = help: Convert to `X | Y`
+
+ℹ Suggested fix
+1 1 | isinstance(1, (int, float))  # UP038
+2   |-issubclass("yes", (int, float, str))  # UP038
+  2 |+issubclass("yes", int | float | str)  # UP038
+3 3 | 
+4 4 | isinstance(1, int)  # OK
+5 5 | issubclass("yes", int)  # OK
+
 

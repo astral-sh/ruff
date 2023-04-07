@@ -1,89 +1,78 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryCollectionCall
-    body: "Unnecessary `tuple` call (rewrite as a literal)"
-    suggestion: Rewrite as a literal
-    fixable: true
-  location:
-    row: 1
-    column: 4
-  end_location:
-    row: 1
-    column: 11
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 4
-        end_location:
-          row: 1
-          column: 11
-        content: ()
-  parent: ~
-- kind:
-    name: UnnecessaryCollectionCall
-    body: "Unnecessary `list` call (rewrite as a literal)"
-    suggestion: Rewrite as a literal
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 4
-        end_location:
-          row: 2
-          column: 10
-        content: "[]"
-  parent: ~
-- kind:
-    name: UnnecessaryCollectionCall
-    body: "Unnecessary `dict` call (rewrite as a literal)"
-    suggestion: Rewrite as a literal
-    fixable: true
-  location:
-    row: 3
-    column: 5
-  end_location:
-    row: 3
-    column: 11
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 5
-        end_location:
-          row: 3
-          column: 11
-        content: "{}"
-  parent: ~
-- kind:
-    name: UnnecessaryCollectionCall
-    body: "Unnecessary `dict` call (rewrite as a literal)"
-    suggestion: Rewrite as a literal
-    fixable: true
-  location:
-    row: 4
-    column: 5
-  end_location:
-    row: 4
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 5
-        end_location:
-          row: 4
-          column: 14
-        content: "{\"a\": 1}"
-  parent: ~
+./resources/test/fixtures/flake8_comprehensions/C408.py:1:5: C408 [*] Unnecessary `tuple` call (rewrite as a literal)
+  |
+1 | t = tuple()
+  |     ^^^^^^^ C408
+2 | l = list()
+3 | d1 = dict()
+  |
+  = help: Rewrite as a literal
+
+ℹ Suggested fix
+1   |-t = tuple()
+  1 |+t = ()
+2 2 | l = list()
+3 3 | d1 = dict()
+4 4 | d2 = dict(a=1)
+
+./resources/test/fixtures/flake8_comprehensions/C408.py:2:5: C408 [*] Unnecessary `list` call (rewrite as a literal)
+  |
+2 | t = tuple()
+3 | l = list()
+  |     ^^^^^^ C408
+4 | d1 = dict()
+5 | d2 = dict(a=1)
+  |
+  = help: Rewrite as a literal
+
+ℹ Suggested fix
+1 1 | t = tuple()
+2   |-l = list()
+  2 |+l = []
+3 3 | d1 = dict()
+4 4 | d2 = dict(a=1)
+5 5 | d3 = dict(**d2)
+
+./resources/test/fixtures/flake8_comprehensions/C408.py:3:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
+  |
+3 | t = tuple()
+4 | l = list()
+5 | d1 = dict()
+  |      ^^^^^^ C408
+6 | d2 = dict(a=1)
+7 | d3 = dict(**d2)
+  |
+  = help: Rewrite as a literal
+
+ℹ Suggested fix
+1 1 | t = tuple()
+2 2 | l = list()
+3   |-d1 = dict()
+  3 |+d1 = {}
+4 4 | d2 = dict(a=1)
+5 5 | d3 = dict(**d2)
+6 6 | 
+
+./resources/test/fixtures/flake8_comprehensions/C408.py:4:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
+  |
+4 | l = list()
+5 | d1 = dict()
+6 | d2 = dict(a=1)
+  |      ^^^^^^^^^ C408
+7 | d3 = dict(**d2)
+  |
+  = help: Rewrite as a literal
+
+ℹ Suggested fix
+1 1 | t = tuple()
+2 2 | l = list()
+3 3 | d1 = dict()
+4   |-d2 = dict(a=1)
+  4 |+d2 = {"a": 1}
+5 5 | d3 = dict(**d2)
+6 6 | 
+7 7 | 
+
 

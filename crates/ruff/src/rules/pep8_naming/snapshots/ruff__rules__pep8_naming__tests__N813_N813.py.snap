@@ -1,53 +1,28 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CamelcaseImportedAsLowercase
-    body: "Camelcase `Camel` imported as lowercase `camel`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 7
-  end_location:
-    row: 1
-    column: 25
-  fix:
-    edits: []
-  parent:
-    row: 1
-    column: 0
-- kind:
-    name: CamelcaseImportedAsLowercase
-    body: "Camelcase `CamelCase` imported as lowercase `camelcase`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 16
-  end_location:
-    row: 2
-    column: 38
-  fix:
-    edits: []
-  parent:
-    row: 2
-    column: 0
-- kind:
-    name: CamelcaseImportedAsLowercase
-    body: "Camelcase `AnotherCamelCase` imported as lowercase `another_camelcase`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 16
-  end_location:
-    row: 3
-    column: 53
-  fix:
-    edits: []
-  parent:
-    row: 3
-    column: 0
+./resources/test/fixtures/pep8_naming/N813.py:1:8: N813 Camelcase `Camel` imported as lowercase `camel`
+  |
+1 | import mod.Camel as camel
+  |        ^^^^^^^^^^^^^^^^^^ N813
+2 | from mod import CamelCase as camelcase
+3 | from mod import AnotherCamelCase as another_camelcase
+  |
+
+./resources/test/fixtures/pep8_naming/N813.py:2:17: N813 Camelcase `CamelCase` imported as lowercase `camelcase`
+  |
+2 | import mod.Camel as camel
+3 | from mod import CamelCase as camelcase
+  |                 ^^^^^^^^^^^^^^^^^^^^^^ N813
+4 | from mod import AnotherCamelCase as another_camelcase
+  |
+
+./resources/test/fixtures/pep8_naming/N813.py:3:17: N813 Camelcase `AnotherCamelCase` imported as lowercase `another_camelcase`
+  |
+3 | import mod.Camel as camel
+4 | from mod import CamelCase as camelcase
+5 | from mod import AnotherCamelCase as another_camelcase
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N813
+  |
+
 

@@ -1,61 +1,44 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnexpectedIndentationComment
-    body: Unexpected indentation (comment)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 5
-  end_location:
-    row: 15
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedIndentationComment
-    body: Unexpected indentation (comment)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 12
-  end_location:
-    row: 22
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedIndentationComment
-    body: Unexpected indentation (comment)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 12
-  end_location:
-    row: 24
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnexpectedIndentationComment
-    body: Unexpected indentation (comment)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 12
-  end_location:
-    row: 26
-    column: 12
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E11.py:15:6: E116 Unexpected indentation (comment)
+   |
+15 | #: E114 E116
+16 | mimetype = 'application/x-directory'
+17 |      # 'httpd/unix-directory'
+   |       E116
+18 | create_date = False
+19 | #: E116 E116 E116
+   |
+
+./resources/test/fixtures/pycodestyle/E11.py:22:13: E116 Unexpected indentation (comment)
+   |
+22 |         self.master.start()
+23 |         # try:
+24 |             # self.master.start()
+   |              E116
+25 |         # except MasterExit:
+26 |             # self.shutdown()
+   |
+
+./resources/test/fixtures/pycodestyle/E11.py:24:13: E116 Unexpected indentation (comment)
+   |
+24 |             # self.master.start()
+25 |         # except MasterExit:
+26 |             # self.shutdown()
+   |              E116
+27 |         # finally:
+28 |             # sys.exit()
+   |
+
+./resources/test/fixtures/pycodestyle/E11.py:26:13: E116 Unexpected indentation (comment)
+   |
+26 |             # self.shutdown()
+27 |         # finally:
+28 |             # sys.exit()
+   |              E116
+29 | #: E115 E115 E115 E115 E115 E115
+30 | def start(self):
+   |
+
 

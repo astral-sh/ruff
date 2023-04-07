@@ -1,47 +1,38 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 31
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 31
-        content: "''' this is not a docstring '''"
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 31
-  fix:
-    edits:
-      - location:
-          row: 6
-          column: 0
-        end_location:
-          row: 6
-          column: 31
-        content: "''' this is not a docstring '''"
-  parent: ~
+./resources/test/fixtures/flake8_quotes/docstring_doubles_module_singleline.py:2:1: Q001 [*] Double quote multiline found but single quotes preferred
+  |
+2 | """ Double quotes singleline module docstring """
+3 | """ this is not a docstring """
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q001
+4 | 
+5 | def foo():
+  |
+  = help: Replace double multiline quotes with single quotes
+
+ℹ Suggested fix
+1 1 | """ Double quotes singleline module docstring """
+2   |-""" this is not a docstring """
+  2 |+''' this is not a docstring '''
+3 3 | 
+4 4 | def foo():
+5 5 |     pass
+
+./resources/test/fixtures/flake8_quotes/docstring_doubles_module_singleline.py:6:1: Q001 [*] Double quote multiline found but single quotes preferred
+  |
+6 | def foo():
+7 |     pass
+8 | """ this is not a docstring """
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q001
+  |
+  = help: Replace double multiline quotes with single quotes
+
+ℹ Suggested fix
+3 3 | 
+4 4 | def foo():
+5 5 |     pass
+6   |-""" this is not a docstring """
+  6 |+''' this is not a docstring '''
+
 

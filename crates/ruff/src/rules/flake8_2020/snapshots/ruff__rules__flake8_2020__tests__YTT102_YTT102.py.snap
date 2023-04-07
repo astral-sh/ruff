@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/flake8_2020/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SysVersion2
-    body: "`sys.version[2]` referenced (python3.10), use `sys.version_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 11
-  end_location:
-    row: 4
-    column: 22
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SysVersion2
-    body: "`sys.version[2]` referenced (python3.10), use `sys.version_info`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 11
-  end_location:
-    row: 5
-    column: 18
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_2020/YTT102.py:4:12: YTT102 `sys.version[2]` referenced (python3.10), use `sys.version_info`
+  |
+4 | from sys import version
+5 | 
+6 | py_minor = sys.version[2]
+  |            ^^^^^^^^^^^ YTT102
+7 | py_minor = version[2]
+  |
+
+./resources/test/fixtures/flake8_2020/YTT102.py:5:12: YTT102 `sys.version[2]` referenced (python3.10), use `sys.version_info`
+  |
+5 | py_minor = sys.version[2]
+6 | py_minor = version[2]
+  |            ^^^^^^^ YTT102
+  |
+
 

@@ -1,47 +1,25 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: AmbiguousClassName
-    body: "Ambiguous class name: `l`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 6
-  end_location:
-    row: 1
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AmbiguousClassName
-    body: "Ambiguous class name: `I`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 6
-  end_location:
-    row: 5
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AmbiguousClassName
-    body: "Ambiguous class name: `O`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 6
-  end_location:
-    row: 9
-    column: 7
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E742.py:1:7: E742 Ambiguous class name: `l`
+  |
+1 | class l:
+  |       ^ E742
+2 |     pass
+  |
+
+./resources/test/fixtures/pycodestyle/E742.py:5:7: E742 Ambiguous class name: `I`
+  |
+5 | class I:
+  |       ^ E742
+6 |     pass
+  |
+
+./resources/test/fixtures/pycodestyle/E742.py:9:7: E742 Ambiguous class name: `O`
+   |
+ 9 | class O:
+   |       ^ E742
+10 |     pass
+   |
+
 

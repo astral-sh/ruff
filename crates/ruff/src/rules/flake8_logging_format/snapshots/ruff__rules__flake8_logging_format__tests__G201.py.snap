@@ -1,33 +1,24 @@
 ---
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: LoggingExcInfo
-    body: "Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 12
-  end_location:
-    row: 8
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: LoggingExcInfo
-    body: "Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 12
-  end_location:
-    row: 13
-    column: 17
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_logging_format/G201.py:8:13: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+   |
+ 8 |     pass
+ 9 | except:
+10 |     logging.error("Hello World", exc_info=True)
+   |             ^^^^^ G201
+11 | 
+12 | try:
+   |
+
+./resources/test/fixtures/flake8_logging_format/G201.py:13:13: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+   |
+13 |     pass
+14 | except:
+15 |     logging.error("Hello World", exc_info=sys.exc_info())
+   |             ^^^^^ G201
+16 | 
+17 | # OK
+   |
+
 

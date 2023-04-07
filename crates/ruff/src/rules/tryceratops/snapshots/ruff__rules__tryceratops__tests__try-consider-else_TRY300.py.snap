@@ -1,19 +1,14 @@
 ---
 source: crates/ruff/src/rules/tryceratops/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: TryConsiderElse
-    body: "Consider moving this statement to an `else` block"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 8
-  end_location:
-    row: 20
-    column: 16
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/tryceratops/TRY300.py:20:9: TRY300 Consider moving this statement to an `else` block
+   |
+20 |         a = 1
+21 |         b = process()
+22 |         return b
+   |         ^^^^^^^^ TRY300
+23 |     except MyException:
+24 |         logger.exception("process failed")
+   |
+
 

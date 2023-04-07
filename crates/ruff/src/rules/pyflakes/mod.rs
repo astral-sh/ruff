@@ -9,7 +9,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use regex::Regex;
     use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
@@ -21,7 +21,7 @@ mod tests {
     use crate::registry::{AsRule, Linter, Rule};
     use crate::settings::flags;
     use crate::test::test_path;
-    use crate::{directives, settings};
+    use crate::{assert_messages, directives, settings};
 
     #[test_case(Rule::UnusedImport, Path::new("F401_0.py"); "F401_0")]
     #[test_case(Rule::UnusedImport, Path::new("F401_1.py"); "F401_1")]
@@ -127,7 +127,7 @@ mod tests {
             Path::new("pyflakes").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -140,7 +140,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::UnusedVariable)
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -150,7 +150,7 @@ mod tests {
             Path::new("pyflakes/__init__.py"),
             &settings::Settings::for_rules(vec![Rule::UndefinedName, Rule::UndefinedExport]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -160,7 +160,7 @@ mod tests {
             Path::new("pyflakes/builtins.py"),
             &settings::Settings::for_rules(vec![Rule::UndefinedName]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -173,7 +173,7 @@ mod tests {
                 ..settings::Settings::for_rules(vec![Rule::UndefinedName])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -183,7 +183,7 @@ mod tests {
             Path::new("pyflakes/typing_modules.py"),
             &settings::Settings::for_rules(vec![Rule::UndefinedName]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -196,7 +196,7 @@ mod tests {
                 ..settings::Settings::for_rules(vec![Rule::UndefinedName])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -206,7 +206,7 @@ mod tests {
             Path::new("pyflakes/future_annotations.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UndefinedName]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -216,7 +216,7 @@ mod tests {
             Path::new("pyflakes/multi_statement_lines.py"),
             &settings::Settings::for_rule(Rule::UnusedImport),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -229,7 +229,7 @@ mod tests {
                 ..settings::Settings::for_rules(vec![Rule::UndefinedName])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -242,7 +242,7 @@ mod tests {
                 ..settings::Settings::for_rules(vec![Rule::UndefinedName])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 

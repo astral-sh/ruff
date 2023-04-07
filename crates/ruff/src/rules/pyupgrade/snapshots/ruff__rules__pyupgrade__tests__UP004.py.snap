@@ -1,425 +1,438 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 5
-    column: 8
-  end_location:
-    row: 5
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 5
-          column: 7
-        end_location:
-          row: 5
-          column: 15
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 10
-    column: 4
-  end_location:
-    row: 10
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 9
-          column: 7
-        end_location:
-          row: 11
-          column: 1
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 16
-    column: 4
-  end_location:
-    row: 16
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 15
-          column: 7
-        end_location:
-          row: 18
-          column: 1
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 24
-    column: 4
-  end_location:
-    row: 24
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 22
-          column: 7
-        end_location:
-          row: 25
-          column: 1
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 31
-    column: 4
-  end_location:
-    row: 31
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 29
-          column: 7
-        end_location:
-          row: 32
-          column: 1
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 37
-    column: 4
-  end_location:
-    row: 37
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 36
-          column: 7
-        end_location:
-          row: 39
-          column: 1
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 45
-    column: 4
-  end_location:
-    row: 45
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 43
-          column: 7
-        end_location:
-          row: 47
-          column: 1
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 53
-    column: 4
-  end_location:
-    row: 53
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 51
-          column: 7
-        end_location:
-          row: 55
-          column: 1
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 61
-    column: 4
-  end_location:
-    row: 61
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 59
-          column: 7
-        end_location:
-          row: 63
-          column: 1
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 69
-    column: 4
-  end_location:
-    row: 69
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 67
-          column: 7
-        end_location:
-          row: 71
-          column: 1
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `B` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 75
-    column: 11
-  end_location:
-    row: 75
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 75
-          column: 9
-        end_location:
-          row: 75
-          column: 17
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `B` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 79
-    column: 8
-  end_location:
-    row: 79
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 79
-          column: 8
-        end_location:
-          row: 79
-          column: 16
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `B` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 84
-    column: 4
-  end_location:
-    row: 84
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 84
-          column: 4
-        end_location:
-          row: 85
-          column: 4
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `B` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 92
-    column: 4
-  end_location:
-    row: 92
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 91
-          column: 5
-        end_location:
-          row: 92
-          column: 10
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `B` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 98
-    column: 4
-  end_location:
-    row: 98
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 98
-          column: 4
-        end_location:
-          row: 99
-          column: 4
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `B` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 108
-    column: 4
-  end_location:
-    row: 108
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 107
-          column: 5
-        end_location:
-          row: 108
-          column: 10
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 114
-    column: 12
-  end_location:
-    row: 114
-    column: 18
-  fix:
-    edits:
-      - location:
-          row: 114
-          column: 11
-        end_location:
-          row: 114
-          column: 19
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 119
-    column: 4
-  end_location:
-    row: 119
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 118
-          column: 7
-        end_location:
-          row: 120
-          column: 1
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 125
-    column: 4
-  end_location:
-    row: 125
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 124
-          column: 7
-        end_location:
-          row: 126
-          column: 1
-        content: ~
-  parent: ~
-- kind:
-    name: UselessObjectInheritance
-    body: "Class `A` inherits from `object`"
-    suggestion: "Remove `object` inheritance"
-    fixable: true
-  location:
-    row: 131
-    column: 4
-  end_location:
-    row: 131
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 130
-          column: 7
-        end_location:
-          row: 133
-          column: 1
-        content: ~
-  parent: ~
+./resources/test/fixtures/pyupgrade/UP004.py:5:9: UP004 [*] Class `A` inherits from `object`
+  |
+5 | class A(object):
+  |         ^^^^^^ UP004
+6 |     ...
+  |
+  = help: Remove `object` inheritance
+
+ℹ Suggested fix
+2 2 |     ...
+3 3 | 
+4 4 | 
+5   |-class A(object):
+  5 |+class A:
+6 6 |     ...
+7 7 | 
+8 8 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:10:5: UP004 [*] Class `A` inherits from `object`
+   |
+10 | class A(
+11 |     object,
+   |     ^^^^^^ UP004
+12 | ):
+13 |     ...
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+6  6  |     ...
+7  7  | 
+8  8  | 
+9     |-class A(
+10    |-    object,
+11    |-):
+   9  |+class A:
+12 10 |     ...
+13 11 | 
+14 12 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:16:5: UP004 [*] Class `A` inherits from `object`
+   |
+16 | class A(
+17 |     object,
+   |     ^^^^^^ UP004
+18 |     #
+19 | ):
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+12 12 |     ...
+13 13 | 
+14 14 | 
+15    |-class A(
+16    |-    object,
+17    |-    #
+18    |-):
+   15 |+class A:
+19 16 |     ...
+20 17 | 
+21 18 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:24:5: UP004 [*] Class `A` inherits from `object`
+   |
+24 | class A(
+25 |     #
+26 |     object,
+   |     ^^^^^^ UP004
+27 | ):
+28 |     ...
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+19 19 |     ...
+20 20 | 
+21 21 | 
+22    |-class A(
+23    |-    #
+24    |-    object,
+25    |-):
+   22 |+class A:
+26 23 |     ...
+27 24 | 
+28 25 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:31:5: UP004 [*] Class `A` inherits from `object`
+   |
+31 | class A(
+32 |     #
+33 |     object
+   |     ^^^^^^ UP004
+34 | ):
+35 |     ...
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+26 26 |     ...
+27 27 | 
+28 28 | 
+29    |-class A(
+30    |-    #
+31    |-    object
+32    |-):
+   29 |+class A:
+33 30 |     ...
+34 31 | 
+35 32 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:37:5: UP004 [*] Class `A` inherits from `object`
+   |
+37 | class A(
+38 |     object
+   |     ^^^^^^ UP004
+39 |     #
+40 | ):
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+33 33 |     ...
+34 34 | 
+35 35 | 
+36    |-class A(
+37    |-    object
+38    |-    #
+39    |-):
+   36 |+class A:
+40 37 |     ...
+41 38 | 
+42 39 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:45:5: UP004 [*] Class `A` inherits from `object`
+   |
+45 | class A(
+46 |     #
+47 |     object,
+   |     ^^^^^^ UP004
+48 |     #
+49 | ):
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+40 40 |     ...
+41 41 | 
+42 42 | 
+43    |-class A(
+44    |-    #
+45    |-    object,
+46    |-    #
+47    |-):
+   43 |+class A:
+48 44 |     ...
+49 45 | 
+50 46 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:53:5: UP004 [*] Class `A` inherits from `object`
+   |
+53 | class A(
+54 |     #
+55 |     object,
+   |     ^^^^^^ UP004
+56 |     #
+57 | ):
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+48 48 |     ...
+49 49 | 
+50 50 | 
+51    |-class A(
+52    |-    #
+53    |-    object,
+54    |-    #
+55    |-):
+   51 |+class A:
+56 52 |     ...
+57 53 | 
+58 54 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:61:5: UP004 [*] Class `A` inherits from `object`
+   |
+61 | class A(
+62 |     #
+63 |     object
+   |     ^^^^^^ UP004
+64 |     #
+65 | ):
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+56 56 |     ...
+57 57 | 
+58 58 | 
+59    |-class A(
+60    |-    #
+61    |-    object
+62    |-    #
+63    |-):
+   59 |+class A:
+64 60 |     ...
+65 61 | 
+66 62 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:69:5: UP004 [*] Class `A` inherits from `object`
+   |
+69 | class A(
+70 |     #
+71 |     object
+   |     ^^^^^^ UP004
+72 |     #
+73 | ):
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+64 64 |     ...
+65 65 | 
+66 66 | 
+67    |-class A(
+68    |-    #
+69    |-    object
+70    |-    #
+71    |-):
+   67 |+class A:
+72 68 |     ...
+73 69 | 
+74 70 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:75:12: UP004 [*] Class `B` inherits from `object`
+   |
+75 | class B(A, object):
+   |            ^^^^^^ UP004
+76 |     ...
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+72 72 |     ...
+73 73 | 
+74 74 | 
+75    |-class B(A, object):
+   75 |+class B(A):
+76 76 |     ...
+77 77 | 
+78 78 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:79:9: UP004 [*] Class `B` inherits from `object`
+   |
+79 | class B(object, A):
+   |         ^^^^^^ UP004
+80 |     ...
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+76 76 |     ...
+77 77 | 
+78 78 | 
+79    |-class B(object, A):
+   79 |+class B(A):
+80 80 |     ...
+81 81 | 
+82 82 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:84:5: UP004 [*] Class `B` inherits from `object`
+   |
+84 | class B(
+85 |     object,
+   |     ^^^^^^ UP004
+86 |     A,
+87 | ):
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+81 81 | 
+82 82 | 
+83 83 | class B(
+84    |-    object,
+85 84 |     A,
+86 85 | ):
+87 86 |     ...
+
+./resources/test/fixtures/pyupgrade/UP004.py:92:5: UP004 [*] Class `B` inherits from `object`
+   |
+92 | class B(
+93 |     A,
+94 |     object,
+   |     ^^^^^^ UP004
+95 | ):
+96 |     ...
+   |
+   = help: Remove `object` inheritance
+
+ℹ Suggested fix
+89 89 | 
+90 90 | class B(
+91 91 |     A,
+92    |-    object,
+93 92 | ):
+94 93 |     ...
+95 94 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:98:5: UP004 [*] Class `B` inherits from `object`
+    |
+ 98 | class B(
+ 99 |     object,
+    |     ^^^^^^ UP004
+100 |     # Comment on A.
+101 |     A,
+    |
+    = help: Remove `object` inheritance
+
+ℹ Suggested fix
+95 95 | 
+96 96 | 
+97 97 | class B(
+98    |-    object,
+99 98 |     # Comment on A.
+100 99 |     A,
+101 100 | ):
+
+./resources/test/fixtures/pyupgrade/UP004.py:108:5: UP004 [*] Class `B` inherits from `object`
+    |
+108 |     # Comment on A.
+109 |     A,
+110 |     object,
+    |     ^^^^^^ UP004
+111 | ):
+112 |     ...
+    |
+    = help: Remove `object` inheritance
+
+ℹ Suggested fix
+105 105 | class B(
+106 106 |     # Comment on A.
+107 107 |     A,
+108     |-    object,
+109 108 | ):
+110 109 |     ...
+111 110 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:114:13: UP004 [*] Class `A` inherits from `object`
+    |
+114 | def f():
+115 |     class A(object):
+    |             ^^^^^^ UP004
+116 |         ...
+    |
+    = help: Remove `object` inheritance
+
+ℹ Suggested fix
+111 111 | 
+112 112 | 
+113 113 | def f():
+114     |-    class A(object):
+    114 |+    class A:
+115 115 |         ...
+116 116 | 
+117 117 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:119:5: UP004 [*] Class `A` inherits from `object`
+    |
+119 | class A(
+120 |     object,
+    |     ^^^^^^ UP004
+121 | ):
+122 |     ...
+    |
+    = help: Remove `object` inheritance
+
+ℹ Suggested fix
+115 115 |         ...
+116 116 | 
+117 117 | 
+118     |-class A(
+119     |-    object,
+120     |-):
+    118 |+class A:
+121 119 |     ...
+122 120 | 
+123 121 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:125:5: UP004 [*] Class `A` inherits from `object`
+    |
+125 | class A(
+126 |     object,  # )
+    |     ^^^^^^ UP004
+127 | ):
+128 |     ...
+    |
+    = help: Remove `object` inheritance
+
+ℹ Suggested fix
+121 121 |     ...
+122 122 | 
+123 123 | 
+124     |-class A(
+125     |-    object,  # )
+126     |-):
+    124 |+class A:
+127 125 |     ...
+128 126 | 
+129 127 | 
+
+./resources/test/fixtures/pyupgrade/UP004.py:131:5: UP004 [*] Class `A` inherits from `object`
+    |
+131 | class A(
+132 |     object  # )
+    |     ^^^^^^ UP004
+133 |     ,
+134 | ):
+    |
+    = help: Remove `object` inheritance
+
+ℹ Suggested fix
+127 127 |     ...
+128 128 | 
+129 129 | 
+130     |-class A(
+131     |-    object  # )
+132     |-    ,
+133     |-):
+    130 |+class A:
+134 131 |     ...
+135 132 | 
+136 133 | 
+
 

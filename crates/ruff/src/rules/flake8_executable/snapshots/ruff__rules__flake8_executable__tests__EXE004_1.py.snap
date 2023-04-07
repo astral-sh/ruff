@@ -1,26 +1,15 @@
 ---
 source: crates/ruff/src/rules/flake8_executable/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ShebangLeadingWhitespace
-    body: Avoid whitespace before shebang
-    suggestion: Remove whitespace before shebang
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 4
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 0
-        end_location:
-          row: 1
-          column: 4
-        content: ~
-  parent: ~
+./resources/test/fixtures/flake8_executable/EXE004_1.py:1:1: EXE004 [*] Avoid whitespace before shebang
+  |
+1 |     #!/usr/bin/python
+  | ^^^^ EXE004
+  |
+  = help: Remove whitespace before shebang
+
+ℹ Suggested fix
+1   |-    #!/usr/bin/python
+  1 |+#!/usr/bin/python
+
 

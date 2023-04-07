@@ -1,131 +1,129 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NativeLiterals
-    body: "Unnecessary call to `str`"
-    suggestion: "Replace with `str`"
-    fixable: true
-  location:
-    row: 20
-    column: 0
-  end_location:
-    row: 20
-    column: 5
-  fix:
-    edits:
-      - location:
-          row: 20
-          column: 0
-        end_location:
-          row: 20
-          column: 5
-        content: "\"\""
-  parent: ~
-- kind:
-    name: NativeLiterals
-    body: "Unnecessary call to `str`"
-    suggestion: "Replace with `str`"
-    fixable: true
-  location:
-    row: 21
-    column: 0
-  end_location:
-    row: 21
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 21
-          column: 0
-        end_location:
-          row: 21
-          column: 10
-        content: "\"foo\""
-  parent: ~
-- kind:
-    name: NativeLiterals
-    body: "Unnecessary call to `str`"
-    suggestion: "Replace with `str`"
-    fixable: true
-  location:
-    row: 22
-    column: 0
-  end_location:
-    row: 23
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 22
-          column: 0
-        end_location:
-          row: 23
-          column: 7
-        content: "\"\"\"\nfoo\"\"\""
-  parent: ~
-- kind:
-    name: NativeLiterals
-    body: "Unnecessary call to `bytes`"
-    suggestion: "Replace with `bytes`"
-    fixable: true
-  location:
-    row: 24
-    column: 0
-  end_location:
-    row: 24
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 24
-          column: 0
-        end_location:
-          row: 24
-          column: 7
-        content: "b\"\""
-  parent: ~
-- kind:
-    name: NativeLiterals
-    body: "Unnecessary call to `bytes`"
-    suggestion: "Replace with `bytes`"
-    fixable: true
-  location:
-    row: 25
-    column: 0
-  end_location:
-    row: 25
-    column: 13
-  fix:
-    edits:
-      - location:
-          row: 25
-          column: 0
-        end_location:
-          row: 25
-          column: 13
-        content: "b\"foo\""
-  parent: ~
-- kind:
-    name: NativeLiterals
-    body: "Unnecessary call to `bytes`"
-    suggestion: "Replace with `bytes`"
-    fixable: true
-  location:
-    row: 26
-    column: 0
-  end_location:
-    row: 27
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 26
-          column: 0
-        end_location:
-          row: 27
-          column: 7
-        content: "b\"\"\"\nfoo\"\"\""
-  parent: ~
+./resources/test/fixtures/pyupgrade/UP018.py:20:1: UP018 [*] Unnecessary call to `str`
+   |
+20 | # These become string or byte literals
+21 | str()
+   | ^^^^^ UP018
+22 | str("foo")
+23 | str("""
+   |
+   = help: Replace with `str`
+
+ℹ Suggested fix
+17 17 | bytes("foo")
+18 18 | 
+19 19 | # These become string or byte literals
+20    |-str()
+   20 |+""
+21 21 | str("foo")
+22 22 | str("""
+23 23 | foo""")
+
+./resources/test/fixtures/pyupgrade/UP018.py:21:1: UP018 [*] Unnecessary call to `str`
+   |
+21 | # These become string or byte literals
+22 | str()
+23 | str("foo")
+   | ^^^^^^^^^^ UP018
+24 | str("""
+25 | foo""")
+   |
+   = help: Replace with `str`
+
+ℹ Suggested fix
+18 18 | 
+19 19 | # These become string or byte literals
+20 20 | str()
+21    |-str("foo")
+   21 |+"foo"
+22 22 | str("""
+23 23 | foo""")
+24 24 | bytes()
+
+./resources/test/fixtures/pyupgrade/UP018.py:22:1: UP018 [*] Unnecessary call to `str`
+   |
+22 |   str()
+23 |   str("foo")
+24 | / str("""
+25 | | foo""")
+   | |_______^ UP018
+26 |   bytes()
+27 |   bytes(b"foo")
+   |
+   = help: Replace with `str`
+
+ℹ Suggested fix
+19 19 | # These become string or byte literals
+20 20 | str()
+21 21 | str("foo")
+22    |-str("""
+23    |-foo""")
+   22 |+"""
+   23 |+foo"""
+24 24 | bytes()
+25 25 | bytes(b"foo")
+26 26 | bytes(b"""
+
+./resources/test/fixtures/pyupgrade/UP018.py:24:1: UP018 [*] Unnecessary call to `bytes`
+   |
+24 | str("""
+25 | foo""")
+26 | bytes()
+   | ^^^^^^^ UP018
+27 | bytes(b"foo")
+28 | bytes(b"""
+   |
+   = help: Replace with `bytes`
+
+ℹ Suggested fix
+21 21 | str("foo")
+22 22 | str("""
+23 23 | foo""")
+24    |-bytes()
+   24 |+b""
+25 25 | bytes(b"foo")
+26 26 | bytes(b"""
+27 27 | foo""")
+
+./resources/test/fixtures/pyupgrade/UP018.py:25:1: UP018 [*] Unnecessary call to `bytes`
+   |
+25 | foo""")
+26 | bytes()
+27 | bytes(b"foo")
+   | ^^^^^^^^^^^^^ UP018
+28 | bytes(b"""
+29 | foo""")
+   |
+   = help: Replace with `bytes`
+
+ℹ Suggested fix
+22 22 | str("""
+23 23 | foo""")
+24 24 | bytes()
+25    |-bytes(b"foo")
+   25 |+b"foo"
+26 26 | bytes(b"""
+27 27 | foo""")
+
+./resources/test/fixtures/pyupgrade/UP018.py:26:1: UP018 [*] Unnecessary call to `bytes`
+   |
+26 |   bytes()
+27 |   bytes(b"foo")
+28 | / bytes(b"""
+29 | | foo""")
+   | |_______^ UP018
+   |
+   = help: Replace with `bytes`
+
+ℹ Suggested fix
+23 23 | foo""")
+24 24 | bytes()
+25 25 | bytes(b"foo")
+26    |-bytes(b"""
+27    |-foo""")
+   26 |+b"""
+   27 |+foo"""
+
 

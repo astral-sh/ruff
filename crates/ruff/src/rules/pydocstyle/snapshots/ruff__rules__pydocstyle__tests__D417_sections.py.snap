@@ -1,159 +1,103 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument description in the docstring: `y`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 292
-    column: 8
-  end_location:
-    row: 292
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument description in the docstring: `y`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 309
-    column: 4
-  end_location:
-    row: 309
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument descriptions in the docstring: `test`, `y`, `z`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 333
-    column: 8
-  end_location:
-    row: 333
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument descriptions in the docstring: `test`, `y`, `z`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 345
-    column: 8
-  end_location:
-    row: 345
-    column: 38
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument descriptions in the docstring: `a`, `y`, `z`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 358
-    column: 8
-  end_location:
-    row: 358
-    column: 39
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument descriptions in the docstring: `a`, `b`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 370
-    column: 8
-  end_location:
-    row: 370
-    column: 30
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument description in the docstring: `y`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 398
-    column: 4
-  end_location:
-    row: 398
-    column: 27
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument descriptions in the docstring: `test`, `y`, `z`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 434
-    column: 8
-  end_location:
-    row: 434
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument descriptions in the docstring: `test`, `y`, `z`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 449
-    column: 8
-  end_location:
-    row: 449
-    column: 38
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument descriptions in the docstring: `a`, `z`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 468
-    column: 8
-  end_location:
-    row: 468
-    column: 39
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndocumentedParam
-    body: "Missing argument description in the docstring: `y`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 498
-    column: 8
-  end_location:
-    row: 498
-    column: 29
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pydocstyle/sections.py:292:9: D417 Missing argument description in the docstring: `y`
+    |
+292 |     x = 1
+293 | 
+294 |     def bar(y=2):  # noqa: D207, D213, D406, D407
+    |         ^^^ D417
+295 |         """Nested function test for docstrings.
+    |
+
+./resources/test/fixtures/pydocstyle/sections.py:309:5: D417 Missing argument description in the docstring: `y`
+    |
+309 |         "(argument(s) y are missing descriptions in "
+310 |         "'test_missing_google_args' docstring)")
+311 | def test_missing_google_args(x=1, y=2, _private=3):  # noqa: D406, D407
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^ D417
+312 |     """Toggle the gizmo.
+    |
+
+./resources/test/fixtures/pydocstyle/sections.py:333:9: D417 Missing argument descriptions in the docstring: `test`, `y`, `z`
+    |
+333 |             "(argument(s) test, y, z are missing descriptions in "
+334 |             "'test_missing_args' docstring)", arg_count=5)
+335 |     def test_missing_args(self, test, x, y, z=3, _private_arg=3):  # noqa: D213, D407
+    |         ^^^^^^^^^^^^^^^^^ D417
+336 |         """Test a valid args section.
+    |
+
+./resources/test/fixtures/pydocstyle/sections.py:345:9: D417 Missing argument descriptions in the docstring: `test`, `y`, `z`
+    |
+345 |             "(argument(s) test, y, z are missing descriptions in "
+346 |             "'test_missing_args_class_method' docstring)", arg_count=5)
+347 |     def test_missing_args_class_method(cls, test, x, y, _, z=3):  # noqa: D213, D407
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D417
+348 |         """Test a valid args section.
+    |
+
+./resources/test/fixtures/pydocstyle/sections.py:358:9: D417 Missing argument descriptions in the docstring: `a`, `y`, `z`
+    |
+358 |             "(argument(s) a, y, z are missing descriptions in "
+359 |             "'test_missing_args_static_method' docstring)", arg_count=4)
+360 |     def test_missing_args_static_method(a, x, y, _test, z=3):  # noqa: D213, D407
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D417
+361 |         """Test a valid args section.
+    |
+
+./resources/test/fixtures/pydocstyle/sections.py:370:9: D417 Missing argument descriptions in the docstring: `a`, `b`
+    |
+370 |             "(argument(s) a, b are missing descriptions in "
+371 |             "'test_missing_docstring' docstring)", arg_count=2)
+372 |     def test_missing_docstring(a, b):  # noqa: D213, D407
+    |         ^^^^^^^^^^^^^^^^^^^^^^ D417
+373 |         """Test a valid args section.
+    |
+
+./resources/test/fixtures/pydocstyle/sections.py:398:5: D417 Missing argument description in the docstring: `y`
+    |
+398 |         "(argument(s) y are missing descriptions in "
+399 |         "'test_missing_numpy_args' docstring)")
+400 | def test_missing_numpy_args(_private_arg=0, x=1, y=2):  # noqa: D406, D407
+    |     ^^^^^^^^^^^^^^^^^^^^^^^ D417
+401 |     """Toggle the gizmo.
+    |
+
+./resources/test/fixtures/pydocstyle/sections.py:434:9: D417 Missing argument descriptions in the docstring: `test`, `y`, `z`
+    |
+434 |             "(argument(s) test, y, z are missing descriptions in "
+435 |             "'test_missing_args' docstring)", arg_count=5)
+436 |     def test_missing_args(self, test, x, y, z=3, t=1, _private=0):  # noqa: D213, D407
+    |         ^^^^^^^^^^^^^^^^^ D417
+437 |         """Test a valid args section.
+    |
+
+./resources/test/fixtures/pydocstyle/sections.py:449:9: D417 Missing argument descriptions in the docstring: `test`, `y`, `z`
+    |
+449 |             "(argument(s) test, y, z are missing descriptions in "
+450 |             "'test_missing_args_class_method' docstring)", arg_count=4)
+451 |     def test_missing_args_class_method(cls, test, x, y, z=3):  # noqa: D213, D407
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D417
+452 |         """Test a valid args section.
+    |
+
+./resources/test/fixtures/pydocstyle/sections.py:468:9: D417 Missing argument descriptions in the docstring: `a`, `z`
+    |
+468 |             "(argument(s) a, z are missing descriptions in "
+469 |             "'test_missing_args_static_method' docstring)", arg_count=3)
+470 |     def test_missing_args_static_method(a, x, y, z=3, t=1):  # noqa: D213, D407
+    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D417
+471 |         """Test a valid args section.
+    |
+
+./resources/test/fixtures/pydocstyle/sections.py:498:9: D417 Missing argument description in the docstring: `y`
+    |
+498 |             "(argument(s) y are missing descriptions in "
+499 |             "'test_incorrect_indent' docstring)", arg_count=3)
+500 |     def test_incorrect_indent(self, x=1, y=2):  # noqa: D207, D213, D407
+    |         ^^^^^^^^^^^^^^^^^^^^^ D417
+501 |         """Reproducing issue #437.
+    |
+
 
