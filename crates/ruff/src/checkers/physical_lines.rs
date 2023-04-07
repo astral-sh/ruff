@@ -4,7 +4,7 @@ use std::path::Path;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
 use crate::registry::Rule;
 use crate::rules::flake8_executable::helpers::{extract_shebang, ShebangDirective};
@@ -24,7 +24,7 @@ pub fn check_physical_lines(
     path: &Path,
     locator: &Locator,
     stylist: &Stylist,
-    commented_lines: &[usize],
+    indexer: &Indexer,
     doc_lines: &[usize],
     settings: &Settings,
     autofix: flags::Autofix,
@@ -55,8 +55,11 @@ pub fn check_physical_lines(
     let fix_shebang_whitespace =
         autofix.into() && settings.rules.should_fix(Rule::ShebangLeadingWhitespace);
 
-    let mut commented_lines_iter = commented_lines.iter().peekable();
+    let mut commented_lines_iter = indexer.commented_lines().iter().peekable();
     let mut doc_lines_iter = doc_lines.iter().peekable();
+
+    let string_lines = indexer.string_ranges();
+
     for (index, line) in locator.contents().universal_newlines().enumerate() {
         while commented_lines_iter
             .next_if(|lineno| &(index + 1) == *lineno)
@@ -155,7 +158,7 @@ pub fn check_physical_lines(
         }
 
         if enforce_tab_indentation {
-            if let Some(diagnostic) = tab_indentation(index, line) {
+            if let Some(diagnostic) = tab_indentation(index + 1, line, string_lines) {
                 diagnostics.push(diagnostic);
             }
         }
@@ -186,7 +189,7 @@ mod tests {
     use rustpython_parser::Mode;
     use std::path::Path;
 
-    use ruff_python_ast::source_code::{Locator, Stylist};
+    use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 
     use crate::registry::Rule;
     use crate::settings::{flags, Settings};
@@ -198,6 +201,7 @@ mod tests {
         let line = "'\u{4e9c}' * 2"; // 7 in UTF-32, 9 in UTF-8.
         let locator = Locator::new(line);
         let tokens: Vec<_> = lex(line, Mode::Module).collect();
+        let indexer: Indexer = tokens.as_slice().into();
         let stylist = Stylist::from_tokens(&tokens, &locator);
 
         let check_with_max_line_length = |line_length: usize| {
@@ -205,7 +209,7 @@ mod tests {
                 Path::new("foo.py"),
                 &locator,
                 &stylist,
-                &[],
+                &indexer,
                 &[],
                 &Settings {
                     line_length,
