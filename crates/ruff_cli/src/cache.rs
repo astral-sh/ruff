@@ -1,3 +1,4 @@
+use std::cell::RefCell;
 use std::fs;
 use std::hash::Hasher;
 use std::io::Write;
@@ -5,7 +6,6 @@ use std::path::Path;
 
 use anyhow::Result;
 use filetime::FileTime;
-use itertools::Itertools;
 use log::error;
 use path_absolutize::Absolutize;
 use ruff::message::{Location, Message};
@@ -13,8 +13,7 @@ use ruff::settings::{flags, AllSettings, Settings};
 use ruff_cache::{CacheKey, CacheKeyHasher};
 use ruff_diagnostics::{DiagnosticKind, Fix};
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::source_code::{LineIndex, SourceCodeBuf};
-use rustc_hash::FxHashMap;
+use ruff_python_ast::source_code::SourceFileBuilder;
 use serde::ser::{SerializeSeq, SerializeStruct};
 use serde::{Deserialize, Serialize, Serializer};
 #[cfg(unix)]
@@ -22,28 +21,78 @@ use std::os::unix::fs::PermissionsExt;
 
 const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[derive(Serialize)]
+/// Vec storing all source files. The tuple is (filename, source code).
+type Files<'a> = Vec<(&'a str, Option<&'a str>)>;
+type FilesBuf = Vec<(String, Option<String>)>;
+
 struct CheckResultRef<'a> {
-    #[serde(serialize_with = "serialize_messages")]
-    messages: &'a [Message],
     imports: &'a ImportMap,
-    sources: Vec<(&'a str, &'a str)>,
+    messages: &'a [Message],
 }
 
-fn serialize_messages<S>(messages: &[Message], serializer: S) -> Result<S::Ok, S::Error>
-where
-    S: Serializer,
-{
-    let mut s = serializer.serialize_seq(Some(messages.len()))?;
+impl Serialize for CheckResultRef<'_> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_struct("CheckResultRef", 3)?;
 
-    for message in messages {
-        s.serialize_element(&SerializeMessage(message))?;
+        s.serialize_field("imports", &self.imports)?;
+
+        let serialize_messages = SerializeMessages {
+            messages: &self.messages,
+            files: RefCell::default(),
+        };
+
+        s.serialize_field("messages", &serialize_messages)?;
+
+        let files = serialize_messages.files.take();
+
+        s.serialize_field("files", &files)?;
+
+        s.end()
     }
-
-    s.end()
 }
 
-struct SerializeMessage<'a>(&'a Message);
+struct SerializeMessages<'a> {
+    messages: &'a [Message],
+    files: RefCell<Files<'a>>,
+}
+
+impl Serialize for SerializeMessages<'_> {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut s = serializer.serialize_seq(Some(self.messages.len()))?;
+        let mut files = self.files.borrow_mut();
+
+        for message in self.messages {
+            // Using a Vec instead of a HashMap because the cache is per file and the large majority of
+            // files have exactly one source file.
+            let file_id = match files
+                .iter()
+                .position(|(filename, _)| *filename == message.filename())
+            {
+                Some(position) => position,
+                None => {
+                    let index = files.len();
+                    files.push((message.filename(), message.file.source_text()));
+                    index
+                }
+            };
+
+            s.serialize_element(&SerializeMessage { message, file_id })?;
+        }
+
+        s.end()
+    }
+}
+
+struct SerializeMessage<'a> {
+    message: &'a Message,
+    file_id: usize,
+}
 
 impl Serialize for SerializeMessage<'_> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
@@ -55,11 +104,10 @@ impl Serialize for SerializeMessage<'_> {
             location,
             end_location,
             fix,
-            filename,
             // Serialized manually for all files
-            source: _source,
+            file: _,
             noqa_row,
-        } = self.0;
+        } = self.message;
 
         let mut s = serializer.serialize_struct("Message", 6)?;
 
@@ -67,7 +115,7 @@ impl Serialize for SerializeMessage<'_> {
         s.serialize_field("location", &location)?;
         s.serialize_field("end_location", &end_location)?;
         s.serialize_field("fix", &fix)?;
-        s.serialize_field("filename", &filename)?;
+        s.serialize_field("file_id", &self.file_id)?;
         s.serialize_field("noqa_row", &noqa_row)?;
 
         s.end()
@@ -80,15 +128,15 @@ struct MessageHeader {
     location: Location,
     end_location: Location,
     fix: Fix,
-    filename: String,
+    file_id: usize,
     noqa_row: usize,
 }
 
 #[derive(Deserialize)]
 struct CheckResult {
-    messages: Vec<MessageHeader>,
     imports: ImportMap,
-    sources: Vec<(String, String)>,
+    messages: Vec<MessageHeader>,
+    files: FilesBuf,
 }
 
 fn content_dir() -> &'static Path {
@@ -170,25 +218,35 @@ pub fn get(
         Ok(CheckResult {
             messages: headers,
             imports,
-            sources,
+            files: sources,
         }) => {
             let mut messages = Vec::with_capacity(headers.len());
-            let sources: FxHashMap<_, _> = sources
+
+            let source_files: Vec<_> = sources
                 .into_iter()
-                .map(|(filename, content)| {
-                    let index = LineIndex::from_source_text(&content);
-                    (filename, SourceCodeBuf::new(&content, index))
+                .map(|(filename, text)| {
+                    let mut builder = SourceFileBuilder::from_string(filename);
+
+                    if let Some(text) = text {
+                        builder.set_source_text_string(text);
+                    }
+
+                    builder.finish()
                 })
                 .collect();
 
             for header in headers {
+                let Some(source_file) = source_files.get(header.file_id) else {
+                    error!("Failed to retrieve source file for cached entry");
+                    return None;
+                };
+
                 messages.push(Message {
                     kind: header.kind,
                     location: header.location,
                     end_location: header.end_location,
                     fix: header.fix,
-                    source: sources.get(&header.filename).cloned(),
-                    filename: header.filename,
+                    file: source_file.clone(),
                     noqa_row: header.noqa_row,
                 });
             }
@@ -212,23 +270,7 @@ pub fn set(
     messages: &[Message],
     imports: &ImportMap,
 ) {
-    // Store the content of the source files, assuming that all files with the same name have the same content
-    let sources: Vec<_> = messages
-        .iter()
-        .filter_map(|message| {
-            message
-                .source
-                .as_ref()
-                .map(|source| (&*message.filename, source.text()))
-        })
-        .unique_by(|(filename, _)| *filename)
-        .collect();
-
-    let check_result = CheckResultRef {
-        messages,
-        imports,
-        sources,
-    };
+    let check_result = CheckResultRef { messages, imports };
     if let Err(e) = write_sync(
         &settings.cli.cache_dir,
         cache_key(path, package, metadata, &settings.lib, autofix),

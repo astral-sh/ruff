@@ -35,12 +35,13 @@ impl Emitter for TextEmitter {
             write!(
                 writer,
                 "{path}{sep}",
-                path = relativize_path(&message.filename).bold(),
+                path = relativize_path(message.filename()).bold(),
                 sep = ":".cyan(),
             )?;
 
             // Check if we're working on a jupyter notebook and translate positions with cell accordingly
-            let (row, col) = if let Some(jupyter_index) = context.jupyter_index(&message.filename) {
+            let (row, col) = if let Some(jupyter_index) = context.jupyter_index(message.filename())
+            {
                 write!(
                     writer,
                     "cell {cell}{sep}",
@@ -66,7 +67,7 @@ impl Emitter for TextEmitter {
                 }
             )?;
 
-            if message.source.is_some() {
+            if message.file.source_code().is_some() {
                 writeln!(writer, "{}", MessageCodeFrame { message })?;
             }
         }
@@ -121,13 +122,13 @@ impl Display for MessageCodeFrame<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         let Message {
             kind,
-            source,
+            file,
             location,
             end_location,
             ..
         } = self.message;
 
-        if let Some(source_code) = source {
+        if let Some(source_code) = file.source_code() {
             let suggestion = kind.suggestion.as_deref();
             let footer = if suggestion.is_some() {
                 vec![Annotation {

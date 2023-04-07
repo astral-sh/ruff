@@ -16,7 +16,7 @@ impl Emitter for GithubEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
-            let (row, column) = if context.is_jupyter_notebook(&message.filename) {
+            let (row, column) = if context.is_jupyter_notebook(message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 (1, 0)
@@ -29,7 +29,7 @@ impl Emitter for GithubEmitter {
                 "::error title=Ruff \
                          ({code}),file={file},line={row},col={column},endLine={end_row},endColumn={end_column}::",
                 code = message.kind.rule().noqa_code(),
-                file = message.filename,
+                file = message.filename(),
                 row = message.location.row(),
                 column = message.location.column(),
                 end_row = message.end_location.row(),
@@ -39,7 +39,7 @@ impl Emitter for GithubEmitter {
             writeln!(
                 writer,
                 "{path}:{row}:{column}: {code} {body}",
-                path = relativize_path(&message.filename),
+                path = relativize_path(&message.filename()),
                 code = message.kind.rule().noqa_code(),
                 body = message.kind.body,
             )?;

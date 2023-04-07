@@ -24,7 +24,7 @@ pub use text::TextEmitter;
 
 use crate::jupyter::JupyterIndex;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
-use ruff_python_ast::source_code::SourceCodeBuf;
+use ruff_python_ast::source_code::SourceFile;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct Message {
@@ -32,18 +32,12 @@ pub struct Message {
     pub location: Location,
     pub end_location: Location,
     pub fix: Fix,
-    pub filename: String,
-    pub source: Option<SourceCodeBuf>,
+    pub file: SourceFile,
     pub noqa_row: usize,
 }
 
 impl Message {
-    pub fn from_diagnostic(
-        diagnostic: Diagnostic,
-        filename: String,
-        source: Option<SourceCodeBuf>,
-        noqa_row: usize,
-    ) -> Self {
+    pub fn from_diagnostic(diagnostic: Diagnostic, file: SourceFile, noqa_row: usize) -> Self {
         Self {
             kind: diagnostic.kind,
             location: Location::new(diagnostic.location.row(), diagnostic.location.column() + 1),
@@ -52,17 +46,20 @@ impl Message {
                 diagnostic.end_location.column() + 1,
             ),
             fix: diagnostic.fix,
-            filename,
-            source,
+            file,
             noqa_row,
         }
+    }
+
+    pub fn filename(&self) -> &str {
+        self.file.name()
     }
 }
 
 impl Ord for Message {
     fn cmp(&self, other: &Self) -> Ordering {
-        (&self.filename, self.location.row(), self.location.column()).cmp(&(
-            &other.filename,
+        (self.filename(), self.location.row(), self.location.column()).cmp(&(
+            other.filename(),
             other.location.row(),
             other.location.column(),
         ))
@@ -79,7 +76,7 @@ fn group_messages_by_filename(messages: &[Message]) -> BTreeMap<&str, Vec<&Messa
     let mut grouped_messages = BTreeMap::default();
     for message in messages {
         grouped_messages
-            .entry(message.filename.as_str())
+            .entry(message.filename())
             .or_insert_with(Vec::new)
             .push(message);
     }
@@ -125,7 +122,7 @@ mod tests {
     use crate::message::{Emitter, EmitterContext, Location, Message};
     use crate::rules::pyflakes::rules::{UndefinedName, UnusedImport, UnusedVariable};
     use ruff_diagnostics::{Diagnostic, Edit, Fix};
-    use ruff_python_ast::source_code::SourceCodeBuf;
+    use ruff_python_ast::source_code::SourceFileBuilder;
     use ruff_python_ast::types::Range;
     use rustc_hash::FxHashMap;
 
@@ -153,7 +150,7 @@ def fibonacci(n):
             Range::new(Location::new(1, 7), Location::new(1, 9)),
         );
 
-        let fib_source = SourceCodeBuf::from_content(fib);
+        let fib_source = SourceFileBuilder::new("fib.py").source_text(fib).finish();
 
         let unused_variable = Diagnostic::new(
             UnusedVariable {
@@ -175,22 +172,14 @@ def fibonacci(n):
             Range::new(Location::new(1, 3), Location::new(1, 4)),
         );
 
-        let file_2_source = SourceCodeBuf::from_content(file_2);
+        let file_2_source = SourceFileBuilder::new("undef.py")
+            .source_text(file_2)
+            .finish();
 
         vec![
-            Message::from_diagnostic(
-                unused_import,
-                "fib.py".to_string(),
-                Some(fib_source.clone()),
-                1,
-            ),
-            Message::from_diagnostic(unused_variable, "fib.py".to_string(), Some(fib_source), 1),
-            Message::from_diagnostic(
-                undefined_name,
-                "undef.py".to_string(),
-                Some(file_2_source),
-                1,
-            ),
+            Message::from_diagnostic(unused_import, fib_source.clone(), 1),
+            Message::from_diagnostic(unused_variable, fib_source, 1),
+            Message::from_diagnostic(undefined_name, file_2_source, 1),
         ]
     }
 
