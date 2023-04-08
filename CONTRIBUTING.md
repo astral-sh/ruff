@@ -116,8 +116,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 To define the violation, start by creating a dedicated file for your rule under the appropriate
 rule linter (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
 contain a struct defined via `#[violation]`, along with a function that creates the violation
-based on any required inputs. (Many of the existing examples live in `crates/ruff/src/violations.rs`,
-but we're looking to place new rules in their own files.)
+based on any required inputs.
 
 To trigger the violation, you'll likely want to augment the logic in `crates/ruff/src/checkers/ast.rs`,
 which defines the Python AST visitor, responsible for iterating over the abstract syntax tree and
