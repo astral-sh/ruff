@@ -872,15 +872,29 @@ pub fn fix_unnecessary_double_cast_or_process(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
+    outer: &str,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let body = match_expr(&mut tree)?;
     let mut outer_call = match_call(body)?;
-    let inner_call = match &outer_call.args[..] {
+
+    outer_call.args = match &outer_call.args[..] {
         [arg] => {
             if let Expression::Call(call) = &arg.value {
-                &call.args
+                call.args.clone()
+            } else {
+                bail!("Expected Expression::Call ");
+            }
+        }
+        args if outer == "sorted" => {
+            let Some((first, rest)) = args.split_first() else {
+                bail!("Expected at least one argument in outer function call");
+            };
+            if let Expression::Call(call) = &first.value {
+                let mut args = call.args.clone();
+                args.extend_from_slice(rest);
+                args
             } else {
                 bail!("Expected Expression::Call ");
             }
@@ -889,8 +903,6 @@ pub fn fix_unnecessary_double_cast_or_process(
             bail!("Expected one argument in outer function call");
         }
     };
-
-    outer_call.args = inner_call.clone();
 
     let mut state = CodegenState {
         default_newline: &stylist.line_ending(),

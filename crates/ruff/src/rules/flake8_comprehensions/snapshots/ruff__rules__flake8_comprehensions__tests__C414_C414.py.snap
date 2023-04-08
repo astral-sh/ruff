@@ -176,19 +176,19 @@ expression: diagnostics
     suggestion: "Remove the inner `reversed` call"
     fixable: true
   location:
-    row: 10
+    row: 11
     column: 0
   end_location:
-    row: 10
+    row: 11
     column: 16
   fix:
     edits:
       - content: set(x)
         location:
-          row: 10
+          row: 11
           column: 0
         end_location:
-          row: 10
+          row: 11
           column: 16
   parent: ~
 - kind:
@@ -197,19 +197,19 @@ expression: diagnostics
     suggestion: "Remove the inner `list` call"
     fixable: true
   location:
-    row: 11
+    row: 12
     column: 0
   end_location:
-    row: 11
+    row: 12
     column: 15
   fix:
     edits:
       - content: sorted(x)
         location:
-          row: 11
+          row: 12
           column: 0
         end_location:
-          row: 11
+          row: 12
           column: 15
   parent: ~
 - kind:
@@ -218,19 +218,19 @@ expression: diagnostics
     suggestion: "Remove the inner `tuple` call"
     fixable: true
   location:
-    row: 12
+    row: 13
     column: 0
   end_location:
-    row: 12
+    row: 13
     column: 16
   fix:
     edits:
       - content: sorted(x)
         location:
-          row: 12
+          row: 13
           column: 0
         end_location:
-          row: 12
+          row: 13
           column: 16
   parent: ~
 - kind:
@@ -239,19 +239,19 @@ expression: diagnostics
     suggestion: "Remove the inner `sorted` call"
     fixable: true
   location:
-    row: 13
+    row: 14
     column: 0
   end_location:
-    row: 13
+    row: 14
     column: 17
   fix:
     edits:
       - content: sorted(x)
         location:
-          row: 13
+          row: 14
           column: 0
         end_location:
-          row: 13
+          row: 14
           column: 17
   parent: ~
 - kind:
@@ -260,20 +260,41 @@ expression: diagnostics
     suggestion: "Remove the inner `reversed` call"
     fixable: true
   location:
-    row: 14
+    row: 16
     column: 0
   end_location:
-    row: 14
+    row: 16
     column: 19
   fix:
     edits:
       - content: sorted(x)
         location:
-          row: 14
+          row: 16
           column: 0
         end_location:
-          row: 14
+          row: 16
           column: 19
+  parent: ~
+- kind:
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `list` call within `sorted()`"
+    suggestion: "Remove the inner `list` call"
+    fixable: true
+  location:
+    row: 17
+    column: 0
+  end_location:
+    row: 17
+    column: 32
+  fix:
+    edits:
+      - content: "sorted(x, key=lambda y: y)"
+        location:
+          row: 17
+          column: 0
+        end_location:
+          row: 17
+          column: 32
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
@@ -281,19 +302,19 @@ expression: diagnostics
     suggestion: "Remove the inner `list` call"
     fixable: true
   location:
-    row: 15
+    row: 18
     column: 0
   end_location:
-    row: 20
+    row: 23
     column: 1
   fix:
     edits:
       - content: "tuple(\n    [x, 3, \"hell\"\\\n        \"o\"]\n    )"
         location:
-          row: 15
+          row: 18
           column: 0
         end_location:
-          row: 20
+          row: 23
           column: 1
   parent: ~
 
