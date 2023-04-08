@@ -3214,6 +3214,15 @@ where
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
             }
+            ExprKind::BinOp {
+                left,
+                op: Operator::BitOr,
+                right,
+            } => {
+                if self.settings.rules.enabled(Rule::DuplicatesInUnion) {
+                    flake8_pyi::rules::duplicates_in_union(self, left, right);
+                }
+            }
             ExprKind::UnaryOp { op, operand } => {
                 let check_not_in = self.settings.rules.enabled(Rule::NotInTest);
                 let check_not_is = self.settings.rules.enabled(Rule::NotIsTest);
