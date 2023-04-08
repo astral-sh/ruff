@@ -344,6 +344,7 @@ where
                             |expr| self.ctx.resolve_call_path(expr),
                         ));
                 }
+
                 if self.settings.rules.enabled(Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
                         pycodestyle::rules::ambiguous_function_name(name, || {
@@ -358,7 +359,9 @@ where
                     if let Some(diagnostic) = pep8_naming::rules::invalid_function_name(
                         stmt,
                         name,
+                        decorator_list,
                         &self.settings.pep8_naming.ignore_names,
+                        &self.ctx,
                         self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
