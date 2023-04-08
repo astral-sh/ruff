@@ -1,12 +1,15 @@
+use crate::autofix::actions::get_or_import_symbol;
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Located, Stmt, StmtKind};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
+
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers;
 use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
+use crate::registry::AsRule;
 
 #[violation]
 pub struct SuppressibleException {
@@ -14,6 +17,7 @@ pub struct SuppressibleException {
 }
 
 impl Violation for SuppressibleException {
+    const AUTOFIX: AutofixKind = AutofixKind::Always;
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuppressibleException { exception } = self;
@@ -24,13 +28,13 @@ impl Violation for SuppressibleException {
 pub fn suppressible_exception(
     checker: &mut Checker,
     stmt: &Stmt,
-    body: &[Stmt],
+    try_body: &[Stmt],
     handlers: &[Excepthandler],
     orelse: &[Stmt],
     finalbody: &[Stmt],
 ) {
     if !matches!(
-        body,
+        try_body,
         [Located {
             node: StmtKind::Delete { .. }
                 | StmtKind::Assign { .. }
@@ -62,10 +66,35 @@ pub fn suppressible_exception(
             } else {
                 handler_names.join(", ")
             };
-            checker.diagnostics.push(Diagnostic::new(
-                SuppressibleException { exception },
+            let mut diagnostic = Diagnostic::new(
+                SuppressibleException {
+                    exception: exception.clone(),
+                },
                 Range::from(stmt),
-            ));
+            );
+
+            if checker.patch(diagnostic.kind.rule()) {
+                diagnostic.try_set_fix(|| {
+                    let (import_edit, binding) = get_or_import_symbol(
+                        "contextlib",
+                        "suppress",
+                        &checker.ctx,
+                        &checker.importer,
+                        checker.locator,
+                    )?;
+                    let try_ending = stmt.location.with_col_offset(3); // size of "try"
+                    let replace_try = Edit::replacement(
+                        format!("with {binding}({exception})"),
+                        stmt.location,
+                        try_ending,
+                    );
+                    let remove_handler =
+                        Edit::deletion(handler.location, handler.end_location.unwrap());
+                    Ok(Fix::from_iter([import_edit, replace_try, remove_handler]))
+                });
+            }
+
+            checker.diagnostics.push(diagnostic);
         }
     }
 }

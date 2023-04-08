@@ -14,7 +14,28 @@ expression: diagnostics
     row: 7
     column: 8
   fix:
-    edits: []
+    edits:
+      - content: "import contextlib\n"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 0
+      - content: with contextlib.suppress(ValueError)
+        location:
+          row: 4
+          column: 0
+        end_location:
+          row: 4
+          column: 3
+      - content: ""
+        location:
+          row: 6
+          column: 0
+        end_location:
+          row: 7
+          column: 8
   parent: ~
 - kind:
     name: SuppressibleException
@@ -28,7 +49,28 @@ expression: diagnostics
     row: 12
     column: 8
   fix:
-    edits: []
+    edits:
+      - content: "import contextlib\n"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 0
+      - content: "with contextlib.suppress(ValueError, OSError)"
+        location:
+          row: 9
+          column: 0
+        end_location:
+          row: 9
+          column: 3
+      - content: ""
+        location:
+          row: 11
+          column: 0
+        end_location:
+          row: 12
+          column: 8
   parent: ~
 - kind:
     name: SuppressibleException
@@ -42,7 +84,28 @@ expression: diagnostics
     row: 17
     column: 8
   fix:
-    edits: []
+    edits:
+      - content: "import contextlib\n"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 0
+      - content: with contextlib.suppress(Exception)
+        location:
+          row: 14
+          column: 0
+        end_location:
+          row: 14
+          column: 3
+      - content: ""
+        location:
+          row: 16
+          column: 0
+        end_location:
+          row: 17
+          column: 8
   parent: ~
 - kind:
     name: SuppressibleException
@@ -56,6 +119,27 @@ expression: diagnostics
     row: 22
     column: 8
   fix:
-    edits: []
+    edits:
+      - content: "import contextlib\n"
+        location:
+          row: 1
+          column: 0
+        end_location:
+          row: 1
+          column: 0
+      - content: "with contextlib.suppress(a.Error, b.Error)"
+        location:
+          row: 19
+          column: 0
+        end_location:
+          row: 19
+          column: 3
+      - content: ""
+        location:
+          row: 21
+          column: 0
+        end_location:
+          row: 22
+          column: 8
   parent: ~
 
