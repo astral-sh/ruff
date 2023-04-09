@@ -743,11 +743,11 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flynt, "002") => Rule::StaticJoinToFString,
 
         // flake8-todo
-        (Flake8Todo, "001") => Rule::InvalidTODOTag,
-        (Flake8Todo, "002") => Rule::MissingAuthorInTODO,
-        (Flake8Todo, "004") => Rule::MissingColonInTODO,
-        (Flake8Todo, "005") => Rule::MissingTextInTODO,
-        (Flake8Todo, "007") => Rule::MissingSpaceAfterColonInTODO,
+        (Flake8Todo, "001") => Rule::InvalidTodoTag,
+        (Flake8Todo, "002") => Rule::MissingAuthorInTodo,
+        (Flake8Todo, "004") => Rule::MissingColonInTodo,
+        (Flake8Todo, "005") => Rule::MissingTextInTodo,
+        (Flake8Todo, "007") => Rule::MissingSpaceAfterColonInTodo,
         _ => return None,
     })
 }

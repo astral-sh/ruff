@@ -60,13 +60,13 @@ pub(crate) fn check_tokens(
     let enforce_extraneous_parenthesis = settings.rules.enabled(Rule::ExtraneousParentheses);
     let enforce_type_comment_in_stub = settings.rules.enabled(Rule::TypeCommentInStub);
     let enforce_todos = settings.rules.any_enabled(&[
-        Rule::InvalidTODOTag,
-        Rule::MissingAuthorInTODO,
-        Rule::MissingColonInTODO,
-        Rule::MissingTextInTODO,
-        Rule::MissingSpaceAfterColonInTODO,
-        // Rule::InvalidTODOCapitalization,
-        //     Rule::TODOMissingLink,
+        Rule::InvalidTodoTag,
+        Rule::MissingAuthorInTodo,
+        Rule::MissingColonInTodo,
+        Rule::MissingTextInTodo,
+        Rule::MissingSpaceAfterColonInTodo,
+        // Rule::InvalidTodoCapitalization,
+        //     Rule::TodoMissingLink,
     ]);
 
     // RUF001, RUF002, RUF003

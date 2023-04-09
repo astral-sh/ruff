@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_todo/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: MissingSpaceAfterColonInTODO
+    name: MissingSpaceAfterColonInTodo
     body: Missing space after colon in TODO
     suggestion: ~
     fixable: false

@@ -11,22 +11,22 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 #[violation]
-pub struct InvalidTODOTag {
+pub struct InvalidTodoTag {
     pub tag: String,
 }
 
 // TODO - autofix this to just insert TODO instead of the tag?
-impl Violation for InvalidTODOTag {
+impl Violation for InvalidTodoTag {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let InvalidTODOTag { tag } = self;
+        let InvalidTodoTag { tag } = self;
         format!("Invalid TODO tag: `{tag}` should be `TODO`")
     }
 }
 
 #[violation]
-pub struct MissingAuthorInTODO;
-impl Violation for MissingAuthorInTODO {
+pub struct MissingAuthorInTodo;
+impl Violation for MissingAuthorInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing author into TODO")
@@ -43,16 +43,17 @@ impl Violation for MissingLink {
 }
 
 #[violation]
-pub struct MissingColonInTODO;
-impl Violation for MissingColonInTODO {
+pub struct MissingColonInTodo;
+impl Violation for MissingColonInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing colon in TODO")
     }
 }
+
 #[violation]
-pub struct MissingTextInTODO;
-impl Violation for MissingTextInTODO {
+pub struct MissingTextInTodo;
+impl Violation for MissingTextInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing text in TODO")
@@ -66,8 +67,8 @@ impl Violation for MissingTextInTODO {
 // }
 
 #[violation]
-pub struct MissingSpaceAfterColonInTODO;
-impl Violation for MissingSpaceAfterColonInTODO {
+pub struct MissingSpaceAfterColonInTodo;
+impl Violation for MissingSpaceAfterColonInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing space after colon in TODO")
@@ -131,7 +132,7 @@ fn get_tag_regex_errors(text: &str, start: Location, end: Location) -> Vec<Diagn
         let tag = capture.get(1).unwrap().as_str();
         if tag != "TODO" {
             diagnostics.push(Diagnostic::new(
-                InvalidTODOTag {
+                InvalidTodoTag {
                     tag: String::from(tag),
                 },
                 Range::new(start, end),
@@ -147,19 +148,19 @@ fn get_tag_regex_errors(text: &str, start: Location, end: Location) -> Vec<Diagn
             if capture.get(capture_group_index).is_none() {
                 let range = Range::new(start, end);
                 diagnostics.push(match capture_group_index {
-                    2usize => Diagnostic::new(MissingAuthorInTODO, range),
-                    3usize => Diagnostic::new(MissingColonInTODO, range),
+                    2usize => Diagnostic::new(MissingAuthorInTodo, range),
+                    3usize => Diagnostic::new(MissingColonInTodo, range),
                     4usize => {
                         if diagnostics
                             .last()
-                            .map_or(true, |last| last.kind != MissingColonInTODO.into())
+                            .map_or(true, |last| last.kind != MissingColonInTodo.into())
                         {
-                            Diagnostic::new(MissingSpaceAfterColonInTODO, range)
+                            Diagnostic::new(MissingSpaceAfterColonInTodo, range)
                         } else {
                             continue;
                         }
                     }
-                    5usize => Diagnostic::new(MissingTextInTODO, range),
+                    5usize => Diagnostic::new(MissingTextInTodo, range),
                     _ => break,
                 });
             }

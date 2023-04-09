@@ -674,11 +674,11 @@ ruff_macros::register_rules!(
     // flynt
     rules::flynt::rules::StaticJoinToFString,
     // flake8-todo
-    rules::flake8_todo::rules::InvalidTODOTag,
-    rules::flake8_todo::rules::MissingAuthorInTODO,
-    rules::flake8_todo::rules::MissingColonInTODO,
-    rules::flake8_todo::rules::MissingSpaceAfterColonInTODO,
-    rules::flake8_todo::rules::MissingTextInTODO,
+    rules::flake8_todo::rules::InvalidTodoTag,
+    rules::flake8_todo::rules::MissingAuthorInTodo,
+    rules::flake8_todo::rules::MissingColonInTodo,
+    rules::flake8_todo::rules::MissingSpaceAfterColonInTodo,
+    rules::flake8_todo::rules::MissingTextInTodo,
 );
 
 pub trait AsRule {
@@ -947,11 +947,11 @@ impl Rule {
             | Rule::MultipleStatementsOnOneLineSemicolon
             | Rule::ProhibitedTrailingComma
             | Rule::TypeCommentInStub
-            | Rule::InvalidTODOTag
-            | Rule::MissingAuthorInTODO
-            | Rule::MissingSpaceAfterColonInTODO
-            | Rule::MissingTextInTODO
-            | Rule::MissingColonInTODO => LintSource::Tokens,
+            | Rule::InvalidTodoTag
+            | Rule::MissingAuthorInTodo
+            | Rule::MissingSpaceAfterColonInTodo
+            | Rule::MissingTextInTodo
+            | Rule::MissingColonInTodo => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,

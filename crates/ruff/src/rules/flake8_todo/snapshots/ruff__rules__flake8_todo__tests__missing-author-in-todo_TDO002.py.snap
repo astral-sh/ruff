@@ -3,8 +3,8 @@ source: crates/ruff/src/rules/flake8_todo/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: MissingColonInTODO
-    body: Missing colon in TODO
+    name: MissingAuthorInTodo
+    body: Missing author into TODO
     suggestion: ~
     fixable: false
   location:
@@ -12,7 +12,7 @@ expression: diagnostics
     column: 0
   end_location:
     row: 4
-    column: 41
+    column: 26
   fix:
     edits: []
   parent: ~
