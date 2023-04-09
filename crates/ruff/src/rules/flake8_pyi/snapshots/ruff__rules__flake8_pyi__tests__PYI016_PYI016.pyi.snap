@@ -1,0 +1,278 @@
+---
+source: crates/ruff/src/rules/flake8_pyi/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate name in union
+    suggestion: Remove latter name from union
+    fixable: true
+  location:
+    row: 4
+    column: 14
+  end_location:
+    row: 4
+    column: 17
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 4
+          column: 11
+        end_location:
+          row: 4
+          column: 17
+  parent: ~
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate name in union
+    suggestion: Remove latter name from union
+    fixable: true
+  location:
+    row: 7
+    column: 22
+  end_location:
+    row: 7
+    column: 25
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 7
+          column: 19
+        end_location:
+          row: 7
+          column: 25
+  parent: ~
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate name in union
+    suggestion: Remove latter name from union
+    fixable: true
+  location:
+    row: 9
+    column: 17
+  end_location:
+    row: 9
+    column: 21
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 9
+          column: 14
+        end_location:
+          row: 9
+          column: 21
+  parent: ~
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate name in union
+    suggestion: Remove latter name from union
+    fixable: true
+  location:
+    row: 13
+    column: 14
+  end_location:
+    row: 13
+    column: 17
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 13
+          column: 11
+        end_location:
+          row: 13
+          column: 17
+  parent: ~
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate name in union
+    suggestion: Remove latter name from union
+    fixable: true
+  location:
+    row: 14
+    column: 14
+  end_location:
+    row: 14
+    column: 17
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 14
+          column: 11
+        end_location:
+          row: 14
+          column: 17
+  parent: ~
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate name in union
+    suggestion: Remove latter name from union
+    fixable: true
+  location:
+    row: 15
+    column: 20
+  end_location:
+    row: 15
+    column: 23
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 15
+          column: 17
+        end_location:
+          row: 15
+          column: 23
+  parent: ~
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate name in union
+    suggestion: Remove latter name from union
+    fixable: true
+  location:
+    row: 16
+    column: 27
+  end_location:
+    row: 16
+    column: 30
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 16
+          column: 24
+        end_location:
+          row: 16
+          column: 30
+  parent: ~
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate literal in union
+    suggestion: Remove latter literal from union
+    fixable: true
+  location:
+    row: 20
+    column: 17
+  end_location:
+    row: 20
+    column: 18
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 20
+          column: 14
+        end_location:
+          row: 20
+          column: 18
+  parent: ~
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate literal in union
+    suggestion: Remove latter literal from union
+    fixable: true
+  location:
+    row: 21
+    column: 21
+  end_location:
+    row: 21
+    column: 24
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 21
+          column: 18
+        end_location:
+          row: 21
+          column: 24
+  parent: ~
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate literal in union
+    suggestion: Remove latter literal from union
+    fixable: true
+  location:
+    row: 21
+    column: 27
+  end_location:
+    row: 21
+    column: 30
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 21
+          column: 24
+        end_location:
+          row: 21
+          column: 30
+  parent: ~
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate literal in union
+    suggestion: Remove latter literal from union
+    fixable: true
+  location:
+    row: 23
+    column: 20
+  end_location:
+    row: 23
+    column: 25
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 23
+          column: 17
+        end_location:
+          row: 23
+          column: 25
+  parent: ~
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate name in union
+    suggestion: Remove latter name from union
+    fixable: true
+  location:
+    row: 23
+    column: 28
+  end_location:
+    row: 23
+    column: 33
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 23
+          column: 25
+        end_location:
+          row: 23
+          column: 33
+  parent: ~
+- kind:
+    name: DuplicatesInUnion
+    body: Duplicate literal in union
+    suggestion: Remove latter literal from union
+    fixable: true
+  location:
+    row: 25
+    column: 14
+  end_location:
+    row: 25
+    column: 17
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 25
+          column: 11
+        end_location:
+          row: 25
+          column: 17
+  parent: ~
+

@@ -3,13 +3,11 @@ field1: str
 # Should find duplicate field types
 field2: str | str  # PYI016 Duplicate name in union
 
-
 # Should affect union types in arguments
 def func1(arg1: int | int):  # PYI016 Duplicate name in union
     # Should affect union expressions
     val = arg1 | arg1  # PYI016 Duplicate name in union
     print(arg1, val)
-
 
 # Should affect in longer unions
 field3: str | str | int  # PYI016 Duplicate name in union
