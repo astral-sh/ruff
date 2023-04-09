@@ -71,16 +71,6 @@ pub fn unnecessary_double_cast_or_process(
     func: &Expr,
     args: &[Expr],
 ) {
-    fn create_diagnostic(inner: &str, outer: &str, location: Range) -> Diagnostic {
-        Diagnostic::new(
-            UnnecessaryDoubleCastOrProcess {
-                inner: inner.to_string(),
-                outer: outer.to_string(),
-            },
-            location,
-        )
-    }
-
     let Some(outer) = helpers::expr_name(func) else {
         return;
     };
@@ -95,7 +85,7 @@ pub fn unnecessary_double_cast_or_process(
     let Some(arg) = args.first() else {
         return;
     };
-    let ExprKind::Call { func, .. } = &arg.node else {
+    let ExprKind::Call { func, ..} = &arg.node else {
         return;
     };
     let Some(inner) = helpers::expr_name(func) else {
@@ -113,7 +103,13 @@ pub fn unnecessary_double_cast_or_process(
         || (outer == "set" && inner == "set")
         || ((outer == "list" || outer == "tuple") && (inner == "list" || inner == "tuple"))
     {
-        let mut diagnostic = create_diagnostic(inner, outer, Range::from(expr));
+        let mut diagnostic = Diagnostic::new(
+            UnnecessaryDoubleCastOrProcess {
+                inner: inner.to_string(),
+                outer: outer.to_string(),
+            },
+            Range::from(expr),
+        );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
                 fixes::fix_unnecessary_double_cast_or_process(
