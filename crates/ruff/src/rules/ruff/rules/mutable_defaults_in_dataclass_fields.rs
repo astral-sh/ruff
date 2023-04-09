@@ -1,18 +1,21 @@
-use crate::checkers::ast::Checker;
+use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{call_path::compose_call_path, helpers::map_callable, types::Range};
 use ruff_python_semantic::context::Context;
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for mutable default values in dataclasses without the usage of
+/// Checks for mutable default values in dataclasses without the use of
 /// `dataclasses.field`.
 ///
 /// ## Why is it bad?
 /// Mutable default values share state across all instances of the dataclass,
-/// while not being obvious. This can lead to nasty bugs when the attributes
-/// are changed, but expected not to in another instance.
+/// while not being obvious. This can lead to bugs when the attributes are
+/// changed in one instance, as those changes will unexpectedly affect all
+/// other instances.
 ///
 /// ## Examples:
 /// ```python
@@ -32,8 +35,8 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 ///     mutable_default: list[int] = field(default_factory=list)
 /// ```
 ///
-/// Alternatively, if you __want__ the shared behaviour, make it more obvious
-/// by assigning it to a module-level variable:
+/// Alternatively, if you _want_ shared behaviour, make it more obvious
+/// by assigning to a module-level variable:
 /// ```python
 /// from dataclasses import dataclass
 ///
@@ -57,8 +60,8 @@ impl Violation for MutableDataclassDefault {
 /// Checks for function calls in dataclass defaults.
 ///
 /// ## Why is it bad?
-/// Function calls are only performed once during definition time. The result
-/// gets reused in all created instances of the dataclass.
+/// Function calls are only performed once, at definition time. The returned
+/// value is then reused by all instances of the dataclass.
 ///
 /// ## Examples:
 /// ```python
@@ -94,7 +97,7 @@ impl Violation for MutableDataclassDefault {
 ///     also_mutable_default_but_sneakier: A = field(default_factory=A)
 /// ```
 ///
-/// Alternatively, if you __want__ the shared behaviour, make it more obvious
+/// Alternatively, if you _want_ the shared behaviour, make it more obvious
 /// by assigning it to a module-level variable:
 /// ```python
 /// from dataclasses import dataclass
