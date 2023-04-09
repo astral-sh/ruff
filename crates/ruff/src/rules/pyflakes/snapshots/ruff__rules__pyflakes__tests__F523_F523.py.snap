@@ -170,4 +170,25 @@ expression: diagnostics
           row: 13
           column: 23
   parent: ~
+- kind:
+    name: StringDotFormatExtraPositionalArguments
+    body: "`.format` call has unused arguments at position(s): 2"
+    suggestion: "Remove extra positional arguments at position(s): 2"
+    fixable: true
+  location:
+    row: 19
+    column: 0
+  end_location:
+    row: 19
+    column: 31
+  fix:
+    edits:
+      - content: "\"{0}{1}\".format(1, 2, *args)"
+        location:
+          row: 19
+          column: 0
+        end_location:
+          row: 19
+          column: 31
+  parent: ~
 
