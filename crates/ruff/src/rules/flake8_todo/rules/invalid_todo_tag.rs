@@ -99,7 +99,7 @@ impl Violation for TODOMissingSpaceAfterColon {
 // Note: Tags taken from https://github.com/orsinium-labs/flake8-todos/blob/master/flake8_todos/_rules.py#L12.
 static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
     // TODO BEFORE COMMITTING - <space> should be a nested group inside of <colon>
-    Regex::new(r"^#\s*(TODO|BUG|FIXME|XXX)(\(.*\))?(:( )?)?(.+)?$").unwrap()
+    Regex::new(r"^#\s*(TODO|BUG|FIXME|XXX)(\(.*\))?(:)?( )?(.+)?$").unwrap()
 });
 static NUM_CAPTURE_GROUPS: usize = 5usize;
 
@@ -149,7 +149,16 @@ fn get_tag_regex_errors(text: &String, start: &Location, end: &Location) -> Vec<
                 diagnostics.push(match capture_group_index {
                     2usize => Diagnostic::new(TODOMissingAuthor, range),
                     3usize => Diagnostic::new(TODOMissingColon, range),
-                    4usize => Diagnostic::new(TODOMissingSpaceAfterColon, range),
+                    4usize => {
+                        if diagnostics
+                            .last()
+                            .map_or(true, |last| last.kind != TODOMissingColon.into())
+                        {
+                            Diagnostic::new(TODOMissingSpaceAfterColon, range)
+                        } else {
+                            continue;
+                        }
+                    }
                     5usize => Diagnostic::new(TODOMissingText, range),
                     _ => break,
                 });
