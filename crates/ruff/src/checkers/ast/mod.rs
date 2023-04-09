@@ -819,6 +819,24 @@ where
                     flake8_pie::rules::non_unique_enums(self, stmt, body);
                 }
 
+                if self.settings.rules.any_enabled(&[
+                    Rule::MutableDataclassDefault,
+                    Rule::FunctionCallInDataclassDefaultArgument,
+                ]) && ruff::rules::is_dataclass(self, decorator_list)
+                {
+                    if self.settings.rules.enabled(Rule::MutableDataclassDefault) {
+                        ruff::rules::mutable_dataclass_default(self, body);
+                    }
+
+                    if self
+                        .settings
+                        .rules
+                        .enabled(Rule::FunctionCallInDataclassDefaultArgument)
+                    {
+                        ruff::rules::function_call_in_dataclass_defaults(self, body);
+                    }
+                }
+
                 self.check_builtin_shadowing(name, stmt, false);
 
                 for expr in bases {

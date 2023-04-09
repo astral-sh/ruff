@@ -1,0 +1,61 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: FunctionCallInDataclassDefaultArgument
+    body: "Do not perform function call `default_function` in dataclass defaults"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 15
+    column: 40
+  end_location:
+    row: 15
+    column: 58
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: FunctionCallInDataclassDefaultArgument
+    body: "Do not perform function call `default_function` in dataclass defaults"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 24
+    column: 40
+  end_location:
+    row: 24
+    column: 58
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: FunctionCallInDataclassDefaultArgument
+    body: "Do not perform function call `A` in dataclass defaults"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 25
+    column: 27
+  end_location:
+    row: 25
+    column: 30
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: FunctionCallInDataclassDefaultArgument
+    body: "Do not perform function call `ImmutableType` in dataclass defaults"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 26
+    column: 33
+  end_location:
+    row: 26
+    column: 50
+  fix:
+    edits: []
+  parent: ~
+

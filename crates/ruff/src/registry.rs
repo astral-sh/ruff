@@ -644,6 +644,8 @@ ruff_macros::register_rules!(
     rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,
     rules::ruff::rules::PairwiseOverZipped,
+    rules::ruff::rules::MutableDataclassDefault,
+    rules::ruff::rules::FunctionCallInDataclassDefaultArgument,
     // flake8-django
     rules::flake8_django::rules::DjangoNullableModelStringField,
     rules::flake8_django::rules::DjangoLocalsInRenderFunction,
