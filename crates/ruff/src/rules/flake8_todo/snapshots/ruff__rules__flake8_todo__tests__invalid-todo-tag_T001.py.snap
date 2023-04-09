@@ -1,0 +1,47 @@
+---
+source: crates/ruff/src/rules/flake8_todo/mod.rs
+expression: diagnostics
+---
+- kind:
+    name: InvalidTODOTag
+    body: "Invalid TODO tag: `XXX` should be `TODO`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 7
+    column: 0
+  end_location:
+    row: 7
+    column: 40
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: InvalidTODOTag
+    body: "Invalid TODO tag: `BUG` should be `TODO`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 8
+    column: 0
+  end_location:
+    row: 8
+    column: 40
+  fix:
+    edits: []
+  parent: ~
+- kind:
+    name: InvalidTODOTag
+    body: "Invalid TODO tag: `FIXME` should be `TODO`"
+    suggestion: ~
+    fixable: false
+  location:
+    row: 9
+    column: 0
+  end_location:
+    row: 9
+    column: 42
+  fix:
+    edits: []
+  parent: ~
+
