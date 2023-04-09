@@ -493,12 +493,15 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     args: &[Expr],
     location: Range,
 ) {
-    if has_star_args(args) {
-        return;
-    }
-
-    let missing: Vec<usize> = (0..args.len())
-        .filter(|i| !(summary.autos.contains(i) || summary.indices.contains(i)))
+    let missing: Vec<usize> = args
+        .iter()
+        .enumerate()
+        .filter(|(i, arg)| {
+            !(matches!(arg.node, ExprKind::Starred { .. })
+                || summary.autos.contains(i)
+                || summary.indices.contains(i))
+        })
+        .map(|(i, _)| i)
         .collect();
 
     if missing.is_empty() {
