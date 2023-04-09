@@ -13,11 +13,11 @@ mod tests {
     use crate::settings;
     use crate::test::test_path;
 
-    #[test_case(Rule::InvalidTODOTag, Path::new("T001.py"); "T001")]
-    #[test_case(Rule::MissingAuthorInTODO, Path::new("T002.py"); "T002")]
-    #[test_case(Rule::MissingColonInTODO, Path::new("T004.py"); "T004")]
-    #[test_case(Rule::MissingTextInTODO, Path::new("T005.py"); "T005")]
-    #[test_case(Rule::MissingSpaceAfterColonInTODO, Path::new("T007.py"); "T007")]
+    #[test_case(Rule::InvalidTodoTag, Path::new("TDO001.py"); "TDO001")]
+    #[test_case(Rule::MissingAuthorInTodo, Path::new("TDO002.py"); "TDO002")]
+    #[test_case(Rule::MissingColonInTodo, Path::new("TDO004.py"); "TDO004")]
+    #[test_case(Rule::MissingTextInTodo, Path::new("TDO005.py"); "TDO005")]
+    #[test_case(Rule::MissingSpaceAfterColonInTodo, Path::new("TDO007.py"); "TDO007")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.as_ref(), path.to_string_lossy());
         let diagnostics = test_path(
