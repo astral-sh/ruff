@@ -872,36 +872,28 @@ pub fn fix_unnecessary_double_cast_or_process(
     locator: &Locator,
     stylist: &Stylist,
     expr: &rustpython_parser::ast::Expr,
-    outer: &str,
 ) -> Result<Edit> {
     let module_text = locator.slice(expr);
     let mut tree = match_module(module_text)?;
     let body = match_expr(&mut tree)?;
     let mut outer_call = match_call(body)?;
 
-    outer_call.args = match &outer_call.args[..] {
-        [arg] => {
-            if let Expression::Call(call) = &arg.value {
-                call.args.clone()
-            } else {
+    outer_call.args = match outer_call.args.split_first() {
+        Some((first, rest)) => {
+            let Expression::Call(inner_call) = &first.value else {
                 bail!("Expected Expression::Call ");
-            }
-        }
-        args if outer == "sorted" => {
-            let Some((first, rest)) = args.split_first() else {
-                bail!("Expected at least one argument in outer function call");
             };
-            if let Expression::Call(call) = &first.value {
-                let mut args = call.args.clone();
-                args.extend_from_slice(rest);
+            if let Some(iterable) = inner_call.args.first() {
+                let mut args = vec![iterable.clone()];
+                if !rest.is_empty() {
+                    args.extend_from_slice(rest);
+                }
                 args
             } else {
-                bail!("Expected Expression::Call ");
+                bail!("Expected at least one argument in inner function call");
             }
         }
-        _ => {
-            bail!("Expected one argument in outer function call");
-        }
+        None => bail!("Expected at least one argument in outer function call"),
     };
 
     let mut state = CodegenState {

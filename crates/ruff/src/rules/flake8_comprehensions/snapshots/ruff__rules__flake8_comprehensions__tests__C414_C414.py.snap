@@ -172,6 +172,27 @@ expression: diagnostics
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `sorted` call within `set()`"
+    suggestion: "Remove the inner `sorted` call"
+    fixable: true
+  location:
+    row: 10
+    column: 0
+  end_location:
+    row: 10
+    column: 31
+  fix:
+    edits:
+      - content: "set(x, )"
+        location:
+          row: 10
+          column: 0
+        end_location:
+          row: 10
+          column: 31
+  parent: ~
+- kind:
+    name: UnnecessaryDoubleCastOrProcess
     body: "Unnecessary `reversed` call within `set()`"
     suggestion: "Remove the inner `reversed` call"
     fixable: true
@@ -253,6 +274,27 @@ expression: diagnostics
         end_location:
           row: 14
           column: 17
+  parent: ~
+- kind:
+    name: UnnecessaryDoubleCastOrProcess
+    body: "Unnecessary `sorted` call within `sorted()`"
+    suggestion: "Remove the inner `sorted` call"
+    fixable: true
+  location:
+    row: 15
+    column: 0
+  end_location:
+    row: 15
+    column: 34
+  fix:
+    edits:
+      - content: "sorted(x, )"
+        location:
+          row: 15
+          column: 0
+        end_location:
+          row: 15
+          column: 34
   parent: ~
 - kind:
     name: UnnecessaryDoubleCastOrProcess

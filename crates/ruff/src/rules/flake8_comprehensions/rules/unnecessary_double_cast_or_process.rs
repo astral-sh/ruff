@@ -85,18 +85,12 @@ pub fn unnecessary_double_cast_or_process(
     let Some(arg) = args.first() else {
         return;
     };
-    let ExprKind::Call { func, args: inner_args, keywords: inner_keywords } = &arg.node else {
+    let ExprKind::Call { func, ..} = &arg.node else {
         return;
     };
     let Some(inner) = helpers::expr_name(func) else {
         return;
     };
-    // If the inner function is `sorted`, it must have no arguments otherwise
-    // it'll be a false positive. E.g., `sorted(sorted(iterable, key=...))`
-    // is not the same as `sorted(iterable, key=...)`.
-    if inner == "sorted" && inner_args.len() + inner_keywords.len() > 1 {
-        return;
-    }
     if !checker.ctx.is_builtin(inner) || !checker.ctx.is_builtin(outer) {
         return;
     }
@@ -122,7 +116,6 @@ pub fn unnecessary_double_cast_or_process(
                     checker.locator,
                     checker.stylist,
                     expr,
-                    outer,
                 )
             });
         }
