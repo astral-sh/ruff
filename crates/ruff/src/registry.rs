@@ -675,10 +675,10 @@ ruff_macros::register_rules!(
     rules::flynt::rules::StaticJoinToFString,
     // flake8-todo
     rules::flake8_todo::rules::InvalidTODOTag,
-    rules::flake8_todo::rules::TODOMissingAuthor,
-    rules::flake8_todo::rules::TODOMissingColon,
-    rules::flake8_todo::rules::TODOMissingSpaceAfterColon,
-    rules::flake8_todo::rules::TODOMissingText,
+    rules::flake8_todo::rules::MissingAuthorInTODO,
+    rules::flake8_todo::rules::MissingColonInTODO,
+    rules::flake8_todo::rules::MissingSpaceAfterColonInTODO,
+    rules::flake8_todo::rules::MissingTextInTODO,
 );
 
 pub trait AsRule {
@@ -948,10 +948,10 @@ impl Rule {
             | Rule::ProhibitedTrailingComma
             | Rule::TypeCommentInStub
             | Rule::InvalidTODOTag
-            | Rule::TODOMissingAuthor
-            | Rule::TODOMissingSpaceAfterColon
-            | Rule::TODOMissingText
-            | Rule::TODOMissingColon => LintSource::Tokens,
+            | Rule::MissingAuthorInTODO
+            | Rule::MissingSpaceAfterColonInTODO
+            | Rule::MissingTextInTODO
+            | Rule::MissingColonInTODO => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,

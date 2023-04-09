@@ -61,10 +61,10 @@ pub(crate) fn check_tokens(
     let enforce_type_comment_in_stub = settings.rules.enabled(Rule::TypeCommentInStub);
     let enforce_todos = settings.rules.any_enabled(&[
         Rule::InvalidTODOTag,
-        Rule::TODOMissingAuthor,
-        Rule::TODOMissingColon,
-        Rule::TODOMissingText,
-        Rule::TODOMissingSpaceAfterColon,
+        Rule::MissingAuthorInTODO,
+        Rule::MissingColonInTODO,
+        Rule::MissingTextInTODO,
+        Rule::MissingSpaceAfterColonInTODO,
         // Rule::InvalidTODOCapitalization,
         //     Rule::TODOMissingLink,
     ]);

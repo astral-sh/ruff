@@ -25,8 +25,8 @@ impl Violation for InvalidTODOTag {
 }
 
 #[violation]
-pub struct TODOMissingAuthor;
-impl Violation for TODOMissingAuthor {
+pub struct MissingAuthorInTODO;
+impl Violation for MissingAuthorInTODO {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing author into TODO")
@@ -43,16 +43,16 @@ impl Violation for MissingLink {
 }
 
 #[violation]
-pub struct TODOMissingColon;
-impl Violation for TODOMissingColon {
+pub struct MissingColonInTODO;
+impl Violation for MissingColonInTODO {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing colon in TODO")
     }
 }
 #[violation]
-pub struct TODOMissingText;
-impl Violation for TODOMissingText {
+pub struct MissingTextInTODO;
+impl Violation for MissingTextInTODO {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing text in TODO")
@@ -66,8 +66,8 @@ impl Violation for TODOMissingText {
 // }
 
 #[violation]
-pub struct TODOMissingSpaceAfterColon;
-impl Violation for TODOMissingSpaceAfterColon {
+pub struct MissingSpaceAfterColonInTODO;
+impl Violation for MissingSpaceAfterColonInTODO {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Missing space after colon in TODO")
@@ -147,19 +147,19 @@ fn get_tag_regex_errors(text: &str, start: Location, end: Location) -> Vec<Diagn
             if capture.get(capture_group_index).is_none() {
                 let range = Range::new(start, end);
                 diagnostics.push(match capture_group_index {
-                    2usize => Diagnostic::new(TODOMissingAuthor, range),
-                    3usize => Diagnostic::new(TODOMissingColon, range),
+                    2usize => Diagnostic::new(MissingAuthorInTODO, range),
+                    3usize => Diagnostic::new(MissingColonInTODO, range),
                     4usize => {
                         if diagnostics
                             .last()
-                            .map_or(true, |last| last.kind != TODOMissingColon.into())
+                            .map_or(true, |last| last.kind != MissingColonInTODO.into())
                         {
-                            Diagnostic::new(TODOMissingSpaceAfterColon, range)
+                            Diagnostic::new(MissingSpaceAfterColonInTODO, range)
                         } else {
                             continue;
                         }
                     }
-                    5usize => Diagnostic::new(TODOMissingText, range),
+                    5usize => Diagnostic::new(MissingTextInTODO, range),
                     _ => break,
                 });
             }
