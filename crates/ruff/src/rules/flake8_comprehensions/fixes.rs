@@ -885,9 +885,7 @@ pub fn fix_unnecessary_double_cast_or_process(
             };
             if let Some(iterable) = inner_call.args.first() {
                 let mut args = vec![iterable.clone()];
-                if !rest.is_empty() {
-                    args.extend_from_slice(rest);
-                }
+                args.extend_from_slice(rest);
                 args
             } else {
                 bail!("Expected at least one argument in inner function call");
