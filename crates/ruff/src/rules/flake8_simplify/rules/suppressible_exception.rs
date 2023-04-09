@@ -1,13 +1,12 @@
-use crate::autofix::actions::get_or_import_symbol;
 use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Located, Location, Stmt, StmtKind};
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
-
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers;
 use ruff_python_ast::types::Range;
 
+use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -16,14 +15,19 @@ pub struct SuppressibleException {
     pub exception: String,
 }
 
-impl Violation for SuppressibleException {
-    const AUTOFIX: AutofixKind = AutofixKind::Always;
+impl AlwaysAutofixableViolation for SuppressibleException {
     #[derive_message_formats]
     fn message(&self) -> String {
         let SuppressibleException { exception } = self;
-        format!("Use `contextlib.suppress({exception})` instead of try-except-pass")
+        format!("Use `contextlib.suppress({exception})` instead of `try`-`except`-`pass`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let SuppressibleException { exception } = self;
+        format!("Replace with `contextlib.suppress({exception})`")
     }
 }
+
 /// SIM105
 pub fn suppressible_exception(
     checker: &mut Checker,

@@ -4,9 +4,9 @@ expression: diagnostics
 ---
 - kind:
     name: SuppressibleException
-    body: "Use `contextlib.suppress(ValueError)` instead of try-except-pass"
-    suggestion: ~
-    fixable: false
+    body: "Use `contextlib.suppress(ValueError)` instead of `try`-`except`-`pass`"
+    suggestion: "Replace with `contextlib.suppress(ValueError)`"
+    fixable: true
   location:
     row: 4
     column: 0
@@ -39,9 +39,9 @@ expression: diagnostics
   parent: ~
 - kind:
     name: SuppressibleException
-    body: "Use `contextlib.suppress(ValueError, OSError)` instead of try-except-pass"
-    suggestion: ~
-    fixable: false
+    body: "Use `contextlib.suppress(ValueError, OSError)` instead of `try`-`except`-`pass`"
+    suggestion: "Replace with `contextlib.suppress(ValueError, OSError)`"
+    fixable: true
   location:
     row: 9
     column: 0
@@ -74,9 +74,9 @@ expression: diagnostics
   parent: ~
 - kind:
     name: SuppressibleException
-    body: "Use `contextlib.suppress(Exception)` instead of try-except-pass"
-    suggestion: ~
-    fixable: false
+    body: "Use `contextlib.suppress(Exception)` instead of `try`-`except`-`pass`"
+    suggestion: "Replace with `contextlib.suppress(Exception)`"
+    fixable: true
   location:
     row: 14
     column: 0
@@ -109,9 +109,9 @@ expression: diagnostics
   parent: ~
 - kind:
     name: SuppressibleException
-    body: "Use `contextlib.suppress(a.Error, b.Error)` instead of try-except-pass"
-    suggestion: ~
-    fixable: false
+    body: "Use `contextlib.suppress(a.Error, b.Error)` instead of `try`-`except`-`pass`"
+    suggestion: "Replace with `contextlib.suppress(a.Error, b.Error)`"
+    fixable: true
   location:
     row: 19
     column: 0
