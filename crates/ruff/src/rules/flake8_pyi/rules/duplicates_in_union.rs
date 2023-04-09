@@ -27,7 +27,7 @@ pub fn duplicates_in_union(checker: &mut Checker, left: &Expr, right: &Expr) {
     // The union data structure always works like so:
     // a | b | c | d -> (((a | b) | c) | d).
     // This function gets called on each pair of brackets, so it's safe to only check if the
-    // right is the duplicate (since we will have already checked the others in other invokations)
+    // right is the duplicate (since we will have already checked the others in other invocations)
 
     // Collapse down the left side of the left expression into a vector of nodes
     let mut left_nodes: Vec<ExprKind> = Vec::new();
