@@ -76,7 +76,7 @@ impl Violation for TODOMissingSpaceAfterColon {
 
 // Capture groups correspond to checking:
 //      1. Tag (used to match against `TODO` in capitalization and spelling, e.g. ToDo and FIXME)
-//      2. Author exists (in parenthese) after tag, but before colon
+//      2. Author exists (in parentheses) after tag, but before colon
 //      3. Colon exists after author
 //      4. Space exists after colon
 //      5. Text exists after space
@@ -112,18 +112,18 @@ pub fn check_rules(tokens: &[LexResult]) -> Vec<Diagnostic> {
         };
 
         if get_captured_matches(comment).peek().is_some() {
-            diagnostics.extend(get_tag_regex_errors(comment, start, end));
+            diagnostics.extend(get_tag_regex_errors(comment, *start, *end));
         }
     }
 
     diagnostics
 }
 
-fn get_captured_matches(text: &String) -> Peekable<CaptureMatches> {
+fn get_captured_matches(text: &str) -> Peekable<CaptureMatches> {
     TODO_REGEX.captures_iter(text).peekable()
 }
 
-fn get_tag_regex_errors(text: &String, start: &Location, end: &Location) -> Vec<Diagnostic> {
+fn get_tag_regex_errors(text: &str, start: Location, end: Location) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
     for capture in TODO_REGEX.captures_iter(text) {
@@ -134,7 +134,7 @@ fn get_tag_regex_errors(text: &String, start: &Location, end: &Location) -> Vec<
                 InvalidTODOTag {
                     tag: String::from(tag),
                 },
-                Range::new(*start, *end),
+                Range::new(start, end),
             ));
 
             // TODO: T006 check can go here
@@ -143,9 +143,9 @@ fn get_tag_regex_errors(text: &String, start: &Location, end: &Location) -> Vec<
         // Note: This initially looks bad from a speed perspective, but is O(1) given that we
         // know that there will only ever be 1 `capture` (due to regex anchors) and constant
         // capture groups.
-        for capture_group_index in 2..NUM_CAPTURE_GROUPS + 1 {
+        for capture_group_index in 2..=NUM_CAPTURE_GROUPS {
             if capture.get(capture_group_index).is_none() {
-                let range = Range::new(*start, *end);
+                let range = Range::new(start, end);
                 diagnostics.push(match capture_group_index {
                     2usize => Diagnostic::new(TODOMissingAuthor, range),
                     3usize => Diagnostic::new(TODOMissingColon, range),
