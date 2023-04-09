@@ -1,5 +1,5 @@
 use crate::autofix::actions::get_or_import_symbol;
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Located, Stmt, StmtKind};
+use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Located, Location, Stmt, StmtKind};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 
@@ -88,8 +88,9 @@ pub fn suppressible_exception(
                         stmt.location,
                         try_ending,
                     );
+                    let handler_line_begin = Location::new(handler.location.row(), 0);
                     let remove_handler =
-                        Edit::deletion(handler.location, handler.end_location.unwrap());
+                        Edit::deletion(handler_line_begin, handler.end_location.unwrap());
                     Ok(Fix::from_iter([import_edit, replace_try, remove_handler]))
                 });
             }
