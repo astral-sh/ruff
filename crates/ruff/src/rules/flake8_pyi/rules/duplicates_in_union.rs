@@ -33,21 +33,19 @@ pub fn duplicates_in_union(checker: &mut Checker, left: &Expr, right: &Expr) {
     let mut left_nodes: Vec<ExprKind> = Vec::new();
     let mut left_tree = left.node.clone();
     loop {
-        match left_tree {
-            ExprKind::BinOp {
-                op: Operator::BitOr,
-                left,
-                right,
-            } => {
-                left_nodes.push(right.node);
-                left_tree = left.node;
-            }
-            _ => {
-                // We found a non-union node.
-                // Tree traversal stops here but add this node to the vec
-                left_nodes.push(left_tree);
-                break;
-            }
+        if let ExprKind::BinOp {
+            op: Operator::BitOr,
+            left,
+            right,
+        } = left_tree
+        {
+            left_nodes.push(right.node);
+            left_tree = left.node;
+        } else {
+            // We found a non-union node.
+            // Tree traversal stops here but add this node to the vec
+            left_nodes.push(left_tree);
+            break;
         }
     }
 
