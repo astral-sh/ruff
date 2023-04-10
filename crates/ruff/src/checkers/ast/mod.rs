@@ -3215,14 +3215,20 @@ where
                 }
             }
             ExprKind::BinOp {
-                left,
+                left: _,
                 op: Operator::BitOr,
-                right,
+                right: _,
             } => {
                 if self.settings.rules.enabled(Rule::DuplicateTypesInUnion)
                     && self.ctx.in_type_definition
+                    && self.ctx.current_expr_parent().is_none()
                 {
-                    flake8_pyi::rules::duplicate_types_in_union(self, left, right);
+                    flake8_pyi::rules::duplicate_types_in_union(
+                        FxHashSet::default(),
+                        self,
+                        expr,
+                        None,
+                    );
                 }
             }
             ExprKind::UnaryOp { op, operand } => {

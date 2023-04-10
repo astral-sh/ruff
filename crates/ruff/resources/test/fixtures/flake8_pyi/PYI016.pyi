@@ -20,3 +20,6 @@ field6: int | bool | str | int  # PYI016 Duplicate name in union
 
 # Shouldn't emit for non-type unions
 field7 = str | str
+
+# Should emit for strangely-bracketed unions
+field8: int | (str | int)  # PYI016 Duplicate name in union

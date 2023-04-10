@@ -149,4 +149,25 @@ expression: diagnostics
           row: 19
           column: 30
   parent: ~
+- kind:
+    name: DuplicateTypesInUnion
+    body: Duplicate name in union
+    suggestion: Remove latter name from union
+    fixable: true
+  location:
+    row: 25
+    column: 21
+  end_location:
+    row: 25
+    column: 24
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 25
+          column: 18
+        end_location:
+          row: 25
+          column: 24
+  parent: ~
 
