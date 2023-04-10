@@ -26,11 +26,11 @@ impl AlwaysAutofixableViolation for DuplicateTypesInUnion {
 
 ///PYI016
 pub fn duplicate_types_in_union<'a>(
-    mut seen_nodes: FxHashSet<ComparableExpr<'a>>,
+    seen_nodes: &mut FxHashSet<ComparableExpr<'a>>,
     checker: &mut Checker,
     expr: &'a Expr,
     previous: Option<&'a Expr>,
-) -> FxHashSet<ComparableExpr<'a>> {
+) {
     // The union data structure usually works like so:
     // a | b | c -> (a | b) | c
     // But can be forced via brackets to any structure:
@@ -45,9 +45,8 @@ pub fn duplicate_types_in_union<'a>(
     } = &expr.node
     {
         // traverse left, then right, assigning the previous node as needed
-        seen_nodes = duplicate_types_in_union(seen_nodes, checker, left, previous);
-        seen_nodes = duplicate_types_in_union(seen_nodes, checker, right, Some(left));
-        return seen_nodes;
+        duplicate_types_in_union(seen_nodes, checker, left, previous);
+        duplicate_types_in_union(seen_nodes, checker, right, Some(left));
     }
     // If was already in the set, raise a violation
     if !seen_nodes.insert(expr.into()) {
@@ -68,5 +67,4 @@ pub fn duplicate_types_in_union<'a>(
         }
         checker.diagnostics.push(diagnostic);
     }
-    seen_nodes
 }

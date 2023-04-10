@@ -3224,7 +3224,7 @@ where
                     && self.ctx.current_expr_parent().is_none()
                 {
                     flake8_pyi::rules::duplicate_types_in_union(
-                        FxHashSet::default(),
+                        &mut FxHashSet::default(),
                         self,
                         expr,
                         None,
