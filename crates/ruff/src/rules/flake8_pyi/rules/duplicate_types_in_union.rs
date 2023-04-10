@@ -41,15 +41,13 @@ pub fn duplicate_types_in_union(checker: &mut Checker, left_expr: &Expr, potenti
             if right_node.node == potential_dup.node {
                 // Early exit - we only care if there _is_ a duplicate, not how many
                 break true;
-            } else {
-                working_tree = left_node.node;
-                continue;
             }
-        } else {
-            // We found a non-union node.
-            // Tree traversal stops here, but still check this node
-            break working_tree == potential_dup.node;
+            working_tree = left_node.node;
+            continue;
         }
+        // We found a non-union node.
+        // Tree traversal stops here, but still check this node
+        break working_tree == potential_dup.node;
     } {
         // If we broke the loop with true, create a violation
         let mut diagnostic = Diagnostic::new(
