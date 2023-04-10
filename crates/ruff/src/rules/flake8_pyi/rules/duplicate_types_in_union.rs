@@ -33,8 +33,8 @@ pub fn duplicate_types_in_union<'a>(
 ) -> FxHashSet<ComparableExpr<'a>> {
     // The union data structure usually works like so:
     // a | b | c -> (a | b) | c
-    // But can be forced via brackets into:
-    // a | (b | c | d) -> a | (b | c)
+    // But can be forced via brackets to any structure:
+    // a | (b | c)
     // So we need to check the tree fully - left first, then right so we always emit on the latter
     // duplicate(s)
 
