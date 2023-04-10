@@ -1,4 +1,6 @@
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Located, Location, Stmt, StmtKind};
+use rustpython_parser::ast::{
+    Constant, Excepthandler, ExcepthandlerKind, ExprKind, Located, Location, Stmt, StmtKind,
+};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
@@ -60,7 +62,17 @@ pub fn suppressible_exception(
     let handler = &handlers[0];
     let ExcepthandlerKind::ExceptHandler { body, .. } = &handler.node;
     if body.len() == 1 {
-        if matches!(body[0].node, StmtKind::Pass) {
+        let node = &body[0].node;
+        if matches!(node, StmtKind::Pass)
+            || (matches!(
+            node,
+            StmtKind::Expr {
+                value,
+                    ..
+                }
+            if matches!(**value, Located { node: ExprKind::Constant { value: Constant::Ellipsis, .. }, ..})
+            ))
+        {
             let handler_names: Vec<String> = helpers::extract_handled_exceptions(handlers)
                 .into_iter()
                 .filter_map(compose_call_path)
