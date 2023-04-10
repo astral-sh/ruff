@@ -23,4 +23,67 @@ expression: diagnostics
           row: 34
           column: 13
   parent: ~
+- kind:
+    name: InvalidCharacterZeroWidthSpace
+    body: "Invalid unescaped character zero-width-space, use \"\\u200B\" instead"
+    suggestion: Replace with escape sequence
+    fixable: true
+  location:
+    row: 38
+    column: 35
+  end_location:
+    row: 38
+    column: 36
+  fix:
+    edits:
+      - content: "\\u200b"
+        location:
+          row: 38
+          column: 35
+        end_location:
+          row: 38
+          column: 36
+  parent: ~
+- kind:
+    name: InvalidCharacterZeroWidthSpace
+    body: "Invalid unescaped character zero-width-space, use \"\\u200B\" instead"
+    suggestion: Replace with escape sequence
+    fixable: true
+  location:
+    row: 39
+    column: 59
+  end_location:
+    row: 39
+    column: 60
+  fix:
+    edits:
+      - content: "\\u200b"
+        location:
+          row: 39
+          column: 59
+        end_location:
+          row: 39
+          column: 60
+  parent: ~
+- kind:
+    name: InvalidCharacterZeroWidthSpace
+    body: "Invalid unescaped character zero-width-space, use \"\\u200B\" instead"
+    suggestion: Replace with escape sequence
+    fixable: true
+  location:
+    row: 39
+    column: 60
+  end_location:
+    row: 39
+    column: 61
+  fix:
+    edits:
+      - content: "\\u200b"
+        location:
+          row: 39
+          column: 60
+        end_location:
+          row: 39
+          column: 61
+  parent: ~
 

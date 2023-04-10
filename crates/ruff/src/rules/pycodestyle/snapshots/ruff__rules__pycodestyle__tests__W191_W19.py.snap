@@ -358,48 +358,6 @@ expression: diagnostics
     suggestion: ~
     fixable: false
   location:
-    row: 102
-    column: 0
-  end_location:
-    row: 102
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 105
-    column: 0
-  end_location:
-    row: 105
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 110
-    column: 0
-  end_location:
-    row: 110
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
     row: 125
     column: 0
   end_location:
@@ -447,20 +405,6 @@ expression: diagnostics
   end_location:
     row: 133
     column: 2
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 136
-    column: 0
-  end_location:
-    row: 136
-    column: 1
   fix:
     edits: []
   parent: ~

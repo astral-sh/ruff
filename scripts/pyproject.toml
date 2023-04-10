@@ -14,6 +14,8 @@ ignore = [
   "C901", # McCabe complexity
   "PL",   # pylint
   "S",    # bandit
+  "G",    # flake8-logging
+  "T",    # flake8-print
 ]
 
 [tool.ruff.pydocstyle]

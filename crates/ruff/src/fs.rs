@@ -1,36 +1,21 @@
 use std::path::{Path, PathBuf};
 
-use anyhow::{anyhow, Result};
 use globset::GlobMatcher;
 use log::debug;
 use path_absolutize::{path_dedot, Absolutize};
 
 use crate::registry::RuleSet;
 
-/// Extract the absolute path and basename (as strings) from a Path.
-pub fn extract_path_names(path: &Path) -> Result<(&str, &str)> {
-    let file_path = path
-        .to_str()
-        .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?;
-    let file_basename = path
-        .file_name()
-        .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?
-        .to_str()
-        .ok_or_else(|| anyhow!("Unable to parse filename: {:?}", path))?;
-    Ok((file_path, file_basename))
-}
-
 /// Create a set with codes matching the pattern/code pairs.
 pub(crate) fn ignores_from_path(
     path: &Path,
     pattern_code_pairs: &[(GlobMatcher, GlobMatcher, RuleSet)],
 ) -> RuleSet {
-    let (file_path, file_basename) = extract_path_names(path).expect("Unable to parse filename");
-
+    let file_name = path.file_name().expect("Unable to parse filename");
     pattern_code_pairs
         .iter()
         .filter_map(|(absolute, basename, rules)| {
-            if basename.is_match(file_basename) {
+            if basename.is_match(file_name) {
                 debug!(
                     "Adding per-file ignores for {:?} due to basename match on {:?}: {:?}",
                     path,
@@ -38,7 +23,7 @@ pub(crate) fn ignores_from_path(
                     rules
                 );
                 Some(rules)
-            } else if absolute.is_match(file_path) {
+            } else if absolute.is_match(path) {
                 debug!(
                     "Adding per-file ignores for {:?} due to absolute match on {:?}: {:?}",
                     path,

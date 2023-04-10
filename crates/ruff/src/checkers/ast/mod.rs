@@ -388,6 +388,7 @@ where
                             |expr| self.ctx.resolve_call_path(expr),
                         ));
                 }
+
                 if self.settings.rules.enabled(Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
                         pycodestyle::rules::ambiguous_function_name(name, || {
@@ -402,7 +403,9 @@ where
                     if let Some(diagnostic) = pep8_naming::rules::invalid_function_name(
                         stmt,
                         name,
+                        decorator_list,
                         &self.settings.pep8_naming.ignore_names,
+                        &self.ctx,
                         self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
@@ -858,6 +861,24 @@ where
 
                 if self.settings.rules.enabled(Rule::NonUniqueEnums) {
                     flake8_pie::rules::non_unique_enums(self, stmt, body);
+                }
+
+                if self.settings.rules.any_enabled(&[
+                    Rule::MutableDataclassDefault,
+                    Rule::FunctionCallInDataclassDefaultArgument,
+                ]) && ruff::rules::is_dataclass(self, decorator_list)
+                {
+                    if self.settings.rules.enabled(Rule::MutableDataclassDefault) {
+                        ruff::rules::mutable_dataclass_default(self, body);
+                    }
+
+                    if self
+                        .settings
+                        .rules
+                        .enabled(Rule::FunctionCallInDataclassDefaultArgument)
+                    {
+                        ruff::rules::function_call_in_dataclass_defaults(self, body);
+                    }
                 }
 
                 self.check_builtin_shadowing(name, stmt, false);

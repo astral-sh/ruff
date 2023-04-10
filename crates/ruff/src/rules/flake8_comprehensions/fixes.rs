@@ -877,20 +877,22 @@ pub fn fix_unnecessary_double_cast_or_process(
     let mut tree = match_module(module_text)?;
     let body = match_expr(&mut tree)?;
     let mut outer_call = match_call(body)?;
-    let inner_call = match &outer_call.args[..] {
-        [arg] => {
-            if let Expression::Call(call) = &arg.value {
-                &call.args
-            } else {
+
+    outer_call.args = match outer_call.args.split_first() {
+        Some((first, rest)) => {
+            let Expression::Call(inner_call) = &first.value else {
                 bail!("Expected Expression::Call ");
+            };
+            if let Some(iterable) = inner_call.args.first() {
+                let mut args = vec![iterable.clone()];
+                args.extend_from_slice(rest);
+                args
+            } else {
+                bail!("Expected at least one argument in inner function call");
             }
         }
-        _ => {
-            bail!("Expected one argument in outer function call");
-        }
+        None => bail!("Expected at least one argument in outer function call"),
     };
-
-    outer_call.args = inner_call.clone();
 
     let mut state = CodegenState {
         default_newline: &stylist.line_ending(),

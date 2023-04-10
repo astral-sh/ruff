@@ -39,3 +39,11 @@ class Test(unittest.TestCase):
 
     def testTest(self):
         assert True
+
+
+from typing import override
+
+
+@override
+def BAD_FUNC():
+    pass
