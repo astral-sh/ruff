@@ -59,11 +59,23 @@ pub struct Options {
     /// A mapping of modules to their conventional import aliases. These aliases
     /// will be added to the `aliases` mapping.
     pub extend_aliases: Option<FxHashMap<String, String>>,
+    #[option(
+        default = r#"{}"#,
+        value_type = "dict[str, list[str]]",
+        example = r#"
+            [tool.ruff.flake8-import-conventions.banned-aliases]
+            # Declare the banned aliases.
+            "tensorflow.keras.backend" = ["K"]
+    "#
+    )]
+    /// A mapping of modules to their banned import aliases.
+    pub banned_aliases: Option<FxHashMap<String, Vec<String>>>,
 }
 
 #[derive(Debug, CacheKey)]
 pub struct Settings {
     pub aliases: FxHashMap<String, String>,
+    pub banned_aliases: FxHashMap<String, Vec<String>>,
 }
 
 fn default_aliases() -> FxHashMap<String, String> {
@@ -73,7 +85,9 @@ fn default_aliases() -> FxHashMap<String, String> {
         .collect::<FxHashMap<_, _>>()
 }
 
-fn resolve_aliases(options: Options) -> FxHashMap<String, String> {
+fn resolve_aliases(
+    options: Options,
+) -> (FxHashMap<String, String>, FxHashMap<String, Vec<String>>) {
     let mut aliases = match options.aliases {
         Some(options_aliases) => options_aliases,
         None => default_aliases(),
@@ -81,21 +95,28 @@ fn resolve_aliases(options: Options) -> FxHashMap<String, String> {
     if let Some(extend_aliases) = options.extend_aliases {
         aliases.extend(extend_aliases);
     }
-    aliases
+    let banned_aliases = match options.banned_aliases {
+        Some(options_banned_aliases) => options_banned_aliases,
+        None => FxHashMap::default(),
+    };
+    (aliases, banned_aliases)
 }
 
 impl Default for Settings {
     fn default() -> Self {
         Self {
             aliases: default_aliases(),
+            banned_aliases: FxHashMap::default(),
         }
     }
 }
 
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
+        let (aliases, banned_aliases) = resolve_aliases(options);
         Self {
-            aliases: resolve_aliases(options),
+            aliases,
+            banned_aliases,
         }
     }
 }
@@ -105,6 +126,7 @@ impl From<Settings> for Options {
         Self {
             aliases: Some(settings.aliases),
             extend_aliases: None,
+            banned_aliases: None,
         }
     }
 }

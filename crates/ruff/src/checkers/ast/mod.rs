@@ -1077,6 +1077,19 @@ where
                         }
                     }
 
+                    if self.settings.rules.enabled(Rule::BannedImportAlias) {
+                        if let Some(diagnostic) =
+                            flake8_import_conventions::rules::check_banned_import(
+                                stmt,
+                                &alias.node.name,
+                                alias.node.asname.as_deref(),
+                                &self.settings.flake8_import_conventions.banned_aliases,
+                            )
+                        {
+                            self.diagnostics.push(diagnostic);
+                        }
+                    }
+
                     if self
                         .settings
                         .rules
@@ -1333,6 +1346,24 @@ where
                                 &full_name,
                                 alias.node.asname.as_deref(),
                                 &self.settings.flake8_import_conventions.aliases,
+                            )
+                        {
+                            self.diagnostics.push(diagnostic);
+                        }
+                    }
+
+                    if self.settings.rules.enabled(Rule::BannedImportAlias) {
+                        let full_name = helpers::format_import_from_member(
+                            *level,
+                            module.as_deref(),
+                            &alias.node.name,
+                        );
+                        if let Some(diagnostic) =
+                            flake8_import_conventions::rules::check_banned_import(
+                                stmt,
+                                &full_name,
+                                alias.node.asname.as_deref(),
+                                &self.settings.flake8_import_conventions.banned_aliases,
                             )
                         {
                             self.diagnostics.push(diagnostic);
