@@ -3219,8 +3219,10 @@ where
                 op: Operator::BitOr,
                 right,
             } => {
-                if self.settings.rules.enabled(Rule::DuplicatesInUnion) {
-                    flake8_pyi::rules::duplicates_in_union(self, left, right);
+                if self.settings.rules.enabled(Rule::DuplicateTypesInUnion)
+                    && self.ctx.in_type_definition
+                {
+                    flake8_pyi::rules::duplicate_types_in_union(self, left, right);
                 }
             }
             ExprKind::UnaryOp { op, operand } => {

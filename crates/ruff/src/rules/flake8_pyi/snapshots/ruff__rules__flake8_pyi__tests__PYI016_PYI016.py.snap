@@ -3,276 +3,150 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: DuplicatesInUnion
+    name: DuplicateTypesInUnion
     body: Duplicate name in union
     suggestion: Remove latter name from union
     fixable: true
   location:
-    row: 4
+    row: 5
     column: 14
   end_location:
-    row: 4
+    row: 5
     column: 17
   fix:
     edits:
       - content: ""
         location:
-          row: 4
+          row: 5
           column: 11
         end_location:
-          row: 4
+          row: 5
           column: 17
   parent: ~
 - kind:
-    name: DuplicatesInUnion
+    name: DuplicateTypesInUnion
     body: Duplicate name in union
     suggestion: Remove latter name from union
     fixable: true
   location:
-    row: 8
+    row: 9
     column: 22
   end_location:
-    row: 8
+    row: 9
     column: 25
   fix:
     edits:
       - content: ""
         location:
-          row: 8
+          row: 9
           column: 19
         end_location:
-          row: 8
+          row: 9
           column: 25
   parent: ~
 - kind:
-    name: DuplicatesInUnion
+    name: DuplicateTypesInUnion
     body: Duplicate name in union
     suggestion: Remove latter name from union
     fixable: true
   location:
-    row: 10
-    column: 17
-  end_location:
-    row: 10
-    column: 21
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 10
-          column: 14
-        end_location:
-          row: 10
-          column: 21
-  parent: ~
-- kind:
-    name: DuplicatesInUnion
-    body: Duplicate name in union
-    suggestion: Remove latter name from union
-    fixable: true
-  location:
-    row: 15
-    column: 14
-  end_location:
-    row: 15
-    column: 17
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 15
-          column: 11
-        end_location:
-          row: 15
-          column: 17
-  parent: ~
-- kind:
-    name: DuplicatesInUnion
-    body: Duplicate name in union
-    suggestion: Remove latter name from union
-    fixable: true
-  location:
-    row: 16
-    column: 14
-  end_location:
-    row: 16
-    column: 17
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 16
-          column: 11
-        end_location:
-          row: 16
-          column: 17
-  parent: ~
-- kind:
-    name: DuplicatesInUnion
-    body: Duplicate name in union
-    suggestion: Remove latter name from union
-    fixable: true
-  location:
-    row: 17
-    column: 20
-  end_location:
-    row: 17
-    column: 23
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 17
-          column: 17
-        end_location:
-          row: 17
-          column: 23
-  parent: ~
-- kind:
-    name: DuplicatesInUnion
-    body: Duplicate name in union
-    suggestion: Remove latter name from union
-    fixable: true
-  location:
-    row: 18
-    column: 27
-  end_location:
-    row: 18
-    column: 30
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 18
-          column: 24
-        end_location:
-          row: 18
-          column: 30
-  parent: ~
-- kind:
-    name: DuplicatesInUnion
-    body: Duplicate literal in union
-    suggestion: Remove latter literal from union
-    fixable: true
-  location:
-    row: 22
-    column: 17
-  end_location:
-    row: 22
-    column: 18
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 22
-          column: 14
-        end_location:
-          row: 22
-          column: 18
-  parent: ~
-- kind:
-    name: DuplicatesInUnion
-    body: Duplicate literal in union
-    suggestion: Remove latter literal from union
-    fixable: true
-  location:
-    row: 23
+    row: 14
     column: 21
   end_location:
-    row: 23
+    row: 14
     column: 24
   fix:
     edits:
       - content: ""
         location:
-          row: 23
+          row: 14
           column: 18
         end_location:
-          row: 23
+          row: 14
           column: 24
   parent: ~
 - kind:
-    name: DuplicatesInUnion
-    body: Duplicate literal in union
-    suggestion: Remove latter literal from union
-    fixable: true
-  location:
-    row: 23
-    column: 27
-  end_location:
-    row: 23
-    column: 30
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 23
-          column: 24
-        end_location:
-          row: 23
-          column: 30
-  parent: ~
-- kind:
-    name: DuplicatesInUnion
-    body: Duplicate literal in union
-    suggestion: Remove latter literal from union
-    fixable: true
-  location:
-    row: 25
-    column: 20
-  end_location:
-    row: 25
-    column: 25
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 25
-          column: 17
-        end_location:
-          row: 25
-          column: 25
-  parent: ~
-- kind:
-    name: DuplicatesInUnion
+    name: DuplicateTypesInUnion
     body: Duplicate name in union
     suggestion: Remove latter name from union
     fixable: true
   location:
-    row: 25
-    column: 28
-  end_location:
-    row: 25
-    column: 33
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 25
-          column: 25
-        end_location:
-          row: 25
-          column: 33
-  parent: ~
-- kind:
-    name: DuplicatesInUnion
-    body: Duplicate literal in union
-    suggestion: Remove latter literal from union
-    fixable: true
-  location:
-    row: 27
+    row: 19
     column: 14
   end_location:
-    row: 27
+    row: 19
     column: 17
   fix:
     edits:
       - content: ""
         location:
-          row: 27
+          row: 19
           column: 11
         end_location:
-          row: 27
+          row: 19
           column: 17
+  parent: ~
+- kind:
+    name: DuplicateTypesInUnion
+    body: Duplicate name in union
+    suggestion: Remove latter name from union
+    fixable: true
+  location:
+    row: 20
+    column: 14
+  end_location:
+    row: 20
+    column: 17
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 20
+          column: 11
+        end_location:
+          row: 20
+          column: 17
+  parent: ~
+- kind:
+    name: DuplicateTypesInUnion
+    body: Duplicate name in union
+    suggestion: Remove latter name from union
+    fixable: true
+  location:
+    row: 21
+    column: 20
+  end_location:
+    row: 21
+    column: 23
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 21
+          column: 17
+        end_location:
+          row: 21
+          column: 23
+  parent: ~
+- kind:
+    name: DuplicateTypesInUnion
+    body: Duplicate name in union
+    suggestion: Remove latter name from union
+    fixable: true
+  location:
+    row: 22
+    column: 27
+  end_location:
+    row: 22
+    column: 30
+  fix:
+    edits:
+      - content: ""
+        location:
+          row: 22
+          column: 24
+        end_location:
+          row: 22
+          column: 30
   parent: ~
 

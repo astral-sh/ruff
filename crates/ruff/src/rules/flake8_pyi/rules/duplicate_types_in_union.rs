@@ -7,11 +7,11 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct DuplicatesInUnion {
+pub struct DuplicateTypesInUnion {
     pub duplicate_name: String,
 }
 
-impl AlwaysAutofixableViolation for DuplicatesInUnion {
+impl AlwaysAutofixableViolation for DuplicateTypesInUnion {
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Duplicate {} in union", self.duplicate_name)
@@ -23,7 +23,7 @@ impl AlwaysAutofixableViolation for DuplicatesInUnion {
 }
 
 ///PYI016
-pub fn duplicates_in_union(checker: &mut Checker, left: &Expr, right: &Expr) {
+pub fn duplicate_types_in_union(checker: &mut Checker, left: &Expr, right: &Expr) {
     // The union data structure always works like so:
     // a | b | c | d -> (((a | b) | c) | d).
     // This function gets called on each pair of brackets, so it's safe to only check if the
@@ -51,7 +51,7 @@ pub fn duplicates_in_union(checker: &mut Checker, left: &Expr, right: &Expr) {
 
     if left_nodes.contains(&right.node) {
         let mut diagnostic = Diagnostic::new(
-            DuplicatesInUnion {
+            DuplicateTypesInUnion {
                 duplicate_name: right.node.name().to_string(),
             },
             Range::from(right),
