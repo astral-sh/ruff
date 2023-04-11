@@ -15,13 +15,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: str
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 8
+        content: str
   parent: ~
 - kind:
     name: TypeOfPrimitive
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: bytes
-        location:
+      - location:
           row: 2
           column: 0
         end_location:
           row: 2
           column: 9
+        content: bytes
   parent: ~
 - kind:
     name: TypeOfPrimitive
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: int
-        location:
+      - location:
           row: 3
           column: 0
         end_location:
           row: 3
           column: 7
+        content: int
   parent: ~
 - kind:
     name: TypeOfPrimitive
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: float
-        location:
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 9
+        content: float
   parent: ~
 - kind:
     name: TypeOfPrimitive
@@ -99,12 +99,12 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: complex
-        location:
+      - location:
           row: 5
           column: 0
         end_location:
           row: 5
           column: 8
+        content: complex
   parent: ~
 

@@ -15,13 +15,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "f\"{a} {b}\""
-        location:
+      - location:
           row: 5
           column: 0
         end_location:
           row: 5
           column: 20
+        content: "f\"{a} {b}\""
   parent: ~
 - kind:
     name: FString
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: "f\"{b} {a}\""
-        location:
+      - location:
           row: 7
           column: 0
         end_location:
           row: 7
           column: 22
+        content: "f\"{b} {a}\""
   parent: ~
 - kind:
     name: FString
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "f\"{z.y}\""
-        location:
+      - location:
           row: 9
           column: 0
         end_location:
           row: 9
           column: 19
+        content: "f\"{z.y}\""
   parent: ~
 - kind:
     name: FString
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: "f\"{a.x} {b.y}\""
-        location:
+      - location:
           row: 11
           column: 0
         end_location:
           row: 11
           column: 24
+        content: "f\"{a.x} {b.y}\""
   parent: ~
 - kind:
     name: FString
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: "f\"{a.b} {c.d}\""
-        location:
+      - location:
           row: 13
           column: 0
         end_location:
           row: 13
           column: 24
+        content: "f\"{a.b} {c.d}\""
   parent: ~
 - kind:
     name: FString
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "f\"{a()}\""
-        location:
+      - location:
           row: 15
           column: 0
         end_location:
           row: 15
           column: 16
+        content: "f\"{a()}\""
   parent: ~
 - kind:
     name: FString
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: "f\"{a.b()}\""
-        location:
+      - location:
           row: 17
           column: 0
         end_location:
           row: 17
           column: 18
+        content: "f\"{a.b()}\""
   parent: ~
 - kind:
     name: FString
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: "f\"{a.b().c()}\""
-        location:
+      - location:
           row: 19
           column: 0
         end_location:
           row: 19
           column: 22
+        content: "f\"{a.b().c()}\""
   parent: ~
 - kind:
     name: FString
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: "f\"hello {name}!\""
-        location:
+      - location:
           row: 21
           column: 0
         end_location:
           row: 21
           column: 24
+        content: "f\"hello {name}!\""
   parent: ~
 - kind:
     name: FString
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: "f\"{a}{b}{c}\""
-        location:
+      - location:
           row: 23
           column: 0
         end_location:
           row: 23
           column: 27
+        content: "f\"{a}{b}{c}\""
   parent: ~
 - kind:
     name: FString
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "f\"{0x0}\""
-        location:
+      - location:
           row: 25
           column: 0
         end_location:
           row: 25
           column: 16
+        content: "f\"{0x0}\""
   parent: ~
 - kind:
     name: FString
@@ -246,13 +246,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "f\"{a} {b}\""
-        location:
+      - location:
           row: 27
           column: 0
         end_location:
           row: 27
           column: 20
+        content: "f\"{a} {b}\""
   parent: ~
 - kind:
     name: FString
@@ -267,13 +267,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: "f\"\"\"{a} {b}\"\"\""
-        location:
+      - location:
           row: 29
           column: 0
         end_location:
           row: 29
           column: 24
+        content: "f\"\"\"{a} {b}\"\"\""
   parent: ~
 - kind:
     name: FString
@@ -288,13 +288,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: "f\"foo{1}\""
-        location:
+      - location:
           row: 31
           column: 0
         end_location:
           row: 31
           column: 17
+        content: "f\"foo{1}\""
   parent: ~
 - kind:
     name: FString
@@ -309,13 +309,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: "fr\"foo{1}\""
-        location:
+      - location:
           row: 33
           column: 0
         end_location:
           row: 33
           column: 18
+        content: "fr\"foo{1}\""
   parent: ~
 - kind:
     name: FString
@@ -330,13 +330,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "f\"{1}\""
-        location:
+      - location:
           row: 35
           column: 4
         end_location:
           row: 35
           column: 21
+        content: "f\"{1}\""
   parent: ~
 - kind:
     name: FString
@@ -351,13 +351,13 @@ expression: diagnostics
     column: 25
   fix:
     edits:
-      - content: "f\"foo {x} \""
-        location:
+      - location:
           row: 37
           column: 6
         end_location:
           row: 37
           column: 25
+        content: "f\"foo {x} \""
   parent: ~
 - kind:
     name: FString
@@ -372,13 +372,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "f\"{a[b]}\""
-        location:
+      - location:
           row: 39
           column: 0
         end_location:
           row: 39
           column: 20
+        content: "f\"{a[b]}\""
   parent: ~
 - kind:
     name: FString
@@ -393,13 +393,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: "f\"{a.a[b]}\""
-        location:
+      - location:
           row: 41
           column: 0
         end_location:
           row: 41
           column: 22
+        content: "f\"{a.a[b]}\""
   parent: ~
 - kind:
     name: FString
@@ -414,13 +414,13 @@ expression: diagnostics
     column: 29
   fix:
     edits:
-      - content: "f\"{escaped}{{}}{y}\""
-        location:
+      - location:
           row: 43
           column: 0
         end_location:
           row: 43
           column: 29
+        content: "f\"{escaped}{{}}{y}\""
   parent: ~
 - kind:
     name: FString
@@ -435,13 +435,13 @@ expression: diagnostics
     column: 14
   fix:
     edits:
-      - content: "f\"{a}\""
-        location:
+      - location:
           row: 45
           column: 0
         end_location:
           row: 45
           column: 14
+        content: "f\"{a}\""
   parent: ~
 - kind:
     name: FString
@@ -456,13 +456,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: "f'({a}={{0!e}})'"
-        location:
+      - location:
           row: 47
           column: 0
         end_location:
           row: 47
           column: 24
+        content: "f'({a}={{0!e}})'"
   parent: ~
 - kind:
     name: FString
@@ -477,13 +477,13 @@ expression: diagnostics
     column: 53
   fix:
     edits:
-      - content: " f\"{osname}-{version}.{release}\""
-        location:
+      - location:
           row: 92
           column: 10
         end_location:
           row: 92
           column: 53
+        content: " f\"{osname}-{version}.{release}\""
   parent: ~
 - kind:
     name: FString
@@ -498,13 +498,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: " f\"{1}\""
-        location:
+      - location:
           row: 96
           column: 9
         end_location:
           row: 96
           column: 23
+        content: " f\"{1}\""
   parent: ~
 - kind:
     name: FString
@@ -519,12 +519,12 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: " f\"{1}\""
-        location:
+      - location:
           row: 99
           column: 6
         end_location:
           row: 99
           column: 20
+        content: " f\"{1}\""
   parent: ~
 

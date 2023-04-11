@@ -15,13 +15,13 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 2
           column: 4
         end_location:
           row: 2
           column: 5
+        content: ~
   parent: ~
 - kind:
     name: UnicodeKindPrefix
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 1
+        content: ~
   parent: ~
 - kind:
     name: UnicodeKindPrefix
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 14
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 6
           column: 6
         end_location:
           row: 6
           column: 7
+        content: ~
   parent: ~
 - kind:
     name: UnicodeKindPrefix
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 14
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 8
           column: 6
         end_location:
           row: 8
           column: 7
+        content: ~
   parent: ~
 - kind:
     name: UnicodeKindPrefix
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 12
           column: 4
         end_location:
           row: 12
           column: 5
+        content: ~
   parent: ~
 - kind:
     name: UnicodeKindPrefix
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 12
           column: 14
         end_location:
           row: 12
           column: 15
+        content: ~
   parent: ~
 - kind:
     name: UnicodeKindPrefix
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 12
           column: 26
         end_location:
           row: 12
           column: 27
+        content: ~
   parent: ~
 - kind:
     name: UnicodeKindPrefix
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 46
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 12
           column: 38
         end_location:
           row: 12
           column: 39
+        content: ~
   parent: ~
 - kind:
     name: UnicodeKindPrefix
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 16
           column: 4
         end_location:
           row: 16
           column: 5
+        content: ~
   parent: ~
 - kind:
     name: UnicodeKindPrefix
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 17
           column: 4
         end_location:
           row: 17
           column: 5
+        content: ~
   parent: ~
 - kind:
     name: UnicodeKindPrefix
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 18
           column: 4
         end_location:
           row: 18
           column: 5
+        content: ~
   parent: ~
 - kind:
     name: UnicodeKindPrefix
@@ -246,12 +246,12 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 19
           column: 4
         end_location:
           row: 19
           column: 5
+        content: ~
   parent: ~
 

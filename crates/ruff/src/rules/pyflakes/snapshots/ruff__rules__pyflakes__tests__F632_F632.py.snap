@@ -15,13 +15,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: "=="
-        location:
+      - location:
           row: 1
           column: 5
         end_location:
           row: 1
           column: 7
+        content: "=="
   parent: ~
 - kind:
     name: IsLiteral
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: "!="
-        location:
+      - location:
           row: 4
           column: 7
         end_location:
           row: 4
           column: 13
+        content: "!="
   parent: ~
 - kind:
     name: IsLiteral
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: "!="
-        location:
+      - location:
           row: 7
           column: 7
         end_location:
           row: 8
           column: 11
+        content: "!="
   parent: ~
 - kind:
     name: IsLiteral
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: "=="
-        location:
+      - location:
           row: 11
           column: 9
         end_location:
           row: 11
           column: 11
+        content: "=="
   parent: ~
 - kind:
     name: IsLiteral
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: "=="
-        location:
+      - location:
           row: 14
           column: 14
         end_location:
           row: 14
           column: 16
+        content: "=="
   parent: ~
 - kind:
     name: IsLiteral
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "=="
-        location:
+      - location:
           row: 17
           column: 16
         end_location:
           row: 17
           column: 18
+        content: "=="
   parent: ~
 - kind:
     name: IsLiteral
@@ -141,12 +141,12 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "=="
-        location:
+      - location:
           row: 20
           column: 15
         end_location:
           row: 20
           column: 17
+        content: "=="
   parent: ~
 

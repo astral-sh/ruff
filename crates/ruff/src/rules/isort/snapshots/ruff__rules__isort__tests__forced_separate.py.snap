@@ -15,12 +15,12 @@ expression: diagnostics
     column: 0
   fix:
     edits:
-      - content: "from office_helper.assistants import entity_registry as er\nfrom office_helper.core import CoreState\n\nimport tests.common.foo as tcf\nfrom tests.common import async_mock_service\n\nfrom experiments.starry import *\nfrom experiments.weird import varieties\n"
-        location:
+      - location:
           row: 3
           column: 0
         end_location:
           row: 9
           column: 0
+        content: "from office_helper.assistants import entity_registry as er\nfrom office_helper.core import CoreState\n\nimport tests.common.foo as tcf\nfrom tests.common import async_mock_service\n\nfrom experiments.starry import *\nfrom experiments.weird import varieties\n"
   parent: ~
 

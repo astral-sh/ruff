@@ -15,13 +15,13 @@ expression: diagnostics
     column: 55
   fix:
     edits:
-      - content: open
-        location:
+      - location:
           row: 3
           column: 5
         end_location:
           row: 3
           column: 12
+        content: open
   parent: ~
 - kind:
     name: OpenAlias

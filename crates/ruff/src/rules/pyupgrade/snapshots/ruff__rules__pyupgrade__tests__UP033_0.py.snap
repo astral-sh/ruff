@@ -15,20 +15,20 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: import functools
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 16
-      - content: functools.cache
-        location:
+        content: import functools
+      - location:
           row: 4
           column: 1
         end_location:
           row: 4
           column: 34
+        content: functools.cache
   parent: ~
 - kind:
     name: LRUCacheWithMaxsizeNone
@@ -43,20 +43,20 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: import functools
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 16
-      - content: functools.cache
-        location:
+        content: import functools
+      - location:
           row: 10
           column: 1
         end_location:
           row: 10
           column: 34
+        content: functools.cache
   parent: ~
 - kind:
     name: LRUCacheWithMaxsizeNone
@@ -71,19 +71,19 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: import functools
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 16
-      - content: functools.cache
-        location:
+        content: import functools
+      - location:
           row: 15
           column: 1
         end_location:
           row: 15
           column: 34
+        content: functools.cache
   parent: ~
 

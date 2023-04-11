@@ -15,13 +15,13 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: from pathlib import Path
-        location:
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 34
+        content: from pathlib import Path
   parent:
     row: 4
     column: 0

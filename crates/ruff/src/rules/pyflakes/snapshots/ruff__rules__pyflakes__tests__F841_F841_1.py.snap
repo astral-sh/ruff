@@ -43,13 +43,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 16
           column: 13
         end_location:
           row: 16
           column: 22
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable
@@ -64,13 +64,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 20
           column: 4
         end_location:
           row: 20
           column: 13
+        content: ~
   parent: ~
 - kind:
     name: UnusedVariable

@@ -57,13 +57,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 12
           column: 8
         end_location:
           row: 13
           column: 8
+        content: ~
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -106,13 +106,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 19
           column: 8
         end_location:
           row: 20
           column: 8
+        content: ~
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 25
           column: 8
         end_location:
           row: 26
           column: 8
+        content: ~
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 34
           column: 10
         end_location:
           row: 35
           column: 8
+        content: ~
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -267,13 +267,13 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 44
           column: 9
         end_location:
           row: 44
           column: 15
+        content: ~
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyVariable
@@ -288,12 +288,12 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 45
           column: 15
         end_location:
           row: 45
           column: 21
+        content: ~
   parent: ~
 

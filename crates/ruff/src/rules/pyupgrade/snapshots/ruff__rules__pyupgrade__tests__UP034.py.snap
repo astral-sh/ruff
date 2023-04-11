@@ -15,13 +15,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: "\"foo\""
-        location:
+      - location:
           row: 2
           column: 6
         end_location:
           row: 2
           column: 13
+        content: "\"foo\""
   parent: ~
 - kind:
     name: ExtraneousParentheses
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 26
   fix:
     edits:
-      - content: "\"hell((goodybe))o\""
-        location:
+      - location:
           row: 5
           column: 6
         end_location:
           row: 5
           column: 26
+        content: "\"hell((goodybe))o\""
   parent: ~
 - kind:
     name: ExtraneousParentheses
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: "(\"foo\")"
-        location:
+      - location:
           row: 8
           column: 6
         end_location:
           row: 8
           column: 15
+        content: "(\"foo\")"
   parent: ~
 - kind:
     name: ExtraneousParentheses
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: ((1))
-        location:
+      - location:
           row: 11
           column: 6
         end_location:
           row: 11
           column: 13
+        content: ((1))
   parent: ~
 - kind:
     name: ExtraneousParentheses
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 25
   fix:
     edits:
-      - content: "\"foo{}\".format(1)"
-        location:
+      - location:
           row: 14
           column: 6
         end_location:
           row: 14
           column: 25
+        content: "\"foo{}\".format(1)"
   parent: ~
 - kind:
     name: ExtraneousParentheses
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: "\"foo{}\".format(1)"
-        location:
+      - location:
           row: 18
           column: 4
         end_location:
           row: 18
           column: 23
+        content: "\"foo{}\".format(1)"
   parent: ~
 - kind:
     name: ExtraneousParentheses
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 5
   fix:
     edits:
-      - content: "\n        \"foo\"\n    "
-        location:
+      - location:
           row: 23
           column: 4
         end_location:
           row: 25
           column: 5
+        content: "\n        \"foo\"\n    "
   parent: ~
 - kind:
     name: ExtraneousParentheses
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: (yield 1)
-        location:
+      - location:
           row: 30
           column: 12
         end_location:
           row: 30
           column: 23
+        content: (yield 1)
   parent: ~
 - kind:
     name: ExtraneousParentheses
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: "\"foo{}\".format(1)"
-        location:
+      - location:
           row: 35
           column: 8
         end_location:
           row: 35
           column: 27
+        content: "\"foo{}\".format(1)"
   parent: ~
 - kind:
     name: ExtraneousParentheses
@@ -204,12 +204,12 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: x for x in range(3)
-        location:
+      - location:
           row: 39
           column: 6
         end_location:
           row: 39
           column: 27
+        content: x for x in range(3)
   parent: ~
 

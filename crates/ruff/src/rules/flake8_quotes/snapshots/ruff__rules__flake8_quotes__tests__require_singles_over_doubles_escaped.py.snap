@@ -15,13 +15,13 @@ expression: diagnostics
     column: 47
   fix:
     edits:
-      - content: "\"This is a 'string'\""
-        location:
+      - location:
           row: 1
           column: 25
         end_location:
           row: 1
           column: 47
+        content: "\"This is a 'string'\""
   parent: ~
 - kind:
     name: AvoidableEscapedQuote
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 52
   fix:
     edits:
-      - content: "\"This is \\\\ a \\\\'string'\""
-        location:
+      - location:
           row: 2
           column: 25
         end_location:
           row: 2
           column: 52
+        content: "\"This is \\\\ a \\\\'string'\""
   parent: ~
 - kind:
     name: AvoidableEscapedQuote
@@ -57,12 +57,12 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "\"'string'\""
-        location:
+      - location:
           row: 10
           column: 4
         end_location:
           row: 10
           column: 16
+        content: "\"'string'\""
   parent: ~
 

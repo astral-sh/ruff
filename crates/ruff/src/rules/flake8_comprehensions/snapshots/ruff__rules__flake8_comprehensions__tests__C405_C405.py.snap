@@ -15,13 +15,13 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: "{1, 2}"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 11
+        content: "{1, 2}"
   parent: ~
 - kind:
     name: UnnecessaryLiteralSet
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: "{1, 2}"
-        location:
+      - location:
           row: 2
           column: 0
         end_location:
           row: 2
           column: 11
+        content: "{1, 2}"
   parent: ~
 - kind:
     name: UnnecessaryLiteralSet
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: set()
-        location:
+      - location:
           row: 3
           column: 0
         end_location:
           row: 3
           column: 7
+        content: set()
   parent: ~
 - kind:
     name: UnnecessaryLiteralSet
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: set()
-        location:
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 7
+        content: set()
   parent: ~
 - kind:
     name: UnnecessaryLiteralSet
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: "{1}"
-        location:
+      - location:
           row: 6
           column: 0
         end_location:
           row: 6
           column: 9
+        content: "{1}"
   parent: ~
 - kind:
     name: UnnecessaryLiteralSet
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 2
   fix:
     edits:
-      - content: "{\n    1,\n}"
-        location:
+      - location:
           row: 7
           column: 0
         end_location:
           row: 9
           column: 2
+        content: "{\n    1,\n}"
   parent: ~
 - kind:
     name: UnnecessaryLiteralSet
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 2
   fix:
     edits:
-      - content: "{\n    1,\n}"
-        location:
+      - location:
           row: 10
           column: 0
         end_location:
           row: 12
           column: 2
+        content: "{\n    1,\n}"
   parent: ~
 - kind:
     name: UnnecessaryLiteralSet
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: "{1}"
-        location:
+      - location:
           row: 13
           column: 0
         end_location:
           row: 15
           column: 1
+        content: "{1}"
   parent: ~
 - kind:
     name: UnnecessaryLiteralSet
@@ -183,12 +183,12 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: "{1,}"
-        location:
+      - location:
           row: 16
           column: 0
         end_location:
           row: 18
           column: 1
+        content: "{1,}"
   parent: ~
 

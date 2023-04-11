@@ -15,13 +15,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "def f(x):\n    return 2 * x"
-        location:
+      - location:
           row: 2
           column: 0
         end_location:
           row: 2
           column: 19
+        content: "def f(x):\n    return 2 * x"
   parent: ~
 - kind:
     name: LambdaAssignment
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "def f(x):\n    return 2 * x"
-        location:
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 19
+        content: "def f(x):\n    return 2 * x"
   parent: ~
 - kind:
     name: LambdaAssignment
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 29
   fix:
     edits:
-      - content: "def this(y, z):\n        return 2 * x"
-        location:
+      - location:
           row: 7
           column: 4
         end_location:
           row: 7
           column: 29
+        content: "def this(y, z):\n        return 2 * x"
   parent: ~
 - kind:
     name: LambdaAssignment
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "def f():\n    return (yield 1)"
-        location:
+      - location:
           row: 9
           column: 0
         end_location:
           row: 9
           column: 21
+        content: "def f():\n    return (yield 1)"
   parent: ~
 - kind:
     name: LambdaAssignment
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 28
   fix:
     edits:
-      - content: "def f():\n    return (yield from g())"
-        location:
+      - location:
           row: 11
           column: 0
         end_location:
           row: 11
           column: 28
+        content: "def f():\n    return (yield from g())"
   parent: ~
 - kind:
     name: LambdaAssignment

@@ -29,13 +29,13 @@ expression: diagnostics
     column: 55
   fix:
     edits:
-      - content: "from my_package.sublib.protocol import commands, definitions, responses"
-        location:
+      - location:
           row: 6
           column: 0
         end_location:
           row: 6
           column: 55
+        content: "from my_package.sublib.protocol import commands, definitions, responses"
   parent: ~
 - kind:
     name: RelativeImports
@@ -50,13 +50,13 @@ expression: diagnostics
     column: 55
   fix:
     edits:
-      - content: "from my_package.sublib.protocol import commands, definitions, responses"
-        location:
+      - location:
           row: 6
           column: 0
         end_location:
           row: 6
           column: 55
+        content: "from my_package.sublib.protocol import commands, definitions, responses"
   parent: ~
 - kind:
     name: RelativeImports
@@ -71,13 +71,13 @@ expression: diagnostics
     column: 55
   fix:
     edits:
-      - content: "from my_package.sublib.protocol import commands, definitions, responses"
-        location:
+      - location:
           row: 6
           column: 0
         end_location:
           row: 6
           column: 55
+        content: "from my_package.sublib.protocol import commands, definitions, responses"
   parent: ~
 - kind:
     name: RelativeImports
@@ -92,13 +92,13 @@ expression: diagnostics
     column: 28
   fix:
     edits:
-      - content: from my_package.sublib.server import example
-        location:
+      - location:
           row: 7
           column: 0
         end_location:
           row: 7
           column: 28
+        content: from my_package.sublib.server import example
   parent: ~
 - kind:
     name: RelativeImports
@@ -113,13 +113,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: from my_package.sublib import server
-        location:
+      - location:
           row: 8
           column: 0
         end_location:
           row: 8
           column: 21
+        content: from my_package.sublib import server
   parent: ~
 - kind:
     name: RelativeImports
@@ -134,12 +134,12 @@ expression: diagnostics
     column: 52
   fix:
     edits:
-      - content: from my_package.sublib.protocol.UpperCaseModule import some_function
-        location:
+      - location:
           row: 10
           column: 0
         end_location:
           row: 10
           column: 52
+        content: from my_package.sublib.protocol.UpperCaseModule import some_function
   parent: ~
 

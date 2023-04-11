@@ -43,13 +43,13 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: datetime.UTC
-        location:
+      - location:
           row: 10
           column: 6
         end_location:
           row: 10
           column: 27
+        content: datetime.UTC
   parent: ~
 - kind:
     name: DatetimeTimezoneUTC

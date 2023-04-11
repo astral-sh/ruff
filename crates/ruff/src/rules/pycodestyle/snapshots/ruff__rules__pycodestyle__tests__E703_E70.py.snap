@@ -15,13 +15,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 10
           column: 12
         end_location:
           row: 10
           column: 13
+        content: ~
   parent: ~
 - kind:
     name: UselessSemicolon
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 12
           column: 22
         end_location:
           row: 12
           column: 23
+        content: ~
   parent: ~
 - kind:
     name: UselessSemicolon
@@ -57,12 +57,12 @@ expression: diagnostics
     column: 14
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 25
           column: 13
         end_location:
           row: 25
           column: 14
+        content: ~
   parent: ~
 

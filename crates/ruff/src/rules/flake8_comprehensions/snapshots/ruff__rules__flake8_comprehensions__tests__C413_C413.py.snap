@@ -15,13 +15,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: sorted(x)
-        location:
+      - location:
           row: 3
           column: 0
         end_location:
           row: 3
           column: 15
+        content: sorted(x)
   parent: ~
 - kind:
     name: UnnecessaryCallAroundSorted
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "sorted(x, reverse=True)"
-        location:
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 19
+        content: "sorted(x, reverse=True)"
   parent: ~
 - kind:
     name: UnnecessaryCallAroundSorted
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 36
   fix:
     edits:
-      - content: "sorted(x, key=lambda e: e, reverse=True)"
-        location:
+      - location:
           row: 5
           column: 0
         end_location:
           row: 5
           column: 36
+        content: "sorted(x, key=lambda e: e, reverse=True)"
   parent: ~
 - kind:
     name: UnnecessaryCallAroundSorted
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 33
   fix:
     edits:
-      - content: "sorted(x, reverse=False)"
-        location:
+      - location:
           row: 6
           column: 0
         end_location:
           row: 6
           column: 33
+        content: "sorted(x, reverse=False)"
   parent: ~
 - kind:
     name: UnnecessaryCallAroundSorted
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 50
   fix:
     edits:
-      - content: "sorted(x, key=lambda e: e, reverse=False)"
-        location:
+      - location:
           row: 7
           column: 0
         end_location:
           row: 7
           column: 50
+        content: "sorted(x, key=lambda e: e, reverse=False)"
   parent: ~
 - kind:
     name: UnnecessaryCallAroundSorted
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 50
   fix:
     edits:
-      - content: "sorted(x, reverse=False, key=lambda e: e)"
-        location:
+      - location:
           row: 8
           column: 0
         end_location:
           row: 8
           column: 50
+        content: "sorted(x, reverse=False, key=lambda e: e)"
   parent: ~
 - kind:
     name: UnnecessaryCallAroundSorted
@@ -141,12 +141,12 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: "sorted(x, reverse=True)"
-        location:
+      - location:
           row: 9
           column: 0
         end_location:
           row: 9
           column: 34
+        content: "sorted(x, reverse=True)"
   parent: ~
 

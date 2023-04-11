@@ -15,12 +15,12 @@ expression: diagnostics
     column: 0
   fix:
     edits:
-      - content: "from subprocess import A_constant, First, konst, Last, STDOUT, Class, func, var\n\nfrom sklearn.svm import Const, constant, XYZ, Klass, func, variable\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 3
           column: 0
+        content: "from subprocess import A_constant, First, konst, Last, STDOUT, Class, func, var\n\nfrom sklearn.svm import Const, constant, XYZ, Klass, func, variable\n"
   parent: ~
 

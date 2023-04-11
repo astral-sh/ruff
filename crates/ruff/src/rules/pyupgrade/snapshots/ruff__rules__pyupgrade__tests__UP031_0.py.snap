@@ -15,13 +15,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: "'{} {}'.format(a, b)"
-        location:
+      - location:
           row: 4
           column: 6
         end_location:
           row: 4
           column: 22
+        content: "'{} {}'.format(a, b)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "'{}{}'.format(a, b)"
-        location:
+      - location:
           row: 6
           column: 6
         end_location:
           row: 6
           column: 21
+        content: "'{}{}'.format(a, b)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "\"trivial\".format()"
-        location:
+      - location:
           row: 8
           column: 6
         end_location:
           row: 8
           column: 20
+        content: "\"trivial\".format()"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: "\"{}\".format(\"simple\")"
-        location:
+      - location:
           row: 10
           column: 6
         end_location:
           row: 10
           column: 24
+        content: "\"{}\".format(\"simple\")"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: "\"{}\".format(\"%s\" % (\"nested\",))"
-        location:
+      - location:
           row: 12
           column: 6
         end_location:
           row: 12
           column: 34
+        content: "\"{}\".format(\"%s\" % (\"nested\",))"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 32
   fix:
     edits:
-      - content: "\"{}\".format(\"nested\")"
-        location:
+      - location:
           row: 12
           column: 14
         end_location:
           row: 12
           column: 32
+        content: "\"{}\".format(\"nested\")"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 28
   fix:
     edits:
-      - content: "\"{}% percent\".format(15)"
-        location:
+      - location:
           row: 14
           column: 6
         end_location:
           row: 14
           column: 28
+        content: "\"{}% percent\".format(15)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: "\"{:f}\".format(15)"
-        location:
+      - location:
           row: 16
           column: 6
         end_location:
           row: 16
           column: 18
+        content: "\"{:f}\".format(15)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "\"{:.0f}\".format(15)"
-        location:
+      - location:
           row: 18
           column: 6
         end_location:
           row: 18
           column: 19
+        content: "\"{:.0f}\".format(15)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "\"{:.3f}\".format(15)"
-        location:
+      - location:
           row: 20
           column: 6
         end_location:
           row: 20
           column: 20
+        content: "\"{:.3f}\".format(15)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "\"{:3f}\".format(15)"
-        location:
+      - location:
           row: 22
           column: 6
         end_location:
           row: 22
           column: 19
+        content: "\"{:3f}\".format(15)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -246,13 +246,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "\"{:<5f}\".format(5)"
-        location:
+      - location:
           row: 24
           column: 6
         end_location:
           row: 24
           column: 19
+        content: "\"{:<5f}\".format(5)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -267,13 +267,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: "\"{:9f}\".format(5)"
-        location:
+      - location:
           row: 26
           column: 6
         end_location:
           row: 26
           column: 18
+        content: "\"{:9f}\".format(5)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -288,13 +288,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "\"{:#o}\".format(123)"
-        location:
+      - location:
           row: 28
           column: 6
         end_location:
           row: 28
           column: 20
+        content: "\"{:#o}\".format(123)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -309,13 +309,13 @@ expression: diagnostics
     column: 26
   fix:
     edits:
-      - content: "\"brace {{}} {}\".format(1)"
-        location:
+      - location:
           row: 30
           column: 6
         end_location:
           row: 30
           column: 26
+        content: "\"brace {{}} {}\".format(1)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -330,13 +330,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: "\"{}\".format(\n    \"trailing comma\",\n        )"
-        location:
+      - location:
           row: 33
           column: 2
         end_location:
           row: 35
           column: 9
+        content: "\"{}\".format(\n    \"trailing comma\",\n        )"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -351,13 +351,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: "\"foo {} \".format(x)"
-        location:
+      - location:
           row: 38
           column: 6
         end_location:
           row: 38
           column: 22
+        content: "\"foo {} \".format(x)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -372,13 +372,13 @@ expression: diagnostics
     column: 26
   fix:
     edits:
-      - content: "\"{k}\".format(k=\"v\")"
-        location:
+      - location:
           row: 40
           column: 6
         end_location:
           row: 40
           column: 26
+        content: "\"{k}\".format(k=\"v\")"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -393,13 +393,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: "\"{k}\".format(\n    k=\"v\",\n    i=\"j\",\n)"
-        location:
+      - location:
           row: 42
           column: 6
         end_location:
           row: 45
           column: 1
+        content: "\"{k}\".format(\n    k=\"v\",\n    i=\"j\",\n)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -414,13 +414,13 @@ expression: diagnostics
     column: 37
   fix:
     edits:
-      - content: "\"{to_list}\".format(to_list=[])"
-        location:
+      - location:
           row: 47
           column: 6
         end_location:
           row: 47
           column: 37
+        content: "\"{to_list}\".format(to_list=[])"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -435,13 +435,13 @@ expression: diagnostics
     column: 43
   fix:
     edits:
-      - content: "\"{k}\".format(k=\"v\", i=1, j=[])"
-        location:
+      - location:
           row: 49
           column: 6
         end_location:
           row: 49
           column: 43
+        content: "\"{k}\".format(k=\"v\", i=1, j=[])"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -456,13 +456,13 @@ expression: diagnostics
     column: 29
   fix:
     edits:
-      - content: "\"{ab}\".format(ab=1)"
-        location:
+      - location:
           row: 51
           column: 6
         end_location:
           row: 51
           column: 29
+        content: "\"{ab}\".format(ab=1)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -477,13 +477,13 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: "\"{a}\".format(a=1)"
-        location:
+      - location:
           row: 53
           column: 6
         end_location:
           row: 53
           column: 27
+        content: "\"{a}\".format(a=1)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -498,13 +498,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "\"foo {} \"\n    \"bar {}\".format(x, y)"
-        location:
+      - location:
           row: 56
           column: 4
         end_location:
           row: 57
           column: 21
+        content: "\"foo {} \"\n    \"bar {}\".format(x, y)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -519,13 +519,13 @@ expression: diagnostics
     column: 40
   fix:
     edits:
-      - content: "\"foo {foo} \"\n    \"bar {bar}\".format(foo=x, bar=y)"
-        location:
+      - location:
           row: 61
           column: 4
         end_location:
           row: 62
           column: 40
+        content: "\"foo {foo} \"\n    \"bar {bar}\".format(foo=x, bar=y)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -540,13 +540,13 @@ expression: diagnostics
     column: 37
   fix:
     edits:
-      - content: "\"foo {foo} \"\n    \"bar {bar}\".format(foo=x, **bar)"
-        location:
+      - location:
           row: 67
           column: 4
         end_location:
           row: 68
           column: 37
+        content: "\"foo {foo} \"\n    \"bar {bar}\".format(foo=x, **bar)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -561,13 +561,13 @@ expression: diagnostics
     column: 29
   fix:
     edits:
-      - content: "\"{} \\N{snowman}\".format(a)"
-        location:
+      - location:
           row: 71
           column: 6
         end_location:
           row: 71
           column: 29
+        content: "\"{} \\N{snowman}\".format(a)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -582,13 +582,13 @@ expression: diagnostics
     column: 40
   fix:
     edits:
-      - content: "\"{foo} \\N{snowman}\".format(foo=1)"
-        location:
+      - location:
           row: 73
           column: 6
         end_location:
           row: 73
           column: 40
+        content: "\"{foo} \\N{snowman}\".format(foo=1)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -603,13 +603,13 @@ expression: diagnostics
     column: 35
   fix:
     edits:
-      - content: "(\"foo {} \" \"bar {}\").format(x, y)"
-        location:
+      - location:
           row: 75
           column: 6
         end_location:
           row: 75
           column: 35
+        content: "(\"foo {} \" \"bar {}\").format(x, y)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -624,13 +624,13 @@ expression: diagnostics
     column: 26
   fix:
     edits:
-      - content: "'Hello {}'.format(\"World\")"
-        location:
+      - location:
           row: 78
           column: 6
         end_location:
           row: 78
           column: 26
+        content: "'Hello {}'.format(\"World\")"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -645,13 +645,13 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: "'Hello {}'.format(f\"World\")"
-        location:
+      - location:
           row: 79
           column: 6
         end_location:
           row: 79
           column: 27
+        content: "'Hello {}'.format(f\"World\")"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -666,13 +666,13 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: "'Hello {} ({})'.format(*bar)"
-        location:
+      - location:
           row: 80
           column: 6
         end_location:
           row: 80
           column: 27
+        content: "'Hello {} ({})'.format(*bar)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -687,13 +687,13 @@ expression: diagnostics
     column: 31
   fix:
     edits:
-      - content: "'Hello {} ({})'.format(*bar.baz)"
-        location:
+      - location:
           row: 81
           column: 6
         end_location:
           row: 81
           column: 31
+        content: "'Hello {} ({})'.format(*bar.baz)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -708,13 +708,13 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: "'Hello {} ({})'.format(*bar['bop'])"
-        location:
+      - location:
           row: 82
           column: 6
         end_location:
           row: 82
           column: 34
+        content: "'Hello {} ({})'.format(*bar['bop'])"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -729,13 +729,13 @@ expression: diagnostics
     column: 27
   fix:
     edits:
-      - content: "'Hello {arg}'.format(**bar)"
-        location:
+      - location:
           row: 83
           column: 6
         end_location:
           row: 83
           column: 27
+        content: "'Hello {arg}'.format(**bar)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -750,13 +750,13 @@ expression: diagnostics
     column: 31
   fix:
     edits:
-      - content: "'Hello {arg}'.format(**bar.baz)"
-        location:
+      - location:
           row: 84
           column: 6
         end_location:
           row: 84
           column: 31
+        content: "'Hello {arg}'.format(**bar.baz)"
   parent: ~
 - kind:
     name: PrintfStringFormatting
@@ -771,12 +771,12 @@ expression: diagnostics
     column: 34
   fix:
     edits:
-      - content: "'Hello {arg}'.format(**bar['bop'])"
-        location:
+      - location:
           row: 85
           column: 6
         end_location:
           row: 85
           column: 34
+        content: "'Hello {arg}'.format(**bar['bop'])"
   parent: ~
 

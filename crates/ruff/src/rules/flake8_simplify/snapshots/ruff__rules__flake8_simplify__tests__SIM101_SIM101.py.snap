@@ -15,13 +15,13 @@ expression: diagnostics
     column: 45
   fix:
     edits:
-      - content: "isinstance(a, (int, float))"
-        location:
+      - location:
           row: 1
           column: 3
         end_location:
           row: 1
           column: 45
+        content: "isinstance(a, (int, float))"
   parent: ~
 - kind:
     name: DuplicateIsinstanceCall
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 53
   fix:
     edits:
-      - content: "isinstance(a, (int, float, bool))"
-        location:
+      - location:
           row: 4
           column: 3
         end_location:
           row: 4
           column: 53
+        content: "isinstance(a, (int, float, bool))"
   parent: ~
 - kind:
     name: DuplicateIsinstanceCall
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 68
   fix:
     edits:
-      - content: "isinstance(a, (int, float)) or isinstance(b, bool)"
-        location:
+      - location:
           row: 7
           column: 3
         end_location:
           row: 7
           column: 68
+        content: "isinstance(a, (int, float)) or isinstance(b, bool)"
   parent: ~
 - kind:
     name: DuplicateIsinstanceCall
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 68
   fix:
     edits:
-      - content: "isinstance(a, (int, float)) or isinstance(b, bool)"
-        location:
+      - location:
           row: 10
           column: 3
         end_location:
           row: 10
           column: 68
+        content: "isinstance(a, (int, float)) or isinstance(b, bool)"
   parent: ~
 - kind:
     name: DuplicateIsinstanceCall
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 68
   fix:
     edits:
-      - content: "isinstance(a, (int, float)) or isinstance(b, bool)"
-        location:
+      - location:
           row: 13
           column: 3
         end_location:
           row: 13
           column: 68
+        content: "isinstance(a, (int, float)) or isinstance(b, bool)"
   parent: ~
 - kind:
     name: DuplicateIsinstanceCall
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 46
   fix:
     edits:
-      - content: "isinstance(a, (int, float))"
-        location:
+      - location:
           row: 16
           column: 4
         end_location:
           row: 16
           column: 46
+        content: "isinstance(a, (int, float))"
   parent: ~
 - kind:
     name: DuplicateIsinstanceCall
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 49
   fix:
     edits:
-      - content: "isinstance(a.b, (int, float))"
-        location:
+      - location:
           row: 19
           column: 3
         end_location:
           row: 19
           column: 49
+        content: "isinstance(a.b, (int, float))"
   parent: ~
 - kind:
     name: DuplicateIsinstanceCall

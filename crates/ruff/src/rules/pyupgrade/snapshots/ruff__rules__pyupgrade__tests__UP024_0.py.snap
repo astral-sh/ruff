@@ -15,13 +15,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: OSError
-        location:
+      - location:
           row: 6
           column: 7
         end_location:
           row: 6
           column: 23
+        content: OSError
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 14
   fix:
     edits:
-      - content: OSError
-        location:
+      - location:
           row: 11
           column: 7
         end_location:
           row: 11
           column: 14
+        content: OSError
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: OSError
-        location:
+      - location:
           row: 16
           column: 7
         end_location:
           row: 16
           column: 19
+        content: OSError
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: OSError
-        location:
+      - location:
           row: 21
           column: 7
         end_location:
           row: 21
           column: 17
+        content: OSError
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: OSError
-        location:
+      - location:
           row: 26
           column: 7
         end_location:
           row: 26
           column: 19
+        content: OSError
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: OSError
-        location:
+      - location:
           row: 31
           column: 7
         end_location:
           row: 31
           column: 19
+        content: OSError
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: OSError
-        location:
+      - location:
           row: 36
           column: 7
         end_location:
           row: 36
           column: 12
+        content: OSError
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: OSError
-        location:
+      - location:
           row: 43
           column: 7
         end_location:
           row: 43
           column: 17
+        content: OSError
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: OSError
-        location:
+      - location:
           row: 47
           column: 7
         end_location:
           row: 47
           column: 20
+        content: OSError
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 57
   fix:
     edits:
-      - content: OSError
-        location:
+      - location:
           row: 51
           column: 7
         end_location:
           row: 51
           column: 57
+        content: OSError
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 35
   fix:
     edits:
-      - content: "(KeyError, OSError)"
-        location:
+      - location:
           row: 58
           column: 7
         end_location:
           row: 58
           column: 35
+        content: "(KeyError, OSError)"
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -246,13 +246,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: "(OSError, error)"
-        location:
+      - location:
           row: 65
           column: 7
         end_location:
           row: 65
           column: 23
+        content: "(OSError, error)"
   parent: ~
 - kind:
     name: OSErrorAlias
@@ -267,12 +267,12 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: OSError
-        location:
+      - location:
           row: 87
           column: 7
         end_location:
           row: 87
           column: 19
+        content: OSError
   parent: ~
 

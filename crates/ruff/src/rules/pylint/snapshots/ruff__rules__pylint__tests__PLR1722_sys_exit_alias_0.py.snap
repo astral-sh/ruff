@@ -15,20 +15,20 @@ expression: diagnostics
     column: 4
   fix:
     edits:
-      - content: "import sys\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 0
-      - content: sys.exit
-        location:
+        content: "import sys\n"
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 4
+        content: sys.exit
   parent: ~
 - kind:
     name: SysExitAlias
@@ -43,20 +43,20 @@ expression: diagnostics
     column: 4
   fix:
     edits:
-      - content: "import sys\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 0
-      - content: sys.exit
-        location:
+        content: "import sys\n"
+      - location:
           row: 2
           column: 0
         end_location:
           row: 2
           column: 4
+        content: sys.exit
   parent: ~
 - kind:
     name: SysExitAlias
@@ -71,20 +71,20 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: "import sys\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 0
-      - content: sys.exit
-        location:
+        content: "import sys\n"
+      - location:
           row: 6
           column: 4
         end_location:
           row: 6
           column: 8
+        content: sys.exit
   parent: ~
 - kind:
     name: SysExitAlias
@@ -99,19 +99,19 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: "import sys\n"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 0
-      - content: sys.exit
-        location:
+        content: "import sys\n"
+      - location:
           row: 7
           column: 4
         end_location:
           row: 7
           column: 8
+        content: sys.exit
   parent: ~
 

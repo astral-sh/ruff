@@ -15,13 +15,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: from os import path
-        location:
+      - location:
           row: 9
           column: 0
         end_location:
           row: 9
           column: 22
+        content: from os import path
   parent: ~
 - kind:
     name: ManualFromImport
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 31
   fix:
     edits:
-      - content: from foo.bar import foobar
-        location:
+      - location:
           row: 11
           column: 0
         end_location:
           row: 11
           column: 31
+        content: from foo.bar import foobar
   parent: ~
 - kind:
     name: ManualFromImport

@@ -15,13 +15,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: any(x.id for x in bar)
-        location:
+      - location:
           row: 2
           column: 0
         end_location:
           row: 2
           column: 24
+        content: any(x.id for x in bar)
   parent: ~
 - kind:
     name: UnnecessaryComprehensionAnyAll
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: all(x.id for x in bar)
-        location:
+      - location:
           row: 3
           column: 0
         end_location:
           row: 3
           column: 24
+        content: all(x.id for x in bar)
   parent: ~
 - kind:
     name: UnnecessaryComprehensionAnyAll
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: "any(  # first comment\n    x.id for x in bar  # second comment\n)"
-        location:
+      - location:
           row: 4
           column: 0
         end_location:
           row: 6
           column: 1
+        content: "any(  # first comment\n    x.id for x in bar  # second comment\n)"
   parent: ~
 - kind:
     name: UnnecessaryComprehensionAnyAll
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: "all(  # first comment\n    x.id for x in bar  # second comment\n)"
-        location:
+      - location:
           row: 7
           column: 0
         end_location:
           row: 9
           column: 1
+        content: "all(  # first comment\n    x.id for x in bar  # second comment\n)"
   parent: ~
 - kind:
     name: UnnecessaryComprehensionAnyAll

@@ -15,13 +15,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: " -> str"
-        location:
+      - location:
           row: 2
           column: 21
         end_location:
           row: 2
           column: 21
+        content: " -> str"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: " -> str"
-        location:
+      - location:
           row: 5
           column: 22
         end_location:
           row: 5
           column: 22
+        content: " -> str"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: " -> int"
-        location:
+      - location:
           row: 8
           column: 21
         end_location:
           row: 8
           column: 21
+        content: " -> int"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: " -> int"
-        location:
+      - location:
           row: 11
           column: 29
         end_location:
           row: 11
           column: 29
+        content: " -> int"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: " -> None"
-        location:
+      - location:
           row: 14
           column: 22
         end_location:
           row: 14
           column: 22
+        content: " -> None"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: " -> None"
-        location:
+      - location:
           row: 17
           column: 21
         end_location:
           row: 17
           column: 21
+        content: " -> None"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: " -> bool"
-        location:
+      - location:
           row: 20
           column: 22
         end_location:
           row: 20
           column: 22
+        content: " -> bool"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: " -> bytes"
-        location:
+      - location:
           row: 23
           column: 23
         end_location:
           row: 23
           column: 23
+        content: " -> bytes"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: " -> str"
-        location:
+      - location:
           row: 26
           column: 37
         end_location:
           row: 26
           column: 37
+        content: " -> str"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: " -> bool"
-        location:
+      - location:
           row: 29
           column: 32
         end_location:
           row: 29
           column: 32
+        content: " -> bool"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: " -> complex"
-        location:
+      - location:
           row: 32
           column: 25
         end_location:
           row: 32
           column: 25
+        content: " -> complex"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -246,13 +246,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: " -> int"
-        location:
+      - location:
           row: 35
           column: 21
         end_location:
           row: 35
           column: 21
+        content: " -> int"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -267,13 +267,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: " -> float"
-        location:
+      - location:
           row: 38
           column: 23
         end_location:
           row: 38
           column: 23
+        content: " -> float"
   parent: ~
 - kind:
     name: MissingReturnTypeSpecialMethod
@@ -288,12 +288,12 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: " -> int"
-        location:
+      - location:
           row: 41
           column: 23
         end_location:
           row: 41
           column: 23
+        content: " -> int"
   parent: ~
 

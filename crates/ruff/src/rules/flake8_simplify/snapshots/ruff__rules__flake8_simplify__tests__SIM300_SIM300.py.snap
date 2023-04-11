@@ -15,13 +15,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: "compare == \"yoda\""
-        location:
+      - location:
           row: 2
           column: 0
         end_location:
           row: 2
           column: 17
+        content: "compare == \"yoda\""
   parent: ~
 - kind:
     name: YodaConditions
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: "compare == \"yoda\""
-        location:
+      - location:
           row: 3
           column: 0
         end_location:
           row: 3
           column: 17
+        content: "compare == \"yoda\""
   parent: ~
 - kind:
     name: YodaConditions
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: age == 42
-        location:
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 9
+        content: age == 42
   parent: ~
 - kind:
     name: YodaConditions
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "compare == (\"a\", \"b\")"
-        location:
+      - location:
           row: 5
           column: 0
         end_location:
           row: 5
           column: 21
+        content: "compare == (\"a\", \"b\")"
   parent: ~
 - kind:
     name: YodaConditions
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: "compare >= \"yoda\""
-        location:
+      - location:
           row: 6
           column: 0
         end_location:
           row: 6
           column: 17
+        content: "compare >= \"yoda\""
   parent: ~
 - kind:
     name: YodaConditions
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "compare > \"yoda\""
-        location:
+      - location:
           row: 7
           column: 0
         end_location:
           row: 7
           column: 16
+        content: "compare > \"yoda\""
   parent: ~
 - kind:
     name: YodaConditions
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: age < 42
-        location:
+      - location:
           row: 8
           column: 0
         end_location:
           row: 8
           column: 8
+        content: age < 42
   parent: ~
 - kind:
     name: YodaConditions
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: age < -42
-        location:
+      - location:
           row: 9
           column: 0
         end_location:
           row: 9
           column: 9
+        content: age < -42
   parent: ~
 - kind:
     name: YodaConditions
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: age < +42
-        location:
+      - location:
           row: 10
           column: 0
         end_location:
           row: 10
           column: 9
+        content: age < +42
   parent: ~
 - kind:
     name: YodaConditions
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: age == YODA
-        location:
+      - location:
           row: 11
           column: 0
         end_location:
           row: 11
           column: 11
+        content: age == YODA
   parent: ~
 - kind:
     name: YodaConditions
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: age < YODA
-        location:
+      - location:
           row: 12
           column: 0
         end_location:
           row: 12
           column: 10
+        content: age < YODA
   parent: ~
 - kind:
     name: YodaConditions
@@ -246,13 +246,13 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: age <= YODA
-        location:
+      - location:
           row: 13
           column: 0
         end_location:
           row: 13
           column: 11
+        content: age <= YODA
   parent: ~
 - kind:
     name: YodaConditions
@@ -267,13 +267,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: age == JediOrder.YODA
-        location:
+      - location:
           row: 14
           column: 0
         end_location:
           row: 14
           column: 21
+        content: age == JediOrder.YODA
   parent: ~
 - kind:
     name: YodaConditions
@@ -288,13 +288,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: (number - 100) > 0
-        location:
+      - location:
           row: 15
           column: 0
         end_location:
           row: 15
           column: 18
+        content: (number - 100) > 0
   parent: ~
 - kind:
     name: YodaConditions
@@ -309,12 +309,12 @@ expression: diagnostics
     column: 52
   fix:
     edits:
-      - content: (60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE
-        location:
+      - location:
           row: 16
           column: 0
         end_location:
           row: 16
           column: 52
+        content: (60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE
   parent: ~
 

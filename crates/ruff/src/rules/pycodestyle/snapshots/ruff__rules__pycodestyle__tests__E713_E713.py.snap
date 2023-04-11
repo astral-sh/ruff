@@ -15,13 +15,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: X not in Y
-        location:
+      - location:
           row: 2
           column: 3
         end_location:
           row: 2
           column: 13
+        content: X not in Y
   parent: ~
 - kind:
     name: NotInTest
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: X.B not in Y
-        location:
+      - location:
           row: 5
           column: 3
         end_location:
           row: 5
           column: 15
+        content: X.B not in Y
   parent: ~
 - kind:
     name: NotInTest
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: X not in Y
-        location:
+      - location:
           row: 8
           column: 3
         end_location:
           row: 8
           column: 13
+        content: X not in Y
   parent: ~
 - kind:
     name: NotInTest
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 28
   fix:
     edits:
-      - content: Y not in Z
-        location:
+      - location:
           row: 11
           column: 18
         end_location:
           row: 11
           column: 28
+        content: Y not in Z
   parent: ~
 - kind:
     name: NotInTest
@@ -99,12 +99,12 @@ expression: diagnostics
     column: 14
   fix:
     edits:
-      - content: X not in Y
-        location:
+      - location:
           row: 14
           column: 3
         end_location:
           row: 14
           column: 15
+        content: X not in Y
   parent: ~
 

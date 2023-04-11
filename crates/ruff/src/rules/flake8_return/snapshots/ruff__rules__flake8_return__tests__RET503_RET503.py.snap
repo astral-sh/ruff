@@ -15,13 +15,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "\n    return None"
-        location:
+      - location:
           row: 21
           column: 16
         end_location:
           row: 21
           column: 16
+        content: "\n    return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: "\n        return None"
-        location:
+      - location:
           row: 27
           column: 24
         end_location:
           row: 27
           column: 24
+        content: "\n        return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: "\n    return None"
-        location:
+      - location:
           row: 36
           column: 20
         end_location:
           row: 36
           column: 20
+        content: "\n    return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "\n    return None"
-        location:
+      - location:
           row: 43
           column: 20
         end_location:
           row: 43
           column: 20
+        content: "\n    return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: "\n        return None"
-        location:
+      - location:
           row: 52
           column: 24
         end_location:
           row: 52
           column: 24
+        content: "\n        return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: "\n    return None"
-        location:
+      - location:
           row: 59
           column: 31
         end_location:
           row: 59
           column: 31
+        content: "\n    return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "\n    return None"
-        location:
+      - location:
           row: 66
           column: 30
         end_location:
           row: 66
           column: 30
+        content: "\n    return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 14
   fix:
     edits:
-      - content: "\n    return None"
-        location:
+      - location:
           row: 85
           column: 14
         end_location:
           row: 85
           column: 14
+        content: "\n    return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "\n    return None"
-        location:
+      - location:
           row: 116
           column: 16
         end_location:
           row: 116
           column: 16
+        content: "\n    return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "\n    return None"
-        location:
+      - location:
           row: 126
           column: 19
         end_location:
           row: 126
           column: 19
+        content: "\n    return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "\n    return None"
-        location:
+      - location:
           row: 133
           column: 16
         end_location:
           row: 133
           column: 16
+        content: "\n    return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -246,13 +246,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "\n    return None"
-        location:
+      - location:
           row: 143
           column: 19
         end_location:
           row: 143
           column: 19
+        content: "\n    return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -267,13 +267,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: "\n    return None"
-        location:
+      - location:
           row: 275
           column: 20
         end_location:
           row: 275
           column: 20
+        content: "\n    return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -288,13 +288,13 @@ expression: diagnostics
     column: 19
   fix:
     edits:
-      - content: "\n            return None"
-        location:
+      - location:
           row: 291
           column: 28
         end_location:
           row: 291
           column: 28
+        content: "\n            return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -309,13 +309,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "\n        return None"
-        location:
+      - location:
           row: 301
           column: 21
         end_location:
           row: 301
           column: 21
+        content: "\n        return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -330,13 +330,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "\n        return None"
-        location:
+      - location:
           row: 306
           column: 21
         end_location:
           row: 306
           column: 21
+        content: "\n        return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -351,13 +351,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "\n        return None"
-        location:
+      - location:
           row: 311
           column: 37
         end_location:
           row: 311
           column: 37
+        content: "\n        return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -372,13 +372,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "\n        return None"
-        location:
+      - location:
           row: 316
           column: 24
         end_location:
           row: 316
           column: 24
+        content: "\n        return None"
   parent: ~
 - kind:
     name: ImplicitReturn
@@ -393,12 +393,12 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: "\n        return None"
-        location:
+      - location:
           row: 322
           column: 33
         end_location:
           row: 322
           column: 33
+        content: "\n        return None"
   parent: ~
 

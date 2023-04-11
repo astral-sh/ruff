@@ -15,13 +15,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: b = c if a else d
-        location:
+      - location:
           row: 2
           column: 0
         end_location:
           row: 5
           column: 9
+        content: b = c if a else d
   parent: ~
 - kind:
     name: IfElseBlockInsteadOfIfExp
@@ -50,13 +50,13 @@ expression: diagnostics
     column: 45
   fix:
     edits:
-      - content: b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd
-        location:
+      - location:
           row: 82
           column: 0
         end_location:
           row: 85
           column: 45
+        content: b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd
   parent: ~
 - kind:
     name: IfElseBlockInsteadOfIfExp

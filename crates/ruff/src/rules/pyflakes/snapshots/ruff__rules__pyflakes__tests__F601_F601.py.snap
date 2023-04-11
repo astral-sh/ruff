@@ -85,13 +85,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 17
           column: 10
         end_location:
           row: 18
           column: 10
+        content: ~
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -134,13 +134,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 24
           column: 10
         end_location:
           row: 25
           column: 10
+        content: ~
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -169,13 +169,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 30
           column: 10
         end_location:
           row: 31
           column: 10
+        content: ~
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -260,13 +260,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 44
           column: 8
         end_location:
           row: 45
           column: 10
+        content: ~
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -281,13 +281,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 49
           column: 11
         end_location:
           row: 49
           column: 19
+        content: ~
   parent: ~
 - kind:
     name: MultiValueRepeatedKeyLiteral
@@ -302,12 +302,12 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 50
           column: 19
         end_location:
           row: 50
           column: 27
+        content: ~
   parent: ~
 

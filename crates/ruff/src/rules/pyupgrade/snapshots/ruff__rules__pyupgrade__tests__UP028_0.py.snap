@@ -15,13 +15,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: yield from y
-        location:
+      - location:
           row: 2
           column: 4
         end_location:
           row: 3
           column: 15
+        content: yield from y
   parent: ~
 - kind:
     name: YieldInForLoop
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: yield from z
-        location:
+      - location:
           row: 7
           column: 4
         end_location:
           row: 8
           column: 20
+        content: yield from z
   parent: ~
 - kind:
     name: YieldInForLoop
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: "yield from [1, 2, 3]"
-        location:
+      - location:
           row: 12
           column: 4
         end_location:
           row: 13
           column: 15
+        content: "yield from [1, 2, 3]"
   parent: ~
 - kind:
     name: YieldInForLoop
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: "yield from {x for x in y}"
-        location:
+      - location:
           row: 17
           column: 4
         end_location:
           row: 18
           column: 15
+        content: "yield from {x for x in y}"
   parent: ~
 - kind:
     name: YieldInForLoop
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: "yield from (1, 2, 3)"
-        location:
+      - location:
           row: 22
           column: 4
         end_location:
           row: 23
           column: 15
+        content: "yield from (1, 2, 3)"
   parent: ~
 - kind:
     name: YieldInForLoop
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: "yield from {3: \"x\", 6: \"y\"}"
-        location:
+      - location:
           row: 27
           column: 4
         end_location:
           row: 28
           column: 18
+        content: "yield from {3: \"x\", 6: \"y\"}"
   parent: ~
 - kind:
     name: YieldInForLoop
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: "yield from {  # Comment three\\n'\n        3: \"x\",  # Comment four\\n'\n        # Comment five\\n'\n        6: \"y\",  # Comment six\\n'\n    }"
-        location:
+      - location:
           row: 33
           column: 4
         end_location:
           row: 39
           column: 18
+        content: "yield from {  # Comment three\\n'\n        3: \"x\",  # Comment four\\n'\n        # Comment five\\n'\n        6: \"y\",  # Comment six\\n'\n    }"
   parent: ~
 - kind:
     name: YieldInForLoop
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: "yield from [{3: (3, [44, \"long ss\"]), 6: \"y\"}]"
-        location:
+      - location:
           row: 44
           column: 4
         end_location:
           row: 45
           column: 18
+        content: "yield from [{3: (3, [44, \"long ss\"]), 6: \"y\"}]"
   parent: ~
 - kind:
     name: YieldInForLoop
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: yield from z()
-        location:
+      - location:
           row: 49
           column: 4
         end_location:
           row: 50
           column: 18
+        content: yield from z()
   parent: ~
 - kind:
     name: YieldInForLoop
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: yield from z()
-        location:
+      - location:
           row: 55
           column: 8
         end_location:
           row: 57
           column: 22
+        content: yield from z()
   parent: ~
 - kind:
     name: YieldInForLoop
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: yield from x
-        location:
+      - location:
           row: 67
           column: 4
         end_location:
           row: 68
           column: 15
+        content: yield from x
   parent: ~
 - kind:
     name: YieldInForLoop
@@ -246,12 +246,12 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: yield from z()
-        location:
+      - location:
           row: 72
           column: 4
         end_location:
           row: 73
           column: 18
+        content: yield from z()
   parent: ~
 

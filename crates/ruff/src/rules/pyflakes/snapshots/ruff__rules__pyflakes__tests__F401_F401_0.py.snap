@@ -15,13 +15,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: import os
-        location:
+      - location:
           row: 2
           column: 0
         end_location:
           row: 2
           column: 20
+        content: import os
   parent: ~
 - kind:
     name: UnusedImport
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: "from collections import (\n    Counter,\n    namedtuple,\n)"
-        location:
+      - location:
           row: 4
           column: 0
         end_location:
           row: 8
           column: 1
+        content: "from collections import (\n    Counter,\n    namedtuple,\n)"
   parent:
     row: 4
     column: 0
@@ -59,13 +59,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 12
           column: 0
         end_location:
           row: 13
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -80,13 +80,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 32
           column: 0
         end_location:
           row: 33
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -101,13 +101,13 @@ expression: diagnostics
     column: 20
   fix:
     edits:
-      - content: pass
-        location:
+      - location:
           row: 33
           column: 4
         end_location:
           row: 33
           column: 20
+        content: pass
   parent: ~
 - kind:
     name: UnusedImport
@@ -122,13 +122,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 37
           column: 0
         end_location:
           row: 38
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -143,13 +143,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: pass
-        location:
+      - location:
           row: 52
           column: 8
         end_location:
           row: 52
           column: 21
+        content: pass
   parent: ~
 - kind:
     name: UnusedImport
@@ -164,13 +164,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 93
           column: 0
         end_location:
           row: 94
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: UnusedImport
@@ -185,12 +185,12 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: pass
-        location:
+      - location:
           row: 94
           column: 8
         end_location:
           row: 94
           column: 16
+        content: pass
   parent: ~
 

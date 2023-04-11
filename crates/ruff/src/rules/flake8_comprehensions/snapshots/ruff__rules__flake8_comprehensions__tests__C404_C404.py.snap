@@ -15,12 +15,12 @@ expression: diagnostics
     column: 32
   fix:
     edits:
-      - content: "{i: i for i in range(3)}"
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 32
+        content: "{i: i for i in range(3)}"
   parent: ~
 

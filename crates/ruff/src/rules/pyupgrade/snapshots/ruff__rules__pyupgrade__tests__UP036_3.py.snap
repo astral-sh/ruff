@@ -15,13 +15,13 @@ expression: diagnostics
     column: 28
   fix:
     edits:
-      - content: "print(\"py3\")\nfor item in range(10):\n    print(f\"PY3-{item}\")"
-        location:
+      - location:
           row: 3
           column: 0
         end_location:
           row: 10
           column: 28
+        content: "print(\"py3\")\nfor item in range(10):\n    print(f\"PY3-{item}\")"
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 32
   fix:
     edits:
-      - content: "    print(\"py3\")\n    for item in range(10):\n        print(f\"PY3-{item}\")"
-        location:
+      - location:
           row: 13
           column: 0
         end_location:
           row: 20
           column: 32
+        content: "    print(\"py3\")\n    for item in range(10):\n        print(f\"PY3-{item}\")"
   parent: ~
 - kind:
     name: OutdatedVersionBlock
@@ -57,12 +57,12 @@ expression: diagnostics
     column: 50
   fix:
     edits:
-      - content: "print(\"PY3!\")"
-        location:
+      - location:
           row: 23
           column: 0
         end_location:
           row: 24
           column: 50
+        content: "print(\"PY3!\")"
   parent: ~
 

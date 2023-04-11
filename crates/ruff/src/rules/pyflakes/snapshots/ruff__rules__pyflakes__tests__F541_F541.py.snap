@@ -15,13 +15,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: "\"def\""
-        location:
+      - location:
           row: 6
           column: 4
         end_location:
           row: 6
           column: 10
+        content: "\"def\""
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: "\"def\""
-        location:
+      - location:
           row: 7
           column: 4
         end_location:
           row: 7
           column: 10
+        content: "\"def\""
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 10
   fix:
     edits:
-      - content: "\"def\""
-        location:
+      - location:
           row: 9
           column: 4
         end_location:
           row: 9
           column: 10
+        content: "\"def\""
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: "\"a\""
-        location:
+      - location:
           row: 13
           column: 4
         end_location:
           row: 13
           column: 8
+        content: "\"a\""
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: "\"b\""
-        location:
+      - location:
           row: 14
           column: 4
         end_location:
           row: 14
           column: 8
+        content: "\"b\""
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: "\"d\""
-        location:
+      - location:
           row: 16
           column: 5
         end_location:
           row: 16
           column: 9
+        content: "\"d\""
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: "r\"e\""
-        location:
+      - location:
           row: 17
           column: 4
         end_location:
           row: 17
           column: 9
+        content: "r\"e\""
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: "\"\""
-        location:
+      - location:
           row: 19
           column: 4
         end_location:
           row: 19
           column: 7
+        content: "\"\""
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "\"z\""
-        location:
+      - location:
           row: 25
           column: 12
         end_location:
           row: 25
           column: 16
+        content: "\"z\""
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: "'0.2f'"
-        location:
+      - location:
           row: 34
           column: 6
         end_location:
           row: 34
           column: 13
+        content: "'0.2f'"
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 6
   fix:
     edits:
-      - content: "''"
-        location:
+      - location:
           row: 35
           column: 3
         end_location:
           row: 35
           column: 6
+        content: "''"
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -246,13 +246,13 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: "\"{test}\""
-        location:
+      - location:
           row: 36
           column: 0
         end_location:
           row: 36
           column: 11
+        content: "\"{test}\""
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -267,13 +267,13 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: "'{ 40 }'"
-        location:
+      - location:
           row: 37
           column: 0
         end_location:
           row: 37
           column: 11
+        content: "'{ 40 }'"
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -288,13 +288,13 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: "\"{a {x}\""
-        location:
+      - location:
           row: 38
           column: 0
         end_location:
           row: 38
           column: 12
+        content: "\"{a {x}\""
   parent: ~
 - kind:
     name: FStringMissingPlaceholders
@@ -309,12 +309,12 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: "\"{{x}}\""
-        location:
+      - location:
           row: 39
           column: 0
         end_location:
           row: 39
           column: 12
+        content: "\"{{x}}\""
   parent: ~
 

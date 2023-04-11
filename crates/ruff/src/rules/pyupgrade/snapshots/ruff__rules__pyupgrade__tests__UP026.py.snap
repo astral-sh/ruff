@@ -15,13 +15,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: from unittest import mock
-        location:
+      - location:
           row: 3
           column: 4
         end_location:
           row: 3
           column: 15
+        content: from unittest import mock
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 15
   fix:
     edits:
-      - content: "import sys\n    from unittest import mock"
-        location:
+      - location:
           row: 7
           column: 4
         end_location:
           row: 7
           column: 20
+        content: "import sys\n    from unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: from unittest.mock import *
-        location:
+      - location:
           row: 11
           column: 4
         end_location:
           row: 11
           column: 22
+        content: from unittest.mock import *
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: from unittest import mock
-        location:
+      - location:
           row: 14
           column: 0
         end_location:
           row: 14
           column: 16
+        content: from unittest import mock
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: "import contextlib, sys\nfrom unittest import mock"
-        location:
+      - location:
           row: 17
           column: 0
         end_location:
           row: 17
           column: 28
+        content: "import contextlib, sys\nfrom unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: "import sys\nfrom unittest import mock"
-        location:
+      - location:
           row: 20
           column: 0
         end_location:
           row: 20
           column: 16
+        content: "import sys\nfrom unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 21
   fix:
     edits:
-      - content: from unittest import mock
-        location:
+      - location:
           row: 24
           column: 0
         end_location:
           row: 24
           column: 21
+        content: from unittest import mock
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: "from unittest.mock import (\n    a,\n    b,\n    c,\n)\nfrom unittest import mock"
-        location:
+      - location:
           row: 27
           column: 0
         end_location:
           row: 32
           column: 1
+        content: "from unittest.mock import (\n    a,\n    b,\n    c,\n)\nfrom unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -183,13 +183,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: "from unittest.mock import (\n    a,\n    b,\n    c,\n)\nfrom unittest import mock"
-        location:
+      - location:
           row: 33
           column: 0
         end_location:
           row: 38
           column: 1
+        content: "from unittest.mock import (\n    a,\n    b,\n    c,\n)\nfrom unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -204,13 +204,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: "from unittest.mock import (\n    a,\n    b,\n    c\n)\nfrom unittest import mock"
-        location:
+      - location:
           row: 41
           column: 0
         end_location:
           row: 46
           column: 1
+        content: "from unittest.mock import (\n    a,\n    b,\n    c\n)\nfrom unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -225,13 +225,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: "from unittest.mock import (\n    a,\n    b,\n    c\n)\nfrom unittest import mock"
-        location:
+      - location:
           row: 47
           column: 0
         end_location:
           row: 52
           column: 1
+        content: "from unittest.mock import (\n    a,\n    b,\n    c\n)\nfrom unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -246,13 +246,13 @@ expression: diagnostics
     column: 30
   fix:
     edits:
-      - content: "from unittest.mock import a, b, c\nfrom unittest import mock"
-        location:
+      - location:
           row: 53
           column: 0
         end_location:
           row: 53
           column: 30
+        content: "from unittest.mock import a, b, c\nfrom unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -267,13 +267,13 @@ expression: diagnostics
     column: 30
   fix:
     edits:
-      - content: "from unittest.mock import a, b, c\nfrom unittest import mock"
-        location:
+      - location:
           row: 54
           column: 0
         end_location:
           row: 54
           column: 30
+        content: "from unittest.mock import a, b, c\nfrom unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -288,13 +288,13 @@ expression: diagnostics
     column: 9
   fix:
     edits:
-      - content: "from unittest.mock import (\n            a,\n            b,\n            c\n        )\n        from unittest import mock"
-        location:
+      - location:
           row: 58
           column: 8
         end_location:
           row: 63
           column: 9
+        content: "from unittest.mock import (\n            a,\n            b,\n            c\n        )\n        from unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -309,13 +309,13 @@ expression: diagnostics
     column: 11
   fix:
     edits:
-      - content: "from unittest import mock\nfrom unittest import mock"
-        location:
+      - location:
           row: 69
           column: 0
         end_location:
           row: 69
           column: 17
+        content: "from unittest import mock\nfrom unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -330,13 +330,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: "from unittest import mock\nfrom unittest import mock"
-        location:
+      - location:
           row: 69
           column: 0
         end_location:
           row: 69
           column: 17
+        content: "from unittest import mock\nfrom unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -351,13 +351,13 @@ expression: diagnostics
     column: 18
   fix:
     edits:
-      - content: from unittest import mock as foo
-        location:
+      - location:
           row: 72
           column: 0
         end_location:
           row: 72
           column: 18
+        content: from unittest import mock as foo
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -372,13 +372,13 @@ expression: diagnostics
     column: 28
   fix:
     edits:
-      - content: from unittest import mock as foo
-        location:
+      - location:
           row: 75
           column: 0
         end_location:
           row: 75
           column: 28
+        content: from unittest import mock as foo
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -393,13 +393,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
+      - location:
           row: 79
           column: 4
         end_location:
           row: 79
           column: 41
+        content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -414,13 +414,13 @@ expression: diagnostics
     column: 35
   fix:
     edits:
-      - content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
+      - location:
           row: 79
           column: 4
         end_location:
           row: 79
           column: 41
+        content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -435,13 +435,13 @@ expression: diagnostics
     column: 41
   fix:
     edits:
-      - content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
+      - location:
           row: 79
           column: 4
         end_location:
           row: 79
           column: 41
+        content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -456,13 +456,13 @@ expression: diagnostics
     column: 22
   fix:
     edits:
-      - content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
+      - location:
           row: 82
           column: 4
         end_location:
           row: 82
           column: 45
+        content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -477,13 +477,13 @@ expression: diagnostics
     column: 35
   fix:
     edits:
-      - content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
+      - location:
           row: 82
           column: 4
         end_location:
           row: 82
           column: 45
+        content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -498,13 +498,13 @@ expression: diagnostics
     column: 41
   fix:
     edits:
-      - content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
+      - location:
           row: 82
           column: 4
         end_location:
           row: 82
           column: 45
+        content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -519,13 +519,13 @@ expression: diagnostics
     column: 51
   fix:
     edits:
-      - content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
+      - location:
           row: 86
           column: 4
         end_location:
           row: 86
           column: 51
+        content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
   parent: ~
 - kind:
     name: DeprecatedMockImport
@@ -540,12 +540,12 @@ expression: diagnostics
     column: 13
   fix:
     edits:
-      - content: mock
-        location:
+      - location:
           row: 93
           column: 4
         end_location:
           row: 93
           column: 13
+        content: mock
   parent: ~
 

@@ -15,13 +15,13 @@ expression: diagnostics
     column: 29
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 169
           column: 0
         end_location:
           row: 170
           column: 0
+        content: ~
   parent: ~
 - kind:
     name: BlankLineBeforeClass
@@ -36,12 +36,12 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: ""
-        location:
+      - location:
           row: 180
           column: 0
         end_location:
           row: 181
           column: 0
+        content: ~
   parent: ~
 

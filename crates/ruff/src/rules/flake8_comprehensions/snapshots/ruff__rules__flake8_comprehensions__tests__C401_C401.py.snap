@@ -15,13 +15,13 @@ expression: diagnostics
     column: 28
   fix:
     edits:
-      - content: "{x for x in range(3)}"
-        location:
+      - location:
           row: 1
           column: 4
         end_location:
           row: 1
           column: 28
+        content: "{x for x in range(3)}"
   parent: ~
 - kind:
     name: UnnecessaryGeneratorSet
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 1
   fix:
     edits:
-      - content: "{\n    x for x in range(3)\n}"
-        location:
+      - location:
           row: 2
           column: 4
         end_location:
           row: 4
           column: 1
+        content: "{\n    x for x in range(3)\n}"
   parent: ~
 - kind:
     name: UnnecessaryGeneratorSet
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 48
   fix:
     edits:
-      - content: " {a if a < 6 else 0  for a in range(3)} "
-        location:
+      - location:
           row: 5
           column: 7
         end_location:
           row: 5
           column: 48
+        content: " {a if a < 6 else 0  for a in range(3)} "
   parent: ~
 - kind:
     name: UnnecessaryGeneratorSet
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 57
   fix:
     edits:
-      - content: "{a if a < 6 else 0  for a in range(3)}"
-        location:
+      - location:
           row: 6
           column: 16
         end_location:
           row: 6
           column: 57
+        content: "{a if a < 6 else 0  for a in range(3)}"
   parent: ~
 - kind:
     name: UnnecessaryGeneratorSet
@@ -99,12 +99,12 @@ expression: diagnostics
     column: 39
   fix:
     edits:
-      - content: " {a for a in range(3)} "
-        location:
+      - location:
           row: 7
           column: 15
         end_location:
           row: 7
           column: 39
+        content: " {a for a in range(3)} "
   parent: ~
 

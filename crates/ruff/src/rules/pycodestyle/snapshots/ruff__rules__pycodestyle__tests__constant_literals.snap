@@ -15,13 +15,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: "=="
-        location:
+      - location:
           row: 4
           column: 9
         end_location:
           row: 4
           column: 11
+        content: "=="
   parent: ~
 - kind:
     name: IsLiteral
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "=="
-        location:
+      - location:
           row: 6
           column: 9
         end_location:
           row: 6
           column: 11
+        content: "=="
   parent: ~
 - kind:
     name: IsLiteral
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: "=="
-        location:
+      - location:
           row: 8
           column: 8
         end_location:
           row: 8
           column: 10
+        content: "=="
   parent: ~
 - kind:
     name: IsLiteral
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: "=="
-        location:
+      - location:
           row: 10
           column: 9
         end_location:
           row: 10
           column: 11
+        content: "=="
   parent: ~
 - kind:
     name: IsLiteral
@@ -99,13 +99,13 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: "=="
-        location:
+      - location:
           row: 12
           column: 9
         end_location:
           row: 12
           column: 11
+        content: "=="
   parent: ~
 - kind:
     name: TrueFalseComparison
@@ -120,13 +120,13 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: False is None
-        location:
+      - location:
           row: 14
           column: 3
         end_location:
           row: 14
           column: 16
+        content: False is None
   parent: ~
 - kind:
     name: NoneComparison
@@ -141,13 +141,13 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: False is None
-        location:
+      - location:
           row: 14
           column: 3
         end_location:
           row: 14
           column: 16
+        content: False is None
   parent: ~
 - kind:
     name: NoneComparison
@@ -162,13 +162,13 @@ expression: diagnostics
     column: 7
   fix:
     edits:
-      - content: None is False
-        location:
+      - location:
           row: 16
           column: 3
         end_location:
           row: 16
           column: 16
+        content: None is False
   parent: ~
 - kind:
     name: TrueFalseComparison
@@ -183,12 +183,12 @@ expression: diagnostics
     column: 16
   fix:
     edits:
-      - content: None is False
-        location:
+      - location:
           row: 16
           column: 3
         end_location:
           row: 16
           column: 16
+        content: None is False
   parent: ~
 

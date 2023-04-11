@@ -15,20 +15,20 @@ expression: diagnostics
     column: 4
   fix:
     edits:
-      - content: from sys import exit
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 20
-      - content: exit
-        location:
+        content: from sys import exit
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 4
+        content: exit
   parent: ~
 - kind:
     name: SysExitAlias
@@ -43,20 +43,20 @@ expression: diagnostics
     column: 8
   fix:
     edits:
-      - content: from sys import exit
-        location:
+      - location:
           row: 1
           column: 0
         end_location:
           row: 1
           column: 20
-      - content: exit
-        location:
+        content: from sys import exit
+      - location:
           row: 9
           column: 4
         end_location:
           row: 9
           column: 8
+        content: exit
   parent: ~
 - kind:
     name: SysExitAlias

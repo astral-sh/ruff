@@ -15,12 +15,12 @@ expression: diagnostics
     column: 12
   fix:
     edits:
-      - content: "\"\"\" This 'should'\nbe\n'linted' \"\"\""
-        location:
+      - location:
           row: 1
           column: 4
         end_location:
           row: 3
           column: 12
+        content: "\"\"\" This 'should'\nbe\n'linted' \"\"\""
   parent: ~
 

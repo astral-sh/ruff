@@ -15,13 +15,13 @@ expression: diagnostics
     column: 46
   fix:
     edits:
-      - content: "obj.startswith((\"foo\", \"bar\"))"
-        location:
+      - location:
           row: 2
           column: 0
         end_location:
           row: 2
           column: 46
+        content: "obj.startswith((\"foo\", \"bar\"))"
   parent: ~
 - kind:
     name: MultipleStartsEndsWith
@@ -36,13 +36,13 @@ expression: diagnostics
     column: 42
   fix:
     edits:
-      - content: "obj.endswith((\"foo\", \"bar\"))"
-        location:
+      - location:
           row: 4
           column: 0
         end_location:
           row: 4
           column: 42
+        content: "obj.endswith((\"foo\", \"bar\"))"
   parent: ~
 - kind:
     name: MultipleStartsEndsWith
@@ -57,13 +57,13 @@ expression: diagnostics
     column: 42
   fix:
     edits:
-      - content: "obj.startswith((foo, bar))"
-        location:
+      - location:
           row: 6
           column: 0
         end_location:
           row: 6
           column: 42
+        content: "obj.startswith((foo, bar))"
   parent: ~
 - kind:
     name: MultipleStartsEndsWith
@@ -78,13 +78,13 @@ expression: diagnostics
     column: 44
   fix:
     edits:
-      - content: "obj.startswith((foo, \"foo\"))"
-        location:
+      - location:
           row: 8
           column: 0
         end_location:
           row: 8
           column: 44
+        content: "obj.startswith((foo, \"foo\"))"
   parent: ~
 - kind:
     name: MultipleStartsEndsWith
@@ -99,12 +99,12 @@ expression: diagnostics
     column: 65
   fix:
     edits:
-      - content: "obj.endswith(foo) or obj.startswith((foo, \"foo\"))"
-        location:
+      - location:
           row: 10
           column: 0
         end_location:
           row: 10
           column: 65
+        content: "obj.endswith(foo) or obj.startswith((foo, \"foo\"))"
   parent: ~
 
