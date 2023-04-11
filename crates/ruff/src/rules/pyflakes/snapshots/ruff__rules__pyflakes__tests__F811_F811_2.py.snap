@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F811_2.py:1:27: F811 Redefinition of unused `FU` from line 1
+F811_2.py:1:27: F811 Redefinition of unused `FU` from line 1
   |
 1 | from moo import fu as FU, bar as FU
   |                           ^^^^^^^^^ F811

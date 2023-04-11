@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT023.py:12:2: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023.py:12:2: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
    |
 12 | @pytest.mark.foo
    |  ^^^^^^^^^^^^^^^ PT023
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 14 14 |     pass
 15 15 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT023.py:17:2: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023.py:17:2: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
    |
 17 | @pytest.mark.foo
    |  ^^^^^^^^^^^^^^^ PT023
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 19 19 |     def test_something():
 20 20 |         pass
 
-./resources/test/fixtures/flake8_pytest_style/PT023.py:24:6: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023.py:24:6: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
    |
 24 | class TestClass:
 25 |     @pytest.mark.foo
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 26 26 |         pass
 27 27 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT023.py:30:6: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023.py:30:6: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
    |
 30 | class TestClass:
 31 |     @pytest.mark.foo
@@ -79,7 +79,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 32 32 |         def test_something():
 33 33 |             pass
 
-./resources/test/fixtures/flake8_pytest_style/PT023.py:38:10: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
+PT023.py:38:10: PT023 [*] Use `@pytest.mark.foo()` over `@pytest.mark.foo`
    |
 38 | class TestClass:
 39 |     class TestNestedClass:

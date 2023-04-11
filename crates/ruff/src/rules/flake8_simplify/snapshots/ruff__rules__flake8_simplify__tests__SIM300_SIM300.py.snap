@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM300.py:2:1: SIM300 [*] Yoda conditions are discouraged, use `compare == "yoda"` instead
+SIM300.py:2:1: SIM300 [*] Yoda conditions are discouraged, use `compare == "yoda"` instead
   |
 2 | # Errors
 3 | "yoda" == compare  # SIM300
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 4 4 | 42 == age  # SIM300
 5 5 | ("a", "b") == compare  # SIM300
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:3:1: SIM300 [*] Yoda conditions are discouraged, use `compare == "yoda"` instead
+SIM300.py:3:1: SIM300 [*] Yoda conditions are discouraged, use `compare == "yoda"` instead
   |
 3 | # Errors
 4 | "yoda" == compare  # SIM300
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 5 5 | ("a", "b") == compare  # SIM300
 6 6 | "yoda" <= compare  # SIM300
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:4:1: SIM300 [*] Yoda conditions are discouraged, use `age == 42` instead
+SIM300.py:4:1: SIM300 [*] Yoda conditions are discouraged, use `age == 42` instead
   |
 4 | "yoda" == compare  # SIM300
 5 | "yoda" == compare  # SIM300
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 6 6 | "yoda" <= compare  # SIM300
 7 7 | "yoda" < compare  # SIM300
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:5:1: SIM300 [*] Yoda conditions are discouraged, use `compare == ("a", "b")` instead
+SIM300.py:5:1: SIM300 [*] Yoda conditions are discouraged, use `compare == ("a", "b")` instead
   |
 5 | "yoda" == compare  # SIM300
 6 | 42 == age  # SIM300
@@ -81,7 +81,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 7 7 | "yoda" < compare  # SIM300
 8 8 | 42 > age  # SIM300
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:6:1: SIM300 [*] Yoda conditions are discouraged, use `compare >= "yoda"` instead
+SIM300.py:6:1: SIM300 [*] Yoda conditions are discouraged, use `compare >= "yoda"` instead
    |
  6 | 42 == age  # SIM300
  7 | ("a", "b") == compare  # SIM300
@@ -102,7 +102,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 8 8 | 42 > age  # SIM300
 9 9 | -42 > age  # SIM300
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:7:1: SIM300 [*] Yoda conditions are discouraged, use `compare > "yoda"` instead
+SIM300.py:7:1: SIM300 [*] Yoda conditions are discouraged, use `compare > "yoda"` instead
    |
  7 | ("a", "b") == compare  # SIM300
  8 | "yoda" <= compare  # SIM300
@@ -123,7 +123,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 9 9 | -42 > age  # SIM300
 10 10 | +42 > age  # SIM300
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:8:1: SIM300 [*] Yoda conditions are discouraged, use `age < 42` instead
+SIM300.py:8:1: SIM300 [*] Yoda conditions are discouraged, use `age < 42` instead
    |
  8 | "yoda" <= compare  # SIM300
  9 | "yoda" < compare  # SIM300
@@ -144,7 +144,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 10 10 | +42 > age  # SIM300
 11 11 | YODA == age  # SIM300
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:9:1: SIM300 [*] Yoda conditions are discouraged, use `age < -42` instead
+SIM300.py:9:1: SIM300 [*] Yoda conditions are discouraged, use `age < -42` instead
    |
  9 | "yoda" < compare  # SIM300
 10 | 42 > age  # SIM300
@@ -165,7 +165,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 11 11 | YODA == age  # SIM300
 12 12 | YODA > age  # SIM300
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:10:1: SIM300 [*] Yoda conditions are discouraged, use `age < +42` instead
+SIM300.py:10:1: SIM300 [*] Yoda conditions are discouraged, use `age < +42` instead
    |
 10 | 42 > age  # SIM300
 11 | -42 > age  # SIM300
@@ -186,7 +186,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 12 12 | YODA > age  # SIM300
 13 13 | YODA >= age  # SIM300
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:11:1: SIM300 [*] Yoda conditions are discouraged, use `age == YODA` instead
+SIM300.py:11:1: SIM300 [*] Yoda conditions are discouraged, use `age == YODA` instead
    |
 11 | -42 > age  # SIM300
 12 | +42 > age  # SIM300
@@ -207,7 +207,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 13 13 | YODA >= age  # SIM300
 14 14 | JediOrder.YODA == age  # SIM300
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:12:1: SIM300 [*] Yoda conditions are discouraged, use `age < YODA` instead
+SIM300.py:12:1: SIM300 [*] Yoda conditions are discouraged, use `age < YODA` instead
    |
 12 | +42 > age  # SIM300
 13 | YODA == age  # SIM300
@@ -228,7 +228,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 14 14 | JediOrder.YODA == age  # SIM300
 15 15 | 0 < (number - 100)  # SIM300
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:13:1: SIM300 [*] Yoda conditions are discouraged, use `age <= YODA` instead
+SIM300.py:13:1: SIM300 [*] Yoda conditions are discouraged, use `age <= YODA` instead
    |
 13 | YODA == age  # SIM300
 14 | YODA > age  # SIM300
@@ -249,7 +249,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 15 15 | 0 < (number - 100)  # SIM300
 16 16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:14:1: SIM300 [*] Yoda conditions are discouraged, use `age == JediOrder.YODA` instead
+SIM300.py:14:1: SIM300 [*] Yoda conditions are discouraged, use `age == JediOrder.YODA` instead
    |
 14 | YODA > age  # SIM300
 15 | YODA >= age  # SIM300
@@ -270,7 +270,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 16 16 | SomeClass().settings.SOME_CONSTANT_VALUE > (60 * 60)  # SIM300
 17 17 | 
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:15:1: SIM300 [*] Yoda conditions are discouraged, use `(number - 100) > 0` instead
+SIM300.py:15:1: SIM300 [*] Yoda conditions are discouraged, use `(number - 100) > 0` instead
    |
 15 | YODA >= age  # SIM300
 16 | JediOrder.YODA == age  # SIM300
@@ -290,7 +290,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 17 17 | 
 18 18 | # OK
 
-./resources/test/fixtures/flake8_simplify/SIM300.py:16:1: SIM300 [*] Yoda conditions are discouraged, use `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE` instead
+SIM300.py:16:1: SIM300 [*] Yoda conditions are discouraged, use `(60 * 60) < SomeClass().settings.SOME_CONSTANT_VALUE` instead
    |
 16 | JediOrder.YODA == age  # SIM300
 17 | 0 < (number - 100)  # SIM300

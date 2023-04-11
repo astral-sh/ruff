@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
-./resources/test/fixtures/flake8_comprehensions/C401.py:1:5: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:1:5: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
 1 | x = set(x for x in range(3))
   |     ^^^^^^^^^^^^^^^^^^^^^^^^ C401
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 3 3 |     x for x in range(3)
 4 4 | )
 
-./resources/test/fixtures/flake8_comprehensions/C401.py:2:5: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:2:5: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
 2 |   x = set(x for x in range(3))
 3 |   x = set(
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 6 6 | _ = '{}'.format(set(a if a < 6 else 0  for a in range(3)))
 7 7 | print(f'Hello {set(a for a in range(3))} World')
 
-./resources/test/fixtures/flake8_comprehensions/C401.py:5:8: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:5:8: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
 5 |     x for x in range(3)
 6 | )
@@ -62,7 +62,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 7 7 | print(f'Hello {set(a for a in range(3))} World')
 8 8 | 
 
-./resources/test/fixtures/flake8_comprehensions/C401.py:6:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:6:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
   |
 6 | )
 7 | y = f'{set(a if a < 6 else 0  for a in range(3))}'
@@ -82,7 +82,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 8 8 | 
 9 9 | def set(*args, **kwargs):
 
-./resources/test/fixtures/flake8_comprehensions/C401.py:7:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+C401.py:7:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
    |
  7 | y = f'{set(a if a < 6 else 0  for a in range(3))}'
  8 | _ = '{}'.format(set(a if a < 6 else 0  for a in range(3)))

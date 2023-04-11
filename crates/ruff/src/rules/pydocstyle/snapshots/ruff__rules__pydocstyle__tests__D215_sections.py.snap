@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/sections.py:156:5: D215 [*] Section underline is over-indented ("Returns")
+sections.py:156:5: D215 [*] Section underline is over-indented ("Returns")
     |
 156 |   @expect("D215: Section underline is over-indented (in section 'Returns')")
 157 |   def section_underline_overindented():  # noqa: D416
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 161 161 | 
 162 162 |     """
 
-./resources/test/fixtures/pydocstyle/sections.py:170:5: D215 [*] Section underline is over-indented ("Returns")
+sections.py:170:5: D215 [*] Section underline is over-indented ("Returns")
     |
 170 |   @expect("D414: Section has no content ('Returns')")
 171 |   def section_underline_overindented_and_contentless():  # noqa: D416

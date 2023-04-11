@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
-./resources/test/fixtures/flake8_bandit/S101.py:2:1: S101 Use of `assert` detected
+S101.py:2:1: S101 Use of `assert` detected
   |
 2 | # Error
 3 | assert True
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 5 | def fn():
   |
 
-./resources/test/fixtures/flake8_bandit/S101.py:8:5: S101 Use of `assert` detected
+S101.py:8:5: S101 Use of `assert` detected
    |
  8 |     # Error
  9 |     assert x == 1
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 11 |     # Error
    |
 
-./resources/test/fixtures/flake8_bandit/S101.py:11:5: S101 Use of `assert` detected
+S101.py:11:5: S101 Use of `assert` detected
    |
 11 |     # Error
 12 |     assert x == 2

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:161:5: D203 [*] 1 blank line required before class docstring
+D.py:161:5: D203 [*] 1 blank line required before class docstring
     |
 161 | class LeadingSpaceMissing:
 162 |     """Leading space missing."""
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 162 163 | 
 163 164 | 
 
-./resources/test/fixtures/pydocstyle/D.py:192:5: D203 [*] 1 blank line required before class docstring
+D.py:192:5: D203 [*] 1 blank line required before class docstring
     |
 192 | class LeadingAndTrailingSpaceMissing:
 193 |     """Leading and trailing space missing."""
@@ -36,7 +36,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 193 194 |     pass
 194 195 | 
 
-./resources/test/fixtures/pydocstyle/D.py:526:5: D203 [*] 1 blank line required before class docstring
+D.py:526:5: D203 [*] 1 blank line required before class docstring
     |
 526 |   # parameters as functions for Google / Numpy conventions.
 527 |   class Blah:  # noqa: D203,D213

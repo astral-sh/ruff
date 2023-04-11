@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/sections.py:17:5: D405 [*] Section name should be properly capitalized ("returns")
+sections.py:17:5: D405 [*] Section name should be properly capitalized ("returns")
    |
 17 |           "('Returns', not 'returns')")
 18 |   def not_capitalized():  # noqa: D416
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 21 21 |     A value of some sort.
 22 22 | 
 
-./resources/test/fixtures/pydocstyle/sections.py:216:5: D405 [*] Section name should be properly capitalized ("Short summary")
+sections.py:216:5: D405 [*] Section name should be properly capitalized ("Short summary")
     |
 216 |   @expect("D407: Missing dashed underline after section ('Raises')")
 217 |   def multiple_sections():  # noqa: D416

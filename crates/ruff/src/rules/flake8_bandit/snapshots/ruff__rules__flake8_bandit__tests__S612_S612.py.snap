@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
-./resources/test/fixtures/flake8_bandit/S612.py:3:5: S612 Use of insecure `logging.config.listen` detected
+S612.py:3:5: S612 Use of insecure `logging.config.listen` detected
   |
 3 | import logging.config
 4 | 

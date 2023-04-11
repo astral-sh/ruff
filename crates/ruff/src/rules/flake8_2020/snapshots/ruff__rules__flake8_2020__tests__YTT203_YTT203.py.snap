@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_2020/mod.rs
 ---
-./resources/test/fixtures/flake8_2020/YTT203.py:4:1: YTT203 `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple
+YTT203.py:4:1: YTT203 `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple
   |
 4 | from sys import version_info
 5 | 
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_2020/mod.rs
 7 | version_info[1] < 6
   |
 
-./resources/test/fixtures/flake8_2020/YTT203.py:5:1: YTT203 `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple
+YTT203.py:5:1: YTT203 `sys.version_info[1]` compared to integer (python4), compare `sys.version_info` to tuple
   |
 5 | sys.version_info[1] >= 5
 6 | version_info[1] < 6

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/import_aliasing.py:9:8: PLR0402 [*] Use `from os import path` in lieu of alias
+import_aliasing.py:9:8: PLR0402 [*] Use `from os import path` in lieu of alias
    |
  9 | from collections import OrderedDict as OrderedDict  # [useless-import-alias]
 10 | from collections import OrderedDict as o_dict
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 11 11 | import foo.bar.foobar as foobar  # [consider-using-from-import]
 12 12 | import foo.bar.foobar as foobar, sys  # [consider-using-from-import]
 
-./resources/test/fixtures/pylint/import_aliasing.py:11:8: PLR0402 [*] Use `from foo.bar import foobar` in lieu of alias
+import_aliasing.py:11:8: PLR0402 [*] Use `from foo.bar import foobar` in lieu of alias
    |
 11 | import os.path as path  # [consider-using-from-import]
 12 | import os.path as p
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 13 13 | import os
 14 14 | import os as OS
 
-./resources/test/fixtures/pylint/import_aliasing.py:12:8: PLR0402 Use `from foo.bar import foobar` in lieu of alias
+import_aliasing.py:12:8: PLR0402 Use `from foo.bar import foobar` in lieu of alias
    |
 12 | import os.path as p
 13 | import foo.bar.foobar as foobar  # [consider-using-from-import]

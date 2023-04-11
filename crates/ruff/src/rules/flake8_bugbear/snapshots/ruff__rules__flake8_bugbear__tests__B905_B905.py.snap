@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B905.py:1:1: B905 `zip()` without an explicit `strict=` parameter
+B905.py:1:1: B905 `zip()` without an explicit `strict=` parameter
   |
 1 | zip()
   | ^^^^^ B905
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 3 | zip("a", "b")
   |
 
-./resources/test/fixtures/flake8_bugbear/B905.py:2:1: B905 `zip()` without an explicit `strict=` parameter
+B905.py:2:1: B905 `zip()` without an explicit `strict=` parameter
   |
 2 | zip()
 3 | zip(range(3))
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 5 | zip("a", "b", *zip("c"))
   |
 
-./resources/test/fixtures/flake8_bugbear/B905.py:3:1: B905 `zip()` without an explicit `strict=` parameter
+B905.py:3:1: B905 `zip()` without an explicit `strict=` parameter
   |
 3 | zip()
 4 | zip(range(3))
@@ -28,7 +28,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 7 | zip(zip("a"), strict=False)
   |
 
-./resources/test/fixtures/flake8_bugbear/B905.py:4:1: B905 `zip()` without an explicit `strict=` parameter
+B905.py:4:1: B905 `zip()` without an explicit `strict=` parameter
   |
 4 | zip(range(3))
 5 | zip("a", "b")
@@ -38,7 +38,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 8 | zip(zip("a", strict=True))
   |
 
-./resources/test/fixtures/flake8_bugbear/B905.py:4:16: B905 `zip()` without an explicit `strict=` parameter
+B905.py:4:16: B905 `zip()` without an explicit `strict=` parameter
   |
 4 | zip(range(3))
 5 | zip("a", "b")
@@ -48,7 +48,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 8 | zip(zip("a", strict=True))
   |
 
-./resources/test/fixtures/flake8_bugbear/B905.py:5:5: B905 `zip()` without an explicit `strict=` parameter
+B905.py:5:5: B905 `zip()` without an explicit `strict=` parameter
   |
 5 | zip("a", "b")
 6 | zip("a", "b", *zip("c"))
@@ -57,7 +57,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 8 | zip(zip("a", strict=True))
   |
 
-./resources/test/fixtures/flake8_bugbear/B905.py:6:1: B905 `zip()` without an explicit `strict=` parameter
+B905.py:6:1: B905 `zip()` without an explicit `strict=` parameter
    |
  6 | zip("a", "b", *zip("c"))
  7 | zip(zip("a"), strict=False)

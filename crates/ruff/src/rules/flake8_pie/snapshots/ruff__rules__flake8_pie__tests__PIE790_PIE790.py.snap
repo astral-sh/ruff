@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pie/mod.rs
 ---
-./resources/test/fixtures/flake8_pie/PIE790.py:4:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:4:5: PIE790 [*] Unnecessary `pass` statement
   |
 4 |     """buzz"""
 5 | 
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 6 5 | 
 7 6 | if foo:
 
-./resources/test/fixtures/flake8_pie/PIE790.py:9:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:9:5: PIE790 [*] Unnecessary `pass` statement
    |
  9 | if foo:
 10 |     """foo"""
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 11 10 | 
 12 11 | def multi_statement() -> None:
 
-./resources/test/fixtures/flake8_pie/PIE790.py:14:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:14:5: PIE790 [*] Unnecessary `pass` statement
    |
 14 | def multi_statement() -> None:
 15 |     """This is a function."""
@@ -56,7 +56,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 16 16 | 
 17 17 | if foo:
 
-./resources/test/fixtures/flake8_pie/PIE790.py:21:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:21:5: PIE790 [*] Unnecessary `pass` statement
    |
 21 | else:
 22 |     """bar"""
@@ -74,7 +74,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 23 22 | 
 24 23 | while True:
 
-./resources/test/fixtures/flake8_pie/PIE790.py:28:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:28:5: PIE790 [*] Unnecessary `pass` statement
    |
 28 | else:
 29 |     """bar"""
@@ -92,7 +92,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 30 29 | 
 31 30 | for _ in range(10):
 
-./resources/test/fixtures/flake8_pie/PIE790.py:35:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:35:5: PIE790 [*] Unnecessary `pass` statement
    |
 35 | else:
 36 |     """bar"""
@@ -110,7 +110,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 37 36 | 
 38 37 | async for _ in range(10):
 
-./resources/test/fixtures/flake8_pie/PIE790.py:42:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:42:5: PIE790 [*] Unnecessary `pass` statement
    |
 42 | else:
 43 |     """bar"""
@@ -128,7 +128,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 44 43 | 
 45 44 | def foo() -> None:
 
-./resources/test/fixtures/flake8_pie/PIE790.py:50:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:50:5: PIE790 [*] Unnecessary `pass` statement
    |
 50 |     """
 51 | 
@@ -146,7 +146,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 52 51 | 
 53 52 | async def foo():
 
-./resources/test/fixtures/flake8_pie/PIE790.py:58:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:58:5: PIE790 [*] Unnecessary `pass` statement
    |
 58 |     """
 59 | 
@@ -164,7 +164,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 60 59 | 
 61 60 | try:
 
-./resources/test/fixtures/flake8_pie/PIE790.py:65:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:65:5: PIE790 [*] Unnecessary `pass` statement
    |
 65 |     buzz
 66 |     """
@@ -184,7 +184,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 67 66 |     pass
 68 67 | 
 
-./resources/test/fixtures/flake8_pie/PIE790.py:74:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:74:5: PIE790 [*] Unnecessary `pass` statement
    |
 74 | except ValueError:
 75 |     """bar"""
@@ -202,7 +202,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 76 75 | 
 77 76 | for _ in range(10):
 
-./resources/test/fixtures/flake8_pie/PIE790.py:79:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:79:5: PIE790 [*] Unnecessary `pass` statement
    |
 79 | for _ in range(10):
 80 |     """buzz"""
@@ -222,7 +222,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 81 80 | async for _ in range(10):
 82 81 |     """buzz"""
 
-./resources/test/fixtures/flake8_pie/PIE790.py:83:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:83:5: PIE790 [*] Unnecessary `pass` statement
    |
 83 | async for _ in range(10):
 84 |     """buzz"""
@@ -242,7 +242,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 85 84 | while cond:
 86 85 |     """buzz"""
 
-./resources/test/fixtures/flake8_pie/PIE790.py:87:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:87:5: PIE790 [*] Unnecessary `pass` statement
    |
 87 | while cond:
 88 |     """buzz"""
@@ -260,7 +260,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 89 88 | 
 90 89 | with bar:
 
-./resources/test/fixtures/flake8_pie/PIE790.py:92:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:92:5: PIE790 [*] Unnecessary `pass` statement
    |
 92 | with bar:
 93 |     """buzz"""
@@ -280,7 +280,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 94 93 | async with bar:
 95 94 |     """buzz"""
 
-./resources/test/fixtures/flake8_pie/PIE790.py:96:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:96:5: PIE790 [*] Unnecessary `pass` statement
    |
 96 | async with bar:
 97 |     """buzz"""
@@ -298,7 +298,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 98 97 | 
 99 98 | def foo() -> None:
 
-./resources/test/fixtures/flake8_pie/PIE790.py:101:5: PIE790 [*] Unnecessary `pass` statement
+PIE790.py:101:5: PIE790 [*] Unnecessary `pass` statement
     |
 101 | def foo() -> None:
 102 |     """buzz"""

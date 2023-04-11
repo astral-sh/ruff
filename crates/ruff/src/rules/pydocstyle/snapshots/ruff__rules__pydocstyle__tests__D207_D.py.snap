@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:232:1: D207 [*] Docstring is under-indented
+D.py:232:1: D207 [*] Docstring is under-indented
     |
 232 |     """Summary.
 233 | 
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 234 234 |     """
 235 235 | 
 
-./resources/test/fixtures/pydocstyle/D.py:244:1: D207 [*] Docstring is under-indented
+D.py:244:1: D207 [*] Docstring is under-indented
     |
 244 |     Description.
 245 | 
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 246 246 | 
 247 247 | @expect('D208: Docstring is over-indented')
 
-./resources/test/fixtures/pydocstyle/D.py:440:1: D207 [*] Docstring is under-indented
+D.py:440:1: D207 [*] Docstring is under-indented
     |
 440 | def docstring_start_in_same_line(): """First Line.
 441 | 
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 442 442 | 
 443 443 | 
 
-./resources/test/fixtures/pydocstyle/D.py:441:1: D207 [*] Docstring is under-indented
+D.py:441:1: D207 [*] Docstring is under-indented
     |
 441 |     Second Line
 442 |     """

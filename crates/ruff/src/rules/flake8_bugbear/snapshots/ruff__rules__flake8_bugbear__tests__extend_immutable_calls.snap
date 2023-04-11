@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B008_extended.py:19:51: B008 Do not perform function call `Depends` in argument defaults
+B008_extended.py:19:51: B008 Do not perform function call `Depends` in argument defaults
    |
 19 | def error_due_to_missing_import(data: List[str] = Depends(None)):
    |                                                   ^^^^^^^^^^^^^ B008

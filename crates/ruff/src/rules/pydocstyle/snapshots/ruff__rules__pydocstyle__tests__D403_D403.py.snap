@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D403.py:2:5: D403 [*] First word of the first line should be capitalized: `this` -> `This`
+D403.py:2:5: D403 [*] First word of the first line should be capitalized: `this` -> `This`
   |
 2 | def bad_function():
 3 |     """this docstring is not capitalized"""

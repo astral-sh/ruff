@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP021.py:6:25: UP021 [*] `universal_newlines` is deprecated, use `text`
+UP021.py:6:25: UP021 [*] `universal_newlines` is deprecated, use `text`
   |
 6 | from subprocess import run as anothername
 7 | 
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 8 | 
 9 9 | run(["foo"], universal_newlines=True, check=False)
 
-./resources/test/fixtures/pyupgrade/UP021.py:7:23: UP021 [*] `universal_newlines` is deprecated, use `text`
+UP021.py:7:23: UP021 [*] `universal_newlines` is deprecated, use `text`
    |
  7 | subprocess.run(["foo"], universal_newlines=True, check=True)
  8 | somename.run(["foo"], universal_newlines=True)
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 9 9 | run(["foo"], universal_newlines=True, check=False)
 10 10 | anothername(["foo"], universal_newlines=True)
 
-./resources/test/fixtures/pyupgrade/UP021.py:9:14: UP021 [*] `universal_newlines` is deprecated, use `text`
+UP021.py:9:14: UP021 [*] `universal_newlines` is deprecated, use `text`
    |
  9 | somename.run(["foo"], universal_newlines=True)
 10 | 
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 11 11 | 
 12 12 | subprocess.run(["foo"], check=True)
 
-./resources/test/fixtures/pyupgrade/UP021.py:10:22: UP021 [*] `universal_newlines` is deprecated, use `text`
+UP021.py:10:22: UP021 [*] `universal_newlines` is deprecated, use `text`
    |
 10 | run(["foo"], universal_newlines=True, check=False)
 11 | anothername(["foo"], universal_newlines=True)

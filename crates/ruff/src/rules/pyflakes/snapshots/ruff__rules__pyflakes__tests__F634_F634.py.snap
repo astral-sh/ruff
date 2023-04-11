@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F634.py:1:1: F634 If test is a tuple, which is always `True`
+F634.py:1:1: F634 If test is a tuple, which is always `True`
   |
 1 | / if (1, 2):
 2 | |     pass
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 4 |   for _ in range(5):
   |
 
-./resources/test/fixtures/pyflakes/F634.py:7:5: F634 If test is a tuple, which is always `True`
+F634.py:7:5: F634 If test is a tuple, which is always `True`
    |
  7 |       if True:
  8 |           pass

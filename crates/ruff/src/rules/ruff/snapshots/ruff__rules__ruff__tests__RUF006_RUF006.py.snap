@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-./resources/test/fixtures/ruff/RUF006.py:6:5: RUF006 Store a reference to the return value of `asyncio.create_task`
+RUF006.py:6:5: RUF006 Store a reference to the return value of `asyncio.create_task`
   |
 6 | # Error
 7 | def f():
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF006
   |
 
-./resources/test/fixtures/ruff/RUF006.py:11:5: RUF006 Store a reference to the return value of `asyncio.ensure_future`
+RUF006.py:11:5: RUF006 Store a reference to the return value of `asyncio.ensure_future`
    |
 11 | # Error
 12 | def f():

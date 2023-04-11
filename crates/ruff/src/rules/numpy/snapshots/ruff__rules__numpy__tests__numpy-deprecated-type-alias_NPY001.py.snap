@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/numpy/mod.rs
 ---
-./resources/test/fixtures/numpy/NPY001.py:6:1: NPY001 [*] Type alias `np.bool` is deprecated, replace with builtin type
+NPY001.py:6:1: NPY001 [*] Type alias `np.bool` is deprecated, replace with builtin type
   |
 6 | # Error
 7 | npy.bool
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 8 8 | 
 9 9 | if dtype == np.object:
 
-./resources/test/fixtures/numpy/NPY001.py:7:1: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
+NPY001.py:7:1: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
    |
  7 | # Error
  8 | npy.bool
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 9 9 | if dtype == np.object:
 10 10 |     ...
 
-./resources/test/fixtures/numpy/NPY001.py:9:13: NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
+NPY001.py:9:13: NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
    |
  9 | npy.int
 10 | 
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 11 11 | 
 12 12 | result = result.select_dtypes([np.byte, np.ubyte, np.short, np.ushort, np.int, np.long])
 
-./resources/test/fixtures/numpy/NPY001.py:12:72: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
+NPY001.py:12:72: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
    |
 12 |     ...
 13 | 
@@ -82,7 +82,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 14 14 | pdf = pd.DataFrame(
 15 15 |     data=[[1, 2, 3]],
 
-./resources/test/fixtures/numpy/NPY001.py:12:80: NPY001 [*] Type alias `np.long` is deprecated, replace with builtin type
+NPY001.py:12:80: NPY001 [*] Type alias `np.long` is deprecated, replace with builtin type
    |
 12 |     ...
 13 | 
@@ -103,7 +103,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 14 14 | pdf = pd.DataFrame(
 15 15 |     data=[[1, 2, 3]],
 
-./resources/test/fixtures/numpy/NPY001.py:17:11: NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
+NPY001.py:17:11: NPY001 [*] Type alias `np.object` is deprecated, replace with builtin type
    |
 17 |     data=[[1, 2, 3]],
 18 |     columns=["a", "b", "c"],
@@ -123,7 +123,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 19 19 | 
 20 20 | _ = arr.astype(np.int)
 
-./resources/test/fixtures/numpy/NPY001.py:20:16: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
+NPY001.py:20:16: NPY001 [*] Type alias `np.int` is deprecated, replace with builtin type
    |
 20 | )
 21 | 

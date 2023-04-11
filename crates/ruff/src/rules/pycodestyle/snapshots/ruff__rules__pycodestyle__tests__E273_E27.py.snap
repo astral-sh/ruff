@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E27.py:10:9: E273 Tab after keyword
+E27.py:10:9: E273 Tab after keyword
    |
 10 | if   1:
 11 | #: E273
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 14 | True		and	False
    |
 
-./resources/test/fixtures/pycodestyle/E27.py:12:5: E273 Tab after keyword
+E27.py:12:5: E273 Tab after keyword
    |
 12 | True and		False
 13 | #: E273 E274
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 16 | a and  b
    |
 
-./resources/test/fixtures/pycodestyle/E27.py:12:10: E273 Tab after keyword
+E27.py:12:10: E273 Tab after keyword
    |
 12 | True and		False
 13 | #: E273 E274
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 16 | a and  b
    |
 
-./resources/test/fixtures/pycodestyle/E27.py:26:6: E273 Tab after keyword
+E27.py:26:6: E273 Tab after keyword
    |
 26 | this  and False
 27 | #: E273
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 30 | a		and b
    |
 
-./resources/test/fixtures/pycodestyle/E27.py:30:10: E273 Tab after keyword
+E27.py:30:10: E273 Tab after keyword
    |
 30 | a		and b
 31 | #: E273 E274

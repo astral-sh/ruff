@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:328:5: D301 Use `r"""` if any backslashes in a docstring
+D.py:328:5: D301 Use `r"""` if any backslashes in a docstring
     |
 328 | @expect('D301: Use r""" if any backslashes in a docstring')
 329 | def single_quotes_raw_uppercase_backslash():
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
     |     ^^^^^^^^^^^^ D301
     |
 
-./resources/test/fixtures/pydocstyle/D.py:333:5: D301 Use `r"""` if any backslashes in a docstring
+D.py:333:5: D301 Use `r"""` if any backslashes in a docstring
     |
 333 | @expect('D301: Use r""" if any backslashes in a docstring')
 334 | def double_quotes_backslash():
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
     |     ^^^^^^^^^^^^^^^^ D301
     |
 
-./resources/test/fixtures/pydocstyle/D.py:338:5: D301 Use `r"""` if any backslashes in a docstring
+D.py:338:5: D301 Use `r"""` if any backslashes in a docstring
     |
 338 | @expect('D301: Use r""" if any backslashes in a docstring')
 339 | def double_quotes_backslash_uppercase():

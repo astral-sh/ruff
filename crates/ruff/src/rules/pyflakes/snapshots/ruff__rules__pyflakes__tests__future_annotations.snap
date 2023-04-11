@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/future_annotations.py:8:5: F401 [*] `models.Nut` imported but unused
+future_annotations.py:8:5: F401 [*] `models.Nut` imported but unused
    |
  8 | from models import (
  9 |     Fruit,
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 10 9 | 
 11 10 | 
 
-./resources/test/fixtures/pyflakes/future_annotations.py:26:19: F821 Undefined name `Bar`
+future_annotations.py:26:19: F821 Undefined name `Bar`
    |
 26 |     @classmethod
 27 |     def c(cls) -> Bar:

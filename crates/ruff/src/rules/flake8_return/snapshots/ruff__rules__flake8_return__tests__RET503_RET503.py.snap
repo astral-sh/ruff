@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
-./resources/test/fixtures/flake8_return/RET503.py:20:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:20:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 20 |   # if/elif/else
 21 |   def x(y):
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 23 24 | 
 24 25 | 
 
-./resources/test/fixtures/flake8_return/RET503.py:27:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:27:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 27 | def x(y):
 28 |     if not y:
@@ -42,7 +42,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 29 30 |         return 2
 30 31 | 
 
-./resources/test/fixtures/flake8_return/RET503.py:36:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:36:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 36 |         return 1
 37 | 
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 38 39 | 
 39 40 | # for
 
-./resources/test/fixtures/flake8_return/RET503.py:41:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:41:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 41 |   # for
 42 |   def x(y):
@@ -82,7 +82,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 45 46 | 
 46 47 | 
 
-./resources/test/fixtures/flake8_return/RET503.py:52:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:52:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 52 |             return i
 53 |     else:
@@ -100,7 +100,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 54 55 | 
 55 56 | # A nonexistent function
 
-./resources/test/fixtures/flake8_return/RET503.py:59:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:59:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 59 |     if x > 0:
 60 |         return False
@@ -118,7 +118,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 61 62 | 
 62 63 | # A function that does return the control
 
-./resources/test/fixtures/flake8_return/RET503.py:66:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:66:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 66 |     if x > 0:
 67 |         return False
@@ -136,7 +136,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 68 69 | 
 69 70 | ###
 
-./resources/test/fixtures/flake8_return/RET503.py:82:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:82:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
    |
 82 |   # last line in while loop
 83 |   def x(y):
@@ -158,7 +158,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 87 88 | 
 88 89 | # exclude empty functions
 
-./resources/test/fixtures/flake8_return/RET503.py:113:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:113:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 113 |   # return value within loop
 114 |   def bar1(x, y, z):
@@ -180,7 +180,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 118 119 | 
 119 120 | def bar3(x, y, z):
 
-./resources/test/fixtures/flake8_return/RET503.py:120:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:120:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 120 |   def bar3(x, y, z):
 121 |       for i in x:
@@ -204,7 +204,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 128 129 | 
 129 130 | def bar1(x, y, z):
 
-./resources/test/fixtures/flake8_return/RET503.py:130:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:130:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 130 |   def bar1(x, y, z):
 131 |       for i in x:
@@ -225,7 +225,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 135 136 | 
 136 137 | def bar3(x, y, z):
 
-./resources/test/fixtures/flake8_return/RET503.py:137:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:137:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 137 |   def bar3(x, y, z):
 138 |       for i in x:
@@ -249,7 +249,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 145 146 | 
 146 147 | def prompts(self, foo):
 
-./resources/test/fixtures/flake8_return/RET503.py:274:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:274:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 274 |           return False
 275 |   
@@ -269,7 +269,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 277 278 | 
 278 279 | def while_true():
 
-./resources/test/fixtures/flake8_return/RET503.py:291:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:291:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 291 |             return 1
 292 |         case 1:
@@ -287,7 +287,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 293 294 | 
 294 295 | def foo(baz: str) -> str:
 
-./resources/test/fixtures/flake8_return/RET503.py:300:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:300:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 300 |   def end_of_statement():
 301 |       def example():
@@ -307,7 +307,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 303 304 | 
 304 305 |     def example():
 
-./resources/test/fixtures/flake8_return/RET503.py:305:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:305:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 305 |       def example():
 306 |           if True:
@@ -326,7 +326,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 308 309 | 
 309 310 |     def example():
 
-./resources/test/fixtures/flake8_return/RET503.py:310:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:310:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 310 |       def example():
 311 |           if True:
@@ -345,7 +345,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 313 314 | 
 314 315 |     def example():
 
-./resources/test/fixtures/flake8_return/RET503.py:315:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:315:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 315 |       def example():
 316 |           if True:
@@ -364,7 +364,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 318 319 | 
 319 320 |     def example():
 
-./resources/test/fixtures/flake8_return/RET503.py:320:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+RET503.py:320:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
     |
 320 |       def example():
 321 |           if True:

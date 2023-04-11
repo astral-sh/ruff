@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP035.py:2:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:2:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
   |
 2 | # UP035
 3 | from collections import Mapping
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 4 4 | from collections import Mapping as MAP
 5 5 | 
 
-./resources/test/fixtures/pyupgrade/UP035.py:4:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:4:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
   |
 4 | from collections import Mapping
 5 | 
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 6 6 | from collections import Mapping, Sequence
 7 7 | 
 
-./resources/test/fixtures/pyupgrade/UP035.py:6:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
+UP035.py:6:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
    |
  6 | from collections import Mapping as MAP
  7 | 
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 8 | from collections import Counter, Mapping
 9 9 | 
 
-./resources/test/fixtures/pyupgrade/UP035.py:8:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:8:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
  8 | from collections import Mapping, Sequence
  9 | 
@@ -83,7 +83,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 10 11 | from collections import (Counter, Mapping)
 11 12 | 
 
-./resources/test/fixtures/pyupgrade/UP035.py:10:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:10:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 10 | from collections import Counter, Mapping
 11 | 
@@ -105,7 +105,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 12 13 | from collections import (Counter,
 13 14 |                          Mapping)
 
-./resources/test/fixtures/pyupgrade/UP035.py:12:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:12:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 12 |   from collections import (Counter, Mapping)
 13 |   
@@ -129,7 +129,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 15 15 | from collections import Counter, \
 16 16 |                          Mapping
 
-./resources/test/fixtures/pyupgrade/UP035.py:15:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:15:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 15 |                            Mapping)
 16 |   
@@ -153,7 +153,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 18 18 | from collections import Counter, Mapping, Sequence
 19 19 | 
 
-./resources/test/fixtures/pyupgrade/UP035.py:18:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
+UP035.py:18:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
    |
 18 |                          Mapping
 19 | 
@@ -175,7 +175,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 21 | from collections import Mapping as mapping, Counter
 21 22 | 
 
-./resources/test/fixtures/pyupgrade/UP035.py:20:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:20:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 20 | from collections import Counter, Mapping, Sequence
 21 | 
@@ -197,7 +197,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 22 23 | if True:
 23 24 |     from collections import Mapping, Counter
 
-./resources/test/fixtures/pyupgrade/UP035.py:23:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:23:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 23 | if True:
 24 |     from collections import Mapping, Counter
@@ -218,7 +218,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 25 26 | if True:
 26 27 |     if True:
 
-./resources/test/fixtures/pyupgrade/UP035.py:28:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:28:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 28 |     if True:
 29 |         pass
@@ -240,7 +240,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 30 31 | if True: from collections import Mapping
 31 32 | 
 
-./resources/test/fixtures/pyupgrade/UP035.py:30:10: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:30:10: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 30 |     from collections import Mapping, Counter
 31 | 
@@ -261,7 +261,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 32 32 | import os
 33 33 | from collections import Counter, Mapping
 
-./resources/test/fixtures/pyupgrade/UP035.py:33:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+UP035.py:33:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
    |
 33 | import os
 34 | from collections import Counter, Mapping
@@ -281,7 +281,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 35 36 | 
 36 37 | if True:
 
-./resources/test/fixtures/pyupgrade/UP035.py:37:5: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Callable`
+UP035.py:37:5: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Callable`
    |
 37 |   if True:
 38 |       from collections import (
@@ -311,7 +311,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 44 43 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
 45 44 | 
 
-./resources/test/fixtures/pyupgrade/UP035.py:44:1: UP035 [*] Import from `collections.abc` instead: `Callable`
+UP035.py:44:1: UP035 [*] Import from `collections.abc` instead: `Callable`
    |
 44 |     )
 45 | 
@@ -333,7 +333,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 46 47 | if True: from collections import (
 47 48 |     Mapping, Counter)
 
-./resources/test/fixtures/pyupgrade/UP035.py:44:1: UP035 [*] Import from `collections` instead: `OrderedDict`
+UP035.py:44:1: UP035 [*] Import from `collections` instead: `OrderedDict`
    |
 44 |     )
 45 | 
@@ -355,7 +355,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 46 47 | if True: from collections import (
 47 48 |     Mapping, Counter)
 
-./resources/test/fixtures/pyupgrade/UP035.py:44:1: UP035 [*] Import from `re` instead: `Match`, `Pattern`
+UP035.py:44:1: UP035 [*] Import from `re` instead: `Match`, `Pattern`
    |
 44 |     )
 45 | 
@@ -377,7 +377,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 46 47 | if True: from collections import (
 47 48 |     Mapping, Counter)
 
-./resources/test/fixtures/pyupgrade/UP035.py:44:1: UP035 `typing.List` is deprecated, use `list` instead
+UP035.py:44:1: UP035 `typing.List` is deprecated, use `list` instead
    |
 44 |     )
 45 | 
@@ -387,7 +387,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 48 | if True: from collections import (
    |
 
-./resources/test/fixtures/pyupgrade/UP035.py:44:1: UP035 `typing.AbstractSet` is deprecated, use `collections.abc.Set` instead
+UP035.py:44:1: UP035 `typing.AbstractSet` is deprecated, use `collections.abc.Set` instead
    |
 44 |     )
 45 | 
@@ -397,7 +397,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 48 | if True: from collections import (
    |
 
-./resources/test/fixtures/pyupgrade/UP035.py:44:1: UP035 `typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead
+UP035.py:44:1: UP035 `typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead
    |
 44 |     )
 45 | 
@@ -407,7 +407,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 48 | if True: from collections import (
    |
 
-./resources/test/fixtures/pyupgrade/UP035.py:46:10: UP035 Import from `collections.abc` instead: `Mapping`
+UP035.py:46:10: UP035 Import from `collections.abc` instead: `Mapping`
    |
 46 |   from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
 47 |   

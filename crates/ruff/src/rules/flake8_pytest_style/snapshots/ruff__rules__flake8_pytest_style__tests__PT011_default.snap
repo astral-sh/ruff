@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT011.py:17:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+PT011.py:17:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
    |
 17 | def test_error_no_argument_given():
 18 |     with pytest.raises(ValueError):
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 19 |         raise ValueError("Can't divide 1 by 0")
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT011.py:20:24: PT011 `pytest.raises(socket.error)` is too broad, set the `match` parameter or use a more specific exception
+PT011.py:20:24: PT011 `pytest.raises(socket.error)` is too broad, set the `match` parameter or use a more specific exception
    |
 20 |         raise ValueError("Can't divide 1 by 0")
 21 | 
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 23 |         raise ValueError("Can't divide 1 by 0")
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT011.py:25:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+PT011.py:25:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
    |
 25 | def test_error_match_is_empty():
 26 |     with pytest.raises(ValueError, match=None):
@@ -26,7 +26,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 27 |         raise ValueError("Can't divide 1 by 0")
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT011.py:28:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+PT011.py:28:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
    |
 28 |         raise ValueError("Can't divide 1 by 0")
 29 | 
@@ -35,7 +35,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 31 |         raise ValueError("Can't divide 1 by 0")
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT011.py:31:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
+PT011.py:31:24: PT011 `pytest.raises(ValueError)` is too broad, set the `match` parameter or use a more specific exception
    |
 31 |         raise ValueError("Can't divide 1 by 0")
 32 | 

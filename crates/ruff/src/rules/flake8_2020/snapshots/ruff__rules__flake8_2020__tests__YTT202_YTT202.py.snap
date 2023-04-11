@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_2020/mod.rs
 ---
-./resources/test/fixtures/flake8_2020/YTT202.py:4:4: YTT202 `six.PY3` referenced (python4), use `not six.PY2`
+YTT202.py:4:4: YTT202 `six.PY3` referenced (python4), use `not six.PY2`
   |
 4 | from six import PY3
 5 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_2020/mod.rs
 8 | if PY3:
   |
 
-./resources/test/fixtures/flake8_2020/YTT202.py:6:4: YTT202 `six.PY3` referenced (python4), use `not six.PY2`
+YTT202.py:6:4: YTT202 `six.PY3` referenced (python4), use `not six.PY2`
   |
 6 | if six.PY3:
 7 |     print("3")

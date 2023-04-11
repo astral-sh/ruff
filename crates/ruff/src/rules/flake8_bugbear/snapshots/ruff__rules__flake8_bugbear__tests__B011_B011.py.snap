@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B011.py:8:8: B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
+B011.py:8:8: B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
    |
  8 | assert 1 != 2
  9 | assert False
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 9 9 | assert 1 != 2, "message"
 10 10 | assert False, "message"
 
-./resources/test/fixtures/flake8_bugbear/B011.py:10:8: B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
+B011.py:10:8: B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
    |
 10 | assert False
 11 | assert 1 != 2, "message"

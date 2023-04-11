@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP024_0.py:6:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:6:8: UP024 [*] Replace aliased errors with `OSError`
   |
 6 | try:
 7 |     pass
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 8 | 
 9 9 | try:
 
-./resources/test/fixtures/pyupgrade/UP024_0.py:11:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:11:8: UP024 [*] Replace aliased errors with `OSError`
    |
 11 | try:
 12 |     pass
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 13 13 | 
 14 14 | try:
 
-./resources/test/fixtures/pyupgrade/UP024_0.py:16:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:16:8: UP024 [*] Replace aliased errors with `OSError`
    |
 16 | try:
 17 |     pass
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 18 18 | 
 19 19 | try:
 
-./resources/test/fixtures/pyupgrade/UP024_0.py:21:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:21:8: UP024 [*] Replace aliased errors with `OSError`
    |
 21 | try:
 22 |     pass
@@ -81,7 +81,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 23 23 | 
 24 24 | try:
 
-./resources/test/fixtures/pyupgrade/UP024_0.py:26:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:26:8: UP024 [*] Replace aliased errors with `OSError`
    |
 26 | try:
 27 |     pass
@@ -101,7 +101,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 28 28 | 
 29 29 | try:
 
-./resources/test/fixtures/pyupgrade/UP024_0.py:31:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:31:8: UP024 [*] Replace aliased errors with `OSError`
    |
 31 | try:
 32 |     pass
@@ -121,7 +121,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 33 33 | 
 34 34 | try:
 
-./resources/test/fixtures/pyupgrade/UP024_0.py:36:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:36:8: UP024 [*] Replace aliased errors with `OSError`
    |
 36 | try:
 37 |     pass
@@ -141,7 +141,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 38 38 | 
 39 39 | # Should NOT be in parentheses when replaced
 
-./resources/test/fixtures/pyupgrade/UP024_0.py:43:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:43:8: UP024 [*] Replace aliased errors with `OSError`
    |
 43 | try:
 44 |     pass
@@ -162,7 +162,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 45 45 | try:
 46 46 |     pass
 
-./resources/test/fixtures/pyupgrade/UP024_0.py:47:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:47:8: UP024 [*] Replace aliased errors with `OSError`
    |
 47 | try:
 48 |     pass
@@ -183,7 +183,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 49 49 | try:
 50 50 |     pass
 
-./resources/test/fixtures/pyupgrade/UP024_0.py:51:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:51:8: UP024 [*] Replace aliased errors with `OSError`
    |
 51 | try:
 52 |     pass
@@ -203,7 +203,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 53 53 | 
 54 54 | # Should be kept in parentheses (because multiple)
 
-./resources/test/fixtures/pyupgrade/UP024_0.py:58:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:58:8: UP024 [*] Replace aliased errors with `OSError`
    |
 58 | try:
 59 |     pass
@@ -223,7 +223,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 60 60 | 
 61 61 | # First should change, second should not
 
-./resources/test/fixtures/pyupgrade/UP024_0.py:65:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:65:8: UP024 [*] Replace aliased errors with `OSError`
    |
 65 | try:
 66 |     pass
@@ -244,7 +244,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 67 67 | # These should not change
 68 68 | 
 
-./resources/test/fixtures/pyupgrade/UP024_0.py:87:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_0.py:87:8: UP024 [*] Replace aliased errors with `OSError`
    |
 87 | try:
 88 |     pass

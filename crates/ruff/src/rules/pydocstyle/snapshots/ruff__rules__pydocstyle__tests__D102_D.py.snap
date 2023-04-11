@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:23:9: D102 Missing docstring in public method
+D.py:23:9: D102 Missing docstring in public method
    |
 23 |     @expect('D102: Missing docstring in public method')
 24 |     def method(self=None):
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 25 |         pass
    |
 
-./resources/test/fixtures/pydocstyle/D.py:56:9: D102 Missing docstring in public method
+D.py:56:9: D102 Missing docstring in public method
    |
 56 |     @expect('D102: Missing docstring in public method')
 57 |     def __new__(self=None):
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 58 |         pass
    |
 
-./resources/test/fixtures/pydocstyle/D.py:68:9: D102 Missing docstring in public method
+D.py:68:9: D102 Missing docstring in public method
    |
 68 |     @expect('D102: Missing docstring in public method')
 69 |     def __call__(self=None, x=None, y=None, z=None):

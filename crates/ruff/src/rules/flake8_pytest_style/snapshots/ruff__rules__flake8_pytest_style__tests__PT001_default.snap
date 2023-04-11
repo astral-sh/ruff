@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT001.py:9:2: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
+PT001.py:9:2: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
  9 | @pytest.fixture
    |  ^^^^^^^^^^^^^^ PT001
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 11 11 |     return 42
 12 12 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT001.py:34:2: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
+PT001.py:34:2: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
 34 | @fixture
    |  ^^^^^^^ PT001
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 36 36 |     return 42
 37 37 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT001.py:59:2: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
+PT001.py:59:2: PT001 [*] Use `@pytest.fixture()` over `@pytest.fixture`
    |
 59 | @aliased
    |  ^^^^^^^ PT001

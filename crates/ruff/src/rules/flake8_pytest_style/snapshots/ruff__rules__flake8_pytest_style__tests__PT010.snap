@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT010.py:5:10: PT010 set the expected exception in `pytest.raises()`
+PT010.py:5:10: PT010 set the expected exception in `pytest.raises()`
   |
 5 | def test_ok():
 6 |     with pytest.raises():

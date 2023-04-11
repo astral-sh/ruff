@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F524.py:1:1: F524 `.format` call is missing argument(s) for placeholder(s): 1
+F524.py:1:1: F524 `.format` call is missing argument(s) for placeholder(s): 1
   |
 1 | "{} {}".format(1)  # F524
   | ^^^^^^^^^^^^^^^^^ F524
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 3 | "{bar}".format()  # F524
   |
 
-./resources/test/fixtures/pyflakes/F524.py:2:1: F524 `.format` call is missing argument(s) for placeholder(s): 2
+F524.py:2:1: F524 `.format` call is missing argument(s) for placeholder(s): 2
   |
 2 | "{} {}".format(1)  # F524
 3 | "{2}".format()  # F524
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 5 | "{0} {bar}".format(1)  # F524
   |
 
-./resources/test/fixtures/pyflakes/F524.py:3:1: F524 `.format` call is missing argument(s) for placeholder(s): bar
+F524.py:3:1: F524 `.format` call is missing argument(s) for placeholder(s): bar
   |
 3 | "{} {}".format(1)  # F524
 4 | "{2}".format()  # F524
@@ -28,7 +28,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 7 | "{0} {bar}".format()  # F524
   |
 
-./resources/test/fixtures/pyflakes/F524.py:4:1: F524 `.format` call is missing argument(s) for placeholder(s): bar
+F524.py:4:1: F524 `.format` call is missing argument(s) for placeholder(s): bar
   |
 4 | "{2}".format()  # F524
 5 | "{bar}".format()  # F524
@@ -38,7 +38,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 8 | "{bar} {0}".format()  # F524
   |
 
-./resources/test/fixtures/pyflakes/F524.py:5:1: F524 `.format` call is missing argument(s) for placeholder(s): 0, bar
+F524.py:5:1: F524 `.format` call is missing argument(s) for placeholder(s): 0, bar
   |
 5 | "{bar}".format()  # F524
 6 | "{0} {bar}".format(1)  # F524
@@ -47,7 +47,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 8 | "{bar} {0}".format()  # F524
   |
 
-./resources/test/fixtures/pyflakes/F524.py:6:1: F524 `.format` call is missing argument(s) for placeholder(s): 0, bar
+F524.py:6:1: F524 `.format` call is missing argument(s) for placeholder(s): 0, bar
   |
 6 | "{0} {bar}".format(1)  # F524
 7 | "{0} {bar}".format()  # F524

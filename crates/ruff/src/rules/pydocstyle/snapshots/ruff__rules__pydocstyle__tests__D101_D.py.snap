@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:15:7: D101 Missing docstring in public class
+D.py:15:7: D101 Missing docstring in public class
    |
 15 | class class_:
    |       ^^^^^^ D101

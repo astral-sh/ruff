@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F706.py:6:5: F706 `return` statement outside of a function/method
+F706.py:6:5: F706 `return` statement outside of a function/method
   |
 6 | class Foo:
 7 |     return 2
   |     ^^^^^^^^ F706
   |
 
-./resources/test/fixtures/pyflakes/F706.py:9:1: F706 `return` statement outside of a function/method
+F706.py:9:1: F706 `return` statement outside of a function/method
   |
 9 | return 3
   | ^^^^^^^^ F706

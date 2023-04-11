@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
-./resources/test/fixtures/flake8_bandit/S104.py:9:1: S104 Possible binding to all interfaces
+S104.py:9:1: S104 Possible binding to all interfaces
    |
  9 | # Error
 10 | "0.0.0.0"
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 11 | '0.0.0.0'
    |
 
-./resources/test/fixtures/flake8_bandit/S104.py:10:1: S104 Possible binding to all interfaces
+S104.py:10:1: S104 Possible binding to all interfaces
    |
 10 | # Error
 11 | "0.0.0.0"
@@ -17,14 +17,14 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
    | ^^^^^^^^^ S104
    |
 
-./resources/test/fixtures/flake8_bandit/S104.py:14:6: S104 Possible binding to all interfaces
+S104.py:14:6: S104 Possible binding to all interfaces
    |
 14 | # Error
 15 | func("0.0.0.0")
    |      ^^^^^^^^^ S104
    |
 
-./resources/test/fixtures/flake8_bandit/S104.py:18:9: S104 Possible binding to all interfaces
+S104.py:18:9: S104 Possible binding to all interfaces
    |
 18 | def my_func():
 19 |     x = "0.0.0.0"

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-./resources/test/fixtures/ruff/RUF005.py:10:7: RUF005 [*] Consider `[1, 2, 3, *foo]` instead of concatenation
+RUF005.py:10:7: RUF005 [*] Consider `[1, 2, 3, *foo]` instead of concatenation
    |
 10 | foo = [4, 5, 6]
 11 | bar = [1, 2, 3] + foo
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 12 12 | quux = (7, 8, 9) + zoob
 13 13 | spam = quux + (10, 11, 12)
 
-./resources/test/fixtures/ruff/RUF005.py:12:8: RUF005 [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
+RUF005.py:12:8: RUF005 [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
    |
 12 | bar = [1, 2, 3] + foo
 13 | zoob = tuple(bar)
@@ -42,7 +42,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 14 14 | spom = list(spam)
 15 15 | eggs = spom + [13, 14, 15]
 
-./resources/test/fixtures/ruff/RUF005.py:13:8: RUF005 [*] Consider `(*quux, 10, 11, 12)` instead of concatenation
+RUF005.py:13:8: RUF005 [*] Consider `(*quux, 10, 11, 12)` instead of concatenation
    |
 13 | zoob = tuple(bar)
 14 | quux = (7, 8, 9) + zoob
@@ -63,7 +63,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 15 15 | eggs = spom + [13, 14, 15]
 16 16 | elatement = ("we all say", ) + yay()
 
-./resources/test/fixtures/ruff/RUF005.py:15:8: RUF005 [*] Consider `[*spom, 13, 14, 15]` instead of concatenation
+RUF005.py:15:8: RUF005 [*] Consider `[*spom, 13, 14, 15]` instead of concatenation
    |
 15 | spam = quux + (10, 11, 12)
 16 | spom = list(spam)
@@ -84,7 +84,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 17 17 | excitement = ("we all think", ) + Fun().yay()
 18 18 | astonishment = ("we all feel", ) + Fun.words
 
-./resources/test/fixtures/ruff/RUF005.py:16:13: RUF005 [*] Consider `("we all say", *yay())` instead of concatenation
+RUF005.py:16:13: RUF005 [*] Consider `("we all say", *yay())` instead of concatenation
    |
 16 | spom = list(spam)
 17 | eggs = spom + [13, 14, 15]
@@ -105,7 +105,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 18 18 | astonishment = ("we all feel", ) + Fun.words
 19 19 | 
 
-./resources/test/fixtures/ruff/RUF005.py:17:14: RUF005 [*] Consider `("we all think", *Fun().yay())` instead of concatenation
+RUF005.py:17:14: RUF005 [*] Consider `("we all think", *Fun().yay())` instead of concatenation
    |
 17 | eggs = spom + [13, 14, 15]
 18 | elatement = ("we all say", ) + yay()
@@ -125,7 +125,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 19 19 | 
 20 20 | chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
 
-./resources/test/fixtures/ruff/RUF005.py:18:16: RUF005 [*] Consider `("we all feel", *Fun.words)` instead of concatenation
+RUF005.py:18:16: RUF005 [*] Consider `("we all feel", *Fun.words)` instead of concatenation
    |
 18 | elatement = ("we all say", ) + yay()
 19 | excitement = ("we all think", ) + Fun().yay()
@@ -146,7 +146,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 20 20 | chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
 21 21 | 
 
-./resources/test/fixtures/ruff/RUF005.py:20:9: RUF005 [*] Consider `["a", "b", "c", *eggs]` instead of concatenation
+RUF005.py:20:9: RUF005 [*] Consider `["a", "b", "c", *eggs]` instead of concatenation
    |
 20 | astonishment = ("we all feel", ) + Fun.words
 21 | 
@@ -167,7 +167,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 22 22 | baz = () + zoob
 23 23 | 
 
-./resources/test/fixtures/ruff/RUF005.py:20:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of concatenation
+RUF005.py:20:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of concatenation
    |
 20 | astonishment = ("we all feel", ) + Fun.words
 21 | 
@@ -188,7 +188,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 22 22 | baz = () + zoob
 23 23 | 
 
-./resources/test/fixtures/ruff/RUF005.py:22:7: RUF005 [*] Consider `(*zoob,)` instead of concatenation
+RUF005.py:22:7: RUF005 [*] Consider `(*zoob,)` instead of concatenation
    |
 22 | chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
 23 | 
@@ -209,7 +209,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 24 24 | first = [
 25 25 |     # The order
 
-./resources/test/fixtures/ruff/RUF005.py:32:10: RUF005 Consider `[*first, 4, 5, 6]` instead of concatenation
+RUF005.py:32:10: RUF005 Consider `[*first, 4, 5, 6]` instead of concatenation
    |
 32 |       # to preserve
 33 |   ]
@@ -227,7 +227,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 43 |   [] + foo + [
    |
 
-./resources/test/fixtures/ruff/RUF005.py:41:1: RUF005 [*] Consider `[*foo]` instead of concatenation
+RUF005.py:41:1: RUF005 [*] Consider `[*foo]` instead of concatenation
    |
 41 | ]
 42 | 
@@ -247,7 +247,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 43 43 | 
 44 44 | [] + foo + [  # This will be preserved, but doesn't prevent the fix
 
-./resources/test/fixtures/ruff/RUF005.py:44:1: RUF005 [*] Consider `[*foo]` instead of concatenation
+RUF005.py:44:1: RUF005 [*] Consider `[*foo]` instead of concatenation
    |
 44 | ]
 45 | 

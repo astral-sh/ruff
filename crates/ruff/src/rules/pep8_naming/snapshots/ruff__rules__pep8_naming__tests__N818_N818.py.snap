@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 ---
-./resources/test/fixtures/pep8_naming/N818.py:9:7: N818 Exception name `C` should be named with an Error suffix
+N818.py:9:7: N818 Exception name `C` should be named with an Error suffix
    |
  9 | class C(Exception):
    |       ^ N818
 10 |     pass
    |
 
-./resources/test/fixtures/pep8_naming/N818.py:17:7: N818 Exception name `E` should be named with an Error suffix
+N818.py:17:7: N818 Exception name `E` should be named with an Error suffix
    |
 17 | class E(AnotherError):
    |       ^ N818

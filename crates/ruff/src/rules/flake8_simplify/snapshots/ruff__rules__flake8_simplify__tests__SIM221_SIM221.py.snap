@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM221.py:1:4: SIM221 [*] Use `True` instead of `a or not a`
+SIM221.py:1:4: SIM221 [*] Use `True` instead of `a or not a`
   |
 1 | if a or not a:
   |    ^^^^^^^^^^ SIM221
@@ -16,7 +16,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 3 3 | 
 4 4 | if (a or not a) or b:
 
-./resources/test/fixtures/flake8_simplify/SIM221.py:4:5: SIM221 [*] Use `True` instead of `a or not a`
+SIM221.py:4:5: SIM221 [*] Use `True` instead of `a or not a`
   |
 4 |     pass
 5 | 
@@ -36,7 +36,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 6 6 | 
 7 7 | if (a or not a) and b:
 
-./resources/test/fixtures/flake8_simplify/SIM221.py:7:5: SIM221 [*] Use `True` instead of `a or not a`
+SIM221.py:7:5: SIM221 [*] Use `True` instead of `a or not a`
    |
  7 |     pass
  8 | 

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E11.py:6:6: E117 Over-indented
+E11.py:6:6: E117 Over-indented
    |
  6 | #: E111 E117
  7 | if True:
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 10 | if False:
    |
 
-./resources/test/fixtures/pycodestyle/E11.py:39:9: E117 Over-indented
+E11.py:39:9: E117 Over-indented
    |
 39 | #: E117
 40 | def start():
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 43 | def start():
    |
 
-./resources/test/fixtures/pycodestyle/E11.py:42:3: E117 Over-indented
+E11.py:42:3: E117 Over-indented
    |
 42 | #: E117 W191
 43 | def start():

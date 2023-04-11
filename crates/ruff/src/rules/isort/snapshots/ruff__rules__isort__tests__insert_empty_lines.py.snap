@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/isort/mod.rs
 ---
-./resources/test/fixtures/isort/insert_empty_lines.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+insert_empty_lines.py:1:1: I001 [*] Import block is un-sorted or un-formatted
   |
 1 | / import a
 2 | | import b
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/isort/mod.rs
 4 5 | import os
 5 6 | import sys
 
-./resources/test/fixtures/isort/insert_empty_lines.py:4:1: I001 [*] Import block is un-sorted or un-formatted
+insert_empty_lines.py:4:1: I001 [*] Import block is un-sorted or un-formatted
    |
  4 |   import b
  5 |   x = 1
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/isort/mod.rs
 7 9 |     pass
 8 10 | if True:
 
-./resources/test/fixtures/isort/insert_empty_lines.py:14:1: I001 [*] Import block is un-sorted or un-formatted
+insert_empty_lines.py:14:1: I001 [*] Import block is un-sorted or un-formatted
    |
 14 |   class X: pass
 15 |   y = 1
@@ -65,7 +65,7 @@ source: crates/ruff/src/rules/isort/mod.rs
 17 18 | 
 18 19 | if True:
 
-./resources/test/fixtures/isort/insert_empty_lines.py:52:1: I001 [*] Import block is un-sorted or un-formatted
+insert_empty_lines.py:52:1: I001 [*] Import block is un-sorted or un-formatted
    |
 52 | / import os
 53 | | 

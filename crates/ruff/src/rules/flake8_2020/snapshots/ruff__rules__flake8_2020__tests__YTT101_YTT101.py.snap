@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_2020/mod.rs
 ---
-./resources/test/fixtures/flake8_2020/YTT101.py:6:7: YTT101 `sys.version[:3]` referenced (python3.10), use `sys.version_info`
+YTT101.py:6:7: YTT101 `sys.version[:3]` referenced (python3.10), use `sys.version_info`
    |
  6 | print(sys.version)
  7 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_2020/mod.rs
 10 | print(v[:3])
    |
 
-./resources/test/fixtures/flake8_2020/YTT101.py:7:7: YTT101 `sys.version[:3]` referenced (python3.10), use `sys.version_info`
+YTT101.py:7:7: YTT101 `sys.version[:3]` referenced (python3.10), use `sys.version_info`
   |
 7 | print(sys.version[:3])
 8 | print(version[:3])
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_2020/mod.rs
 9 | print(v[:3])
   |
 
-./resources/test/fixtures/flake8_2020/YTT101.py:8:7: YTT101 `sys.version[:3]` referenced (python3.10), use `sys.version_info`
+YTT101.py:8:7: YTT101 `sys.version[:3]` referenced (python3.10), use `sys.version_info`
    |
  8 | print(sys.version[:3])
  9 | print(version[:3])

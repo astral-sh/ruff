@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT016.py:13:5: PT016 No message passed to `pytest.fail()`
+PT016.py:13:5: PT016 No message passed to `pytest.fail()`
    |
 13 | def test_xxx():  # Error
 14 |     pytest.fail()
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 16 |     pytest.fail(f"")
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT016.py:14:5: PT016 No message passed to `pytest.fail()`
+PT016.py:14:5: PT016 No message passed to `pytest.fail()`
    |
 14 | def test_xxx():  # Error
 15 |     pytest.fail()
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 18 |     pytest.fail(msg="")
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT016.py:15:5: PT016 No message passed to `pytest.fail()`
+PT016.py:15:5: PT016 No message passed to `pytest.fail()`
    |
 15 |     pytest.fail()
 16 |     pytest.fail("")
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 19 |     pytest.fail(msg=f"")
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT016.py:16:5: PT016 No message passed to `pytest.fail()`
+PT016.py:16:5: PT016 No message passed to `pytest.fail()`
    |
 16 |     pytest.fail("")
 17 |     pytest.fail(f"")
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 19 |     pytest.fail(msg=f"")
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT016.py:17:5: PT016 No message passed to `pytest.fail()`
+PT016.py:17:5: PT016 No message passed to `pytest.fail()`
    |
 17 |     pytest.fail(f"")
 18 |     pytest.fail(msg="")

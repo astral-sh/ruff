@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F50x.py:9:1: F502 `%`-format string expected mapping but got sequence
+F50x.py:9:1: F502 `%`-format string expected mapping but got sequence
    |
  9 | '%(bar)s' % {}  # F505
 10 | '%(bar)s' % {'bar': 1, 'baz': 2}  # F504

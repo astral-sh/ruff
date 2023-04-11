@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E26.py:19:5: E266 Too many leading `#` before block comment
+E26.py:19:5: E266 Too many leading `#` before block comment
    |
 19 | def how_it_feel(r):
 20 | 
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 22 |     a = 42
    |
 
-./resources/test/fixtures/pycodestyle/E26.py:22:5: E266 Too many leading `#` before block comment
+E26.py:22:5: E266 Too many leading `#` before block comment
    |
 22 |     a = 42
 23 | 
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 26 | #: E265:1:1 E266:2:1
    |
 
-./resources/test/fixtures/pycodestyle/E26.py:26:1: E266 Too many leading `#` before block comment
+E26.py:26:1: E266 Too many leading `#` before block comment
    |
 26 | #: E265:1:1 E266:2:1
 27 | ##if DEBUG:

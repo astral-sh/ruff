@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E70.py:10:13: E703 [*] Statement ends with an unnecessary semicolon
+E70.py:10:13: E703 [*] Statement ends with an unnecessary semicolon
    |
 10 | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
 11 | #: E703:1:13
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 12 12 | del a[:]; a.append(42);
 13 13 | #: E704:1:1
 
-./resources/test/fixtures/pycodestyle/E70.py:12:23: E703 [*] Statement ends with an unnecessary semicolon
+E70.py:12:23: E703 [*] Statement ends with an unnecessary semicolon
    |
 12 | import shlex;
 13 | #: E702:1:9 E703:1:23
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 14 14 | def f(x): return 2
 15 15 | #: E704:1:1
 
-./resources/test/fixtures/pycodestyle/E70.py:25:14: E703 [*] Statement ends with an unnecessary semicolon
+E70.py:25:14: E703 [*] Statement ends with an unnecessary semicolon
    |
 25 |     def f(x): return 2*x
 26 | #: E704:1:8 E702:1:11 E703:1:14

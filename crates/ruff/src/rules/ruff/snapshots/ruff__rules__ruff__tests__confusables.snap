@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-./resources/test/fixtures/ruff/confusables.py:1:6: RUF001 [*] String contains ambiguous unicode character `𝐁` (did you mean `B`?)
+confusables.py:1:6: RUF001 [*] String contains ambiguous unicode character `𝐁` (did you mean `B`?)
   |
 1 | x = "𝐁ad string"
   |      ^ RUF001
@@ -16,7 +16,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 3 3 | 
 4 4 | 
 
-./resources/test/fixtures/ruff/confusables.py:6:56: RUF002 [*] Docstring contains ambiguous unicode character `）` (did you mean `)`?)
+confusables.py:6:56: RUF002 [*] Docstring contains ambiguous unicode character `）` (did you mean `)`?)
   |
 6 | def f():
 7 |     """Here's a docstring with an unusual parenthesis: ）"""
@@ -36,7 +36,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 8 8 |     ...
 9 9 | 
 
-./resources/test/fixtures/ruff/confusables.py:7:62: RUF003 [*] Comment contains ambiguous unicode character `᜵` (did you mean `/`?)
+confusables.py:7:62: RUF003 [*] Comment contains ambiguous unicode character `᜵` (did you mean `/`?)
    |
  7 | def f():
  8 |     """Here's a docstring with an unusual parenthesis: ）"""

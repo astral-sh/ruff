@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_annotations/mod.rs
 ---
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:4:5: ANN201 Missing return type annotation for public function `foo`
+annotation_presence.py:4:5: ANN201 Missing return type annotation for public function `foo`
   |
 4 | # Error
 5 | def foo(a, b):
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 6 |     pass
   |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:4:9: ANN001 Missing type annotation for function argument `a`
+annotation_presence.py:4:9: ANN001 Missing type annotation for function argument `a`
   |
 4 | # Error
 5 | def foo(a, b):
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 6 |     pass
   |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:4:12: ANN001 Missing type annotation for function argument `b`
+annotation_presence.py:4:12: ANN001 Missing type annotation for function argument `b`
   |
 4 | # Error
 5 | def foo(a, b):
@@ -25,7 +25,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 6 |     pass
   |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:9:5: ANN201 Missing return type annotation for public function `foo`
+annotation_presence.py:9:5: ANN201 Missing return type annotation for public function `foo`
    |
  9 | # Error
 10 | def foo(a: int, b):
@@ -33,7 +33,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 11 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:9:17: ANN001 Missing type annotation for function argument `b`
+annotation_presence.py:9:17: ANN001 Missing type annotation for function argument `b`
    |
  9 | # Error
 10 | def foo(a: int, b):
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 11 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:14:17: ANN001 Missing type annotation for function argument `b`
+annotation_presence.py:14:17: ANN001 Missing type annotation for function argument `b`
    |
 14 | # Error
 15 | def foo(a: int, b) -> int:
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 16 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:19:5: ANN201 Missing return type annotation for public function `foo`
+annotation_presence.py:19:5: ANN201 Missing return type annotation for public function `foo`
    |
 19 | # Error
 20 | def foo(a: int, b: int):
@@ -57,7 +57,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 21 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:24:5: ANN201 Missing return type annotation for public function `foo`
+annotation_presence.py:24:5: ANN201 Missing return type annotation for public function `foo`
    |
 24 | # Error
 25 | def foo():
@@ -65,7 +65,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 26 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:44:12: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+annotation_presence.py:44:12: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
    |
 44 | # ANN401
 45 | def foo(a: Any, *args: str, **kwargs: str) -> int:
@@ -73,7 +73,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 46 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:49:47: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo`
+annotation_presence.py:49:47: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo`
    |
 49 | # ANN401
 50 | def foo(a: int, *args: str, **kwargs: str) -> Any:
@@ -81,7 +81,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 51 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:54:24: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+annotation_presence.py:54:24: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
    |
 54 | # ANN401
 55 | def foo(a: int, *args: Any, **kwargs: Any) -> int:
@@ -89,7 +89,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 56 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:54:39: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+annotation_presence.py:54:39: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
    |
 54 | # ANN401
 55 | def foo(a: int, *args: Any, **kwargs: Any) -> int:
@@ -97,7 +97,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 56 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:59:24: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+annotation_presence.py:59:24: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
    |
 59 | # ANN401
 60 | def foo(a: int, *args: Any, **kwargs: str) -> int:
@@ -105,7 +105,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 61 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:64:39: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+annotation_presence.py:64:39: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
    |
 64 | # ANN401
 65 | def foo(a: int, *args: str, **kwargs: Any) -> int:
@@ -113,7 +113,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 66 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:74:13: ANN101 Missing type annotation for `self` in method
+annotation_presence.py:74:13: ANN101 Missing type annotation for `self` in method
    |
 74 |     # ANN101
 75 |     def foo(self, a: int, b: int) -> int:
@@ -121,7 +121,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 76 |         pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:78:29: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+annotation_presence.py:78:29: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
    |
 78 |     # ANN401
 79 |     def foo(self: "Foo", a: Any, *params: str, **options: str) -> int:
@@ -129,7 +129,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 80 |         pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:82:67: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo`
+annotation_presence.py:82:67: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo`
    |
 82 |     # ANN401
 83 |     def foo(self: "Foo", a: int, *params: str, **options: str) -> Any:
@@ -137,7 +137,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 84 |         pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:86:43: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*params`
+annotation_presence.py:86:43: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*params`
    |
 86 |     # ANN401
 87 |     def foo(self: "Foo", a: int, *params: Any, **options: Any) -> int:
@@ -145,7 +145,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 88 |         pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:86:59: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**options`
+annotation_presence.py:86:59: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**options`
    |
 86 |     # ANN401
 87 |     def foo(self: "Foo", a: int, *params: Any, **options: Any) -> int:
@@ -153,7 +153,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 88 |         pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:90:43: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*params`
+annotation_presence.py:90:43: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*params`
    |
 90 |     # ANN401
 91 |     def foo(self: "Foo", a: int, *params: Any, **options: str) -> int:
@@ -161,7 +161,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 92 |         pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:94:59: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**options`
+annotation_presence.py:94:59: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**options`
    |
 94 |     # ANN401
 95 |     def foo(self: "Foo", a: int, *params: str, **options: Any) -> int:
@@ -169,7 +169,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 96 |         pass
    |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:104:13: ANN102 Missing type annotation for `cls` in classmethod
+annotation_presence.py:104:13: ANN102 Missing type annotation for `cls` in classmethod
     |
 104 |     # ANN102
 105 |     @classmethod
@@ -178,7 +178,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 107 |         pass
     |
 
-./resources/test/fixtures/flake8_annotations/annotation_presence.py:108:13: ANN101 Missing type annotation for `self` in method
+annotation_presence.py:108:13: ANN101 Missing type annotation for `self` in method
     |
 108 |     # ANN101
 109 |     def foo(self, /, a: int, b: int) -> int:

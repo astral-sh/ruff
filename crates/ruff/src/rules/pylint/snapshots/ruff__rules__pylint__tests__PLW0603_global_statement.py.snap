@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/global_statement.py:17:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
+global_statement.py:17:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
    |
 17 | def fix_constant(value):
 18 |     """All this is ok, but try not to use `global` ;)"""
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 21 |     CONSTANT = value
    |
 
-./resources/test/fixtures/pylint/global_statement.py:24:5: PLW0603 Using the global statement to update `sys` is discouraged
+global_statement.py:24:5: PLW0603 Using the global statement to update `sys` is discouraged
    |
 24 | def global_with_import():
 25 |     """Should only warn for global-statement when using `Import` node"""
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 27 |     import sys
    |
 
-./resources/test/fixtures/pylint/global_statement.py:30:5: PLW0603 Using the global statement to update `namedtuple` is discouraged
+global_statement.py:30:5: PLW0603 Using the global statement to update `namedtuple` is discouraged
    |
 30 | def global_with_import_from():
 31 |     """Should only warn for global-statement when using `ImportFrom` node"""
@@ -29,7 +29,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 33 |     from collections import namedtuple
    |
 
-./resources/test/fixtures/pylint/global_statement.py:36:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
+global_statement.py:36:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
    |
 36 | def global_del():
 37 |     """Deleting the global name prevents `global-variable-not-assigned`"""
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 40 |     del CONSTANT
    |
 
-./resources/test/fixtures/pylint/global_statement.py:43:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
+global_statement.py:43:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
    |
 43 | def global_operator_assign():
 44 |     """Operator assigns should only throw a global statement error"""
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 47 |     CONSTANT += 1
    |
 
-./resources/test/fixtures/pylint/global_statement.py:50:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
+global_statement.py:50:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
    |
 50 | def global_function_assign():
 51 |     """Function assigns should only throw a global statement error"""
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 54 |     def CONSTANT():
    |
 
-./resources/test/fixtures/pylint/global_statement.py:60:5: PLW0603 Using the global statement to update `FUNC` is discouraged
+global_statement.py:60:5: PLW0603 Using the global statement to update `FUNC` is discouraged
    |
 60 | def override_func():
 61 |     """Overriding a function should only throw a global statement error"""
@@ -69,7 +69,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 64 |     def FUNC():
    |
 
-./resources/test/fixtures/pylint/global_statement.py:70:5: PLW0603 Using the global statement to update `CLASS` is discouraged
+global_statement.py:70:5: PLW0603 Using the global statement to update `CLASS` is discouraged
    |
 70 | def override_class():
 71 |     """Overriding a class should only throw a global statement error"""

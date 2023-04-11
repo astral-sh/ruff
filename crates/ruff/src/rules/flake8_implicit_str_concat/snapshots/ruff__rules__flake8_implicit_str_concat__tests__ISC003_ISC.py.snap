@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:3:5: ISC003 Explicitly concatenated string should be implicitly concatenated
+ISC.py:3:5: ISC003 Explicitly concatenated string should be implicitly concatenated
   |
 3 | _ = "a" "b" "c"
 4 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 7 | _ = "abc" \
   |
 
-./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:9:3: ISC003 Explicitly concatenated string should be implicitly concatenated
+ISC.py:9:3: ISC003 Explicitly concatenated string should be implicitly concatenated
    |
  9 |   _ = (
 10 |     "abc" +
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 12 |   )
    |
 
-./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:14:3: ISC003 Explicitly concatenated string should be implicitly concatenated
+ISC.py:14:3: ISC003 Explicitly concatenated string should be implicitly concatenated
    |
 14 |   _ = (
 15 |     f"abc" +
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 17 |   )
    |
 
-./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:19:3: ISC003 Explicitly concatenated string should be implicitly concatenated
+ISC.py:19:3: ISC003 Explicitly concatenated string should be implicitly concatenated
    |
 19 |   _ = (
 20 |     b"abc" +

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM910.py:2:1: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+SIM910.py:2:1: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
   |
 2 | # SIM910
 3 | {}.get(key, None)
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 4 4 | # SIM910
 5 5 | {}.get("key", None)
 
-./resources/test/fixtures/flake8_simplify/SIM910.py:5:1: SIM910 [*] Use `{}.get("key")` instead of `{}.get("key", None)`
+SIM910.py:5:1: SIM910 [*] Use `{}.get("key")` instead of `{}.get("key", None)`
   |
 5 | # SIM910
 6 | {}.get("key", None)
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 7 7 | # OK
 8 8 | {}.get(key)
 
-./resources/test/fixtures/flake8_simplify/SIM910.py:20:9: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+SIM910.py:20:9: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
    |
 20 | # SIM910
 21 | if a := {}.get(key, None):
@@ -58,7 +58,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 22 22 | 
 23 23 | # SIM910
 
-./resources/test/fixtures/flake8_simplify/SIM910.py:24:5: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
+SIM910.py:24:5: SIM910 [*] Use `{}.get(key)` instead of `{}.get(key, None)`
    |
 24 | # SIM910
 25 | a = {}.get(key, None)
@@ -78,7 +78,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 26 26 | # SIM910
 27 27 | ({}).get(key, None)
 
-./resources/test/fixtures/flake8_simplify/SIM910.py:27:1: SIM910 [*] Use `({}).get(key)` instead of `({}).get(key, None)`
+SIM910.py:27:1: SIM910 [*] Use `({}).get(key)` instead of `({}).get(key, None)`
    |
 27 | # SIM910
 28 | ({}).get(key, None)

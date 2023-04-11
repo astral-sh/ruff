@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/isort/mod.rs
 ---
-./resources/test/fixtures/isort/skip.py:20:1: I001 [*] Import block is un-sorted or un-formatted
+skip.py:20:1: I001 [*] Import block is un-sorted or un-formatted
    |
 20 |       import sys
 21 |       import os  # isort: skip
@@ -25,7 +25,7 @@ source: crates/ruff/src/rules/isort/mod.rs
 23 23 | 
 24 24 | def f():
 
-./resources/test/fixtures/isort/skip.py:27:1: I001 [*] Import block is un-sorted or un-formatted
+skip.py:27:1: I001 [*] Import block is un-sorted or un-formatted
    |
 27 |       import sys
 28 |       import os  # isort:skip

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 ---
-./resources/test/fixtures/flake8_datetimez/DTZ002.py:4:1: DTZ002 The use of `datetime.datetime.today()` is not allowed, use `datetime.datetime.now(tz=)` instead
+DTZ002.py:4:1: DTZ002 The use of `datetime.datetime.today()` is not allowed, use `datetime.datetime.now(tz=)` instead
   |
 4 | # qualified
 5 | datetime.datetime.today()
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 7 | from datetime import datetime
   |
 
-./resources/test/fixtures/flake8_datetimez/DTZ002.py:9:1: DTZ002 The use of `datetime.datetime.today()` is not allowed, use `datetime.datetime.now(tz=)` instead
+DTZ002.py:9:1: DTZ002 The use of `datetime.datetime.today()` is not allowed, use `datetime.datetime.now(tz=)` instead
    |
  9 | # unqualified
 10 | datetime.today()

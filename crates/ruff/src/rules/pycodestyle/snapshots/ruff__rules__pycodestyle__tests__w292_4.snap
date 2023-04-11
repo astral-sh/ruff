@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/W292_4.py:1:2: W292 [*] No newline at end of file
+W292_4.py:1:2: W292 [*] No newline at end of file
   |
 1 |  
   |   W292

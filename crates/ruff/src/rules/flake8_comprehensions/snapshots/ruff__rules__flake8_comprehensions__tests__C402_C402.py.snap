@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
-./resources/test/fixtures/flake8_comprehensions/C402.py:1:1: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+C402.py:1:1: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
   |
 1 | dict((x, x) for x in range(3))
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C402
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 3 3 |     (x, x) for x in range(3)
 4 4 | )
 
-./resources/test/fixtures/flake8_comprehensions/C402.py:2:1: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+C402.py:2:1: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
   |
 2 |   dict((x, x) for x in range(3))
 3 | / dict(
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 6 6 | y = f'{dict((x, x) for x in range(3))}'
 7 7 | print(f'Hello {dict((x, x) for x in range(3))} World')
 
-./resources/test/fixtures/flake8_comprehensions/C402.py:6:8: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+C402.py:6:8: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
   |
 6 | )
 7 | dict(((x, x) for x in range(3)), z=3)
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
   6 |+y = f'{ {x: x for x in range(3)} }'
 7 7 | print(f'Hello {dict((x, x) for x in range(3))} World')
 
-./resources/test/fixtures/flake8_comprehensions/C402.py:7:16: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
+C402.py:7:16: C402 [*] Unnecessary generator (rewrite as a `dict` comprehension)
   |
 7 | dict(((x, x) for x in range(3)), z=3)
 8 | y = f'{dict((x, x) for x in range(3))}'

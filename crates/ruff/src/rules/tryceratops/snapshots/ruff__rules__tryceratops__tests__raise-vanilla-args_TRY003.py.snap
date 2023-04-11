@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
-./resources/test/fixtures/tryceratops/TRY003.py:8:15: TRY003 Avoid specifying long messages outside the exception class
+TRY003.py:8:15: TRY003 Avoid specifying long messages outside the exception class
    |
  8 |     a = 1
  9 |     if a == 1:
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 12 |         raise CustomException("Short")  # This is acceptable
    |
 
-./resources/test/fixtures/tryceratops/TRY003.py:34:15: TRY003 Avoid specifying long messages outside the exception class
+TRY003.py:34:15: TRY003 Avoid specifying long messages outside the exception class
    |
 34 | def bad(a):
 35 |     if a % 2 == 0:
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY003
    |
 
-./resources/test/fixtures/tryceratops/TRY003.py:39:15: TRY003 Avoid specifying long messages outside the exception class
+TRY003.py:39:15: TRY003 Avoid specifying long messages outside the exception class
    |
 39 | def another_bad(a):
 40 |     if a % 2 == 0:
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY003
    |
 
-./resources/test/fixtures/tryceratops/TRY003.py:44:15: TRY003 Avoid specifying long messages outside the exception class
+TRY003.py:44:15: TRY003 Avoid specifying long messages outside the exception class
    |
 44 | def and_another_bad(a):
 45 |     if a % 2 == 0:

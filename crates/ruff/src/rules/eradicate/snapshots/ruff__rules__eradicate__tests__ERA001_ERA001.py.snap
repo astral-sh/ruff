@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/eradicate/mod.rs
 ---
-./resources/test/fixtures/eradicate/ERA001.py:1:1: ERA001 [*] Found commented-out code
+ERA001.py:1:1: ERA001 [*] Found commented-out code
   |
 1 | #import os
   | ^^^^^^^^^^ ERA001
@@ -16,7 +16,7 @@ source: crates/ruff/src/rules/eradicate/mod.rs
 3 2 | #a = 3
 4 3 | a = 4
 
-./resources/test/fixtures/eradicate/ERA001.py:2:1: ERA001 [*] Found commented-out code
+ERA001.py:2:1: ERA001 [*] Found commented-out code
   |
 2 | #import os
 3 | # from foo import junk
@@ -33,7 +33,7 @@ source: crates/ruff/src/rules/eradicate/mod.rs
 4 3 | a = 4
 5 4 | #foo(1, 2, 3)
 
-./resources/test/fixtures/eradicate/ERA001.py:3:1: ERA001 [*] Found commented-out code
+ERA001.py:3:1: ERA001 [*] Found commented-out code
   |
 3 | #import os
 4 | # from foo import junk
@@ -52,7 +52,7 @@ source: crates/ruff/src/rules/eradicate/mod.rs
 5 4 | #foo(1, 2, 3)
 6 5 | 
 
-./resources/test/fixtures/eradicate/ERA001.py:5:1: ERA001 [*] Found commented-out code
+ERA001.py:5:1: ERA001 [*] Found commented-out code
   |
 5 | #a = 3
 6 | a = 4
@@ -72,7 +72,7 @@ source: crates/ruff/src/rules/eradicate/mod.rs
 7 6 | def foo(x, y, z):
 8 7 |     content = 1 # print('hello')
 
-./resources/test/fixtures/eradicate/ERA001.py:12:5: ERA001 [*] Found commented-out code
+ERA001.py:12:5: ERA001 [*] Found commented-out code
    |
 12 |     # This is a real comment.
 13 |     #return True

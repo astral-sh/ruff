@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:170:5: D211 [*] No blank lines allowed before class docstring
+D.py:170:5: D211 [*] No blank lines allowed before class docstring
     |
 170 | class WithLeadingSpace:
 171 | 
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 171 170 | 
 172 171 | 
 
-./resources/test/fixtures/pydocstyle/D.py:181:5: D211 [*] No blank lines allowed before class docstring
+D.py:181:5: D211 [*] No blank lines allowed before class docstring
     |
 181 | class TrailingSpace:
 182 | 

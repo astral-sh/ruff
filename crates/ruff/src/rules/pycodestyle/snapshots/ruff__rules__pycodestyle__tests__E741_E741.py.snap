@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E741.py:3:1: E741 Ambiguous variable name: `l`
+E741.py:3:1: E741 Ambiguous variable name: `l`
   |
 3 | from contextlib import contextmanager
 4 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 7 | O = 0
   |
 
-./resources/test/fixtures/pycodestyle/E741.py:4:1: E741 Ambiguous variable name: `I`
+E741.py:4:1: E741 Ambiguous variable name: `I`
   |
 4 | l = 0
 5 | I = 0
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 7 | l: int = 0
   |
 
-./resources/test/fixtures/pycodestyle/E741.py:5:1: E741 Ambiguous variable name: `O`
+E741.py:5:1: E741 Ambiguous variable name: `O`
   |
 5 | l = 0
 6 | I = 0
@@ -29,7 +29,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 8 | l: int = 0
   |
 
-./resources/test/fixtures/pycodestyle/E741.py:6:1: E741 Ambiguous variable name: `l`
+E741.py:6:1: E741 Ambiguous variable name: `l`
    |
  6 | I = 0
  7 | O = 0
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 10 | a, l = 0, 1
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:8:4: E741 Ambiguous variable name: `l`
+E741.py:8:4: E741 Ambiguous variable name: `l`
    |
  8 | l: int = 0
  9 | 
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 12 | a, *l = 0, 1, 2
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:9:5: E741 Ambiguous variable name: `l`
+E741.py:9:5: E741 Ambiguous variable name: `l`
    |
  9 | a, l = 0, 1
 10 | [a, l] = 0, 1
@@ -58,7 +58,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 12 | a = l = 0
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:10:5: E741 Ambiguous variable name: `l`
+E741.py:10:5: E741 Ambiguous variable name: `l`
    |
 10 | a, l = 0, 1
 11 | [a, l] = 0, 1
@@ -67,7 +67,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 13 | a = l = 0
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:11:5: E741 Ambiguous variable name: `l`
+E741.py:11:5: E741 Ambiguous variable name: `l`
    |
 11 | [a, l] = 0, 1
 12 | a, *l = 0, 1, 2
@@ -77,7 +77,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 15 | o = 0
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:16:5: E741 Ambiguous variable name: `l`
+E741.py:16:5: E741 Ambiguous variable name: `l`
    |
 16 | i = 0
 17 | 
@@ -86,14 +86,14 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 19 |     pass
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:20:8: E741 Ambiguous variable name: `l`
+E741.py:20:8: E741 Ambiguous variable name: `l`
    |
 20 | for a, l in zip(range(3), range(3)):
    |        ^ E741
 21 |     pass
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:25:12: E741 Ambiguous variable name: `l`
+E741.py:25:12: E741 Ambiguous variable name: `l`
    |
 25 | def f1():
 26 |     global l
@@ -101,7 +101,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 27 |     l = 0
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:26:5: E741 Ambiguous variable name: `l`
+E741.py:26:5: E741 Ambiguous variable name: `l`
    |
 26 | def f1():
 27 |     global l
@@ -109,7 +109,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
    |     ^ E741
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:30:5: E741 Ambiguous variable name: `l`
+E741.py:30:5: E741 Ambiguous variable name: `l`
    |
 30 | def f2():
 31 |     l = 0
@@ -118,7 +118,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 33 |     def f3():
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:33:18: E741 Ambiguous variable name: `l`
+E741.py:33:18: E741 Ambiguous variable name: `l`
    |
 33 |     def f3():
 34 |         nonlocal l
@@ -126,7 +126,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 35 |         l = 1
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:34:9: E741 Ambiguous variable name: `l`
+E741.py:34:9: E741 Ambiguous variable name: `l`
    |
 34 |     def f3():
 35 |         nonlocal l
@@ -136,63 +136,63 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 38 |     f3()
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:40:8: E741 Ambiguous variable name: `l`
+E741.py:40:8: E741 Ambiguous variable name: `l`
    |
 40 | def f4(l, /, I):
    |        ^ E741
 41 |     return l, I, O
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:40:14: E741 Ambiguous variable name: `I`
+E741.py:40:14: E741 Ambiguous variable name: `I`
    |
 40 | def f4(l, /, I):
    |              ^ E741
 41 |     return l, I, O
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:44:8: E741 Ambiguous variable name: `l`
+E741.py:44:8: E741 Ambiguous variable name: `l`
    |
 44 | def f5(l=0, *, I=1):
    |        ^ E741
 45 |     return l, I
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:44:16: E741 Ambiguous variable name: `I`
+E741.py:44:16: E741 Ambiguous variable name: `I`
    |
 44 | def f5(l=0, *, I=1):
    |                ^ E741
 45 |     return l, I
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:48:9: E741 Ambiguous variable name: `l`
+E741.py:48:9: E741 Ambiguous variable name: `l`
    |
 48 | def f6(*l, **I):
    |         ^ E741
 49 |     return l, I
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:48:14: E741 Ambiguous variable name: `I`
+E741.py:48:14: E741 Ambiguous variable name: `I`
    |
 48 | def f6(*l, **I):
    |              ^ E741
 49 |     return l, I
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:57:16: E741 Ambiguous variable name: `l`
+E741.py:57:16: E741 Ambiguous variable name: `l`
    |
 57 | with ctx1() as l:
    |                ^ E741
 58 |     pass
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:66:20: E741 Ambiguous variable name: `l`
+E741.py:66:20: E741 Ambiguous variable name: `l`
    |
 66 | with ctx2() as (a, l):
    |                    ^ E741
 67 |     pass
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:71:22: E741 Ambiguous variable name: `l`
+E741.py:71:22: E741 Ambiguous variable name: `l`
    |
 71 | try:
 72 |     pass
@@ -201,7 +201,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 74 |     pass
    |
 
-./resources/test/fixtures/pycodestyle/E741.py:74:5: E741 Ambiguous variable name: `l`
+E741.py:74:5: E741 Ambiguous variable name: `l`
    |
 74 |     pass
 75 | 

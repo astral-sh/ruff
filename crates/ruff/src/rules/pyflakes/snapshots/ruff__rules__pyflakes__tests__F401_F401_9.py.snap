@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F401_9.py:4:22: F401 [*] `foo.baz` imported but unused
+F401_9.py:4:22: F401 [*] `foo.baz` imported but unused
   |
 4 | __all__ = ("bar",)
 5 | from foo import bar, baz

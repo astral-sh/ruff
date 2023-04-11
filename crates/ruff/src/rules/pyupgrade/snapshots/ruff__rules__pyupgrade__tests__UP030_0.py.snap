@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP030_0.py:3:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:3:1: UP030 [*] Use implicit references for positional format fields
   |
 3 | # Invalid calls; errors expected.
 4 | 
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 5 5 | "a {3} complicated {1} string with {0} {2}".format(
 6 6 |     "first", "second", "third", "fourth"
 
-./resources/test/fixtures/pyupgrade/UP030_0.py:5:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:5:1: UP030 [*] Use implicit references for positional format fields
    |
  5 |   "{0}" "{1}" "{2}".format(1, 2, 3)
  6 |   
@@ -46,7 +46,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 8 | 
 9 9 | '{0}'.format(1)
 
-./resources/test/fixtures/pyupgrade/UP030_0.py:9:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:9:1: UP030 [*] Use implicit references for positional format fields
    |
  9 | )
 10 | 
@@ -67,7 +67,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 11 11 | '{0:x}'.format(30)
 12 12 | 
 
-./resources/test/fixtures/pyupgrade/UP030_0.py:11:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:11:1: UP030 [*] Use implicit references for positional format fields
    |
 11 | '{0}'.format(1)
 12 | 
@@ -88,7 +88,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 13 13 | x = '{0}'.format(1)
 14 14 | 
 
-./resources/test/fixtures/pyupgrade/UP030_0.py:13:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:13:5: UP030 [*] Use implicit references for positional format fields
    |
 13 | '{0:x}'.format(30)
 14 | 
@@ -109,7 +109,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 15 15 | '''{0}\n{1}\n'''.format(1, 2)
 16 16 | 
 
-./resources/test/fixtures/pyupgrade/UP030_0.py:15:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:15:1: UP030 [*] Use implicit references for positional format fields
    |
 15 | x = '{0}'.format(1)
 16 | 
@@ -130,7 +130,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 17 17 | x = "foo {0}" \
 18 18 |     "bar {1}".format(1, 2)
 
-./resources/test/fixtures/pyupgrade/UP030_0.py:17:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:17:5: UP030 [*] Use implicit references for positional format fields
    |
 17 |   '''{0}\n{1}\n'''.format(1, 2)
 18 |   
@@ -155,7 +155,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 20 | ("{0}").format(1)
 21 21 | 
 
-./resources/test/fixtures/pyupgrade/UP030_0.py:20:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:20:1: UP030 [*] Use implicit references for positional format fields
    |
 20 |     "bar {1}".format(1, 2)
 21 | 
@@ -176,7 +176,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 22 22 | "\N{snowman} {0}".format(1)
 23 23 | 
 
-./resources/test/fixtures/pyupgrade/UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:22:1: UP030 [*] Use implicit references for positional format fields
    |
 22 | ("{0}").format(1)
 23 | 
@@ -197,7 +197,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 24 24 | '{' '0}'.format(1)
 25 25 | 
 
-./resources/test/fixtures/pyupgrade/UP030_0.py:24:1: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:24:1: UP030 [*] Use implicit references for positional format fields
    |
 24 | "\N{snowman} {0}".format(1)
 25 | 
@@ -208,7 +208,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
    |
    = help: Remove explicit positional indices
 
-./resources/test/fixtures/pyupgrade/UP030_0.py:29:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:29:5: UP030 [*] Use implicit references for positional format fields
    |
 29 |   # https://github.com/Instagram/LibCST/issues/846
 30 |   print(
@@ -220,7 +220,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
    |
    = help: Remove explicit positional indices
 
-./resources/test/fixtures/pyupgrade/UP030_0.py:34:5: UP030 [*] Use implicit references for positional format fields
+UP030_0.py:34:5: UP030 [*] Use implicit references for positional format fields
    |
 34 |   print(
 35 |       'foo{0}'  # ohai\n"

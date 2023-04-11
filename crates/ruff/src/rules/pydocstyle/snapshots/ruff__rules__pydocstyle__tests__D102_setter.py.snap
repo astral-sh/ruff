@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/setter.py:16:9: D102 Missing docstring in public method
+setter.py:16:9: D102 Missing docstring in public method
    |
 16 |     @foo
 17 |     def foo(self, value: str) -> None:

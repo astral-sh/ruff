@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E22.py:28:8: E222 Multiple spaces after operator
+E22.py:28:8: E222 Multiple spaces after operator
    |
 28 | #: E222
 29 | a = a +  1
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 31 | #: E222 E222
    |
 
-./resources/test/fixtures/pycodestyle/E22.py:31:4: E222 Multiple spaces after operator
+E22.py:31:4: E222 Multiple spaces after operator
    |
 31 | b = b + 10
 32 | #: E222 E222
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 35 | long_variable = 3
    |
 
-./resources/test/fixtures/pycodestyle/E22.py:32:4: E222 Multiple spaces after operator
+E22.py:32:4: E222 Multiple spaces after operator
    |
 32 | #: E222 E222
 33 | x =            -1
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 36 | #: E222 E222
    |
 
-./resources/test/fixtures/pycodestyle/E22.py:35:7: E222 Multiple spaces after operator
+E22.py:35:7: E222 Multiple spaces after operator
    |
 35 | long_variable = 3
 36 | #: E222 E222
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 39 | long_variable = 3
    |
 
-./resources/test/fixtures/pycodestyle/E22.py:36:7: E222 Multiple spaces after operator
+E22.py:36:7: E222 Multiple spaces after operator
    |
 36 | #: E222 E222
 37 | x[0] =          1

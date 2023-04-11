@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP036_0.py:3:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:3:1: UP036 [*] Version block is outdated for minimum Python version
    |
  3 |   import sys
  4 |   
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 5 | if sys.version_info < (3,0):
 9 6 |     if True:
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:8:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:8:1: UP036 [*] Version block is outdated for minimum Python version
    |
  8 |       print("py3")
  9 |   
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 16 10 | if sys.version_info < (3,0): print("PY2!")
 17 11 | else: print("PY3!")
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:16:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:16:1: UP036 [*] Version block is outdated for minimum Python version
    |
 16 |       print("py3")
 17 |   
@@ -83,7 +83,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 19 18 | if True:
 20 19 |     if sys.version_info < (3,0):
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:20:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:20:5: UP036 [*] Version block is outdated for minimum Python version
    |
 20 |   if True:
 21 |       if sys.version_info < (3,0):
@@ -110,7 +110,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 25 22 | if sys.version_info < (3,0): print(1 if True else 3)
 26 23 | else:
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:25:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:25:1: UP036 [*] Version block is outdated for minimum Python version
    |
 25 |           print("PY3")
 26 |   
@@ -135,7 +135,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 29 27 | if sys.version_info < (3,0):
 30 28 |     def f():
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:29:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:29:1: UP036 [*] Version block is outdated for minimum Python version
    |
 29 |       print("py3")
 30 |   
@@ -170,7 +170,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 37 33 | if sys.version_info > (3,0):
 38 34 |     print("py3")
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:37:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:37:1: UP036 [*] Version block is outdated for minimum Python version
    |
 37 |           print("This the next")
 38 |   
@@ -195,7 +195,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 42 39 | 
 43 40 | x = 1
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:45:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:45:1: UP036 [*] Version block is outdated for minimum Python version
    |
 45 |   x = 1
 46 |   
@@ -221,7 +221,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 50 47 | 
 51 48 | x = 1
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:53:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:53:1: UP036 [*] Version block is outdated for minimum Python version
    |
 53 |   x = 1
 54 |   
@@ -244,7 +244,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 56 55 | if sys.version_info > (3,):
 57 56 |     print("py3")
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:56:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:56:1: UP036 [*] Version block is outdated for minimum Python version
    |
 56 |   else: print("py2")
 57 |   
@@ -271,7 +271,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 61 58 | if True:
 62 59 |     if sys.version_info > (3,):
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:62:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:62:5: UP036 [*] Version block is outdated for minimum Python version
    |
 62 |   if True:
 63 |       if sys.version_info > (3,):
@@ -298,7 +298,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 67 64 | if sys.version_info < (3,):
 68 65 |     print("py2")
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:67:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:67:1: UP036 [*] Version block is outdated for minimum Python version
    |
 67 |           print("py2")
 68 |   
@@ -325,7 +325,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 72 69 | def f():
 73 70 |     if sys.version_info < (3,0):
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:73:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:73:5: UP036 [*] Version block is outdated for minimum Python version
    |
 73 |   def f():
 74 |       if sys.version_info < (3,0):
@@ -356,7 +356,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 81 75 | 
 82 76 | class C:
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:86:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:86:5: UP036 [*] Version block is outdated for minimum Python version
    |
 86 |           pass
 87 |   
@@ -389,7 +389,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 93 89 |     def h():
 94 90 |         pass
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:97:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:97:5: UP036 [*] Version block is outdated for minimum Python version
     |
  97 |   if True:
  98 |       if sys.version_info < (3,0):
@@ -416,7 +416,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 102 99  |     # comment
 103 100 | 
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:104:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:104:1: UP036 [*] Version block is outdated for minimum Python version
     |
 104 |       # comment
 105 |   
@@ -458,7 +458,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 115 109 | if True:
 116 110 |     if sys.version_info > (3,):
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:116:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:116:5: UP036 [*] Version block is outdated for minimum Python version
     |
 116 |   if True:
 117 |       if sys.version_info > (3,):
@@ -481,7 +481,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 119 118 |     print(2+3)
 120 119 | 
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:122:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:122:5: UP036 [*] Version block is outdated for minimum Python version
     |
 122 | if True:
 123 |     if sys.version_info > (3,): print(3)
@@ -501,7 +501,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 124 124 | if True:
 125 125 |     if sys.version_info > (3,):
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:125:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:125:5: UP036 [*] Version block is outdated for minimum Python version
     |
 125 |   if True:
 126 |       if sys.version_info > (3,):
@@ -522,7 +522,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 128 127 | 
 129 128 | if True:
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:130:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:130:5: UP036 [*] Version block is outdated for minimum Python version
     |
 130 |   if True:
 131 |       if sys.version_info <= (3, 0):
@@ -556,7 +556,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 139 136 | 
 140 137 | if sys.version_info <= (3, 0):
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:140:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:140:1: UP036 [*] Version block is outdated for minimum Python version
     |
 140 | / if sys.version_info <= (3, 0):
 141 | |     expected_error = []
@@ -588,7 +588,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 149 146 | 
 150 147 | if sys.version_info > (3,0):
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:150:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:150:1: UP036 [*] Version block is outdated for minimum Python version
     |
 150 | / if sys.version_info > (3,0):
 151 | |     """this
@@ -633,7 +633,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 163 162 | if sys.version_info > (3, 0): expected_error = \
 164 163 |     []
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:163:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:163:1: UP036 [*] Version block is outdated for minimum Python version
     |
 163 |        "this for some reason")
 164 |   
@@ -655,7 +655,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 165 165 | 
 166 166 | if sys.version_info > (3, 0): expected_error = []
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:166:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:166:1: UP036 [*] Version block is outdated for minimum Python version
     |
 166 |     []
 167 | 
@@ -676,7 +676,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 168 168 | if sys.version_info > (3, 0): \
 169 169 |     expected_error = []
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:168:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:168:1: UP036 [*] Version block is outdated for minimum Python version
     |
 168 |   if sys.version_info > (3, 0): expected_error = []
 169 |   
@@ -699,7 +699,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 171 170 | if True:
 172 171 |     if sys.version_info > (3, 0): expected_error = \
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:172:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:172:5: UP036 [*] Version block is outdated for minimum Python version
     |
 172 |   if True:
 173 |       if sys.version_info > (3, 0): expected_error = \
@@ -721,7 +721,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 174 174 | 
 175 175 | if True:
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:176:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:176:5: UP036 [*] Version block is outdated for minimum Python version
     |
 176 | if True:
 177 |     if sys.version_info > (3, 0): expected_error = []
@@ -741,7 +741,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 178 178 | if True:
 179 179 |     if sys.version_info > (3, 0): \
 
-./resources/test/fixtures/pyupgrade/UP036_0.py:179:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_0.py:179:5: UP036 [*] Version block is outdated for minimum Python version
     |
 179 |   if True:
 180 |       if sys.version_info > (3, 0): \

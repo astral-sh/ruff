@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 ---
-./resources/test/fixtures/pep8_naming/N817.py:1:8: N817 CamelCase `CaMel` imported as acronym `CM`
+N817.py:1:8: N817 CamelCase `CaMel` imported as acronym `CM`
   |
 1 | import mod.CaMel as CM
   |        ^^^^^^^^^^^^^^^ N817
 2 | from mod import CamelCase as CC
   |
 
-./resources/test/fixtures/pep8_naming/N817.py:2:17: N817 CamelCase `CamelCase` imported as acronym `CC`
+N817.py:2:17: N817 CamelCase `CamelCase` imported as acronym `CC`
   |
 2 | import mod.CaMel as CM
 3 | from mod import CamelCase as CC

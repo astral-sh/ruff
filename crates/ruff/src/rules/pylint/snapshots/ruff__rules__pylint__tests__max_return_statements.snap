@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/too_many_return_statements_params.py:1:5: PLR0911 Too many return statements (2 > 1)
+too_many_return_statements_params.py:1:5: PLR0911 Too many return statements (2 > 1)
   |
 1 | def f(x):  # Too many return statements (2/1)
   |     ^ PLR0911

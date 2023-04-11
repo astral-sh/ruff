@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-./resources/test/fixtures/flake8_pyi/PYI008.pyi:3:20: PYI008 Unrecognized platform `linus`
+PYI008.pyi:3:20: PYI008 Unrecognized platform `linus`
   |
 3 | import sys
 4 | 

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:2:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |
 2 |   def f():
 3 |       for x in y:
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 5 4 | 
 6 5 | def g():
 
-./resources/test/fixtures/pyupgrade/UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:7:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
   |
 7 |   def g():
 8 |       for x, y in z:
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 10 9 | 
 11 10 | def h():
 
-./resources/test/fixtures/pyupgrade/UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:12:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 12 |   def h():
 13 |       for x in [1, 2, 3]:
@@ -62,7 +62,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 15 14 | 
 16 15 | def i():
 
-./resources/test/fixtures/pyupgrade/UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:17:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 17 |   def i():
 18 |       for x in {x for x in y}:
@@ -83,7 +83,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 19 | 
 21 20 | def j():
 
-./resources/test/fixtures/pyupgrade/UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:22:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 22 |   def j():
 23 |       for x in (1, 2, 3):
@@ -104,7 +104,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 25 24 | 
 26 25 | def k():
 
-./resources/test/fixtures/pyupgrade/UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:27:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 27 |   def k():
 28 |       for x, y in {3: "x", 6: "y"}:
@@ -125,7 +125,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 30 29 | 
 31 30 | def f():  # Comment one\n'
 
-./resources/test/fixtures/pyupgrade/UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:33:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 33 |   def f():  # Comment one\n'
 34 |       # Comment two\n'
@@ -159,7 +159,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 41 39 | 
 42 40 | 
 
-./resources/test/fixtures/pyupgrade/UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:44:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 44 |   def f():
 45 |       for x, y in [{3: (3, [44, "long ss"]), 6: "y"}]:
@@ -180,7 +180,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 47 46 | 
 48 47 | def f():
 
-./resources/test/fixtures/pyupgrade/UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:49:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 49 |   def f():
 50 |       for x, y in z():
@@ -203,7 +203,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 52 51 | def f():
 53 52 |     def func():
 
-./resources/test/fixtures/pyupgrade/UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:55:9: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 55 |       def func():
 56 |           # This comment is preserved\n'
@@ -229,7 +229,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 59 57 | # Comment\n'
 60 58 | def g():
 
-./resources/test/fixtures/pyupgrade/UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:67:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 67 |       for x in y:
 68 |           yield x
@@ -251,7 +251,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 70 69 | 
 71 70 | def f():
 
-./resources/test/fixtures/pyupgrade/UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
+UP028_0.py:72:5: UP028 [*] Replace `yield` over `for` loop with `yield from`
    |
 72 |   def f():
 73 |       for x, y in z():

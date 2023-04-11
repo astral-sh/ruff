@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B025.py:19:8: B025 try-except block with duplicate exception `ValueError`
+B025.py:19:8: B025 try-except block with duplicate exception `ValueError`
    |
 19 | except ValueError:
 20 |     a = 2
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 22 |     a = 2
    |
 
-./resources/test/fixtures/flake8_bugbear/B025.py:28:8: B025 try-except block with duplicate exception `pickle.PickleError`
+B025.py:28:8: B025 try-except block with duplicate exception `pickle.PickleError`
    |
 28 | except ValueError:
 29 |     a = 2
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 31 |     a = 2
    |
 
-./resources/test/fixtures/flake8_bugbear/B025.py:35:8: B025 try-except block with duplicate exception `ValueError`
+B025.py:35:8: B025 try-except block with duplicate exception `ValueError`
    |
 35 | except (ValueError, TypeError):
 36 |     a = 2
@@ -29,7 +29,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 39 | except (OSError, TypeError):
    |
 
-./resources/test/fixtures/flake8_bugbear/B025.py:37:18: B025 try-except block with duplicate exception `TypeError`
+B025.py:37:18: B025 try-except block with duplicate exception `TypeError`
    |
 37 | except ValueError:
 38 |     a = 2

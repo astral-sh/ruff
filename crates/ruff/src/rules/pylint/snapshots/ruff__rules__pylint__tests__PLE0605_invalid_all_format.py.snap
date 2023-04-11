@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/invalid_all_format.py:1:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:1:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
   |
 1 | __all__ = "CONST"  # [invalid-all-format]
   | ^^^^^^^ PLE0605
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 3 | __all__ = ["Hello"] + {"world"}  # [invalid-all-format]
   |
 
-./resources/test/fixtures/pylint/invalid_all_format.py:3:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:3:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
   |
 3 | __all__ = "CONST"  # [invalid-all-format]
 4 | 
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 7 | __all__ += {"world"}  # [invalid-all-format]
   |
 
-./resources/test/fixtures/pylint/invalid_all_format.py:5:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:5:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
   |
 5 | __all__ = ["Hello"] + {"world"}  # [invalid-all-format]
 6 | 
@@ -29,7 +29,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 9 | __all__ = {"world"} + ["Hello"]  # [invalid-all-format]
   |
 
-./resources/test/fixtures/pylint/invalid_all_format.py:7:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:7:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
    |
  7 | __all__ += {"world"}  # [invalid-all-format]
  8 | 
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 11 | __all__ = {"world"} + list(["Hello"])  # [invalid-all-format]
    |
 
-./resources/test/fixtures/pylint/invalid_all_format.py:9:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:9:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
    |
  9 | __all__ = {"world"} + ["Hello"]  # [invalid-all-format]
 10 | 
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 13 | __all__ = list(["Hello"]) + {"world"}  # [invalid-all-format]
    |
 
-./resources/test/fixtures/pylint/invalid_all_format.py:11:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:11:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
    |
 11 | __all__ = {"world"} + list(["Hello"])  # [invalid-all-format]
 12 | 
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 15 | __all__ = (x for x in ["Hello", "world"])  # [invalid-all-format]
    |
 
-./resources/test/fixtures/pylint/invalid_all_format.py:13:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:13:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
    |
 13 | __all__ = list(["Hello"]) + {"world"}  # [invalid-all-format]
 14 | 
@@ -69,7 +69,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 17 | __all__ = {x for x in ["Hello", "world"]}  # [invalid-all-format]
    |
 
-./resources/test/fixtures/pylint/invalid_all_format.py:15:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
+invalid_all_format.py:15:1: PLE0605 Invalid format for `__all__`, must be `tuple` or `list`
    |
 15 | __all__ = (x for x in ["Hello", "world"])  # [invalid-all-format]
 16 | 

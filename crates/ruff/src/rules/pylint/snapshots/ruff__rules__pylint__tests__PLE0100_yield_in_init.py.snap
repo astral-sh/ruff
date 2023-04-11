@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/yield_in_init.py:9:9: PLE0100 `__init__` method is a generator
+yield_in_init.py:9:9: PLE0100 `__init__` method is a generator
    |
  9 | class A:
 10 |     def __init__(self):
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
    |         ^^^^^ PLE0100
    |
 
-./resources/test/fixtures/pylint/yield_in_init.py:14:9: PLE0100 `__init__` method is a generator
+yield_in_init.py:14:9: PLE0100 `__init__` method is a generator
    |
 14 | class B:
 15 |     def __init__(self):

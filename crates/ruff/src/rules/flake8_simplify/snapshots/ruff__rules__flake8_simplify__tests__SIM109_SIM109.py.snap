@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109.py:2:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
   |
 2 | # SIM109
 3 | if a == b or a == c:
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 4 4 | 
 5 5 | # SIM109
 
-./resources/test/fixtures/flake8_simplify/SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109.py:6:5: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
   |
 6 | # SIM109
 7 | if (a == b or a == c) and None:
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 8 8 | 
 9 9 | # SIM109
 
-./resources/test/fixtures/flake8_simplify/SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109.py:10:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
    |
 10 | # SIM109
 11 | if a == b or a == c or None:
@@ -56,7 +56,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 12 12 | 
 13 13 | # SIM109
 
-./resources/test/fixtures/flake8_simplify/SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
+SIM109.py:14:4: SIM109 [*] Use `a in (b, c)` instead of multiple equality comparisons
    |
 14 | # SIM109
 15 | if a == b or None or a == c:

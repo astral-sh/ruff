@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
 ---
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:9:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:9:1: TID252 [*] Relative imports from parent modules are banned
    |
  9 | from . import sibling
 10 | from .sibling import example
@@ -12,7 +12,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:10:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:10:1: TID252 [*] Relative imports from parent modules are banned
    |
 10 | from .sibling import example
 11 | from .. import parent
@@ -23,7 +23,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:11:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:11:1: TID252 [*] Relative imports from parent modules are banned
    |
 11 | from .. import parent
 12 | from ..parent import example
@@ -34,7 +34,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:12:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:12:1: TID252 [*] Relative imports from parent modules are banned
    |
 12 | from ..parent import example
 13 | from ... import grandparent
@@ -45,7 +45,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:17:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:17:1: TID252 [*] Relative imports from parent modules are banned
    |
 17 |       parent import \
 18 |           hello_world
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:21:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:21:1: TID252 [*] Relative imports from parent modules are banned
    |
 21 |     import \
 22 |     world_hello
@@ -70,7 +70,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:22:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:22:1: TID252 [*] Relative imports from parent modules are banned
    |
 22 |     world_hello
 23 | from ..... import ultragrantparent
@@ -81,7 +81,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:23:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:23:1: TID252 [*] Relative imports from parent modules are banned
    |
 23 | from ..... import ultragrantparent
 24 | from ...... import ultragrantparent
@@ -92,7 +92,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:24:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:24:1: TID252 [*] Relative imports from parent modules are banned
    |
 24 | from ...... import ultragrantparent
 25 | from ....... import ultragrantparent
@@ -103,7 +103,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:25:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:25:1: TID252 [*] Relative imports from parent modules are banned
    |
 25 | from ....... import ultragrantparent
 26 | from ......... import ultragrantparent
@@ -114,7 +114,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:26:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:26:1: TID252 [*] Relative imports from parent modules are banned
    |
 26 | from ......... import ultragrantparent
 27 | from ........................... import ultragrantparent
@@ -125,7 +125,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:27:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:27:1: TID252 [*] Relative imports from parent modules are banned
    |
 27 | from ........................... import ultragrantparent
 28 | from .....parent import ultragrantparent
@@ -135,7 +135,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
    |
    = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252.py:28:1: TID252 [*] Relative imports from parent modules are banned
+TID252.py:28:1: TID252 [*] Relative imports from parent modules are banned
    |
 28 | from .....parent import ultragrantparent
 29 | from .........parent import ultragrantparent

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/sections.py:42:5: D407 [*] Missing dashed underline after section ("Returns")
+sections.py:42:5: D407 [*] Missing dashed underline after section ("Returns")
    |
 42 |   @expect("D407: Missing dashed underline after section ('Returns')")
 43 |   def no_underline():  # noqa: D416
@@ -25,7 +25,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 46 47 | 
 47 48 |     """
 
-./resources/test/fixtures/pydocstyle/sections.py:54:5: D407 [*] Missing dashed underline after section ("Returns")
+sections.py:54:5: D407 [*] Missing dashed underline after section ("Returns")
    |
 54 |   @expect("D414: Section has no content ('Returns')")
 55 |   def no_underline_and_no_description():  # noqa: D416
@@ -48,7 +48,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 58 59 |     """
 59 60 | 
 
-./resources/test/fixtures/pydocstyle/sections.py:65:5: D407 [*] Missing dashed underline after section ("Returns")
+sections.py:65:5: D407 [*] Missing dashed underline after section ("Returns")
    |
 65 |   @expect("D414: Section has no content ('Returns')")
 66 |   def no_underline_and_no_newline():  # noqa: D416
@@ -71,7 +71,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 69 70 | 
 70 71 | @expect(_D213)
 
-./resources/test/fixtures/pydocstyle/sections.py:216:5: D407 [*] Missing dashed underline after section ("Raises")
+sections.py:216:5: D407 [*] Missing dashed underline after section ("Raises")
     |
 216 |   @expect("D407: Missing dashed underline after section ('Raises')")
 217 |   def multiple_sections():  # noqa: D416
@@ -104,7 +104,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 229 230 | 
 230 231 |     """
 
-./resources/test/fixtures/pydocstyle/sections.py:261:5: D407 [*] Missing dashed underline after section ("Args")
+sections.py:261:5: D407 [*] Missing dashed underline after section ("Args")
     |
 261 |   @expect("D414: Section has no content ('Returns')")
 262 |   def valid_google_style_section():  # noqa: D406, D407
@@ -133,7 +133,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 265 266 | 
 266 267 |     Returns:
 
-./resources/test/fixtures/pydocstyle/sections.py:261:5: D407 [*] Missing dashed underline after section ("Returns")
+sections.py:261:5: D407 [*] Missing dashed underline after section ("Returns")
     |
 261 |   @expect("D414: Section has no content ('Returns')")
 262 |   def valid_google_style_section():  # noqa: D406, D407
@@ -162,7 +162,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 268 269 |     Raises:
 269 270 |         RandomError: A random error that occurs randomly.
 
-./resources/test/fixtures/pydocstyle/sections.py:261:5: D407 [*] Missing dashed underline after section ("Raises")
+sections.py:261:5: D407 [*] Missing dashed underline after section ("Raises")
     |
 261 |   @expect("D414: Section has no content ('Returns')")
 262 |   def valid_google_style_section():  # noqa: D406, D407
@@ -191,7 +191,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 270 271 | 
 271 272 |     """
 
-./resources/test/fixtures/pydocstyle/sections.py:278:5: D407 [*] Missing dashed underline after section ("Args")
+sections.py:278:5: D407 [*] Missing dashed underline after section ("Args")
     |
 278 |           "('Args:', not 'Args')")
 279 |   def missing_colon_google_style_section():  # noqa: D406, D407
@@ -215,7 +215,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 282 283 | 
 283 284 |     """
 
-./resources/test/fixtures/pydocstyle/sections.py:293:9: D407 [*] Missing dashed underline after section ("Args")
+sections.py:293:9: D407 [*] Missing dashed underline after section ("Args")
     |
 293 |       def bar(y=2):  # noqa: D207, D213, D406, D407
 294 |           """Nested function test for docstrings.
@@ -242,7 +242,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 299 300 | that is broken.
 300 301 | 
 
-./resources/test/fixtures/pydocstyle/sections.py:310:5: D407 [*] Missing dashed underline after section ("Args")
+sections.py:310:5: D407 [*] Missing dashed underline after section ("Args")
     |
 310 |           "'test_missing_google_args' docstring)")
 311 |   def test_missing_google_args(x=1, y=2, _private=3):  # noqa: D406, D407
@@ -266,7 +266,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 314 315 | 
 315 316 |     """
 
-./resources/test/fixtures/pydocstyle/sections.py:322:9: D407 [*] Missing dashed underline after section ("Args")
+sections.py:322:9: D407 [*] Missing dashed underline after section ("Args")
     |
 322 |       def test_method(self, test, another_test, _):  # noqa: D213, D407
 323 |           """Test a valid args section.
@@ -292,7 +292,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 326 327 |             another_test: Another parameter.
 327 328 | 
 
-./resources/test/fixtures/pydocstyle/sections.py:334:9: D407 [*] Missing dashed underline after section ("Args")
+sections.py:334:9: D407 [*] Missing dashed underline after section ("Args")
     |
 334 |               "'test_missing_args' docstring)", arg_count=5)
 335 |       def test_missing_args(self, test, x, y, z=3, _private_arg=3):  # noqa: D213, D407
@@ -318,7 +318,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 338 339 | 
 339 340 |         """
 
-./resources/test/fixtures/pydocstyle/sections.py:346:9: D407 [*] Missing dashed underline after section ("Args")
+sections.py:346:9: D407 [*] Missing dashed underline after section ("Args")
     |
 346 |               "'test_missing_args_class_method' docstring)", arg_count=5)
 347 |       def test_missing_args_class_method(cls, test, x, y, _, z=3):  # noqa: D213, D407
@@ -345,7 +345,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 350 351 |             y:
 351 352 | 
 
-./resources/test/fixtures/pydocstyle/sections.py:359:9: D407 [*] Missing dashed underline after section ("Args")
+sections.py:359:9: D407 [*] Missing dashed underline after section ("Args")
     |
 359 |               "'test_missing_args_static_method' docstring)", arg_count=4)
 360 |       def test_missing_args_static_method(a, x, y, _test, z=3):  # noqa: D213, D407
@@ -371,7 +371,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 363 364 | 
 364 365 |         """
 
-./resources/test/fixtures/pydocstyle/sections.py:371:9: D407 [*] Missing dashed underline after section ("Args")
+sections.py:371:9: D407 [*] Missing dashed underline after section ("Args")
     |
 371 |               "'test_missing_docstring' docstring)", arg_count=2)
 372 |       def test_missing_docstring(a, b):  # noqa: D213, D407
@@ -397,7 +397,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 375 376 | 
 376 377 |         """
 
-./resources/test/fixtures/pydocstyle/sections.py:380:9: D407 [*] Missing dashed underline after section ("Args")
+sections.py:380:9: D407 [*] Missing dashed underline after section ("Args")
     |
 380 |       @staticmethod
 381 |       def test_hanging_indent(skip, verbose):  # noqa: D213, D407
@@ -427,7 +427,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 384 385 |                 Lorem ipsum dolor sit amet, consectetur adipiscing elit.
 385 386 |                 Etiam at tellus a tellus faucibus maximus. Curabitur tellus
 
-./resources/test/fixtures/pydocstyle/sections.py:499:9: D407 [*] Missing dashed underline after section ("Args")
+sections.py:499:9: D407 [*] Missing dashed underline after section ("Args")
     |
 499 |               "'test_incorrect_indent' docstring)", arg_count=3)
 500 |       def test_incorrect_indent(self, x=1, y=2):  # noqa: D207, D213, D407

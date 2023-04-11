@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F50x.py:4:1: F509 `%`-format string has unsupported format character `j`
+F50x.py:4:1: F509 `%`-format string has unsupported format character `j`
   |
 4 | '%s %(foo)s' % {'foo': 'bar'}  # F506
 5 | '%(foo)s %s' % {'foo': 'bar'}  # F506

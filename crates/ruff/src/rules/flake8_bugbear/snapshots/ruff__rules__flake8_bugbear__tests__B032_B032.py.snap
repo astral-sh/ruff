@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B032.py:9:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:9:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
  9 | dct = {"a": 1}
 10 | 
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 12 | dct.b: 2
    |
 
-./resources/test/fixtures/flake8_bugbear/B032.py:10:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:10:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
 10 | dct["b"]: 2
 11 | dct.b: 2
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 13 | dct["b"]: "test"
    |
 
-./resources/test/fixtures/flake8_bugbear/B032.py:12:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:12:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
 12 | dct.b: 2
 13 | 
@@ -28,7 +28,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 15 | dct.b: "test"
    |
 
-./resources/test/fixtures/flake8_bugbear/B032.py:13:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:13:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
 13 | dct["b"]: "test"
 14 | dct.b: "test"
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 16 | test = "test"
    |
 
-./resources/test/fixtures/flake8_bugbear/B032.py:16:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:16:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
 16 | test = "test"
 17 | dct["b"]: test
@@ -46,7 +46,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 19 | dct.b: test
    |
 
-./resources/test/fixtures/flake8_bugbear/B032.py:17:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:17:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
 17 | test = "test"
 18 | dct["b"]: test
@@ -56,7 +56,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 21 | dct.b: test.lower()
    |
 
-./resources/test/fixtures/flake8_bugbear/B032.py:18:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:18:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
 18 | dct["b"]: test
 19 | dct["b"]: test.lower()
@@ -65,7 +65,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 21 | dct.b: test.lower()
    |
 
-./resources/test/fixtures/flake8_bugbear/B032.py:19:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
+B032.py:19:1: B032 Possible unintentional type annotation (using `:`). Did you mean to assign (using `=`)?
    |
 19 | dct["b"]: test.lower()
 20 | dct.b: test

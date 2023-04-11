@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_blind_except/mod.rs
 ---
-./resources/test/fixtures/flake8_blind_except/BLE.py:25:8: BLE001 Do not catch blind exception: `BaseException`
+BLE.py:25:8: BLE001 Do not catch blind exception: `BaseException`
    |
 25 | except Exception as e:
 26 |     raise e
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_blind_except/mod.rs
 28 |     pass
    |
 
-./resources/test/fixtures/flake8_blind_except/BLE.py:31:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:31:8: BLE001 Do not catch blind exception: `Exception`
    |
 31 | try:
 32 |     pass
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_blind_except/mod.rs
 35 | finally:
    |
 
-./resources/test/fixtures/flake8_blind_except/BLE.py:42:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:42:8: BLE001 Do not catch blind exception: `Exception`
    |
 42 | try:
 43 |     pass
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/flake8_blind_except/mod.rs
 46 |         raise e
    |
 
-./resources/test/fixtures/flake8_blind_except/BLE.py:45:12: BLE001 Do not catch blind exception: `BaseException`
+BLE.py:45:12: BLE001 Do not catch blind exception: `BaseException`
    |
 45 |     try:
 46 |         raise e
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_blind_except/mod.rs
 48 |         pass
    |
 
-./resources/test/fixtures/flake8_blind_except/BLE.py:54:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:54:8: BLE001 Do not catch blind exception: `Exception`
    |
 54 |     except BaseException as e:
 55 |         raise e
@@ -48,7 +48,7 @@ source: crates/ruff/src/rules/flake8_blind_except/mod.rs
 57 |     pass
    |
 
-./resources/test/fixtures/flake8_blind_except/BLE.py:60:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:60:8: BLE001 Do not catch blind exception: `Exception`
    |
 60 | try:
 61 |     pass
@@ -58,7 +58,7 @@ source: crates/ruff/src/rules/flake8_blind_except/mod.rs
 64 | except BaseException:
    |
 
-./resources/test/fixtures/flake8_blind_except/BLE.py:62:8: BLE001 Do not catch blind exception: `BaseException`
+BLE.py:62:8: BLE001 Do not catch blind exception: `BaseException`
    |
 62 | except Exception as e:
 63 |     raise bad
@@ -67,7 +67,7 @@ source: crates/ruff/src/rules/flake8_blind_except/mod.rs
 65 |     pass
    |
 
-./resources/test/fixtures/flake8_blind_except/BLE.py:69:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:69:8: BLE001 Do not catch blind exception: `Exception`
    |
 69 | try:
 70 |     pass
@@ -76,7 +76,7 @@ source: crates/ruff/src/rules/flake8_blind_except/mod.rs
 72 |     logging.error("...")
    |
 
-./resources/test/fixtures/flake8_blind_except/BLE.py:75:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:75:8: BLE001 Do not catch blind exception: `Exception`
    |
 75 | try:
 76 |     pass
@@ -85,7 +85,7 @@ source: crates/ruff/src/rules/flake8_blind_except/mod.rs
 78 |     logging.error("...", exc_info=False)
    |
 
-./resources/test/fixtures/flake8_blind_except/BLE.py:81:8: BLE001 Do not catch blind exception: `Exception`
+BLE.py:81:8: BLE001 Do not catch blind exception: `Exception`
    |
 81 | try:
 82 |     pass

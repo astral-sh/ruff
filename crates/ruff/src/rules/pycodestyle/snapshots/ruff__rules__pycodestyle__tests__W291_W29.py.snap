@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/W29.py:4:6: W291 [*] Trailing whitespace
+W29.py:4:6: W291 [*] Trailing whitespace
   |
 4 | # 情
 5 | #: W291:1:6
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 6 6 | class Foo(object):
 7 7 |     
 
-./resources/test/fixtures/pycodestyle/W29.py:11:35: W291 [*] Trailing whitespace
+W29.py:11:35: W291 [*] Trailing whitespace
    |
 11 | #: W291:2:35
 12 | '''multiline
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 13 13 | x = 1   
 14 14 | #: W191 W292 noeol
 
-./resources/test/fixtures/pycodestyle/W29.py:13:6: W291 [*] Trailing whitespace
+W29.py:13:6: W291 [*] Trailing whitespace
    |
 13 | string with trailing whitespace'''   
 14 | #: W291 W292 noeol

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B020.py:8:5: B020 Loop control variable `items` overrides iterable it iterates
+B020.py:8:5: B020 Loop control variable `items` overrides iterable it iterates
    |
  8 | items = [1, 2, 3]
  9 | 
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 11 |     print(items)
    |
 
-./resources/test/fixtures/flake8_bugbear/B020.py:21:10: B020 Loop control variable `values` overrides iterable it iterates
+B020.py:21:10: B020 Loop control variable `values` overrides iterable it iterates
    |
 21 |     print(f"{key}, {value}")
 22 | 
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 24 |     print(f"{key}, {values}")
    |
 
-./resources/test/fixtures/flake8_bugbear/B020.py:36:5: B020 Loop control variable `vars` overrides iterable it iterates
+B020.py:36:5: B020 Loop control variable `vars` overrides iterable it iterates
    |
 36 | # However we still call out reassigning the iterable in the comprehension.
 37 | for vars in [i for i in vars]:

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP037.py:18:14: UP037 [*] Remove quotes from type annotation
+UP037.py:18:14: UP037 [*] Remove quotes from type annotation
    |
 18 | def foo(var: "MyClass") -> "MyClass":
    |              ^^^^^^^^^ UP037
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 20 | 
 21 21 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:18:28: UP037 [*] Remove quotes from type annotation
+UP037.py:18:28: UP037 [*] Remove quotes from type annotation
    |
 18 | def foo(var: "MyClass") -> "MyClass":
    |                            ^^^^^^^^^ UP037
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 20 | 
 21 21 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:19:8: UP037 [*] Remove quotes from type annotation
+UP037.py:19:8: UP037 [*] Remove quotes from type annotation
    |
 19 | def foo(var: "MyClass") -> "MyClass":
 20 |     x: "MyClass"
@@ -55,7 +55,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 21 21 | 
 22 22 | def foo(*, inplace: "bool"):
 
-./resources/test/fixtures/pyupgrade/UP037.py:22:21: UP037 [*] Remove quotes from type annotation
+UP037.py:22:21: UP037 [*] Remove quotes from type annotation
    |
 22 | def foo(*, inplace: "bool"):
    |                     ^^^^^^ UP037
@@ -73,7 +73,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 24 24 | 
 25 25 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:26:16: UP037 [*] Remove quotes from type annotation
+UP037.py:26:16: UP037 [*] Remove quotes from type annotation
    |
 26 | def foo(*args: "str", **kwargs: "int"):
    |                ^^^^^ UP037
@@ -91,7 +91,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 28 28 | 
 29 29 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:26:33: UP037 [*] Remove quotes from type annotation
+UP037.py:26:33: UP037 [*] Remove quotes from type annotation
    |
 26 | def foo(*args: "str", **kwargs: "int"):
    |                                 ^^^^^ UP037
@@ -109,7 +109,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 28 28 | 
 29 29 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:30:10: UP037 [*] Remove quotes from type annotation
+UP037.py:30:10: UP037 [*] Remove quotes from type annotation
    |
 30 | x: Tuple["MyClass"]
    |          ^^^^^^^^^ UP037
@@ -128,7 +128,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 32 32 | x: Callable[["MyClass"], None]
 33 33 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:32:14: UP037 [*] Remove quotes from type annotation
+UP037.py:32:14: UP037 [*] Remove quotes from type annotation
    |
 32 | x: Tuple["MyClass"]
 33 | 
@@ -147,7 +147,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 34 34 | 
 35 35 | class Foo(NamedTuple):
 
-./resources/test/fixtures/pyupgrade/UP037.py:36:8: UP037 [*] Remove quotes from type annotation
+UP037.py:36:8: UP037 [*] Remove quotes from type annotation
    |
 36 | class Foo(NamedTuple):
 37 |     x: "MyClass"
@@ -165,7 +165,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 38 38 | 
 39 39 | class D(TypedDict):
 
-./resources/test/fixtures/pyupgrade/UP037.py:40:27: UP037 [*] Remove quotes from type annotation
+UP037.py:40:27: UP037 [*] Remove quotes from type annotation
    |
 40 | class D(TypedDict):
 41 |     E: TypedDict("E", foo="int", total=False)
@@ -183,7 +183,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 42 42 | 
 43 43 | class D(TypedDict):
 
-./resources/test/fixtures/pyupgrade/UP037.py:44:31: UP037 [*] Remove quotes from type annotation
+UP037.py:44:31: UP037 [*] Remove quotes from type annotation
    |
 44 | class D(TypedDict):
 45 |     E: TypedDict("E", {"foo": "int"})
@@ -201,7 +201,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 46 46 | 
 47 47 | x: Annotated["str", "metadata"]
 
-./resources/test/fixtures/pyupgrade/UP037.py:47:14: UP037 [*] Remove quotes from type annotation
+UP037.py:47:14: UP037 [*] Remove quotes from type annotation
    |
 47 | x: Annotated["str", "metadata"]
    |              ^^^^^ UP037
@@ -220,7 +220,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 49 49 | x: Arg("str", "name")
 50 50 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:49:8: UP037 [*] Remove quotes from type annotation
+UP037.py:49:8: UP037 [*] Remove quotes from type annotation
    |
 49 | x: Annotated["str", "metadata"]
 50 | 
@@ -241,7 +241,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 51 51 | x: DefaultArg("str", "name")
 52 52 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:51:15: UP037 [*] Remove quotes from type annotation
+UP037.py:51:15: UP037 [*] Remove quotes from type annotation
    |
 51 | x: Arg("str", "name")
 52 | 
@@ -262,7 +262,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 53 53 | x: NamedArg("str", "name")
 54 54 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:53:13: UP037 [*] Remove quotes from type annotation
+UP037.py:53:13: UP037 [*] Remove quotes from type annotation
    |
 53 | x: DefaultArg("str", "name")
 54 | 
@@ -283,7 +283,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 55 55 | x: DefaultNamedArg("str", "name")
 56 56 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:55:20: UP037 [*] Remove quotes from type annotation
+UP037.py:55:20: UP037 [*] Remove quotes from type annotation
    |
 55 | x: NamedArg("str", "name")
 56 | 
@@ -304,7 +304,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 57 57 | x: DefaultNamedArg("str", name="name")
 58 58 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:57:20: UP037 [*] Remove quotes from type annotation
+UP037.py:57:20: UP037 [*] Remove quotes from type annotation
    |
 57 | x: DefaultNamedArg("str", "name")
 58 | 
@@ -325,7 +325,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 59 59 | x: VarArg("str")
 60 60 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:59:11: UP037 [*] Remove quotes from type annotation
+UP037.py:59:11: UP037 [*] Remove quotes from type annotation
    |
 59 | x: DefaultNamedArg("str", name="name")
 60 | 
@@ -346,7 +346,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 61 61 | x: List[List[List["MyClass"]]]
 62 62 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:61:19: UP037 [*] Remove quotes from type annotation
+UP037.py:61:19: UP037 [*] Remove quotes from type annotation
    |
 61 | x: VarArg("str")
 62 | 
@@ -367,7 +367,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 63 63 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
 64 64 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:63:29: UP037 [*] Remove quotes from type annotation
+UP037.py:63:29: UP037 [*] Remove quotes from type annotation
    |
 63 | x: List[List[List["MyClass"]]]
 64 | 
@@ -388,7 +388,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 65 65 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
 66 66 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:63:45: UP037 [*] Remove quotes from type annotation
+UP037.py:63:45: UP037 [*] Remove quotes from type annotation
    |
 63 | x: List[List[List["MyClass"]]]
 64 | 
@@ -409,7 +409,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 65 65 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
 66 66 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:65:29: UP037 [*] Remove quotes from type annotation
+UP037.py:65:29: UP037 [*] Remove quotes from type annotation
    |
 65 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
 66 | 
@@ -430,7 +430,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 67 67 | x: NamedTuple(typename="X", fields=[("foo", "int")])
 68 68 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:65:36: UP037 [*] Remove quotes from type annotation
+UP037.py:65:36: UP037 [*] Remove quotes from type annotation
    |
 65 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
 66 | 
@@ -451,7 +451,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 67 67 | x: NamedTuple(typename="X", fields=[("foo", "int")])
 68 68 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:65:45: UP037 [*] Remove quotes from type annotation
+UP037.py:65:45: UP037 [*] Remove quotes from type annotation
    |
 65 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
 66 | 
@@ -472,7 +472,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 67 67 | x: NamedTuple(typename="X", fields=[("foo", "int")])
 68 68 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:65:52: UP037 [*] Remove quotes from type annotation
+UP037.py:65:52: UP037 [*] Remove quotes from type annotation
    |
 65 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
 66 | 
@@ -493,7 +493,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 67 67 | x: NamedTuple(typename="X", fields=[("foo", "int")])
 68 68 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:67:24: UP037 [*] Remove quotes from type annotation
+UP037.py:67:24: UP037 [*] Remove quotes from type annotation
    |
 67 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
 68 | 
@@ -514,7 +514,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 69 69 | X: MyCallable("X")
 70 70 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:67:38: UP037 [*] Remove quotes from type annotation
+UP037.py:67:38: UP037 [*] Remove quotes from type annotation
    |
 67 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
 68 | 
@@ -535,7 +535,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 69 69 | X: MyCallable("X")
 70 70 | 
 
-./resources/test/fixtures/pyupgrade/UP037.py:67:45: UP037 [*] Remove quotes from type annotation
+UP037.py:67:45: UP037 [*] Remove quotes from type annotation
    |
 67 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
 68 | 

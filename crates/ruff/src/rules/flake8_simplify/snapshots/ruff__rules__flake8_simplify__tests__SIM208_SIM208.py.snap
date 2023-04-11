@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM208.py:1:4: SIM208 [*] Use `a` instead of `not (not a)`
+SIM208.py:1:4: SIM208 [*] Use `a` instead of `not (not a)`
   |
 1 | if not (not a):  # SIM208
   |    ^^^^^^^^^^^ SIM208
@@ -16,7 +16,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 3 3 | 
 4 4 | if not (not (a == b)):  # SIM208
 
-./resources/test/fixtures/flake8_simplify/SIM208.py:4:4: SIM208 [*] Use `a == b` instead of `not (not a == b)`
+SIM208.py:4:4: SIM208 [*] Use `a == b` instead of `not (not a == b)`
   |
 4 |     pass
 5 | 

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F632.py:1:4: F632 [*] Use `==` to compare constant literals
+F632.py:1:4: F632 [*] Use `==` to compare constant literals
   |
 1 | if x is "abc":
   |    ^^^^^^^^^^ F632
@@ -16,7 +16,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 3 3 | 
 4 4 | if 123 is not y:
 
-./resources/test/fixtures/pyflakes/F632.py:4:4: F632 [*] Use `!=` to compare constant literals
+F632.py:4:4: F632 [*] Use `!=` to compare constant literals
   |
 4 |     pass
 5 | 
@@ -36,7 +36,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 6 6 | 
 7 7 | if 123 is \
 
-./resources/test/fixtures/pyflakes/F632.py:7:4: F632 [*] Use `!=` to compare constant literals
+F632.py:7:4: F632 [*] Use `!=` to compare constant literals
    |
  7 |       pass
  8 |   
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 10 9 | 
 11 10 | if "123" is x < 3:
 
-./resources/test/fixtures/pyflakes/F632.py:11:4: F632 [*] Use `==` to compare constant literals
+F632.py:11:4: F632 [*] Use `==` to compare constant literals
    |
 11 |     pass
 12 | 
@@ -79,7 +79,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 13 13 | 
 14 14 | if "123" != x is 3:
 
-./resources/test/fixtures/pyflakes/F632.py:14:4: F632 [*] Use `==` to compare constant literals
+F632.py:14:4: F632 [*] Use `==` to compare constant literals
    |
 14 |     pass
 15 | 
@@ -99,7 +99,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 16 16 | 
 17 17 | if ("123" != x) is 3:
 
-./resources/test/fixtures/pyflakes/F632.py:17:4: F632 [*] Use `==` to compare constant literals
+F632.py:17:4: F632 [*] Use `==` to compare constant literals
    |
 17 |     pass
 18 | 
@@ -119,7 +119,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 19 19 | 
 20 20 | if "123" != (x is 3):
 
-./resources/test/fixtures/pyflakes/F632.py:20:14: F632 [*] Use `==` to compare constant literals
+F632.py:20:14: F632 [*] Use `==` to compare constant literals
    |
 20 |     pass
 21 | 

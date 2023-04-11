@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/sections.py:292:9: D417 Missing argument description in the docstring: `y`
+sections.py:292:9: D417 Missing argument description in the docstring: `y`
     |
 292 |     x = 1
 293 | 
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 295 |         """Nested function test for docstrings.
     |
 
-./resources/test/fixtures/pydocstyle/sections.py:309:5: D417 Missing argument description in the docstring: `y`
+sections.py:309:5: D417 Missing argument description in the docstring: `y`
     |
 309 |         "(argument(s) y are missing descriptions in "
 310 |         "'test_missing_google_args' docstring)")
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 312 |     """Toggle the gizmo.
     |
 
-./resources/test/fixtures/pydocstyle/sections.py:333:9: D417 Missing argument descriptions in the docstring: `test`, `y`, `z`
+sections.py:333:9: D417 Missing argument descriptions in the docstring: `test`, `y`, `z`
     |
 333 |             "(argument(s) test, y, z are missing descriptions in "
 334 |             "'test_missing_args' docstring)", arg_count=5)
@@ -28,7 +28,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 336 |         """Test a valid args section.
     |
 
-./resources/test/fixtures/pydocstyle/sections.py:345:9: D417 Missing argument descriptions in the docstring: `test`, `y`, `z`
+sections.py:345:9: D417 Missing argument descriptions in the docstring: `test`, `y`, `z`
     |
 345 |             "(argument(s) test, y, z are missing descriptions in "
 346 |             "'test_missing_args_class_method' docstring)", arg_count=5)
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 348 |         """Test a valid args section.
     |
 
-./resources/test/fixtures/pydocstyle/sections.py:358:9: D417 Missing argument descriptions in the docstring: `a`, `y`, `z`
+sections.py:358:9: D417 Missing argument descriptions in the docstring: `a`, `y`, `z`
     |
 358 |             "(argument(s) a, y, z are missing descriptions in "
 359 |             "'test_missing_args_static_method' docstring)", arg_count=4)
@@ -46,7 +46,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 361 |         """Test a valid args section.
     |
 
-./resources/test/fixtures/pydocstyle/sections.py:370:9: D417 Missing argument descriptions in the docstring: `a`, `b`
+sections.py:370:9: D417 Missing argument descriptions in the docstring: `a`, `b`
     |
 370 |             "(argument(s) a, b are missing descriptions in "
 371 |             "'test_missing_docstring' docstring)", arg_count=2)
@@ -55,7 +55,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 373 |         """Test a valid args section.
     |
 
-./resources/test/fixtures/pydocstyle/sections.py:398:5: D417 Missing argument description in the docstring: `y`
+sections.py:398:5: D417 Missing argument description in the docstring: `y`
     |
 398 |         "(argument(s) y are missing descriptions in "
 399 |         "'test_missing_numpy_args' docstring)")
@@ -64,7 +64,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 401 |     """Toggle the gizmo.
     |
 
-./resources/test/fixtures/pydocstyle/sections.py:434:9: D417 Missing argument descriptions in the docstring: `test`, `y`, `z`
+sections.py:434:9: D417 Missing argument descriptions in the docstring: `test`, `y`, `z`
     |
 434 |             "(argument(s) test, y, z are missing descriptions in "
 435 |             "'test_missing_args' docstring)", arg_count=5)
@@ -73,7 +73,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 437 |         """Test a valid args section.
     |
 
-./resources/test/fixtures/pydocstyle/sections.py:449:9: D417 Missing argument descriptions in the docstring: `test`, `y`, `z`
+sections.py:449:9: D417 Missing argument descriptions in the docstring: `test`, `y`, `z`
     |
 449 |             "(argument(s) test, y, z are missing descriptions in "
 450 |             "'test_missing_args_class_method' docstring)", arg_count=4)
@@ -82,7 +82,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 452 |         """Test a valid args section.
     |
 
-./resources/test/fixtures/pydocstyle/sections.py:468:9: D417 Missing argument descriptions in the docstring: `a`, `z`
+sections.py:468:9: D417 Missing argument descriptions in the docstring: `a`, `z`
     |
 468 |             "(argument(s) a, z are missing descriptions in "
 469 |             "'test_missing_args_static_method' docstring)", arg_count=3)
@@ -91,7 +91,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 471 |         """Test a valid args section.
     |
 
-./resources/test/fixtures/pydocstyle/sections.py:498:9: D417 Missing argument description in the docstring: `y`
+sections.py:498:9: D417 Missing argument description in the docstring: `y`
     |
 498 |             "(argument(s) y are missing descriptions in "
 499 |             "'test_incorrect_indent' docstring)", arg_count=3)

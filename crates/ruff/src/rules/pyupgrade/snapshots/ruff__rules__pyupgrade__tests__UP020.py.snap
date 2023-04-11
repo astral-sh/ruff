@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP020.py:3:6: UP020 [*] Use builtin `open`
+UP020.py:3:6: UP020 [*] Use builtin `open`
   |
 3 | import io
 4 | 
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 5 5 | 
 6 6 | from io import open
 
-./resources/test/fixtures/pyupgrade/UP020.py:8:6: UP020 Use builtin `open`
+UP020.py:8:6: UP020 Use builtin `open`
    |
  8 | from io import open
  9 | 

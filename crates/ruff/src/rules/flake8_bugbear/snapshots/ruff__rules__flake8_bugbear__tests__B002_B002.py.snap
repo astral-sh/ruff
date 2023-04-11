@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B002.py:15:9: B002 Python does not support the unary prefix increment
+B002.py:15:9: B002 Python does not support the unary prefix increment
    |
 15 | def this_is_buggy(n):
 16 |     x = ++n
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 17 |     return x
    |
 
-./resources/test/fixtures/flake8_bugbear/B002.py:20:12: B002 Python does not support the unary prefix increment
+B002.py:20:12: B002 Python does not support the unary prefix increment
    |
 20 | def this_is_buggy_too(n):
 21 |     return ++n

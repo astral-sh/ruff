@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
-./resources/test/fixtures/flake8_quotes/docstring_doubles.py:1:1: Q002 [*] Double quote docstring found but single quotes preferred
+docstring_doubles.py:1:1: Q002 [*] Double quote docstring found but single quotes preferred
   |
 1 | / """
 2 | | Double quotes multiline module docstring
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 5 5 | """
 6 6 | this is not a docstring
 
-./resources/test/fixtures/flake8_quotes/docstring_doubles.py:12:5: Q002 [*] Double quote docstring found but single quotes preferred
+docstring_doubles.py:12:5: Q002 [*] Double quote docstring found but single quotes preferred
    |
 12 |   class Cls:
 13 |       """
@@ -48,7 +48,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 16 16 |     """
 17 17 |     this is not a docstring
 
-./resources/test/fixtures/flake8_quotes/docstring_doubles.py:24:9: Q002 [*] Double quote docstring found but single quotes preferred
+docstring_doubles.py:24:9: Q002 [*] Double quote docstring found but single quotes preferred
    |
 24 |           definitely not a docstring""",
 25 |           val=l[Cls():3]):

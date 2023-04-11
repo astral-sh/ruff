@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/constant_literals.py:4:4: F632 [*] Use `==` to compare constant literals
+constant_literals.py:4:4: F632 [*] Use `==` to compare constant literals
   |
 4 | # Errors
 5 | ###
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 6 6 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
 7 7 |     pass
 
-./resources/test/fixtures/pycodestyle/constant_literals.py:6:4: F632 [*] Use `==` to compare constant literals
+constant_literals.py:6:4: F632 [*] Use `==` to compare constant literals
    |
  6 | if "abc" is "def":  # F632 (fix)
  7 |     pass
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 8 8 | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
 9 9 |     pass
 
-./resources/test/fixtures/pycodestyle/constant_literals.py:8:4: F632 [*] Use `==` to compare constant literals
+constant_literals.py:8:4: F632 [*] Use `==` to compare constant literals
    |
  8 | if "abc" is None:  # F632 (fix, but leaves behind unfixable E711)
  9 |     pass
@@ -64,7 +64,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 10 10 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
 11 11 |     pass
 
-./resources/test/fixtures/pycodestyle/constant_literals.py:10:4: F632 [*] Use `==` to compare constant literals
+constant_literals.py:10:4: F632 [*] Use `==` to compare constant literals
    |
 10 | if None is "abc":  # F632 (fix, but leaves behind unfixable E711)
 11 |     pass
@@ -85,7 +85,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 12 12 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 13 13 |     pass
 
-./resources/test/fixtures/pycodestyle/constant_literals.py:12:4: F632 [*] Use `==` to compare constant literals
+constant_literals.py:12:4: F632 [*] Use `==` to compare constant literals
    |
 12 | if "abc" is False:  # F632 (fix, but leaves behind unfixable E712)
 13 |     pass
@@ -106,7 +106,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 14 14 | if False == None:  # E711, E712 (fix)
 15 15 |     pass
 
-./resources/test/fixtures/pycodestyle/constant_literals.py:14:4: E712 [*] Comparison to `False` should be `cond is False`
+constant_literals.py:14:4: E712 [*] Comparison to `False` should be `cond is False`
    |
 14 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 15 |     pass
@@ -127,7 +127,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 16 16 | if None == False:  # E711, E712 (fix)
 17 17 |     pass
 
-./resources/test/fixtures/pycodestyle/constant_literals.py:14:13: E711 [*] Comparison to `None` should be `cond is None`
+constant_literals.py:14:13: E711 [*] Comparison to `None` should be `cond is None`
    |
 14 | if False is "abc":  # F632 (fix, but leaves behind unfixable E712)
 15 |     pass
@@ -148,7 +148,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 16 16 | if None == False:  # E711, E712 (fix)
 17 17 |     pass
 
-./resources/test/fixtures/pycodestyle/constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None`
+constant_literals.py:16:4: E711 [*] Comparison to `None` should be `cond is None`
    |
 16 | if False == None:  # E711, E712 (fix)
 17 |     pass
@@ -168,7 +168,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 18 18 | 
 19 19 | ###
 
-./resources/test/fixtures/pycodestyle/constant_literals.py:16:12: E712 [*] Comparison to `False` should be `cond is False`
+constant_literals.py:16:12: E712 [*] Comparison to `False` should be `cond is False`
    |
 16 | if False == None:  # E711, E712 (fix)
 17 |     pass

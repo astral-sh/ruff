@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_debugger/mod.rs
 ---
-./resources/test/fixtures/flake8_debugger/T100.py:1:1: T100 Trace found: `breakpoint` used
+T100.py:1:1: T100 Trace found: `breakpoint` used
   |
 1 | breakpoint()
   | ^^^^^^^^^^^^ T100
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_debugger/mod.rs
 3 | import pdb
   |
 
-./resources/test/fixtures/flake8_debugger/T100.py:3:1: T100 Import for `pdb` found
+T100.py:3:1: T100 Import for `pdb` found
   |
 3 | breakpoint()
 4 | 
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_debugger/mod.rs
 7 | from builtins import breakpoint
   |
 
-./resources/test/fixtures/flake8_debugger/T100.py:5:1: T100 Import for `builtins.breakpoint` found
+T100.py:5:1: T100 Import for `builtins.breakpoint` found
   |
 5 | import pdb
 6 | import builtins
@@ -29,7 +29,7 @@ source: crates/ruff/src/rules/flake8_debugger/mod.rs
 9 | from celery.contrib.rdb import set_trace
   |
 
-./resources/test/fixtures/flake8_debugger/T100.py:6:1: T100 Import for `pdb.set_trace` found
+T100.py:6:1: T100 Import for `pdb.set_trace` found
    |
  6 | import builtins
  7 | from builtins import breakpoint
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_debugger/mod.rs
 10 | from celery.contrib import rdb
    |
 
-./resources/test/fixtures/flake8_debugger/T100.py:7:1: T100 Import for `celery.contrib.rdb.set_trace` found
+T100.py:7:1: T100 Import for `celery.contrib.rdb.set_trace` found
    |
  7 | from builtins import breakpoint
  8 | from pdb import set_trace as st
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/flake8_debugger/mod.rs
 11 | import celery.contrib.rdb
    |
 
-./resources/test/fixtures/flake8_debugger/T100.py:9:1: T100 Import for `celery.contrib.rdb` found
+T100.py:9:1: T100 Import for `celery.contrib.rdb` found
    |
  9 | from celery.contrib.rdb import set_trace
 10 | from celery.contrib import rdb
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/flake8_debugger/mod.rs
 13 | breakpoint()
    |
 
-./resources/test/fixtures/flake8_debugger/T100.py:11:1: T100 Trace found: `builtins.breakpoint` used
+T100.py:11:1: T100 Trace found: `builtins.breakpoint` used
    |
 11 | import celery.contrib.rdb
 12 | 
@@ -69,7 +69,7 @@ source: crates/ruff/src/rules/flake8_debugger/mod.rs
 15 | set_trace()
    |
 
-./resources/test/fixtures/flake8_debugger/T100.py:12:1: T100 Trace found: `pdb.set_trace` used
+T100.py:12:1: T100 Trace found: `pdb.set_trace` used
    |
 12 | breakpoint()
 13 | st()
@@ -77,7 +77,7 @@ source: crates/ruff/src/rules/flake8_debugger/mod.rs
 14 | set_trace()
    |
 
-./resources/test/fixtures/flake8_debugger/T100.py:13:1: T100 Trace found: `celery.contrib.rdb.set_trace` used
+T100.py:13:1: T100 Trace found: `celery.contrib.rdb.set_trace` used
    |
 13 | breakpoint()
 14 | st()

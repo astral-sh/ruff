@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 ---
-./resources/test/fixtures/flake8_datetimez/DTZ007.py:4:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
+DTZ007.py:4:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
   |
 4 | # bad format
 5 | datetime.datetime.strptime("something", "%H:%M:%S%Z")
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 7 | # no replace or astimezone
   |
 
-./resources/test/fixtures/flake8_datetimez/DTZ007.py:7:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
+DTZ007.py:7:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
    |
  7 | # no replace or astimezone
  8 | datetime.datetime.strptime("something", "something")
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 10 | # wrong replace
    |
 
-./resources/test/fixtures/flake8_datetimez/DTZ007.py:10:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
+DTZ007.py:10:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
    |
 10 | # wrong replace
 11 | datetime.datetime.strptime("something", "something").replace(hour=1)
@@ -28,7 +28,7 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 13 | # none replace
    |
 
-./resources/test/fixtures/flake8_datetimez/DTZ007.py:13:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
+DTZ007.py:13:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
    |
 13 | # none replace
 14 | datetime.datetime.strptime("something", "something").replace(tzinfo=None)
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 16 | # OK
    |
 
-./resources/test/fixtures/flake8_datetimez/DTZ007.py:35:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
+DTZ007.py:35:1: DTZ007 The use of `datetime.datetime.strptime()` without %z must be followed by `.replace(tzinfo=)` or `.astimezone()`
    |
 35 | # no replace orastimezone unqualified
 36 | datetime.strptime("something", "something")

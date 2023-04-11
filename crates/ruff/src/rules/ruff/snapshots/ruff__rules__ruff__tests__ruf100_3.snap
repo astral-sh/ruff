@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-./resources/test/fixtures/ruff/RUF100_3.py:1:1: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:1:1: RUF100 [*] Unused blanket `noqa` directive
   |
 1 | # noqa
   | ^^^^^^ RUF100
@@ -16,7 +16,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 3 2 | print()  # noqa
 4 3 | print()  # noqa # comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:2:1: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:2:1: RUF100 [*] Unused blanket `noqa` directive
   |
 2 | # noqa
 3 | # noqa # comment
@@ -34,7 +34,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 4 4 | print()  # noqa # comment
 5 5 | print()  # noqa  # comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:3:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:3:10: RUF100 [*] Unused blanket `noqa` directive
   |
 3 | # noqa
 4 | # noqa # comment
@@ -54,7 +54,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 5 5 | print()  # noqa  # comment
 6 6 | print()  # noqa comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:4:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:4:10: RUF100 [*] Unused blanket `noqa` directive
   |
 4 | # noqa # comment
 5 | print()  # noqa
@@ -75,7 +75,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 6 6 | print()  # noqa comment
 7 7 | print()  # noqa  comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:5:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:5:10: RUF100 [*] Unused blanket `noqa` directive
   |
 5 | print()  # noqa
 6 | print()  # noqa # comment
@@ -96,7 +96,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 7 7 | print()  # noqa  comment
 8 8 | print(a)  # noqa
 
-./resources/test/fixtures/ruff/RUF100_3.py:6:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:6:10: RUF100 [*] Unused blanket `noqa` directive
    |
  6 | print()  # noqa # comment
  7 | print()  # noqa  # comment
@@ -117,7 +117,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 8 8 | print(a)  # noqa
 9 9 | print(a)  # noqa # comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:7:10: RUF100 [*] Unused blanket `noqa` directive
+RUF100_3.py:7:10: RUF100 [*] Unused blanket `noqa` directive
    |
  7 | print()  # noqa  # comment
  8 | print()  # noqa comment
@@ -138,7 +138,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 9 9 | print(a)  # noqa # comment
 10 10 | print(a)  # noqa  # comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:14:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:14:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 14 | print(a)  # noqa  comment
 15 | 
@@ -158,7 +158,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 16 15 | print()  # noqa: E501, F821
 17 16 | print()  # noqa: E501, F821 # comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:15:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:15:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 15 | # noqa: E501, F821
 16 | # noqa: E501, F821 # comment
@@ -178,7 +178,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 17 17 | print()  # noqa: E501, F821 # comment
 18 18 | print()  # noqa: E501, F821  # comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:16:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:16:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 16 | # noqa: E501, F821
 17 | # noqa: E501, F821 # comment
@@ -199,7 +199,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 18 18 | print()  # noqa: E501, F821  # comment
 19 19 | print()  # noqa: E501, F821 comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:17:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:17:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 17 | # noqa: E501, F821 # comment
 18 | print()  # noqa: E501, F821
@@ -220,7 +220,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 19 19 | print()  # noqa: E501, F821 comment
 20 20 | print()  # noqa: E501, F821  comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:18:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:18:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 18 | print()  # noqa: E501, F821
 19 | print()  # noqa: E501, F821 # comment
@@ -241,7 +241,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 20 20 | print()  # noqa: E501, F821  comment
 21 21 | print(a)  # noqa: E501, F821
 
-./resources/test/fixtures/ruff/RUF100_3.py:19:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:19:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 19 | print()  # noqa: E501, F821 # comment
 20 | print()  # noqa: E501, F821  # comment
@@ -262,7 +262,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 21 21 | print(a)  # noqa: E501, F821
 22 22 | print(a)  # noqa: E501, F821 # comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:20:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+RUF100_3.py:20:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
    |
 20 | print()  # noqa: E501, F821  # comment
 21 | print()  # noqa: E501, F821 comment
@@ -283,7 +283,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 22 22 | print(a)  # noqa: E501, F821 # comment
 23 23 | print(a)  # noqa: E501, F821  # comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:21:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:21:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 21 | print()  # noqa: E501, F821 comment
 22 | print()  # noqa: E501, F821  comment
@@ -304,7 +304,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 23 23 | print(a)  # noqa: E501, F821  # comment
 24 24 | print(a)  # noqa: E501, F821 comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:22:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:22:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 22 | print()  # noqa: E501, F821  comment
 23 | print(a)  # noqa: E501, F821
@@ -325,7 +325,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 24 24 | print(a)  # noqa: E501, F821 comment
 25 25 | print(a)  # noqa: E501, F821  comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:23:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:23:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 23 | print(a)  # noqa: E501, F821
 24 | print(a)  # noqa: E501, F821 # comment
@@ -345,7 +345,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 24 24 | print(a)  # noqa: E501, F821 comment
 25 25 | print(a)  # noqa: E501, F821  comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:24:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:24:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 24 | print(a)  # noqa: E501, F821 # comment
 25 | print(a)  # noqa: E501, F821  # comment
@@ -363,7 +363,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
    24 |+print(a)  # noqa: F821 comment
 25 25 | print(a)  # noqa: E501, F821  comment
 
-./resources/test/fixtures/ruff/RUF100_3.py:25:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+RUF100_3.py:25:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
    |
 25 | print(a)  # noqa: E501, F821  # comment
 26 | print(a)  # noqa: E501, F821 comment

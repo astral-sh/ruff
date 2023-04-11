@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F401_11.py:4:27: F401 [*] `pathlib.PurePath` imported but unused
+F401_11.py:4:27: F401 [*] `pathlib.PurePath` imported but unused
   |
 4 | from typing import List
 5 | from pathlib import Path, PurePath

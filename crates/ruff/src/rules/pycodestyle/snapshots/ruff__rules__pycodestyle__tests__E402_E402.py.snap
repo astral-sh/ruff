@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E402.py:24:1: E402 Module level import not at top of file
+E402.py:24:1: E402 Module level import not at top of file
    |
 24 | y = x + 1
 25 | 

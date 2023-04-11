@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM118.py:1:1: SIM118 [*] Use `key in obj` instead of `key in obj.keys()`
+SIM118.py:1:1: SIM118 [*] Use `key in obj` instead of `key in obj.keys()`
   |
 1 | key in obj.keys()  # SIM118
   | ^^^^^^^^^^^^^^^^^ SIM118
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 3 3 | foo["bar"] in obj.keys()  # SIM118
 4 4 | 
 
-./resources/test/fixtures/flake8_simplify/SIM118.py:3:1: SIM118 [*] Use `foo["bar"] in obj` instead of `foo["bar"] in obj.keys()`
+SIM118.py:3:1: SIM118 [*] Use `foo["bar"] in obj` instead of `foo["bar"] in obj.keys()`
   |
 3 | key in obj.keys()  # SIM118
 4 | 
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 5 5 | foo['bar'] in obj.keys()  # SIM118
 6 6 | 
 
-./resources/test/fixtures/flake8_simplify/SIM118.py:5:1: SIM118 [*] Use `foo['bar'] in obj` instead of `foo['bar'] in obj.keys()`
+SIM118.py:5:1: SIM118 [*] Use `foo['bar'] in obj` instead of `foo['bar'] in obj.keys()`
   |
 5 | foo["bar"] in obj.keys()  # SIM118
 6 | 
@@ -58,7 +58,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 7 7 | foo() in obj.keys()  # SIM118
 8 8 | 
 
-./resources/test/fixtures/flake8_simplify/SIM118.py:7:1: SIM118 [*] Use `foo() in obj` instead of `foo() in obj.keys()`
+SIM118.py:7:1: SIM118 [*] Use `foo() in obj` instead of `foo() in obj.keys()`
    |
  7 | foo['bar'] in obj.keys()  # SIM118
  8 | 
@@ -79,7 +79,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 9 9 | for key in obj.keys():  # SIM118
 10 10 |     pass
 
-./resources/test/fixtures/flake8_simplify/SIM118.py:9:5: SIM118 [*] Use `key in obj` instead of `key in obj.keys()`
+SIM118.py:9:5: SIM118 [*] Use `key in obj` instead of `key in obj.keys()`
    |
  9 | foo() in obj.keys()  # SIM118
 10 | 
@@ -99,7 +99,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 11 11 | 
 12 12 | for key in list(obj.keys()):
 
-./resources/test/fixtures/flake8_simplify/SIM118.py:16:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
+SIM118.py:16:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
    |
 16 |         del obj[key]
 17 | 
@@ -120,7 +120,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 18 18 | {k for k in obj.keys()}  # SIM118
 19 19 | 
 
-./resources/test/fixtures/flake8_simplify/SIM118.py:18:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
+SIM118.py:18:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
    |
 18 | [k for k in obj.keys()]  # SIM118
 19 | 
@@ -141,7 +141,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 20 20 | {k: k for k in obj.keys()}  # SIM118
 21 21 | 
 
-./resources/test/fixtures/flake8_simplify/SIM118.py:20:11: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
+SIM118.py:20:11: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
    |
 20 | {k for k in obj.keys()}  # SIM118
 21 | 
@@ -162,7 +162,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 22 22 | (k for k in obj.keys())  # SIM118
 23 23 | 
 
-./resources/test/fixtures/flake8_simplify/SIM118.py:22:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
+SIM118.py:22:8: SIM118 [*] Use `k in obj` instead of `k in obj.keys()`
    |
 22 | {k: k for k in obj.keys()}  # SIM118
 23 | 
@@ -182,7 +182,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 23 23 | 
 24 24 | key in (obj or {}).keys()  # SIM118
 
-./resources/test/fixtures/flake8_simplify/SIM118.py:24:1: SIM118 [*] Use `key in (obj or {})` instead of `key in (obj or {}).keys()`
+SIM118.py:24:1: SIM118 [*] Use `key in (obj or {})` instead of `key in (obj or {}).keys()`
    |
 24 | (k for k in obj.keys())  # SIM118
 25 | 

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
-./resources/test/fixtures/flake8_comprehensions/C410.py:1:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+C410.py:1:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
   |
 1 | l1 = list([1, 2])
   |      ^^^^^^^^^^^^ C410
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 3 3 | l3 = list([])
 4 4 | l4 = list(())
 
-./resources/test/fixtures/flake8_comprehensions/C410.py:2:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
+C410.py:2:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
   |
 2 | l1 = list([1, 2])
 3 | l2 = list((1, 2))
@@ -34,7 +34,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 3 3 | l3 = list([])
 4 4 | l4 = list(())
 
-./resources/test/fixtures/flake8_comprehensions/C410.py:3:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
+C410.py:3:6: C410 [*] Unnecessary `list` literal passed to `list()` (remove the outer call to `list()`)
   |
 3 | l1 = list([1, 2])
 4 | l2 = list((1, 2))
@@ -51,7 +51,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
   3 |+l3 = []
 4 4 | l4 = list(())
 
-./resources/test/fixtures/flake8_comprehensions/C410.py:4:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
+C410.py:4:6: C410 [*] Unnecessary `tuple` literal passed to `list()` (rewrite as a `list` literal)
   |
 4 | l2 = list((1, 2))
 5 | l3 = list([])

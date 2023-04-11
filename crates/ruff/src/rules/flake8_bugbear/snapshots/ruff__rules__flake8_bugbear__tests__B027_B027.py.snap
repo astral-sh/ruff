@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B027.py:13:5: B027 `AbstractClass.empty_1` is an empty method in an abstract base class, but has no abstract decorator
+B027.py:13:5: B027 `AbstractClass.empty_1` is an empty method in an abstract base class, but has no abstract decorator
    |
 13 |   class AbstractClass(ABC):
 14 |       def empty_1(self):  # error
@@ -12,7 +12,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 17 |       def empty_2(self):  # error
    |
 
-./resources/test/fixtures/flake8_bugbear/B027.py:16:5: B027 `AbstractClass.empty_2` is an empty method in an abstract base class, but has no abstract decorator
+B027.py:16:5: B027 `AbstractClass.empty_2` is an empty method in an abstract base class, but has no abstract decorator
    |
 16 |           ...
 17 |   
@@ -24,7 +24,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 21 |       def empty_3(self):  # error
    |
 
-./resources/test/fixtures/flake8_bugbear/B027.py:19:5: B027 `AbstractClass.empty_3` is an empty method in an abstract base class, but has no abstract decorator
+B027.py:19:5: B027 `AbstractClass.empty_3` is an empty method in an abstract base class, but has no abstract decorator
    |
 19 |           pass
 20 |   
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 25 |       def empty_4(self):  # error
    |
 
-./resources/test/fixtures/flake8_bugbear/B027.py:23:5: B027 `AbstractClass.empty_4` is an empty method in an abstract base class, but has no abstract decorator
+B027.py:23:5: B027 `AbstractClass.empty_4` is an empty method in an abstract base class, but has no abstract decorator
    |
 23 |           ...
 24 |   

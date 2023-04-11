@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
-./resources/test/fixtures/flake8_bandit/S301.py:3:1: S301 `pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue
+S301.py:3:1: S301 `pickle` and modules that wrap it can be unsafe when used to deserialize untrusted data, possible security issue
   |
 3 | import pickle
 4 | 

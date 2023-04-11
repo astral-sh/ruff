@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E714.py:2:8: E714 [*] Test for object identity should be `is not`
+E714.py:2:8: E714 [*] Test for object identity should be `is not`
   |
 2 | #: E714
 3 | if not X is Y:
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 4 4 | #: E714
 5 5 | if not X.B is Y:
 
-./resources/test/fixtures/pycodestyle/E714.py:5:8: E714 [*] Test for object identity should be `is not`
+E714.py:5:8: E714 [*] Test for object identity should be `is not`
   |
 5 |     pass
 6 | #: E714
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 7 7 | #: E714
 8 8 | if not X is Y is not Z:
 
-./resources/test/fixtures/pycodestyle/E714.py:8:8: E714 [*] Test for object identity should be `is not`
+E714.py:8:8: E714 [*] Test for object identity should be `is not`
    |
  8 |     pass
  9 | #: E714

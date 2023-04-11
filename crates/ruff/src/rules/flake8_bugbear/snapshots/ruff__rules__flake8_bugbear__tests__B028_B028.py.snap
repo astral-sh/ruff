@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B028.py:8:1: B028 No explicit `stacklevel` keyword argument found
+B028.py:8:1: B028 No explicit `stacklevel` keyword argument found
    |
  8 | """
  9 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 12 | warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
    |
 
-./resources/test/fixtures/flake8_bugbear/B028.py:9:1: B028 No explicit `stacklevel` keyword argument found
+B028.py:9:1: B028 No explicit `stacklevel` keyword argument found
    |
  9 | warnings.warn(DeprecationWarning("test"))
 10 | warnings.warn(DeprecationWarning("test"), source=None)

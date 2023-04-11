@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:137:5: D201 [*] No blank lines allowed before function docstring (found 1)
+D.py:137:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
 137 | def leading_space():
 138 | 
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 138 137 | 
 139 138 | 
 
-./resources/test/fixtures/pydocstyle/D.py:151:5: D201 [*] No blank lines allowed before function docstring (found 1)
+D.py:151:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
 151 | def trailing_and_leading_space():
 152 | 
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 152 151 | 
 153 152 |     pass
 
-./resources/test/fixtures/pydocstyle/D.py:546:5: D201 [*] No blank lines allowed before function docstring (found 1)
+D.py:546:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
 546 |   def multiline_leading_space():
 547 |   
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 547 546 | 
 548 547 |     More content.
 
-./resources/test/fixtures/pydocstyle/D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
+D.py:568:5: D201 [*] No blank lines allowed before function docstring (found 1)
     |
 568 |   def multiline_trailing_and_leading_space():
 569 |   

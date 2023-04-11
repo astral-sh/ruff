@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-./resources/test/fixtures/flake8_pyi/PYI007.pyi:7:4: PYI007 Unrecognized `sys.platform` check
+PYI007.pyi:7:4: PYI007 Unrecognized `sys.platform` check
    |
  7 | if sys.platform != "platform_name_2": ...  # OK
  8 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 11 | if sys.platform > 3: ...  # Error: PYI007 Unrecognized sys.platform check
    |
 
-./resources/test/fixtures/flake8_pyi/PYI007.pyi:9:4: PYI007 Unrecognized `sys.platform` check
+PYI007.pyi:9:4: PYI007 Unrecognized `sys.platform` check
    |
  9 | if sys.platform in ["linux"]: ...  # Error: PYI007 Unrecognized sys.platform check
 10 | 
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 13 | if sys.platform == 10.12: ...  # Error: PYI007 Unrecognized sys.platform check
    |
 
-./resources/test/fixtures/flake8_pyi/PYI007.pyi:11:4: PYI007 Unrecognized `sys.platform` check
+PYI007.pyi:11:4: PYI007 Unrecognized `sys.platform` check
    |
 11 | if sys.platform > 3: ...  # Error: PYI007 Unrecognized sys.platform check
 12 | 

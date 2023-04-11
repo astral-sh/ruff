@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
-./resources/test/fixtures/flake8_comprehensions/C414.py:2:1: C414 [*] Unnecessary `list` call within `list()`
+C414.py:2:1: C414 [*] Unnecessary `list` call within `list()`
   |
 2 | x = [1, 2, 3]
 3 | list(list(x))
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 4 4 | tuple(list(x))
 5 5 | tuple(tuple(x))
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:3:1: C414 [*] Unnecessary `tuple` call within `list()`
+C414.py:3:1: C414 [*] Unnecessary `tuple` call within `list()`
   |
 3 | x = [1, 2, 3]
 4 | list(list(x))
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 5 5 | tuple(tuple(x))
 6 6 | set(set(x))
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:4:1: C414 [*] Unnecessary `list` call within `tuple()`
+C414.py:4:1: C414 [*] Unnecessary `list` call within `tuple()`
   |
 4 | list(list(x))
 5 | list(tuple(x))
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 6 6 | set(set(x))
 7 7 | set(list(x))
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:5:1: C414 [*] Unnecessary `tuple` call within `tuple()`
+C414.py:5:1: C414 [*] Unnecessary `tuple` call within `tuple()`
   |
 5 | list(tuple(x))
 6 | tuple(list(x))
@@ -81,7 +81,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 7 7 | set(list(x))
 8 8 | set(tuple(x))
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:6:1: C414 [*] Unnecessary `set` call within `set()`
+C414.py:6:1: C414 [*] Unnecessary `set` call within `set()`
    |
  6 | tuple(list(x))
  7 | tuple(tuple(x))
@@ -102,7 +102,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 8 8 | set(tuple(x))
 9 9 | set(sorted(x))
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:7:1: C414 [*] Unnecessary `list` call within `set()`
+C414.py:7:1: C414 [*] Unnecessary `list` call within `set()`
    |
  7 | tuple(tuple(x))
  8 | set(set(x))
@@ -123,7 +123,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 9 9 | set(sorted(x))
 10 10 | set(sorted(x, key=lambda y: y))
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:8:1: C414 [*] Unnecessary `tuple` call within `set()`
+C414.py:8:1: C414 [*] Unnecessary `tuple` call within `set()`
    |
  8 | set(set(x))
  9 | set(list(x))
@@ -144,7 +144,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 10 10 | set(sorted(x, key=lambda y: y))
 11 11 | set(reversed(x))
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:9:1: C414 [*] Unnecessary `sorted` call within `set()`
+C414.py:9:1: C414 [*] Unnecessary `sorted` call within `set()`
    |
  9 | set(list(x))
 10 | set(tuple(x))
@@ -165,7 +165,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 11 11 | set(reversed(x))
 12 12 | sorted(list(x))
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:10:1: C414 [*] Unnecessary `sorted` call within `set()`
+C414.py:10:1: C414 [*] Unnecessary `sorted` call within `set()`
    |
 10 | set(tuple(x))
 11 | set(sorted(x))
@@ -186,7 +186,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 12 12 | sorted(list(x))
 13 13 | sorted(tuple(x))
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:11:1: C414 [*] Unnecessary `reversed` call within `set()`
+C414.py:11:1: C414 [*] Unnecessary `reversed` call within `set()`
    |
 11 | set(sorted(x))
 12 | set(sorted(x, key=lambda y: y))
@@ -207,7 +207,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 13 13 | sorted(tuple(x))
 14 14 | sorted(sorted(x))
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:12:1: C414 [*] Unnecessary `list` call within `sorted()`
+C414.py:12:1: C414 [*] Unnecessary `list` call within `sorted()`
    |
 12 | set(sorted(x, key=lambda y: y))
 13 | set(reversed(x))
@@ -228,7 +228,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 14 14 | sorted(sorted(x))
 15 15 | sorted(sorted(x, key=lambda y: y))
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:13:1: C414 [*] Unnecessary `tuple` call within `sorted()`
+C414.py:13:1: C414 [*] Unnecessary `tuple` call within `sorted()`
    |
 13 | set(reversed(x))
 14 | sorted(list(x))
@@ -249,7 +249,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 15 15 | sorted(sorted(x, key=lambda y: y))
 16 16 | sorted(reversed(x))
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:14:1: C414 [*] Unnecessary `sorted` call within `sorted()`
+C414.py:14:1: C414 [*] Unnecessary `sorted` call within `sorted()`
    |
 14 | sorted(list(x))
 15 | sorted(tuple(x))
@@ -270,7 +270,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 16 16 | sorted(reversed(x))
 17 17 | sorted(list(x), key=lambda y: y)
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:15:1: C414 [*] Unnecessary `sorted` call within `sorted()`
+C414.py:15:1: C414 [*] Unnecessary `sorted` call within `sorted()`
    |
 15 | sorted(tuple(x))
 16 | sorted(sorted(x))
@@ -291,7 +291,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 17 17 | sorted(list(x), key=lambda y: y)
 18 18 | tuple(
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:16:1: C414 [*] Unnecessary `reversed` call within `sorted()`
+C414.py:16:1: C414 [*] Unnecessary `reversed` call within `sorted()`
    |
 16 | sorted(sorted(x))
 17 | sorted(sorted(x, key=lambda y: y))
@@ -312,7 +312,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 18 18 | tuple(
 19 19 |     list(
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:17:1: C414 [*] Unnecessary `list` call within `sorted()`
+C414.py:17:1: C414 [*] Unnecessary `list` call within `sorted()`
    |
 17 | sorted(sorted(x, key=lambda y: y))
 18 | sorted(reversed(x))
@@ -333,7 +333,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 19 19 |     list(
 20 20 |         [x, 3, "hell"\
 
-./resources/test/fixtures/flake8_comprehensions/C414.py:18:1: C414 [*] Unnecessary `list` call within `tuple()`
+C414.py:18:1: C414 [*] Unnecessary `list` call within `tuple()`
    |
 18 |   sorted(reversed(x))
 19 |   sorted(list(x), key=lambda y: y)

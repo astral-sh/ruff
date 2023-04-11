@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/sections.py:30:5: D406 [*] Section name should end with a newline ("Returns")
+sections.py:30:5: D406 [*] Section name should end with a newline ("Returns")
    |
 30 |           "('Returns', not 'Returns:')")
 31 |   def superfluous_suffix():  # noqa: D416
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 34 34 |     A value of some sort.
 35 35 | 
 
-./resources/test/fixtures/pydocstyle/sections.py:216:5: D406 [*] Section name should end with a newline ("Raises")
+sections.py:216:5: D406 [*] Section name should end with a newline ("Raises")
     |
 216 |   @expect("D407: Missing dashed underline after section ('Raises')")
 217 |   def multiple_sections():  # noqa: D416

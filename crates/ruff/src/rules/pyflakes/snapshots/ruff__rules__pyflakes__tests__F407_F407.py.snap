@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F407.py:2:24: F407 Future feature `non_existent_feature` is not defined
+F407.py:2:24: F407 Future feature `non_existent_feature` is not defined
   |
 2 | from __future__ import print_function
 3 | from __future__ import non_existent_feature

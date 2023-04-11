@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT017.py:19:9: PT017 Found assertion on exception `e` in `except` block, use `pytest.raises()` instead
+PT017.py:19:9: PT017 Found assertion on exception `e` in `except` block, use `pytest.raises()` instead
    |
 19 |         something()
 20 |     except Exception as e:

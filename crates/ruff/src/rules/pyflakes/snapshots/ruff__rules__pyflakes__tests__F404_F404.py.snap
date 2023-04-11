@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F404.py:6:1: F404 `from __future__` imports must occur at the beginning of the file
+F404.py:6:1: F404 `from __future__` imports must occur at the beginning of the file
    |
  6 | from collections import namedtuple
  7 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 10 | import __future__
    |
 
-./resources/test/fixtures/pyflakes/F404.py:8:1: F404 `from __future__` imports must occur at the beginning of the file
+F404.py:8:1: F404 `from __future__` imports must occur at the beginning of the file
    |
  8 | from __future__ import print_function
  9 | 

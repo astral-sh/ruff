@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 ---
-./resources/test/fixtures/flake8_logging_format/G001.py:4:14: G001 Logging statement uses `string.format()`
+G001.py:4:14: G001 Logging statement uses `string.format()`
   |
 4 | import logging as foo
 5 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 8 | foo.info("Hello {}".format("World!"))
   |
 
-./resources/test/fixtures/flake8_logging_format/G001.py:5:27: G001 Logging statement uses `string.format()`
+G001.py:5:27: G001 Logging statement uses `string.format()`
   |
 5 | logging.info("Hello {}".format("World!"))
 6 | logging.log(logging.INFO, "Hello {}".format("World!"))
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 8 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
   |
 
-./resources/test/fixtures/flake8_logging_format/G001.py:6:10: G001 Logging statement uses `string.format()`
+G001.py:6:10: G001 Logging statement uses `string.format()`
    |
  6 | logging.info("Hello {}".format("World!"))
  7 | logging.log(logging.INFO, "Hello {}".format("World!"))
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 10 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))
    |
 
-./resources/test/fixtures/flake8_logging_format/G001.py:7:31: G001 Logging statement uses `string.format()`
+G001.py:7:31: G001 Logging statement uses `string.format()`
    |
  7 | logging.log(logging.INFO, "Hello {}".format("World!"))
  8 | foo.info("Hello {}".format("World!"))
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 11 | logging.log(msg="Hello {}".format("World!"), level=logging.INFO)
    |
 
-./resources/test/fixtures/flake8_logging_format/G001.py:8:37: G001 Logging statement uses `string.format()`
+G001.py:8:37: G001 Logging statement uses `string.format()`
    |
  8 | foo.info("Hello {}".format("World!"))
  9 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 11 | logging.log(msg="Hello {}".format("World!"), level=logging.INFO)
    |
 
-./resources/test/fixtures/flake8_logging_format/G001.py:9:17: G001 Logging statement uses `string.format()`
+G001.py:9:17: G001 Logging statement uses `string.format()`
    |
  9 | logging.log(logging.INFO, msg="Hello {}".format("World!"))
 10 | logging.log(level=logging.INFO, msg="Hello {}".format("World!"))

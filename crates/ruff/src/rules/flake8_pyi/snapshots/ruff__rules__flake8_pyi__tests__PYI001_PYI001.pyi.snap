@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-./resources/test/fixtures/flake8_pyi/PYI001.pyi:3:5: PYI001 Name of private `TypeVar` must start with `_`
+PYI001.pyi:3:5: PYI001 Name of private `TypeVar` must start with `_`
   |
 3 | from typing import ParamSpec, TypeVar, TypeVarTuple
 4 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 7 | TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
   |
 
-./resources/test/fixtures/flake8_pyi/PYI001.pyi:5:10: PYI001 Name of private `TypeVarTuple` must start with `_`
+PYI001.pyi:5:10: PYI001 Name of private `TypeVarTuple` must start with `_`
   |
 5 | T = TypeVar("T")  # Error: TypeVars in stubs must start with _
 6 | 
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 9 | P = ParamSpec("P")  # Error: ParamSpecs must start with _
   |
 
-./resources/test/fixtures/flake8_pyi/PYI001.pyi:7:5: PYI001 Name of private `ParamSpec` must start with `_`
+PYI001.pyi:7:5: PYI001 Name of private `ParamSpec` must start with `_`
    |
  7 | TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
  8 | 

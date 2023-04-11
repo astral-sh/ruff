@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP006.py:4:10: UP006 [*] Use `list` instead of `List` for type annotations
+UP006.py:4:10: UP006 [*] Use `list` instead of `List` for type annotations
   |
 4 | def f(x: typing.List[str]) -> None:
   |          ^^^^^^^^^^^ UP006
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 6 6 | 
 7 7 | 
 
-./resources/test/fixtures/pyupgrade/UP006.py:11:10: UP006 [*] Use `list` instead of `List` for type annotations
+UP006.py:11:10: UP006 [*] Use `list` instead of `List` for type annotations
    |
 11 | def f(x: List[str]) -> None:
    |          ^^^^ UP006
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 13 13 | 
 14 14 | 
 
-./resources/test/fixtures/pyupgrade/UP006.py:18:10: UP006 [*] Use `list` instead of `List` for type annotations
+UP006.py:18:10: UP006 [*] Use `list` instead of `List` for type annotations
    |
 18 | def f(x: t.List[str]) -> None:
    |          ^^^^^^ UP006
@@ -55,7 +55,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 20 | 
 21 21 | 
 
-./resources/test/fixtures/pyupgrade/UP006.py:25:10: UP006 [*] Use `list` instead of `List` for type annotations
+UP006.py:25:10: UP006 [*] Use `list` instead of `List` for type annotations
    |
 25 | def f(x: IList[str]) -> None:
    |          ^^^^^ UP006
@@ -73,7 +73,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 27 27 | 
 28 28 | 
 
-./resources/test/fixtures/pyupgrade/UP006.py:29:11: UP006 [*] Use `list` instead of `List` for type annotations
+UP006.py:29:11: UP006 [*] Use `list` instead of `List` for type annotations
    |
 29 | def f(x: "List[str]") -> None:
    |           ^^^^ UP006
@@ -91,7 +91,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 31 31 | 
 32 32 | 
 
-./resources/test/fixtures/pyupgrade/UP006.py:33:12: UP006 [*] Use `list` instead of `List` for type annotations
+UP006.py:33:12: UP006 [*] Use `list` instead of `List` for type annotations
    |
 33 | def f(x: r"List[str]") -> None:
    |            ^^^^ UP006
@@ -109,7 +109,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 35 35 | 
 36 36 | 
 
-./resources/test/fixtures/pyupgrade/UP006.py:37:11: UP006 [*] Use `list` instead of `List` for type annotations
+UP006.py:37:11: UP006 [*] Use `list` instead of `List` for type annotations
    |
 37 | def f(x: "List[str]") -> None:
    |           ^^^^ UP006
@@ -127,7 +127,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 39 39 | 
 40 40 | 
 
-./resources/test/fixtures/pyupgrade/UP006.py:41:13: UP006 [*] Use `list` instead of `List` for type annotations
+UP006.py:41:13: UP006 [*] Use `list` instead of `List` for type annotations
    |
 41 | def f(x: """List[str]""") -> None:
    |             ^^^^ UP006
@@ -145,14 +145,14 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 43 43 | 
 44 44 | 
 
-./resources/test/fixtures/pyupgrade/UP006.py:45:10: UP006 Use `list` instead of `List` for type annotations
+UP006.py:45:10: UP006 Use `list` instead of `List` for type annotations
    |
 45 | def f(x: "Li" "st[str]") -> None:
    |          ^^^^^^^^^^^^^^ UP006
 46 |     ...
    |
 
-./resources/test/fixtures/pyupgrade/UP006.py:49:11: UP006 [*] Use `list` instead of `List` for type annotations
+UP006.py:49:11: UP006 [*] Use `list` instead of `List` for type annotations
    |
 49 | def f(x: "List['List[str]']") -> None:
    |           ^^^^ UP006
@@ -170,7 +170,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 51 51 | 
 52 52 | 
 
-./resources/test/fixtures/pyupgrade/UP006.py:49:17: UP006 [*] Use `list` instead of `List` for type annotations
+UP006.py:49:17: UP006 [*] Use `list` instead of `List` for type annotations
    |
 49 | def f(x: "List['List[str]']") -> None:
    |                 ^^^^ UP006
@@ -188,7 +188,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 51 51 | 
 52 52 | 
 
-./resources/test/fixtures/pyupgrade/UP006.py:53:11: UP006 [*] Use `list` instead of `List` for type annotations
+UP006.py:53:11: UP006 [*] Use `list` instead of `List` for type annotations
    |
 53 | def f(x: "List['Li' 'st[str]']") -> None:
    |           ^^^^ UP006
@@ -206,21 +206,21 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 55 55 | 
 56 56 | 
 
-./resources/test/fixtures/pyupgrade/UP006.py:53:16: UP006 Use `list` instead of `List` for type annotations
+UP006.py:53:16: UP006 Use `list` instead of `List` for type annotations
    |
 53 | def f(x: "List['Li' 'st[str]']") -> None:
    |                ^^^^^^^^^^^^^^ UP006
 54 |     ...
    |
 
-./resources/test/fixtures/pyupgrade/UP006.py:57:10: UP006 Use `list` instead of `List` for type annotations
+UP006.py:57:10: UP006 Use `list` instead of `List` for type annotations
    |
 57 | def f(x: "Li" "st['List[str]']") -> None:
    |          ^^^^^^^^^^^^^^^^^^^^^^ UP006
 58 |     ...
    |
 
-./resources/test/fixtures/pyupgrade/UP006.py:57:10: UP006 Use `list` instead of `List` for type annotations
+UP006.py:57:10: UP006 Use `list` instead of `List` for type annotations
    |
 57 | def f(x: "Li" "st['List[str]']") -> None:
    |          ^^^^^^^^^^^^^^^^^^^^^^ UP006

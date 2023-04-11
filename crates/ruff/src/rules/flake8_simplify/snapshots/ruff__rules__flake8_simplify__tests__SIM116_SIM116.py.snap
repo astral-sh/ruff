@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM116.py:5:1: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:5:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
  5 |   # SIM116
  6 | / if a == "foo":
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 15 |   # SIM116
    |
 
-./resources/test/fixtures/flake8_simplify/SIM116.py:15:1: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:15:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
 15 |   # SIM116
 16 | / if a == 1:
@@ -33,7 +33,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 25 |   # SIM116
    |
 
-./resources/test/fixtures/flake8_simplify/SIM116.py:25:1: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:25:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
 25 |   # SIM116
 26 | / if a == 1:
@@ -47,7 +47,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 33 |   # SIM116
    |
 
-./resources/test/fixtures/flake8_simplify/SIM116.py:33:1: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:33:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
 33 |   # SIM116
 34 | / if a == "hello 'sir'":
@@ -63,7 +63,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 43 |   # SIM116
    |
 
-./resources/test/fixtures/flake8_simplify/SIM116.py:43:1: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:43:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
 43 |   # SIM116
 44 | / if a == b"one":
@@ -77,7 +77,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 51 |   # SIM116
    |
 
-./resources/test/fixtures/flake8_simplify/SIM116.py:51:1: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:51:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
 51 |   # SIM116
 52 | / if a == "hello 'sir'":
@@ -93,7 +93,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 61 |   # OK
    |
 
-./resources/test/fixtures/flake8_simplify/SIM116.py:79:1: SIM116 Use a dictionary instead of consecutive `if` statements
+SIM116.py:79:1: SIM116 Use a dictionary instead of consecutive `if` statements
    |
 79 |   # SIM116
 80 | / if func_name == "create":

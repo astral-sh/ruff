@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F401_10.py:6:16: F401 `orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability
+F401_10.py:6:16: F401 `orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability
    |
  6 | def module_not_found_error():
  7 |     try:
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 10 |         return True
    |
 
-./resources/test/fixtures/pyflakes/F401_10.py:15:16: F401 [*] `orjson` imported but unused
+F401_10.py:15:16: F401 [*] `orjson` imported but unused
    |
 15 | def import_error():
 16 |     try:

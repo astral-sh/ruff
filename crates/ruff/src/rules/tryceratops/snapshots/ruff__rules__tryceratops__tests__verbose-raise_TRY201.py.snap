@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
-./resources/test/fixtures/tryceratops/TRY201.py:20:15: TRY201 Use `raise` without specifying exception name
+TRY201.py:20:15: TRY201 Use `raise` without specifying exception name
    |
 20 |     except MyException as e:
 21 |         logger.exception("process failed")
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |               ^ TRY201
    |
 
-./resources/test/fixtures/tryceratops/TRY201.py:63:19: TRY201 Use `raise` without specifying exception name
+TRY201.py:63:19: TRY201 Use `raise` without specifying exception name
    |
 63 |         logger.exception("process failed")
 64 |         if True:
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |                   ^ TRY201
    |
 
-./resources/test/fixtures/tryceratops/TRY201.py:74:23: TRY201 Use `raise` without specifying exception name
+TRY201.py:74:23: TRY201 Use `raise` without specifying exception name
    |
 74 |             def foo():
 75 |                 raise e

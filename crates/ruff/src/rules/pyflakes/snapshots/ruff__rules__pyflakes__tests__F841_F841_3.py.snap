@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F841_3.py:5:5: F841 [*] Local variable `x` is assigned to but never used
+F841_3.py:5:5: F841 [*] Local variable `x` is assigned to but never used
   |
 5 | def f():
 6 |     x = 1
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 7 6 | 
 8 7 |     z = 3
 
-./resources/test/fixtures/pyflakes/F841_3.py:6:5: F841 [*] Local variable `y` is assigned to but never used
+F841_3.py:6:5: F841 [*] Local variable `y` is assigned to but never used
    |
  6 | def f():
  7 |     x = 1
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 8 7 |     z = 3
 9 8 |     print(z)
 
-./resources/test/fixtures/pyflakes/F841_3.py:13:5: F841 [*] Local variable `x` is assigned to but never used
+F841_3.py:13:5: F841 [*] Local variable `x` is assigned to but never used
    |
 13 | def f():
 14 |     x: int = 1
@@ -57,7 +57,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 15 14 | 
 16 15 |     z: int = 3
 
-./resources/test/fixtures/pyflakes/F841_3.py:14:5: F841 [*] Local variable `y` is assigned to but never used
+F841_3.py:14:5: F841 [*] Local variable `y` is assigned to but never used
    |
 14 | def f():
 15 |     x: int = 1
@@ -77,7 +77,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 16 15 |     z: int = 3
 17 16 |     print(z)
 
-./resources/test/fixtures/pyflakes/F841_3.py:21:19: F841 [*] Local variable `x1` is assigned to but never used
+F841_3.py:21:19: F841 [*] Local variable `x1` is assigned to but never used
    |
 21 | def f():
 22 |     with foo() as x1:
@@ -96,7 +96,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 23 23 | 
 24 24 |     with foo() as (x2, y2):
 
-./resources/test/fixtures/pyflakes/F841_3.py:27:20: F841 [*] Local variable `x3` is assigned to but never used
+F841_3.py:27:20: F841 [*] Local variable `x3` is assigned to but never used
    |
 27 |         pass
 28 | 
@@ -116,7 +116,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 29 29 | 
 30 30 | 
 
-./resources/test/fixtures/pyflakes/F841_3.py:27:33: F841 [*] Local variable `y3` is assigned to but never used
+F841_3.py:27:33: F841 [*] Local variable `y3` is assigned to but never used
    |
 27 |         pass
 28 | 
@@ -136,7 +136,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 29 29 | 
 30 30 | 
 
-./resources/test/fixtures/pyflakes/F841_3.py:27:46: F841 [*] Local variable `z3` is assigned to but never used
+F841_3.py:27:46: F841 [*] Local variable `z3` is assigned to but never used
    |
 27 |         pass
 28 | 
@@ -156,7 +156,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 29 29 | 
 30 30 | 
 
-./resources/test/fixtures/pyflakes/F841_3.py:32:6: F841 [*] Local variable `x1` is assigned to but never used
+F841_3.py:32:6: F841 [*] Local variable `x1` is assigned to but never used
    |
 32 | def f():
 33 |     (x1, y1) = (1, 2)
@@ -166,7 +166,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
    |
    = help: Remove assignment to unused variable `x1`
 
-./resources/test/fixtures/pyflakes/F841_3.py:32:10: F841 [*] Local variable `y1` is assigned to but never used
+F841_3.py:32:10: F841 [*] Local variable `y1` is assigned to but never used
    |
 32 | def f():
 33 |     (x1, y1) = (1, 2)
@@ -176,7 +176,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
    |
    = help: Remove assignment to unused variable `y1`
 
-./resources/test/fixtures/pyflakes/F841_3.py:33:16: F841 [*] Local variable `coords2` is assigned to but never used
+F841_3.py:33:16: F841 [*] Local variable `coords2` is assigned to but never used
    |
 33 | def f():
 34 |     (x1, y1) = (1, 2)
@@ -196,7 +196,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 35 35 | 
 36 36 | 
 
-./resources/test/fixtures/pyflakes/F841_3.py:34:5: F841 [*] Local variable `coords3` is assigned to but never used
+F841_3.py:34:5: F841 [*] Local variable `coords3` is assigned to but never used
    |
 34 |     (x1, y1) = (1, 2)
 35 |     (x2, y2) = coords2 = (1, 2)
@@ -215,7 +215,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 36 36 | 
 37 37 | def f():
 
-./resources/test/fixtures/pyflakes/F841_3.py:40:26: F841 [*] Local variable `x1` is assigned to but never used
+F841_3.py:40:26: F841 [*] Local variable `x1` is assigned to but never used
    |
 40 |     try:
 41 |         1 / 0
@@ -235,7 +235,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 42 42 | 
 43 43 |     try:
 
-./resources/test/fixtures/pyflakes/F841_3.py:45:47: F841 [*] Local variable `x2` is assigned to but never used
+F841_3.py:45:47: F841 [*] Local variable `x2` is assigned to but never used
    |
 45 |     try:
 46 |         1 / 0
@@ -255,7 +255,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 47 47 | 
 48 48 | 
 
-./resources/test/fixtures/pyflakes/F841_3.py:50:5: F841 [*] Local variable `x` is assigned to but never used
+F841_3.py:50:5: F841 [*] Local variable `x` is assigned to but never used
    |
 50 | def f(a, b):
 51 |     x = (
@@ -275,7 +275,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 52 52 |         if a is not None
 53 53 |         else b
 
-./resources/test/fixtures/pyflakes/F841_3.py:56:5: F841 [*] Local variable `y` is assigned to but never used
+F841_3.py:56:5: F841 [*] Local variable `y` is assigned to but never used
    |
 56 |     )
 57 | 
@@ -296,7 +296,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 59 58 | 
 60 59 | def f(a, b):
 
-./resources/test/fixtures/pyflakes/F841_3.py:61:5: F841 [*] Local variable `x` is assigned to but never used
+F841_3.py:61:5: F841 [*] Local variable `x` is assigned to but never used
    |
 61 | def f(a, b):
 62 |     x = (
@@ -320,7 +320,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 67 63 |     y = \
 68 64 |         a if a is not None else b
 
-./resources/test/fixtures/pyflakes/F841_3.py:67:5: F841 [*] Local variable `y` is assigned to but never used
+F841_3.py:67:5: F841 [*] Local variable `y` is assigned to but never used
    |
 67 |     )
 68 | 
@@ -340,7 +340,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 70 68 | 
 71 69 | def f():
 
-./resources/test/fixtures/pyflakes/F841_3.py:72:24: F841 [*] Local variable `cm` is assigned to but never used
+F841_3.py:72:24: F841 [*] Local variable `cm` is assigned to but never used
    |
 72 | def f():
 73 |     with Nested(m) as (cm):
@@ -359,7 +359,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 74 74 | 
 75 75 | 
 
-./resources/test/fixtures/pyflakes/F841_3.py:77:25: F841 [*] Local variable `cm` is assigned to but never used
+F841_3.py:77:25: F841 [*] Local variable `cm` is assigned to but never used
    |
 77 | def f():
 78 |     with (Nested(m) as (cm),):
@@ -378,7 +378,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 79 79 | 
 80 80 | 
 
-./resources/test/fixtures/pyflakes/F841_3.py:87:5: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:87:5: F841 [*] Local variable `toplevel` is assigned to but never used
    |
 87 | def f():
 88 |     toplevel = tt = lexer.get_token()
@@ -398,7 +398,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 89 89 |         break
 90 90 | 
 
-./resources/test/fixtures/pyflakes/F841_3.py:93:5: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:93:5: F841 [*] Local variable `toplevel` is assigned to but never used
    |
 93 | def f():
 94 |     toplevel = tt = lexer.get_token()
@@ -416,7 +416,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 95 95 | 
 96 96 | def f():
 
-./resources/test/fixtures/pyflakes/F841_3.py:93:16: F841 [*] Local variable `tt` is assigned to but never used
+F841_3.py:93:16: F841 [*] Local variable `tt` is assigned to but never used
    |
 93 | def f():
 94 |     toplevel = tt = lexer.get_token()
@@ -434,7 +434,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 95 95 | 
 96 96 | def f():
 
-./resources/test/fixtures/pyflakes/F841_3.py:97:5: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:97:5: F841 [*] Local variable `toplevel` is assigned to but never used
    |
 97 | def f():
 98 |     toplevel = (a, b) = lexer.get_token()
@@ -452,7 +452,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 99 99 | 
 100 100 | def f():
 
-./resources/test/fixtures/pyflakes/F841_3.py:101:14: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:101:14: F841 [*] Local variable `toplevel` is assigned to but never used
     |
 101 | def f():
 102 |     (a, b) = toplevel = lexer.get_token()
@@ -470,7 +470,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 103 103 | 
 104 104 | def f():
 
-./resources/test/fixtures/pyflakes/F841_3.py:105:5: F841 [*] Local variable `toplevel` is assigned to but never used
+F841_3.py:105:5: F841 [*] Local variable `toplevel` is assigned to but never used
     |
 105 | def f():
 106 |     toplevel = tt = 1
@@ -485,7 +485,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 105     |-    toplevel = tt = 1
     105 |+    tt = 1
 
-./resources/test/fixtures/pyflakes/F841_3.py:105:16: F841 [*] Local variable `tt` is assigned to but never used
+F841_3.py:105:16: F841 [*] Local variable `tt` is assigned to but never used
     |
 105 | def f():
 106 |     toplevel = tt = 1

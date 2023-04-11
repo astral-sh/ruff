@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_executable/mod.rs
 ---
-./resources/test/fixtures/flake8_executable/EXE004_1.py:1:1: EXE004 [*] Avoid whitespace before shebang
+EXE004_1.py:1:1: EXE004 [*] Avoid whitespace before shebang
   |
 1 |     #!/usr/bin/python
   | ^^^^ EXE004

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_django/mod.rs
 ---
-./resources/test/fixtures/flake8_django/DJ006.py:6:9: DJ006 Do not use `exclude` with `ModelForm`, use `fields` instead
+DJ006.py:6:9: DJ006 Do not use `exclude` with `ModelForm`, use `fields` instead
   |
 6 | class TestModelForm1(forms.ModelForm):
 7 |     class Meta:

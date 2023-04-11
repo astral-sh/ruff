@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:60:9: D107 Missing docstring in `__init__`
+D.py:60:9: D107 Missing docstring in `__init__`
    |
 60 |     @expect('D107: Missing docstring in __init__')
 61 |     def __init__(self=None):
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 62 |         pass
    |
 
-./resources/test/fixtures/pydocstyle/D.py:534:9: D107 Missing docstring in `__init__`
+D.py:534:9: D107 Missing docstring in `__init__`
     |
 534 |     """
 535 | 

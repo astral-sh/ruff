@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E26.py:2:5: E261 Insert at least two spaces before an inline comment
+E26.py:2:5: E261 Insert at least two spaces before an inline comment
   |
 2 | #: E261:1:5
 3 | pass # an inline comment

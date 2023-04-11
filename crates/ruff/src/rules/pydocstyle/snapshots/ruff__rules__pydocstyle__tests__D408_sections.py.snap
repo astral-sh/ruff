@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/sections.py:94:5: D408 [*] Section underline should be in the line following the section's name ("Returns")
+sections.py:94:5: D408 [*] Section underline should be in the line following the section's name ("Returns")
     |
  94 |           "section's name ('Returns')")
  95 |   def blank_line_before_underline():  # noqa: D416

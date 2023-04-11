@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E70.py:6:10: E702 Multiple statements on one line (semicolon)
+E70.py:6:10: E702 Multiple statements on one line (semicolon)
    |
  6 | if not header or header[:6] != 'bytes=': return
  7 | #: E702:1:10
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 10 | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
    |
 
-./resources/test/fixtures/pycodestyle/E70.py:8:17: E702 Multiple statements on one line (semicolon)
+E70.py:8:17: E702 Multiple statements on one line (semicolon)
    |
  8 | a = False; b = True
  9 | #: E702:1:17
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 12 | import shlex;
    |
 
-./resources/test/fixtures/pycodestyle/E70.py:12:9: E702 Multiple statements on one line (semicolon)
+E70.py:12:9: E702 Multiple statements on one line (semicolon)
    |
 12 | import shlex;
 13 | #: E702:1:9 E703:1:23
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 16 | def f(x): return 2
    |
 
-./resources/test/fixtures/pycodestyle/E70.py:25:11: E702 Multiple statements on one line (semicolon)
+E70.py:25:11: E702 Multiple statements on one line (semicolon)
    |
 25 |     def f(x): return 2*x
 26 | #: E704:1:8 E702:1:11 E703:1:14
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 29 | if True: lambda a: b
    |
 
-./resources/test/fixtures/pycodestyle/E70.py:54:13: E702 Multiple statements on one line (semicolon)
+E70.py:54:13: E702 Multiple statements on one line (semicolon)
    |
 54 | def f(): ...
 55 | #: E701:1:8 E702:1:13
@@ -51,7 +51,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 58 | class C: ...; ...
    |
 
-./resources/test/fixtures/pycodestyle/E70.py:56:13: E702 Multiple statements on one line (semicolon)
+E70.py:56:13: E702 Multiple statements on one line (semicolon)
    |
 56 | class C: ...; x = 1
 57 | #: E701:1:8 E702:1:13

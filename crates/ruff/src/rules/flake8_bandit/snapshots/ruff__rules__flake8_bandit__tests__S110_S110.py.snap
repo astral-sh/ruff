@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
-./resources/test/fixtures/flake8_bandit/S110.py:3:1: S110 `try`-`except`-`pass` detected, consider logging the exception
+S110.py:3:1: S110 `try`-`except`-`pass` detected, consider logging the exception
   |
 3 |   try:
 4 |       pass
@@ -12,7 +12,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 8 |   try:
   |
 
-./resources/test/fixtures/flake8_bandit/S110.py:8:1: S110 `try`-`except`-`pass` detected, consider logging the exception
+S110.py:8:1: S110 `try`-`except`-`pass` detected, consider logging the exception
    |
  8 |   try:
  9 |       pass

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP022.py:4:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+UP022.py:4:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
   |
 4 | import subprocess
 5 | 
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 6 6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
 7 7 | 
 
-./resources/test/fixtures/pyupgrade/UP022.py:6:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+UP022.py:6:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
    |
  6 | output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
  7 | 
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 8 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
 9 9 | 
 
-./resources/test/fixtures/pyupgrade/UP022.py:8:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+UP022.py:8:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
    |
  8 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
  9 | 
@@ -64,7 +64,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 10 10 | output = subprocess.run(
 11 11 |     ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
 
-./resources/test/fixtures/pyupgrade/UP022.py:10:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+UP022.py:10:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
    |
 10 |   output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
 11 |   
@@ -88,7 +88,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 13 13 | 
 14 14 | output = subprocess.run(
 
-./resources/test/fixtures/pyupgrade/UP022.py:14:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+UP022.py:14:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
    |
 14 |   )
 15 |   
@@ -112,7 +112,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 17 17 | 
 18 18 | output = subprocess.run(
 
-./resources/test/fixtures/pyupgrade/UP022.py:18:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+UP022.py:18:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
    |
 18 |   )
 19 |   
@@ -144,7 +144,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 24 23 |     encoding="utf-8",
 25 24 |     close_fds=True,
 
-./resources/test/fixtures/pyupgrade/UP022.py:29:14: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+UP022.py:29:14: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
    |
 29 |   if output:
 30 |       output = subprocess.run(

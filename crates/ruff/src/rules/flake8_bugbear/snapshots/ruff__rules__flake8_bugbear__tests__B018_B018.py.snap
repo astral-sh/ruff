@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B018.py:11:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:11:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 11 |     "str"  # Str (no raise)
 12 |     f"{int}"  # JoinedStr (no raise)
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 15 |     1.0  # Number (float)
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:12:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:12:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 12 |     f"{int}"  # JoinedStr (no raise)
 13 |     1j  # Number (complex)
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 16 |     b"foo"  # Binary
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:13:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:13:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 13 |     1j  # Number (complex)
 14 |     1  # Number (int)
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 17 |     True  # NameConstant (True)
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:14:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:14:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 14 |     1  # Number (int)
 15 |     1.0  # Number (float)
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 18 |     False  # NameConstant (False)
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:15:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:15:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 15 |     1.0  # Number (float)
 16 |     b"foo"  # Binary
@@ -51,7 +51,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 19 |     None  # NameConstant (None)
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:16:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:16:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 16 |     b"foo"  # Binary
 17 |     True  # NameConstant (True)
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 20 |     [1, 2]  # list
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:17:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:17:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 17 |     True  # NameConstant (True)
 18 |     False  # NameConstant (False)
@@ -71,7 +71,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 21 |     {1, 2}  # set
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:18:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:18:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 18 |     False  # NameConstant (False)
 19 |     None  # NameConstant (None)
@@ -81,7 +81,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 22 |     {"foo": "bar"}  # dict
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:19:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:19:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 19 |     None  # NameConstant (None)
 20 |     [1, 2]  # list
@@ -90,7 +90,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 22 |     {"foo": "bar"}  # dict
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:20:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:20:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 20 |     [1, 2]  # list
 21 |     {1, 2}  # set
@@ -98,7 +98,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    |     ^^^^^^^^^^^^^^ B018
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:24:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:24:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 24 | class Foo3:
 25 |     123
@@ -107,7 +107,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 27 |     "str"
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:27:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:27:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 27 |     a = 2
 28 |     "str"
@@ -115,7 +115,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    |     ^ B018
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:39:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:39:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 39 |     "str"  # Str (no raise)
 40 |     f"{int}"  # JoinedStr (no raise)
@@ -125,7 +125,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 43 |     1.0  # Number (float)
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:40:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:40:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 40 |     f"{int}"  # JoinedStr (no raise)
 41 |     1j  # Number (complex)
@@ -135,7 +135,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 44 |     b"foo"  # Binary
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:41:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:41:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 41 |     1j  # Number (complex)
 42 |     1  # Number (int)
@@ -145,7 +145,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 45 |     True  # NameConstant (True)
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:42:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:42:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 42 |     1  # Number (int)
 43 |     1.0  # Number (float)
@@ -155,7 +155,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 46 |     False  # NameConstant (False)
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:43:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:43:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 43 |     1.0  # Number (float)
 44 |     b"foo"  # Binary
@@ -165,7 +165,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 47 |     None  # NameConstant (None)
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:44:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:44:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 44 |     b"foo"  # Binary
 45 |     True  # NameConstant (True)
@@ -175,7 +175,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 48 |     [1, 2]  # list
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:45:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:45:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 45 |     True  # NameConstant (True)
 46 |     False  # NameConstant (False)
@@ -185,7 +185,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 49 |     {1, 2}  # set
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:46:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:46:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 46 |     False  # NameConstant (False)
 47 |     None  # NameConstant (None)
@@ -195,7 +195,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 50 |     {"foo": "bar"}  # dict
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:47:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:47:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 47 |     None  # NameConstant (None)
 48 |     [1, 2]  # list
@@ -204,7 +204,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 50 |     {"foo": "bar"}  # dict
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:48:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:48:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 48 |     [1, 2]  # list
 49 |     {1, 2}  # set
@@ -212,7 +212,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    |     ^^^^^^^^^^^^^^ B018
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:52:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:52:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 52 | def foo3():
 53 |     123
@@ -221,7 +221,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 55 |     "str"
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:55:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:55:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 55 |     a = 2
 56 |     "str"
@@ -229,7 +229,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    |     ^ B018
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:63:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:63:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 63 | def foo5():
 64 |     foo.bar  # Attribute (raise)
@@ -238,7 +238,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 66 |     "foo" + "bar"  # BinOp (raise)
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:64:5: B018 Found useless attribute access. Either assign it to a variable or remove it.
+B018.py:64:5: B018 Found useless attribute access. Either assign it to a variable or remove it.
    |
 64 | def foo5():
 65 |     foo.bar  # Attribute (raise)
@@ -247,7 +247,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 67 |     "foo" + "bar"  # BinOp (raise)
    |
 
-./resources/test/fixtures/flake8_bugbear/B018.py:65:5: B018 Found useless expression. Either assign it to a variable or remove it.
+B018.py:65:5: B018 Found useless expression. Either assign it to a variable or remove it.
    |
 65 |     foo.bar  # Attribute (raise)
 66 |     object().__class__  # Attribute (raise)

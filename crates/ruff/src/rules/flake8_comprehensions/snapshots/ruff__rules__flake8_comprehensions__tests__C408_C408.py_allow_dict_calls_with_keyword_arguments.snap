@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
-./resources/test/fixtures/flake8_comprehensions/C408.py:1:5: C408 [*] Unnecessary `tuple` call (rewrite as a literal)
+C408.py:1:5: C408 [*] Unnecessary `tuple` call (rewrite as a literal)
   |
 1 | t = tuple()
   |     ^^^^^^^ C408
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 3 3 | d1 = dict()
 4 4 | d2 = dict(a=1)
 
-./resources/test/fixtures/flake8_comprehensions/C408.py:2:5: C408 [*] Unnecessary `list` call (rewrite as a literal)
+C408.py:2:5: C408 [*] Unnecessary `list` call (rewrite as a literal)
   |
 2 | t = tuple()
 3 | l = list()
@@ -35,7 +35,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 4 4 | d2 = dict(a=1)
 5 5 | d3 = dict(**d2)
 
-./resources/test/fixtures/flake8_comprehensions/C408.py:3:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
+C408.py:3:6: C408 [*] Unnecessary `dict` call (rewrite as a literal)
   |
 3 | t = tuple()
 4 | l = list()

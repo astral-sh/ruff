@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:307:5: D300 Use triple double quotes `"""`
+D.py:307:5: D300 Use triple double quotes `"""`
     |
 307 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
 308 | def triple_single_quotes_raw():
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
     |     ^^^^^^^^^^^^^^^ D300
     |
 
-./resources/test/fixtures/pydocstyle/D.py:312:5: D300 Use triple double quotes `"""`
+D.py:312:5: D300 Use triple double quotes `"""`
     |
 312 | @expect('D300: Use """triple double quotes""" (found \'\'\'-quotes)')
 313 | def triple_single_quotes_raw_uppercase():
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
     |     ^^^^^^^^^^^^^^^ D300
     |
 
-./resources/test/fixtures/pydocstyle/D.py:317:5: D300 Use triple double quotes `"""`
+D.py:317:5: D300 Use triple double quotes `"""`
     |
 317 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 318 | def single_quotes_raw():
@@ -25,7 +25,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
     |     ^^^^^^^^^^^ D300
     |
 
-./resources/test/fixtures/pydocstyle/D.py:322:5: D300 Use triple double quotes `"""`
+D.py:322:5: D300 Use triple double quotes `"""`
     |
 322 | @expect('D300: Use """triple double quotes""" (found \'-quotes)')
 323 | def single_quotes_raw_uppercase():
@@ -33,7 +33,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
     |     ^^^^^^^^^^^ D300
     |
 
-./resources/test/fixtures/pydocstyle/D.py:328:5: D300 Use triple double quotes `"""`
+D.py:328:5: D300 Use triple double quotes `"""`
     |
 328 | @expect('D301: Use r""" if any backslashes in a docstring')
 329 | def single_quotes_raw_uppercase_backslash():

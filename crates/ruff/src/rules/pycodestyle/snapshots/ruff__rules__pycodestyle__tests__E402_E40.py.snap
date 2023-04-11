@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E40.py:55:1: E402 Module level import not at top of file
+E40.py:55:1: E402 Module level import not at top of file
    |
 55 | VERSION = '1.2.3'
 56 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 59 | import foo
    |
 
-./resources/test/fixtures/pycodestyle/E40.py:57:1: E402 Module level import not at top of file
+E40.py:57:1: E402 Module level import not at top of file
    |
 57 | import foo
 58 | #: E402
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 61 | a = 1
    |
 
-./resources/test/fixtures/pycodestyle/E40.py:61:1: E402 Module level import not at top of file
+E40.py:61:1: E402 Module level import not at top of file
    |
 61 | a = 1
 62 | 

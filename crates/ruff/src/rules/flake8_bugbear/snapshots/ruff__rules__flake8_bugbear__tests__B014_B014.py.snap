@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B014.py:17:8: B014 [*] Exception handler with duplicate exception: `OSError`
+B014.py:17:8: B014 [*] Exception handler with duplicate exception: `OSError`
    |
 17 | try:
 18 |     pass
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 19 19 |     pass
 20 20 | 
 
-./resources/test/fixtures/flake8_bugbear/B014.py:28:8: B014 [*] Exception handler with duplicate exception: `MyError`
+B014.py:28:8: B014 [*] Exception handler with duplicate exception: `MyError`
    |
 28 | try:
 29 |     pass
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 30 30 |     pass
 31 31 | 
 
-./resources/test/fixtures/flake8_bugbear/B014.py:49:8: B014 [*] Exception handler with duplicate exception: `re.error`
+B014.py:49:8: B014 [*] Exception handler with duplicate exception: `re.error`
    |
 49 | try:
 50 |     pass

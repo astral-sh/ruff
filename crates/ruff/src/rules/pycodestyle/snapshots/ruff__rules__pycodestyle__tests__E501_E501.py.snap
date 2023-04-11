@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E501.py:5:89: E501 Line too long (123 > 88 characters)
+E501.py:5:89: E501 Line too long (123 > 88 characters)
   |
 5 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
 6 | 
@@ -10,14 +10,14 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 8 | """
   |
 
-./resources/test/fixtures/pycodestyle/E501.py:16:89: E501 Line too long (95 > 88 characters)
+E501.py:16:89: E501 Line too long (95 > 88 characters)
    |
 16 | _ = "---------------------------------------------------------------------------AAAAAAA"
 17 | _ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜"
    |                                                                                                 E501
    |
 
-./resources/test/fixtures/pycodestyle/E501.py:25:89: E501 Line too long (127 > 88 characters)
+E501.py:25:89: E501 Line too long (127 > 88 characters)
    |
 25 | caller(
 26 |     """
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 29 | )
    |
 
-./resources/test/fixtures/pycodestyle/E501.py:40:89: E501 Line too long (132 > 88 characters)
+E501.py:40:89: E501 Line too long (132 > 88 characters)
    |
 40 |     "Lorem ipsum dolor": "sit amet",
 41 |     # E501 Line too long
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 44 |     "Lorem ipsum dolor": """
    |
 
-./resources/test/fixtures/pycodestyle/E501.py:43:89: E501 Line too long (105 > 88 characters)
+E501.py:43:89: E501 Line too long (105 > 88 characters)
    |
 43 |     # E501 Line too long
 44 |     "Lorem ipsum dolor": """
@@ -47,7 +47,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 47 |     # OK
    |
 
-./resources/test/fixtures/pycodestyle/E501.py:83:89: E501 Line too long (147 > 88 characters)
+E501.py:83:89: E501 Line too long (147 > 88 characters)
    |
 83 | class Bar:
 84 |     """

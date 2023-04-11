@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
 ---
-./resources/test/fixtures/flake8_tidy_imports/TID252/my_package/sublib/api/application.py:5:1: TID252 [*] Relative imports from parent modules are banned
+application.py:5:1: TID252 [*] Relative imports from parent modules are banned
   |
 5 | import attrs
 6 | 
@@ -12,7 +12,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
   |
   = help: Replace relative imports from parent modules with absolute imports
 
-./resources/test/fixtures/flake8_tidy_imports/TID252/my_package/sublib/api/application.py:6:1: TID252 [*] Relative imports from parent modules are banned
+application.py:6:1: TID252 [*] Relative imports from parent modules are banned
   |
 6 | from ....import unknown
 7 | from ..protocol import commands, definitions, responses
@@ -32,7 +32,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
 8 8 | from .. import server
 9 9 | from . import logger, models
 
-./resources/test/fixtures/flake8_tidy_imports/TID252/my_package/sublib/api/application.py:6:1: TID252 [*] Relative imports from parent modules are banned
+application.py:6:1: TID252 [*] Relative imports from parent modules are banned
   |
 6 | from ....import unknown
 7 | from ..protocol import commands, definitions, responses
@@ -52,7 +52,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
 8 8 | from .. import server
 9 9 | from . import logger, models
 
-./resources/test/fixtures/flake8_tidy_imports/TID252/my_package/sublib/api/application.py:6:1: TID252 [*] Relative imports from parent modules are banned
+application.py:6:1: TID252 [*] Relative imports from parent modules are banned
   |
 6 | from ....import unknown
 7 | from ..protocol import commands, definitions, responses
@@ -72,7 +72,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
 8 8 | from .. import server
 9 9 | from . import logger, models
 
-./resources/test/fixtures/flake8_tidy_imports/TID252/my_package/sublib/api/application.py:7:1: TID252 [*] Relative imports from parent modules are banned
+application.py:7:1: TID252 [*] Relative imports from parent modules are banned
    |
  7 | from ....import unknown
  8 | from ..protocol import commands, definitions, responses
@@ -93,7 +93,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
 9 9 | from . import logger, models
 10 10 | from ..protocol.UpperCaseModule import some_function
 
-./resources/test/fixtures/flake8_tidy_imports/TID252/my_package/sublib/api/application.py:8:1: TID252 [*] Relative imports from parent modules are banned
+application.py:8:1: TID252 [*] Relative imports from parent modules are banned
    |
  8 | from ..protocol import commands, definitions, responses
  9 | from ..server import example
@@ -113,7 +113,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
 9 9 | from . import logger, models
 10 10 | from ..protocol.UpperCaseModule import some_function
 
-./resources/test/fixtures/flake8_tidy_imports/TID252/my_package/sublib/api/application.py:10:1: TID252 [*] Relative imports from parent modules are banned
+application.py:10:1: TID252 [*] Relative imports from parent modules are banned
    |
 10 | from .. import server
 11 | from . import logger, models

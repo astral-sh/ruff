@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
-./resources/test/fixtures/flake8_bandit/S103.py:6:25: S103 `os.chmod` setting a permissive mask `0o227` on file or directory
+S103.py:6:25: S103 `os.chmod` setting a permissive mask `0o227` on file or directory
    |
  6 | keyfile = "foo"
  7 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 10 | os.chmod("/etc/passwd", 0o664)  # OK
    |
 
-./resources/test/fixtures/flake8_bandit/S103.py:7:25: S103 `os.chmod` setting a permissive mask `0o7` on file or directory
+S103.py:7:25: S103 `os.chmod` setting a permissive mask `0o7` on file or directory
    |
  7 | os.chmod("/etc/passwd", 0o227)  # Error
  8 | os.chmod("/etc/passwd", 0o7)  # Error
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 10 | os.chmod("/etc/passwd", 0o777)  # Error
    |
 
-./resources/test/fixtures/flake8_bandit/S103.py:9:25: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:9:25: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
    |
  9 | os.chmod("/etc/passwd", 0o7)  # Error
 10 | os.chmod("/etc/passwd", 0o664)  # OK
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 13 | os.chmod("/etc/passwd", 0o776)  # Error
    |
 
-./resources/test/fixtures/flake8_bandit/S103.py:10:25: S103 `os.chmod` setting a permissive mask `0o770` on file or directory
+S103.py:10:25: S103 `os.chmod` setting a permissive mask `0o770` on file or directory
    |
 10 | os.chmod("/etc/passwd", 0o664)  # OK
 11 | os.chmod("/etc/passwd", 0o777)  # Error
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 14 | os.chmod("/etc/passwd", 0o760)  # OK
    |
 
-./resources/test/fixtures/flake8_bandit/S103.py:11:25: S103 `os.chmod` setting a permissive mask `0o776` on file or directory
+S103.py:11:25: S103 `os.chmod` setting a permissive mask `0o776` on file or directory
    |
 11 | os.chmod("/etc/passwd", 0o777)  # Error
 12 | os.chmod("/etc/passwd", 0o770)  # Error
@@ -50,7 +50,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 15 | os.chmod("~/.bashrc", 511)  # Error
    |
 
-./resources/test/fixtures/flake8_bandit/S103.py:13:23: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:13:23: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
    |
 13 | os.chmod("/etc/passwd", 0o776)  # Error
 14 | os.chmod("/etc/passwd", 0o760)  # OK
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 17 | os.chmod("/tmp/oh_hai", 0x1FF)  # Error
    |
 
-./resources/test/fixtures/flake8_bandit/S103.py:14:24: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:14:24: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
    |
 14 | os.chmod("/etc/passwd", 0o760)  # OK
 15 | os.chmod("~/.bashrc", 511)  # Error
@@ -70,7 +70,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 18 | os.chmod("/etc/passwd", stat.S_IRWXU)  # OK
    |
 
-./resources/test/fixtures/flake8_bandit/S103.py:15:25: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:15:25: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
    |
 15 | os.chmod("~/.bashrc", 511)  # Error
 16 | os.chmod("/etc/hosts", 0o777)  # Error
@@ -80,7 +80,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 19 | os.chmod(keyfile, 0o777)  # Error
    |
 
-./resources/test/fixtures/flake8_bandit/S103.py:17:19: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:17:19: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
    |
 17 | os.chmod("/tmp/oh_hai", 0x1FF)  # Error
 18 | os.chmod("/etc/passwd", stat.S_IRWXU)  # OK
@@ -90,7 +90,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 21 | os.chmod(keyfile, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)  # Error
    |
 
-./resources/test/fixtures/flake8_bandit/S103.py:18:19: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:18:19: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
    |
 18 | os.chmod("/etc/passwd", stat.S_IRWXU)  # OK
 19 | os.chmod(keyfile, 0o777)  # Error
@@ -100,7 +100,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 22 | os.chmod("~/hidden_exec", stat.S_IXGRP)  # Error
    |
 
-./resources/test/fixtures/flake8_bandit/S103.py:19:19: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
+S103.py:19:19: S103 `os.chmod` setting a permissive mask `0o777` on file or directory
    |
 19 | os.chmod(keyfile, 0o777)  # Error
 20 | os.chmod(keyfile, 0o7 | 0o70 | 0o700)  # Error
@@ -110,7 +110,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 23 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK
    |
 
-./resources/test/fixtures/flake8_bandit/S103.py:20:27: S103 `os.chmod` setting a permissive mask `0o10` on file or directory
+S103.py:20:27: S103 `os.chmod` setting a permissive mask `0o10` on file or directory
    |
 20 | os.chmod(keyfile, 0o7 | 0o70 | 0o700)  # Error
 21 | os.chmod(keyfile, stat.S_IRWXO | stat.S_IRWXG | stat.S_IRWXU)  # Error
@@ -120,7 +120,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 24 | os.chmod("/etc/passwd", stat.S_IWOTH)  # Error
    |
 
-./resources/test/fixtures/flake8_bandit/S103.py:22:25: S103 `os.chmod` setting a permissive mask `0o2` on file or directory
+S103.py:22:25: S103 `os.chmod` setting a permissive mask `0o2` on file or directory
    |
 22 | os.chmod("~/hidden_exec", stat.S_IXGRP)  # Error
 23 | os.chmod("~/hidden_exec", stat.S_IXOTH)  # OK

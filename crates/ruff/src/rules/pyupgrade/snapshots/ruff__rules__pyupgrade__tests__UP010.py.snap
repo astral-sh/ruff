@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP010.py:1:1: UP010 [*] Unnecessary `__future__` imports `generators`, `nested_scopes` for target Python version
+UP010.py:1:1: UP010 [*] Unnecessary `__future__` imports `generators`, `nested_scopes` for target Python version
   |
 1 | from __future__ import nested_scopes, generators
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP010
@@ -16,7 +16,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 3 2 | from __future__ import absolute_import, division
 4 3 | from __future__ import generator_stop
 
-./resources/test/fixtures/pyupgrade/UP010.py:2:1: UP010 [*] Unnecessary `__future__` imports `unicode_literals`, `with_statement` for target Python version
+UP010.py:2:1: UP010 [*] Unnecessary `__future__` imports `unicode_literals`, `with_statement` for target Python version
   |
 2 | from __future__ import nested_scopes, generators
 3 | from __future__ import with_statement, unicode_literals
@@ -33,7 +33,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 4 3 | from __future__ import generator_stop
 5 4 | from __future__ import print_function, generator_stop
 
-./resources/test/fixtures/pyupgrade/UP010.py:3:1: UP010 [*] Unnecessary `__future__` imports `absolute_import`, `division` for target Python version
+UP010.py:3:1: UP010 [*] Unnecessary `__future__` imports `absolute_import`, `division` for target Python version
   |
 3 | from __future__ import nested_scopes, generators
 4 | from __future__ import with_statement, unicode_literals
@@ -52,7 +52,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 5 4 | from __future__ import print_function, generator_stop
 6 5 | from __future__ import invalid_module, generators
 
-./resources/test/fixtures/pyupgrade/UP010.py:4:1: UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
+UP010.py:4:1: UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
   |
 4 | from __future__ import with_statement, unicode_literals
 5 | from __future__ import absolute_import, division
@@ -72,7 +72,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 6 5 | from __future__ import invalid_module, generators
 7 6 | 
 
-./resources/test/fixtures/pyupgrade/UP010.py:5:1: UP010 [*] Unnecessary `__future__` imports `generator_stop`, `print_function` for target Python version
+UP010.py:5:1: UP010 [*] Unnecessary `__future__` imports `generator_stop`, `print_function` for target Python version
   |
 5 | from __future__ import absolute_import, division
 6 | from __future__ import generator_stop
@@ -91,7 +91,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 7 6 | 
 8 7 | if True:
 
-./resources/test/fixtures/pyupgrade/UP010.py:6:1: UP010 [*] Unnecessary `__future__` import `generators` for target Python version
+UP010.py:6:1: UP010 [*] Unnecessary `__future__` import `generators` for target Python version
    |
  6 | from __future__ import generator_stop
  7 | from __future__ import print_function, generator_stop
@@ -112,7 +112,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 8 | if True:
 9 9 |     from __future__ import generator_stop
 
-./resources/test/fixtures/pyupgrade/UP010.py:9:5: UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
+UP010.py:9:5: UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
    |
  9 | if True:
 10 |     from __future__ import generator_stop
@@ -130,7 +130,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 11 10 | 
 12 11 | if True:
 
-./resources/test/fixtures/pyupgrade/UP010.py:10:5: UP010 [*] Unnecessary `__future__` import `generators` for target Python version
+UP010.py:10:5: UP010 [*] Unnecessary `__future__` import `generators` for target Python version
    |
 10 | if True:
 11 |     from __future__ import generator_stop
@@ -151,7 +151,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 12 12 | if True:
 13 13 |     from __future__ import generator_stop
 
-./resources/test/fixtures/pyupgrade/UP010.py:13:5: UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
+UP010.py:13:5: UP010 [*] Unnecessary `__future__` import `generator_stop` for target Python version
    |
 13 | if True:
 14 |     from __future__ import generator_stop
@@ -167,7 +167,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 13    |-    from __future__ import generator_stop
 14 13 |     from __future__ import invalid_module, generators
 
-./resources/test/fixtures/pyupgrade/UP010.py:14:5: UP010 [*] Unnecessary `__future__` import `generators` for target Python version
+UP010.py:14:5: UP010 [*] Unnecessary `__future__` import `generators` for target Python version
    |
 14 | if True:
 15 |     from __future__ import generator_stop

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
-./resources/test/fixtures/flake8_comprehensions/C400.py:1:5: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
+C400.py:1:5: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
   |
 1 | x = list(x for x in range(3))
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ C400
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 3 3 |     x for x in range(3)
 4 4 | )
 
-./resources/test/fixtures/flake8_comprehensions/C400.py:2:5: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
+C400.py:2:5: C400 [*] Unnecessary generator (rewrite as a `list` comprehension)
   |
 2 |   x = list(x for x in range(3))
 3 |   x = list(

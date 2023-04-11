@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F707.py:3:1: F707 An `except` block as not the last exception handler
+F707.py:3:1: F707 An `except` block as not the last exception handler
   |
 3 | try:
 4 |     pass
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 7 | except ValueError:
   |
 
-./resources/test/fixtures/pyflakes/F707.py:10:1: F707 An `except` block as not the last exception handler
+F707.py:10:1: F707 An `except` block as not the last exception handler
    |
 10 | try:
 11 |     pass
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 14 | except ValueError:
    |
 
-./resources/test/fixtures/pyflakes/F707.py:19:1: F707 An `except` block as not the last exception handler
+F707.py:19:1: F707 An `except` block as not the last exception handler
    |
 19 | try:
 20 |     pass

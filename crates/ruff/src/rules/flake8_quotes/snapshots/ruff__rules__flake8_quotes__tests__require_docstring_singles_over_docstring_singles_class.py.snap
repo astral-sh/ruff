@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
-./resources/test/fixtures/flake8_quotes/docstring_singles_class.py:3:5: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles_class.py:3:5: Q001 [*] Single quote multiline found but double quotes preferred
   |
 3 | class SingleLineDocstrings():
 4 |     ''' Double quotes single line class docstring '''
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 5 5 |     def foo(self, bar='''not a docstring'''):
 6 6 |         ''' Double quotes single line method docstring'''
 
-./resources/test/fixtures/flake8_quotes/docstring_singles_class.py:5:23: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles_class.py:5:23: Q001 [*] Single quote multiline found but double quotes preferred
   |
 5 |     ''' Not a docstring '''
 6 | 

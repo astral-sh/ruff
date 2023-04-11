@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/W29.py:7:1: W293 [*] Blank line contains whitespace
+W29.py:7:1: W293 [*] Blank line contains whitespace
    |
  7 | #: W293:2:1
  8 | class Foo(object):

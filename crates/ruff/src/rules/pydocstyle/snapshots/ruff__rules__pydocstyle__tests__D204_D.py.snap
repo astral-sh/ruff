@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:181:5: D204 [*] 1 blank line required after class docstring
+D.py:181:5: D204 [*] 1 blank line required after class docstring
     |
 181 | class TrailingSpace:
 182 | 
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 183 184 | 
 184 185 | 
 
-./resources/test/fixtures/pydocstyle/D.py:192:5: D204 [*] 1 blank line required after class docstring
+D.py:192:5: D204 [*] 1 blank line required after class docstring
     |
 192 | class LeadingAndTrailingSpaceMissing:
 193 |     """Leading and trailing space missing."""

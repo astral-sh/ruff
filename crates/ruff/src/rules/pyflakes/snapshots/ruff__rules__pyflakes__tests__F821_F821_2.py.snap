@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F821_2.py:5:13: F821 Undefined name `Model`
+F821_2.py:5:13: F821 Undefined name `Model`
   |
 5 | # F821 Undefined name `Model`
 6 | x: Literal["Model"]

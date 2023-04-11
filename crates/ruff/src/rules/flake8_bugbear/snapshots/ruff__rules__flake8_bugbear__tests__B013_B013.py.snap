@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B013.py:3:8: B013 [*] A length-one tuple literal is redundant. Write `except ValueError` instead of `except (ValueError,)`.
+B013.py:3:8: B013 [*] A length-one tuple literal is redundant. Write `except ValueError` instead of `except (ValueError,)`.
   |
 3 | try:
 4 |     pass

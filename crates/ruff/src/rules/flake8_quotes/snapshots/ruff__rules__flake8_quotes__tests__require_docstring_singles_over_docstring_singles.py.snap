@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
-./resources/test/fixtures/flake8_quotes/docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quotes preferred
    |
  5 |   '''
  6 |   
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 9 9 | l = []
 10 10 | 
 
-./resources/test/fixtures/flake8_quotes/docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quotes preferred
    |
 11 |   l = []
 12 |   
@@ -54,7 +54,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 15 15 |     Single quotes multiline class docstring
 16 16 |     '''
 
-./resources/test/fixtures/flake8_quotes/docstring_singles.py:18:5: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles.py:18:5: Q001 [*] Single quote multiline found but double quotes preferred
    |
 18 |       '''
 19 |   
@@ -81,7 +81,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 22 22 |     # The colon in the list indexing below is an edge case for the docstring scanner
 23 23 |     def f(self, bar='''
 
-./resources/test/fixtures/flake8_quotes/docstring_singles.py:23:21: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles.py:23:21: Q001 [*] Single quote multiline found but double quotes preferred
    |
 23 |       # The colon in the list indexing below is an edge case for the docstring scanner
 24 |       def f(self, bar='''
@@ -105,7 +105,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 26 26 |         '''
 27 27 |         Single quotes multiline function docstring
 
-./resources/test/fixtures/flake8_quotes/docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quotes preferred
    |
 32 |           some_expression = 'hello world'
 33 |   
@@ -132,7 +132,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 36 36 |         if l:
 37 37 |             '''
 
-./resources/test/fixtures/flake8_quotes/docstring_singles.py:37:13: Q001 [*] Single quote multiline found but double quotes preferred
+docstring_singles.py:37:13: Q001 [*] Single quote multiline found but double quotes preferred
    |
 37 |           if l:
 38 |               '''

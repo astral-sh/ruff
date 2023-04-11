@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 ---
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:49:11: ARG004 Unused static method argument: `cls`
+ARG.py:49:11: ARG004 Unused static method argument: `cls`
    |
 49 |     @staticmethod
 50 |     def f(cls, x):
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 51 |         print("Hello, world!")
    |
 
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:49:16: ARG004 Unused static method argument: `x`
+ARG.py:49:16: ARG004 Unused static method argument: `x`
    |
 49 |     @staticmethod
 50 |     def f(cls, x):
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 51 |         print("Hello, world!")
    |
 
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:53:11: ARG004 Unused static method argument: `x`
+ARG.py:53:11: ARG004 Unused static method argument: `x`
    |
 53 |     @staticmethod
 54 |     def f(x):

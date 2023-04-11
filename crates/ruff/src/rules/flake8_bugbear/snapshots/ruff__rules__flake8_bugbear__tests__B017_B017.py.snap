@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B017.py:22:9: B017 `assertRaises(Exception)` should be considered evil
+B017.py:22:9: B017 `assertRaises(Exception)` should be considered evil
    |
 22 |   class Foobar(unittest.TestCase):
 23 |       def evil_raises(self) -> None:

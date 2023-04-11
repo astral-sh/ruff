@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
-./resources/test/fixtures/flake8_bandit/S102.py:3:5: S102 Use of `exec` detected
+S102.py:3:5: S102 Use of `exec` detected
   |
 3 | def fn():
 4 |     # Error
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 7 | exec('y = 3')
   |
 
-./resources/test/fixtures/flake8_bandit/S102.py:5:1: S102 Use of `exec` detected
+S102.py:5:1: S102 Use of `exec` detected
   |
 5 |     exec('x = 2')
 6 | 

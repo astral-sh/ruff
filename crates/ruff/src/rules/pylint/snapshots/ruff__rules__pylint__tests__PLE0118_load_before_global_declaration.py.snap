@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/load_before_global_declaration.py:5:11: PLE0118 Name `x` is used prior to global declaration on line 7
+load_before_global_declaration.py:5:11: PLE0118 Name `x` is used prior to global declaration on line 7
   |
 5 | ###
 6 | def f():
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 9 |     global x
   |
 
-./resources/test/fixtures/pylint/load_before_global_declaration.py:15:11: PLE0118 Name `x` is used prior to global declaration on line 17
+load_before_global_declaration.py:15:11: PLE0118 Name `x` is used prior to global declaration on line 17
    |
 15 |     global x
 16 | 
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 19 |     global x
    |
 
-./resources/test/fixtures/pylint/load_before_global_declaration.py:23:11: PLE0118 Name `x` is used prior to global declaration on line 25
+load_before_global_declaration.py:23:11: PLE0118 Name `x` is used prior to global declaration on line 25
    |
 23 | def f():
 24 |     print(x)
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 26 |     global x, y
    |
 
-./resources/test/fixtures/pylint/load_before_global_declaration.py:33:11: PLE0118 Name `x` is used prior to global declaration on line 35
+load_before_global_declaration.py:33:11: PLE0118 Name `x` is used prior to global declaration on line 35
    |
 33 |     global x, y
 34 | 
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 37 |     global x, y
    |
 
-./resources/test/fixtures/pylint/load_before_global_declaration.py:41:5: PLE0118 Name `x` is used prior to global declaration on line 43
+load_before_global_declaration.py:41:5: PLE0118 Name `x` is used prior to global declaration on line 43
    |
 41 | def f():
 42 |     x = 1
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 44 |     global x
    |
 
-./resources/test/fixtures/pylint/load_before_global_declaration.py:51:5: PLE0118 Name `x` is used prior to global declaration on line 53
+load_before_global_declaration.py:51:5: PLE0118 Name `x` is used prior to global declaration on line 53
    |
 51 |     global x
 52 | 
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 55 |     global x
    |
 
-./resources/test/fixtures/pylint/load_before_global_declaration.py:59:9: PLE0118 Name `x` is used prior to global declaration on line 61
+load_before_global_declaration.py:59:9: PLE0118 Name `x` is used prior to global declaration on line 61
    |
 59 | def f():
 60 |     del x
@@ -68,7 +68,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 62 |     global x, y
    |
 
-./resources/test/fixtures/pylint/load_before_global_declaration.py:69:9: PLE0118 Name `x` is used prior to global declaration on line 71
+load_before_global_declaration.py:69:9: PLE0118 Name `x` is used prior to global declaration on line 71
    |
 69 |     global x, y
 70 | 
@@ -78,7 +78,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 73 |     global x, y
    |
 
-./resources/test/fixtures/pylint/load_before_global_declaration.py:77:9: PLE0118 Name `x` is used prior to global declaration on line 79
+load_before_global_declaration.py:77:9: PLE0118 Name `x` is used prior to global declaration on line 79
    |
 77 | def f():
 78 |     del x
@@ -87,7 +87,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 80 |     global x
    |
 
-./resources/test/fixtures/pylint/load_before_global_declaration.py:87:9: PLE0118 Name `x` is used prior to global declaration on line 89
+load_before_global_declaration.py:87:9: PLE0118 Name `x` is used prior to global declaration on line 89
    |
 87 |     global x
 88 | 
@@ -97,7 +97,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 91 |     global x
    |
 
-./resources/test/fixtures/pylint/load_before_global_declaration.py:95:9: PLE0118 Name `x` is used prior to global declaration on line 97
+load_before_global_declaration.py:95:9: PLE0118 Name `x` is used prior to global declaration on line 97
    |
 95 | def f():
 96 |     del x
@@ -106,7 +106,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 98 |     global x, y
    |
 
-./resources/test/fixtures/pylint/load_before_global_declaration.py:105:9: PLE0118 Name `x` is used prior to global declaration on line 107
+load_before_global_declaration.py:105:9: PLE0118 Name `x` is used prior to global declaration on line 107
     |
 105 |     global x, y
 106 | 
@@ -116,7 +116,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 109 |     global x, y
     |
 
-./resources/test/fixtures/pylint/load_before_global_declaration.py:113:14: PLE0118 Name `x` is used prior to global declaration on line 114
+load_before_global_declaration.py:113:14: PLE0118 Name `x` is used prior to global declaration on line 114
     |
 113 | def f():
 114 |     print(f"{x=}")

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT025.py:9:2: PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
+PT025.py:9:2: PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
    |
  9 | @pytest.mark.usefixtures("a")
    |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT025
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 11 10 | def my_fixture():  # Error before
 12 11 |     return 0
 
-./resources/test/fixtures/flake8_pytest_style/PT025.py:16:2: PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
+PT025.py:16:2: PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
    |
 16 | @pytest.fixture()
 17 | @pytest.mark.usefixtures("a")

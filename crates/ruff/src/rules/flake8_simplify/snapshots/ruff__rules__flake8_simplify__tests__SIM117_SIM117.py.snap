@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM117.py:2:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:2:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
   |
 2 |   # SIM117
 3 | / with A() as a:
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 6 5 | # SIM117
 7 6 | with A():
 
-./resources/test/fixtures/flake8_simplify/SIM117.py:7:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:7:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
  7 |   # SIM117
  8 | / with A():
@@ -48,7 +48,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 12 11 | # SIM117
 13 12 | with A() as a:
 
-./resources/test/fixtures/flake8_simplify/SIM117.py:13:1: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:13:1: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 13 |   # SIM117
 14 | / with A() as a:
@@ -58,7 +58,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 17 |           print("hello")
    |
 
-./resources/test/fixtures/flake8_simplify/SIM117.py:19:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:19:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 19 |   # SIM117
 20 | / with A() as a:
@@ -84,7 +84,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 24 23 | # OK
 25 24 | with A() as a:
 
-./resources/test/fixtures/flake8_simplify/SIM117.py:53:5: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:53:5: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 53 |   while True:
 54 |       # SIM117
@@ -122,7 +122,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 66 65 | 
 67 66 | # SIM117
 
-./resources/test/fixtures/flake8_simplify/SIM117.py:68:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:68:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 68 |   # SIM117
 69 | / with (
@@ -149,7 +149,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 75 74 | # SIM117
 76 75 | with A() as a:
 
-./resources/test/fixtures/flake8_simplify/SIM117.py:76:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:76:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 76 |   # SIM117
 77 | / with A() as a:
@@ -181,7 +181,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 83 82 | # SIM117
 84 83 | with (
 
-./resources/test/fixtures/flake8_simplify/SIM117.py:84:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+SIM117.py:84:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
    |
 84 |   # SIM117
 85 | / with (

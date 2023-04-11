@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_2020/mod.rs
 ---
-./resources/test/fixtures/flake8_2020/YTT204.py:4:1: YTT204 `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple
+YTT204.py:4:1: YTT204 `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple
   |
 4 | from sys import version_info
 5 | 
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_2020/mod.rs
 7 | version_info.minor > 8
   |
 
-./resources/test/fixtures/flake8_2020/YTT204.py:5:1: YTT204 `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple
+YTT204.py:5:1: YTT204 `sys.version_info.minor` compared to integer (python4), compare `sys.version_info` to tuple
   |
 5 | sys.version_info.minor <= 7
 6 | version_info.minor > 8

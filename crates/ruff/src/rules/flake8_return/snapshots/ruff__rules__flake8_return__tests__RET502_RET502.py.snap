@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
-./resources/test/fixtures/flake8_return/RET502.py:3:9: RET502 [*] Do not implicitly `return None` in function able to return non-`None` value
+RET502.py:3:9: RET502 [*] Do not implicitly `return None` in function able to return non-`None` value
   |
 3 | def x(y):
 4 |     if not y:

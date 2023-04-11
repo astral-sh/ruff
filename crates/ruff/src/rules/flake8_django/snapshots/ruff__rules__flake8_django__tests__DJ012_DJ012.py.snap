@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_django/mod.rs
 ---
-./resources/test/fixtures/flake8_django/DJ012.py:28:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
+DJ012.py:28:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
    |
 28 |         return "foobar"
 29 | 
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012
    |
 
-./resources/test/fixtures/flake8_django/DJ012.py:43:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before manager declaration
+DJ012.py:43:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before manager declaration
    |
 43 |         return "foobar"
 44 | 
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012
    |
 
-./resources/test/fixtures/flake8_django/DJ012.py:56:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `__str__` method should come before custom method
+DJ012.py:56:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `__str__` method should come before custom method
    |
 56 |           pass
 57 |   
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
    | |_______________________^ DJ012
    |
 
-./resources/test/fixtures/flake8_django/DJ012.py:69:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `save` method should come before `get_absolute_url` method
+DJ012.py:69:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `save` method should come before `get_absolute_url` method
    |
 69 |           pass
 70 |   

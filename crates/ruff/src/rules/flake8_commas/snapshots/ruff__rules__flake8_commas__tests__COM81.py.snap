@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_commas/mod.rs
 ---
-./resources/test/fixtures/flake8_commas/COM81.py:4:18: COM812 [*] Trailing comma missing
+COM81.py:4:18: COM812 [*] Trailing comma missing
   |
 4 | bad_function_call(
 5 |     param1='test',
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 6 6 | # ==> bad_list.py <==
 7 7 | bad_list = [
 
-./resources/test/fixtures/flake8_commas/COM81.py:10:6: COM812 [*] Trailing comma missing
+COM81.py:10:6: COM812 [*] Trailing comma missing
    |
 10 |     1,
 11 |     2,
@@ -42,7 +42,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 12 12 | 
 13 13 | bad_list_with_comment = [
 
-./resources/test/fixtures/flake8_commas/COM81.py:16:6: COM812 [*] Trailing comma missing
+COM81.py:16:6: COM812 [*] Trailing comma missing
    |
 16 |     1,
 17 |     2,
@@ -63,7 +63,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 18 18 | ]
 19 19 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:23:6: COM812 [*] Trailing comma missing
+COM81.py:23:6: COM812 [*] Trailing comma missing
    |
 23 |     1,
 24 |     2,
@@ -82,7 +82,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 25 25 | 
 26 26 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:36:8: COM818 Trailing comma on bare tuple prohibited
+COM81.py:36:8: COM818 Trailing comma on bare tuple prohibited
    |
 36 | foo = (1,)
 37 | 
@@ -92,7 +92,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 40 | bar = 1; foo = bar,
    |
 
-./resources/test/fixtures/flake8_commas/COM81.py:38:19: COM818 Trailing comma on bare tuple prohibited
+COM81.py:38:19: COM818 Trailing comma on bare tuple prohibited
    |
 38 | foo = 1,
 39 | 
@@ -102,7 +102,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 42 | foo = (
    |
 
-./resources/test/fixtures/flake8_commas/COM81.py:45:8: COM818 Trailing comma on bare tuple prohibited
+COM81.py:45:8: COM818 Trailing comma on bare tuple prohibited
    |
 45 | )
 46 | 
@@ -112,7 +112,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 49 | class A(object):
    |
 
-./resources/test/fixtures/flake8_commas/COM81.py:49:10: COM818 Trailing comma on bare tuple prohibited
+COM81.py:49:10: COM818 Trailing comma on bare tuple prohibited
    |
 49 | class A(object):
 50 |  foo = 3
@@ -121,7 +121,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 52 |  foo_bar = 2
    |
 
-./resources/test/fixtures/flake8_commas/COM81.py:56:32: COM818 Trailing comma on bare tuple prohibited
+COM81.py:56:32: COM818 Trailing comma on bare tuple prohibited
    |
 56 | from foo import bar, baz
 57 | 
@@ -131,7 +131,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 60 | group_by = ('foobar' * 3),
    |
 
-./resources/test/fixtures/flake8_commas/COM81.py:58:26: COM818 Trailing comma on bare tuple prohibited
+COM81.py:58:26: COM818 Trailing comma on bare tuple prohibited
    |
 58 | group_by = function_call('arg'),
 59 | 
@@ -141,7 +141,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 62 | def foo():
    |
 
-./resources/test/fixtures/flake8_commas/COM81.py:61:17: COM818 Trailing comma on bare tuple prohibited
+COM81.py:61:17: COM818 Trailing comma on bare tuple prohibited
    |
 61 | def foo():
 62 |     return False,
@@ -150,7 +150,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 64 | # ==> callable_before_parenth_form.py <==
    |
 
-./resources/test/fixtures/flake8_commas/COM81.py:70:8: COM812 [*] Trailing comma missing
+COM81.py:70:8: COM812 [*] Trailing comma missing
    |
 70 | {'foo': foo}['foo'](
 71 |     bar
@@ -169,7 +169,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 72 72 | 
 73 73 | {'foo': foo}['foo'](
 
-./resources/test/fixtures/flake8_commas/COM81.py:78:8: COM812 [*] Trailing comma missing
+COM81.py:78:8: COM812 [*] Trailing comma missing
    |
 78 | (foo)(
 79 |     bar
@@ -188,7 +188,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 80 80 | 
 81 81 | (foo)[0](
 
-./resources/test/fixtures/flake8_commas/COM81.py:86:8: COM812 [*] Trailing comma missing
+COM81.py:86:8: COM812 [*] Trailing comma missing
    |
 86 | [foo][0](
 87 |     bar
@@ -207,7 +207,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 88 88 | 
 89 89 | [foo][0](
 
-./resources/test/fixtures/flake8_commas/COM81.py:152:6: COM812 [*] Trailing comma missing
+COM81.py:152:6: COM812 [*] Trailing comma missing
     |
 152 | # ==> keyword_before_parenth_form/base_bad.py <==
 153 | from x import (
@@ -227,7 +227,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 154 154 | 
 155 155 | assert(
 
-./resources/test/fixtures/flake8_commas/COM81.py:158:11: COM812 [*] Trailing comma missing
+COM81.py:158:11: COM812 [*] Trailing comma missing
     |
 158 |     SyntaxWarning,
 159 |     ThrownHere,
@@ -247,7 +247,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 160 160 | 
 161 161 | # async await is fine outside an async def
 
-./resources/test/fixtures/flake8_commas/COM81.py:293:15: COM812 [*] Trailing comma missing
+COM81.py:293:15: COM812 [*] Trailing comma missing
     |
 293 | # ==> multiline_bad_dict.py <==
 294 | multiline_bad_dict = {
@@ -268,7 +268,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 295 295 | # ==> multiline_bad_function_def.py <==
 296 296 | def func_good(
 
-./resources/test/fixtures/flake8_commas/COM81.py:304:14: COM812 [*] Trailing comma missing
+COM81.py:304:14: COM812 [*] Trailing comma missing
     |
 304 | def func_bad(
 305 |         a = 3,
@@ -289,7 +289,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 306 306 |     pass
 307 307 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:310:14: COM812 [*] Trailing comma missing
+COM81.py:310:14: COM812 [*] Trailing comma missing
     |
 310 | # ==> multiline_bad_function_one_param.py <==
 311 | def func(
@@ -310,7 +310,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 312 312 |     pass
 313 313 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:316:10: COM812 [*] Trailing comma missing
+COM81.py:316:10: COM812 [*] Trailing comma missing
     |
 316 | func(
 317 |     a = 3
@@ -329,7 +329,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 318 318 | 
 319 319 | # ==> multiline_bad_or_dict.py <==
 
-./resources/test/fixtures/flake8_commas/COM81.py:322:15: COM812 [*] Trailing comma missing
+COM81.py:322:15: COM812 [*] Trailing comma missing
     |
 322 | multiline_bad_or_dict = {
 323 |     "good": True or False,
@@ -349,7 +349,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 324 324 | 
 325 325 | # ==> multiline_good_dict.py <==
 
-./resources/test/fixtures/flake8_commas/COM81.py:368:15: COM812 [*] Trailing comma missing
+COM81.py:368:15: COM812 [*] Trailing comma missing
     |
 368 | multiline_index_access[
 369 |     "probably fine",
@@ -369,7 +369,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 370 370 | 
 371 371 | multiline_index_access[
 
-./resources/test/fixtures/flake8_commas/COM81.py:375:15: COM812 [*] Trailing comma missing
+COM81.py:375:15: COM812 [*] Trailing comma missing
     |
 375 |     "fine",
 376 |     :
@@ -389,7 +389,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 377 377 | 
 378 378 | # ==> multiline_string.py <==
 
-./resources/test/fixtures/flake8_commas/COM81.py:404:15: COM812 [*] Trailing comma missing
+COM81.py:404:15: COM812 [*] Trailing comma missing
     |
 404 |     "fine"
 405 |     :
@@ -409,7 +409,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 406 406 | 
 407 407 | multiline_index_access[
 
-./resources/test/fixtures/flake8_commas/COM81.py:432:15: COM812 [*] Trailing comma missing
+COM81.py:432:15: COM812 [*] Trailing comma missing
     |
 432 |     :
 433 |     "fine",
@@ -429,7 +429,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 434 434 | 
 435 435 | multiline_index_access[
 
-./resources/test/fixtures/flake8_commas/COM81.py:485:21: COM819 [*] Trailing comma prohibited
+COM81.py:485:21: COM819 [*] Trailing comma prohibited
     |
 485 | # ==> prohibited.py <==
 486 | foo = ['a', 'b', 'c',]
@@ -449,7 +449,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 487 487 | bar = { a: b,}
 488 488 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:487:13: COM819 [*] Trailing comma prohibited
+COM81.py:487:13: COM819 [*] Trailing comma prohibited
     |
 487 | foo = ['a', 'b', 'c',]
 488 | 
@@ -470,7 +470,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 489 489 | def bah(ham, spam,):
 490 490 |     pass
 
-./resources/test/fixtures/flake8_commas/COM81.py:489:18: COM819 [*] Trailing comma prohibited
+COM81.py:489:18: COM819 [*] Trailing comma prohibited
     |
 489 | bar = { a: b,}
 490 | 
@@ -490,7 +490,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 491 491 | 
 492 492 | (0,)
 
-./resources/test/fixtures/flake8_commas/COM81.py:494:6: COM819 [*] Trailing comma prohibited
+COM81.py:494:6: COM819 [*] Trailing comma prohibited
     |
 494 | (0,)
 495 | 
@@ -511,7 +511,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 496 496 | foo = ['a', 'b', 'c', ]
 497 497 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:496:21: COM819 [*] Trailing comma prohibited
+COM81.py:496:21: COM819 [*] Trailing comma prohibited
     |
 496 | (0, 1,)
 497 | 
@@ -532,7 +532,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 498 498 | bar = { a: b, }
 499 499 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:498:13: COM819 [*] Trailing comma prohibited
+COM81.py:498:13: COM819 [*] Trailing comma prohibited
     |
 498 | foo = ['a', 'b', 'c', ]
 499 | 
@@ -553,7 +553,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 500 500 | def bah(ham, spam, ):
 501 501 |     pass
 
-./resources/test/fixtures/flake8_commas/COM81.py:500:18: COM819 [*] Trailing comma prohibited
+COM81.py:500:18: COM819 [*] Trailing comma prohibited
     |
 500 | bar = { a: b, }
 501 | 
@@ -573,7 +573,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 502 502 | 
 503 503 | (0, )
 
-./resources/test/fixtures/flake8_commas/COM81.py:505:6: COM819 [*] Trailing comma prohibited
+COM81.py:505:6: COM819 [*] Trailing comma prohibited
     |
 505 | (0, )
 506 | 
@@ -594,7 +594,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 507 507 | image[:, :, 0]
 508 508 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:511:10: COM819 [*] Trailing comma prohibited
+COM81.py:511:10: COM819 [*] Trailing comma prohibited
     |
 511 | image[:,]
 512 | 
@@ -615,7 +615,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 513 513 | lambda x, :
 514 514 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:513:9: COM819 [*] Trailing comma prohibited
+COM81.py:513:9: COM819 [*] Trailing comma prohibited
     |
 513 | image[:,:,]
 514 | 
@@ -636,7 +636,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 515 515 | # ==> unpack.py <==
 516 516 | def function(
 
-./resources/test/fixtures/flake8_commas/COM81.py:519:13: COM812 [*] Trailing comma missing
+COM81.py:519:13: COM812 [*] Trailing comma missing
     |
 519 |     foo,
 520 |     bar,
@@ -657,7 +657,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 521 521 |     pass
 522 522 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:526:10: COM812 [*] Trailing comma missing
+COM81.py:526:10: COM812 [*] Trailing comma missing
     |
 526 |     foo,
 527 |     bar,
@@ -678,7 +678,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 528 528 |     pass
 529 529 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:534:16: COM812 [*] Trailing comma missing
+COM81.py:534:16: COM812 [*] Trailing comma missing
     |
 534 |     bar,
 535 |     *args,
@@ -699,7 +699,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 536 536 |     pass
 537 537 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:541:13: COM812 [*] Trailing comma missing
+COM81.py:541:13: COM812 [*] Trailing comma missing
     |
 541 |     foo,
 542 |     bar,
@@ -719,7 +719,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 543 543 | 
 544 544 | result = function(
 
-./resources/test/fixtures/flake8_commas/COM81.py:547:24: COM812 [*] Trailing comma missing
+COM81.py:547:24: COM812 [*] Trailing comma missing
     |
 547 |     foo,
 548 |     bar,
@@ -739,7 +739,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 549 549 | 
 550 550 | def foo(
 
-./resources/test/fixtures/flake8_commas/COM81.py:554:15: COM812 [*] Trailing comma missing
+COM81.py:554:15: COM812 [*] Trailing comma missing
     |
 554 |     spam,
 555 |     *args,
@@ -760,7 +760,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 556 556 |     pass
 557 557 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:561:13: COM812 [*] Trailing comma missing
+COM81.py:561:13: COM812 [*] Trailing comma missing
     |
 561 | foo(
 562 |     **kwargs
@@ -779,7 +779,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 563 563 | 
 564 564 | {
 
-./resources/test/fixtures/flake8_commas/COM81.py:565:13: COM812 [*] Trailing comma missing
+COM81.py:565:13: COM812 [*] Trailing comma missing
     |
 565 | {
 566 |     **kwargs
@@ -798,7 +798,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 567 567 | 
 568 568 | (
 
-./resources/test/fixtures/flake8_commas/COM81.py:573:10: COM812 [*] Trailing comma missing
+COM81.py:573:10: COM812 [*] Trailing comma missing
     |
 573 | {
 574 |     *args
@@ -817,7 +817,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 575 575 | 
 576 576 | [
 
-./resources/test/fixtures/flake8_commas/COM81.py:577:10: COM812 [*] Trailing comma missing
+COM81.py:577:10: COM812 [*] Trailing comma missing
     |
 577 | [
 578 |     *args
@@ -836,7 +836,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 579 579 | 
 580 580 | def foo(
 
-./resources/test/fixtures/flake8_commas/COM81.py:583:10: COM812 [*] Trailing comma missing
+COM81.py:583:10: COM812 [*] Trailing comma missing
     |
 583 |     ham,
 584 |     spam,
@@ -857,7 +857,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 585 585 |     pass
 586 586 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:590:13: COM812 [*] Trailing comma missing
+COM81.py:590:13: COM812 [*] Trailing comma missing
     |
 590 |     ham,
 591 |     spam,
@@ -878,7 +878,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 592 592 |     pass
 593 593 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:598:15: COM812 [*] Trailing comma missing
+COM81.py:598:15: COM812 [*] Trailing comma missing
     |
 598 |     spam,
 599 |     *args,
@@ -899,7 +899,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 600 600 |     pass
 601 601 | 
 
-./resources/test/fixtures/flake8_commas/COM81.py:627:20: COM812 [*] Trailing comma missing
+COM81.py:627:20: COM812 [*] Trailing comma missing
     |
 627 |     foo,
 628 |     bar,
@@ -919,7 +919,7 @@ source: crates/ruff/src/rules/flake8_commas/mod.rs
 629 629 | 
 630 630 | # Make sure the COM812 and UP034 rules don't autofix simultaneously and cause a syntax error.
 
-./resources/test/fixtures/flake8_commas/COM81.py:632:42: COM812 [*] Trailing comma missing
+COM81.py:632:42: COM812 [*] Trailing comma missing
     |
 632 | # Make sure the COM812 and UP034 rules don't autofix simultaneously and cause a syntax error.
 633 | the_first_one = next(

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/too_many_branches.py:6:5: PLR0912 Too many branches (13 > 12)
+too_many_branches.py:6:5: PLR0912 Too many branches (13 > 12)
    |
  6 | """
  7 | # pylint: disable=using-constant-test

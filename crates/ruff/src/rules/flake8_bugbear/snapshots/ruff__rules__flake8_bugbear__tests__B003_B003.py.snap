@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B003.py:9:1: B003 Assigning to `os.environ` doesn't clear the environment
+B003.py:9:1: B003 Assigning to `os.environ` doesn't clear the environment
    |
  9 | from os import environ
 10 | 

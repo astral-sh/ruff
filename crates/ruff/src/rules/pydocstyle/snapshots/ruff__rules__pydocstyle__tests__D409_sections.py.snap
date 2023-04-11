@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/sections.py:108:5: D409 [*] Section underline should match the length of its name ("Returns")
+sections.py:108:5: D409 [*] Section underline should match the length of its name ("Returns")
     |
 108 |           "(Expected 7 dashes in section 'Returns', got 2)")
 109 |   def bad_underline_length():  # noqa: D416
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 113 113 | 
 114 114 |     """
 
-./resources/test/fixtures/pydocstyle/sections.py:216:5: D409 [*] Section underline should match the length of its name ("Returns")
+sections.py:216:5: D409 [*] Section underline should match the length of its name ("Returns")
     |
 216 |   @expect("D407: Missing dashed underline after section ('Raises')")
 217 |   def multiple_sections():  # noqa: D416

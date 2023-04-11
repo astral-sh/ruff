@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E26.py:10:1: E265 Block comment should start with `# `
+E26.py:10:1: E265 Block comment should start with `# `
    |
 10 | x = y + 1  #:  Increment x
 11 | #: E265:1:1
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 14 | #: E265:2:1
    |
 
-./resources/test/fixtures/pycodestyle/E26.py:14:1: E265 Block comment should start with `# `
+E26.py:14:1: E265 Block comment should start with `# `
    |
 14 | #: E265:2:1
 15 | m = 42
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 18 | #: E266:3:5 E266:6:5
    |
 
-./resources/test/fixtures/pycodestyle/E26.py:25:1: E265 Block comment should start with `# `
+E26.py:25:1: E265 Block comment should start with `# `
    |
 25 |     return
 26 | #: E265:1:1 E266:2:1
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 29 | #: W291:1:42
    |
 
-./resources/test/fixtures/pycodestyle/E26.py:32:1: E265 Block comment should start with `# `
+E26.py:32:1: E265 Block comment should start with `# `
    |
 32 | #: Okay
 33 | #!/usr/bin/env python

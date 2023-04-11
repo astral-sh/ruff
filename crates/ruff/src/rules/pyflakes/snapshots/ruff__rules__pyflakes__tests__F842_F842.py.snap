@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F842.py:2:5: F842 Local variable `name` is annotated but never used
+F842.py:2:5: F842 Local variable `name` is annotated but never used
   |
 2 | def f():
 3 |     name: str
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 4 |     age: int
   |
 
-./resources/test/fixtures/pyflakes/F842.py:3:5: F842 Local variable `age` is annotated but never used
+F842.py:3:5: F842 Local variable `age` is annotated but never used
   |
 3 | def f():
 4 |     name: str

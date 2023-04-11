@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B024.py:18:1: B024 `Base_1` is an abstract base class, but it has no abstract methods
+B024.py:18:1: B024 `Base_1` is an abstract base class, but it has no abstract methods
    |
 18 | / class Base_1(ABC):  # error
 19 | |     def method(self):
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    | |_____________^ B024
    |
 
-./resources/test/fixtures/flake8_bugbear/B024.py:71:1: B024 `MetaBase_1` is an abstract base class, but it has no abstract methods
+B024.py:71:1: B024 `MetaBase_1` is an abstract base class, but it has no abstract methods
    |
 71 | / class MetaBase_1(metaclass=ABCMeta):  # error
 72 | |     def method(self):
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    | |_____________^ B024
    |
 
-./resources/test/fixtures/flake8_bugbear/B024.py:82:1: B024 `abc_Base_1` is an abstract base class, but it has no abstract methods
+B024.py:82:1: B024 `abc_Base_1` is an abstract base class, but it has no abstract methods
    |
 82 | / class abc_Base_1(abc.ABC):  # error
 83 | |     def method(self):
@@ -25,7 +25,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    | |_____________^ B024
    |
 
-./resources/test/fixtures/flake8_bugbear/B024.py:87:1: B024 `abc_Base_2` is an abstract base class, but it has no abstract methods
+B024.py:87:1: B024 `abc_Base_2` is an abstract base class, but it has no abstract methods
    |
 87 | / class abc_Base_2(metaclass=abc.ABCMeta):  # error
 88 | |     def method(self):
@@ -33,7 +33,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    | |_____________^ B024
    |
 
-./resources/test/fixtures/flake8_bugbear/B024.py:92:1: B024 `notabc_Base_1` is an abstract base class, but it has no abstract methods
+B024.py:92:1: B024 `notabc_Base_1` is an abstract base class, but it has no abstract methods
    |
 92 | / class notabc_Base_1(notabc.ABC):  # error
 93 | |     def method(self):
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    | |_____________^ B024
    |
 
-./resources/test/fixtures/flake8_bugbear/B024.py:141:1: B024 `abc_set_class_variable_4` is an abstract base class, but it has no abstract methods
+B024.py:141:1: B024 `abc_set_class_variable_4` is an abstract base class, but it has no abstract methods
     |
 141 |   # this doesn't actually declare a class variable, it's just an expression
 142 | / class abc_set_class_variable_4(ABC):  # error

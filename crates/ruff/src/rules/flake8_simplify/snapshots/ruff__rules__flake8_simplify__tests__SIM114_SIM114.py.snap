@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM114.py:2:1: SIM114 Combine `if` branches using logical `or` operator
+SIM114.py:2:1: SIM114 Combine `if` branches using logical `or` operator
   |
 2 |   # Errors
 3 | / if a:
@@ -13,7 +13,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 8 |   if x == 1:
   |
 
-./resources/test/fixtures/flake8_simplify/SIM114.py:7:1: SIM114 Combine `if` branches using logical `or` operator
+SIM114.py:7:1: SIM114 Combine `if` branches using logical `or` operator
    |
  7 |       b
  8 |   
@@ -28,7 +28,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 16 |   if x == 1:
    |
 
-./resources/test/fixtures/flake8_simplify/SIM114.py:14:1: SIM114 Combine `if` branches using logical `or` operator
+SIM114.py:14:1: SIM114 Combine `if` branches using logical `or` operator
    |
 14 |           print("hello")
 15 |   
@@ -45,7 +45,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 25 |   if x == 1:
    |
 
-./resources/test/fixtures/flake8_simplify/SIM114.py:23:1: SIM114 Combine `if` branches using logical `or` operator
+SIM114.py:23:1: SIM114 Combine `if` branches using logical `or` operator
    |
 23 |               print("hello")
 24 |   
@@ -68,7 +68,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 40 |   if (
    |
 
-./resources/test/fixtures/flake8_simplify/SIM114.py:24:5: SIM114 Combine `if` branches using logical `or` operator
+SIM114.py:24:5: SIM114 Combine `if` branches using logical `or` operator
    |
 24 |   if x == 1:
 25 |       if True:
@@ -83,7 +83,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 32 |       if True:
    |
 
-./resources/test/fixtures/flake8_simplify/SIM114.py:31:5: SIM114 Combine `if` branches using logical `or` operator
+SIM114.py:31:5: SIM114 Combine `if` branches using logical `or` operator
    |
 31 |               print("hello")
 32 |   elif x == 2:
@@ -99,7 +99,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 40 |   if (
    |
 
-./resources/test/fixtures/flake8_simplify/SIM114.py:38:1: SIM114 Combine `if` branches using logical `or` operator
+SIM114.py:38:1: SIM114 Combine `if` branches using logical `or` operator
    |
 38 |               print("hello")
 39 |   
@@ -127,7 +127,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 60 |   if result.eofs == "O":
    |
 
-./resources/test/fixtures/flake8_simplify/SIM114.py:62:6: SIM114 Combine `if` branches using logical `or` operator
+SIM114.py:62:6: SIM114 Combine `if` branches using logical `or` operator
    |
 62 |   elif result.eofs == "S":
 63 |       skipped = 1

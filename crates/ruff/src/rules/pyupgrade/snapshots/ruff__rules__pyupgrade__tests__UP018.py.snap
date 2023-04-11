@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP018.py:20:1: UP018 [*] Unnecessary call to `str`
+UP018.py:20:1: UP018 [*] Unnecessary call to `str`
    |
 20 | # These become string or byte literals
 21 | str()
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 22 22 | str("""
 23 23 | foo""")
 
-./resources/test/fixtures/pyupgrade/UP018.py:21:1: UP018 [*] Unnecessary call to `str`
+UP018.py:21:1: UP018 [*] Unnecessary call to `str`
    |
 21 | # These become string or byte literals
 22 | str()
@@ -42,7 +42,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 23 23 | foo""")
 24 24 | bytes()
 
-./resources/test/fixtures/pyupgrade/UP018.py:22:1: UP018 [*] Unnecessary call to `str`
+UP018.py:22:1: UP018 [*] Unnecessary call to `str`
    |
 22 |   str()
 23 |   str("foo")
@@ -66,7 +66,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 25 25 | bytes(b"foo")
 26 26 | bytes(b"""
 
-./resources/test/fixtures/pyupgrade/UP018.py:24:1: UP018 [*] Unnecessary call to `bytes`
+UP018.py:24:1: UP018 [*] Unnecessary call to `bytes`
    |
 24 | str("""
 25 | foo""")
@@ -87,7 +87,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 26 26 | bytes(b"""
 27 27 | foo""")
 
-./resources/test/fixtures/pyupgrade/UP018.py:25:1: UP018 [*] Unnecessary call to `bytes`
+UP018.py:25:1: UP018 [*] Unnecessary call to `bytes`
    |
 25 | foo""")
 26 | bytes()
@@ -107,7 +107,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 26 26 | bytes(b"""
 27 27 | foo""")
 
-./resources/test/fixtures/pyupgrade/UP018.py:26:1: UP018 [*] Unnecessary call to `bytes`
+UP018.py:26:1: UP018 [*] Unnecessary call to `bytes`
    |
 26 |   bytes()
 27 |   bytes(b"foo")

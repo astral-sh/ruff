@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_2020/mod.rs
 ---
-./resources/test/fixtures/flake8_2020/YTT301.py:4:12: YTT301 `sys.version[0]` referenced (python10), use `sys.version_info`
+YTT301.py:4:12: YTT301 `sys.version[0]` referenced (python10), use `sys.version_info`
   |
 4 | from sys import version
 5 | 
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_2020/mod.rs
 7 | py_major = version[0]
   |
 
-./resources/test/fixtures/flake8_2020/YTT301.py:5:12: YTT301 `sys.version[0]` referenced (python10), use `sys.version_info`
+YTT301.py:5:12: YTT301 `sys.version[0]` referenced (python10), use `sys.version_info`
   |
 5 | py_major = sys.version[0]
 6 | py_major = version[0]

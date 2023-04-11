@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP029.py:1:1: UP029 [*] Unnecessary builtin import: `*`
+UP029.py:1:1: UP029 [*] Unnecessary builtin import: `*`
   |
 1 | from builtins import *
   | ^^^^^^^^^^^^^^^^^^^^^^ UP029
@@ -16,7 +16,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 3 2 | from builtins import str as _str
 4 3 | from six.moves import filter, zip, zip_longest
 
-./resources/test/fixtures/pyupgrade/UP029.py:2:1: UP029 [*] Unnecessary builtin imports: `ascii`, `bytes`
+UP029.py:2:1: UP029 [*] Unnecessary builtin imports: `ascii`, `bytes`
   |
 2 | from builtins import *
 3 | from builtins import ascii, bytes, compile
@@ -34,7 +34,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 4 4 | from six.moves import filter, zip, zip_longest
 5 5 | from io import open
 
-./resources/test/fixtures/pyupgrade/UP029.py:4:1: UP029 [*] Unnecessary builtin imports: `filter`, `zip`
+UP029.py:4:1: UP029 [*] Unnecessary builtin imports: `filter`, `zip`
   |
 4 | from builtins import ascii, bytes, compile
 5 | from builtins import str as _str
@@ -55,7 +55,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 6 6 | import io
 7 7 | import six
 
-./resources/test/fixtures/pyupgrade/UP029.py:5:1: UP029 [*] Unnecessary builtin import: `open`
+UP029.py:5:1: UP029 [*] Unnecessary builtin import: `open`
   |
 5 | from builtins import str as _str
 6 | from six.moves import filter, zip, zip_longest

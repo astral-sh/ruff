@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP024_2.py:10:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:10:7: UP024 [*] Replace aliased errors with `OSError`
    |
 10 | # Testing the modules
 11 | import socket, mmap, select
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 12 12 | raise select.error
 13 13 | 
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:11:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:11:7: UP024 [*] Replace aliased errors with `OSError`
    |
 11 | import socket, mmap, select
 12 | raise socket.error
@@ -42,7 +42,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 13 13 | 
 14 14 | raise socket.error()
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:12:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:12:7: UP024 [*] Replace aliased errors with `OSError`
    |
 12 | raise socket.error
 13 | raise mmap.error
@@ -63,7 +63,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 14 14 | raise socket.error()
 15 15 | raise mmap.error(1)
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:14:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:14:7: UP024 [*] Replace aliased errors with `OSError`
    |
 14 | raise select.error
 15 | 
@@ -84,7 +84,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 16 16 | raise select.error(1, 2)
 17 17 | 
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:15:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:15:7: UP024 [*] Replace aliased errors with `OSError`
    |
 15 | raise socket.error()
 16 | raise mmap.error(1)
@@ -103,7 +103,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 17 17 | 
 18 18 | raise socket.error(
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:16:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:16:7: UP024 [*] Replace aliased errors with `OSError`
    |
 16 | raise socket.error()
 17 | raise mmap.error(1)
@@ -124,7 +124,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 18 18 | raise socket.error(
 19 19 |     1,
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:18:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:18:7: UP024 [*] Replace aliased errors with `OSError`
    |
 18 | raise select.error(1, 2)
 19 | 
@@ -145,7 +145,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 20 |     2,
 21 21 |     3,
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:25:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:25:7: UP024 [*] Replace aliased errors with `OSError`
    |
 25 | from mmap import error
 26 | raise error
@@ -165,7 +165,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 27 27 | from socket import error
 28 28 | raise error(1)
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:28:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:28:7: UP024 [*] Replace aliased errors with `OSError`
    |
 28 | from socket import error
 29 | raise error(1)
@@ -185,7 +185,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 30 30 | from select import error
 31 31 | raise error(1, 2)
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:31:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:31:7: UP024 [*] Replace aliased errors with `OSError`
    |
 31 | from select import error
 32 | raise error(1, 2)
@@ -205,7 +205,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 33 33 | # Testing the names
 34 34 | raise EnvironmentError
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:34:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:34:7: UP024 [*] Replace aliased errors with `OSError`
    |
 34 | # Testing the names
 35 | raise EnvironmentError
@@ -225,7 +225,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 36 36 | raise WindowsError
 37 37 | 
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:35:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:35:7: UP024 [*] Replace aliased errors with `OSError`
    |
 35 | # Testing the names
 36 | raise EnvironmentError
@@ -245,7 +245,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 37 37 | 
 38 38 | raise EnvironmentError()
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:36:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:36:7: UP024 [*] Replace aliased errors with `OSError`
    |
 36 | raise EnvironmentError
 37 | raise IOError
@@ -266,7 +266,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 38 38 | raise EnvironmentError()
 39 39 | raise IOError(1)
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:38:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:38:7: UP024 [*] Replace aliased errors with `OSError`
    |
 38 | raise WindowsError
 39 | 
@@ -287,7 +287,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 40 40 | raise WindowsError(1, 2)
 41 41 | 
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:39:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:39:7: UP024 [*] Replace aliased errors with `OSError`
    |
 39 | raise EnvironmentError()
 40 | raise IOError(1)
@@ -306,7 +306,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 41 41 | 
 42 42 | raise EnvironmentError(
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:40:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:40:7: UP024 [*] Replace aliased errors with `OSError`
    |
 40 | raise EnvironmentError()
 41 | raise IOError(1)
@@ -327,7 +327,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 42 42 | raise EnvironmentError(
 43 43 |     1,
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:42:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:42:7: UP024 [*] Replace aliased errors with `OSError`
    |
 42 | raise WindowsError(1, 2)
 43 | 
@@ -348,7 +348,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 44 44 |     2,
 45 45 |     3,
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:48:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:48:7: UP024 [*] Replace aliased errors with `OSError`
    |
 48 | )
 49 | 
@@ -368,7 +368,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 49 49 | raise EnvironmentError(1)
 50 50 | raise IOError(1, 2)
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:49:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:49:7: UP024 [*] Replace aliased errors with `OSError`
    |
 49 | raise WindowsError
 50 | raise EnvironmentError(1)
@@ -385,7 +385,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
    49 |+raise OSError(1)
 50 50 | raise IOError(1, 2)
 
-./resources/test/fixtures/pyupgrade/UP024_2.py:50:7: UP024 [*] Replace aliased errors with `OSError`
+UP024_2.py:50:7: UP024 [*] Replace aliased errors with `OSError`
    |
 50 | raise WindowsError
 51 | raise EnvironmentError(1)

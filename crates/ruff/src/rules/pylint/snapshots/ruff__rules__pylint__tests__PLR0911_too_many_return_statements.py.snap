@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/too_many_return_statements.py:4:5: PLR0911 Too many return statements (11 > 6)
+too_many_return_statements.py:4:5: PLR0911 Too many return statements (11 > 6)
   |
 4 | https://github.com/PyCQA/pylint/blob/69eca9b3f9856c3033957b769358803ee48e8e47/tests/functional/t/too/too_many_return_statements.py
 5 | """

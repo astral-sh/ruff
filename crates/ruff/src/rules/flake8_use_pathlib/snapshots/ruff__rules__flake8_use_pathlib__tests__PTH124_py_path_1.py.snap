@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_use_pathlib/mod.rs
 ---
-./resources/test/fixtures/flake8_use_pathlib/py_path_1.py:3:5: PTH124 `py.path` is in maintenance mode, use `pathlib` instead
+py_path_1.py:3:5: PTH124 `py.path` is in maintenance mode, use `pathlib` instead
   |
 3 | import py
 4 | 

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP030_2.py:6:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:6:1: UP030 [*] Use implicit references for positional format fields
    |
  6 | kwargs = {x: x for x in range(10)}
  7 | 
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 8 | "{0}".format(**kwargs)
 9 9 | 
 
-./resources/test/fixtures/pyupgrade/UP030_2.py:8:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:8:1: UP030 [*] Use implicit references for positional format fields
    |
  8 | "{0}".format(*args)
  9 | 
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 10 10 | "{0}_{1}".format(*args)
 11 11 | 
 
-./resources/test/fixtures/pyupgrade/UP030_2.py:10:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:10:1: UP030 [*] Use implicit references for positional format fields
    |
 10 | "{0}".format(**kwargs)
 11 | 
@@ -64,7 +64,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 12 12 | "{0}_{1}".format(1, *args)
 13 13 | 
 
-./resources/test/fixtures/pyupgrade/UP030_2.py:12:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:12:1: UP030 [*] Use implicit references for positional format fields
    |
 12 | "{0}_{1}".format(*args)
 13 | 
@@ -85,7 +85,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 14 14 | "{1}_{0}".format(*args)
 15 15 | 
 
-./resources/test/fixtures/pyupgrade/UP030_2.py:14:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:14:1: UP030 [*] Use implicit references for positional format fields
    |
 14 | "{0}_{1}".format(1, *args)
 15 | 
@@ -96,7 +96,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
    |
    = help: Remove explicit positional indices
 
-./resources/test/fixtures/pyupgrade/UP030_2.py:16:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:16:1: UP030 [*] Use implicit references for positional format fields
    |
 16 | "{1}_{0}".format(*args)
 17 | 
@@ -117,7 +117,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 18 18 | "{0}_{1}".format(1, 2, *args)
 19 19 | 
 
-./resources/test/fixtures/pyupgrade/UP030_2.py:18:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:18:1: UP030 [*] Use implicit references for positional format fields
    |
 18 | "{1}_{0}".format(1, *args)
 19 | 
@@ -138,7 +138,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 20 | "{0}_{1}".format(*args, 1, 2)
 21 21 | 
 
-./resources/test/fixtures/pyupgrade/UP030_2.py:20:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:20:1: UP030 [*] Use implicit references for positional format fields
    |
 20 | "{0}_{1}".format(1, 2, *args)
 21 | 
@@ -159,7 +159,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 22 22 | "{0}_{1}_{2}".format(1, **kwargs)
 23 23 | 
 
-./resources/test/fixtures/pyupgrade/UP030_2.py:22:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:22:1: UP030 [*] Use implicit references for positional format fields
    |
 22 | "{0}_{1}".format(*args, 1, 2)
 23 | 
@@ -180,7 +180,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 24 24 | "{0}_{1}_{2}".format(1, 2, **kwargs)
 25 25 | 
 
-./resources/test/fixtures/pyupgrade/UP030_2.py:24:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:24:1: UP030 [*] Use implicit references for positional format fields
    |
 24 | "{0}_{1}_{2}".format(1, **kwargs)
 25 | 
@@ -201,7 +201,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 26 26 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
 27 27 | 
 
-./resources/test/fixtures/pyupgrade/UP030_2.py:26:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:26:1: UP030 [*] Use implicit references for positional format fields
    |
 26 | "{0}_{1}_{2}".format(1, 2, **kwargs)
 27 | 
@@ -221,7 +221,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 27 27 | 
 28 28 | "{0}_{1}_{2}".format(1, 2, 3, *args, **kwargs)
 
-./resources/test/fixtures/pyupgrade/UP030_2.py:28:1: UP030 [*] Use implicit references for positional format fields
+UP030_2.py:28:1: UP030 [*] Use implicit references for positional format fields
    |
 28 | "{0}_{1}_{2}".format(1, 2, 3, **kwargs)
 29 | 

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 ---
-./resources/test/fixtures/flake8_import_conventions/remove_default.py:3:1: ICN001 `altair` should be imported as `alt`
+remove_default.py:3:1: ICN001 `altair` should be imported as `alt`
   |
 3 | import math  # not checked
 4 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 7 | import numpy  # not checked
   |
 
-./resources/test/fixtures/flake8_import_conventions/remove_default.py:4:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
+remove_default.py:4:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
   |
 4 | import altair  # unconventional
 5 | import matplotlib.pyplot  # unconventional
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 7 | import pandas  # unconventional
   |
 
-./resources/test/fixtures/flake8_import_conventions/remove_default.py:6:1: ICN001 `pandas` should be imported as `pd`
+remove_default.py:6:1: ICN001 `pandas` should be imported as `pd`
   |
 6 | import matplotlib.pyplot  # unconventional
 7 | import numpy  # not checked
@@ -29,7 +29,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 9 | import seaborn  # unconventional
   |
 
-./resources/test/fixtures/flake8_import_conventions/remove_default.py:7:1: ICN001 `seaborn` should be imported as `sns`
+remove_default.py:7:1: ICN001 `seaborn` should be imported as `sns`
    |
  7 | import numpy  # not checked
  8 | import pandas  # unconventional
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 11 | import altair as altr  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/remove_default.py:9:1: ICN001 `altair` should be imported as `alt`
+remove_default.py:9:1: ICN001 `altair` should be imported as `alt`
    |
  9 | import seaborn  # unconventional
 10 | 
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 13 | import numpy as nmp  # not checked
    |
 
-./resources/test/fixtures/flake8_import_conventions/remove_default.py:10:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
+remove_default.py:10:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
    |
 10 | import altair as altr  # unconventional
 11 | import matplotlib.pyplot as plot  # unconventional
@@ -58,7 +58,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 13 | import pandas as pdas  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/remove_default.py:12:1: ICN001 `pandas` should be imported as `pd`
+remove_default.py:12:1: ICN001 `pandas` should be imported as `pd`
    |
 12 | import matplotlib.pyplot as plot  # unconventional
 13 | import numpy as nmp  # not checked
@@ -67,7 +67,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 15 | import seaborn as sbrn  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/remove_default.py:13:1: ICN001 `seaborn` should be imported as `sns`
+remove_default.py:13:1: ICN001 `seaborn` should be imported as `sns`
    |
 13 | import numpy as nmp  # not checked
 14 | import pandas as pdas  # unconventional

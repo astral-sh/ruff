@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E27.py:20:2: E272 Multiple spaces before keyword
+E27.py:20:2: E272 Multiple spaces before keyword
    |
 20 | a and  2
 21 | #: E271 E272
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 24 | a  and  2
    |
 
-./resources/test/fixtures/pycodestyle/E27.py:22:2: E272 Multiple spaces before keyword
+E27.py:22:2: E272 Multiple spaces before keyword
    |
 22 | 1  and  b
 23 | #: E271 E272
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 26 | this  and False
    |
 
-./resources/test/fixtures/pycodestyle/E27.py:24:5: E272 Multiple spaces before keyword
+E27.py:24:5: E272 Multiple spaces before keyword
    |
 24 | a  and  2
 25 | #: E272

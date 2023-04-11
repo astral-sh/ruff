@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/bad_str_strip_call.py:2:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:2:21: PLE1310 String `strip` call contains duplicate characters
   |
 2 | # PLE1310
 3 | "Hello World".strip("Hello")
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 5 | # PLE1310
   |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:5:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:5:21: PLE1310 String `strip` call contains duplicate characters
   |
 5 | # PLE1310
 6 | "Hello World".strip("Hello")
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 8 | # PLE1310
   |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:8:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:8:21: PLE1310 String `strip` call contains duplicate characters
    |
  8 | # PLE1310
  9 | "Hello World".strip(u"Hello")
@@ -28,7 +28,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 11 | # PLE1310
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:11:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:11:21: PLE1310 String `strip` call contains duplicate characters
    |
 11 | # PLE1310
 12 | "Hello World".strip(r"Hello")
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 14 | # PLE1310
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:14:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:14:21: PLE1310 String `strip` call contains duplicate characters
    |
 14 | # PLE1310
 15 | "Hello World".strip("Hello\t")
@@ -46,7 +46,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 17 | # PLE1310
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:17:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:17:21: PLE1310 String `strip` call contains duplicate characters
    |
 17 | # PLE1310
 18 | "Hello World".strip(r"Hello\t")
@@ -55,7 +55,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 20 | # PLE1310
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:20:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:20:21: PLE1310 String `strip` call contains duplicate characters
    |
 20 | # PLE1310
 21 | "Hello World".strip("Hello\\")
@@ -64,7 +64,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 23 | # PLE1310
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:23:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:23:21: PLE1310 String `strip` call contains duplicate characters
    |
 23 | # PLE1310
 24 | "Hello World".strip(r"Hello\\")
@@ -73,7 +73,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 26 | # PLE1310
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:26:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:26:21: PLE1310 String `strip` call contains duplicate characters
    |
 26 | # PLE1310
 27 | "Hello World".strip("🤣🤣🤣🤣🙃👀😀")
@@ -82,7 +82,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 29 | # PLE1310
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:30:5: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:30:5: PLE1310 String `strip` call contains duplicate characters
    |
 30 |   # PLE1310
 31 |   "Hello World".strip(
@@ -94,7 +94,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 35 |   )
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:36:21: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:36:21: PLE1310 String `strip` call contains duplicate characters
    |
 36 |   # PLE1310
 37 |   "Hello World".strip("can we get a long " \
@@ -106,7 +106,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 41 |   # PLE1310
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:42:5: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:42:5: PLE1310 String `strip` call contains duplicate characters
    |
 42 |   # PLE1310
 43 |   "Hello World".strip(
@@ -118,7 +118,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 47 |   )
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:49:5: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:49:5: PLE1310 String `strip` call contains duplicate characters
    |
 49 |   # PLE1310
 50 |   "Hello World".strip(
@@ -130,7 +130,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 54 |   )
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:61:11: PLE1310 String `strip` call contains duplicate characters
+bad_str_strip_call.py:61:11: PLE1310 String `strip` call contains duplicate characters
    |
 61 | # PLE1310
 62 | u''.strip('http://')
@@ -139,7 +139,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 64 | # PLE1310
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:64:12: PLE1310 String `lstrip` call contains duplicate characters (did you mean `removeprefix`?)
+bad_str_strip_call.py:64:12: PLE1310 String `lstrip` call contains duplicate characters (did you mean `removeprefix`?)
    |
 64 | # PLE1310
 65 | u''.lstrip('http://')
@@ -148,7 +148,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 67 | # PLE1310
    |
 
-./resources/test/fixtures/pylint/bad_str_strip_call.py:67:12: PLE1310 String `rstrip` call contains duplicate characters (did you mean `removesuffix`?)
+bad_str_strip_call.py:67:12: PLE1310 String `rstrip` call contains duplicate characters (did you mean `removesuffix`?)
    |
 67 | # PLE1310
 68 | b''.rstrip('http://')

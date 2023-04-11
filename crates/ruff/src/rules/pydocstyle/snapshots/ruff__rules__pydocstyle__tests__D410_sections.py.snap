@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/sections.py:76:5: D410 [*] Missing blank line after section ("Returns")
+sections.py:76:5: D410 [*] Missing blank line after section ("Returns")
    |
 76 |   @expect("D414: Section has no content ('Yields')")
 77 |   def consecutive_sections():  # noqa: D416
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 81 82 |     ------
 82 83 | 
 
-./resources/test/fixtures/pydocstyle/sections.py:216:5: D410 [*] Missing blank line after section ("Returns")
+sections.py:216:5: D410 [*] Missing blank line after section ("Returns")
     |
 216 |   @expect("D407: Missing dashed underline after section ('Raises')")
 217 |   def multiple_sections():  # noqa: D416

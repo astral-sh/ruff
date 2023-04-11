@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:5:5: ISC002 Implicitly concatenated string literals over multiple lines
+ISC.py:5:5: ISC002 Implicitly concatenated string literals over multiple lines
    |
  5 |   _ = "abc" + "def"
  6 |   
@@ -13,7 +13,7 @@ source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 10 |   _ = (
    |
 
-./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:24:3: ISC002 Implicitly concatenated string literals over multiple lines
+ISC.py:24:3: ISC002 Implicitly concatenated string literals over multiple lines
    |
 24 |   _ = (
 25 |     "abc"
@@ -23,7 +23,7 @@ source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 27 |   )
    |
 
-./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:29:3: ISC002 Implicitly concatenated string literals over multiple lines
+ISC.py:29:3: ISC002 Implicitly concatenated string literals over multiple lines
    |
 29 |   _ = (
 30 |     f"abc"
@@ -33,7 +33,7 @@ source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 32 |   )
    |
 
-./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:34:3: ISC002 Implicitly concatenated string literals over multiple lines
+ISC.py:34:3: ISC002 Implicitly concatenated string literals over multiple lines
    |
 34 |   _ = (
 35 |     b"abc"

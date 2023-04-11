@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT001.py:14:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:14:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 14 | @pytest.fixture()
    |  ^^^^^^^^^^^^^^^^ PT001
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 16 16 |     return 42
 17 17 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT001.py:24:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:24:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 24 |   @pytest.fixture(
    |  __^
@@ -44,7 +44,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 28 26 |     return 42
 29 27 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT001.py:39:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:39:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 39 | @fixture()
    |  ^^^^^^^^^ PT001
@@ -63,7 +63,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 41 41 |     return 42
 42 42 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT001.py:49:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:49:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 49 |   @fixture(
    |  __^
@@ -87,7 +87,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 53 51 |     return 42
 54 52 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT001.py:64:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:64:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 64 | @aliased()
    |  ^^^^^^^^^ PT001
@@ -106,7 +106,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 66 66 |     return 42
 67 67 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT001.py:74:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
+PT001.py:74:2: PT001 [*] Use `@pytest.fixture` over `@pytest.fixture()`
    |
 74 |   @aliased(
    |  __^

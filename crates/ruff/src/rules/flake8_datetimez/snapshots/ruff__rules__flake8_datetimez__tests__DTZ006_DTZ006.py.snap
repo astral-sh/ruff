@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 ---
-./resources/test/fixtures/flake8_datetimez/DTZ006.py:4:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+DTZ006.py:4:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
   |
 4 | # no args
 5 | datetime.datetime.fromtimestamp(1234)
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 7 | # wrong keywords
   |
 
-./resources/test/fixtures/flake8_datetimez/DTZ006.py:7:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+DTZ006.py:7:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
    |
  7 | # wrong keywords
  8 | datetime.datetime.fromtimestamp(1234, bad=datetime.timezone.utc)
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 10 | # none args
    |
 
-./resources/test/fixtures/flake8_datetimez/DTZ006.py:10:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+DTZ006.py:10:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
    |
 10 | # none args
 11 | datetime.datetime.fromtimestamp(1234, None)
@@ -28,7 +28,7 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 13 | # none keywords
    |
 
-./resources/test/fixtures/flake8_datetimez/DTZ006.py:13:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+DTZ006.py:13:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
    |
 13 | # none keywords
 14 | datetime.datetime.fromtimestamp(1234, tz=None)
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_datetimez/mod.rs
 16 | from datetime import datetime
    |
 
-./resources/test/fixtures/flake8_datetimez/DTZ006.py:18:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+DTZ006.py:18:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
    |
 18 | # no args unqualified
 19 | datetime.fromtimestamp(1234)

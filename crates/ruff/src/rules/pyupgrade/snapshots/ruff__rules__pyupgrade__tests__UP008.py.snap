@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP008.py:17:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:17:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
 17 |     def wrong(self):
 18 |         parent = super(Child, self)  # wrong
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 19 19 |         super(
 20 20 |             Child,
 
-./resources/test/fixtures/pyupgrade/UP008.py:18:9: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:18:9: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
 18 |     def wrong(self):
 19 |         parent = super(Child, self)  # wrong
@@ -42,7 +42,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 20 |             Child,
 21 21 |             self,
 
-./resources/test/fixtures/pyupgrade/UP008.py:19:9: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:19:9: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
 19 |           parent = super(Child, self)  # wrong
 20 |           super(Child, self).method  # wrong
@@ -68,7 +68,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 24 21 | 
 25 22 | class BaseClass:
 
-./resources/test/fixtures/pyupgrade/UP008.py:36:9: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:36:9: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
 36 | class MyClass(BaseClass):
 37 |     def normal(self):
@@ -88,7 +88,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 38 38 | 
 39 39 |     def different_argument(self, other):
 
-./resources/test/fixtures/pyupgrade/UP008.py:50:13: UP008 [*] Use `super()` instead of `super(__class__, self)`
+UP008.py:50:13: UP008 [*] Use `super()` instead of `super(__class__, self)`
    |
 50 |         def inner_argument(self):
 51 |             super(MyClass, self).f()  # can use super()

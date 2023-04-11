@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/numpy/mod.rs
 ---
-./resources/test/fixtures/numpy/NPY002.py:10:8: NPY002 Replace legacy `np.random.standard_normal` call with `np.random.Generator`
+NPY002.py:10:8: NPY002 Replace legacy `np.random.standard_normal` call with `np.random.Generator`
    |
 10 | # instead of this (legacy version)
 11 | from numpy import random
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 14 | numbers = random.integers(high, size=5)
    |
 
-./resources/test/fixtures/numpy/NPY002.py:11:13: NPY002 Replace legacy `np.random.standard_normal` call with `np.random.Generator`
+NPY002.py:11:13: NPY002 Replace legacy `np.random.standard_normal` call with `np.random.Generator`
    |
 11 | from numpy import random
 12 | vals = random.standard_normal(10)
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 14 | numbers = random.integers(high, size=5)
    |
 
-./resources/test/fixtures/numpy/NPY002.py:15:1: NPY002 Replace legacy `np.random.seed` call with `np.random.Generator`
+NPY002.py:15:1: NPY002 Replace legacy `np.random.seed` call with `np.random.Generator`
    |
 15 | import numpy
 16 | numpy.random.seed()
@@ -29,7 +29,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 18 | numpy.random.set_state()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:16:1: NPY002 Replace legacy `np.random.get_state` call with `np.random.Generator`
+NPY002.py:16:1: NPY002 Replace legacy `np.random.get_state` call with `np.random.Generator`
    |
 16 | import numpy
 17 | numpy.random.seed()
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 20 | numpy.random.rand()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:17:1: NPY002 Replace legacy `np.random.set_state` call with `np.random.Generator`
+NPY002.py:17:1: NPY002 Replace legacy `np.random.set_state` call with `np.random.Generator`
    |
 17 | numpy.random.seed()
 18 | numpy.random.get_state()
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 21 | numpy.random.randn()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:18:1: NPY002 Replace legacy `np.random.rand` call with `np.random.Generator`
+NPY002.py:18:1: NPY002 Replace legacy `np.random.rand` call with `np.random.Generator`
    |
 18 | numpy.random.get_state()
 19 | numpy.random.set_state()
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 22 | numpy.random.randint()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:19:1: NPY002 Replace legacy `np.random.randn` call with `np.random.Generator`
+NPY002.py:19:1: NPY002 Replace legacy `np.random.randn` call with `np.random.Generator`
    |
 19 | numpy.random.set_state()
 20 | numpy.random.rand()
@@ -69,7 +69,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 23 | numpy.random.random_integers()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:20:1: NPY002 Replace legacy `np.random.randint` call with `np.random.Generator`
+NPY002.py:20:1: NPY002 Replace legacy `np.random.randint` call with `np.random.Generator`
    |
 20 | numpy.random.rand()
 21 | numpy.random.randn()
@@ -79,7 +79,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 24 | numpy.random.random_sample()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:21:1: NPY002 Replace legacy `np.random.random_integers` call with `np.random.Generator`
+NPY002.py:21:1: NPY002 Replace legacy `np.random.random_integers` call with `np.random.Generator`
    |
 21 | numpy.random.randn()
 22 | numpy.random.randint()
@@ -89,7 +89,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 25 | numpy.random.choice()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:22:1: NPY002 Replace legacy `np.random.random_sample` call with `np.random.Generator`
+NPY002.py:22:1: NPY002 Replace legacy `np.random.random_sample` call with `np.random.Generator`
    |
 22 | numpy.random.randint()
 23 | numpy.random.random_integers()
@@ -99,7 +99,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 26 | numpy.random.bytes()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:23:1: NPY002 Replace legacy `np.random.choice` call with `np.random.Generator`
+NPY002.py:23:1: NPY002 Replace legacy `np.random.choice` call with `np.random.Generator`
    |
 23 | numpy.random.random_integers()
 24 | numpy.random.random_sample()
@@ -109,7 +109,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 27 | numpy.random.shuffle()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:24:1: NPY002 Replace legacy `np.random.bytes` call with `np.random.Generator`
+NPY002.py:24:1: NPY002 Replace legacy `np.random.bytes` call with `np.random.Generator`
    |
 24 | numpy.random.random_sample()
 25 | numpy.random.choice()
@@ -119,7 +119,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 28 | numpy.random.permutation()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:25:1: NPY002 Replace legacy `np.random.shuffle` call with `np.random.Generator`
+NPY002.py:25:1: NPY002 Replace legacy `np.random.shuffle` call with `np.random.Generator`
    |
 25 | numpy.random.choice()
 26 | numpy.random.bytes()
@@ -129,7 +129,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 29 | numpy.random.beta()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:26:1: NPY002 Replace legacy `np.random.permutation` call with `np.random.Generator`
+NPY002.py:26:1: NPY002 Replace legacy `np.random.permutation` call with `np.random.Generator`
    |
 26 | numpy.random.bytes()
 27 | numpy.random.shuffle()
@@ -139,7 +139,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 30 | numpy.random.binomial()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:27:1: NPY002 Replace legacy `np.random.beta` call with `np.random.Generator`
+NPY002.py:27:1: NPY002 Replace legacy `np.random.beta` call with `np.random.Generator`
    |
 27 | numpy.random.shuffle()
 28 | numpy.random.permutation()
@@ -149,7 +149,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 31 | numpy.random.chisquare()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:28:1: NPY002 Replace legacy `np.random.binomial` call with `np.random.Generator`
+NPY002.py:28:1: NPY002 Replace legacy `np.random.binomial` call with `np.random.Generator`
    |
 28 | numpy.random.permutation()
 29 | numpy.random.beta()
@@ -159,7 +159,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 32 | numpy.random.dirichlet()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:29:1: NPY002 Replace legacy `np.random.chisquare` call with `np.random.Generator`
+NPY002.py:29:1: NPY002 Replace legacy `np.random.chisquare` call with `np.random.Generator`
    |
 29 | numpy.random.beta()
 30 | numpy.random.binomial()
@@ -169,7 +169,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 33 | numpy.random.exponential()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:30:1: NPY002 Replace legacy `np.random.dirichlet` call with `np.random.Generator`
+NPY002.py:30:1: NPY002 Replace legacy `np.random.dirichlet` call with `np.random.Generator`
    |
 30 | numpy.random.binomial()
 31 | numpy.random.chisquare()
@@ -179,7 +179,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 34 | numpy.random.f()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:31:1: NPY002 Replace legacy `np.random.exponential` call with `np.random.Generator`
+NPY002.py:31:1: NPY002 Replace legacy `np.random.exponential` call with `np.random.Generator`
    |
 31 | numpy.random.chisquare()
 32 | numpy.random.dirichlet()
@@ -189,7 +189,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 35 | numpy.random.gamma()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:32:1: NPY002 Replace legacy `np.random.f` call with `np.random.Generator`
+NPY002.py:32:1: NPY002 Replace legacy `np.random.f` call with `np.random.Generator`
    |
 32 | numpy.random.dirichlet()
 33 | numpy.random.exponential()
@@ -199,7 +199,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 36 | numpy.random.geometric()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:33:1: NPY002 Replace legacy `np.random.gamma` call with `np.random.Generator`
+NPY002.py:33:1: NPY002 Replace legacy `np.random.gamma` call with `np.random.Generator`
    |
 33 | numpy.random.exponential()
 34 | numpy.random.f()
@@ -209,7 +209,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 37 | numpy.random.get_state()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:34:1: NPY002 Replace legacy `np.random.geometric` call with `np.random.Generator`
+NPY002.py:34:1: NPY002 Replace legacy `np.random.geometric` call with `np.random.Generator`
    |
 34 | numpy.random.f()
 35 | numpy.random.gamma()
@@ -219,7 +219,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 38 | numpy.random.gumbel()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:35:1: NPY002 Replace legacy `np.random.get_state` call with `np.random.Generator`
+NPY002.py:35:1: NPY002 Replace legacy `np.random.get_state` call with `np.random.Generator`
    |
 35 | numpy.random.gamma()
 36 | numpy.random.geometric()
@@ -229,7 +229,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 39 | numpy.random.hypergeometric()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:36:1: NPY002 Replace legacy `np.random.gumbel` call with `np.random.Generator`
+NPY002.py:36:1: NPY002 Replace legacy `np.random.gumbel` call with `np.random.Generator`
    |
 36 | numpy.random.geometric()
 37 | numpy.random.get_state()
@@ -239,7 +239,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 40 | numpy.random.laplace()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:37:1: NPY002 Replace legacy `np.random.hypergeometric` call with `np.random.Generator`
+NPY002.py:37:1: NPY002 Replace legacy `np.random.hypergeometric` call with `np.random.Generator`
    |
 37 | numpy.random.get_state()
 38 | numpy.random.gumbel()
@@ -249,7 +249,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 41 | numpy.random.logistic()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:38:1: NPY002 Replace legacy `np.random.laplace` call with `np.random.Generator`
+NPY002.py:38:1: NPY002 Replace legacy `np.random.laplace` call with `np.random.Generator`
    |
 38 | numpy.random.gumbel()
 39 | numpy.random.hypergeometric()
@@ -259,7 +259,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 42 | numpy.random.lognormal()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:39:1: NPY002 Replace legacy `np.random.logistic` call with `np.random.Generator`
+NPY002.py:39:1: NPY002 Replace legacy `np.random.logistic` call with `np.random.Generator`
    |
 39 | numpy.random.hypergeometric()
 40 | numpy.random.laplace()
@@ -269,7 +269,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 43 | numpy.random.logseries()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:40:1: NPY002 Replace legacy `np.random.lognormal` call with `np.random.Generator`
+NPY002.py:40:1: NPY002 Replace legacy `np.random.lognormal` call with `np.random.Generator`
    |
 40 | numpy.random.laplace()
 41 | numpy.random.logistic()
@@ -279,7 +279,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 44 | numpy.random.multinomial()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:41:1: NPY002 Replace legacy `np.random.logseries` call with `np.random.Generator`
+NPY002.py:41:1: NPY002 Replace legacy `np.random.logseries` call with `np.random.Generator`
    |
 41 | numpy.random.logistic()
 42 | numpy.random.lognormal()
@@ -289,7 +289,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 45 | numpy.random.multivariate_normal()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:42:1: NPY002 Replace legacy `np.random.multinomial` call with `np.random.Generator`
+NPY002.py:42:1: NPY002 Replace legacy `np.random.multinomial` call with `np.random.Generator`
    |
 42 | numpy.random.lognormal()
 43 | numpy.random.logseries()
@@ -299,7 +299,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 46 | numpy.random.negative_binomial()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:43:1: NPY002 Replace legacy `np.random.multivariate_normal` call with `np.random.Generator`
+NPY002.py:43:1: NPY002 Replace legacy `np.random.multivariate_normal` call with `np.random.Generator`
    |
 43 | numpy.random.logseries()
 44 | numpy.random.multinomial()
@@ -309,7 +309,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 47 | numpy.random.noncentral_chisquare()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:44:1: NPY002 Replace legacy `np.random.negative_binomial` call with `np.random.Generator`
+NPY002.py:44:1: NPY002 Replace legacy `np.random.negative_binomial` call with `np.random.Generator`
    |
 44 | numpy.random.multinomial()
 45 | numpy.random.multivariate_normal()
@@ -319,7 +319,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 48 | numpy.random.noncentral_f()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:45:1: NPY002 Replace legacy `np.random.noncentral_chisquare` call with `np.random.Generator`
+NPY002.py:45:1: NPY002 Replace legacy `np.random.noncentral_chisquare` call with `np.random.Generator`
    |
 45 | numpy.random.multivariate_normal()
 46 | numpy.random.negative_binomial()
@@ -329,7 +329,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 49 | numpy.random.normal()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:46:1: NPY002 Replace legacy `np.random.noncentral_f` call with `np.random.Generator`
+NPY002.py:46:1: NPY002 Replace legacy `np.random.noncentral_f` call with `np.random.Generator`
    |
 46 | numpy.random.negative_binomial()
 47 | numpy.random.noncentral_chisquare()
@@ -339,7 +339,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 50 | numpy.random.pareto()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:47:1: NPY002 Replace legacy `np.random.normal` call with `np.random.Generator`
+NPY002.py:47:1: NPY002 Replace legacy `np.random.normal` call with `np.random.Generator`
    |
 47 | numpy.random.noncentral_chisquare()
 48 | numpy.random.noncentral_f()
@@ -349,7 +349,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 51 | numpy.random.poisson()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:48:1: NPY002 Replace legacy `np.random.pareto` call with `np.random.Generator`
+NPY002.py:48:1: NPY002 Replace legacy `np.random.pareto` call with `np.random.Generator`
    |
 48 | numpy.random.noncentral_f()
 49 | numpy.random.normal()
@@ -359,7 +359,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 52 | numpy.random.power()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:49:1: NPY002 Replace legacy `np.random.poisson` call with `np.random.Generator`
+NPY002.py:49:1: NPY002 Replace legacy `np.random.poisson` call with `np.random.Generator`
    |
 49 | numpy.random.normal()
 50 | numpy.random.pareto()
@@ -369,7 +369,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 53 | numpy.random.rayleigh()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:50:1: NPY002 Replace legacy `np.random.power` call with `np.random.Generator`
+NPY002.py:50:1: NPY002 Replace legacy `np.random.power` call with `np.random.Generator`
    |
 50 | numpy.random.pareto()
 51 | numpy.random.poisson()
@@ -379,7 +379,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 54 | numpy.random.standard_cauchy()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:51:1: NPY002 Replace legacy `np.random.rayleigh` call with `np.random.Generator`
+NPY002.py:51:1: NPY002 Replace legacy `np.random.rayleigh` call with `np.random.Generator`
    |
 51 | numpy.random.poisson()
 52 | numpy.random.power()
@@ -389,7 +389,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 55 | numpy.random.standard_exponential()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:52:1: NPY002 Replace legacy `np.random.standard_cauchy` call with `np.random.Generator`
+NPY002.py:52:1: NPY002 Replace legacy `np.random.standard_cauchy` call with `np.random.Generator`
    |
 52 | numpy.random.power()
 53 | numpy.random.rayleigh()
@@ -399,7 +399,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 56 | numpy.random.standard_gamma()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:53:1: NPY002 Replace legacy `np.random.standard_exponential` call with `np.random.Generator`
+NPY002.py:53:1: NPY002 Replace legacy `np.random.standard_exponential` call with `np.random.Generator`
    |
 53 | numpy.random.rayleigh()
 54 | numpy.random.standard_cauchy()
@@ -409,7 +409,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 57 | numpy.random.standard_normal()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:54:1: NPY002 Replace legacy `np.random.standard_gamma` call with `np.random.Generator`
+NPY002.py:54:1: NPY002 Replace legacy `np.random.standard_gamma` call with `np.random.Generator`
    |
 54 | numpy.random.standard_cauchy()
 55 | numpy.random.standard_exponential()
@@ -419,7 +419,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 58 | numpy.random.standard_t()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:55:1: NPY002 Replace legacy `np.random.standard_normal` call with `np.random.Generator`
+NPY002.py:55:1: NPY002 Replace legacy `np.random.standard_normal` call with `np.random.Generator`
    |
 55 | numpy.random.standard_exponential()
 56 | numpy.random.standard_gamma()
@@ -429,7 +429,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 59 | numpy.random.triangular()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:56:1: NPY002 Replace legacy `np.random.standard_t` call with `np.random.Generator`
+NPY002.py:56:1: NPY002 Replace legacy `np.random.standard_t` call with `np.random.Generator`
    |
 56 | numpy.random.standard_gamma()
 57 | numpy.random.standard_normal()
@@ -439,7 +439,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 60 | numpy.random.uniform()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:57:1: NPY002 Replace legacy `np.random.triangular` call with `np.random.Generator`
+NPY002.py:57:1: NPY002 Replace legacy `np.random.triangular` call with `np.random.Generator`
    |
 57 | numpy.random.standard_normal()
 58 | numpy.random.standard_t()
@@ -449,7 +449,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 61 | numpy.random.vonmises()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:58:1: NPY002 Replace legacy `np.random.uniform` call with `np.random.Generator`
+NPY002.py:58:1: NPY002 Replace legacy `np.random.uniform` call with `np.random.Generator`
    |
 58 | numpy.random.standard_t()
 59 | numpy.random.triangular()
@@ -459,7 +459,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 62 | numpy.random.wald()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:59:1: NPY002 Replace legacy `np.random.vonmises` call with `np.random.Generator`
+NPY002.py:59:1: NPY002 Replace legacy `np.random.vonmises` call with `np.random.Generator`
    |
 59 | numpy.random.triangular()
 60 | numpy.random.uniform()
@@ -469,7 +469,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 63 | numpy.random.weibull()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:60:1: NPY002 Replace legacy `np.random.wald` call with `np.random.Generator`
+NPY002.py:60:1: NPY002 Replace legacy `np.random.wald` call with `np.random.Generator`
    |
 60 | numpy.random.uniform()
 61 | numpy.random.vonmises()
@@ -479,7 +479,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 64 | numpy.random.zipf()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:61:1: NPY002 Replace legacy `np.random.weibull` call with `np.random.Generator`
+NPY002.py:61:1: NPY002 Replace legacy `np.random.weibull` call with `np.random.Generator`
    |
 61 | numpy.random.vonmises()
 62 | numpy.random.wald()
@@ -488,7 +488,7 @@ source: crates/ruff/src/rules/numpy/mod.rs
 64 | numpy.random.zipf()
    |
 
-./resources/test/fixtures/numpy/NPY002.py:62:1: NPY002 Replace legacy `np.random.zipf` call with `np.random.Generator`
+NPY002.py:62:1: NPY002 Replace legacy `np.random.zipf` call with `np.random.Generator`
    |
 62 | numpy.random.wald()
 63 | numpy.random.weibull()

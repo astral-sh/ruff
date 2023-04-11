@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/W505.py:2:51: W505 Doc line too long (57 > 50 characters)
+W505.py:2:51: W505 Doc line too long (57 > 50 characters)
   |
 2 | #!/usr/bin/env python3
 3 | """Here's a top-level docstring that's over the limit."""
   |                                                   ^^^^^^^ W505
   |
 
-./resources/test/fixtures/pycodestyle/W505.py:6:51: W505 Doc line too long (56 > 50 characters)
+W505.py:6:51: W505 Doc line too long (56 > 50 characters)
   |
 6 | def f():
 7 |     """Here's a docstring that's also over the limit."""
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 9 |     x = 1  # Here's a comment that's over the limit, but it's not standalone.
   |
 
-./resources/test/fixtures/pycodestyle/W505.py:10:51: W505 Doc line too long (56 > 50 characters)
+W505.py:10:51: W505 Doc line too long (56 > 50 characters)
    |
 10 |     x = 1  # Here's a comment that's over the limit, but it's not standalone.
 11 | 
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 14 |     print("Here's a string that's over the limit, but it's not a docstring.")
    |
 
-./resources/test/fixtures/pycodestyle/W505.py:15:51: W505 Doc line too long (61 > 50 characters)
+W505.py:15:51: W505 Doc line too long (61 > 50 characters)
    |
 15 | "This is also considered a docstring, and is over the limit."
    |                                                   ^^^^^^^^^^^ W505

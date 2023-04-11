@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 ---
-./resources/test/fixtures/flake8_type_checking/runtime_evaluated_base_classes_1.py:10:12: TCH004 Move import `datetime` out of type-checking block. Import is used for more than type hinting.
+runtime_evaluated_base_classes_1.py:10:12: TCH004 Move import `datetime` out of type-checking block. Import is used for more than type hinting.
    |
 10 | if TYPE_CHECKING:
 11 |     import datetime  # TCH004
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 12 |     from array import array  # TCH004
    |
 
-./resources/test/fixtures/flake8_type_checking/runtime_evaluated_base_classes_1.py:11:23: TCH004 Move import `array.array` out of type-checking block. Import is used for more than type hinting.
+runtime_evaluated_base_classes_1.py:11:23: TCH004 Move import `array.array` out of type-checking block. Import is used for more than type hinting.
    |
 11 | if TYPE_CHECKING:
 12 |     import datetime  # TCH004
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 15 |     import pandas  # TCH004
    |
 
-./resources/test/fixtures/flake8_type_checking/runtime_evaluated_base_classes_1.py:13:12: TCH004 Move import `pandas` out of type-checking block. Import is used for more than type hinting.
+runtime_evaluated_base_classes_1.py:13:12: TCH004 Move import `pandas` out of type-checking block. Import is used for more than type hinting.
    |
 13 |     from array import array  # TCH004
 14 | 

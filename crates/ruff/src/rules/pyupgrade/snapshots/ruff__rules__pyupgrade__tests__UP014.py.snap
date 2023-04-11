@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP014.py:5:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:5:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
   |
 5 | # with complex annotations
 6 | MyType = NamedTuple("MyType", [("a", int), ("b", tuple[str, ...])])
@@ -23,7 +23,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 7 9 | # with default values as list
 8 10 | MyType = NamedTuple(
 
-./resources/test/fixtures/pyupgrade/UP014.py:8:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:8:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
  8 |   # with default values as list
  9 | / MyType = NamedTuple(
@@ -54,7 +54,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 14 13 | # with namespace
 15 14 | MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
 
-./resources/test/fixtures/pyupgrade/UP014.py:15:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:15:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
 15 | # with namespace
 16 | MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
@@ -76,7 +76,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 17 19 | # too many default values (OK)
 18 20 | MyType = NamedTuple(
 
-./resources/test/fixtures/pyupgrade/UP014.py:28:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:28:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
 28 | # no fields
 29 | MyType = typing.NamedTuple("MyType")
@@ -97,7 +97,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 30 31 | # empty fields
 31 32 | MyType = typing.NamedTuple("MyType", [])
 
-./resources/test/fixtures/pyupgrade/UP014.py:31:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+UP014.py:31:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
    |
 31 | # empty fields
 32 | MyType = typing.NamedTuple("MyType", [])
