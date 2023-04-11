@@ -1,19 +1,13 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: TabAfterOperator
-    body: Tab after operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 48
-    column: 4
-  end_location:
-    row: 48
-    column: 4
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E22.py:48:5: E224 Tab after operator
+   |
+48 | #: E224
+49 | a +=	1
+   |      E224
+50 | b += 1000
+51 | #:
+   |
+
 

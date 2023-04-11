@@ -1,61 +1,40 @@
 ---
 source: crates/ruff/src/rules/flake8_django/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DjangoUnorderedBodyContentInModel
-    body: "Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 28
-    column: 4
-  end_location:
-    row: 28
-    column: 48
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DjangoUnorderedBodyContentInModel
-    body: "Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before manager declaration"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 4
-  end_location:
-    row: 43
-    column: 48
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DjangoUnorderedBodyContentInModel
-    body: "Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `__str__` method should come before custom method"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 56
-    column: 4
-  end_location:
-    row: 57
-    column: 23
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DjangoUnorderedBodyContentInModel
-    body: "Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `save` method should come before `get_absolute_url` method"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 69
-    column: 4
-  end_location:
-    row: 70
-    column: 12
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_django/DJ012.py:28:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before `Meta` class
+   |
+28 |         return "foobar"
+29 | 
+30 |     first_name = models.CharField(max_length=32)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012
+   |
+
+./resources/test/fixtures/flake8_django/DJ012.py:43:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: field declaration should come before manager declaration
+   |
+43 |         return "foobar"
+44 | 
+45 |     first_name = models.CharField(max_length=32)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DJ012
+   |
+
+./resources/test/fixtures/flake8_django/DJ012.py:56:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `__str__` method should come before custom method
+   |
+56 |           pass
+57 |   
+58 |       def __str__(self):
+   |  _____^
+59 | |         return "foobar"
+   | |_______________________^ DJ012
+   |
+
+./resources/test/fixtures/flake8_django/DJ012.py:69:5: DJ012 Order of model's inner classes, methods, and fields does not follow the Django Style Guide: `save` method should come before `get_absolute_url` method
+   |
+69 |           pass
+70 |   
+71 |       def save(self):
+   |  _____^
+72 | |         pass
+   | |____________^ DJ012
+   |
+
 

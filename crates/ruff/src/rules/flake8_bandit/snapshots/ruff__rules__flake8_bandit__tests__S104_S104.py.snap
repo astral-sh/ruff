@@ -1,61 +1,35 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: HardcodedBindAllInterfaces
-    body: Possible binding to all interfaces
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedBindAllInterfaces
-    body: Possible binding to all interfaces
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedBindAllInterfaces
-    body: Possible binding to all interfaces
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 5
-  end_location:
-    row: 14
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedBindAllInterfaces
-    body: Possible binding to all interfaces
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 8
-  end_location:
-    row: 18
-    column: 17
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bandit/S104.py:9:1: S104 Possible binding to all interfaces
+   |
+ 9 | # Error
+10 | "0.0.0.0"
+   | ^^^^^^^^^ S104
+11 | '0.0.0.0'
+   |
+
+./resources/test/fixtures/flake8_bandit/S104.py:10:1: S104 Possible binding to all interfaces
+   |
+10 | # Error
+11 | "0.0.0.0"
+12 | '0.0.0.0'
+   | ^^^^^^^^^ S104
+   |
+
+./resources/test/fixtures/flake8_bandit/S104.py:14:6: S104 Possible binding to all interfaces
+   |
+14 | # Error
+15 | func("0.0.0.0")
+   |      ^^^^^^^^^ S104
+   |
+
+./resources/test/fixtures/flake8_bandit/S104.py:18:9: S104 Possible binding to all interfaces
+   |
+18 | def my_func():
+19 |     x = "0.0.0.0"
+   |         ^^^^^^^^^ S104
+20 |     print(x)
+   |
+
 

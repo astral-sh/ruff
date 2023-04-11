@@ -1,47 +1,39 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DoubleNegation
-    body: "Use `a` instead of `not (not a)`"
-    suggestion: "Replace with `a`"
-    fixable: true
-  location:
-    row: 1
-    column: 3
-  end_location:
-    row: 1
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 3
-        end_location:
-          row: 1
-          column: 14
-        content: a
-  parent: ~
-- kind:
-    name: DoubleNegation
-    body: "Use `a == b` instead of `not (not a == b)`"
-    suggestion: "Replace with `a == b`"
-    fixable: true
-  location:
-    row: 4
-    column: 3
-  end_location:
-    row: 4
-    column: 21
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 3
-        end_location:
-          row: 4
-          column: 21
-        content: a == b
-  parent: ~
+./resources/test/fixtures/flake8_simplify/SIM208.py:1:4: SIM208 [*] Use `a` instead of `not (not a)`
+  |
+1 | if not (not a):  # SIM208
+  |    ^^^^^^^^^^^ SIM208
+2 |     pass
+  |
+  = help: Replace with `a`
+
+ℹ Suggested fix
+1   |-if not (not a):  # SIM208
+  1 |+if a:  # SIM208
+2 2 |     pass
+3 3 | 
+4 4 | if not (not (a == b)):  # SIM208
+
+./resources/test/fixtures/flake8_simplify/SIM208.py:4:4: SIM208 [*] Use `a == b` instead of `not (not a == b)`
+  |
+4 |     pass
+5 | 
+6 | if not (not (a == b)):  # SIM208
+  |    ^^^^^^^^^^^^^^^^^^ SIM208
+7 |     pass
+  |
+  = help: Replace with `a == b`
+
+ℹ Suggested fix
+1 1 | if not (not a):  # SIM208
+2 2 |     pass
+3 3 | 
+4   |-if not (not (a == b)):  # SIM208
+  4 |+if a == b:  # SIM208
+5 5 |     pass
+6 6 | 
+7 7 | if not a:  # OK
+
 

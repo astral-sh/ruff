@@ -1,33 +1,18 @@
 ---
 source: crates/ruff/src/rules/flake8_django/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DjangoLocalsInRenderFunction
-    body: "Avoid passing `locals()` as context to a `render` function"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 41
-  end_location:
-    row: 5
-    column: 49
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DjangoLocalsInRenderFunction
-    body: "Avoid passing `locals()` as context to a `render` function"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 49
-  end_location:
-    row: 9
-    column: 57
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_django/DJ003.py:5:42: DJ003 Avoid passing `locals()` as context to a `render` function
+  |
+5 | def test_view1(request):
+6 |     return render(request, "index.html", locals())
+  |                                          ^^^^^^^^ DJ003
+  |
+
+./resources/test/fixtures/flake8_django/DJ003.py:9:50: DJ003 Avoid passing `locals()` as context to a `render` function
+   |
+ 9 | def test_view2(request):
+10 |     return render(request, "index.html", context=locals())
+   |                                                  ^^^^^^^^ DJ003
+   |
+
 

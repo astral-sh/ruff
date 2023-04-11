@@ -1,159 +1,106 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: TypeCommentInStub
-    body: "Don't use type comments in stub file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 21
-  end_location:
-    row: 6
-    column: 127
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeCommentInStub
-    body: "Don't use type comments in stub file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 21
-  end_location:
-    row: 7
-    column: 183
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeCommentInStub
-    body: "Don't use type comments in stub file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 21
-  end_location:
-    row: 8
-    column: 126
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeCommentInStub
-    body: "Don't use type comments in stub file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 21
-  end_location:
-    row: 9
-    column: 132
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeCommentInStub
-    body: "Don't use type comments in stub file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 19
-  end_location:
-    row: 10
-    column: 128
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeCommentInStub
-    body: "Don't use type comments in stub file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 19
-  end_location:
-    row: 11
-    column: 123
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeCommentInStub
-    body: "Don't use type comments in stub file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 11
-  end_location:
-    row: 14
-    column: 128
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeCommentInStub
-    body: "Don't use type comments in stub file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 10
-  end_location:
-    row: 15
-    column: 172
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeCommentInStub
-    body: "Don't use type comments in stub file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 28
-  end_location:
-    row: 19
-    column: 139
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeCommentInStub
-    body: "Don't use type comments in stub file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 21
-  end_location:
-    row: 29
-    column: 44
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypeCommentInStub
-    body: "Don't use type comments in stub file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 25
-  end_location:
-    row: 32
-    column: 55
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_pyi/PYI033.pyi:6:22: PYI033 Don't use type comments in stub file
+   |
+ 6 | from typing import TypeAlias
+ 7 | 
+ 8 | A: TypeAlias = None  # type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI033
+ 9 | B: TypeAlias = None  # type: str  # And here's an extra comment about why it's that type  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+10 | C: TypeAlias = None  #type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |
+
+./resources/test/fixtures/flake8_pyi/PYI033.pyi:7:22: PYI033 Don't use type comments in stub file
+   |
+ 7 | A: TypeAlias = None  # type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+ 8 | B: TypeAlias = None  # type: str  # And here's an extra comment about why it's that type  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI033
+ 9 | C: TypeAlias = None  #type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+10 | D: TypeAlias = None  #      type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |
+
+./resources/test/fixtures/flake8_pyi/PYI033.pyi:8:22: PYI033 Don't use type comments in stub file
+   |
+ 8 | A: TypeAlias = None  # type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+ 9 | B: TypeAlias = None  # type: str  # And here's an extra comment about why it's that type  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+10 | C: TypeAlias = None  #type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI033
+11 | D: TypeAlias = None  #      type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+12 | E: TypeAlias = None#    type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |
+
+./resources/test/fixtures/flake8_pyi/PYI033.pyi:9:22: PYI033 Don't use type comments in stub file
+   |
+ 9 | B: TypeAlias = None  # type: str  # And here's an extra comment about why it's that type  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+10 | C: TypeAlias = None  #type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+11 | D: TypeAlias = None  #      type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI033
+12 | E: TypeAlias = None#    type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+13 | F: TypeAlias = None#type:int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |
+
+./resources/test/fixtures/flake8_pyi/PYI033.pyi:10:20: PYI033 Don't use type comments in stub file
+   |
+10 | C: TypeAlias = None  #type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+11 | D: TypeAlias = None  #      type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+12 | E: TypeAlias = None#    type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI033
+13 | F: TypeAlias = None#type:int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |
+
+./resources/test/fixtures/flake8_pyi/PYI033.pyi:11:20: PYI033 Don't use type comments in stub file
+   |
+11 | D: TypeAlias = None  #      type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+12 | E: TypeAlias = None#    type: int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+13 | F: TypeAlias = None#type:int  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI033
+14 | 
+15 | def func(
+   |
+
+./resources/test/fixtures/flake8_pyi/PYI033.pyi:14:12: PYI033 Don't use type comments in stub file
+   |
+14 | def func(
+15 |     arg1,  # type: dict[str, int]  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI033
+16 |     arg2  # type: Sequence[bytes]  # And here's some more info about this arg  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+17 | ): ...
+   |
+
+./resources/test/fixtures/flake8_pyi/PYI033.pyi:15:11: PYI033 Don't use type comments in stub file
+   |
+15 | def func(
+16 |     arg1,  # type: dict[str, int]  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+17 |     arg2  # type: Sequence[bytes]  # And here's some more info about this arg  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI033
+18 | ): ...
+   |
+
+./resources/test/fixtures/flake8_pyi/PYI033.pyi:19:29: PYI033 Don't use type comments in stub file
+   |
+19 | class Foo:
+20 |     Attr: TypeAlias = None  # type: set[str]  # Y033 Do not use type comments in stubs (e.g. use "x: int" instead of "x = ... # type: int")
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI033
+21 | 
+22 | G: TypeAlias = None  # type: ignore
+   |
+
+./resources/test/fixtures/flake8_pyi/PYI033.pyi:29:22: PYI033 Don't use type comments in stub file
+   |
+29 | # Whole line commented out  # type: int
+30 | M: TypeAlias = None  # type: can't parse me!
+   |                      ^^^^^^^^^^^^^^^^^^^^^^^ PYI033
+31 | 
+32 | class Bar:
+   |
+
+./resources/test/fixtures/flake8_pyi/PYI033.pyi:32:26: PYI033 Don't use type comments in stub file
+   |
+32 | class Bar:
+33 |     N: TypeAlias = None  # type: can't parse me either!
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PYI033
+34 |     # This whole line is commented out and indented # type: str
+   |
+
 

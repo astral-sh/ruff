@@ -1,152 +1,149 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryCallAroundSorted
-    body: "Unnecessary `list` call around `sorted()`"
-    suggestion: "Remove unnecessary `list` call"
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 0
-        end_location:
-          row: 3
-          column: 15
-        content: sorted(x)
-  parent: ~
-- kind:
-    name: UnnecessaryCallAroundSorted
-    body: "Unnecessary `reversed` call around `sorted()`"
-    suggestion: "Remove unnecessary `reversed` call"
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 19
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 0
-        end_location:
-          row: 4
-          column: 19
-        content: "sorted(x, reverse=True)"
-  parent: ~
-- kind:
-    name: UnnecessaryCallAroundSorted
-    body: "Unnecessary `reversed` call around `sorted()`"
-    suggestion: "Remove unnecessary `reversed` call"
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 36
-  fix:
-    edits:
-      - location:
-          row: 5
-          column: 0
-        end_location:
-          row: 5
-          column: 36
-        content: "sorted(x, key=lambda e: e, reverse=True)"
-  parent: ~
-- kind:
-    name: UnnecessaryCallAroundSorted
-    body: "Unnecessary `reversed` call around `sorted()`"
-    suggestion: "Remove unnecessary `reversed` call"
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 33
-  fix:
-    edits:
-      - location:
-          row: 6
-          column: 0
-        end_location:
-          row: 6
-          column: 33
-        content: "sorted(x, reverse=False)"
-  parent: ~
-- kind:
-    name: UnnecessaryCallAroundSorted
-    body: "Unnecessary `reversed` call around `sorted()`"
-    suggestion: "Remove unnecessary `reversed` call"
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 50
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 0
-        end_location:
-          row: 7
-          column: 50
-        content: "sorted(x, key=lambda e: e, reverse=False)"
-  parent: ~
-- kind:
-    name: UnnecessaryCallAroundSorted
-    body: "Unnecessary `reversed` call around `sorted()`"
-    suggestion: "Remove unnecessary `reversed` call"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 50
-  fix:
-    edits:
-      - location:
-          row: 8
-          column: 0
-        end_location:
-          row: 8
-          column: 50
-        content: "sorted(x, reverse=False, key=lambda e: e)"
-  parent: ~
-- kind:
-    name: UnnecessaryCallAroundSorted
-    body: "Unnecessary `reversed` call around `sorted()`"
-    suggestion: "Remove unnecessary `reversed` call"
-    fixable: true
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 34
-  fix:
-    edits:
-      - location:
-          row: 9
-          column: 0
-        end_location:
-          row: 9
-          column: 34
-        content: "sorted(x, reverse=True)"
-  parent: ~
+./resources/test/fixtures/flake8_comprehensions/C413.py:3:1: C413 [*] Unnecessary `list` call around `sorted()`
+  |
+3 | x = [2, 3, 1]
+4 | list(x)
+5 | list(sorted(x))
+  | ^^^^^^^^^^^^^^^ C413
+6 | reversed(sorted(x))
+7 | reversed(sorted(x, key=lambda e: e))
+  |
+  = help: Remove unnecessary `list` call
+
+ℹ Suggested fix
+1 1 | x = [2, 3, 1]
+2 2 | list(x)
+3   |-list(sorted(x))
+  3 |+sorted(x)
+4 4 | reversed(sorted(x))
+5 5 | reversed(sorted(x, key=lambda e: e))
+6 6 | reversed(sorted(x, reverse=True))
+
+./resources/test/fixtures/flake8_comprehensions/C413.py:4:1: C413 [*] Unnecessary `reversed` call around `sorted()`
+  |
+4 | list(x)
+5 | list(sorted(x))
+6 | reversed(sorted(x))
+  | ^^^^^^^^^^^^^^^^^^^ C413
+7 | reversed(sorted(x, key=lambda e: e))
+8 | reversed(sorted(x, reverse=True))
+  |
+  = help: Remove unnecessary `reversed` call
+
+ℹ Suggested fix
+1 1 | x = [2, 3, 1]
+2 2 | list(x)
+3 3 | list(sorted(x))
+4   |-reversed(sorted(x))
+  4 |+sorted(x, reverse=True)
+5 5 | reversed(sorted(x, key=lambda e: e))
+6 6 | reversed(sorted(x, reverse=True))
+7 7 | reversed(sorted(x, key=lambda e: e, reverse=True))
+
+./resources/test/fixtures/flake8_comprehensions/C413.py:5:1: C413 [*] Unnecessary `reversed` call around `sorted()`
+  |
+5 | list(sorted(x))
+6 | reversed(sorted(x))
+7 | reversed(sorted(x, key=lambda e: e))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C413
+8 | reversed(sorted(x, reverse=True))
+9 | reversed(sorted(x, key=lambda e: e, reverse=True))
+  |
+  = help: Remove unnecessary `reversed` call
+
+ℹ Suggested fix
+2 2 | list(x)
+3 3 | list(sorted(x))
+4 4 | reversed(sorted(x))
+5   |-reversed(sorted(x, key=lambda e: e))
+  5 |+sorted(x, key=lambda e: e, reverse=True)
+6 6 | reversed(sorted(x, reverse=True))
+7 7 | reversed(sorted(x, key=lambda e: e, reverse=True))
+8 8 | reversed(sorted(x, reverse=True, key=lambda e: e))
+
+./resources/test/fixtures/flake8_comprehensions/C413.py:6:1: C413 [*] Unnecessary `reversed` call around `sorted()`
+   |
+ 6 | reversed(sorted(x))
+ 7 | reversed(sorted(x, key=lambda e: e))
+ 8 | reversed(sorted(x, reverse=True))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C413
+ 9 | reversed(sorted(x, key=lambda e: e, reverse=True))
+10 | reversed(sorted(x, reverse=True, key=lambda e: e))
+   |
+   = help: Remove unnecessary `reversed` call
+
+ℹ Suggested fix
+3 3 | list(sorted(x))
+4 4 | reversed(sorted(x))
+5 5 | reversed(sorted(x, key=lambda e: e))
+6   |-reversed(sorted(x, reverse=True))
+  6 |+sorted(x, reverse=False)
+7 7 | reversed(sorted(x, key=lambda e: e, reverse=True))
+8 8 | reversed(sorted(x, reverse=True, key=lambda e: e))
+9 9 | reversed(sorted(x, reverse=False))
+
+./resources/test/fixtures/flake8_comprehensions/C413.py:7:1: C413 [*] Unnecessary `reversed` call around `sorted()`
+   |
+ 7 | reversed(sorted(x, key=lambda e: e))
+ 8 | reversed(sorted(x, reverse=True))
+ 9 | reversed(sorted(x, key=lambda e: e, reverse=True))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C413
+10 | reversed(sorted(x, reverse=True, key=lambda e: e))
+11 | reversed(sorted(x, reverse=False))
+   |
+   = help: Remove unnecessary `reversed` call
+
+ℹ Suggested fix
+4 4 | reversed(sorted(x))
+5 5 | reversed(sorted(x, key=lambda e: e))
+6 6 | reversed(sorted(x, reverse=True))
+7   |-reversed(sorted(x, key=lambda e: e, reverse=True))
+  7 |+sorted(x, key=lambda e: e, reverse=False)
+8 8 | reversed(sorted(x, reverse=True, key=lambda e: e))
+9 9 | reversed(sorted(x, reverse=False))
+10 10 | 
+
+./resources/test/fixtures/flake8_comprehensions/C413.py:8:1: C413 [*] Unnecessary `reversed` call around `sorted()`
+   |
+ 8 | reversed(sorted(x, reverse=True))
+ 9 | reversed(sorted(x, key=lambda e: e, reverse=True))
+10 | reversed(sorted(x, reverse=True, key=lambda e: e))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C413
+11 | reversed(sorted(x, reverse=False))
+   |
+   = help: Remove unnecessary `reversed` call
+
+ℹ Suggested fix
+5 5 | reversed(sorted(x, key=lambda e: e))
+6 6 | reversed(sorted(x, reverse=True))
+7 7 | reversed(sorted(x, key=lambda e: e, reverse=True))
+8   |-reversed(sorted(x, reverse=True, key=lambda e: e))
+  8 |+sorted(x, reverse=False, key=lambda e: e)
+9 9 | reversed(sorted(x, reverse=False))
+10 10 | 
+11 11 | def reversed(*args, **kwargs):
+
+./resources/test/fixtures/flake8_comprehensions/C413.py:9:1: C413 [*] Unnecessary `reversed` call around `sorted()`
+   |
+ 9 | reversed(sorted(x, key=lambda e: e, reverse=True))
+10 | reversed(sorted(x, reverse=True, key=lambda e: e))
+11 | reversed(sorted(x, reverse=False))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C413
+12 | 
+13 | def reversed(*args, **kwargs):
+   |
+   = help: Remove unnecessary `reversed` call
+
+ℹ Suggested fix
+6  6  | reversed(sorted(x, reverse=True))
+7  7  | reversed(sorted(x, key=lambda e: e, reverse=True))
+8  8  | reversed(sorted(x, reverse=True, key=lambda e: e))
+9     |-reversed(sorted(x, reverse=False))
+   9  |+sorted(x, reverse=True)
+10 10 | 
+11 11 | def reversed(*args, **kwargs):
+12 12 |     return None
+
 

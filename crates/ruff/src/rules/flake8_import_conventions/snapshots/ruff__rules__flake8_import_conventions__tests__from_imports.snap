@@ -1,117 +1,83 @@
 ---
 source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnconventionalImportAlias
-    body: "`xml.dom.minidom` should be imported as `md`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 22
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`xml.dom.minidom` should be imported as `md`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 31
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`xml.dom.minidom` should be imported as `md`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 36
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`xml.dom.minidom` should be imported as `md`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 27
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`xml.dom.minidom.parseString` should be imported as `pstr`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 48
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`xml.dom.minidom.parseString` should be imported as `pstr`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 39
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`xml.dom.minidom.parseString` should be imported as `pstr`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 46
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`xml.dom.minidom.parseString` should be imported as `pstr`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 61
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_import_conventions/from_imports.py:3:1: ICN001 `xml.dom.minidom` should be imported as `md`
+  |
+3 | # Test absolute imports
+4 | # Violation cases
+5 | import xml.dom.minidom
+  | ^^^^^^^^^^^^^^^^^^^^^^ ICN001
+6 | import xml.dom.minidom as wrong
+7 | from xml.dom import minidom as wrong
+  |
+
+./resources/test/fixtures/flake8_import_conventions/from_imports.py:4:1: ICN001 `xml.dom.minidom` should be imported as `md`
+  |
+4 | # Violation cases
+5 | import xml.dom.minidom
+6 | import xml.dom.minidom as wrong
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
+7 | from xml.dom import minidom as wrong
+8 | from xml.dom import minidom
+  |
+
+./resources/test/fixtures/flake8_import_conventions/from_imports.py:5:1: ICN001 `xml.dom.minidom` should be imported as `md`
+  |
+5 | import xml.dom.minidom
+6 | import xml.dom.minidom as wrong
+7 | from xml.dom import minidom as wrong
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
+8 | from xml.dom import minidom
+9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
+  |
+
+./resources/test/fixtures/flake8_import_conventions/from_imports.py:6:1: ICN001 `xml.dom.minidom` should be imported as `md`
+   |
+ 6 | import xml.dom.minidom as wrong
+ 7 | from xml.dom import minidom as wrong
+ 8 | from xml.dom import minidom
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
+ 9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
+10 | from xml.dom.minidom import parseString
+   |
+
+./resources/test/fixtures/flake8_import_conventions/from_imports.py:7:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
+   |
+ 7 | from xml.dom import minidom as wrong
+ 8 | from xml.dom import minidom
+ 9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
+10 | from xml.dom.minidom import parseString
+11 | from xml.dom.minidom import parse, parseString
+   |
+
+./resources/test/fixtures/flake8_import_conventions/from_imports.py:8:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
+   |
+ 8 | from xml.dom import minidom
+ 9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
+10 | from xml.dom.minidom import parseString
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
+11 | from xml.dom.minidom import parse, parseString
+12 | from xml.dom.minidom import parse as ps, parseString as wrong
+   |
+
+./resources/test/fixtures/flake8_import_conventions/from_imports.py:9:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
+   |
+ 9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
+10 | from xml.dom.minidom import parseString
+11 | from xml.dom.minidom import parse, parseString
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
+12 | from xml.dom.minidom import parse as ps, parseString as wrong
+   |
+
+./resources/test/fixtures/flake8_import_conventions/from_imports.py:10:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
+   |
+10 | from xml.dom.minidom import parseString
+11 | from xml.dom.minidom import parse, parseString
+12 | from xml.dom.minidom import parse as ps, parseString as wrong
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
+13 | 
+14 | # No ICN001 violations
+   |
+
 

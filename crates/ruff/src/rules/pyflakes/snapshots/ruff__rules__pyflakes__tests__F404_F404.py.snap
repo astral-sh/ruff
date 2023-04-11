@@ -1,33 +1,22 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: LateFutureImport
-    body: "`from __future__` imports must occur at the beginning of the file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 37
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: LateFutureImport
-    body: "`from __future__` imports must occur at the beginning of the file"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 17
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F404.py:6:1: F404 `from __future__` imports must occur at the beginning of the file
+   |
+ 6 | from collections import namedtuple
+ 7 | 
+ 8 | from __future__ import print_function
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F404
+ 9 | 
+10 | import __future__
+   |
+
+./resources/test/fixtures/pyflakes/F404.py:8:1: F404 `from __future__` imports must occur at the beginning of the file
+   |
+ 8 | from __future__ import print_function
+ 9 | 
+10 | import __future__
+   | ^^^^^^^^^^^^^^^^^ F404
+   |
+
 

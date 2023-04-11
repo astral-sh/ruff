@@ -1,47 +1,29 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: Assert
-    body: "Use of `assert` detected"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 6
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Assert
-    body: "Use of `assert` detected"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 4
-  end_location:
-    row: 8
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Assert
-    body: "Use of `assert` detected"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 11
-    column: 10
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bandit/S101.py:2:1: S101 Use of `assert` detected
+  |
+2 | # Error
+3 | assert True
+  | ^^^^^^ S101
+4 | 
+5 | def fn():
+  |
+
+./resources/test/fixtures/flake8_bandit/S101.py:8:5: S101 Use of `assert` detected
+   |
+ 8 |     # Error
+ 9 |     assert x == 1
+   |     ^^^^^^ S101
+10 | 
+11 |     # Error
+   |
+
+./resources/test/fixtures/flake8_bandit/S101.py:11:5: S101 Use of `assert` detected
+   |
+11 |     # Error
+12 |     assert x == 2
+   |     ^^^^^^ S101
+   |
+
 

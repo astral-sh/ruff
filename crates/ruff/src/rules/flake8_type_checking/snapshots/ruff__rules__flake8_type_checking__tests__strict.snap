@@ -1,47 +1,34 @@
 ---
 source: crates/ruff/src/rules/flake8_type_checking/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: TypingOnlyThirdPartyImport
-    body: "Move third-party import `pkg.A` into a type-checking block"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 20
-  end_location:
-    row: 24
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypingOnlyThirdPartyImport
-    body: "Move third-party import `pkg.A` into a type-checking block"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 20
-  end_location:
-    row: 32
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TypingOnlyThirdPartyImport
-    body: "Move third-party import `pkg.bar.A` into a type-checking block"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 51
-    column: 24
-  end_location:
-    row: 51
-    column: 25
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_type_checking/strict.py:24:21: TCH002 Move third-party import `pkg.A` into a type-checking block
+   |
+24 |     # In un-strict mode, this shouldn't rase an error, since `pkg` is used at runtime.
+25 |     import pkg
+26 |     from pkg import A
+   |                     ^ TCH002
+27 | 
+28 |     def test(value: A):
+   |
+
+./resources/test/fixtures/flake8_type_checking/strict.py:32:21: TCH002 Move third-party import `pkg.A` into a type-checking block
+   |
+32 | def f():
+33 |     # In un-strict mode, this shouldn't rase an error, since `pkg` is used at runtime.
+34 |     from pkg import A, B
+   |                     ^ TCH002
+35 | 
+36 |     def test(value: A):
+   |
+
+./resources/test/fixtures/flake8_type_checking/strict.py:51:25: TCH002 Move third-party import `pkg.bar.A` into a type-checking block
+   |
+51 |     # In un-strict mode, this _should_ rase an error, since `pkg` is used at runtime.
+52 |     import pkg
+53 |     from pkg.bar import A
+   |                         ^ TCH002
+54 | 
+55 |     def test(value: A):
+   |
+
 

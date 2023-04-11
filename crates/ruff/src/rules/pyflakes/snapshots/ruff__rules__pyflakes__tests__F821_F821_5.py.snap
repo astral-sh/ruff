@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `InnerClass`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 30
-  end_location:
-    row: 5
-    column: 40
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F821_5.py:5:31: F821 Undefined name `InnerClass`
+  |
+5 | class RandomClass:
+6 |     def random_func(self) -> "InnerClass":
+  |                               ^^^^^^^^^^ F821
+7 |         pass
+  |
+
 

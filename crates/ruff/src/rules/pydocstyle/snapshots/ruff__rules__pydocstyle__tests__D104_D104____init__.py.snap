@@ -1,19 +1,8 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndocumentedPublicPackage
-    body: Missing docstring in public package
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 0
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pydocstyle/D104/__init__.py:1:1: D104 Missing docstring in public package
+ |
+ |
+
 

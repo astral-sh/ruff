@@ -1,47 +1,26 @@
 ---
 source: crates/ruff/src/rules/flake8_errmsg/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: RawStringInException
-    body: "Exception must not use a string literal, assign to variable first"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 23
-  end_location:
-    row: 5
-    column: 53
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: FStringInException
-    body: "Exception must not use an f-string literal, assign to variable first"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 23
-  end_location:
-    row: 14
-    column: 56
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DotFormatInException
-    body: "Exception must not use a `.format()` string directly, assign to variable first"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 23
-  end_location:
-    row: 18
-    column: 81
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_errmsg/EM.py:5:24: EM101 Exception must not use a string literal, assign to variable first
+  |
+5 | def f_a():
+6 |     raise RuntimeError("This is an example exception")
+  |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
+  |
+
+./resources/test/fixtures/flake8_errmsg/EM.py:14:24: EM102 Exception must not use an f-string literal, assign to variable first
+   |
+14 | def f_b():
+15 |     example = "example"
+16 |     raise RuntimeError(f"This is an {example} exception")
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM102
+   |
+
+./resources/test/fixtures/flake8_errmsg/EM.py:18:24: EM103 Exception must not use a `.format()` string directly, assign to variable first
+   |
+18 | def f_c():
+19 |     raise RuntimeError("This is an {example} exception".format(example="example"))
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM103
+   |
+
 

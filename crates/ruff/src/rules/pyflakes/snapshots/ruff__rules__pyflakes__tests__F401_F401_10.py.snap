@@ -1,40 +1,34 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedImport
-    body: "`orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 15
-  end_location:
-    row: 6
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`orjson` imported but unused"
-    suggestion: "Remove unused import: `orjson`"
-    fixable: true
-  location:
-    row: 15
-    column: 15
-  end_location:
-    row: 15
-    column: 21
-  fix:
-    edits:
-      - location:
-          row: 15
-          column: 0
-        end_location:
-          row: 16
-          column: 0
-        content: ~
-  parent: ~
+./resources/test/fixtures/pyflakes/F401_10.py:6:16: F401 `orjson` imported but unused; consider using `importlib.util.find_spec` to test for availability
+   |
+ 6 | def module_not_found_error():
+ 7 |     try:
+ 8 |         import orjson
+   |                ^^^^^^ F401
+ 9 | 
+10 |         return True
+   |
+
+./resources/test/fixtures/pyflakes/F401_10.py:15:16: F401 [*] `orjson` imported but unused
+   |
+15 | def import_error():
+16 |     try:
+17 |         import orjson
+   |                ^^^^^^ F401
+18 | 
+19 |         return True
+   |
+   = help: Remove unused import: `orjson`
+
+ℹ Suggested fix
+12 12 | 
+13 13 | def import_error():
+14 14 |     try:
+15    |-        import orjson
+16 15 | 
+17 16 |         return True
+18 17 |     except ImportError:
+
 

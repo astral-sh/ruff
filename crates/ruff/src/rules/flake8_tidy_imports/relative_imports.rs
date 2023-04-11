@@ -189,8 +189,8 @@ pub fn banned_relative_import(
 mod tests {
     use std::path::Path;
 
+    use crate::assert_messages;
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
 
     use crate::registry::Rule;
     use crate::settings::Settings;
@@ -210,7 +210,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -226,7 +226,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -243,7 +243,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

@@ -1,26 +1,19 @@
 ---
 source: crates/ruff/src/rules/isort/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MissingRequiredImport
-    body: "Missing required import: `import os`"
-    suggestion: "Insert required import: `import os`"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 0
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 0
-        content: "import os\n"
-  parent: ~
+./resources/test/fixtures/isort/required_imports/docstring.py:1:1: I002 [*] Missing required import: `import os`
+  |
+1 | """Hello, world!"""
+  |  I002
+2 | 
+3 | x = 1
+  |
+  = help: Insert required import: `import os`
+
+ℹ Suggested fix
+1 1 | """Hello, world!"""
+  2 |+import os
+2 3 | 
+3 4 | x = 1
+
 

@@ -60,6 +60,7 @@ schemars = { workspace = true }
 semver = { version = "1.0.16" }
 serde = { workspace = true }
 serde_json = { workspace = true }
+similar = { workspace = true, features = ["inline"] }
 shellexpand = { workspace = true }
 smallvec = { workspace = true }
 strum = { workspace = true }
@@ -71,7 +72,7 @@ typed-arena = { version = "2.0.2" }
 unicode-width = { version = "0.1.10" }
 
 [dev-dependencies]
-insta = { workspace = true, features = ["yaml", "redactions"] }
+insta = { workspace = true }
 pretty_assertions = "1.3.0"
 test-case = { workspace = true }
 # Disable colored output in tests

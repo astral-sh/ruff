@@ -1,145 +1,109 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 34
-  end_location:
-    row: 4
-    column: 40
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 14
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 4
-  end_location:
-    row: 25
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 8
-  end_location:
-    row: 23
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 8
-  end_location:
-    row: 24
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 8
-  end_location:
-    row: 50
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 51
-    column: 8
-  end_location:
-    row: 51
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 61
-    column: 8
-  end_location:
-    row: 61
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 62
-    column: 8
-  end_location:
-    row: 62
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestParametrizeValuesWrongType
-    body: "Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 81
-    column: 37
-  end_location:
-    row: 81
-    column: 53
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_pytest_style/PT007.py:4:35: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+  |
+4 | @pytest.mark.parametrize("param", (1, 2))
+  |                                   ^^^^^^ PT007
+5 | def test_tuple(param):
+6 |     ...
+  |
+
+./resources/test/fixtures/flake8_pytest_style/PT007.py:11:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+   |
+11 |   @pytest.mark.parametrize(
+12 |       ("param1", "param2"),
+13 |       (
+   |  _____^
+14 | |         (1, 2),
+15 | |         (3, 4),
+16 | |     ),
+   | |_____^ PT007
+17 |   )
+18 |   def test_tuple_of_tuples(param1, param2):
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT007.py:22:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+   |
+22 |   @pytest.mark.parametrize(
+23 |       ("param1", "param2"),
+24 |       (
+   |  _____^
+25 | |         [1, 2],
+26 | |         [3, 4],
+27 | |     ),
+   | |_____^ PT007
+28 |   )
+29 |   def test_tuple_of_lists(param1, param2):
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT007.py:23:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+   |
+23 |     ("param1", "param2"),
+24 |     (
+25 |         [1, 2],
+   |         ^^^^^^ PT007
+26 |         [3, 4],
+27 |     ),
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT007.py:24:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+   |
+24 |     (
+25 |         [1, 2],
+26 |         [3, 4],
+   |         ^^^^^^ PT007
+27 |     ),
+28 | )
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT007.py:50:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+   |
+50 |     ("param1", "param2"),
+51 |     [
+52 |         [1, 2],
+   |         ^^^^^^ PT007
+53 |         [3, 4],
+54 |     ],
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT007.py:51:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+   |
+51 |     [
+52 |         [1, 2],
+53 |         [3, 4],
+   |         ^^^^^^ PT007
+54 |     ],
+55 | )
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT007.py:61:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+   |
+61 |     "param1,param2",
+62 |     [
+63 |         [1, 2],
+   |         ^^^^^^ PT007
+64 |         [3, 4],
+65 |     ],
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT007.py:62:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+   |
+62 |     [
+63 |         [1, 2],
+64 |         [3, 4],
+   |         ^^^^^^ PT007
+65 |     ],
+66 | )
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT007.py:81:38: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `tuple`
+   |
+81 | @pytest.mark.parametrize("a", [1, 2])
+82 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
+   |                                      ^^^^^^^^^^^^^^^^ PT007
+83 | def test_multiple_decorators(a, b, c):
+84 |     pass
+   |
+
 

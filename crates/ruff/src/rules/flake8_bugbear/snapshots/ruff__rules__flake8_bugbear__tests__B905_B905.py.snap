@@ -1,103 +1,70 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 15
-  end_location:
-    row: 4
-    column: 23
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 4
-  end_location:
-    row: 5
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ZipWithoutExplicitStrict
-    body: "`zip()` without an explicit `strict=` parameter"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 26
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bugbear/B905.py:1:1: B905 `zip()` without an explicit `strict=` parameter
+  |
+1 | zip()
+  | ^^^^^ B905
+2 | zip(range(3))
+3 | zip("a", "b")
+  |
+
+./resources/test/fixtures/flake8_bugbear/B905.py:2:1: B905 `zip()` without an explicit `strict=` parameter
+  |
+2 | zip()
+3 | zip(range(3))
+  | ^^^^^^^^^^^^^ B905
+4 | zip("a", "b")
+5 | zip("a", "b", *zip("c"))
+  |
+
+./resources/test/fixtures/flake8_bugbear/B905.py:3:1: B905 `zip()` without an explicit `strict=` parameter
+  |
+3 | zip()
+4 | zip(range(3))
+5 | zip("a", "b")
+  | ^^^^^^^^^^^^^ B905
+6 | zip("a", "b", *zip("c"))
+7 | zip(zip("a"), strict=False)
+  |
+
+./resources/test/fixtures/flake8_bugbear/B905.py:4:1: B905 `zip()` without an explicit `strict=` parameter
+  |
+4 | zip(range(3))
+5 | zip("a", "b")
+6 | zip("a", "b", *zip("c"))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ B905
+7 | zip(zip("a"), strict=False)
+8 | zip(zip("a", strict=True))
+  |
+
+./resources/test/fixtures/flake8_bugbear/B905.py:4:16: B905 `zip()` without an explicit `strict=` parameter
+  |
+4 | zip(range(3))
+5 | zip("a", "b")
+6 | zip("a", "b", *zip("c"))
+  |                ^^^^^^^^ B905
+7 | zip(zip("a"), strict=False)
+8 | zip(zip("a", strict=True))
+  |
+
+./resources/test/fixtures/flake8_bugbear/B905.py:5:5: B905 `zip()` without an explicit `strict=` parameter
+  |
+5 | zip("a", "b")
+6 | zip("a", "b", *zip("c"))
+7 | zip(zip("a"), strict=False)
+  |     ^^^^^^^^ B905
+8 | zip(zip("a", strict=True))
+  |
+
+./resources/test/fixtures/flake8_bugbear/B905.py:6:1: B905 `zip()` without an explicit `strict=` parameter
+   |
+ 6 | zip("a", "b", *zip("c"))
+ 7 | zip(zip("a"), strict=False)
+ 8 | zip(zip("a", strict=True))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ B905
+ 9 | 
+10 | zip(range(3), strict=True)
+   |
+
 

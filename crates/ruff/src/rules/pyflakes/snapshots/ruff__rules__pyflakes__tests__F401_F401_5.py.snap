@@ -1,93 +1,71 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedImport
-    body: "`a.b.c` imported but unused"
-    suggestion: "Remove unused import: `a.b.c`"
-    fixable: true
-  location:
-    row: 2
-    column: 16
-  end_location:
-    row: 2
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 3
-          column: 0
-        content: ~
-  parent:
-    row: 2
-    column: 0
-- kind:
-    name: UnusedImport
-    body: "`d.e.f` imported but unused"
-    suggestion: "Remove unused import: `d.e.f`"
-    fixable: true
-  location:
-    row: 3
-    column: 16
-  end_location:
-    row: 3
-    column: 22
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 0
-        end_location:
-          row: 4
-          column: 0
-        content: ~
-  parent:
-    row: 3
-    column: 0
-- kind:
-    name: UnusedImport
-    body: "`h.i` imported but unused"
-    suggestion: "Remove unused import: `h.i`"
-    fixable: true
-  location:
-    row: 4
-    column: 7
-  end_location:
-    row: 4
-    column: 10
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 0
-        end_location:
-          row: 5
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`j.k` imported but unused"
-    suggestion: "Remove unused import: `j.k`"
-    fixable: true
-  location:
-    row: 5
-    column: 7
-  end_location:
-    row: 5
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 5
-          column: 0
-        end_location:
-          row: 6
-          column: 0
-        content: ~
-  parent: ~
+./resources/test/fixtures/pyflakes/F401_5.py:2:17: F401 [*] `a.b.c` imported but unused
+  |
+2 | """Test: removal of multi-segment and aliases imports."""
+3 | from a.b import c
+  |                 ^ F401
+4 | from d.e import f as g
+5 | import h.i
+  |
+  = help: Remove unused import: `a.b.c`
+
+ℹ Suggested fix
+1 1 | """Test: removal of multi-segment and aliases imports."""
+2   |-from a.b import c
+3 2 | from d.e import f as g
+4 3 | import h.i
+5 4 | import j.k as l
+
+./resources/test/fixtures/pyflakes/F401_5.py:3:17: F401 [*] `d.e.f` imported but unused
+  |
+3 | """Test: removal of multi-segment and aliases imports."""
+4 | from a.b import c
+5 | from d.e import f as g
+  |                 ^^^^^^ F401
+6 | import h.i
+7 | import j.k as l
+  |
+  = help: Remove unused import: `d.e.f`
+
+ℹ Suggested fix
+1 1 | """Test: removal of multi-segment and aliases imports."""
+2 2 | from a.b import c
+3   |-from d.e import f as g
+4 3 | import h.i
+5 4 | import j.k as l
+
+./resources/test/fixtures/pyflakes/F401_5.py:4:8: F401 [*] `h.i` imported but unused
+  |
+4 | from a.b import c
+5 | from d.e import f as g
+6 | import h.i
+  |        ^^^ F401
+7 | import j.k as l
+  |
+  = help: Remove unused import: `h.i`
+
+ℹ Suggested fix
+1 1 | """Test: removal of multi-segment and aliases imports."""
+2 2 | from a.b import c
+3 3 | from d.e import f as g
+4   |-import h.i
+5 4 | import j.k as l
+
+./resources/test/fixtures/pyflakes/F401_5.py:5:8: F401 [*] `j.k` imported but unused
+  |
+5 | from d.e import f as g
+6 | import h.i
+7 | import j.k as l
+  |        ^^^^^^^^ F401
+  |
+  = help: Remove unused import: `j.k`
+
+ℹ Suggested fix
+2 2 | from a.b import c
+3 3 | from d.e import f as g
+4 4 | import h.i
+5   |-import j.k as l
+
 

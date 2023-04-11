@@ -1,75 +1,47 @@
 ---
 source: crates/ruff/src/rules/flake8_datetimez/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CallDatetimeFromtimestamp
-    body: "The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 37
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CallDatetimeFromtimestamp
-    body: "The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 64
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CallDatetimeFromtimestamp
-    body: "The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 43
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CallDatetimeFromtimestamp
-    body: "The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 46
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CallDatetimeFromtimestamp
-    body: "The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 0
-  end_location:
-    row: 18
-    column: 28
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_datetimez/DTZ006.py:4:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+  |
+4 | # no args
+5 | datetime.datetime.fromtimestamp(1234)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006
+6 | 
+7 | # wrong keywords
+  |
+
+./resources/test/fixtures/flake8_datetimez/DTZ006.py:7:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+   |
+ 7 | # wrong keywords
+ 8 | datetime.datetime.fromtimestamp(1234, bad=datetime.timezone.utc)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006
+ 9 | 
+10 | # none args
+   |
+
+./resources/test/fixtures/flake8_datetimez/DTZ006.py:10:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+   |
+10 | # none args
+11 | datetime.datetime.fromtimestamp(1234, None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006
+12 | 
+13 | # none keywords
+   |
+
+./resources/test/fixtures/flake8_datetimez/DTZ006.py:13:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+   |
+13 | # none keywords
+14 | datetime.datetime.fromtimestamp(1234, tz=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006
+15 | 
+16 | from datetime import datetime
+   |
+
+./resources/test/fixtures/flake8_datetimez/DTZ006.py:18:1: DTZ006 The use of `datetime.datetime.fromtimestamp()` without `tz` argument is not allowed
+   |
+18 | # no args unqualified
+19 | datetime.fromtimestamp(1234)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ DTZ006
+   |
+
 

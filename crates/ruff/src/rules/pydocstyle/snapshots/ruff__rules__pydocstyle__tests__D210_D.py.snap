@@ -1,82 +1,74 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SurroundingWhitespace
-    body: No whitespaces allowed surrounding docstring text
-    suggestion: Trim surrounding whitespace
-    fixable: true
-  location:
-    row: 288
-    column: 4
-  end_location:
-    row: 288
-    column: 33
-  fix:
-    edits:
-      - location:
-          row: 288
-          column: 7
-        end_location:
-          row: 288
-          column: 30
-        content: Whitespace at the end.
-  parent: ~
-- kind:
-    name: SurroundingWhitespace
-    body: No whitespaces allowed surrounding docstring text
-    suggestion: Trim surrounding whitespace
-    fixable: true
-  location:
-    row: 293
-    column: 4
-  end_location:
-    row: 293
-    column: 37
-  fix:
-    edits:
-      - location:
-          row: 293
-          column: 7
-        end_location:
-          row: 293
-          column: 34
-        content: Whitespace at everywhere.
-  parent: ~
-- kind:
-    name: SurroundingWhitespace
-    body: No whitespaces allowed surrounding docstring text
-    suggestion: Trim surrounding whitespace
-    fixable: true
-  location:
-    row: 299
-    column: 4
-  end_location:
-    row: 302
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 299
-          column: 7
-        end_location:
-          row: 299
-          column: 36
-        content: Whitespace at the beginning.
-  parent: ~
-- kind:
-    name: SurroundingWhitespace
-    body: No whitespaces allowed surrounding docstring text
-    suggestion: Trim surrounding whitespace
-    fixable: true
-  location:
-    row: 581
-    column: 4
-  end_location:
-    row: 581
-    column: 51
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pydocstyle/D.py:288:5: D210 [*] No whitespaces allowed surrounding docstring text
+    |
+288 | @expect('D210: No whitespaces allowed surrounding docstring text')
+289 | def endswith():
+290 |     """Whitespace at the end. """
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
+    |
+    = help: Trim surrounding whitespace
+
+ℹ Suggested fix
+285 285 | 
+286 286 | @expect('D210: No whitespaces allowed surrounding docstring text')
+287 287 | def endswith():
+288     |-    """Whitespace at the end. """
+    288 |+    """Whitespace at the end."""
+289 289 | 
+290 290 | 
+291 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
+
+./resources/test/fixtures/pydocstyle/D.py:293:5: D210 [*] No whitespaces allowed surrounding docstring text
+    |
+293 | @expect('D210: No whitespaces allowed surrounding docstring text')
+294 | def around():
+295 |     """ Whitespace at everywhere. """
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
+    |
+    = help: Trim surrounding whitespace
+
+ℹ Suggested fix
+290 290 | 
+291 291 | @expect('D210: No whitespaces allowed surrounding docstring text')
+292 292 | def around():
+293     |-    """ Whitespace at everywhere. """
+    293 |+    """Whitespace at everywhere."""
+294 294 | 
+295 295 | 
+296 296 | @expect('D210: No whitespaces allowed surrounding docstring text')
+
+./resources/test/fixtures/pydocstyle/D.py:299:5: D210 [*] No whitespaces allowed surrounding docstring text
+    |
+299 |   @expect('D213: Multi-line docstring summary should start at the second line')
+300 |   def multiline():
+301 |       """ Whitespace at the beginning.
+    |  _____^
+302 | | 
+303 | |     This is the end.
+304 | |     """
+    | |_______^ D210
+    |
+    = help: Trim surrounding whitespace
+
+ℹ Suggested fix
+296 296 | @expect('D210: No whitespaces allowed surrounding docstring text')
+297 297 | @expect('D213: Multi-line docstring summary should start at the second line')
+298 298 | def multiline():
+299     |-    """ Whitespace at the beginning.
+    299 |+    """Whitespace at the beginning.
+300 300 | 
+301 301 |     This is the end.
+302 302 |     """
+
+./resources/test/fixtures/pydocstyle/D.py:581:5: D210 [*] No whitespaces allowed surrounding docstring text
+    |
+581 |         "or exclamation point (not '\"')")
+582 | def endswith_quote():
+583 |     """Whitespace at the end, but also a quote" """
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D210
+    |
+    = help: Trim surrounding whitespace
+
 

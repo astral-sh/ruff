@@ -1,26 +1,19 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedVariable
-    body: "Local variable `x` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `x`"
-    fixable: true
-  location:
-    row: 8
-    column: 4
-  end_location:
-    row: 8
-    column: 5
-  fix:
-    edits:
-      - location:
-          row: 8
-          column: 4
-        end_location:
-          row: 8
-          column: 9
-        content: pass
-  parent: ~
+./resources/test/fixtures/ruff/ruff_targeted_noqa.py:8:5: F841 [*] Local variable `x` is assigned to but never used
+  |
+8 | def f():
+9 |     x = 1
+  |     ^ F841
+  |
+  = help: Remove assignment to unused variable `x`
+
+ℹ Suggested fix
+5 5 | 
+6 6 | 
+7 7 | def f():
+8   |-    x = 1
+  8 |+    pass
+
 

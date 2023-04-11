@@ -1,327 +1,189 @@
 ---
 source: crates/ruff/src/rules/flake8_annotations/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MissingReturnTypeUndocumentedPublicFunction
-    body: "Missing return type annotation for public function `foo`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingTypeFunctionArgument
-    body: "Missing type annotation for function argument `a`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 8
-  end_location:
-    row: 4
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingTypeFunctionArgument
-    body: "Missing type annotation for function argument `b`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 11
-  end_location:
-    row: 4
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingReturnTypeUndocumentedPublicFunction
-    body: "Missing return type annotation for public function `foo`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 4
-  end_location:
-    row: 9
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingTypeFunctionArgument
-    body: "Missing type annotation for function argument `b`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 16
-  end_location:
-    row: 9
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingTypeFunctionArgument
-    body: "Missing type annotation for function argument `b`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 16
-  end_location:
-    row: 14
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingReturnTypeUndocumentedPublicFunction
-    body: "Missing return type annotation for public function `foo`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 4
-  end_location:
-    row: 19
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingReturnTypeUndocumentedPublicFunction
-    body: "Missing return type annotation for public function `foo`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 4
-  end_location:
-    row: 24
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AnyType
-    body: "Dynamically typed expressions (typing.Any) are disallowed in `a`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 11
-  end_location:
-    row: 44
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AnyType
-    body: "Dynamically typed expressions (typing.Any) are disallowed in `foo`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 49
-    column: 46
-  end_location:
-    row: 49
-    column: 49
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AnyType
-    body: "Dynamically typed expressions (typing.Any) are disallowed in `*args`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 23
-  end_location:
-    row: 54
-    column: 26
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AnyType
-    body: "Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 38
-  end_location:
-    row: 54
-    column: 41
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AnyType
-    body: "Dynamically typed expressions (typing.Any) are disallowed in `*args`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 59
-    column: 23
-  end_location:
-    row: 59
-    column: 26
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AnyType
-    body: "Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 64
-    column: 38
-  end_location:
-    row: 64
-    column: 41
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingTypeSelf
-    body: "Missing type annotation for `self` in method"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 74
-    column: 12
-  end_location:
-    row: 74
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AnyType
-    body: "Dynamically typed expressions (typing.Any) are disallowed in `a`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 78
-    column: 28
-  end_location:
-    row: 78
-    column: 31
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AnyType
-    body: "Dynamically typed expressions (typing.Any) are disallowed in `foo`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 82
-    column: 66
-  end_location:
-    row: 82
-    column: 69
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AnyType
-    body: "Dynamically typed expressions (typing.Any) are disallowed in `*params`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 86
-    column: 42
-  end_location:
-    row: 86
-    column: 45
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AnyType
-    body: "Dynamically typed expressions (typing.Any) are disallowed in `**options`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 86
-    column: 58
-  end_location:
-    row: 86
-    column: 61
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AnyType
-    body: "Dynamically typed expressions (typing.Any) are disallowed in `*params`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 90
-    column: 42
-  end_location:
-    row: 90
-    column: 45
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AnyType
-    body: "Dynamically typed expressions (typing.Any) are disallowed in `**options`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 94
-    column: 58
-  end_location:
-    row: 94
-    column: 61
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingTypeCls
-    body: "Missing type annotation for `cls` in classmethod"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 104
-    column: 12
-  end_location:
-    row: 104
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingTypeSelf
-    body: "Missing type annotation for `self` in method"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 108
-    column: 12
-  end_location:
-    row: 108
-    column: 16
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:4:5: ANN201 Missing return type annotation for public function `foo`
+  |
+4 | # Error
+5 | def foo(a, b):
+  |     ^^^ ANN201
+6 |     pass
+  |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:4:9: ANN001 Missing type annotation for function argument `a`
+  |
+4 | # Error
+5 | def foo(a, b):
+  |         ^ ANN001
+6 |     pass
+  |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:4:12: ANN001 Missing type annotation for function argument `b`
+  |
+4 | # Error
+5 | def foo(a, b):
+  |            ^ ANN001
+6 |     pass
+  |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:9:5: ANN201 Missing return type annotation for public function `foo`
+   |
+ 9 | # Error
+10 | def foo(a: int, b):
+   |     ^^^ ANN201
+11 |     pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:9:17: ANN001 Missing type annotation for function argument `b`
+   |
+ 9 | # Error
+10 | def foo(a: int, b):
+   |                 ^ ANN001
+11 |     pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:14:17: ANN001 Missing type annotation for function argument `b`
+   |
+14 | # Error
+15 | def foo(a: int, b) -> int:
+   |                 ^ ANN001
+16 |     pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:19:5: ANN201 Missing return type annotation for public function `foo`
+   |
+19 | # Error
+20 | def foo(a: int, b: int):
+   |     ^^^ ANN201
+21 |     pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:24:5: ANN201 Missing return type annotation for public function `foo`
+   |
+24 | # Error
+25 | def foo():
+   |     ^^^ ANN201
+26 |     pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:44:12: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+   |
+44 | # ANN401
+45 | def foo(a: Any, *args: str, **kwargs: str) -> int:
+   |            ^^^ ANN401
+46 |     pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:49:47: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo`
+   |
+49 | # ANN401
+50 | def foo(a: int, *args: str, **kwargs: str) -> Any:
+   |                                               ^^^ ANN401
+51 |     pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:54:24: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+   |
+54 | # ANN401
+55 | def foo(a: int, *args: Any, **kwargs: Any) -> int:
+   |                        ^^^ ANN401
+56 |     pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:54:39: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+   |
+54 | # ANN401
+55 | def foo(a: int, *args: Any, **kwargs: Any) -> int:
+   |                                       ^^^ ANN401
+56 |     pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:59:24: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*args`
+   |
+59 | # ANN401
+60 | def foo(a: int, *args: Any, **kwargs: str) -> int:
+   |                        ^^^ ANN401
+61 |     pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:64:39: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**kwargs`
+   |
+64 | # ANN401
+65 | def foo(a: int, *args: str, **kwargs: Any) -> int:
+   |                                       ^^^ ANN401
+66 |     pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:74:13: ANN101 Missing type annotation for `self` in method
+   |
+74 |     # ANN101
+75 |     def foo(self, a: int, b: int) -> int:
+   |             ^^^^ ANN101
+76 |         pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:78:29: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+   |
+78 |     # ANN401
+79 |     def foo(self: "Foo", a: Any, *params: str, **options: str) -> int:
+   |                             ^^^ ANN401
+80 |         pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:82:67: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo`
+   |
+82 |     # ANN401
+83 |     def foo(self: "Foo", a: int, *params: str, **options: str) -> Any:
+   |                                                                   ^^^ ANN401
+84 |         pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:86:43: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*params`
+   |
+86 |     # ANN401
+87 |     def foo(self: "Foo", a: int, *params: Any, **options: Any) -> int:
+   |                                           ^^^ ANN401
+88 |         pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:86:59: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**options`
+   |
+86 |     # ANN401
+87 |     def foo(self: "Foo", a: int, *params: Any, **options: Any) -> int:
+   |                                                           ^^^ ANN401
+88 |         pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:90:43: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `*params`
+   |
+90 |     # ANN401
+91 |     def foo(self: "Foo", a: int, *params: Any, **options: str) -> int:
+   |                                           ^^^ ANN401
+92 |         pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:94:59: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `**options`
+   |
+94 |     # ANN401
+95 |     def foo(self: "Foo", a: int, *params: str, **options: Any) -> int:
+   |                                                           ^^^ ANN401
+96 |         pass
+   |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:104:13: ANN102 Missing type annotation for `cls` in classmethod
+    |
+104 |     # ANN102
+105 |     @classmethod
+106 |     def foo(cls, a: int, b: int) -> int:
+    |             ^^^ ANN102
+107 |         pass
+    |
+
+./resources/test/fixtures/flake8_annotations/annotation_presence.py:108:13: ANN101 Missing type annotation for `self` in method
+    |
+108 |     # ANN101
+109 |     def foo(self, /, a: int, b: int) -> int:
+    |             ^^^^ ANN101
+110 |         pass
+    |
+
 

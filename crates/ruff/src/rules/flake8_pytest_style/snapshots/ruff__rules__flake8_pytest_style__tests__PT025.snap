@@ -1,47 +1,40 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestErroneousUseFixturesOnFixture
-    body: "`pytest.mark.usefixtures` has no effect on fixtures"
-    suggestion: "Remove `pytest.mark.usefixtures`"
-    fixable: true
-  location:
-    row: 9
-    column: 1
-  end_location:
-    row: 9
-    column: 29
-  fix:
-    edits:
-      - location:
-          row: 9
-          column: 0
-        end_location:
-          row: 10
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: PytestErroneousUseFixturesOnFixture
-    body: "`pytest.mark.usefixtures` has no effect on fixtures"
-    suggestion: "Remove `pytest.mark.usefixtures`"
-    fixable: true
-  location:
-    row: 16
-    column: 1
-  end_location:
-    row: 16
-    column: 29
-  fix:
-    edits:
-      - location:
-          row: 16
-          column: 0
-        end_location:
-          row: 17
-          column: 0
-        content: ~
-  parent: ~
+./resources/test/fixtures/flake8_pytest_style/PT025.py:9:2: PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
+   |
+ 9 | @pytest.mark.usefixtures("a")
+   |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT025
+10 | @pytest.fixture()
+11 | def my_fixture():  # Error before
+   |
+   = help: Remove `pytest.mark.usefixtures`
+
+ℹ Suggested fix
+6  6  |     pass
+7  7  | 
+8  8  | 
+9     |-@pytest.mark.usefixtures("a")
+10 9  | @pytest.fixture()
+11 10 | def my_fixture():  # Error before
+12 11 |     return 0
+
+./resources/test/fixtures/flake8_pytest_style/PT025.py:16:2: PT025 [*] `pytest.mark.usefixtures` has no effect on fixtures
+   |
+16 | @pytest.fixture()
+17 | @pytest.mark.usefixtures("a")
+   |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT025
+18 | def my_fixture():  # Error after
+19 |     return 0
+   |
+   = help: Remove `pytest.mark.usefixtures`
+
+ℹ Suggested fix
+13 13 | 
+14 14 | 
+15 15 | @pytest.fixture()
+16    |-@pytest.mark.usefixtures("a")
+17 16 | def my_fixture():  # Error after
+18 17 |     return 0
+
 

@@ -1,61 +1,44 @@
 ---
 source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BooleanDefaultValueInFunctionDefinition
-    body: Boolean default value in function definition
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 30
-  end_location:
-    row: 12
-    column: 34
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BooleanDefaultValueInFunctionDefinition
-    body: Boolean default value in function definition
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 42
-  end_location:
-    row: 13
-    column: 46
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BooleanDefaultValueInFunctionDefinition
-    body: Boolean default value in function definition
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 40
-  end_location:
-    row: 14
-    column: 44
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BooleanDefaultValueInFunctionDefinition
-    body: Boolean default value in function definition
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 45
-  end_location:
-    row: 15
-    column: 49
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_boolean_trap/FBT.py:12:31: FBT002 Boolean default value in function definition
+   |
+12 |     posorkw_nonvalued_boolhint: bool,
+13 |     posorkw_nonvalued_boolstrhint: "bool",
+14 |     posorkw_boolvalued_nohint=True,
+   |                               ^^^^ FBT002
+15 |     posorkw_boolvalued_nonboolhint: int = True,
+16 |     posorkw_boolvalued_boolhint: bool = True,
+   |
+
+./resources/test/fixtures/flake8_boolean_trap/FBT.py:13:43: FBT002 Boolean default value in function definition
+   |
+13 |     posorkw_nonvalued_boolstrhint: "bool",
+14 |     posorkw_boolvalued_nohint=True,
+15 |     posorkw_boolvalued_nonboolhint: int = True,
+   |                                           ^^^^ FBT002
+16 |     posorkw_boolvalued_boolhint: bool = True,
+17 |     posorkw_boolvalued_boolstrhint: "bool" = True,
+   |
+
+./resources/test/fixtures/flake8_boolean_trap/FBT.py:14:41: FBT002 Boolean default value in function definition
+   |
+14 |     posorkw_boolvalued_nohint=True,
+15 |     posorkw_boolvalued_nonboolhint: int = True,
+16 |     posorkw_boolvalued_boolhint: bool = True,
+   |                                         ^^^^ FBT002
+17 |     posorkw_boolvalued_boolstrhint: "bool" = True,
+18 |     posorkw_nonboolvalued_nohint=1,
+   |
+
+./resources/test/fixtures/flake8_boolean_trap/FBT.py:15:46: FBT002 Boolean default value in function definition
+   |
+15 |     posorkw_boolvalued_nonboolhint: int = True,
+16 |     posorkw_boolvalued_boolhint: bool = True,
+17 |     posorkw_boolvalued_boolstrhint: "bool" = True,
+   |                                              ^^^^ FBT002
+18 |     posorkw_nonboolvalued_nohint=1,
+19 |     posorkw_nonboolvalued_nonboolhint: int = 2,
+   |
+
 

@@ -1,292 +1,230 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 4
-    column: 9
-  end_location:
-    row: 4
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 9
-        end_location:
-          row: 4
-          column: 20
-        content: list
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 11
-    column: 9
-  end_location:
-    row: 11
-    column: 13
-  fix:
-    edits:
-      - location:
-          row: 11
-          column: 9
-        end_location:
-          row: 11
-          column: 13
-        content: list
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 18
-    column: 9
-  end_location:
-    row: 18
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 18
-          column: 9
-        end_location:
-          row: 18
-          column: 15
-        content: list
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 25
-    column: 9
-  end_location:
-    row: 25
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 25
-          column: 9
-        end_location:
-          row: 25
-          column: 14
-        content: list
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 29
-    column: 10
-  end_location:
-    row: 29
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 29
-          column: 10
-        end_location:
-          row: 29
-          column: 14
-        content: list
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 33
-    column: 11
-  end_location:
-    row: 33
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 33
-          column: 11
-        end_location:
-          row: 33
-          column: 15
-        content: list
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 37
-    column: 10
-  end_location:
-    row: 37
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 37
-          column: 10
-        end_location:
-          row: 37
-          column: 14
-        content: list
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 41
-    column: 12
-  end_location:
-    row: 41
-    column: 16
-  fix:
-    edits:
-      - location:
-          row: 41
-          column: 12
-        end_location:
-          row: 41
-          column: 16
-        content: list
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 45
-    column: 9
-  end_location:
-    row: 45
-    column: 23
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 49
-    column: 10
-  end_location:
-    row: 49
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 49
-          column: 10
-        end_location:
-          row: 49
-          column: 14
-        content: list
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 49
-    column: 16
-  end_location:
-    row: 49
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 49
-          column: 16
-        end_location:
-          row: 49
-          column: 20
-        content: list
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: "Replace `List` with `list`"
-    fixable: true
-  location:
-    row: 53
-    column: 10
-  end_location:
-    row: 53
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 53
-          column: 10
-        end_location:
-          row: 53
-          column: 14
-        content: list
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 53
-    column: 15
-  end_location:
-    row: 53
-    column: 29
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 57
-    column: 9
-  end_location:
-    row: 57
-    column: 31
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonPEP585Annotation
-    body: "Use `list` instead of `List` for type annotations"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 57
-    column: 9
-  end_location:
-    row: 57
-    column: 31
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyupgrade/UP006.py:4:10: UP006 [*] Use `list` instead of `List` for type annotations
+  |
+4 | def f(x: typing.List[str]) -> None:
+  |          ^^^^^^^^^^^ UP006
+5 |     ...
+  |
+  = help: Replace `List` with `list`
+
+ℹ Suggested fix
+1 1 | import typing
+2 2 | 
+3 3 | 
+4   |-def f(x: typing.List[str]) -> None:
+  4 |+def f(x: list[str]) -> None:
+5 5 |     ...
+6 6 | 
+7 7 | 
+
+./resources/test/fixtures/pyupgrade/UP006.py:11:10: UP006 [*] Use `list` instead of `List` for type annotations
+   |
+11 | def f(x: List[str]) -> None:
+   |          ^^^^ UP006
+12 |     ...
+   |
+   = help: Replace `List` with `list`
+
+ℹ Suggested fix
+8  8  | from typing import List
+9  9  | 
+10 10 | 
+11    |-def f(x: List[str]) -> None:
+   11 |+def f(x: list[str]) -> None:
+12 12 |     ...
+13 13 | 
+14 14 | 
+
+./resources/test/fixtures/pyupgrade/UP006.py:18:10: UP006 [*] Use `list` instead of `List` for type annotations
+   |
+18 | def f(x: t.List[str]) -> None:
+   |          ^^^^^^ UP006
+19 |     ...
+   |
+   = help: Replace `List` with `list`
+
+ℹ Suggested fix
+15 15 | import typing as t
+16 16 | 
+17 17 | 
+18    |-def f(x: t.List[str]) -> None:
+   18 |+def f(x: list[str]) -> None:
+19 19 |     ...
+20 20 | 
+21 21 | 
+
+./resources/test/fixtures/pyupgrade/UP006.py:25:10: UP006 [*] Use `list` instead of `List` for type annotations
+   |
+25 | def f(x: IList[str]) -> None:
+   |          ^^^^^ UP006
+26 |     ...
+   |
+   = help: Replace `List` with `list`
+
+ℹ Suggested fix
+22 22 | from typing import List as IList
+23 23 | 
+24 24 | 
+25    |-def f(x: IList[str]) -> None:
+   25 |+def f(x: list[str]) -> None:
+26 26 |     ...
+27 27 | 
+28 28 | 
+
+./resources/test/fixtures/pyupgrade/UP006.py:29:11: UP006 [*] Use `list` instead of `List` for type annotations
+   |
+29 | def f(x: "List[str]") -> None:
+   |           ^^^^ UP006
+30 |     ...
+   |
+   = help: Replace `List` with `list`
+
+ℹ Suggested fix
+26 26 |     ...
+27 27 | 
+28 28 | 
+29    |-def f(x: "List[str]") -> None:
+   29 |+def f(x: "list[str]") -> None:
+30 30 |     ...
+31 31 | 
+32 32 | 
+
+./resources/test/fixtures/pyupgrade/UP006.py:33:12: UP006 [*] Use `list` instead of `List` for type annotations
+   |
+33 | def f(x: r"List[str]") -> None:
+   |            ^^^^ UP006
+34 |     ...
+   |
+   = help: Replace `List` with `list`
+
+ℹ Suggested fix
+30 30 |     ...
+31 31 | 
+32 32 | 
+33    |-def f(x: r"List[str]") -> None:
+   33 |+def f(x: r"list[str]") -> None:
+34 34 |     ...
+35 35 | 
+36 36 | 
+
+./resources/test/fixtures/pyupgrade/UP006.py:37:11: UP006 [*] Use `list` instead of `List` for type annotations
+   |
+37 | def f(x: "List[str]") -> None:
+   |           ^^^^ UP006
+38 |     ...
+   |
+   = help: Replace `List` with `list`
+
+ℹ Suggested fix
+34 34 |     ...
+35 35 | 
+36 36 | 
+37    |-def f(x: "List[str]") -> None:
+   37 |+def f(x: "list[str]") -> None:
+38 38 |     ...
+39 39 | 
+40 40 | 
+
+./resources/test/fixtures/pyupgrade/UP006.py:41:13: UP006 [*] Use `list` instead of `List` for type annotations
+   |
+41 | def f(x: """List[str]""") -> None:
+   |             ^^^^ UP006
+42 |     ...
+   |
+   = help: Replace `List` with `list`
+
+ℹ Suggested fix
+38 38 |     ...
+39 39 | 
+40 40 | 
+41    |-def f(x: """List[str]""") -> None:
+   41 |+def f(x: """list[str]""") -> None:
+42 42 |     ...
+43 43 | 
+44 44 | 
+
+./resources/test/fixtures/pyupgrade/UP006.py:45:10: UP006 Use `list` instead of `List` for type annotations
+   |
+45 | def f(x: "Li" "st[str]") -> None:
+   |          ^^^^^^^^^^^^^^ UP006
+46 |     ...
+   |
+
+./resources/test/fixtures/pyupgrade/UP006.py:49:11: UP006 [*] Use `list` instead of `List` for type annotations
+   |
+49 | def f(x: "List['List[str]']") -> None:
+   |           ^^^^ UP006
+50 |     ...
+   |
+   = help: Replace `List` with `list`
+
+ℹ Suggested fix
+46 46 |     ...
+47 47 | 
+48 48 | 
+49    |-def f(x: "List['List[str]']") -> None:
+   49 |+def f(x: "list['List[str]']") -> None:
+50 50 |     ...
+51 51 | 
+52 52 | 
+
+./resources/test/fixtures/pyupgrade/UP006.py:49:17: UP006 [*] Use `list` instead of `List` for type annotations
+   |
+49 | def f(x: "List['List[str]']") -> None:
+   |                 ^^^^ UP006
+50 |     ...
+   |
+   = help: Replace `List` with `list`
+
+ℹ Suggested fix
+46 46 |     ...
+47 47 | 
+48 48 | 
+49    |-def f(x: "List['List[str]']") -> None:
+   49 |+def f(x: "List['list[str]']") -> None:
+50 50 |     ...
+51 51 | 
+52 52 | 
+
+./resources/test/fixtures/pyupgrade/UP006.py:53:11: UP006 [*] Use `list` instead of `List` for type annotations
+   |
+53 | def f(x: "List['Li' 'st[str]']") -> None:
+   |           ^^^^ UP006
+54 |     ...
+   |
+   = help: Replace `List` with `list`
+
+ℹ Suggested fix
+50 50 |     ...
+51 51 | 
+52 52 | 
+53    |-def f(x: "List['Li' 'st[str]']") -> None:
+   53 |+def f(x: "list['Li' 'st[str]']") -> None:
+54 54 |     ...
+55 55 | 
+56 56 | 
+
+./resources/test/fixtures/pyupgrade/UP006.py:53:16: UP006 Use `list` instead of `List` for type annotations
+   |
+53 | def f(x: "List['Li' 'st[str]']") -> None:
+   |                ^^^^^^^^^^^^^^ UP006
+54 |     ...
+   |
+
+./resources/test/fixtures/pyupgrade/UP006.py:57:10: UP006 Use `list` instead of `List` for type annotations
+   |
+57 | def f(x: "Li" "st['List[str]']") -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^ UP006
+58 |     ...
+   |
+
+./resources/test/fixtures/pyupgrade/UP006.py:57:10: UP006 Use `list` instead of `List` for type annotations
+   |
+57 | def f(x: "Li" "st['List[str]']") -> None:
+   |          ^^^^^^^^^^^^^^^^^^^^^^ UP006
+58 |     ...
+   |
+
 

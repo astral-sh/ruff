@@ -1,103 +1,60 @@
 ---
 source: crates/ruff/src/rules/flake8_pie/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NonUniqueEnums
-    body: "Enum contains duplicate value: `\"B\"`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 4
-  end_location:
-    row: 8
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonUniqueEnums
-    body: "Enum contains duplicate value: `2`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 4
-  end_location:
-    row: 14
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonUniqueEnums
-    body: "Enum contains duplicate value: `\"2\"`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 4
-  end_location:
-    row: 20
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonUniqueEnums
-    body: "Enum contains duplicate value: `2.5`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 4
-  end_location:
-    row: 26
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonUniqueEnums
-    body: "Enum contains duplicate value: `False`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 33
-    column: 4
-  end_location:
-    row: 33
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonUniqueEnums
-    body: "Enum contains duplicate value: `None`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 4
-  end_location:
-    row: 40
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonUniqueEnums
-    body: "Enum contains duplicate value: `2`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 4
-  end_location:
-    row: 54
-    column: 9
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_pie/PIE796.py:8:5: PIE796 Enum contains duplicate value: `"B"`
+   |
+ 8 |     A = "A"
+ 9 |     B = "B"
+10 |     C = "B"  # PIE796
+   |     ^^^^^^^ PIE796
+   |
+
+./resources/test/fixtures/flake8_pie/PIE796.py:14:5: PIE796 Enum contains duplicate value: `2`
+   |
+14 |     A = 1
+15 |     B = 2
+16 |     C = 2  # PIE796
+   |     ^^^^^ PIE796
+   |
+
+./resources/test/fixtures/flake8_pie/PIE796.py:20:5: PIE796 Enum contains duplicate value: `"2"`
+   |
+20 |     A = "1"
+21 |     B = "2"
+22 |     C = "2"  # PIE796
+   |     ^^^^^^^ PIE796
+   |
+
+./resources/test/fixtures/flake8_pie/PIE796.py:26:5: PIE796 Enum contains duplicate value: `2.5`
+   |
+26 |     A = 1.0
+27 |     B = 2.5
+28 |     C = 2.5  # PIE796
+   |     ^^^^^^^ PIE796
+   |
+
+./resources/test/fixtures/flake8_pie/PIE796.py:33:5: PIE796 Enum contains duplicate value: `False`
+   |
+33 |     B = True
+34 |     C = False
+35 |     D = False  # PIE796
+   |     ^^^^^^^^^ PIE796
+   |
+
+./resources/test/fixtures/flake8_pie/PIE796.py:40:5: PIE796 Enum contains duplicate value: `None`
+   |
+40 |     B = 2
+41 |     C = None
+42 |     D = None  # PIE796
+   |     ^^^^^^^^ PIE796
+   |
+
+./resources/test/fixtures/flake8_pie/PIE796.py:54:5: PIE796 Enum contains duplicate value: `2`
+   |
+54 |     A = 1
+55 |     B = 2
+56 |     C = 2  # PIE796
+   |     ^^^^^ PIE796
+   |
+
 

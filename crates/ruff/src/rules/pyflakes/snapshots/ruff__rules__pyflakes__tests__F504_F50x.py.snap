@@ -1,26 +1,25 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PercentFormatExtraNamedArguments
-    body: "`%`-format string has unused named argument(s): baz"
-    suggestion: "Remove extra named arguments: baz"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 32
-  fix:
-    edits:
-      - location:
-          row: 8
-          column: 12
-        end_location:
-          row: 8
-          column: 32
-        content: "{'bar': 1, }"
-  parent: ~
+./resources/test/fixtures/pyflakes/F50x.py:8:1: F504 [*] `%`-format string has unused named argument(s): baz
+   |
+ 8 | '%s %s' % (1, 2, 3)  # F507
+ 9 | '%(bar)s' % {}  # F505
+10 | '%(bar)s' % {'bar': 1, 'baz': 2}  # F504
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F504
+11 | '%(bar)s' % (1, 2, 3)  # F502
+12 | '%s %s' % {'k': 'v'}  # F503
+   |
+   = help: Remove extra named arguments: baz
+
+ℹ Suggested fix
+5 5 | '%s %s' % (1,)  # F507
+6 6 | '%s %s' % (1, 2, 3)  # F507
+7 7 | '%(bar)s' % {}  # F505
+8   |-'%(bar)s' % {'bar': 1, 'baz': 2}  # F504
+  8 |+'%(bar)s' % {'bar': 1, }  # F504
+9 9 | '%(bar)s' % (1, 2, 3)  # F502
+10 10 | '%s %s' % {'k': 'v'}  # F503
+11 11 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
+
 

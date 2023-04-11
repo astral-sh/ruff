@@ -1,47 +1,39 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: AssertFalse
-    body: "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"
-    suggestion: "Replace `assert False`"
-    fixable: true
-  location:
-    row: 8
-    column: 7
-  end_location:
-    row: 8
-    column: 12
-  fix:
-    edits:
-      - location:
-          row: 8
-          column: 0
-        end_location:
-          row: 8
-          column: 12
-        content: raise AssertionError()
-  parent: ~
-- kind:
-    name: AssertFalse
-    body: "Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`"
-    suggestion: "Replace `assert False`"
-    fixable: true
-  location:
-    row: 10
-    column: 7
-  end_location:
-    row: 10
-    column: 12
-  fix:
-    edits:
-      - location:
-          row: 10
-          column: 0
-        end_location:
-          row: 10
-          column: 23
-        content: "raise AssertionError(\"message\")"
-  parent: ~
+./resources/test/fixtures/flake8_bugbear/B011.py:8:8: B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
+   |
+ 8 | assert 1 != 2
+ 9 | assert False
+   |        ^^^^^ B011
+10 | assert 1 != 2, "message"
+11 | assert False, "message"
+   |
+   = help: Replace `assert False`
+
+ℹ Suggested fix
+5 5 | """
+6 6 | 
+7 7 | assert 1 != 2
+8   |-assert False
+  8 |+raise AssertionError()
+9 9 | assert 1 != 2, "message"
+10 10 | assert False, "message"
+
+./resources/test/fixtures/flake8_bugbear/B011.py:10:8: B011 [*] Do not `assert False` (`python -O` removes these calls), raise `AssertionError()`
+   |
+10 | assert False
+11 | assert 1 != 2, "message"
+12 | assert False, "message"
+   |        ^^^^^ B011
+   |
+   = help: Replace `assert False`
+
+ℹ Suggested fix
+7  7  | assert 1 != 2
+8  8  | assert False
+9  9  | assert 1 != 2, "message"
+10    |-assert False, "message"
+   10 |+raise AssertionError("message")
+
 

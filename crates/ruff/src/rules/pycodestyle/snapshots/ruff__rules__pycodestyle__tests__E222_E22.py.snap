@@ -1,75 +1,53 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MultipleSpacesAfterOperator
-    body: Multiple spaces after operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 28
-    column: 7
-  end_location:
-    row: 28
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleSpacesAfterOperator
-    body: Multiple spaces after operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 31
-    column: 3
-  end_location:
-    row: 31
-    column: 3
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleSpacesAfterOperator
-    body: Multiple spaces after operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 3
-  end_location:
-    row: 32
-    column: 3
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleSpacesAfterOperator
-    body: Multiple spaces after operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 35
-    column: 6
-  end_location:
-    row: 35
-    column: 6
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleSpacesAfterOperator
-    body: Multiple spaces after operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 36
-    column: 6
-  end_location:
-    row: 36
-    column: 6
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E22.py:28:8: E222 Multiple spaces after operator
+   |
+28 | #: E222
+29 | a = a +  1
+   |         E222
+30 | b = b + 10
+31 | #: E222 E222
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:31:4: E222 Multiple spaces after operator
+   |
+31 | b = b + 10
+32 | #: E222 E222
+33 | x =            -1
+   |     E222
+34 | y =            -2
+35 | long_variable = 3
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:32:4: E222 Multiple spaces after operator
+   |
+32 | #: E222 E222
+33 | x =            -1
+34 | y =            -2
+   |     E222
+35 | long_variable = 3
+36 | #: E222 E222
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:35:7: E222 Multiple spaces after operator
+   |
+35 | long_variable = 3
+36 | #: E222 E222
+37 | x[0] =          1
+   |        E222
+38 | x[1] =          2
+39 | long_variable = 3
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:36:7: E222 Multiple spaces after operator
+   |
+36 | #: E222 E222
+37 | x[0] =          1
+38 | x[1] =          2
+   |        E222
+39 | long_variable = 3
+40 | #:
+   |
+
 

@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestFixturePositionalArgs
-    body: "Configuration for fixture `my_fixture` specified via positional args, use kwargs"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 1
-  end_location:
-    row: 14
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestFixturePositionalArgs
-    body: "Configuration for fixture `my_fixture` specified via positional args, use kwargs"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 1
-  end_location:
-    row: 19
-    column: 39
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_pytest_style/PT002.py:14:2: PT002 Configuration for fixture `my_fixture` specified via positional args, use kwargs
+   |
+14 | @pytest.fixture("module")
+   |  ^^^^^^^^^^^^^^^^^^^^^^^^ PT002
+15 | def my_fixture():  # Error only args
+16 |     return 0
+   |
+
+./resources/test/fixtures/flake8_pytest_style/PT002.py:19:2: PT002 Configuration for fixture `my_fixture` specified via positional args, use kwargs
+   |
+19 | @pytest.fixture("module", autouse=True)
+   |  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT002
+20 | def my_fixture():  # Error mixed
+21 |     return 0
+   |
+
 

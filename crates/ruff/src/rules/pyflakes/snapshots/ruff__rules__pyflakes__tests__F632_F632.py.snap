@@ -1,152 +1,140 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: IsLiteral
-    body: "Use `==` to compare constant literals"
-    suggestion: "Replace `is` with `==`"
-    fixable: true
-  location:
-    row: 1
-    column: 3
-  end_location:
-    row: 1
-    column: 13
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 5
-        end_location:
-          row: 1
-          column: 7
-        content: "=="
-  parent: ~
-- kind:
-    name: IsLiteral
-    body: "Use `!=` to compare constant literals"
-    suggestion: "Replace `is not` with `!=`"
-    fixable: true
-  location:
-    row: 4
-    column: 3
-  end_location:
-    row: 4
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 7
-        end_location:
-          row: 4
-          column: 13
-        content: "!="
-  parent: ~
-- kind:
-    name: IsLiteral
-    body: "Use `!=` to compare constant literals"
-    suggestion: "Replace `is not` with `!=`"
-    fixable: true
-  location:
-    row: 7
-    column: 3
-  end_location:
-    row: 8
-    column: 13
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 7
-        end_location:
-          row: 8
-          column: 11
-        content: "!="
-  parent: ~
-- kind:
-    name: IsLiteral
-    body: "Use `==` to compare constant literals"
-    suggestion: "Replace `is` with `==`"
-    fixable: true
-  location:
-    row: 11
-    column: 3
-  end_location:
-    row: 11
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 11
-          column: 9
-        end_location:
-          row: 11
-          column: 11
-        content: "=="
-  parent: ~
-- kind:
-    name: IsLiteral
-    body: "Use `==` to compare constant literals"
-    suggestion: "Replace `is` with `==`"
-    fixable: true
-  location:
-    row: 14
-    column: 3
-  end_location:
-    row: 14
-    column: 18
-  fix:
-    edits:
-      - location:
-          row: 14
-          column: 14
-        end_location:
-          row: 14
-          column: 16
-        content: "=="
-  parent: ~
-- kind:
-    name: IsLiteral
-    body: "Use `==` to compare constant literals"
-    suggestion: "Replace `is` with `==`"
-    fixable: true
-  location:
-    row: 17
-    column: 3
-  end_location:
-    row: 17
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 17
-          column: 16
-        end_location:
-          row: 17
-          column: 18
-        content: "=="
-  parent: ~
-- kind:
-    name: IsLiteral
-    body: "Use `==` to compare constant literals"
-    suggestion: "Replace `is` with `==`"
-    fixable: true
-  location:
-    row: 20
-    column: 13
-  end_location:
-    row: 20
-    column: 19
-  fix:
-    edits:
-      - location:
-          row: 20
-          column: 15
-        end_location:
-          row: 20
-          column: 17
-        content: "=="
-  parent: ~
+./resources/test/fixtures/pyflakes/F632.py:1:4: F632 [*] Use `==` to compare constant literals
+  |
+1 | if x is "abc":
+  |    ^^^^^^^^^^ F632
+2 |     pass
+  |
+  = help: Replace `is` with `==`
+
+ℹ Suggested fix
+1   |-if x is "abc":
+  1 |+if x == "abc":
+2 2 |     pass
+3 3 | 
+4 4 | if 123 is not y:
+
+./resources/test/fixtures/pyflakes/F632.py:4:4: F632 [*] Use `!=` to compare constant literals
+  |
+4 |     pass
+5 | 
+6 | if 123 is not y:
+  |    ^^^^^^^^^^^^ F632
+7 |     pass
+  |
+  = help: Replace `is not` with `!=`
+
+ℹ Suggested fix
+1 1 | if x is "abc":
+2 2 |     pass
+3 3 | 
+4   |-if 123 is not y:
+  4 |+if 123 != y:
+5 5 |     pass
+6 6 | 
+7 7 | if 123 is \
+
+./resources/test/fixtures/pyflakes/F632.py:7:4: F632 [*] Use `!=` to compare constant literals
+   |
+ 7 |       pass
+ 8 |   
+ 9 |   if 123 is \
+   |  ____^
+10 | |         not y:
+   | |_____________^ F632
+11 |       pass
+   |
+   = help: Replace `is not` with `!=`
+
+ℹ Suggested fix
+4 4 | if 123 is not y:
+5 5 |     pass
+6 6 | 
+7   |-if 123 is \
+8   |-        not y:
+  7 |+if 123 != y:
+9 8 |     pass
+10 9 | 
+11 10 | if "123" is x < 3:
+
+./resources/test/fixtures/pyflakes/F632.py:11:4: F632 [*] Use `==` to compare constant literals
+   |
+11 |     pass
+12 | 
+13 | if "123" is x < 3:
+   |    ^^^^^^^^^^^^^^ F632
+14 |     pass
+   |
+   = help: Replace `is` with `==`
+
+ℹ Suggested fix
+8  8  |         not y:
+9  9  |     pass
+10 10 | 
+11    |-if "123" is x < 3:
+   11 |+if "123" == x < 3:
+12 12 |     pass
+13 13 | 
+14 14 | if "123" != x is 3:
+
+./resources/test/fixtures/pyflakes/F632.py:14:4: F632 [*] Use `==` to compare constant literals
+   |
+14 |     pass
+15 | 
+16 | if "123" != x is 3:
+   |    ^^^^^^^^^^^^^^^ F632
+17 |     pass
+   |
+   = help: Replace `is` with `==`
+
+ℹ Suggested fix
+11 11 | if "123" is x < 3:
+12 12 |     pass
+13 13 | 
+14    |-if "123" != x is 3:
+   14 |+if "123" != x == 3:
+15 15 |     pass
+16 16 | 
+17 17 | if ("123" != x) is 3:
+
+./resources/test/fixtures/pyflakes/F632.py:17:4: F632 [*] Use `==` to compare constant literals
+   |
+17 |     pass
+18 | 
+19 | if ("123" != x) is 3:
+   |    ^^^^^^^^^^^^^^^^^ F632
+20 |     pass
+   |
+   = help: Replace `is` with `==`
+
+ℹ Suggested fix
+14 14 | if "123" != x is 3:
+15 15 |     pass
+16 16 | 
+17    |-if ("123" != x) is 3:
+   17 |+if ("123" != x) == 3:
+18 18 |     pass
+19 19 | 
+20 20 | if "123" != (x is 3):
+
+./resources/test/fixtures/pyflakes/F632.py:20:14: F632 [*] Use `==` to compare constant literals
+   |
+20 |     pass
+21 | 
+22 | if "123" != (x is 3):
+   |              ^^^^^^ F632
+23 |     pass
+   |
+   = help: Replace `is` with `==`
+
+ℹ Suggested fix
+17 17 | if ("123" != x) is 3:
+18 18 |     pass
+19 19 | 
+20    |-if "123" != (x is 3):
+   20 |+if "123" != (x == 3):
+21 21 |     pass
+
 

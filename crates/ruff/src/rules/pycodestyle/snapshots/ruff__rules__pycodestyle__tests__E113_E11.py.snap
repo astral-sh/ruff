@@ -1,19 +1,14 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnexpectedIndentation
-    body: Unexpected indentation
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 4
-  end_location:
-    row: 12
-    column: 4
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E11.py:12:5: E113 Unexpected indentation
+   |
+12 | #: E113
+13 | print()
+14 |     print()
+   |      E113
+15 | #: E114 E116
+16 | mimetype = 'application/x-directory'
+   |
+
 

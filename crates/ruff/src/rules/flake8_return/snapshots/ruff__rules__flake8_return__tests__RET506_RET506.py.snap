@@ -1,103 +1,74 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `elif` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 4
-  end_location:
-    row: 8
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `elif` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 4
-  end_location:
-    row: 23
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `else` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 34
-    column: 4
-  end_location:
-    row: 34
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `else` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 45
-    column: 8
-  end_location:
-    row: 45
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `else` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 60
-    column: 4
-  end_location:
-    row: 60
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `else` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 70
-    column: 8
-  end_location:
-    row: 70
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseRaise
-    body: "Unnecessary `else` after `raise` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 80
-    column: 4
-  end_location:
-    row: 80
-    column: 8
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_return/RET506.py:8:5: RET506 Unnecessary `elif` after `raise` statement
+   |
+ 8 |         a = 1
+ 9 |         raise Exception(y)
+10 |     elif z:
+   |     ^^^^ RET506
+11 |         b = 2
+12 |         raise Exception(w)
+   |
+
+./resources/test/fixtures/flake8_return/RET506.py:23:5: RET506 Unnecessary `elif` after `raise` statement
+   |
+23 |             b = 2
+24 |         raise Exception(x)
+25 |     elif z:
+   |     ^^^^ RET506
+26 |         raise Exception(y)
+27 |     else:
+   |
+
+./resources/test/fixtures/flake8_return/RET506.py:34:5: RET506 Unnecessary `else` after `raise` statement
+   |
+34 |         a = 1
+35 |         raise Exception(y)
+36 |     else:
+   |     ^^^^ RET506
+37 |         b = 2
+38 |         raise Exception(z)
+   |
+
+./resources/test/fixtures/flake8_return/RET506.py:45:9: RET506 Unnecessary `else` after `raise` statement
+   |
+45 |             b = 2
+46 |             raise Exception(y)
+47 |         else:
+   |         ^^^^ RET506
+48 |             c = 3
+49 |             raise Exception(x)
+   |
+
+./resources/test/fixtures/flake8_return/RET506.py:60:5: RET506 Unnecessary `else` after `raise` statement
+   |
+60 |             b = 2
+61 |         raise Exception(x)
+62 |     else:
+   |     ^^^^ RET506
+63 |         c = 3
+64 |     raise Exception(y)
+   |
+
+./resources/test/fixtures/flake8_return/RET506.py:70:9: RET506 Unnecessary `else` after `raise` statement
+   |
+70 |             a = 4
+71 |             raise Exception(x)
+72 |         else:
+   |         ^^^^ RET506
+73 |             b = 2
+74 |     else:
+   |
+
+./resources/test/fixtures/flake8_return/RET506.py:80:5: RET506 Unnecessary `else` after `raise` statement
+   |
+80 |     if x:  # [no-else-raise]
+81 |         raise Exception(True)
+82 |     else:
+   |     ^^^^ RET506
+83 |         try:
+84 |             raise Exception(False)
+   |
+
 

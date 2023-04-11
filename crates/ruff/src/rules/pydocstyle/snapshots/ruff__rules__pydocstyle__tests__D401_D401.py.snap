@@ -1,103 +1,67 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NonImperativeMood
-    body: "First line of docstring should be in imperative mood: \"Returns foo.\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 4
-  end_location:
-    row: 10
-    column: 22
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonImperativeMood
-    body: "First line of docstring should be in imperative mood: \"Constructor for a foo.\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 4
-  end_location:
-    row: 14
-    column: 32
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonImperativeMood
-    body: "First line of docstring should be in imperative mood: \"Constructor for a boa.\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 4
-  end_location:
-    row: 22
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonImperativeMood
-    body: "First line of docstring should be in imperative mood: \"Runs something\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 4
-  end_location:
-    row: 26
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonImperativeMood
-    body: "First line of docstring should be in imperative mood: \"Runs other things, nested\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 8
-  end_location:
-    row: 29
-    column: 39
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonImperativeMood
-    body: "First line of docstring should be in imperative mood: \"Writes a logical line that\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 35
-    column: 4
-  end_location:
-    row: 37
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonImperativeMood
-    body: "First line of docstring should be in imperative mood: \"This method docstring should be written in imperative mood.\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 74
-    column: 8
-  end_location:
-    row: 74
-    column: 73
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pydocstyle/D401.py:10:5: D401 First line of docstring should be in imperative mood: "Returns foo."
+   |
+10 | def bad_liouiwnlkjl():
+11 |     """Returns foo."""
+   |     ^^^^^^^^^^^^^^^^^^ D401
+   |
+
+./resources/test/fixtures/pydocstyle/D401.py:14:5: D401 First line of docstring should be in imperative mood: "Constructor for a foo."
+   |
+14 | def bad_sdgfsdg23245():
+15 |     """Constructor for a foo."""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D401
+   |
+
+./resources/test/fixtures/pydocstyle/D401.py:18:5: D401 First line of docstring should be in imperative mood: "Constructor for a boa."
+   |
+18 |   def bad_sdgfsdg23245777():
+19 |       """
+   |  _____^
+20 | | 
+21 | |     Constructor for a boa.
+22 | | 
+23 | |     """
+   | |_______^ D401
+   |
+
+./resources/test/fixtures/pydocstyle/D401.py:26:5: D401 First line of docstring should be in imperative mood: "Runs something"
+   |
+26 | def bad_run_something():
+27 |     """Runs something"""
+   |     ^^^^^^^^^^^^^^^^^^^^ D401
+28 | 
+29 |     def bad_nested():
+   |
+
+./resources/test/fixtures/pydocstyle/D401.py:29:9: D401 First line of docstring should be in imperative mood: "Runs other things, nested"
+   |
+29 |     def bad_nested():
+30 |         """Runs other things, nested"""
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D401
+31 | 
+32 |     bad_nested()
+   |
+
+./resources/test/fixtures/pydocstyle/D401.py:35:5: D401 First line of docstring should be in imperative mood: "Writes a logical line that"
+   |
+35 |   def multi_line():
+36 |       """Writes a logical line that
+   |  _____^
+37 | |     extends to two physical lines.
+38 | |     """
+   | |_______^ D401
+   |
+
+./resources/test/fixtures/pydocstyle/D401.py:74:9: D401 First line of docstring should be in imperative mood: "This method docstring should be written in imperative mood."
+   |
+74 |     def bad_method(self):
+75 |         """This method docstring should be written in imperative mood."""
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D401
+76 | 
+77 |     @property
+   |
+
 

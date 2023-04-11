@@ -1,173 +1,98 @@
 ---
 source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `a`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 6
-  end_location:
-    row: 1
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `b`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 9
-  end_location:
-    row: 1
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `a`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 6
-  end_location:
-    row: 5
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `b`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 9
-  end_location:
-    row: 5
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `args`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 13
-  end_location:
-    row: 5
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `kwargs`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 21
-  end_location:
-    row: 5
-    column: 27
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedMethodArgument
-    body: "Unused method argument: `a`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 16
-  end_location:
-    row: 10
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedMethodArgument
-    body: "Unused method argument: `b`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 19
-  end_location:
-    row: 10
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedMethodArgument
-    body: "Unused method argument: `a`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 16
-  end_location:
-    row: 13
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedMethodArgument
-    body: "Unused method argument: `b`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 19
-  end_location:
-    row: 13
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedMethodArgument
-    body: "Unused method argument: `args`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 23
-  end_location:
-    row: 13
-    column: 27
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedMethodArgument
-    body: "Unused method argument: `kwargs`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 31
-  end_location:
-    row: 13
-    column: 37
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py:1:7: ARG001 Unused function argument: `a`
+  |
+1 | def f(a, b):
+  |       ^ ARG001
+2 |     print("Hello, world!")
+  |
+
+./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py:1:10: ARG001 Unused function argument: `b`
+  |
+1 | def f(a, b):
+  |          ^ ARG001
+2 |     print("Hello, world!")
+  |
+
+./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py:5:7: ARG001 Unused function argument: `a`
+  |
+5 | def f(a, b, *args, **kwargs):
+  |       ^ ARG001
+6 |     print("Hello, world!")
+  |
+
+./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py:5:10: ARG001 Unused function argument: `b`
+  |
+5 | def f(a, b, *args, **kwargs):
+  |          ^ ARG001
+6 |     print("Hello, world!")
+  |
+
+./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py:5:14: ARG001 Unused function argument: `args`
+  |
+5 | def f(a, b, *args, **kwargs):
+  |              ^^^^ ARG001
+6 |     print("Hello, world!")
+  |
+
+./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py:5:22: ARG001 Unused function argument: `kwargs`
+  |
+5 | def f(a, b, *args, **kwargs):
+  |                      ^^^^^^ ARG001
+6 |     print("Hello, world!")
+  |
+
+./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py:10:17: ARG002 Unused method argument: `a`
+   |
+10 | class C:
+11 |     def f(self, a, b):
+   |                 ^ ARG002
+12 |         print("Hello, world!")
+   |
+
+./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py:10:20: ARG002 Unused method argument: `b`
+   |
+10 | class C:
+11 |     def f(self, a, b):
+   |                    ^ ARG002
+12 |         print("Hello, world!")
+   |
+
+./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py:13:17: ARG002 Unused method argument: `a`
+   |
+13 |         print("Hello, world!")
+14 | 
+15 |     def f(self, a, b, *args, **kwargs):
+   |                 ^ ARG002
+16 |         print("Hello, world!")
+   |
+
+./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py:13:20: ARG002 Unused method argument: `b`
+   |
+13 |         print("Hello, world!")
+14 | 
+15 |     def f(self, a, b, *args, **kwargs):
+   |                    ^ ARG002
+16 |         print("Hello, world!")
+   |
+
+./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py:13:24: ARG002 Unused method argument: `args`
+   |
+13 |         print("Hello, world!")
+14 | 
+15 |     def f(self, a, b, *args, **kwargs):
+   |                        ^^^^ ARG002
+16 |         print("Hello, world!")
+   |
+
+./resources/test/fixtures/flake8_unused_arguments/ignore_variadic_names.py:13:32: ARG002 Unused method argument: `kwargs`
+   |
+13 |         print("Hello, world!")
+14 | 
+15 |     def f(self, a, b, *args, **kwargs):
+   |                                ^^^^^^ ARG002
+16 |         print("Hello, world!")
+   |
+
 

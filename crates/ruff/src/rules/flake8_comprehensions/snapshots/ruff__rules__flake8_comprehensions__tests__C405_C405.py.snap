@@ -1,194 +1,198 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryLiteralSet
-    body: "Unnecessary `list` literal (rewrite as a `set` literal)"
-    suggestion: "Rewrite as a `set` literal"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 11
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 0
-        end_location:
-          row: 1
-          column: 11
-        content: "{1, 2}"
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralSet
-    body: "Unnecessary `tuple` literal (rewrite as a `set` literal)"
-    suggestion: "Rewrite as a `set` literal"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 11
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 11
-        content: "{1, 2}"
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralSet
-    body: "Unnecessary `list` literal (rewrite as a `set` literal)"
-    suggestion: "Rewrite as a `set` literal"
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 0
-        end_location:
-          row: 3
-          column: 7
-        content: set()
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralSet
-    body: "Unnecessary `tuple` literal (rewrite as a `set` literal)"
-    suggestion: "Rewrite as a `set` literal"
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 0
-        end_location:
-          row: 4
-          column: 7
-        content: set()
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralSet
-    body: "Unnecessary `tuple` literal (rewrite as a `set` literal)"
-    suggestion: "Rewrite as a `set` literal"
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 9
-  fix:
-    edits:
-      - location:
-          row: 6
-          column: 0
-        end_location:
-          row: 6
-          column: 9
-        content: "{1}"
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralSet
-    body: "Unnecessary `tuple` literal (rewrite as a `set` literal)"
-    suggestion: "Rewrite as a `set` literal"
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 9
-    column: 2
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 0
-        end_location:
-          row: 9
-          column: 2
-        content: "{\n    1,\n}"
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralSet
-    body: "Unnecessary `list` literal (rewrite as a `set` literal)"
-    suggestion: "Rewrite as a `set` literal"
-    fixable: true
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 12
-    column: 2
-  fix:
-    edits:
-      - location:
-          row: 10
-          column: 0
-        end_location:
-          row: 12
-          column: 2
-        content: "{\n    1,\n}"
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralSet
-    body: "Unnecessary `tuple` literal (rewrite as a `set` literal)"
-    suggestion: "Rewrite as a `set` literal"
-    fixable: true
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 15
-    column: 1
-  fix:
-    edits:
-      - location:
-          row: 13
-          column: 0
-        end_location:
-          row: 15
-          column: 1
-        content: "{1}"
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralSet
-    body: "Unnecessary `list` literal (rewrite as a `set` literal)"
-    suggestion: "Rewrite as a `set` literal"
-    fixable: true
-  location:
-    row: 16
-    column: 0
-  end_location:
-    row: 18
-    column: 1
-  fix:
-    edits:
-      - location:
-          row: 16
-          column: 0
-        end_location:
-          row: 18
-          column: 1
-        content: "{1,}"
-  parent: ~
+./resources/test/fixtures/flake8_comprehensions/C405.py:1:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+  |
+1 | set([1, 2])
+  | ^^^^^^^^^^^ C405
+2 | set((1, 2))
+3 | set([])
+  |
+  = help: Rewrite as a `set` literal
+
+ℹ Suggested fix
+1   |-set([1, 2])
+  1 |+{1, 2}
+2 2 | set((1, 2))
+3 3 | set([])
+4 4 | set(())
+
+./resources/test/fixtures/flake8_comprehensions/C405.py:2:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+  |
+2 | set([1, 2])
+3 | set((1, 2))
+  | ^^^^^^^^^^^ C405
+4 | set([])
+5 | set(())
+  |
+  = help: Rewrite as a `set` literal
+
+ℹ Suggested fix
+1 1 | set([1, 2])
+2   |-set((1, 2))
+  2 |+{1, 2}
+3 3 | set([])
+4 4 | set(())
+5 5 | set()
+
+./resources/test/fixtures/flake8_comprehensions/C405.py:3:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+  |
+3 | set([1, 2])
+4 | set((1, 2))
+5 | set([])
+  | ^^^^^^^ C405
+6 | set(())
+7 | set()
+  |
+  = help: Rewrite as a `set` literal
+
+ℹ Suggested fix
+1 1 | set([1, 2])
+2 2 | set((1, 2))
+3   |-set([])
+  3 |+set()
+4 4 | set(())
+5 5 | set()
+6 6 | set((1,))
+
+./resources/test/fixtures/flake8_comprehensions/C405.py:4:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+  |
+4 | set((1, 2))
+5 | set([])
+6 | set(())
+  | ^^^^^^^ C405
+7 | set()
+8 | set((1,))
+  |
+  = help: Rewrite as a `set` literal
+
+ℹ Suggested fix
+1 1 | set([1, 2])
+2 2 | set((1, 2))
+3 3 | set([])
+4   |-set(())
+5 4 | set()
+  5 |+set()
+6 6 | set((1,))
+7 7 | set((
+8 8 |     1,
+
+./resources/test/fixtures/flake8_comprehensions/C405.py:6:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+   |
+ 6 | set(())
+ 7 | set()
+ 8 | set((1,))
+   | ^^^^^^^^^ C405
+ 9 | set((
+10 |     1,
+   |
+   = help: Rewrite as a `set` literal
+
+ℹ Suggested fix
+3 3 | set([])
+4 4 | set(())
+5 5 | set()
+6   |-set((1,))
+  6 |+{1}
+7 7 | set((
+8 8 |     1,
+9 9 | ))
+
+./resources/test/fixtures/flake8_comprehensions/C405.py:7:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+   |
+ 7 |   set()
+ 8 |   set((1,))
+ 9 | / set((
+10 | |     1,
+11 | | ))
+   | |__^ C405
+12 |   set([
+13 |       1,
+   |
+   = help: Rewrite as a `set` literal
+
+ℹ Suggested fix
+4  4  | set(())
+5  5  | set()
+6  6  | set((1,))
+7     |-set((
+   7  |+{
+8  8  |     1,
+9     |-))
+   9  |+}
+10 10 | set([
+11 11 |     1,
+12 12 | ])
+
+./resources/test/fixtures/flake8_comprehensions/C405.py:10:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+   |
+10 |       1,
+11 |   ))
+12 | / set([
+13 | |     1,
+14 | | ])
+   | |__^ C405
+15 |   set(
+16 |       (1,)
+   |
+   = help: Rewrite as a `set` literal
+
+ℹ Suggested fix
+7  7  | set((
+8  8  |     1,
+9  9  | ))
+10    |-set([
+   10 |+{
+11 11 |     1,
+12    |-])
+   12 |+}
+13 13 | set(
+14 14 |     (1,)
+15 15 | )
+
+./resources/test/fixtures/flake8_comprehensions/C405.py:13:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+   |
+13 |       1,
+14 |   ])
+15 | / set(
+16 | |     (1,)
+17 | | )
+   | |_^ C405
+18 |   set(
+19 |       [1,]
+   |
+   = help: Rewrite as a `set` literal
+
+ℹ Suggested fix
+10 10 | set([
+11 11 |     1,
+12 12 | ])
+13    |-set(
+14    |-    (1,)
+15    |-)
+   13 |+{1}
+16 14 | set(
+17 15 |     [1,]
+18 16 | )
+
+./resources/test/fixtures/flake8_comprehensions/C405.py:16:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+   |
+16 |       (1,)
+17 |   )
+18 | / set(
+19 | |     [1,]
+20 | | )
+   | |_^ C405
+   |
+   = help: Rewrite as a `set` literal
+
+ℹ Suggested fix
+13 13 | set(
+14 14 |     (1,)
+15 15 | )
+16    |-set(
+17    |-    [1,]
+18    |-)
+   16 |+{1,}
+
 

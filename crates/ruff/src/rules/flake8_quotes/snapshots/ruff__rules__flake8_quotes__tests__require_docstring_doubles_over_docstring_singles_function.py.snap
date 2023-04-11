@@ -1,68 +1,66 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BadQuotesDocstring
-    body: Single quote docstring found but double quotes preferred
-    suggestion: Replace single quotes docstring with double quotes
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 56
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 4
-        end_location:
-          row: 2
-          column: 56
-        content: "\"\"\"function without params, single line docstring\"\"\""
-  parent: ~
-- kind:
-    name: BadQuotesDocstring
-    body: Single quote docstring found but double quotes preferred
-    suggestion: Replace single quotes docstring with double quotes
-    fixable: true
-  location:
-    row: 8
-    column: 4
-  end_location:
-    row: 10
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 8
-          column: 4
-        end_location:
-          row: 10
-          column: 7
-        content: "\"\"\"\n        function without params, multiline docstring\n    \"\"\""
-  parent: ~
-- kind:
-    name: BadQuotesDocstring
-    body: Single quote docstring found but double quotes preferred
-    suggestion: Replace single quotes docstring with double quotes
-    fixable: true
-  location:
-    row: 27
-    column: 4
-  end_location:
-    row: 27
-    column: 27
-  fix:
-    edits:
-      - location:
-          row: 27
-          column: 4
-        end_location:
-          row: 27
-          column: 27
-        content: "\"Single line docstring\""
-  parent: ~
+./resources/test/fixtures/flake8_quotes/docstring_singles_function.py:2:5: Q002 [*] Single quote docstring found but double quotes preferred
+  |
+2 | def foo():
+3 |     '''function without params, single line docstring'''
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002
+4 |     ''' not a docstring'''
+5 |     return
+  |
+  = help: Replace single quotes docstring with double quotes
+
+ℹ Suggested fix
+1 1 | def foo():
+2   |-    '''function without params, single line docstring'''
+  2 |+    """function without params, single line docstring"""
+3 3 |     ''' not a docstring'''
+4 4 |     return
+5 5 | 
+
+./resources/test/fixtures/flake8_quotes/docstring_singles_function.py:8:5: Q002 [*] Single quote docstring found but double quotes preferred
+   |
+ 8 |   def foo2():
+ 9 |       '''
+   |  _____^
+10 | |         function without params, multiline docstring
+11 | |     '''
+   | |_______^ Q002
+12 |       ''' not a docstring'''
+13 |       return
+   |
+   = help: Replace single quotes docstring with double quotes
+
+ℹ Suggested fix
+5  5  | 
+6  6  | 
+7  7  | def foo2():
+8     |-    '''
+   8  |+    """
+9  9  |         function without params, multiline docstring
+10    |-    '''
+   10 |+    """
+11 11 |     ''' not a docstring'''
+12 12 |     return
+13 13 | 
+
+./resources/test/fixtures/flake8_quotes/docstring_singles_function.py:27:5: Q002 [*] Single quote docstring found but double quotes preferred
+   |
+27 | def function_with_single_docstring(a):
+28 |     'Single line docstring'
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ Q002
+   |
+   = help: Replace single quotes docstring with double quotes
+
+ℹ Suggested fix
+24 24 | 
+25 25 | 
+26 26 | def function_with_single_docstring(a):
+27    |-    'Single line docstring'
+   27 |+    "Single line docstring"
+28 28 | 
+29 29 | 
+30 30 | def double_inside_single(a):
+
 

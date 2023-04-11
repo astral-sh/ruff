@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/pygrep_hooks/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DeprecatedLogWarn
-    body: "`warn` is deprecated in favor of `warning`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DeprecatedLogWarn
-    body: "`warn` is deprecated in favor of `warning`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 4
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pygrep-hooks/PGH002_1.py:4:1: PGH002 `warn` is deprecated in favor of `warning`
+  |
+4 | from logging import warn
+5 | 
+6 | logging.warn("this is not ok")
+  | ^^^^^^^^^^^^ PGH002
+7 | warn("not ok")
+  |
+
+./resources/test/fixtures/pygrep-hooks/PGH002_1.py:5:1: PGH002 `warn` is deprecated in favor of `warning`
+  |
+5 | logging.warn("this is not ok")
+6 | warn("not ok")
+  | ^^^^ PGH002
+  |
+
 

@@ -1,26 +1,22 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: FirstLineCapitalized
-    body: "First word of the first line should be capitalized: `this` -> `This`"
-    suggestion: "Capitalize `this` to `This`"
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 43
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 7
-        end_location:
-          row: 2
-          column: 11
-        content: This
-  parent: ~
+./resources/test/fixtures/pydocstyle/D403.py:2:5: D403 [*] First word of the first line should be capitalized: `this` -> `This`
+  |
+2 | def bad_function():
+3 |     """this docstring is not capitalized"""
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D403
+4 | 
+5 | def good_function():
+  |
+  = help: Capitalize `this` to `This`
+
+ℹ Suggested fix
+1 1 | def bad_function():
+2   |-    """this docstring is not capitalized"""
+  2 |+    """This docstring is not capitalized"""
+3 3 | 
+4 4 | def good_function():
+5 5 |     """This docstring is capitalized."""
+
 

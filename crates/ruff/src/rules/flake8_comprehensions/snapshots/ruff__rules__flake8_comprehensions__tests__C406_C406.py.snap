@@ -1,89 +1,75 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryLiteralDict
-    body: "Unnecessary `list` literal (rewrite as a `dict` literal)"
-    suggestion: "Rewrite as a `dict` literal"
-    fixable: true
-  location:
-    row: 1
-    column: 5
-  end_location:
-    row: 1
-    column: 19
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 5
-        end_location:
-          row: 1
-          column: 19
-        content: "{1: 2}"
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralDict
-    body: "Unnecessary `tuple` literal (rewrite as a `dict` literal)"
-    suggestion: "Rewrite as a `dict` literal"
-    fixable: true
-  location:
-    row: 2
-    column: 5
-  end_location:
-    row: 2
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 5
-        end_location:
-          row: 2
-          column: 20
-        content: "{1: 2,}"
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralDict
-    body: "Unnecessary `list` literal (rewrite as a `dict` literal)"
-    suggestion: "Rewrite as a `dict` literal"
-    fixable: true
-  location:
-    row: 3
-    column: 5
-  end_location:
-    row: 3
-    column: 13
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 5
-        end_location:
-          row: 3
-          column: 13
-        content: "{}"
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralDict
-    body: "Unnecessary `tuple` literal (rewrite as a `dict` literal)"
-    suggestion: "Rewrite as a `dict` literal"
-    fixable: true
-  location:
-    row: 4
-    column: 5
-  end_location:
-    row: 4
-    column: 13
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 5
-        end_location:
-          row: 4
-          column: 13
-        content: "{}"
-  parent: ~
+./resources/test/fixtures/flake8_comprehensions/C406.py:1:6: C406 [*] Unnecessary `list` literal (rewrite as a `dict` literal)
+  |
+1 | d1 = dict([(1, 2)])
+  |      ^^^^^^^^^^^^^^ C406
+2 | d2 = dict(((1, 2),))
+3 | d3 = dict([])
+  |
+  = help: Rewrite as a `dict` literal
+
+ℹ Suggested fix
+1   |-d1 = dict([(1, 2)])
+  1 |+d1 = {1: 2}
+2 2 | d2 = dict(((1, 2),))
+3 3 | d3 = dict([])
+4 4 | d4 = dict(())
+
+./resources/test/fixtures/flake8_comprehensions/C406.py:2:6: C406 [*] Unnecessary `tuple` literal (rewrite as a `dict` literal)
+  |
+2 | d1 = dict([(1, 2)])
+3 | d2 = dict(((1, 2),))
+  |      ^^^^^^^^^^^^^^^ C406
+4 | d3 = dict([])
+5 | d4 = dict(())
+  |
+  = help: Rewrite as a `dict` literal
+
+ℹ Suggested fix
+1 1 | d1 = dict([(1, 2)])
+2   |-d2 = dict(((1, 2),))
+  2 |+d2 = {1: 2,}
+3 3 | d3 = dict([])
+4 4 | d4 = dict(())
+5 5 | d5 = dict()
+
+./resources/test/fixtures/flake8_comprehensions/C406.py:3:6: C406 [*] Unnecessary `list` literal (rewrite as a `dict` literal)
+  |
+3 | d1 = dict([(1, 2)])
+4 | d2 = dict(((1, 2),))
+5 | d3 = dict([])
+  |      ^^^^^^^^ C406
+6 | d4 = dict(())
+7 | d5 = dict()
+  |
+  = help: Rewrite as a `dict` literal
+
+ℹ Suggested fix
+1 1 | d1 = dict([(1, 2)])
+2 2 | d2 = dict(((1, 2),))
+3   |-d3 = dict([])
+  3 |+d3 = {}
+4 4 | d4 = dict(())
+5 5 | d5 = dict()
+
+./resources/test/fixtures/flake8_comprehensions/C406.py:4:6: C406 [*] Unnecessary `tuple` literal (rewrite as a `dict` literal)
+  |
+4 | d2 = dict(((1, 2),))
+5 | d3 = dict([])
+6 | d4 = dict(())
+  |      ^^^^^^^^ C406
+7 | d5 = dict()
+  |
+  = help: Rewrite as a `dict` literal
+
+ℹ Suggested fix
+1 1 | d1 = dict([(1, 2)])
+2 2 | d2 = dict(((1, 2),))
+3 3 | d3 = dict([])
+4   |-d4 = dict(())
+  4 |+d4 = {}
+5 5 | d5 = dict()
+
 

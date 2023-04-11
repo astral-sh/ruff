@@ -1,47 +1,34 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MultipleSpacesBeforeKeyword
-    body: Multiple spaces before keyword
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 1
-  end_location:
-    row: 20
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleSpacesBeforeKeyword
-    body: Multiple spaces before keyword
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 1
-  end_location:
-    row: 22
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleSpacesBeforeKeyword
-    body: Multiple spaces before keyword
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 4
-  end_location:
-    row: 24
-    column: 4
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E27.py:20:2: E272 Multiple spaces before keyword
+   |
+20 | a and  2
+21 | #: E271 E272
+22 | 1  and  b
+   |   E272
+23 | #: E271 E272
+24 | a  and  2
+   |
+
+./resources/test/fixtures/pycodestyle/E27.py:22:2: E272 Multiple spaces before keyword
+   |
+22 | 1  and  b
+23 | #: E271 E272
+24 | a  and  2
+   |   E272
+25 | #: E272
+26 | this  and False
+   |
+
+./resources/test/fixtures/pycodestyle/E27.py:24:5: E272 Multiple spaces before keyword
+   |
+24 | a  and  2
+25 | #: E272
+26 | this  and False
+   |      E272
+27 | #: E273
+28 | a and	b
+   |
+
 

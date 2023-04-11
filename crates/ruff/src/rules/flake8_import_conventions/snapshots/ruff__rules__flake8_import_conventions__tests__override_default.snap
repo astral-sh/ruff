@@ -1,145 +1,100 @@
 ---
 source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnconventionalImportAlias
-    body: "`altair` should be imported as `alt`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`matplotlib.pyplot` should be imported as `plt`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`numpy` should be imported as `nmp`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`pandas` should be imported as `pd`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`seaborn` should be imported as `sns`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`altair` should be imported as `alt`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`matplotlib.pyplot` should be imported as `plt`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 32
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`numpy` should be imported as `nmp`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`pandas` should be imported as `pd`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 12
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnconventionalImportAlias
-    body: "`seaborn` should be imported as `sns`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 22
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_import_conventions/override_default.py:3:1: ICN001 `altair` should be imported as `alt`
+  |
+3 | import math  # not checked
+4 | 
+5 | import altair  # unconventional
+  | ^^^^^^^^^^^^^ ICN001
+6 | import matplotlib.pyplot  # unconventional
+7 | import numpy  # unconventional
+  |
+
+./resources/test/fixtures/flake8_import_conventions/override_default.py:4:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
+  |
+4 | import altair  # unconventional
+5 | import matplotlib.pyplot  # unconventional
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
+6 | import numpy  # unconventional
+7 | import pandas  # unconventional
+  |
+
+./resources/test/fixtures/flake8_import_conventions/override_default.py:5:1: ICN001 `numpy` should be imported as `nmp`
+  |
+5 | import altair  # unconventional
+6 | import matplotlib.pyplot  # unconventional
+7 | import numpy  # unconventional
+  | ^^^^^^^^^^^^ ICN001
+8 | import pandas  # unconventional
+9 | import seaborn  # unconventional
+  |
+
+./resources/test/fixtures/flake8_import_conventions/override_default.py:6:1: ICN001 `pandas` should be imported as `pd`
+  |
+6 | import matplotlib.pyplot  # unconventional
+7 | import numpy  # unconventional
+8 | import pandas  # unconventional
+  | ^^^^^^^^^^^^^ ICN001
+9 | import seaborn  # unconventional
+  |
+
+./resources/test/fixtures/flake8_import_conventions/override_default.py:7:1: ICN001 `seaborn` should be imported as `sns`
+   |
+ 7 | import numpy  # unconventional
+ 8 | import pandas  # unconventional
+ 9 | import seaborn  # unconventional
+   | ^^^^^^^^^^^^^^ ICN001
+10 | 
+11 | import altair as altr  # unconventional
+   |
+
+./resources/test/fixtures/flake8_import_conventions/override_default.py:9:1: ICN001 `altair` should be imported as `alt`
+   |
+ 9 | import seaborn  # unconventional
+10 | 
+11 | import altair as altr  # unconventional
+   | ^^^^^^^^^^^^^^^^^^^^^ ICN001
+12 | import matplotlib.pyplot as plot  # unconventional
+13 | import numpy as np  # unconventional
+   |
+
+./resources/test/fixtures/flake8_import_conventions/override_default.py:10:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
+   |
+10 | import altair as altr  # unconventional
+11 | import matplotlib.pyplot as plot  # unconventional
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN001
+12 | import numpy as np  # unconventional
+13 | import pandas as pdas  # unconventional
+   |
+
+./resources/test/fixtures/flake8_import_conventions/override_default.py:11:1: ICN001 `numpy` should be imported as `nmp`
+   |
+11 | import altair as altr  # unconventional
+12 | import matplotlib.pyplot as plot  # unconventional
+13 | import numpy as np  # unconventional
+   | ^^^^^^^^^^^^^^^^^^ ICN001
+14 | import pandas as pdas  # unconventional
+15 | import seaborn as sbrn  # unconventional
+   |
+
+./resources/test/fixtures/flake8_import_conventions/override_default.py:12:1: ICN001 `pandas` should be imported as `pd`
+   |
+12 | import matplotlib.pyplot as plot  # unconventional
+13 | import numpy as np  # unconventional
+14 | import pandas as pdas  # unconventional
+   | ^^^^^^^^^^^^^^^^^^^^^ ICN001
+15 | import seaborn as sbrn  # unconventional
+   |
+
+./resources/test/fixtures/flake8_import_conventions/override_default.py:13:1: ICN001 `seaborn` should be imported as `sns`
+   |
+13 | import numpy as np  # unconventional
+14 | import pandas as pdas  # unconventional
+15 | import seaborn as sbrn  # unconventional
+   | ^^^^^^^^^^^^^^^^^^^^^^ ICN001
+16 | 
+17 | import altair as alt  # conventional
+   |
+
 

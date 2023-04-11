@@ -1,194 +1,182 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 1"
-    suggestion: "Remove extra positional arguments at position(s): 1"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 18
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 18
-        content: "\"{0}\".format(1, )"
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 0, 2"
-    suggestion: "Remove extra positional arguments at position(s): 0, 2"
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 21
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 0
-        end_location:
-          row: 3
-          column: 21
-        content: "\"{0}\".format(2, )"
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 2"
-    suggestion: "Remove extra positional arguments at position(s): 2"
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 25
-  fix:
-    edits:
-      - location:
-          row: 5
-          column: 0
-        end_location:
-          row: 5
-          column: 25
-        content: "\"{1:{0}}\".format(1, 2, )"
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 1"
-    suggestion: "Remove extra positional arguments at position(s): 1"
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 21
-  fix:
-    edits:
-      - location:
-          row: 6
-          column: 0
-        end_location:
-          row: 6
-          column: 21
-        content: "\"{0}{2}\".format(1, )"
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 0, 3"
-    suggestion: "Remove extra positional arguments at position(s): 0, 3"
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 48
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 0
-        end_location:
-          row: 7
-          column: 48
-        content: "\"{0.arg[1]!r:0{1['arg']}{0}}\".format(2, 3, )"
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 1"
-    suggestion: "Remove extra positional arguments at position(s): 1"
-    fixable: true
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 10
-          column: 0
-        end_location:
-          row: 10
-          column: 17
-        content: "\"{}\".format(1, )"
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 1, 2"
-    suggestion: "Remove extra positional arguments at position(s): 1, 2"
-    fixable: true
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 11
-          column: 0
-        end_location:
-          row: 11
-          column: 20
-        content: "\"{}\".format(1, )"
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 2"
-    suggestion: "Remove extra positional arguments at position(s): 2"
-    fixable: true
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 23
-  fix:
-    edits:
-      - location:
-          row: 13
-          column: 0
-        end_location:
-          row: 13
-          column: 23
-        content: "\"{:{}}\".format(1, 2, )"
-  parent: ~
-- kind:
-    name: StringDotFormatExtraPositionalArguments
-    body: "`.format` call has unused arguments at position(s): 2"
-    suggestion: "Remove extra positional arguments at position(s): 2"
-    fixable: true
-  location:
-    row: 19
-    column: 0
-  end_location:
-    row: 19
-    column: 31
-  fix:
-    edits:
-      - location:
-          row: 19
-          column: 0
-        end_location:
-          row: 19
-          column: 31
-        content: "\"{0}{1}\".format(1, 2, *args)"
-  parent: ~
+./resources/test/fixtures/pyflakes/F523.py:2:1: F523 [*] `.format` call has unused arguments at position(s): 1
+  |
+2 | # With indexes
+3 | "{0}".format(1, 2)  # F523
+  | ^^^^^^^^^^^^^^^^^^ F523
+4 | "{1}".format(1, 2, 3)  # F523
+5 | "{1:{0}}".format(1, 2)  # No issues
+  |
+  = help: Remove extra positional arguments at position(s): 1
+
+ℹ Suggested fix
+1 1 | # With indexes
+2   |-"{0}".format(1, 2)  # F523
+  2 |+"{0}".format(1, )  # F523
+3 3 | "{1}".format(1, 2, 3)  # F523
+4 4 | "{1:{0}}".format(1, 2)  # No issues
+5 5 | "{1:{0}}".format(1, 2, 3)  # F523
+
+./resources/test/fixtures/pyflakes/F523.py:3:1: F523 [*] `.format` call has unused arguments at position(s): 0, 2
+  |
+3 | # With indexes
+4 | "{0}".format(1, 2)  # F523
+5 | "{1}".format(1, 2, 3)  # F523
+  | ^^^^^^^^^^^^^^^^^^^^^ F523
+6 | "{1:{0}}".format(1, 2)  # No issues
+7 | "{1:{0}}".format(1, 2, 3)  # F523
+  |
+  = help: Remove extra positional arguments at position(s): 0, 2
+
+ℹ Suggested fix
+1 1 | # With indexes
+2 2 | "{0}".format(1, 2)  # F523
+3   |-"{1}".format(1, 2, 3)  # F523
+  3 |+"{0}".format(2, )  # F523
+4 4 | "{1:{0}}".format(1, 2)  # No issues
+5 5 | "{1:{0}}".format(1, 2, 3)  # F523
+6 6 | "{0}{2}".format(1, 2)  # F523, # F524
+
+./resources/test/fixtures/pyflakes/F523.py:5:1: F523 [*] `.format` call has unused arguments at position(s): 2
+  |
+5 | "{1}".format(1, 2, 3)  # F523
+6 | "{1:{0}}".format(1, 2)  # No issues
+7 | "{1:{0}}".format(1, 2, 3)  # F523
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ F523
+8 | "{0}{2}".format(1, 2)  # F523, # F524
+9 | "{1.arg[1]!r:0{2['arg']}{1}}".format(1, 2, 3, 4) # F523
+  |
+  = help: Remove extra positional arguments at position(s): 2
+
+ℹ Suggested fix
+2 2 | "{0}".format(1, 2)  # F523
+3 3 | "{1}".format(1, 2, 3)  # F523
+4 4 | "{1:{0}}".format(1, 2)  # No issues
+5   |-"{1:{0}}".format(1, 2, 3)  # F523
+  5 |+"{1:{0}}".format(1, 2, )  # F523
+6 6 | "{0}{2}".format(1, 2)  # F523, # F524
+7 7 | "{1.arg[1]!r:0{2['arg']}{1}}".format(1, 2, 3, 4) # F523
+8 8 | 
+
+./resources/test/fixtures/pyflakes/F523.py:6:1: F523 [*] `.format` call has unused arguments at position(s): 1
+  |
+6 | "{1:{0}}".format(1, 2)  # No issues
+7 | "{1:{0}}".format(1, 2, 3)  # F523
+8 | "{0}{2}".format(1, 2)  # F523, # F524
+  | ^^^^^^^^^^^^^^^^^^^^^ F523
+9 | "{1.arg[1]!r:0{2['arg']}{1}}".format(1, 2, 3, 4) # F523
+  |
+  = help: Remove extra positional arguments at position(s): 1
+
+ℹ Suggested fix
+3 3 | "{1}".format(1, 2, 3)  # F523
+4 4 | "{1:{0}}".format(1, 2)  # No issues
+5 5 | "{1:{0}}".format(1, 2, 3)  # F523
+6   |-"{0}{2}".format(1, 2)  # F523, # F524
+  6 |+"{0}{2}".format(1, )  # F523, # F524
+7 7 | "{1.arg[1]!r:0{2['arg']}{1}}".format(1, 2, 3, 4) # F523
+8 8 | 
+9 9 | # With no indexes
+
+./resources/test/fixtures/pyflakes/F523.py:7:1: F523 [*] `.format` call has unused arguments at position(s): 0, 3
+   |
+ 7 | "{1:{0}}".format(1, 2, 3)  # F523
+ 8 | "{0}{2}".format(1, 2)  # F523, # F524
+ 9 | "{1.arg[1]!r:0{2['arg']}{1}}".format(1, 2, 3, 4) # F523
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F523
+10 | 
+11 | # With no indexes
+   |
+   = help: Remove extra positional arguments at position(s): 0, 3
+
+ℹ Suggested fix
+4 4 | "{1:{0}}".format(1, 2)  # No issues
+5 5 | "{1:{0}}".format(1, 2, 3)  # F523
+6 6 | "{0}{2}".format(1, 2)  # F523, # F524
+7   |-"{1.arg[1]!r:0{2['arg']}{1}}".format(1, 2, 3, 4) # F523
+  7 |+"{0.arg[1]!r:0{1['arg']}{0}}".format(2, 3, ) # F523
+8 8 | 
+9 9 | # With no indexes
+10 10 | "{}".format(1, 2)  # F523
+
+./resources/test/fixtures/pyflakes/F523.py:10:1: F523 [*] `.format` call has unused arguments at position(s): 1
+   |
+10 | # With no indexes
+11 | "{}".format(1, 2)  # F523
+   | ^^^^^^^^^^^^^^^^^ F523
+12 | "{}".format(1, 2, 3)  # F523
+13 | "{:{}}".format(1, 2)  # No issues
+   |
+   = help: Remove extra positional arguments at position(s): 1
+
+ℹ Suggested fix
+7  7  | "{1.arg[1]!r:0{2['arg']}{1}}".format(1, 2, 3, 4) # F523
+8  8  | 
+9  9  | # With no indexes
+10    |-"{}".format(1, 2)  # F523
+   10 |+"{}".format(1, )  # F523
+11 11 | "{}".format(1, 2, 3)  # F523
+12 12 | "{:{}}".format(1, 2)  # No issues
+13 13 | "{:{}}".format(1, 2, 3)  # F523
+
+./resources/test/fixtures/pyflakes/F523.py:11:1: F523 [*] `.format` call has unused arguments at position(s): 1, 2
+   |
+11 | # With no indexes
+12 | "{}".format(1, 2)  # F523
+13 | "{}".format(1, 2, 3)  # F523
+   | ^^^^^^^^^^^^^^^^^^^^ F523
+14 | "{:{}}".format(1, 2)  # No issues
+15 | "{:{}}".format(1, 2, 3)  # F523
+   |
+   = help: Remove extra positional arguments at position(s): 1, 2
+
+ℹ Suggested fix
+8  8  | 
+9  9  | # With no indexes
+10 10 | "{}".format(1, 2)  # F523
+11    |-"{}".format(1, 2, 3)  # F523
+   11 |+"{}".format(1, )  # F523
+12 12 | "{:{}}".format(1, 2)  # No issues
+13 13 | "{:{}}".format(1, 2, 3)  # F523
+14 14 | 
+
+./resources/test/fixtures/pyflakes/F523.py:13:1: F523 [*] `.format` call has unused arguments at position(s): 2
+   |
+13 | "{}".format(1, 2, 3)  # F523
+14 | "{:{}}".format(1, 2)  # No issues
+15 | "{:{}}".format(1, 2, 3)  # F523
+   | ^^^^^^^^^^^^^^^^^^^^^^^ F523
+16 | 
+17 | # With *args
+   |
+   = help: Remove extra positional arguments at position(s): 2
+
+ℹ Suggested fix
+10 10 | "{}".format(1, 2)  # F523
+11 11 | "{}".format(1, 2, 3)  # F523
+12 12 | "{:{}}".format(1, 2)  # No issues
+13    |-"{:{}}".format(1, 2, 3)  # F523
+   13 |+"{:{}}".format(1, 2, )  # F523
+14 14 | 
+15 15 | # With *args
+16 16 | "{0}{1}".format(*args)  # No issues
+
+./resources/test/fixtures/pyflakes/F523.py:19:1: F523 [*] `.format` call has unused arguments at position(s): 2
+   |
+19 | "{0}{1}".format(1, *args)  # No issues
+20 | "{0}{1}".format(1, 2, *args)  # No issues
+21 | "{0}{1}".format(1, 2, 3, *args)  # F523
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F523
+   |
+   = help: Remove extra positional arguments at position(s): 2
+
+ℹ Suggested fix
+16 16 | "{0}{1}".format(*args)  # No issues
+17 17 | "{0}{1}".format(1, *args)  # No issues
+18 18 | "{0}{1}".format(1, 2, *args)  # No issues
+19    |-"{0}{1}".format(1, 2, 3, *args)  # F523
+   19 |+"{0}{1}".format(1, 2, *args)  # F523
+
 

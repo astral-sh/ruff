@@ -1,68 +1,56 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: AvoidableEscapedQuote
-    body: Change outer quotes to avoid escaping inner quotes
-    suggestion: Change outer quotes to avoid escaping inner quotes
-    fixable: true
-  location:
-    row: 1
-    column: 25
-  end_location:
-    row: 1
-    column: 47
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 25
-        end_location:
-          row: 1
-          column: 47
-        content: "\"This is a 'string'\""
-  parent: ~
-- kind:
-    name: AvoidableEscapedQuote
-    body: Change outer quotes to avoid escaping inner quotes
-    suggestion: Change outer quotes to avoid escaping inner quotes
-    fixable: true
-  location:
-    row: 2
-    column: 25
-  end_location:
-    row: 2
-    column: 52
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 25
-        end_location:
-          row: 2
-          column: 52
-        content: "\"This is \\\\ a \\\\'string'\""
-  parent: ~
-- kind:
-    name: AvoidableEscapedQuote
-    body: Change outer quotes to avoid escaping inner quotes
-    suggestion: Change outer quotes to avoid escaping inner quotes
-    fixable: true
-  location:
-    row: 10
-    column: 4
-  end_location:
-    row: 10
-    column: 16
-  fix:
-    edits:
-      - location:
-          row: 10
-          column: 4
-        end_location:
-          row: 10
-          column: 16
-        content: "\"'string'\""
-  parent: ~
+./resources/test/fixtures/flake8_quotes/doubles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
+  |
+1 | this_should_raise_Q003 = 'This is a \'string\''
+  |                          ^^^^^^^^^^^^^^^^^^^^^^ Q003
+2 | this_should_raise_Q003 = 'This is \\ a \\\'string\''
+3 | this_is_fine = '"This" is a \'string\''
+  |
+  = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Suggested fix
+1   |-this_should_raise_Q003 = 'This is a \'string\''
+  1 |+this_should_raise_Q003 = "This is a 'string'"
+2 2 | this_should_raise_Q003 = 'This is \\ a \\\'string\''
+3 3 | this_is_fine = '"This" is a \'string\''
+4 4 | this_is_fine = "This is a 'string'"
+
+./resources/test/fixtures/flake8_quotes/doubles_escaped.py:2:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
+  |
+2 | this_should_raise_Q003 = 'This is a \'string\''
+3 | this_should_raise_Q003 = 'This is \\ a \\\'string\''
+  |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q003
+4 | this_is_fine = '"This" is a \'string\''
+5 | this_is_fine = "This is a 'string'"
+  |
+  = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Suggested fix
+1 1 | this_should_raise_Q003 = 'This is a \'string\''
+2   |-this_should_raise_Q003 = 'This is \\ a \\\'string\''
+  2 |+this_should_raise_Q003 = "This is \\ a \\'string'"
+3 3 | this_is_fine = '"This" is a \'string\''
+4 4 | this_is_fine = "This is a 'string'"
+5 5 | this_is_fine = "\"This\" is a 'string'"
+
+./resources/test/fixtures/flake8_quotes/doubles_escaped.py:10:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
+   |
+10 | this_should_raise = (
+11 |     'This is a'
+12 |     '\'string\''
+   |     ^^^^^^^^^^^^ Q003
+13 | )
+   |
+   = help: Change outer quotes to avoid escaping inner quotes
+
+ℹ Suggested fix
+7  7  | this_is_fine = R'This is a \'string\''
+8  8  | this_should_raise = (
+9  9  |     'This is a'
+10    |-    '\'string\''
+   10 |+    "'string'"
+11 11 | )
+
 

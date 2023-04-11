@@ -1,299 +1,212 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 12
-  end_location:
-    row: 54
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 58
-    column: 3
-  end_location:
-    row: 58
-    column: 3
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 60
-    column: 7
-  end_location:
-    row: 60
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 62
-    column: 11
-  end_location:
-    row: 62
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 64
-    column: 9
-  end_location:
-    row: 64
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 66
-    column: 8
-  end_location:
-    row: 66
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 68
-    column: 14
-  end_location:
-    row: 68
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 70
-    column: 11
-  end_location:
-    row: 70
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 72
-    column: 14
-  end_location:
-    row: 72
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 74
-    column: 11
-  end_location:
-    row: 74
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 76
-    column: 2
-  end_location:
-    row: 76
-    column: 2
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 76
-    column: 3
-  end_location:
-    row: 76
-    column: 3
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 78
-    column: 2
-  end_location:
-    row: 78
-    column: 2
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 78
-    column: 5
-  end_location:
-    row: 78
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 88
-    column: 7
-  end_location:
-    row: 88
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 90
-    column: 5
-  end_location:
-    row: 90
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 92
-    column: 2
-  end_location:
-    row: 92
-    column: 2
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 94
-    column: 3
-  end_location:
-    row: 94
-    column: 3
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 98
-    column: 8
-  end_location:
-    row: 98
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 100
-    column: 6
-  end_location:
-    row: 100
-    column: 6
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingWhitespaceAroundOperator
-    body: Missing whitespace around operator
-    suggestion: ~
-    fixable: false
-  location:
-    row: 154
-    column: 12
-  end_location:
-    row: 154
-    column: 12
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E22.py:54:13: E225 Missing whitespace around operator
+   |
+54 | #: E225
+55 | submitted +=1
+   |              E225
+56 | #: E225
+57 | submitted+= 1
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:58:4: E225 Missing whitespace around operator
+   |
+58 | submitted+= 1
+59 | #: E225
+60 | c =-1
+   |     E225
+61 | #: E225
+62 | x = x /2 - 1
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:60:8: E225 Missing whitespace around operator
+   |
+60 | c =-1
+61 | #: E225
+62 | x = x /2 - 1
+   |         E225
+63 | #: E225
+64 | c = alpha -4
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:62:12: E225 Missing whitespace around operator
+   |
+62 | x = x /2 - 1
+63 | #: E225
+64 | c = alpha -4
+   |             E225
+65 | #: E225
+66 | c = alpha- 4
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:64:10: E225 Missing whitespace around operator
+   |
+64 | c = alpha -4
+65 | #: E225
+66 | c = alpha- 4
+   |           E225
+67 | #: E225
+68 | z = x **y
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:66:9: E225 Missing whitespace around operator
+   |
+66 | c = alpha- 4
+67 | #: E225
+68 | z = x **y
+   |          E225
+69 | #: E225
+70 | z = (x + 1) **y
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:68:15: E225 Missing whitespace around operator
+   |
+68 | z = x **y
+69 | #: E225
+70 | z = (x + 1) **y
+   |                E225
+71 | #: E225
+72 | z = (x + 1)** y
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:70:12: E225 Missing whitespace around operator
+   |
+70 | z = (x + 1) **y
+71 | #: E225
+72 | z = (x + 1)** y
+   |             E225
+73 | #: E225
+74 | _1kB = _1MB >>10
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:72:15: E225 Missing whitespace around operator
+   |
+72 | z = (x + 1)** y
+73 | #: E225
+74 | _1kB = _1MB >>10
+   |                E225
+75 | #: E225
+76 | _1kB = _1MB>> 10
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:74:12: E225 Missing whitespace around operator
+   |
+74 | _1kB = _1MB >>10
+75 | #: E225
+76 | _1kB = _1MB>> 10
+   |             E225
+77 | #: E225 E225
+78 | i=i+ 1
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:76:3: E225 Missing whitespace around operator
+   |
+76 | _1kB = _1MB>> 10
+77 | #: E225 E225
+78 | i=i+ 1
+   |    E225
+79 | #: E225 E225
+80 | i=i +1
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:76:4: E225 Missing whitespace around operator
+   |
+76 | _1kB = _1MB>> 10
+77 | #: E225 E225
+78 | i=i+ 1
+   |     E225
+79 | #: E225 E225
+80 | i=i +1
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:78:3: E225 Missing whitespace around operator
+   |
+78 | i=i+ 1
+79 | #: E225 E225
+80 | i=i +1
+   |    E225
+81 | #: E225
+82 | i = 1and 1
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:78:6: E225 Missing whitespace around operator
+   |
+78 | i=i+ 1
+79 | #: E225 E225
+80 | i=i +1
+   |       E225
+81 | #: E225
+82 | i = 1and 1
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:88:8: E225 Missing whitespace around operator
+   |
+88 | 1in []
+89 | #: E225
+90 | i = 1 @2
+   |         E225
+91 | #: E225
+92 | i = 1@ 2
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:90:6: E225 Missing whitespace around operator
+   |
+90 | i = 1 @2
+91 | #: E225
+92 | i = 1@ 2
+   |       E225
+93 | #: E225 E226
+94 | i=i+1
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:92:3: E225 Missing whitespace around operator
+   |
+92 | i = 1@ 2
+93 | #: E225 E226
+94 | i=i+1
+   |    E225
+95 | #: E225 E226
+96 | i =i+1
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:94:4: E225 Missing whitespace around operator
+   |
+94 | i=i+1
+95 | #: E225 E226
+96 | i =i+1
+   |     E225
+97 | #: E225 E226
+98 | i= i+1
+   |
+
+./resources/test/fixtures/pycodestyle/E22.py:98:9: E225 Missing whitespace around operator
+    |
+ 98 | i= i+1
+ 99 | #: E225 E226
+100 | c = (a +b)*(a - b)
+    |          E225
+101 | #: E225 E226
+102 | c = (a+ b)*(a - b)
+    |
+
+./resources/test/fixtures/pycodestyle/E22.py:100:7: E225 Missing whitespace around operator
+    |
+100 | c = (a +b)*(a - b)
+101 | #: E225 E226
+102 | c = (a+ b)*(a - b)
+    |        E225
+103 | #:
+    |
+
+./resources/test/fixtures/pycodestyle/E22.py:154:13: E225 Missing whitespace around operator
+    |
+154 | func2(lambda a, b=h[:], c=0: (a, b, c))
+155 | if not -5 < x < +5:
+156 |     print >>sys.stderr, "x is out of range."
+    |              E225
+157 | print >> sys.stdout, "x is an integer."
+158 | x = x / 2 - 1
+    |
+
 

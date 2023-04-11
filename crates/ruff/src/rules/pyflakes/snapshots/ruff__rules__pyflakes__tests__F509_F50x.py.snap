@@ -1,19 +1,14 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PercentFormatUnsupportedFormatCharacter
-    body: "`%`-format string has unsupported format character `j`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 11
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F50x.py:4:1: F509 `%`-format string has unsupported format character `j`
+  |
+4 | '%s %(foo)s' % {'foo': 'bar'}  # F506
+5 | '%(foo)s %s' % {'foo': 'bar'}  # F506
+6 | '%j' % (1,)  # F509
+  | ^^^^^^^^^^^ F509
+7 | '%s %s' % (1,)  # F507
+8 | '%s %s' % (1, 2, 3)  # F507
+  |
+
 

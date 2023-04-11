@@ -1,68 +1,59 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ExprOrNotExpr
-    body: "Use `True` instead of `a or not a`"
-    suggestion: "Replace with `True`"
-    fixable: true
-  location:
-    row: 1
-    column: 3
-  end_location:
-    row: 1
-    column: 13
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 3
-        end_location:
-          row: 1
-          column: 13
-        content: "True"
-  parent: ~
-- kind:
-    name: ExprOrNotExpr
-    body: "Use `True` instead of `a or not a`"
-    suggestion: "Replace with `True`"
-    fixable: true
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 4
-        end_location:
-          row: 4
-          column: 14
-        content: "True"
-  parent: ~
-- kind:
-    name: ExprOrNotExpr
-    body: "Use `True` instead of `a or not a`"
-    suggestion: "Replace with `True`"
-    fixable: true
-  location:
-    row: 7
-    column: 4
-  end_location:
-    row: 7
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 4
-        end_location:
-          row: 7
-          column: 14
-        content: "True"
-  parent: ~
+./resources/test/fixtures/flake8_simplify/SIM221.py:1:4: SIM221 [*] Use `True` instead of `a or not a`
+  |
+1 | if a or not a:
+  |    ^^^^^^^^^^ SIM221
+2 |     pass
+  |
+  = help: Replace with `True`
+
+ℹ Suggested fix
+1   |-if a or not a:
+  1 |+if True:
+2 2 |     pass
+3 3 | 
+4 4 | if (a or not a) or b:
+
+./resources/test/fixtures/flake8_simplify/SIM221.py:4:5: SIM221 [*] Use `True` instead of `a or not a`
+  |
+4 |     pass
+5 | 
+6 | if (a or not a) or b:
+  |     ^^^^^^^^^^ SIM221
+7 |     pass
+  |
+  = help: Replace with `True`
+
+ℹ Suggested fix
+1 1 | if a or not a:
+2 2 |     pass
+3 3 | 
+4   |-if (a or not a) or b:
+  4 |+if (True) or b:
+5 5 |     pass
+6 6 | 
+7 7 | if (a or not a) and b:
+
+./resources/test/fixtures/flake8_simplify/SIM221.py:7:5: SIM221 [*] Use `True` instead of `a or not a`
+   |
+ 7 |     pass
+ 8 | 
+ 9 | if (a or not a) and b:
+   |     ^^^^^^^^^^ SIM221
+10 |     pass
+   |
+   = help: Replace with `True`
+
+ℹ Suggested fix
+4 4 | if (a or not a) or b:
+5 5 |     pass
+6 6 | 
+7   |-if (a or not a) and b:
+  7 |+if (True) and b:
+8 8 |     pass
+9 9 | 
+10 10 | if a:
+
 

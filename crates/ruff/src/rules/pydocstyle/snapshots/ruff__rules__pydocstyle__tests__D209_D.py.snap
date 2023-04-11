@@ -1,47 +1,50 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NewLineAfterLastParagraph
-    body: Multi-line docstring closing quotes should be on a separate line
-    suggestion: Move closing quotes to new line
-    fixable: true
-  location:
-    row: 281
-    column: 4
-  end_location:
-    row: 283
-    column: 19
-  fix:
-    edits:
-      - location:
-          row: 283
-          column: 16
-        end_location:
-          row: 283
-          column: 16
-        content: "\n    "
-  parent: ~
-- kind:
-    name: NewLineAfterLastParagraph
-    body: Multi-line docstring closing quotes should be on a separate line
-    suggestion: Move closing quotes to new line
-    fixable: true
-  location:
-    row: 588
-    column: 4
-  end_location:
-    row: 590
-    column: 21
-  fix:
-    edits:
-      - location:
-          row: 590
-          column: 16
-        end_location:
-          row: 590
-          column: 18
-        content: "\n    "
-  parent: ~
+./resources/test/fixtures/pydocstyle/D.py:281:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
+    |
+281 |   @expect('D213: Multi-line docstring summary should start at the second line')
+282 |   def asdfljdf24():
+283 |       """Summary.
+    |  _____^
+284 | | 
+285 | |     Description."""
+    | |___________________^ D209
+    |
+    = help: Move closing quotes to new line
+
+ℹ Suggested fix
+280 280 | def asdfljdf24():
+281 281 |     """Summary.
+282 282 | 
+283     |-    Description."""
+    283 |+    Description.
+    284 |+    """
+284 285 | 
+285 286 | 
+286 287 | @expect('D210: No whitespaces allowed surrounding docstring text')
+
+./resources/test/fixtures/pydocstyle/D.py:588:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
+    |
+588 |   @expect('D213: Multi-line docstring summary should start at the second line')
+589 |   def asdfljdjgf24():
+590 |       """Summary.
+    |  _____^
+591 | | 
+592 | |     Description.  """
+    | |_____________________^ D209
+    |
+    = help: Move closing quotes to new line
+
+ℹ Suggested fix
+587 587 | def asdfljdjgf24():
+588 588 |     """Summary.
+589 589 | 
+590     |-    Description.  """
+    590 |+    Description.
+    591 |+    """
+591 592 | 
+592 593 | 
+593 594 | @expect('D200: One-line docstring should fit on one line with quotes '
+
 

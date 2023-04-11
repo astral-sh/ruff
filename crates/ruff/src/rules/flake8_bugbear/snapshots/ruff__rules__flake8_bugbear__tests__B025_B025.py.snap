@@ -1,61 +1,41 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DuplicateTryBlockException
-    body: "try-except block with duplicate exception `ValueError`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 7
-  end_location:
-    row: 19
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DuplicateTryBlockException
-    body: "try-except block with duplicate exception `pickle.PickleError`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 28
-    column: 7
-  end_location:
-    row: 28
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DuplicateTryBlockException
-    body: "try-except block with duplicate exception `ValueError`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 35
-    column: 7
-  end_location:
-    row: 35
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DuplicateTryBlockException
-    body: "try-except block with duplicate exception `TypeError`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 37
-    column: 17
-  end_location:
-    row: 37
-    column: 26
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bugbear/B025.py:19:8: B025 try-except block with duplicate exception `ValueError`
+   |
+19 | except ValueError:
+20 |     a = 2
+21 | except ValueError:
+   |        ^^^^^^^^^^ B025
+22 |     a = 2
+   |
+
+./resources/test/fixtures/flake8_bugbear/B025.py:28:8: B025 try-except block with duplicate exception `pickle.PickleError`
+   |
+28 | except ValueError:
+29 |     a = 2
+30 | except pickle.PickleError:
+   |        ^^^^^^^^^^^^^^^^^^ B025
+31 |     a = 2
+   |
+
+./resources/test/fixtures/flake8_bugbear/B025.py:35:8: B025 try-except block with duplicate exception `ValueError`
+   |
+35 | except (ValueError, TypeError):
+36 |     a = 2
+37 | except ValueError:
+   |        ^^^^^^^^^^ B025
+38 |     a = 2
+39 | except (OSError, TypeError):
+   |
+
+./resources/test/fixtures/flake8_bugbear/B025.py:37:18: B025 try-except block with duplicate exception `TypeError`
+   |
+37 | except ValueError:
+38 |     a = 2
+39 | except (OSError, TypeError):
+   |                  ^^^^^^^^^ B025
+40 |     a = 2
+   |
+
 

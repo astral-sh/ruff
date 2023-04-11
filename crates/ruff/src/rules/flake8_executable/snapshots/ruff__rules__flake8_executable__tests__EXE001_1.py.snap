@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/flake8_executable/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ShebangNotExecutable
-    body: Shebang is present but file is not executable
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 2
-  end_location:
-    row: 1
-    column: 17
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_executable/EXE001_1.py:1:3: EXE001 Shebang is present but file is not executable
+  |
+1 | #!/usr/bin/python
+  |   ^^^^^^^^^^^^^^^ EXE001
+2 | 
+3 | if __name__ == '__main__':
+  |
+
 

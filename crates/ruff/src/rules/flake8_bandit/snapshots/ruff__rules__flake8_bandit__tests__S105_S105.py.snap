@@ -1,551 +1,377 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 11
-  end_location:
-    row: 13
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 8
-  end_location:
-    row: 14
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 9
-  end_location:
-    row: 15
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 6
-  end_location:
-    row: 16
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 9
-  end_location:
-    row: 17
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 8
-  end_location:
-    row: 18
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 10
-  end_location:
-    row: 19
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 18
-  end_location:
-    row: 20
-    column: 26
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 18
-  end_location:
-    row: 21
-    column: 26
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 11
-  end_location:
-    row: 22
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 11
-  end_location:
-    row: 23
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 25
-    column: 16
-  end_location:
-    row: 25
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 12
-  end_location:
-    row: 26
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 27
-    column: 14
-  end_location:
-    row: 27
-    column: 22
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 28
-    column: 11
-  end_location:
-    row: 28
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 14
-  end_location:
-    row: 29
-    column: 22
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 30
-    column: 13
-  end_location:
-    row: 30
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 31
-    column: 15
-  end_location:
-    row: 31
-    column: 23
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 23
-  end_location:
-    row: 32
-    column: 31
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 33
-    column: 23
-  end_location:
-    row: 33
-    column: 31
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 37
-    column: 15
-  end_location:
-    row: 37
-    column: 23
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 41
-    column: 19
-  end_location:
-    row: 41
-    column: 27
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 42
-    column: 16
-  end_location:
-    row: 42
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 17
-  end_location:
-    row: 43
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 14
-  end_location:
-    row: 44
-    column: 22
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 45
-    column: 17
-  end_location:
-    row: 45
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 16
-  end_location:
-    row: 46
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 47
-    column: 18
-  end_location:
-    row: 47
-    column: 26
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 49
-    column: 12
-  end_location:
-    row: 49
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 9
-  end_location:
-    row: 50
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 51
-    column: 10
-  end_location:
-    row: 51
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 52
-    column: 7
-  end_location:
-    row: 52
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 53
-    column: 10
-  end_location:
-    row: 53
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 9
-  end_location:
-    row: 54
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 55
-    column: 11
-  end_location:
-    row: 55
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"s3cr3t\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 56
-    column: 20
-  end_location:
-    row: 56
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"1\\n2\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 58
-    column: 12
-  end_location:
-    row: 58
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"3\\t4\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 61
-    column: 12
-  end_location:
-    row: 61
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordString
-    body: "Possible hardcoded password: \"5\\r6\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 64
-    column: 12
-  end_location:
-    row: 64
-    column: 18
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bandit/S105.py:13:12: S105 Possible hardcoded password: "s3cr3t"
+   |
+13 | # Errors
+14 | password = "s3cr3t"
+   |            ^^^^^^^^ S105
+15 | _pass = "s3cr3t"
+16 | passwd = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:14:9: S105 Possible hardcoded password: "s3cr3t"
+   |
+14 | # Errors
+15 | password = "s3cr3t"
+16 | _pass = "s3cr3t"
+   |         ^^^^^^^^ S105
+17 | passwd = "s3cr3t"
+18 | pwd = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:15:10: S105 Possible hardcoded password: "s3cr3t"
+   |
+15 | password = "s3cr3t"
+16 | _pass = "s3cr3t"
+17 | passwd = "s3cr3t"
+   |          ^^^^^^^^ S105
+18 | pwd = "s3cr3t"
+19 | secret = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:16:7: S105 Possible hardcoded password: "s3cr3t"
+   |
+16 | _pass = "s3cr3t"
+17 | passwd = "s3cr3t"
+18 | pwd = "s3cr3t"
+   |       ^^^^^^^^ S105
+19 | secret = "s3cr3t"
+20 | token = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:17:10: S105 Possible hardcoded password: "s3cr3t"
+   |
+17 | passwd = "s3cr3t"
+18 | pwd = "s3cr3t"
+19 | secret = "s3cr3t"
+   |          ^^^^^^^^ S105
+20 | token = "s3cr3t"
+21 | secrete = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:18:9: S105 Possible hardcoded password: "s3cr3t"
+   |
+18 | pwd = "s3cr3t"
+19 | secret = "s3cr3t"
+20 | token = "s3cr3t"
+   |         ^^^^^^^^ S105
+21 | secrete = "s3cr3t"
+22 | safe = password = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:19:11: S105 Possible hardcoded password: "s3cr3t"
+   |
+19 | secret = "s3cr3t"
+20 | token = "s3cr3t"
+21 | secrete = "s3cr3t"
+   |           ^^^^^^^^ S105
+22 | safe = password = "s3cr3t"
+23 | password = safe = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:20:19: S105 Possible hardcoded password: "s3cr3t"
+   |
+20 | token = "s3cr3t"
+21 | secrete = "s3cr3t"
+22 | safe = password = "s3cr3t"
+   |                   ^^^^^^^^ S105
+23 | password = safe = "s3cr3t"
+24 | PASSWORD = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:21:19: S105 Possible hardcoded password: "s3cr3t"
+   |
+21 | secrete = "s3cr3t"
+22 | safe = password = "s3cr3t"
+23 | password = safe = "s3cr3t"
+   |                   ^^^^^^^^ S105
+24 | PASSWORD = "s3cr3t"
+25 | PassWord = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:22:12: S105 Possible hardcoded password: "s3cr3t"
+   |
+22 | safe = password = "s3cr3t"
+23 | password = safe = "s3cr3t"
+24 | PASSWORD = "s3cr3t"
+   |            ^^^^^^^^ S105
+25 | PassWord = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:23:12: S105 Possible hardcoded password: "s3cr3t"
+   |
+23 | password = safe = "s3cr3t"
+24 | PASSWORD = "s3cr3t"
+25 | PassWord = "s3cr3t"
+   |            ^^^^^^^^ S105
+26 | 
+27 | d["password"] = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:25:17: S105 Possible hardcoded password: "s3cr3t"
+   |
+25 | PassWord = "s3cr3t"
+26 | 
+27 | d["password"] = "s3cr3t"
+   |                 ^^^^^^^^ S105
+28 | d["pass"] = "s3cr3t"
+29 | d["passwd"] = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:26:13: S105 Possible hardcoded password: "s3cr3t"
+   |
+26 | d["password"] = "s3cr3t"
+27 | d["pass"] = "s3cr3t"
+   |             ^^^^^^^^ S105
+28 | d["passwd"] = "s3cr3t"
+29 | d["pwd"] = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:27:15: S105 Possible hardcoded password: "s3cr3t"
+   |
+27 | d["password"] = "s3cr3t"
+28 | d["pass"] = "s3cr3t"
+29 | d["passwd"] = "s3cr3t"
+   |               ^^^^^^^^ S105
+30 | d["pwd"] = "s3cr3t"
+31 | d["secret"] = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:28:12: S105 Possible hardcoded password: "s3cr3t"
+   |
+28 | d["pass"] = "s3cr3t"
+29 | d["passwd"] = "s3cr3t"
+30 | d["pwd"] = "s3cr3t"
+   |            ^^^^^^^^ S105
+31 | d["secret"] = "s3cr3t"
+32 | d["token"] = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:29:15: S105 Possible hardcoded password: "s3cr3t"
+   |
+29 | d["passwd"] = "s3cr3t"
+30 | d["pwd"] = "s3cr3t"
+31 | d["secret"] = "s3cr3t"
+   |               ^^^^^^^^ S105
+32 | d["token"] = "s3cr3t"
+33 | d["secrete"] = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:30:14: S105 Possible hardcoded password: "s3cr3t"
+   |
+30 | d["pwd"] = "s3cr3t"
+31 | d["secret"] = "s3cr3t"
+32 | d["token"] = "s3cr3t"
+   |              ^^^^^^^^ S105
+33 | d["secrete"] = "s3cr3t"
+34 | safe = d["password"] = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:31:16: S105 Possible hardcoded password: "s3cr3t"
+   |
+31 | d["secret"] = "s3cr3t"
+32 | d["token"] = "s3cr3t"
+33 | d["secrete"] = "s3cr3t"
+   |                ^^^^^^^^ S105
+34 | safe = d["password"] = "s3cr3t"
+35 | d["password"] = safe = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:32:24: S105 Possible hardcoded password: "s3cr3t"
+   |
+32 | d["token"] = "s3cr3t"
+33 | d["secrete"] = "s3cr3t"
+34 | safe = d["password"] = "s3cr3t"
+   |                        ^^^^^^^^ S105
+35 | d["password"] = safe = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:33:24: S105 Possible hardcoded password: "s3cr3t"
+   |
+33 | d["secrete"] = "s3cr3t"
+34 | safe = d["password"] = "s3cr3t"
+35 | d["password"] = safe = "s3cr3t"
+   |                        ^^^^^^^^ S105
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:37:16: S105 Possible hardcoded password: "s3cr3t"
+   |
+37 | class MyClass:
+38 |     password = "s3cr3t"
+   |                ^^^^^^^^ S105
+39 |     safe = password
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:41:20: S105 Possible hardcoded password: "s3cr3t"
+   |
+41 | MyClass.password = "s3cr3t"
+   |                    ^^^^^^^^ S105
+42 | MyClass._pass = "s3cr3t"
+43 | MyClass.passwd = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:42:17: S105 Possible hardcoded password: "s3cr3t"
+   |
+42 | MyClass.password = "s3cr3t"
+43 | MyClass._pass = "s3cr3t"
+   |                 ^^^^^^^^ S105
+44 | MyClass.passwd = "s3cr3t"
+45 | MyClass.pwd = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:43:18: S105 Possible hardcoded password: "s3cr3t"
+   |
+43 | MyClass.password = "s3cr3t"
+44 | MyClass._pass = "s3cr3t"
+45 | MyClass.passwd = "s3cr3t"
+   |                  ^^^^^^^^ S105
+46 | MyClass.pwd = "s3cr3t"
+47 | MyClass.secret = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:44:15: S105 Possible hardcoded password: "s3cr3t"
+   |
+44 | MyClass._pass = "s3cr3t"
+45 | MyClass.passwd = "s3cr3t"
+46 | MyClass.pwd = "s3cr3t"
+   |               ^^^^^^^^ S105
+47 | MyClass.secret = "s3cr3t"
+48 | MyClass.token = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:45:18: S105 Possible hardcoded password: "s3cr3t"
+   |
+45 | MyClass.passwd = "s3cr3t"
+46 | MyClass.pwd = "s3cr3t"
+47 | MyClass.secret = "s3cr3t"
+   |                  ^^^^^^^^ S105
+48 | MyClass.token = "s3cr3t"
+49 | MyClass.secrete = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:46:17: S105 Possible hardcoded password: "s3cr3t"
+   |
+46 | MyClass.pwd = "s3cr3t"
+47 | MyClass.secret = "s3cr3t"
+48 | MyClass.token = "s3cr3t"
+   |                 ^^^^^^^^ S105
+49 | MyClass.secrete = "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:47:19: S105 Possible hardcoded password: "s3cr3t"
+   |
+47 | MyClass.secret = "s3cr3t"
+48 | MyClass.token = "s3cr3t"
+49 | MyClass.secrete = "s3cr3t"
+   |                   ^^^^^^^^ S105
+50 | 
+51 | password == "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:49:13: S105 Possible hardcoded password: "s3cr3t"
+   |
+49 | MyClass.secrete = "s3cr3t"
+50 | 
+51 | password == "s3cr3t"
+   |             ^^^^^^^^ S105
+52 | _pass == "s3cr3t"
+53 | passwd == "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:50:10: S105 Possible hardcoded password: "s3cr3t"
+   |
+50 | password == "s3cr3t"
+51 | _pass == "s3cr3t"
+   |          ^^^^^^^^ S105
+52 | passwd == "s3cr3t"
+53 | pwd == "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:51:11: S105 Possible hardcoded password: "s3cr3t"
+   |
+51 | password == "s3cr3t"
+52 | _pass == "s3cr3t"
+53 | passwd == "s3cr3t"
+   |           ^^^^^^^^ S105
+54 | pwd == "s3cr3t"
+55 | secret == "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:52:8: S105 Possible hardcoded password: "s3cr3t"
+   |
+52 | _pass == "s3cr3t"
+53 | passwd == "s3cr3t"
+54 | pwd == "s3cr3t"
+   |        ^^^^^^^^ S105
+55 | secret == "s3cr3t"
+56 | token == "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:53:11: S105 Possible hardcoded password: "s3cr3t"
+   |
+53 | passwd == "s3cr3t"
+54 | pwd == "s3cr3t"
+55 | secret == "s3cr3t"
+   |           ^^^^^^^^ S105
+56 | token == "s3cr3t"
+57 | secrete == "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:54:10: S105 Possible hardcoded password: "s3cr3t"
+   |
+54 | pwd == "s3cr3t"
+55 | secret == "s3cr3t"
+56 | token == "s3cr3t"
+   |          ^^^^^^^^ S105
+57 | secrete == "s3cr3t"
+58 | password == safe == "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:55:12: S105 Possible hardcoded password: "s3cr3t"
+   |
+55 | secret == "s3cr3t"
+56 | token == "s3cr3t"
+57 | secrete == "s3cr3t"
+   |            ^^^^^^^^ S105
+58 | password == safe == "s3cr3t"
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:56:21: S105 Possible hardcoded password: "s3cr3t"
+   |
+56 | token == "s3cr3t"
+57 | secrete == "s3cr3t"
+58 | password == safe == "s3cr3t"
+   |                     ^^^^^^^^ S105
+59 | 
+60 | if token == "1\n2":
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:58:13: S105 Possible hardcoded password: "1\n2"
+   |
+58 | password == safe == "s3cr3t"
+59 | 
+60 | if token == "1\n2":
+   |             ^^^^^^ S105
+61 |     pass
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:61:13: S105 Possible hardcoded password: "3\t4"
+   |
+61 |     pass
+62 | 
+63 | if token == "3\t4":
+   |             ^^^^^^ S105
+64 |     pass
+   |
+
+./resources/test/fixtures/flake8_bandit/S105.py:64:13: S105 Possible hardcoded password: "5\r6"
+   |
+64 |     pass
+65 | 
+66 | if token == "5\r6":
+   |             ^^^^^^ S105
+67 |     pass
+   |
+
 

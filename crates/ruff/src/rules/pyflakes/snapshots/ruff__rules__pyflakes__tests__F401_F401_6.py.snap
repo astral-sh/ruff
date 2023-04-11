@@ -1,93 +1,75 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedImport
-    body: "`.background.BackgroundTasks` imported but unused"
-    suggestion: "Remove unused import: `.background.BackgroundTasks`"
-    fixable: true
-  location:
-    row: 7
-    column: 24
-  end_location:
-    row: 7
-    column: 39
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 0
-        end_location:
-          row: 8
-          column: 0
-        content: ~
-  parent:
-    row: 7
-    column: 0
-- kind:
-    name: UnusedImport
-    body: "`.datastructures.UploadFile` imported but unused"
-    suggestion: "Remove unused import: `.datastructures.UploadFile`"
-    fixable: true
-  location:
-    row: 10
-    column: 28
-  end_location:
-    row: 10
-    column: 52
-  fix:
-    edits:
-      - location:
-          row: 10
-          column: 0
-        end_location:
-          row: 11
-          column: 0
-        content: ~
-  parent:
-    row: 10
-    column: 0
-- kind:
-    name: UnusedImport
-    body: "`background` imported but unused"
-    suggestion: "Remove unused import: `background`"
-    fixable: true
-  location:
-    row: 16
-    column: 7
-  end_location:
-    row: 16
-    column: 17
-  fix:
-    edits:
-      - location:
-          row: 16
-          column: 0
-        end_location:
-          row: 17
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`datastructures` imported but unused"
-    suggestion: "Remove unused import: `datastructures`"
-    fixable: true
-  location:
-    row: 19
-    column: 7
-  end_location:
-    row: 19
-    column: 35
-  fix:
-    edits:
-      - location:
-          row: 19
-          column: 0
-        end_location:
-          row: 20
-          column: 0
-        content: ~
-  parent: ~
+./resources/test/fixtures/pyflakes/F401_6.py:7:25: F401 [*] `.background.BackgroundTasks` imported but unused
+   |
+ 7 | # F401 `background.BackgroundTasks` imported but unused
+ 8 | from .background import BackgroundTasks
+   |                         ^^^^^^^^^^^^^^^ F401
+ 9 | 
+10 | # F401 `datastructures.UploadFile` imported but unused
+   |
+   = help: Remove unused import: `.background.BackgroundTasks`
+
+ℹ Suggested fix
+4 4 | from .applications import FastAPI as FastAPI
+5 5 | 
+6 6 | # F401 `background.BackgroundTasks` imported but unused
+7   |-from .background import BackgroundTasks
+8 7 | 
+9 8 | # F401 `datastructures.UploadFile` imported but unused
+10 9 | from .datastructures import UploadFile as FileUpload
+
+./resources/test/fixtures/pyflakes/F401_6.py:10:29: F401 [*] `.datastructures.UploadFile` imported but unused
+   |
+10 | # F401 `datastructures.UploadFile` imported but unused
+11 | from .datastructures import UploadFile as FileUpload
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^ F401
+12 | 
+13 | # OK
+   |
+   = help: Remove unused import: `.datastructures.UploadFile`
+
+ℹ Suggested fix
+7  7  | from .background import BackgroundTasks
+8  8  | 
+9  9  | # F401 `datastructures.UploadFile` imported but unused
+10    |-from .datastructures import UploadFile as FileUpload
+11 10 | 
+12 11 | # OK
+13 12 | import applications as applications
+
+./resources/test/fixtures/pyflakes/F401_6.py:16:8: F401 [*] `background` imported but unused
+   |
+16 | # F401 `background` imported but unused
+17 | import background
+   |        ^^^^^^^^^^ F401
+18 | 
+19 | # F401 `datastructures` imported but unused
+   |
+   = help: Remove unused import: `background`
+
+ℹ Suggested fix
+13 13 | import applications as applications
+14 14 | 
+15 15 | # F401 `background` imported but unused
+16    |-import background
+17 16 | 
+18 17 | # F401 `datastructures` imported but unused
+19 18 | import datastructures as structures
+
+./resources/test/fixtures/pyflakes/F401_6.py:19:8: F401 [*] `datastructures` imported but unused
+   |
+19 | # F401 `datastructures` imported but unused
+20 | import datastructures as structures
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F401
+   |
+   = help: Remove unused import: `datastructures`
+
+ℹ Suggested fix
+16 16 | import background
+17 17 | 
+18 18 | # F401 `datastructures` imported but unused
+19    |-import datastructures as structures
+
 

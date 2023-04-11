@@ -1,26 +1,25 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: InvalidCharacterEsc
-    body: "Invalid unescaped character ESC, use \"\\x1B\" instead"
-    suggestion: Replace with escape sequence
-    fixable: true
-  location:
-    row: 25
-    column: 15
-  end_location:
-    row: 25
-    column: 16
-  fix:
-    edits:
-      - location:
-          row: 25
-          column: 15
-        end_location:
-          row: 25
-          column: 16
-        content: "\\x1B"
-  parent: ~
+./resources/test/fixtures/pylint/invalid_characters.py:25:16: PLE2513 [*] Invalid unescaped character ESC, use "\x1B" instead
+   |
+25 | sub_ok = '\x1a'
+26 | 
+27 | esc = 'esc esc '
+   |                 PLE2513
+28 | 
+29 | esc_ok = '\x1b'
+   |
+   = help: Replace with escape sequence
+
+ℹ Suggested fix
+22 22 | 
+23 23 | sub_ok = '\x1a'
+24 24 | 
+25    |-esc = 'esc esc '
+   25 |+esc = 'esc esc \x1B'
+26 26 | 
+27 27 | esc_ok = '\x1b'
+28 28 | 
+
 

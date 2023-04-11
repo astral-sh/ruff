@@ -7,15 +7,15 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use rustc_hash::FxHashSet;
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings;
     use crate::settings::resolve_per_file_ignores;
     use crate::settings::types::PerFileIgnore;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"); "RUF005")]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"); "RUF006")]
@@ -25,7 +25,7 @@ mod tests {
             Path::new("ruff").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -42,7 +42,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -58,7 +58,7 @@ mod tests {
                 Rule::TabIndentation,
             ]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -68,7 +68,7 @@ mod tests {
             Path::new("ruff/RUF100_1.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedNOQA, Rule::UnusedImport]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -85,7 +85,7 @@ mod tests {
         .unwrap();
 
         let diagnostics = test_path(Path::new("ruff/RUF100_2.py"), &settings)?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -99,7 +99,7 @@ mod tests {
                 Rule::UndefinedName,
             ]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -109,7 +109,7 @@ mod tests {
             Path::new("ruff/flake8_noqa.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -119,7 +119,7 @@ mod tests {
             Path::new("ruff/ruff_noqa.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -129,7 +129,7 @@ mod tests {
             Path::new("ruff/ruff_targeted_noqa.py"),
             &settings::Settings::for_rules(vec![Rule::UnusedImport, Rule::UnusedVariable]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -139,7 +139,7 @@ mod tests {
             Path::new("ruff/redirects.py"),
             &settings::Settings::for_rules(vec![Rule::NonPEP604Annotation]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -149,7 +149,7 @@ mod tests {
             Path::new("ruff/RUF007.py"),
             &settings::Settings::for_rules(vec![Rule::PairwiseOverZipped]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -161,7 +161,7 @@ mod tests {
             Path::new("ruff").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

@@ -1,33 +1,26 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: TryExceptPass
-    body: "`try`-`except`-`pass` detected, consider logging the exception"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 4
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TryExceptPass
-    body: "`try`-`except`-`pass` detected, consider logging the exception"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 9
-    column: 8
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_bandit/S110.py:3:1: S110 `try`-`except`-`pass` detected, consider logging the exception
+  |
+3 |   try:
+4 |       pass
+5 | / except Exception:
+6 | |     pass
+  | |________^ S110
+7 |   
+8 |   try:
+  |
+
+./resources/test/fixtures/flake8_bandit/S110.py:8:1: S110 `try`-`except`-`pass` detected, consider logging the exception
+   |
+ 8 |   try:
+ 9 |       pass
+10 | / except:
+11 | |     pass
+   | |________^ S110
+12 |   
+13 |   try:
+   |
+
 

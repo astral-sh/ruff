@@ -1,89 +1,82 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnderIndentation
-    body: Docstring is under-indented
-    suggestion: Increase indentation
-    fixable: true
-  location:
-    row: 232
-    column: 0
-  end_location:
-    row: 232
-    column: 0
-  fix:
-    edits:
-      - location:
-          row: 232
-          column: 0
-        end_location:
-          row: 232
-          column: 0
-        content: "    "
-  parent: ~
-- kind:
-    name: UnderIndentation
-    body: Docstring is under-indented
-    suggestion: Increase indentation
-    fixable: true
-  location:
-    row: 244
-    column: 0
-  end_location:
-    row: 244
-    column: 0
-  fix:
-    edits:
-      - location:
-          row: 244
-          column: 0
-        end_location:
-          row: 244
-          column: 0
-        content: "    "
-  parent: ~
-- kind:
-    name: UnderIndentation
-    body: Docstring is under-indented
-    suggestion: Increase indentation
-    fixable: true
-  location:
-    row: 440
-    column: 0
-  end_location:
-    row: 440
-    column: 0
-  fix:
-    edits:
-      - location:
-          row: 440
-          column: 0
-        end_location:
-          row: 440
-          column: 4
-        content: "                                    "
-  parent: ~
-- kind:
-    name: UnderIndentation
-    body: Docstring is under-indented
-    suggestion: Increase indentation
-    fixable: true
-  location:
-    row: 441
-    column: 0
-  end_location:
-    row: 441
-    column: 0
-  fix:
-    edits:
-      - location:
-          row: 441
-          column: 0
-        end_location:
-          row: 441
-          column: 4
-        content: "                                    "
-  parent: ~
+./resources/test/fixtures/pydocstyle/D.py:232:1: D207 [*] Docstring is under-indented
+    |
+232 |     """Summary.
+233 | 
+234 | Description.
+    |  D207
+235 | 
+236 |     """
+    |
+    = help: Increase indentation
+
+ℹ Suggested fix
+229 229 | def asdfsdf():
+230 230 |     """Summary.
+231 231 | 
+232     |-Description.
+    232 |+    Description.
+233 233 | 
+234 234 |     """
+235 235 | 
+
+./resources/test/fixtures/pydocstyle/D.py:244:1: D207 [*] Docstring is under-indented
+    |
+244 |     Description.
+245 | 
+246 | """
+    |  D207
+    |
+    = help: Increase indentation
+
+ℹ Suggested fix
+241 241 | 
+242 242 |     Description.
+243 243 | 
+244     |-"""
+    244 |+    """
+245 245 | 
+246 246 | 
+247 247 | @expect('D208: Docstring is over-indented')
+
+./resources/test/fixtures/pydocstyle/D.py:440:1: D207 [*] Docstring is under-indented
+    |
+440 | def docstring_start_in_same_line(): """First Line.
+441 | 
+442 |     Second Line
+    |  D207
+443 |     """
+    |
+    = help: Increase indentation
+
+ℹ Suggested fix
+437 437 | @expect('D213: Multi-line docstring summary should start at the second line')
+438 438 | def docstring_start_in_same_line(): """First Line.
+439 439 | 
+440     |-    Second Line
+    440 |+                                    Second Line
+441 441 |     """
+442 442 | 
+443 443 | 
+
+./resources/test/fixtures/pydocstyle/D.py:441:1: D207 [*] Docstring is under-indented
+    |
+441 |     Second Line
+442 |     """
+    |  D207
+    |
+    = help: Increase indentation
+
+ℹ Suggested fix
+438 438 | def docstring_start_in_same_line(): """First Line.
+439 439 | 
+440 440 |     Second Line
+441     |-    """
+    441 |+                                    """
+442 442 | 
+443 443 | 
+444 444 | def function_with_lambda_arg(x=lambda y: y):
+
 

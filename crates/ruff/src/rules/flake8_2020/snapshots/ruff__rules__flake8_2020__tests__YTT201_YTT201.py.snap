@@ -1,61 +1,40 @@
 ---
 source: crates/ruff/src/rules/flake8_2020/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SysVersionInfo0Eq3
-    body: "`sys.version_info[0] == 3` referenced (python4), use `>=`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 6
-  end_location:
-    row: 7
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SysVersionInfo0Eq3
-    body: "`sys.version_info[0] == 3` referenced (python4), use `>=`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 6
-  end_location:
-    row: 8
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SysVersionInfo0Eq3
-    body: "`sys.version_info[0] == 3` referenced (python4), use `>=`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 6
-  end_location:
-    row: 9
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SysVersionInfo0Eq3
-    body: "`sys.version_info[0] == 3` referenced (python4), use `>=`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 6
-  end_location:
-    row: 10
-    column: 21
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_2020/YTT201.py:7:7: YTT201 `sys.version_info[0] == 3` referenced (python4), use `>=`
+   |
+ 7 | PY3 = sys.version_info[0] >= 3
+ 8 | 
+ 9 | PY3 = sys.version_info[0] == 3
+   |       ^^^^^^^^^^^^^^^^^^^ YTT201
+10 | PY3 = version_info[0] == 3
+11 | PY2 = sys.version_info[0] != 3
+   |
+
+./resources/test/fixtures/flake8_2020/YTT201.py:8:7: YTT201 `sys.version_info[0] == 3` referenced (python4), use `>=`
+   |
+ 8 | PY3 = sys.version_info[0] == 3
+ 9 | PY3 = version_info[0] == 3
+   |       ^^^^^^^^^^^^^^^ YTT201
+10 | PY2 = sys.version_info[0] != 3
+11 | PY2 = version_info[0] != 3
+   |
+
+./resources/test/fixtures/flake8_2020/YTT201.py:9:7: YTT201 `sys.version_info[0] == 3` referenced (python4), use `>=`
+   |
+ 9 | PY3 = sys.version_info[0] == 3
+10 | PY3 = version_info[0] == 3
+11 | PY2 = sys.version_info[0] != 3
+   |       ^^^^^^^^^^^^^^^^^^^ YTT201
+12 | PY2 = version_info[0] != 3
+   |
+
+./resources/test/fixtures/flake8_2020/YTT201.py:10:7: YTT201 `sys.version_info[0] == 3` referenced (python4), use `>=`
+   |
+10 | PY3 = version_info[0] == 3
+11 | PY2 = sys.version_info[0] != 3
+12 | PY2 = version_info[0] != 3
+   |       ^^^^^^^^^^^^^^^ YTT201
+   |
+
 

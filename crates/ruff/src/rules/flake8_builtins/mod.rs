@@ -7,8 +7,9 @@ pub(crate) mod types;
 mod tests {
     use std::path::Path;
 
+    use crate::assert_messages;
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use test_case::test_case;
 
     use crate::registry::Rule;
@@ -24,7 +25,7 @@ mod tests {
             Path::new("flake8_builtins").join(path).as_path(),
             &Settings::for_rule(rule_code),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -48,7 +49,7 @@ mod tests {
             },
         )?;
 
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

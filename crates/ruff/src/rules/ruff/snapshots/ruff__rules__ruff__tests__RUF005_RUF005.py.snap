@@ -1,271 +1,268 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `[1, 2, 3, *foo]` instead of concatenation"
-    suggestion: "Replace with `[1, 2, 3, *foo]`"
-    fixable: true
-  location:
-    row: 10
-    column: 6
-  end_location:
-    row: 10
-    column: 21
-  fix:
-    edits:
-      - location:
-          row: 10
-          column: 6
-        end_location:
-          row: 10
-          column: 21
-        content: "[1, 2, 3, *foo]"
-  parent: ~
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `(7, 8, 9, *zoob)` instead of concatenation"
-    suggestion: "Replace with `(7, 8, 9, *zoob)`"
-    fixable: true
-  location:
-    row: 12
-    column: 7
-  end_location:
-    row: 12
-    column: 23
-  fix:
-    edits:
-      - location:
-          row: 12
-          column: 7
-        end_location:
-          row: 12
-          column: 23
-        content: "(7, 8, 9, *zoob)"
-  parent: ~
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `(*quux, 10, 11, 12)` instead of concatenation"
-    suggestion: "Replace with `(*quux, 10, 11, 12)`"
-    fixable: true
-  location:
-    row: 13
-    column: 7
-  end_location:
-    row: 13
-    column: 26
-  fix:
-    edits:
-      - location:
-          row: 13
-          column: 7
-        end_location:
-          row: 13
-          column: 26
-        content: "(*quux, 10, 11, 12)"
-  parent: ~
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `[*spom, 13, 14, 15]` instead of concatenation"
-    suggestion: "Replace with `[*spom, 13, 14, 15]`"
-    fixable: true
-  location:
-    row: 15
-    column: 7
-  end_location:
-    row: 15
-    column: 26
-  fix:
-    edits:
-      - location:
-          row: 15
-          column: 7
-        end_location:
-          row: 15
-          column: 26
-        content: "[*spom, 13, 14, 15]"
-  parent: ~
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `(\"we all say\", *yay())` instead of concatenation"
-    suggestion: "Replace with `(\"we all say\", *yay())`"
-    fixable: true
-  location:
-    row: 16
-    column: 12
-  end_location:
-    row: 16
-    column: 36
-  fix:
-    edits:
-      - location:
-          row: 16
-          column: 12
-        end_location:
-          row: 16
-          column: 36
-        content: "(\"we all say\", *yay())"
-  parent: ~
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `(\"we all think\", *Fun().yay())` instead of concatenation"
-    suggestion: "Replace with `(\"we all think\", *Fun().yay())`"
-    fixable: true
-  location:
-    row: 17
-    column: 13
-  end_location:
-    row: 17
-    column: 45
-  fix:
-    edits:
-      - location:
-          row: 17
-          column: 13
-        end_location:
-          row: 17
-          column: 45
-        content: "(\"we all think\", *Fun().yay())"
-  parent: ~
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `(\"we all feel\", *Fun.words)` instead of concatenation"
-    suggestion: "Replace with `(\"we all feel\", *Fun.words)`"
-    fixable: true
-  location:
-    row: 18
-    column: 15
-  end_location:
-    row: 18
-    column: 44
-  fix:
-    edits:
-      - location:
-          row: 18
-          column: 15
-        end_location:
-          row: 18
-          column: 44
-        content: "(\"we all feel\", *Fun.words)"
-  parent: ~
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `[\"a\", \"b\", \"c\", *eggs]` instead of concatenation"
-    suggestion: "Replace with `[\"a\", \"b\", \"c\", *eggs]`"
-    fixable: true
-  location:
-    row: 20
-    column: 8
-  end_location:
-    row: 20
-    column: 30
-  fix:
-    edits:
-      - location:
-          row: 20
-          column: 8
-        end_location:
-          row: 20
-          column: 30
-        content: "[\"a\", \"b\", \"c\", *eggs]"
-  parent: ~
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `(\"yes\", \"no\", \"pants\", *zoob)` instead of concatenation"
-    suggestion: "Replace with `(\"yes\", \"no\", \"pants\", *zoob)`"
-    fixable: true
-  location:
-    row: 20
-    column: 38
-  end_location:
-    row: 20
-    column: 67
-  fix:
-    edits:
-      - location:
-          row: 20
-          column: 38
-        end_location:
-          row: 20
-          column: 67
-        content: "(\"yes\", \"no\", \"pants\", *zoob)"
-  parent: ~
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `(*zoob,)` instead of concatenation"
-    suggestion: "Replace with `(*zoob,)`"
-    fixable: true
-  location:
-    row: 22
-    column: 6
-  end_location:
-    row: 22
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 22
-          column: 6
-        end_location:
-          row: 22
-          column: 15
-        content: "(*zoob,)"
-  parent: ~
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `[*first, 4, 5, 6]` instead of concatenation"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 9
-  end_location:
-    row: 39
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `[*foo]` instead of concatenation"
-    suggestion: "Replace with `[*foo]`"
-    fixable: true
-  location:
-    row: 41
-    column: 0
-  end_location:
-    row: 41
-    column: 8
-  fix:
-    edits:
-      - location:
-          row: 41
-          column: 0
-        end_location:
-          row: 41
-          column: 8
-        content: "[*foo]"
-  parent: ~
-- kind:
-    name: CollectionLiteralConcatenation
-    body: "Consider `[*foo]` instead of concatenation"
-    suggestion: "Replace with `[*foo]`"
-    fixable: true
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 8
-  fix:
-    edits:
-      - location:
-          row: 44
-          column: 0
-        end_location:
-          row: 44
-          column: 8
-        content: "[*foo]"
-  parent: ~
+./resources/test/fixtures/ruff/RUF005.py:10:7: RUF005 [*] Consider `[1, 2, 3, *foo]` instead of concatenation
+   |
+10 | foo = [4, 5, 6]
+11 | bar = [1, 2, 3] + foo
+   |       ^^^^^^^^^^^^^^^ RUF005
+12 | zoob = tuple(bar)
+13 | quux = (7, 8, 9) + zoob
+   |
+   = help: Replace with `[1, 2, 3, *foo]`
+
+ℹ Suggested fix
+7  7  | yay = Fun().yay
+8  8  | 
+9  9  | foo = [4, 5, 6]
+10    |-bar = [1, 2, 3] + foo
+   10 |+bar = [1, 2, 3, *foo]
+11 11 | zoob = tuple(bar)
+12 12 | quux = (7, 8, 9) + zoob
+13 13 | spam = quux + (10, 11, 12)
+
+./resources/test/fixtures/ruff/RUF005.py:12:8: RUF005 [*] Consider `(7, 8, 9, *zoob)` instead of concatenation
+   |
+12 | bar = [1, 2, 3] + foo
+13 | zoob = tuple(bar)
+14 | quux = (7, 8, 9) + zoob
+   |        ^^^^^^^^^^^^^^^^ RUF005
+15 | spam = quux + (10, 11, 12)
+16 | spom = list(spam)
+   |
+   = help: Replace with `(7, 8, 9, *zoob)`
+
+ℹ Suggested fix
+9  9  | foo = [4, 5, 6]
+10 10 | bar = [1, 2, 3] + foo
+11 11 | zoob = tuple(bar)
+12    |-quux = (7, 8, 9) + zoob
+   12 |+quux = (7, 8, 9, *zoob)
+13 13 | spam = quux + (10, 11, 12)
+14 14 | spom = list(spam)
+15 15 | eggs = spom + [13, 14, 15]
+
+./resources/test/fixtures/ruff/RUF005.py:13:8: RUF005 [*] Consider `(*quux, 10, 11, 12)` instead of concatenation
+   |
+13 | zoob = tuple(bar)
+14 | quux = (7, 8, 9) + zoob
+15 | spam = quux + (10, 11, 12)
+   |        ^^^^^^^^^^^^^^^^^^^ RUF005
+16 | spom = list(spam)
+17 | eggs = spom + [13, 14, 15]
+   |
+   = help: Replace with `(*quux, 10, 11, 12)`
+
+ℹ Suggested fix
+10 10 | bar = [1, 2, 3] + foo
+11 11 | zoob = tuple(bar)
+12 12 | quux = (7, 8, 9) + zoob
+13    |-spam = quux + (10, 11, 12)
+   13 |+spam = (*quux, 10, 11, 12)
+14 14 | spom = list(spam)
+15 15 | eggs = spom + [13, 14, 15]
+16 16 | elatement = ("we all say", ) + yay()
+
+./resources/test/fixtures/ruff/RUF005.py:15:8: RUF005 [*] Consider `[*spom, 13, 14, 15]` instead of concatenation
+   |
+15 | spam = quux + (10, 11, 12)
+16 | spom = list(spam)
+17 | eggs = spom + [13, 14, 15]
+   |        ^^^^^^^^^^^^^^^^^^^ RUF005
+18 | elatement = ("we all say", ) + yay()
+19 | excitement = ("we all think", ) + Fun().yay()
+   |
+   = help: Replace with `[*spom, 13, 14, 15]`
+
+ℹ Suggested fix
+12 12 | quux = (7, 8, 9) + zoob
+13 13 | spam = quux + (10, 11, 12)
+14 14 | spom = list(spam)
+15    |-eggs = spom + [13, 14, 15]
+   15 |+eggs = [*spom, 13, 14, 15]
+16 16 | elatement = ("we all say", ) + yay()
+17 17 | excitement = ("we all think", ) + Fun().yay()
+18 18 | astonishment = ("we all feel", ) + Fun.words
+
+./resources/test/fixtures/ruff/RUF005.py:16:13: RUF005 [*] Consider `("we all say", *yay())` instead of concatenation
+   |
+16 | spom = list(spam)
+17 | eggs = spom + [13, 14, 15]
+18 | elatement = ("we all say", ) + yay()
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
+19 | excitement = ("we all think", ) + Fun().yay()
+20 | astonishment = ("we all feel", ) + Fun.words
+   |
+   = help: Replace with `("we all say", *yay())`
+
+ℹ Suggested fix
+13 13 | spam = quux + (10, 11, 12)
+14 14 | spom = list(spam)
+15 15 | eggs = spom + [13, 14, 15]
+16    |-elatement = ("we all say", ) + yay()
+   16 |+elatement = ("we all say", *yay())
+17 17 | excitement = ("we all think", ) + Fun().yay()
+18 18 | astonishment = ("we all feel", ) + Fun.words
+19 19 | 
+
+./resources/test/fixtures/ruff/RUF005.py:17:14: RUF005 [*] Consider `("we all think", *Fun().yay())` instead of concatenation
+   |
+17 | eggs = spom + [13, 14, 15]
+18 | elatement = ("we all say", ) + yay()
+19 | excitement = ("we all think", ) + Fun().yay()
+   |              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
+20 | astonishment = ("we all feel", ) + Fun.words
+   |
+   = help: Replace with `("we all think", *Fun().yay())`
+
+ℹ Suggested fix
+14 14 | spom = list(spam)
+15 15 | eggs = spom + [13, 14, 15]
+16 16 | elatement = ("we all say", ) + yay()
+17    |-excitement = ("we all think", ) + Fun().yay()
+   17 |+excitement = ("we all think", *Fun().yay())
+18 18 | astonishment = ("we all feel", ) + Fun.words
+19 19 | 
+20 20 | chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
+
+./resources/test/fixtures/ruff/RUF005.py:18:16: RUF005 [*] Consider `("we all feel", *Fun.words)` instead of concatenation
+   |
+18 | elatement = ("we all say", ) + yay()
+19 | excitement = ("we all think", ) + Fun().yay()
+20 | astonishment = ("we all feel", ) + Fun.words
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
+21 | 
+22 | chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
+   |
+   = help: Replace with `("we all feel", *Fun.words)`
+
+ℹ Suggested fix
+15 15 | eggs = spom + [13, 14, 15]
+16 16 | elatement = ("we all say", ) + yay()
+17 17 | excitement = ("we all think", ) + Fun().yay()
+18    |-astonishment = ("we all feel", ) + Fun.words
+   18 |+astonishment = ("we all feel", *Fun.words)
+19 19 | 
+20 20 | chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
+21 21 | 
+
+./resources/test/fixtures/ruff/RUF005.py:20:9: RUF005 [*] Consider `["a", "b", "c", *eggs]` instead of concatenation
+   |
+20 | astonishment = ("we all feel", ) + Fun.words
+21 | 
+22 | chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
+   |         ^^^^^^^^^^^^^^^^^^^^^^ RUF005
+23 | 
+24 | baz = () + zoob
+   |
+   = help: Replace with `["a", "b", "c", *eggs]`
+
+ℹ Suggested fix
+17 17 | excitement = ("we all think", ) + Fun().yay()
+18 18 | astonishment = ("we all feel", ) + Fun.words
+19 19 | 
+20    |-chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
+   20 |+chain = ["a", "b", "c", *eggs] + list(('yes', 'no', 'pants') + zoob)
+21 21 | 
+22 22 | baz = () + zoob
+23 23 | 
+
+./resources/test/fixtures/ruff/RUF005.py:20:39: RUF005 [*] Consider `("yes", "no", "pants", *zoob)` instead of concatenation
+   |
+20 | astonishment = ("we all feel", ) + Fun.words
+21 | 
+22 | chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
+   |                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF005
+23 | 
+24 | baz = () + zoob
+   |
+   = help: Replace with `("yes", "no", "pants", *zoob)`
+
+ℹ Suggested fix
+17 17 | excitement = ("we all think", ) + Fun().yay()
+18 18 | astonishment = ("we all feel", ) + Fun.words
+19 19 | 
+20    |-chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
+   20 |+chain = ['a', 'b', 'c'] + eggs + list(("yes", "no", "pants", *zoob))
+21 21 | 
+22 22 | baz = () + zoob
+23 23 | 
+
+./resources/test/fixtures/ruff/RUF005.py:22:7: RUF005 [*] Consider `(*zoob,)` instead of concatenation
+   |
+22 | chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
+23 | 
+24 | baz = () + zoob
+   |       ^^^^^^^^^ RUF005
+25 | 
+26 | first = [
+   |
+   = help: Replace with `(*zoob,)`
+
+ℹ Suggested fix
+19 19 | 
+20 20 | chain = ['a', 'b', 'c'] + eggs + list(('yes', 'no', 'pants') + zoob)
+21 21 | 
+22    |-baz = () + zoob
+   22 |+baz = (*zoob,)
+23 23 | 
+24 24 | first = [
+25 25 |     # The order
+
+./resources/test/fixtures/ruff/RUF005.py:32:10: RUF005 Consider `[*first, 4, 5, 6]` instead of concatenation
+   |
+32 |       # to preserve
+33 |   ]
+34 |   second = first + [
+   |  __________^
+35 | |     # please
+36 | |     4,
+37 | |     # don't
+38 | |     5,
+39 | |     # touch
+40 | |     6,
+41 | | ]
+   | |_^ RUF005
+42 |   
+43 |   [] + foo + [
+   |
+
+./resources/test/fixtures/ruff/RUF005.py:41:1: RUF005 [*] Consider `[*foo]` instead of concatenation
+   |
+41 | ]
+42 | 
+43 | [] + foo + [
+   | ^^^^^^^^ RUF005
+44 | ]
+   |
+   = help: Replace with `[*foo]`
+
+ℹ Suggested fix
+38 38 |     6,
+39 39 | ]
+40 40 | 
+41    |-[] + foo + [
+   41 |+[*foo] + [
+42 42 | ]
+43 43 | 
+44 44 | [] + foo + [  # This will be preserved, but doesn't prevent the fix
+
+./resources/test/fixtures/ruff/RUF005.py:44:1: RUF005 [*] Consider `[*foo]` instead of concatenation
+   |
+44 | ]
+45 | 
+46 | [] + foo + [  # This will be preserved, but doesn't prevent the fix
+   | ^^^^^^^^ RUF005
+47 | ]
+   |
+   = help: Replace with `[*foo]`
+
+ℹ Suggested fix
+41 41 | [] + foo + [
+42 42 | ]
+43 43 | 
+44    |-[] + foo + [  # This will be preserved, but doesn't prevent the fix
+   44 |+[*foo] + [  # This will be preserved, but doesn't prevent the fix
+45 45 | ]
+
 

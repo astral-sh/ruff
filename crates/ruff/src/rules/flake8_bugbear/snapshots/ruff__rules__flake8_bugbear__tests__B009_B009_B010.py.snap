@@ -1,152 +1,149 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 19
-    column: 0
-  end_location:
-    row: 19
-    column: 19
-  fix:
-    edits:
-      - location:
-          row: 19
-          column: 0
-        end_location:
-          row: 19
-          column: 19
-        content: foo.bar
-  parent: ~
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 20
-    column: 0
-  end_location:
-    row: 20
-    column: 23
-  fix:
-    edits:
-      - location:
-          row: 20
-          column: 0
-        end_location:
-          row: 20
-          column: 23
-        content: foo._123abc
-  parent: ~
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 21
-    column: 0
-  end_location:
-    row: 21
-    column: 26
-  fix:
-    edits:
-      - location:
-          row: 21
-          column: 0
-        end_location:
-          row: 21
-          column: 26
-        content: foo.__123abc__
-  parent: ~
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 22
-    column: 0
-  end_location:
-    row: 22
-    column: 22
-  fix:
-    edits:
-      - location:
-          row: 22
-          column: 0
-        end_location:
-          row: 22
-          column: 22
-        content: foo.abc123
-  parent: ~
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 23
-    column: 0
-  end_location:
-    row: 23
-    column: 23
-  fix:
-    edits:
-      - location:
-          row: 23
-          column: 0
-        end_location:
-          row: 23
-          column: 23
-        content: foo.abc123
-  parent: ~
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 24
-    column: 14
-  end_location:
-    row: 24
-    column: 31
-  fix:
-    edits:
-      - location:
-          row: 24
-          column: 14
-        end_location:
-          row: 24
-          column: 31
-        content: x.bar
-  parent: ~
-- kind:
-    name: GetAttrWithConstant
-    body: "Do not call `getattr` with a constant attribute value. It is not any safer than normal property access."
-    suggestion: "Replace `getattr` with attribute access"
-    fixable: true
-  location:
-    row: 25
-    column: 3
-  end_location:
-    row: 25
-    column: 20
-  fix:
-    edits:
-      - location:
-          row: 25
-          column: 3
-        end_location:
-          row: 25
-          column: 20
-        content: x.bar
-  parent: ~
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:19:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+19 | # Invalid usage
+20 | getattr(foo, "bar")
+   | ^^^^^^^^^^^^^^^^^^^ B009
+21 | getattr(foo, "_123abc")
+22 | getattr(foo, "__123abc__")
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+16 16 | getattr(foo, "__123abc")
+17 17 | 
+18 18 | # Invalid usage
+19    |-getattr(foo, "bar")
+   19 |+foo.bar
+20 20 | getattr(foo, "_123abc")
+21 21 | getattr(foo, "__123abc__")
+22 22 | getattr(foo, "abc123")
+
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:20:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+20 | # Invalid usage
+21 | getattr(foo, "bar")
+22 | getattr(foo, "_123abc")
+   | ^^^^^^^^^^^^^^^^^^^^^^^ B009
+23 | getattr(foo, "__123abc__")
+24 | getattr(foo, "abc123")
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+17 17 | 
+18 18 | # Invalid usage
+19 19 | getattr(foo, "bar")
+20    |-getattr(foo, "_123abc")
+   20 |+foo._123abc
+21 21 | getattr(foo, "__123abc__")
+22 22 | getattr(foo, "abc123")
+23 23 | getattr(foo, r"abc123")
+
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:21:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+21 | getattr(foo, "bar")
+22 | getattr(foo, "_123abc")
+23 | getattr(foo, "__123abc__")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ B009
+24 | getattr(foo, "abc123")
+25 | getattr(foo, r"abc123")
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+18 18 | # Invalid usage
+19 19 | getattr(foo, "bar")
+20 20 | getattr(foo, "_123abc")
+21    |-getattr(foo, "__123abc__")
+   21 |+foo.__123abc__
+22 22 | getattr(foo, "abc123")
+23 23 | getattr(foo, r"abc123")
+24 24 | _ = lambda x: getattr(x, "bar")
+
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:22:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+22 | getattr(foo, "_123abc")
+23 | getattr(foo, "__123abc__")
+24 | getattr(foo, "abc123")
+   | ^^^^^^^^^^^^^^^^^^^^^^ B009
+25 | getattr(foo, r"abc123")
+26 | _ = lambda x: getattr(x, "bar")
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+19 19 | getattr(foo, "bar")
+20 20 | getattr(foo, "_123abc")
+21 21 | getattr(foo, "__123abc__")
+22    |-getattr(foo, "abc123")
+   22 |+foo.abc123
+23 23 | getattr(foo, r"abc123")
+24 24 | _ = lambda x: getattr(x, "bar")
+25 25 | if getattr(x, "bar"):
+
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:23:1: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+23 | getattr(foo, "__123abc__")
+24 | getattr(foo, "abc123")
+25 | getattr(foo, r"abc123")
+   | ^^^^^^^^^^^^^^^^^^^^^^^ B009
+26 | _ = lambda x: getattr(x, "bar")
+27 | if getattr(x, "bar"):
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+20 20 | getattr(foo, "_123abc")
+21 21 | getattr(foo, "__123abc__")
+22 22 | getattr(foo, "abc123")
+23    |-getattr(foo, r"abc123")
+   23 |+foo.abc123
+24 24 | _ = lambda x: getattr(x, "bar")
+25 25 | if getattr(x, "bar"):
+26 26 |     pass
+
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:24:15: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+24 | getattr(foo, "abc123")
+25 | getattr(foo, r"abc123")
+26 | _ = lambda x: getattr(x, "bar")
+   |               ^^^^^^^^^^^^^^^^^ B009
+27 | if getattr(x, "bar"):
+28 |     pass
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+21 21 | getattr(foo, "__123abc__")
+22 22 | getattr(foo, "abc123")
+23 23 | getattr(foo, r"abc123")
+24    |-_ = lambda x: getattr(x, "bar")
+   24 |+_ = lambda x: x.bar
+25 25 | if getattr(x, "bar"):
+26 26 |     pass
+27 27 | 
+
+./resources/test/fixtures/flake8_bugbear/B009_B010.py:25:4: B009 [*] Do not call `getattr` with a constant attribute value. It is not any safer than normal property access.
+   |
+25 | getattr(foo, r"abc123")
+26 | _ = lambda x: getattr(x, "bar")
+27 | if getattr(x, "bar"):
+   |    ^^^^^^^^^^^^^^^^^ B009
+28 |     pass
+   |
+   = help: Replace `getattr` with attribute access
+
+ℹ Suggested fix
+22 22 | getattr(foo, "abc123")
+23 23 | getattr(foo, r"abc123")
+24 24 | _ = lambda x: getattr(x, "bar")
+25    |-if getattr(x, "bar"):
+   25 |+if x.bar:
+26 26 |     pass
+27 27 | 
+28 28 | # Valid setattr usage
+
 

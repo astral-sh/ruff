@@ -119,8 +119,9 @@ pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
 mod tests {
     use std::path::Path;
 
+    use crate::assert_messages;
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use rustc_hash::FxHashMap;
 
     use crate::registry::Rule;
@@ -154,7 +155,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::BannedApi])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

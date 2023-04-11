@@ -1,418 +1,422 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 31
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 31
-        content: from collections.abc import Mapping
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 38
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 0
-        end_location:
-          row: 4
-          column: 38
-        content: from collections.abc import Mapping as MAP
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`, `Sequence`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 41
-  fix:
-    edits:
-      - location:
-          row: 6
-          column: 0
-        end_location:
-          row: 6
-          column: 41
-        content: "from collections.abc import Mapping, Sequence"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 40
-  fix:
-    edits:
-      - location:
-          row: 8
-          column: 0
-        end_location:
-          row: 8
-          column: 40
-        content: "from collections import Counter\nfrom collections.abc import Mapping"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 42
-  fix:
-    edits:
-      - location:
-          row: 10
-          column: 0
-        end_location:
-          row: 10
-          column: 42
-        content: "from collections import (Counter)\nfrom collections.abc import Mapping"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 13
-    column: 33
-  fix:
-    edits:
-      - location:
-          row: 12
-          column: 0
-        end_location:
-          row: 13
-          column: 33
-        content: "from collections import (Counter)\nfrom collections.abc import Mapping"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 16
-    column: 32
-  fix:
-    edits:
-      - location:
-          row: 15
-          column: 0
-        end_location:
-          row: 16
-          column: 32
-        content: "from collections import Counter\nfrom collections.abc import Mapping"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`, `Sequence`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 18
-    column: 0
-  end_location:
-    row: 18
-    column: 50
-  fix:
-    edits:
-      - location:
-          row: 18
-          column: 0
-        end_location:
-          row: 18
-          column: 50
-        content: "from collections import Counter\nfrom collections.abc import Mapping, Sequence"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 20
-    column: 0
-  end_location:
-    row: 20
-    column: 51
-  fix:
-    edits:
-      - location:
-          row: 20
-          column: 0
-        end_location:
-          row: 20
-          column: 51
-        content: "from collections import Counter\nfrom collections.abc import Mapping as mapping"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 23
-    column: 4
-  end_location:
-    row: 23
-    column: 44
-  fix:
-    edits:
-      - location:
-          row: 23
-          column: 4
-        end_location:
-          row: 23
-          column: 44
-        content: "from collections import Counter\n    from collections.abc import Mapping"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 28
-    column: 4
-  end_location:
-    row: 28
-    column: 44
-  fix:
-    edits:
-      - location:
-          row: 28
-          column: 4
-        end_location:
-          row: 28
-          column: 44
-        content: "from collections import Counter\n    from collections.abc import Mapping"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 30
-    column: 9
-  end_location:
-    row: 30
-    column: 40
-  fix:
-    edits:
-      - location:
-          row: 30
-          column: 9
-        end_location:
-          row: 30
-          column: 40
-        content: from collections.abc import Mapping
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 33
-    column: 0
-  end_location:
-    row: 33
-    column: 40
-  fix:
-    edits:
-      - location:
-          row: 33
-          column: 0
-        end_location:
-          row: 33
-          column: 40
-        content: "from collections import Counter\nfrom collections.abc import Mapping"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`, `Callable`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 37
-    column: 4
-  end_location:
-    row: 42
-    column: 5
-  fix:
-    edits:
-      - location:
-          row: 37
-          column: 4
-        end_location:
-          row: 42
-          column: 5
-        content: "from collections import (\n        Bad,\n        Good,\n    )\n    from collections.abc import Mapping, Callable"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Callable`"
-    suggestion: "Import from `collections.abc`"
-    fixable: true
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 91
-  fix:
-    edits:
-      - location:
-          row: 44
-          column: 0
-        end_location:
-          row: 44
-          column: 91
-        content: "from typing import Match, Pattern, List, OrderedDict, AbstractSet, ContextManager\nfrom collections.abc import Callable"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections` instead: `OrderedDict`"
-    suggestion: "Import from `collections`"
-    fixable: true
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 91
-  fix:
-    edits:
-      - location:
-          row: 44
-          column: 0
-        end_location:
-          row: 44
-          column: 91
-        content: "from typing import Callable, Match, Pattern, List, AbstractSet, ContextManager\nfrom collections import OrderedDict"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `re` instead: `Match`, `Pattern`"
-    suggestion: "Import from `re`"
-    fixable: true
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 91
-  fix:
-    edits:
-      - location:
-          row: 44
-          column: 0
-        end_location:
-          row: 44
-          column: 91
-        content: "from typing import Callable, List, OrderedDict, AbstractSet, ContextManager\nfrom re import Match, Pattern"
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.List` is deprecated, use `list` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 91
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.AbstractSet` is deprecated, use `collections.abc.Set` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 91
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "`typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 91
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DeprecatedImport
-    body: "Import from `collections.abc` instead: `Mapping`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 9
-  end_location:
-    row: 47
-    column: 21
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyupgrade/UP035.py:2:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+  |
+2 | # UP035
+3 | from collections import Mapping
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+4 | 
+5 | from collections import Mapping as MAP
+  |
+  = help: Import from `collections.abc`
+
+ℹ Suggested fix
+1 1 | # UP035
+2   |-from collections import Mapping
+  2 |+from collections.abc import Mapping
+3 3 | 
+4 4 | from collections import Mapping as MAP
+5 5 | 
+
+./resources/test/fixtures/pyupgrade/UP035.py:4:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+  |
+4 | from collections import Mapping
+5 | 
+6 | from collections import Mapping as MAP
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+7 | 
+8 | from collections import Mapping, Sequence
+  |
+  = help: Import from `collections.abc`
+
+ℹ Suggested fix
+1 1 | # UP035
+2 2 | from collections import Mapping
+3 3 | 
+4   |-from collections import Mapping as MAP
+  4 |+from collections.abc import Mapping as MAP
+5 5 | 
+6 6 | from collections import Mapping, Sequence
+7 7 | 
+
+./resources/test/fixtures/pyupgrade/UP035.py:6:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
+   |
+ 6 | from collections import Mapping as MAP
+ 7 | 
+ 8 | from collections import Mapping, Sequence
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+ 9 | 
+10 | from collections import Counter, Mapping
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+3 3 | 
+4 4 | from collections import Mapping as MAP
+5 5 | 
+6   |-from collections import Mapping, Sequence
+  6 |+from collections.abc import Mapping, Sequence
+7 7 | 
+8 8 | from collections import Counter, Mapping
+9 9 | 
+
+./resources/test/fixtures/pyupgrade/UP035.py:8:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+   |
+ 8 | from collections import Mapping, Sequence
+ 9 | 
+10 | from collections import Counter, Mapping
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+11 | 
+12 | from collections import (Counter, Mapping)
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+5  5  | 
+6  6  | from collections import Mapping, Sequence
+7  7  | 
+8     |-from collections import Counter, Mapping
+   8  |+from collections import Counter
+   9  |+from collections.abc import Mapping
+9  10 | 
+10 11 | from collections import (Counter, Mapping)
+11 12 | 
+
+./resources/test/fixtures/pyupgrade/UP035.py:10:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+   |
+10 | from collections import Counter, Mapping
+11 | 
+12 | from collections import (Counter, Mapping)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+13 | 
+14 | from collections import (Counter,
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+7  7  | 
+8  8  | from collections import Counter, Mapping
+9  9  | 
+10    |-from collections import (Counter, Mapping)
+   10 |+from collections import (Counter)
+   11 |+from collections.abc import Mapping
+11 12 | 
+12 13 | from collections import (Counter,
+13 14 |                          Mapping)
+
+./resources/test/fixtures/pyupgrade/UP035.py:12:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+   |
+12 |   from collections import (Counter, Mapping)
+13 |   
+14 | / from collections import (Counter,
+15 | |                          Mapping)
+   | |_________________________________^ UP035
+16 |   
+17 |   from collections import Counter, \
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+9  9  | 
+10 10 | from collections import (Counter, Mapping)
+11 11 | 
+12    |-from collections import (Counter,
+13    |-                         Mapping)
+   12 |+from collections import (Counter)
+   13 |+from collections.abc import Mapping
+14 14 | 
+15 15 | from collections import Counter, \
+16 16 |                          Mapping
+
+./resources/test/fixtures/pyupgrade/UP035.py:15:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+   |
+15 |                            Mapping)
+16 |   
+17 | / from collections import Counter, \
+18 | |                          Mapping
+   | |________________________________^ UP035
+19 |   
+20 |   from collections import Counter, Mapping, Sequence
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+12 12 | from collections import (Counter,
+13 13 |                          Mapping)
+14 14 | 
+15    |-from collections import Counter, \
+16    |-                         Mapping
+   15 |+from collections import Counter
+   16 |+from collections.abc import Mapping
+17 17 | 
+18 18 | from collections import Counter, Mapping, Sequence
+19 19 | 
+
+./resources/test/fixtures/pyupgrade/UP035.py:18:1: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Sequence`
+   |
+18 |                          Mapping
+19 | 
+20 | from collections import Counter, Mapping, Sequence
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+21 | 
+22 | from collections import Mapping as mapping, Counter
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+15 15 | from collections import Counter, \
+16 16 |                          Mapping
+17 17 | 
+18    |-from collections import Counter, Mapping, Sequence
+   18 |+from collections import Counter
+   19 |+from collections.abc import Mapping, Sequence
+19 20 | 
+20 21 | from collections import Mapping as mapping, Counter
+21 22 | 
+
+./resources/test/fixtures/pyupgrade/UP035.py:20:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+   |
+20 | from collections import Counter, Mapping, Sequence
+21 | 
+22 | from collections import Mapping as mapping, Counter
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+23 | 
+24 | if True:
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+17 17 | 
+18 18 | from collections import Counter, Mapping, Sequence
+19 19 | 
+20    |-from collections import Mapping as mapping, Counter
+   20 |+from collections import Counter
+   21 |+from collections.abc import Mapping as mapping
+21 22 | 
+22 23 | if True:
+23 24 |     from collections import Mapping, Counter
+
+./resources/test/fixtures/pyupgrade/UP035.py:23:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
+   |
+23 | if True:
+24 |     from collections import Mapping, Counter
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+25 | 
+26 | if True:
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+20 20 | from collections import Mapping as mapping, Counter
+21 21 | 
+22 22 | if True:
+23    |-    from collections import Mapping, Counter
+   23 |+    from collections import Counter
+   24 |+    from collections.abc import Mapping
+24 25 | 
+25 26 | if True:
+26 27 |     if True:
+
+./resources/test/fixtures/pyupgrade/UP035.py:28:5: UP035 [*] Import from `collections.abc` instead: `Mapping`
+   |
+28 |     if True:
+29 |         pass
+30 |     from collections import Mapping, Counter
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+31 | 
+32 | if True: from collections import Mapping
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+25 25 | if True:
+26 26 |     if True:
+27 27 |         pass
+28    |-    from collections import Mapping, Counter
+   28 |+    from collections import Counter
+   29 |+    from collections.abc import Mapping
+29 30 | 
+30 31 | if True: from collections import Mapping
+31 32 | 
+
+./resources/test/fixtures/pyupgrade/UP035.py:30:10: UP035 [*] Import from `collections.abc` instead: `Mapping`
+   |
+30 |     from collections import Mapping, Counter
+31 | 
+32 | if True: from collections import Mapping
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+33 | 
+34 | import os
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+27 27 |         pass
+28 28 |     from collections import Mapping, Counter
+29 29 | 
+30    |-if True: from collections import Mapping
+   30 |+if True: from collections.abc import Mapping
+31 31 | 
+32 32 | import os
+33 33 | from collections import Counter, Mapping
+
+./resources/test/fixtures/pyupgrade/UP035.py:33:1: UP035 [*] Import from `collections.abc` instead: `Mapping`
+   |
+33 | import os
+34 | from collections import Counter, Mapping
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+35 | import sys
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+30 30 | if True: from collections import Mapping
+31 31 | 
+32 32 | import os
+33    |-from collections import Counter, Mapping
+   33 |+from collections import Counter
+   34 |+from collections.abc import Mapping
+34 35 | import sys
+35 36 | 
+36 37 | if True:
+
+./resources/test/fixtures/pyupgrade/UP035.py:37:5: UP035 [*] Import from `collections.abc` instead: `Mapping`, `Callable`
+   |
+37 |   if True:
+38 |       from collections import (
+   |  _____^
+39 | |         Mapping,
+40 | |         Callable,
+41 | |         Bad,
+42 | |         Good,
+43 | |     )
+   | |_____^ UP035
+44 |   
+45 |   from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+35 35 | 
+36 36 | if True:
+37 37 |     from collections import (
+38    |-        Mapping,
+39    |-        Callable,
+40 38 |         Bad,
+41 39 |         Good,
+42 40 |     )
+   41 |+    from collections.abc import Mapping, Callable
+43 42 | 
+44 43 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+45 44 | 
+
+./resources/test/fixtures/pyupgrade/UP035.py:44:1: UP035 [*] Import from `collections.abc` instead: `Callable`
+   |
+44 |     )
+45 | 
+46 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+47 | 
+48 | if True: from collections import (
+   |
+   = help: Import from `collections.abc`
+
+ℹ Suggested fix
+41 41 |         Good,
+42 42 |     )
+43 43 | 
+44    |-from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   44 |+from typing import Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   45 |+from collections.abc import Callable
+45 46 | 
+46 47 | if True: from collections import (
+47 48 |     Mapping, Counter)
+
+./resources/test/fixtures/pyupgrade/UP035.py:44:1: UP035 [*] Import from `collections` instead: `OrderedDict`
+   |
+44 |     )
+45 | 
+46 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+47 | 
+48 | if True: from collections import (
+   |
+   = help: Import from `collections`
+
+ℹ Suggested fix
+41 41 |         Good,
+42 42 |     )
+43 43 | 
+44    |-from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   44 |+from typing import Callable, Match, Pattern, List, AbstractSet, ContextManager
+   45 |+from collections import OrderedDict
+45 46 | 
+46 47 | if True: from collections import (
+47 48 |     Mapping, Counter)
+
+./resources/test/fixtures/pyupgrade/UP035.py:44:1: UP035 [*] Import from `re` instead: `Match`, `Pattern`
+   |
+44 |     )
+45 | 
+46 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+47 | 
+48 | if True: from collections import (
+   |
+   = help: Import from `re`
+
+ℹ Suggested fix
+41 41 |         Good,
+42 42 |     )
+43 43 | 
+44    |-from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   44 |+from typing import Callable, List, OrderedDict, AbstractSet, ContextManager
+   45 |+from re import Match, Pattern
+45 46 | 
+46 47 | if True: from collections import (
+47 48 |     Mapping, Counter)
+
+./resources/test/fixtures/pyupgrade/UP035.py:44:1: UP035 `typing.List` is deprecated, use `list` instead
+   |
+44 |     )
+45 | 
+46 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+47 | 
+48 | if True: from collections import (
+   |
+
+./resources/test/fixtures/pyupgrade/UP035.py:44:1: UP035 `typing.AbstractSet` is deprecated, use `collections.abc.Set` instead
+   |
+44 |     )
+45 | 
+46 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+47 | 
+48 | if True: from collections import (
+   |
+
+./resources/test/fixtures/pyupgrade/UP035.py:44:1: UP035 `typing.ContextManager` is deprecated, use `contextlib.AbstractContextManager` instead
+   |
+44 |     )
+45 | 
+46 | from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP035
+47 | 
+48 | if True: from collections import (
+   |
+
+./resources/test/fixtures/pyupgrade/UP035.py:46:10: UP035 Import from `collections.abc` instead: `Mapping`
+   |
+46 |   from typing import Callable, Match, Pattern, List, OrderedDict, AbstractSet, ContextManager
+47 |   
+48 |   if True: from collections import (
+   |  __________^
+49 | |     Mapping, Counter)
+   | |_____________________^ UP035
+50 |   
+51 |   # OK
+   |
+
 

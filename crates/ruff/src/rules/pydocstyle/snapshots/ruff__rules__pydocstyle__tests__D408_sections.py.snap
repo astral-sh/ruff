@@ -1,26 +1,30 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SectionUnderlineAfterName
-    body: "Section underline should be in the line following the section's name (\"Returns\")"
-    suggestion: "Add underline to \"Returns\""
-    fixable: true
-  location:
-    row: 94
-    column: 4
-  end_location:
-    row: 101
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 97
-          column: 0
-        end_location:
-          row: 98
-          column: 0
-        content: ~
-  parent: ~
+./resources/test/fixtures/pydocstyle/sections.py:94:5: D408 [*] Section underline should be in the line following the section's name ("Returns")
+    |
+ 94 |           "section's name ('Returns')")
+ 95 |   def blank_line_before_underline():  # noqa: D416
+ 96 |       """Toggle the gizmo.
+    |  _____^
+ 97 | | 
+ 98 | |     Returns
+ 99 | | 
+100 | |     -------
+101 | |     A value of some sort.
+102 | | 
+103 | |     """
+    | |_______^ D408
+    |
+    = help: Add underline to "Returns"
+
+ℹ Suggested fix
+94 94 |     """Toggle the gizmo.
+95 95 | 
+96 96 |     Returns
+97    |-
+98 97 |     -------
+99 98 |     A value of some sort.
+100 99 | 
+
 

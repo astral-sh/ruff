@@ -1,68 +1,53 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: StringDotFormatExtraNamedArguments
-    body: "`.format` call has unused named argument(s): bar"
-    suggestion: "Remove extra named arguments: bar"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 21
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 0
-        end_location:
-          row: 1
-          column: 21
-        content: "\"{}\".format(1, )"
-  parent: ~
-- kind:
-    name: StringDotFormatExtraNamedArguments
-    body: "`.format` call has unused named argument(s): spam"
-    suggestion: "Remove extra named arguments: spam"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 34
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 34
-        content: "\"{bar}{}\".format(1, bar=2, )"
-  parent: ~
-- kind:
-    name: StringDotFormatExtraNamedArguments
-    body: "`.format` call has unused named argument(s): eggs, ham"
-    suggestion: "Remove extra named arguments: eggs, ham"
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 51
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 0
-        end_location:
-          row: 4
-          column: 51
-        content: "\"{bar:{spam}}\".format(bar=2, spam=3, )"
-  parent: ~
+./resources/test/fixtures/pyflakes/F522.py:1:1: F522 [*] `.format` call has unused named argument(s): bar
+  |
+1 | "{}".format(1, bar=2)  # F522
+  | ^^^^^^^^^^^^^^^^^^^^^ F522
+2 | "{bar}{}".format(1, bar=2, spam=3)  # F522
+3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
+  |
+  = help: Remove extra named arguments: bar
+
+ℹ Suggested fix
+1   |-"{}".format(1, bar=2)  # F522
+  1 |+"{}".format(1, )  # F522
+2 2 | "{bar}{}".format(1, bar=2, spam=3)  # F522
+3 3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
+4 4 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
+
+./resources/test/fixtures/pyflakes/F522.py:2:1: F522 [*] `.format` call has unused named argument(s): spam
+  |
+2 | "{}".format(1, bar=2)  # F522
+3 | "{bar}{}".format(1, bar=2, spam=3)  # F522
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F522
+4 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
+5 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
+  |
+  = help: Remove extra named arguments: spam
+
+ℹ Suggested fix
+1 1 | "{}".format(1, bar=2)  # F522
+2   |-"{bar}{}".format(1, bar=2, spam=3)  # F522
+  2 |+"{bar}{}".format(1, bar=2, )  # F522
+3 3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
+4 4 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
+
+./resources/test/fixtures/pyflakes/F522.py:4:1: F522 [*] `.format` call has unused named argument(s): eggs, ham
+  |
+4 | "{bar}{}".format(1, bar=2, spam=3)  # F522
+5 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
+6 | "{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F522
+  |
+  = help: Remove extra named arguments: eggs, ham
+
+ℹ Suggested fix
+1 1 | "{}".format(1, bar=2)  # F522
+2 2 | "{bar}{}".format(1, bar=2, spam=3)  # F522
+3 3 | "{bar:{spam}}".format(bar=2, spam=3)  # No issues
+4   |-"{bar:{spam}}".format(bar=2, spam=3, eggs=4, ham=5)  # F522
+  4 |+"{bar:{spam}}".format(bar=2, spam=3, )  # F522
+
 

@@ -1,33 +1,17 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ForwardAnnotationSyntaxError
-    body: "Syntax error in forward annotation: `///`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 11
-  end_location:
-    row: 9
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ForwardAnnotationSyntaxError
-    body: "Syntax error in forward annotation: `List[int]☃`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 3
-  end_location:
-    row: 13
-    column: 21
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F722.py:9:12: F722 Syntax error in forward annotation: `///`
+   |
+ 9 | def g() -> "///":
+   |            ^^^^^ F722
+10 |     pass
+   |
+
+./resources/test/fixtures/pyflakes/F722.py:13:4: F722 Syntax error in forward annotation: `List[int]☃`
+   |
+13 | X: """List[int]"""'☃' = []
+   |    ^^^^^^^^^^^^^^^^^^ F722
+   |
+
 

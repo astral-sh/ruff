@@ -1,89 +1,78 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryBuiltinImport
-    body: "Unnecessary builtin import: `*`"
-    suggestion: Remove unnecessary builtin import
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 22
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 0
-        end_location:
-          row: 2
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: UnnecessaryBuiltinImport
-    body: "Unnecessary builtin imports: `ascii`, `bytes`"
-    suggestion: Remove unnecessary builtin import
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 42
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 42
-        content: from builtins import compile
-  parent: ~
-- kind:
-    name: UnnecessaryBuiltinImport
-    body: "Unnecessary builtin imports: `filter`, `zip`"
-    suggestion: Remove unnecessary builtin import
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 46
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 0
-        end_location:
-          row: 4
-          column: 46
-        content: from six.moves import zip_longest
-  parent: ~
-- kind:
-    name: UnnecessaryBuiltinImport
-    body: "Unnecessary builtin import: `open`"
-    suggestion: Remove unnecessary builtin import
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 19
-  fix:
-    edits:
-      - location:
-          row: 5
-          column: 0
-        end_location:
-          row: 6
-          column: 0
-        content: ~
-  parent: ~
+./resources/test/fixtures/pyupgrade/UP029.py:1:1: UP029 [*] Unnecessary builtin import: `*`
+  |
+1 | from builtins import *
+  | ^^^^^^^^^^^^^^^^^^^^^^ UP029
+2 | from builtins import ascii, bytes, compile
+3 | from builtins import str as _str
+  |
+  = help: Remove unnecessary builtin import
+
+ℹ Suggested fix
+1   |-from builtins import *
+2 1 | from builtins import ascii, bytes, compile
+3 2 | from builtins import str as _str
+4 3 | from six.moves import filter, zip, zip_longest
+
+./resources/test/fixtures/pyupgrade/UP029.py:2:1: UP029 [*] Unnecessary builtin imports: `ascii`, `bytes`
+  |
+2 | from builtins import *
+3 | from builtins import ascii, bytes, compile
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP029
+4 | from builtins import str as _str
+5 | from six.moves import filter, zip, zip_longest
+  |
+  = help: Remove unnecessary builtin import
+
+ℹ Suggested fix
+1 1 | from builtins import *
+2   |-from builtins import ascii, bytes, compile
+  2 |+from builtins import compile
+3 3 | from builtins import str as _str
+4 4 | from six.moves import filter, zip, zip_longest
+5 5 | from io import open
+
+./resources/test/fixtures/pyupgrade/UP029.py:4:1: UP029 [*] Unnecessary builtin imports: `filter`, `zip`
+  |
+4 | from builtins import ascii, bytes, compile
+5 | from builtins import str as _str
+6 | from six.moves import filter, zip, zip_longest
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP029
+7 | from io import open
+8 | import io
+  |
+  = help: Remove unnecessary builtin import
+
+ℹ Suggested fix
+1 1 | from builtins import *
+2 2 | from builtins import ascii, bytes, compile
+3 3 | from builtins import str as _str
+4   |-from six.moves import filter, zip, zip_longest
+  4 |+from six.moves import zip_longest
+5 5 | from io import open
+6 6 | import io
+7 7 | import six
+
+./resources/test/fixtures/pyupgrade/UP029.py:5:1: UP029 [*] Unnecessary builtin import: `open`
+  |
+5 | from builtins import str as _str
+6 | from six.moves import filter, zip, zip_longest
+7 | from io import open
+  | ^^^^^^^^^^^^^^^^^^^ UP029
+8 | import io
+9 | import six
+  |
+  = help: Remove unnecessary builtin import
+
+ℹ Suggested fix
+2 2 | from builtins import ascii, bytes, compile
+3 3 | from builtins import str as _str
+4 4 | from six.moves import filter, zip, zip_longest
+5   |-from io import open
+6 5 | import io
+7 6 | import six
+8 7 | import six.moves
+
 

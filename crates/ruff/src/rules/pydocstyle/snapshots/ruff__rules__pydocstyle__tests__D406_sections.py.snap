@@ -1,47 +1,64 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NewLineAfterSectionName
-    body: "Section name should end with a newline (\"Returns\")"
-    suggestion: "Add newline after \"Returns\""
-    fixable: true
-  location:
-    row: 30
-    column: 4
-  end_location:
-    row: 36
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 32
-          column: 11
-        end_location:
-          row: 32
-          column: 12
-        content: ~
-  parent: ~
-- kind:
-    name: NewLineAfterSectionName
-    body: "Section name should end with a newline (\"Raises\")"
-    suggestion: "Add newline after \"Raises\""
-    fixable: true
-  location:
-    row: 216
-    column: 4
-  end_location:
-    row: 230
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 227
-          column: 10
-        end_location:
-          row: 227
-          column: 11
-        content: ~
-  parent: ~
+./resources/test/fixtures/pydocstyle/sections.py:30:5: D406 [*] Section name should end with a newline ("Returns")
+   |
+30 |           "('Returns', not 'Returns:')")
+31 |   def superfluous_suffix():  # noqa: D416
+32 |       """Toggle the gizmo.
+   |  _____^
+33 | | 
+34 | |     Returns:
+35 | |     -------
+36 | |     A value of some sort.
+37 | | 
+38 | |     """
+   | |_______^ D406
+   |
+   = help: Add newline after "Returns"
+
+ℹ Suggested fix
+29 29 | def superfluous_suffix():  # noqa: D416
+30 30 |     """Toggle the gizmo.
+31 31 | 
+32    |-    Returns:
+   32 |+    Returns
+33 33 |     -------
+34 34 |     A value of some sort.
+35 35 | 
+
+./resources/test/fixtures/pydocstyle/sections.py:216:5: D406 [*] Section name should end with a newline ("Raises")
+    |
+216 |   @expect("D407: Missing dashed underline after section ('Raises')")
+217 |   def multiple_sections():  # noqa: D416
+218 |       """Toggle the gizmo.
+    |  _____^
+219 | | 
+220 | |     Short summary
+221 | |     -------------
+222 | | 
+223 | |     This is the function's description, which will also specify what it
+224 | |     returns.
+225 | | 
+226 | |     Returns
+227 | |     ------
+228 | |     Many many wonderful things.
+229 | |     Raises:
+230 | |     My attention.
+231 | | 
+232 | |     """
+    | |_______^ D406
+    |
+    = help: Add newline after "Raises"
+
+ℹ Suggested fix
+224 224 |     Returns
+225 225 |     ------
+226 226 |     Many many wonderful things.
+227     |-    Raises:
+    227 |+    Raises
+228 228 |     My attention.
+229 229 | 
+230 230 |     """
+
 

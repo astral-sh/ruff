@@ -1,47 +1,34 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PercentFormatExpectedSequence
-    body: "`%`-format string expected sequence but got mapping"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 0
-  end_location:
-    row: 17
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PercentFormatExpectedSequence
-    body: "`%`-format string expected sequence but got mapping"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 0
-  end_location:
-    row: 18
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PercentFormatExpectedSequence
-    body: "`%`-format string expected sequence but got mapping"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 0
-  end_location:
-    row: 23
-    column: 42
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F503.py:17:1: F503 `%`-format string expected sequence but got mapping
+   |
+17 | # Multiple placeholders
+18 | "%s %s" % dog
+19 | "%s %s" % {"bob": "bob"}  # F503
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ F503
+20 | "%s %s" % {**{"bob": "bob"}}  # F503
+21 | "%s %s" % ["bob"]
+   |
+
+./resources/test/fixtures/pyflakes/F503.py:18:1: F503 `%`-format string expected sequence but got mapping
+   |
+18 | "%s %s" % dog
+19 | "%s %s" % {"bob": "bob"}  # F503
+20 | "%s %s" % {**{"bob": "bob"}}  # F503
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F503
+21 | "%s %s" % ["bob"]
+22 | "%s %s" % ("bob",)
+   |
+
+./resources/test/fixtures/pyflakes/F503.py:23:1: F503 `%`-format string expected sequence but got mapping
+   |
+23 | "%s %s" % {"bob"}
+24 | "%s %s" % [*["bob"]]
+25 | "%s %s" % {"bob": "bob" for _ in range(1)}  # F503
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ F503
+26 | "%s %s" % ["bob" for _ in range(1)]
+27 | "%s %s" % ("bob" for _ in range(1))
+   |
+
 

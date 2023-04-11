@@ -1,404 +1,382 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedNOQA
-    body: "Unused blanket `noqa` directive"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 6
-  fix:
-    edits:
-      - location:
-          row: 1
-          column: 0
-        end_location:
-          row: 2
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused blanket `noqa` directive"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 6
-  fix:
-    edits:
-      - location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 7
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused blanket `noqa` directive"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 3
-    column: 9
-  end_location:
-    row: 3
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 7
-        end_location:
-          row: 3
-          column: 15
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused blanket `noqa` directive"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 4
-    column: 9
-  end_location:
-    row: 4
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 4
-          column: 9
-        end_location:
-          row: 4
-          column: 16
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused blanket `noqa` directive"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 5
-    column: 9
-  end_location:
-    row: 5
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 5
-          column: 9
-        end_location:
-          row: 5
-          column: 17
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused blanket `noqa` directive"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 6
-    column: 9
-  end_location:
-    row: 6
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 6
-          column: 11
-        end_location:
-          row: 6
-          column: 16
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused blanket `noqa` directive"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 7
-    column: 9
-  end_location:
-    row: 7
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 7
-          column: 11
-        end_location:
-          row: 7
-          column: 17
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `E501`, `F821`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 14
-    column: 0
-  end_location:
-    row: 14
-    column: 18
-  fix:
-    edits:
-      - location:
-          row: 14
-          column: 0
-        end_location:
-          row: 15
-          column: 0
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `E501`, `F821`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 15
-    column: 18
-  fix:
-    edits:
-      - location:
-          row: 15
-          column: 0
-        end_location:
-          row: 15
-          column: 19
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `E501`, `F821`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 16
-    column: 9
-  end_location:
-    row: 16
-    column: 27
-  fix:
-    edits:
-      - location:
-          row: 16
-          column: 7
-        end_location:
-          row: 16
-          column: 27
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `E501`, `F821`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 17
-    column: 9
-  end_location:
-    row: 17
-    column: 27
-  fix:
-    edits:
-      - location:
-          row: 17
-          column: 9
-        end_location:
-          row: 17
-          column: 28
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `E501`, `F821`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 18
-    column: 9
-  end_location:
-    row: 18
-    column: 27
-  fix:
-    edits:
-      - location:
-          row: 18
-          column: 9
-        end_location:
-          row: 18
-          column: 29
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `E501`, `F821`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 19
-    column: 9
-  end_location:
-    row: 19
-    column: 27
-  fix:
-    edits:
-      - location:
-          row: 19
-          column: 11
-        end_location:
-          row: 19
-          column: 28
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `E501`, `F821`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 20
-    column: 9
-  end_location:
-    row: 20
-    column: 27
-  fix:
-    edits:
-      - location:
-          row: 20
-          column: 11
-        end_location:
-          row: 20
-          column: 29
-        content: ~
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `E501`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 21
-    column: 10
-  end_location:
-    row: 21
-    column: 28
-  fix:
-    edits:
-      - location:
-          row: 21
-          column: 10
-        end_location:
-          row: 21
-          column: 28
-        content: "# noqa: F821"
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `E501`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 22
-    column: 10
-  end_location:
-    row: 22
-    column: 28
-  fix:
-    edits:
-      - location:
-          row: 22
-          column: 10
-        end_location:
-          row: 22
-          column: 28
-        content: "# noqa: F821"
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `E501`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 23
-    column: 10
-  end_location:
-    row: 23
-    column: 28
-  fix:
-    edits:
-      - location:
-          row: 23
-          column: 10
-        end_location:
-          row: 23
-          column: 28
-        content: "# noqa: F821"
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `E501`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 24
-    column: 10
-  end_location:
-    row: 24
-    column: 28
-  fix:
-    edits:
-      - location:
-          row: 24
-          column: 10
-        end_location:
-          row: 24
-          column: 28
-        content: "# noqa: F821"
-  parent: ~
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `E501`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 25
-    column: 10
-  end_location:
-    row: 25
-    column: 28
-  fix:
-    edits:
-      - location:
-          row: 25
-          column: 10
-        end_location:
-          row: 25
-          column: 28
-        content: "# noqa: F821"
-  parent: ~
+./resources/test/fixtures/ruff/RUF100_3.py:1:1: RUF100 [*] Unused blanket `noqa` directive
+  |
+1 | # noqa
+  | ^^^^^^ RUF100
+2 | # noqa # comment
+3 | print()  # noqa
+  |
+  = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+1   |-# noqa
+2 1 | # noqa # comment
+3 2 | print()  # noqa
+4 3 | print()  # noqa # comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:2:1: RUF100 [*] Unused blanket `noqa` directive
+  |
+2 | # noqa
+3 | # noqa # comment
+  | ^^^^^^ RUF100
+4 | print()  # noqa
+5 | print()  # noqa # comment
+  |
+  = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+1 1 | # noqa
+2   |-# noqa # comment
+  2 |+# comment
+3 3 | print()  # noqa
+4 4 | print()  # noqa # comment
+5 5 | print()  # noqa  # comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:3:10: RUF100 [*] Unused blanket `noqa` directive
+  |
+3 | # noqa
+4 | # noqa # comment
+5 | print()  # noqa
+  |          ^^^^^^ RUF100
+6 | print()  # noqa # comment
+7 | print()  # noqa  # comment
+  |
+  = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+1 1 | # noqa
+2 2 | # noqa # comment
+3   |-print()  # noqa
+  3 |+print()
+4 4 | print()  # noqa # comment
+5 5 | print()  # noqa  # comment
+6 6 | print()  # noqa comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:4:10: RUF100 [*] Unused blanket `noqa` directive
+  |
+4 | # noqa # comment
+5 | print()  # noqa
+6 | print()  # noqa # comment
+  |          ^^^^^^ RUF100
+7 | print()  # noqa  # comment
+8 | print()  # noqa comment
+  |
+  = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+1 1 | # noqa
+2 2 | # noqa # comment
+3 3 | print()  # noqa
+4   |-print()  # noqa # comment
+  4 |+print()  # comment
+5 5 | print()  # noqa  # comment
+6 6 | print()  # noqa comment
+7 7 | print()  # noqa  comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:5:10: RUF100 [*] Unused blanket `noqa` directive
+  |
+5 | print()  # noqa
+6 | print()  # noqa # comment
+7 | print()  # noqa  # comment
+  |          ^^^^^^ RUF100
+8 | print()  # noqa comment
+9 | print()  # noqa  comment
+  |
+  = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+2 2 | # noqa # comment
+3 3 | print()  # noqa
+4 4 | print()  # noqa # comment
+5   |-print()  # noqa  # comment
+  5 |+print()  # comment
+6 6 | print()  # noqa comment
+7 7 | print()  # noqa  comment
+8 8 | print(a)  # noqa
+
+./resources/test/fixtures/ruff/RUF100_3.py:6:10: RUF100 [*] Unused blanket `noqa` directive
+   |
+ 6 | print()  # noqa # comment
+ 7 | print()  # noqa  # comment
+ 8 | print()  # noqa comment
+   |          ^^^^^^ RUF100
+ 9 | print()  # noqa  comment
+10 | print(a)  # noqa
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+3 3 | print()  # noqa
+4 4 | print()  # noqa # comment
+5 5 | print()  # noqa  # comment
+6   |-print()  # noqa comment
+  6 |+print()  # comment
+7 7 | print()  # noqa  comment
+8 8 | print(a)  # noqa
+9 9 | print(a)  # noqa # comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:7:10: RUF100 [*] Unused blanket `noqa` directive
+   |
+ 7 | print()  # noqa  # comment
+ 8 | print()  # noqa comment
+ 9 | print()  # noqa  comment
+   |          ^^^^^^ RUF100
+10 | print(a)  # noqa
+11 | print(a)  # noqa # comment
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+4 4 | print()  # noqa # comment
+5 5 | print()  # noqa  # comment
+6 6 | print()  # noqa comment
+7   |-print()  # noqa  comment
+  7 |+print()  # comment
+8 8 | print(a)  # noqa
+9 9 | print(a)  # noqa # comment
+10 10 | print(a)  # noqa  # comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:14:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+   |
+14 | print(a)  # noqa  comment
+15 | 
+16 | # noqa: E501, F821
+   | ^^^^^^^^^^^^^^^^^^ RUF100
+17 | # noqa: E501, F821 # comment
+18 | print()  # noqa: E501, F821
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+11 11 | print(a)  # noqa comment
+12 12 | print(a)  # noqa  comment
+13 13 | 
+14    |-# noqa: E501, F821
+15 14 | # noqa: E501, F821 # comment
+16 15 | print()  # noqa: E501, F821
+17 16 | print()  # noqa: E501, F821 # comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:15:1: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+   |
+15 | # noqa: E501, F821
+16 | # noqa: E501, F821 # comment
+   | ^^^^^^^^^^^^^^^^^^ RUF100
+17 | print()  # noqa: E501, F821
+18 | print()  # noqa: E501, F821 # comment
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+12 12 | print(a)  # noqa  comment
+13 13 | 
+14 14 | # noqa: E501, F821
+15    |-# noqa: E501, F821 # comment
+   15 |+# comment
+16 16 | print()  # noqa: E501, F821
+17 17 | print()  # noqa: E501, F821 # comment
+18 18 | print()  # noqa: E501, F821  # comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:16:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+   |
+16 | # noqa: E501, F821
+17 | # noqa: E501, F821 # comment
+18 | print()  # noqa: E501, F821
+   |          ^^^^^^^^^^^^^^^^^^ RUF100
+19 | print()  # noqa: E501, F821 # comment
+20 | print()  # noqa: E501, F821  # comment
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+13 13 | 
+14 14 | # noqa: E501, F821
+15 15 | # noqa: E501, F821 # comment
+16    |-print()  # noqa: E501, F821
+   16 |+print()
+17 17 | print()  # noqa: E501, F821 # comment
+18 18 | print()  # noqa: E501, F821  # comment
+19 19 | print()  # noqa: E501, F821 comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:17:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+   |
+17 | # noqa: E501, F821 # comment
+18 | print()  # noqa: E501, F821
+19 | print()  # noqa: E501, F821 # comment
+   |          ^^^^^^^^^^^^^^^^^^ RUF100
+20 | print()  # noqa: E501, F821  # comment
+21 | print()  # noqa: E501, F821 comment
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+14 14 | # noqa: E501, F821
+15 15 | # noqa: E501, F821 # comment
+16 16 | print()  # noqa: E501, F821
+17    |-print()  # noqa: E501, F821 # comment
+   17 |+print()  # comment
+18 18 | print()  # noqa: E501, F821  # comment
+19 19 | print()  # noqa: E501, F821 comment
+20 20 | print()  # noqa: E501, F821  comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:18:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+   |
+18 | print()  # noqa: E501, F821
+19 | print()  # noqa: E501, F821 # comment
+20 | print()  # noqa: E501, F821  # comment
+   |          ^^^^^^^^^^^^^^^^^^ RUF100
+21 | print()  # noqa: E501, F821 comment
+22 | print()  # noqa: E501, F821  comment
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+15 15 | # noqa: E501, F821 # comment
+16 16 | print()  # noqa: E501, F821
+17 17 | print()  # noqa: E501, F821 # comment
+18    |-print()  # noqa: E501, F821  # comment
+   18 |+print()  # comment
+19 19 | print()  # noqa: E501, F821 comment
+20 20 | print()  # noqa: E501, F821  comment
+21 21 | print(a)  # noqa: E501, F821
+
+./resources/test/fixtures/ruff/RUF100_3.py:19:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+   |
+19 | print()  # noqa: E501, F821 # comment
+20 | print()  # noqa: E501, F821  # comment
+21 | print()  # noqa: E501, F821 comment
+   |          ^^^^^^^^^^^^^^^^^^ RUF100
+22 | print()  # noqa: E501, F821  comment
+23 | print(a)  # noqa: E501, F821
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+16 16 | print()  # noqa: E501, F821
+17 17 | print()  # noqa: E501, F821 # comment
+18 18 | print()  # noqa: E501, F821  # comment
+19    |-print()  # noqa: E501, F821 comment
+   19 |+print()  # comment
+20 20 | print()  # noqa: E501, F821  comment
+21 21 | print(a)  # noqa: E501, F821
+22 22 | print(a)  # noqa: E501, F821 # comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:20:10: RUF100 [*] Unused `noqa` directive (unused: `E501`, `F821`)
+   |
+20 | print()  # noqa: E501, F821  # comment
+21 | print()  # noqa: E501, F821 comment
+22 | print()  # noqa: E501, F821  comment
+   |          ^^^^^^^^^^^^^^^^^^ RUF100
+23 | print(a)  # noqa: E501, F821
+24 | print(a)  # noqa: E501, F821 # comment
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+17 17 | print()  # noqa: E501, F821 # comment
+18 18 | print()  # noqa: E501, F821  # comment
+19 19 | print()  # noqa: E501, F821 comment
+20    |-print()  # noqa: E501, F821  comment
+   20 |+print()  # comment
+21 21 | print(a)  # noqa: E501, F821
+22 22 | print(a)  # noqa: E501, F821 # comment
+23 23 | print(a)  # noqa: E501, F821  # comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:21:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+   |
+21 | print()  # noqa: E501, F821 comment
+22 | print()  # noqa: E501, F821  comment
+23 | print(a)  # noqa: E501, F821
+   |           ^^^^^^^^^^^^^^^^^^ RUF100
+24 | print(a)  # noqa: E501, F821 # comment
+25 | print(a)  # noqa: E501, F821  # comment
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+18 18 | print()  # noqa: E501, F821  # comment
+19 19 | print()  # noqa: E501, F821 comment
+20 20 | print()  # noqa: E501, F821  comment
+21    |-print(a)  # noqa: E501, F821
+   21 |+print(a)  # noqa: F821
+22 22 | print(a)  # noqa: E501, F821 # comment
+23 23 | print(a)  # noqa: E501, F821  # comment
+24 24 | print(a)  # noqa: E501, F821 comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:22:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+   |
+22 | print()  # noqa: E501, F821  comment
+23 | print(a)  # noqa: E501, F821
+24 | print(a)  # noqa: E501, F821 # comment
+   |           ^^^^^^^^^^^^^^^^^^ RUF100
+25 | print(a)  # noqa: E501, F821  # comment
+26 | print(a)  # noqa: E501, F821 comment
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+19 19 | print()  # noqa: E501, F821 comment
+20 20 | print()  # noqa: E501, F821  comment
+21 21 | print(a)  # noqa: E501, F821
+22    |-print(a)  # noqa: E501, F821 # comment
+   22 |+print(a)  # noqa: F821 # comment
+23 23 | print(a)  # noqa: E501, F821  # comment
+24 24 | print(a)  # noqa: E501, F821 comment
+25 25 | print(a)  # noqa: E501, F821  comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:23:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+   |
+23 | print(a)  # noqa: E501, F821
+24 | print(a)  # noqa: E501, F821 # comment
+25 | print(a)  # noqa: E501, F821  # comment
+   |           ^^^^^^^^^^^^^^^^^^ RUF100
+26 | print(a)  # noqa: E501, F821 comment
+27 | print(a)  # noqa: E501, F821  comment
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+20 20 | print()  # noqa: E501, F821  comment
+21 21 | print(a)  # noqa: E501, F821
+22 22 | print(a)  # noqa: E501, F821 # comment
+23    |-print(a)  # noqa: E501, F821  # comment
+   23 |+print(a)  # noqa: F821  # comment
+24 24 | print(a)  # noqa: E501, F821 comment
+25 25 | print(a)  # noqa: E501, F821  comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:24:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+   |
+24 | print(a)  # noqa: E501, F821 # comment
+25 | print(a)  # noqa: E501, F821  # comment
+26 | print(a)  # noqa: E501, F821 comment
+   |           ^^^^^^^^^^^^^^^^^^ RUF100
+27 | print(a)  # noqa: E501, F821  comment
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+21 21 | print(a)  # noqa: E501, F821
+22 22 | print(a)  # noqa: E501, F821 # comment
+23 23 | print(a)  # noqa: E501, F821  # comment
+24    |-print(a)  # noqa: E501, F821 comment
+   24 |+print(a)  # noqa: F821 comment
+25 25 | print(a)  # noqa: E501, F821  comment
+
+./resources/test/fixtures/ruff/RUF100_3.py:25:11: RUF100 [*] Unused `noqa` directive (unused: `E501`)
+   |
+25 | print(a)  # noqa: E501, F821  # comment
+26 | print(a)  # noqa: E501, F821 comment
+27 | print(a)  # noqa: E501, F821  comment
+   |           ^^^^^^^^^^^^^^^^^^ RUF100
+   |
+   = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+22 22 | print(a)  # noqa: E501, F821 # comment
+23 23 | print(a)  # noqa: E501, F821  # comment
+24 24 | print(a)  # noqa: E501, F821 comment
+25    |-print(a)  # noqa: E501, F821  comment
+   25 |+print(a)  # noqa: F821  comment
+
 

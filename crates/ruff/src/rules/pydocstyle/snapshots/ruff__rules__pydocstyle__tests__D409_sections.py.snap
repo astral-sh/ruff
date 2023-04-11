@@ -1,47 +1,64 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SectionUnderlineMatchesSectionLength
-    body: "Section underline should match the length of its name (\"Returns\")"
-    suggestion: "Adjust underline length to match \"Returns\""
-    fixable: true
-  location:
-    row: 108
-    column: 4
-  end_location:
-    row: 114
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 111
-          column: 0
-        end_location:
-          row: 112
-          column: 0
-        content: "    -------\n"
-  parent: ~
-- kind:
-    name: SectionUnderlineMatchesSectionLength
-    body: "Section underline should match the length of its name (\"Returns\")"
-    suggestion: "Adjust underline length to match \"Returns\""
-    fixable: true
-  location:
-    row: 216
-    column: 4
-  end_location:
-    row: 230
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 225
-          column: 0
-        end_location:
-          row: 226
-          column: 0
-        content: "    -------\n"
-  parent: ~
+./resources/test/fixtures/pydocstyle/sections.py:108:5: D409 [*] Section underline should match the length of its name ("Returns")
+    |
+108 |           "(Expected 7 dashes in section 'Returns', got 2)")
+109 |   def bad_underline_length():  # noqa: D416
+110 |       """Toggle the gizmo.
+    |  _____^
+111 | | 
+112 | |     Returns
+113 | |     --
+114 | |     A value of some sort.
+115 | | 
+116 | |     """
+    | |_______^ D409
+    |
+    = help: Adjust underline length to match "Returns"
+
+ℹ Suggested fix
+108 108 |     """Toggle the gizmo.
+109 109 | 
+110 110 |     Returns
+111     |-    --
+    111 |+    -------
+112 112 |     A value of some sort.
+113 113 | 
+114 114 |     """
+
+./resources/test/fixtures/pydocstyle/sections.py:216:5: D409 [*] Section underline should match the length of its name ("Returns")
+    |
+216 |   @expect("D407: Missing dashed underline after section ('Raises')")
+217 |   def multiple_sections():  # noqa: D416
+218 |       """Toggle the gizmo.
+    |  _____^
+219 | | 
+220 | |     Short summary
+221 | |     -------------
+222 | | 
+223 | |     This is the function's description, which will also specify what it
+224 | |     returns.
+225 | | 
+226 | |     Returns
+227 | |     ------
+228 | |     Many many wonderful things.
+229 | |     Raises:
+230 | |     My attention.
+231 | | 
+232 | |     """
+    | |_______^ D409
+    |
+    = help: Adjust underline length to match "Returns"
+
+ℹ Suggested fix
+222 222 |     returns.
+223 223 | 
+224 224 |     Returns
+225     |-    ------
+    225 |+    -------
+226 226 |     Many many wonderful things.
+227 227 |     Raises:
+228 228 |     My attention.
+
 

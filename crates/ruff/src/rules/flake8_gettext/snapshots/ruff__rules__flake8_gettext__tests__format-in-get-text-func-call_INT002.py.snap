@@ -1,19 +1,10 @@
 ---
 source: crates/ruff/src/rules/flake8_gettext/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: FormatInGetTextFuncCall
-    body: "`format` method argument is resolved before function call; consider `_(\"string %s\") % arg`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 2
-  end_location:
-    row: 1
-    column: 21
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/flake8_gettext/INT002.py:1:3: INT002 `format` method argument is resolved before function call; consider `_("string %s") % arg`
+  |
+1 | _("{}".format("line"))
+  |   ^^^^^^^^^^^^^^^^^^^ INT002
+  |
+
 

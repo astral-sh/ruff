@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedAnnotation
-    body: "Local variable `name` is annotated but never used"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedAnnotation
-    body: "Local variable `age` is annotated but never used"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 7
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F842.py:2:5: F842 Local variable `name` is annotated but never used
+  |
+2 | def f():
+3 |     name: str
+  |     ^^^^ F842
+4 |     age: int
+  |
+
+./resources/test/fixtures/pyflakes/F842.py:3:5: F842 Local variable `age` is annotated but never used
+  |
+3 | def f():
+4 |     name: str
+5 |     age: int
+  |     ^^^ F842
+  |
+
 

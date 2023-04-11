@@ -1,82 +1,70 @@
 ---
 source: crates/ruff/src/rules/flake8_annotations/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__init__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 5
-    column: 8
-  end_location:
-    row: 5
-    column: 16
-  fix:
-    edits:
-      - location:
-          row: 5
-          column: 22
-        end_location:
-          row: 5
-          column: 22
-        content: " -> None"
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__init__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 11
-    column: 8
-  end_location:
-    row: 11
-    column: 16
-  fix:
-    edits:
-      - location:
-          row: 11
-          column: 27
-        end_location:
-          row: 11
-          column: 27
-        content: " -> None"
-  parent: ~
-- kind:
-    name: MissingReturnTypePrivateFunction
-    body: "Missing return type annotation for private function `__init__`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 4
-  end_location:
-    row: 40
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingReturnTypeSpecialMethod
-    body: "Missing return type annotation for special method `__init__`"
-    suggestion: "Add `None` return type"
-    fixable: true
-  location:
-    row: 47
-    column: 8
-  end_location:
-    row: 47
-    column: 16
-  fix:
-    edits:
-      - location:
-          row: 47
-          column: 28
-        end_location:
-          row: 47
-          column: 28
-        content: " -> None"
-  parent: ~
+./resources/test/fixtures/flake8_annotations/mypy_init_return.py:5:9: ANN204 [*] Missing return type annotation for special method `__init__`
+  |
+5 | # Error
+6 | class Foo:
+7 |     def __init__(self):
+  |         ^^^^^^^^ ANN204
+8 |         ...
+  |
+  = help: Add `None` return type
+
+ℹ Suggested fix
+2 2 | 
+3 3 | # Error
+4 4 | class Foo:
+5   |-    def __init__(self):
+  5 |+    def __init__(self) -> None:
+6 6 |         ...
+7 7 | 
+8 8 | 
+
+./resources/test/fixtures/flake8_annotations/mypy_init_return.py:11:9: ANN204 [*] Missing return type annotation for special method `__init__`
+   |
+11 | # Error
+12 | class Foo:
+13 |     def __init__(self, foo):
+   |         ^^^^^^^^ ANN204
+14 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+8  8  | 
+9  9  | # Error
+10 10 | class Foo:
+11    |-    def __init__(self, foo):
+   11 |+    def __init__(self, foo) -> None:
+12 12 |         ...
+13 13 | 
+14 14 | 
+
+./resources/test/fixtures/flake8_annotations/mypy_init_return.py:40:5: ANN202 Missing return type annotation for private function `__init__`
+   |
+40 | # Error
+41 | def __init__(self, foo: int):
+   |     ^^^^^^^^ ANN202
+42 |     ...
+   |
+
+./resources/test/fixtures/flake8_annotations/mypy_init_return.py:47:9: ANN204 [*] Missing return type annotation for special method `__init__`
+   |
+47 | # of a vararg falsely indicated that the function has a typed argument.
+48 | class Foo:
+49 |     def __init__(self, *arg):
+   |         ^^^^^^^^ ANN204
+50 |         ...
+   |
+   = help: Add `None` return type
+
+ℹ Suggested fix
+44 44 | # Error – used to be ok for a moment since the mere presence
+45 45 | # of a vararg falsely indicated that the function has a typed argument.
+46 46 | class Foo:
+47    |-    def __init__(self, *arg):
+   47 |+    def __init__(self, *arg) -> None:
+48 48 |         ...
+
 

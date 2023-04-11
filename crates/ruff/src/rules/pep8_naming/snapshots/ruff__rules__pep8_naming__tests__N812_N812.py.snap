@@ -1,53 +1,28 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: LowercaseImportedAsNonLowercase
-    body: "Lowercase `lowercase` imported as non-lowercase `Lower`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 7
-  end_location:
-    row: 1
-    column: 30
-  fix:
-    edits: []
-  parent:
-    row: 1
-    column: 0
-- kind:
-    name: LowercaseImportedAsNonLowercase
-    body: "Lowercase `lowercase` imported as non-lowercase `Lowercase`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 16
-  end_location:
-    row: 2
-    column: 38
-  fix:
-    edits: []
-  parent:
-    row: 2
-    column: 0
-- kind:
-    name: LowercaseImportedAsNonLowercase
-    body: "Lowercase `another_lowercase` imported as non-lowercase `AnotherLowercase`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 16
-  end_location:
-    row: 3
-    column: 53
-  fix:
-    edits: []
-  parent:
-    row: 3
-    column: 0
+./resources/test/fixtures/pep8_naming/N812.py:1:8: N812 Lowercase `lowercase` imported as non-lowercase `Lower`
+  |
+1 | import modl.lowercase as Lower
+  |        ^^^^^^^^^^^^^^^^^^^^^^^ N812
+2 | from mod import lowercase as Lowercase
+3 | from mod import another_lowercase as AnotherLowercase
+  |
+
+./resources/test/fixtures/pep8_naming/N812.py:2:17: N812 Lowercase `lowercase` imported as non-lowercase `Lowercase`
+  |
+2 | import modl.lowercase as Lower
+3 | from mod import lowercase as Lowercase
+  |                 ^^^^^^^^^^^^^^^^^^^^^^ N812
+4 | from mod import another_lowercase as AnotherLowercase
+  |
+
+./resources/test/fixtures/pep8_naming/N812.py:3:17: N812 Lowercase `another_lowercase` imported as non-lowercase `AnotherLowercase`
+  |
+3 | import modl.lowercase as Lower
+4 | from mod import lowercase as Lowercase
+5 | from mod import another_lowercase as AnotherLowercase
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N812
+  |
+
 

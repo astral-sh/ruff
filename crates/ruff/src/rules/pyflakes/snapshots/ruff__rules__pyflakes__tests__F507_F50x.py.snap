@@ -1,33 +1,24 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PercentFormatPositionalCountMismatch
-    body: "`%`-format string has 2 placeholder(s) but 1 substitution(s)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PercentFormatPositionalCountMismatch
-    body: "`%`-format string has 2 placeholder(s) but 3 substitution(s)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 19
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pyflakes/F50x.py:5:1: F507 `%`-format string has 2 placeholder(s) but 1 substitution(s)
+  |
+5 | '%(foo)s %s' % {'foo': 'bar'}  # F506
+6 | '%j' % (1,)  # F509
+7 | '%s %s' % (1,)  # F507
+  | ^^^^^^^^^^^^^^ F507
+8 | '%s %s' % (1, 2, 3)  # F507
+9 | '%(bar)s' % {}  # F505
+  |
+
+./resources/test/fixtures/pyflakes/F50x.py:6:1: F507 `%`-format string has 2 placeholder(s) but 3 substitution(s)
+   |
+ 6 | '%j' % (1,)  # F509
+ 7 | '%s %s' % (1,)  # F507
+ 8 | '%s %s' % (1, 2, 3)  # F507
+   | ^^^^^^^^^^^^^^^^^^^ F507
+ 9 | '%(bar)s' % {}  # F505
+10 | '%(bar)s' % {'bar': 1, 'baz': 2}  # F504
+   |
+
 

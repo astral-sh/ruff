@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NoSignature
-    body: "First line should not be the function's signature"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 378
-    column: 4
-  end_location:
-    row: 378
-    column: 30
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pydocstyle/D.py:378:5: D402 First line should not be the function's signature
+    |
+378 | @expect('D402: First line should not be the function\'s "signature"')
+379 | def foobar():
+380 |     """Signature: foobar()."""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D402
+    |
+
 

@@ -1,131 +1,158 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 7
-    column: 3
-  fix:
-    edits:
-      - location:
-          row: 5
-          column: 0
-        end_location:
-          row: 7
-          column: 3
-        content: "\"\"\"\nthis is not a docstring\n\"\"\""
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 11
-    column: 20
-  end_location:
-    row: 13
-    column: 3
-  fix:
-    edits:
-      - location:
-          row: 11
-          column: 20
-        end_location:
-          row: 13
-          column: 3
-        content: "\"\"\"\n    class params \\t not a docstring\n\"\"\""
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 18
-    column: 4
-  end_location:
-    row: 20
-    column: 7
-  fix:
-    edits:
-      - location:
-          row: 18
-          column: 4
-        end_location:
-          row: 20
-          column: 7
-        content: "\"\"\"\n    this is not a docstring\n    \"\"\""
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 23
-    column: 20
-  end_location:
-    row: 24
-    column: 37
-  fix:
-    edits:
-      - location:
-          row: 23
-          column: 20
-        end_location:
-          row: 24
-          column: 37
-        content: "\"\"\"\n        definitely not a docstring\"\"\""
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 32
-    column: 8
-  end_location:
-    row: 34
-    column: 11
-  fix:
-    edits:
-      - location:
-          row: 32
-          column: 8
-        end_location:
-          row: 34
-          column: 11
-        content: "\"\"\"\n        this is not a docstring\n        \"\"\""
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 37
-    column: 12
-  end_location:
-    row: 39
-    column: 15
-  fix:
-    edits:
-      - location:
-          row: 37
-          column: 12
-        end_location:
-          row: 39
-          column: 15
-        content: "\"\"\"\n            Looks like a docstring, but in reality it isn't - only modules, classes and functions\n            \"\"\""
-  parent: ~
+./resources/test/fixtures/flake8_quotes/docstring_singles.py:5:1: Q001 [*] Single quote multiline found but double quotes preferred
+   |
+ 5 |   '''
+ 6 |   
+ 7 | / '''
+ 8 | | this is not a docstring
+ 9 | | '''
+   | |___^ Q001
+10 |   
+11 |   l = []
+   |
+   = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+2 2 | Single quotes multiline module docstring
+3 3 | '''
+4 4 | 
+5   |-'''
+  5 |+"""
+6 6 | this is not a docstring
+7   |-'''
+  7 |+"""
+8 8 | 
+9 9 | l = []
+10 10 | 
+
+./resources/test/fixtures/flake8_quotes/docstring_singles.py:11:21: Q001 [*] Single quote multiline found but double quotes preferred
+   |
+11 |   l = []
+12 |   
+13 |   class Cls(MakeKlass('''
+   |  _____________________^
+14 | |     class params \t not a docstring
+15 | | ''')):
+   | |___^ Q001
+16 |       '''
+17 |       Single quotes multiline class docstring
+   |
+   = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+8  8  | 
+9  9  | l = []
+10 10 | 
+11    |-class Cls(MakeKlass('''
+   11 |+class Cls(MakeKlass("""
+12 12 |     class params \t not a docstring
+13    |-''')):
+   13 |+""")):
+14 14 |     '''
+15 15 |     Single quotes multiline class docstring
+16 16 |     '''
+
+./resources/test/fixtures/flake8_quotes/docstring_singles.py:18:5: Q001 [*] Single quote multiline found but double quotes preferred
+   |
+18 |       '''
+19 |   
+20 |       '''
+   |  _____^
+21 | |     this is not a docstring
+22 | |     '''
+   | |_______^ Q001
+23 |   
+24 |       # The colon in the list indexing below is an edge case for the docstring scanner
+   |
+   = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+15 15 |     Single quotes multiline class docstring
+16 16 |     '''
+17 17 | 
+18    |-    '''
+   18 |+    """
+19 19 |     this is not a docstring
+20    |-    '''
+   20 |+    """
+21 21 | 
+22 22 |     # The colon in the list indexing below is an edge case for the docstring scanner
+23 23 |     def f(self, bar='''
+
+./resources/test/fixtures/flake8_quotes/docstring_singles.py:23:21: Q001 [*] Single quote multiline found but double quotes preferred
+   |
+23 |       # The colon in the list indexing below is an edge case for the docstring scanner
+24 |       def f(self, bar='''
+   |  _____________________^
+25 | |         definitely not a docstring''',
+   | |_____________________________________^ Q001
+26 |           val=l[Cls():3]):
+27 |           '''
+   |
+   = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+20 20 |     '''
+21 21 | 
+22 22 |     # The colon in the list indexing below is an edge case for the docstring scanner
+23    |-    def f(self, bar='''
+24    |-        definitely not a docstring''',
+   23 |+    def f(self, bar="""
+   24 |+        definitely not a docstring""",
+25 25 |         val=l[Cls():3]):
+26 26 |         '''
+27 27 |         Single quotes multiline function docstring
+
+./resources/test/fixtures/flake8_quotes/docstring_singles.py:32:9: Q001 [*] Single quote multiline found but double quotes preferred
+   |
+32 |           some_expression = 'hello world'
+33 |   
+34 |           '''
+   |  _________^
+35 | |         this is not a docstring
+36 | |         '''
+   | |___________^ Q001
+37 |   
+38 |           if l:
+   |
+   = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+29 29 | 
+30 30 |         some_expression = 'hello world'
+31 31 | 
+32    |-        '''
+   32 |+        """
+33 33 |         this is not a docstring
+34    |-        '''
+   34 |+        """
+35 35 | 
+36 36 |         if l:
+37 37 |             '''
+
+./resources/test/fixtures/flake8_quotes/docstring_singles.py:37:13: Q001 [*] Single quote multiline found but double quotes preferred
+   |
+37 |           if l:
+38 |               '''
+   |  _____________^
+39 | |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
+40 | |             '''
+   | |_______________^ Q001
+41 |               pass
+   |
+   = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+34 34 |         '''
+35 35 | 
+36 36 |         if l:
+37    |-            '''
+   37 |+            """
+38 38 |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
+39    |-            '''
+   39 |+            """
+40 40 |             pass
+
 

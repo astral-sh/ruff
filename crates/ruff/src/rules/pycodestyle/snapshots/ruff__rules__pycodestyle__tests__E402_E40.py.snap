@@ -1,47 +1,32 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ModuleImportNotAtTopOfFile
-    body: Module level import not at top of file
-    suggestion: ~
-    fixable: false
-  location:
-    row: 55
-    column: 0
-  end_location:
-    row: 55
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ModuleImportNotAtTopOfFile
-    body: Module level import not at top of file
-    suggestion: ~
-    fixable: false
-  location:
-    row: 57
-    column: 0
-  end_location:
-    row: 57
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ModuleImportNotAtTopOfFile
-    body: Module level import not at top of file
-    suggestion: ~
-    fixable: false
-  location:
-    row: 61
-    column: 0
-  end_location:
-    row: 61
-    column: 10
-  fix:
-    edits: []
-  parent: ~
+./resources/test/fixtures/pycodestyle/E40.py:55:1: E402 Module level import not at top of file
+   |
+55 | VERSION = '1.2.3'
+56 | 
+57 | import foo
+   | ^^^^^^^^^^ E402
+58 | #: E402
+59 | import foo
+   |
+
+./resources/test/fixtures/pycodestyle/E40.py:57:1: E402 Module level import not at top of file
+   |
+57 | import foo
+58 | #: E402
+59 | import foo
+   | ^^^^^^^^^^ E402
+60 | 
+61 | a = 1
+   |
+
+./resources/test/fixtures/pycodestyle/E40.py:61:1: E402 Module level import not at top of file
+   |
+61 | a = 1
+62 | 
+63 | import bar
+   | ^^^^^^^^^^ E402
+   |
+
 

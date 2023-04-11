@@ -1,26 +1,23 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ImplicitReturnValue
-    body: "Do not implicitly `return None` in function able to return non-`None` value"
-    suggestion: "Add explicit `None` return value"
-    fixable: true
-  location:
-    row: 3
-    column: 8
-  end_location:
-    row: 3
-    column: 14
-  fix:
-    edits:
-      - location:
-          row: 3
-          column: 8
-        end_location:
-          row: 3
-          column: 14
-        content: return None
-  parent: ~
+./resources/test/fixtures/flake8_return/RET502.py:3:9: RET502 [*] Do not implicitly `return None` in function able to return non-`None` value
+  |
+3 | def x(y):
+4 |     if not y:
+5 |         return  # error
+  |         ^^^^^^ RET502
+6 |     return 1
+  |
+  = help: Add explicit `None` return value
+
+ℹ Suggested fix
+1 1 | def x(y):
+2 2 |     if not y:
+3   |-        return  # error
+  3 |+        return None  # error
+4 4 |     return 1
+5 5 | 
+6 6 | 
+
 
