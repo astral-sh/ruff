@@ -43,8 +43,17 @@ impl Diagnostic {
     }
 
     /// Set the [`Fix`] used to fix the diagnostic.
+    #[inline]
     pub fn set_fix<T: Into<Fix>>(&mut self, fix: T) {
         self.fix = fix.into();
+    }
+
+    /// Consumes `self` and returns a new `Diagnostic` with the given `fix`.
+    #[inline]
+    #[must_use]
+    pub fn with_fix<T: Into<Fix>>(mut self, fix: T) -> Self {
+        self.set_fix(fix);
+        self
     }
 
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.

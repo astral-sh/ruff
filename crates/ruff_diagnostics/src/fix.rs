@@ -41,6 +41,10 @@ impl Fix {
     pub fn edits(&self) -> &[Edit] {
         &self.edits
     }
+
+    pub fn into_edits(self) -> Vec<Edit> {
+        self.edits
+    }
 }
 
 impl FromIterator<Edit> for Fix {

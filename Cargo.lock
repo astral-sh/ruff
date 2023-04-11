@@ -1979,6 +1979,7 @@ dependencies = [
 name = "ruff"
 version = "0.0.261"
 dependencies = [
+ "annotate-snippets 0.9.1",
  "anyhow",
  "bitflags",
  "chrono",
@@ -2004,6 +2005,7 @@ dependencies = [
  "pathdiff",
  "pep440_rs",
  "pretty_assertions",
+ "quick-junit",
  "regex",
  "result-like",
  "ruff_cache",
@@ -2082,7 +2084,6 @@ dependencies = [
  "mimalloc",
  "notify",
  "path-absolutize",
- "quick-junit",
  "rayon",
  "regex",
  "ruff",
