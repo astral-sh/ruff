@@ -132,6 +132,7 @@ mod tests {
     pub(super) fn create_messages() -> Vec<Message> {
         let fib = r#"import os
 
+
 def fibonacci(n):
     """Compute the nth number in the Fibonacci sequence."""
     x = 1
@@ -141,7 +142,7 @@ def fibonacci(n):
         return 1
     else:
         return fibonacci(n - 1) + fibonacci(n - 2)
-        "#;
+"#;
 
         let unused_import = Diagnostic::new(
             UnusedImport {
@@ -158,11 +159,11 @@ def fibonacci(n):
             UnusedVariable {
                 name: "x".to_string(),
             },
-            Range::new(Location::new(5, 4), Location::new(5, 5)),
+            Range::new(Location::new(6, 4), Location::new(6, 5)),
         )
         .with_fix(Fix::new(vec![Edit::deletion(
-            Location::new(5, 4),
-            Location::new(5, 9),
+            Location::new(6, 4),
+            Location::new(6, 9),
         )]));
 
         let file_2 = r#"if a == 1: pass"#;

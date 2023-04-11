@@ -78,6 +78,10 @@ impl<'src, 'index> SourceCode<'src, 'index> {
         self.index.line_start(line, self.text)
     }
 
+    pub fn line_end(&self, line: OneIndexed) -> TextSize {
+        self.index.line_end(line, self.text)
+    }
+
     pub fn line_range(&self, line: OneIndexed) -> TextRange {
         self.index.line_range(line, self.text)
     }
@@ -196,6 +200,11 @@ impl SourceCodeBuf {
     #[inline]
     pub fn offset(&self, location: Location) -> TextSize {
         self.as_source_code().offset(location)
+    }
+
+    #[inline]
+    pub fn line_end(&self, line: OneIndexed) -> TextSize {
+        self.as_source_code().line_end(line)
     }
 
     #[inline]
