@@ -36,7 +36,7 @@ fn traverse_union<'a>(
     seen_nodes: &mut FxHashSet<ComparableExpr<'a>>,
     checker: &mut Checker,
     expr: &'a Expr,
-    previous: Option<&'a Expr>,
+    parent: Option<&'a Expr>,
 ) {
     // The union data structure usually looks like this:
     //  a | b | c -> (a | b) | c
@@ -53,8 +53,8 @@ fn traverse_union<'a>(
     } = &expr.node
     {
         // Traverse left subtree, then the right subtree, propagating the previous node.
-        traverse_union(seen_nodes, checker, left, previous);
-        traverse_union(seen_nodes, checker, right, Some(left));
+        traverse_union(seen_nodes, checker, left, Some(expr));
+        traverse_union(seen_nodes, checker, right, Some(expr));
     }
 
     // If we've already seen this union member, raise a violation.
@@ -66,12 +66,25 @@ fn traverse_union<'a>(
             Range::from(expr),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            // Delete the "|" character as well as the duplicate value. We structure this as
-            // a deletion from the end of `previous` to the end of `expr`.
-            diagnostic.set_fix(Edit::deletion(
-                // SAFETY: impossible to have a duplicate without a `previous` node.
-                previous.unwrap().end_location.unwrap(),
-                expr.end_location.unwrap(),
+            // Delete the "|" character as well as the duplicate value by reconstructing the
+            // parent without the duplicate
+
+            // SAFETY: impossible to have a duplicate without a `parent` node.
+            let parent = parent.unwrap();
+
+            // SAFETY: Parent node must have been a BinOp in order for us to have traversed it
+            let ExprKind::BinOp { left, right, .. } = &parent.node
+            else {
+                unreachable!();
+            };
+
+            // Replace parent with the non-duplicate of its children
+            let fixed_parent = if expr.node == left.node { right } else { left };
+
+            diagnostic.set_fix(Edit::replacement(
+                unparse_expr(fixed_parent, checker.stylist),
+                parent.location,
+                parent.end_location.unwrap(),
             ));
         }
         checker.diagnostics.push(diagnostic);

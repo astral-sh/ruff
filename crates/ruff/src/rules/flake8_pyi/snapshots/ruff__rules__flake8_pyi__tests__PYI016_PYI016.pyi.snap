@@ -15,10 +15,10 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: ""
+      - content: str
         location:
           row: 5
-          column: 11
+          column: 8
         end_location:
           row: 5
           column: 17
@@ -36,10 +36,10 @@ expression: diagnostics
     column: 25
   fix:
     edits:
-      - content: ""
+      - content: int
         location:
           row: 8
-          column: 19
+          column: 16
         end_location:
           row: 8
           column: 25
@@ -57,10 +57,10 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: ""
+      - content: str
         location:
           row: 12
-          column: 18
+          column: 15
         end_location:
           row: 12
           column: 24
@@ -78,10 +78,10 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: ""
+      - content: str
         location:
           row: 16
-          column: 11
+          column: 8
         end_location:
           row: 16
           column: 17
@@ -99,10 +99,10 @@ expression: diagnostics
     column: 17
   fix:
     edits:
-      - content: ""
+      - content: int
         location:
           row: 17
-          column: 11
+          column: 8
         end_location:
           row: 17
           column: 17
@@ -120,10 +120,10 @@ expression: diagnostics
     column: 23
   fix:
     edits:
-      - content: ""
+      - content: str | int
         location:
           row: 18
-          column: 17
+          column: 8
         end_location:
           row: 18
           column: 23
@@ -141,10 +141,10 @@ expression: diagnostics
     column: 30
   fix:
     edits:
-      - content: ""
+      - content: int | bool | str
         location:
           row: 19
-          column: 24
+          column: 8
         end_location:
           row: 19
           column: 30
@@ -162,12 +162,54 @@ expression: diagnostics
     column: 24
   fix:
     edits:
-      - content: ""
+      - content: str
         location:
           row: 25
-          column: 18
+          column: 15
         end_location:
           row: 25
           column: 24
+  parent: ~
+- kind:
+    name: DuplicateUnionMember
+    body: "Duplicate union member `int`"
+    suggestion: "Remove duplicate union member `int`"
+    fixable: true
+  location:
+    row: 28
+    column: 15
+  end_location:
+    row: 28
+    column: 18
+  fix:
+    edits:
+      - content: str
+        location:
+          row: 28
+          column: 15
+        end_location:
+          row: 28
+          column: 24
+  parent: ~
+- kind:
+    name: DuplicateUnionMember
+    body: "Duplicate union member `str`"
+    suggestion: "Remove duplicate union member `str`"
+    fixable: true
+  location:
+    row: 29
+    column: 23
+  end_location:
+    row: 29
+    column: 26
+  fix:
+    edits:
+      - content: str | int
+        location:
+          row: 29
+          column: 9
+        end_location:
+          row: 29
+          column: 26
   parent: ~
 
