@@ -125,7 +125,7 @@ pub fn expand_indented_block(
 /// Return true if the `orelse` block of an `if` statement is an `elif` statement.
 pub fn is_elif(orelse: &[rustpython_parser::ast::Stmt], locator: &Locator) -> bool {
     if orelse.len() == 1 && matches!(orelse[0].node, rustpython_parser::ast::StmtKind::If { .. }) {
-        let contents = locator.skip(orelse[0].location);
+        let contents = locator.after(orelse[0].location);
         if contents.starts_with("elif") {
             return true;
         }

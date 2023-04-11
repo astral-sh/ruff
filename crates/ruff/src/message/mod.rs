@@ -20,22 +20,20 @@ pub use json::JsonEmitter;
 pub use junit::JunitEmitter;
 pub use pylint::PylintEmitter;
 pub use rustpython_parser::ast::Location;
-use serde::{Deserialize, Serialize};
 pub use text::TextEmitter;
 
 use crate::jupyter::JupyterIndex;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
-use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
+use ruff_python_ast::source_code::SourceCodeBuf;
 
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, PartialEq, Eq)]
 pub struct Message {
     pub kind: DiagnosticKind,
     pub location: Location,
     pub end_location: Location,
     pub fix: Fix,
     pub filename: String,
-    pub source: Option<Source>,
+    pub source: Option<SourceCodeBuf>,
     pub noqa_row: usize,
 }
 
@@ -43,7 +41,7 @@ impl Message {
     pub fn from_diagnostic(
         diagnostic: Diagnostic,
         filename: String,
-        source: Option<Source>,
+        source: Option<SourceCodeBuf>,
         noqa_row: usize,
     ) -> Self {
         Self {
@@ -74,38 +72,6 @@ impl Ord for Message {
 impl PartialOrd for Message {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
-    }
-}
-
-#[derive(Debug, PartialEq, Eq, Serialize, Deserialize, Clone)]
-pub struct Source {
-    pub contents: String,
-    pub range: (usize, usize),
-}
-
-impl Source {
-    pub fn from_diagnostic(diagnostic: &Diagnostic, locator: &Locator) -> Self {
-        let location = Location::new(diagnostic.location.row(), 0);
-        // Diagnostics can already extend one-past-the-end. If they do, though, then
-        // they'll end at the start of a line. We need to avoid extending by yet another
-        // line past-the-end.
-        let end_location = if diagnostic.end_location.column() == 0 {
-            diagnostic.end_location
-        } else {
-            Location::new(diagnostic.end_location.row() + 1, 0)
-        };
-        let source = locator.slice(Range::new(location, end_location));
-        let num_chars_in_range = locator
-            .slice(Range::new(diagnostic.location, diagnostic.end_location))
-            .chars()
-            .count();
-        Source {
-            contents: source.to_string(),
-            range: (
-                diagnostic.location.column(),
-                diagnostic.location.column() + num_chars_in_range,
-            ),
-        }
     }
 }
 
@@ -156,15 +122,15 @@ impl<'a> EmitterContext<'a> {
 
 #[cfg(test)]
 mod tests {
-    use crate::message::{Emitter, EmitterContext, Location, Message, Source};
+    use crate::message::{Emitter, EmitterContext, Location, Message};
     use crate::rules::pyflakes::rules::{UndefinedName, UnusedImport, UnusedVariable};
     use ruff_diagnostics::{Diagnostic, Edit, Fix};
-    use ruff_python_ast::source_code::Locator;
+    use ruff_python_ast::source_code::SourceCodeBuf;
     use ruff_python_ast::types::Range;
     use rustc_hash::FxHashMap;
 
     pub(super) fn create_messages() -> Vec<Message> {
-        let file_1 = r#"import os
+        let fib = r#"import os
 
 def fibonacci(n):
     """Compute the nth number in the Fibonacci sequence."""
@@ -177,8 +143,6 @@ def fibonacci(n):
         return fibonacci(n - 1) + fibonacci(n - 2)
         "#;
 
-        let file_1_locator = Locator::new(file_1);
-
         let unused_import = Diagnostic::new(
             UnusedImport {
                 name: "os".to_string(),
@@ -188,7 +152,7 @@ def fibonacci(n):
             Range::new(Location::new(1, 7), Location::new(1, 9)),
         );
 
-        let unused_source = Source::from_diagnostic(&unused_import, &file_1_locator);
+        let fib_source = SourceCodeBuf::from_content(fib);
 
         let unused_variable = Diagnostic::new(
             UnusedVariable {
@@ -201,8 +165,6 @@ def fibonacci(n):
             Location::new(5, 9),
         )]));
 
-        let unused_variable_source = Source::from_diagnostic(&unused_variable, &file_1_locator);
-
         let file_2 = r#"if a == 1: pass"#;
 
         let undefined_name = Diagnostic::new(
@@ -212,20 +174,20 @@ def fibonacci(n):
             Range::new(Location::new(1, 3), Location::new(1, 4)),
         );
 
-        let undefined_source = Source::from_diagnostic(&undefined_name, &Locator::new(file_2));
+        let file_2_source = SourceCodeBuf::from_content(file_2);
 
         vec![
-            Message::from_diagnostic(unused_import, "fib.py".to_string(), Some(unused_source), 1),
             Message::from_diagnostic(
-                unused_variable,
+                unused_import,
                 "fib.py".to_string(),
-                Some(unused_variable_source),
+                Some(fib_source.clone()),
                 1,
             ),
+            Message::from_diagnostic(unused_variable, "fib.py".to_string(), Some(fib_source), 1),
             Message::from_diagnostic(
                 undefined_name,
                 "undef.py".to_string(),
-                Some(undefined_source),
+                Some(file_2_source),
                 1,
             ),
         ]

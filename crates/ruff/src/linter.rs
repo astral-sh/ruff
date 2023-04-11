@@ -22,7 +22,7 @@ use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
-use crate::message::{Message, Source};
+use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
@@ -355,19 +355,26 @@ pub fn lint_only(
 
     // Convert from diagnostics to messages.
     let path_lossy = path.to_string_lossy();
+
     result.map(|(messages, imports)| {
+        let source_code = if settings.show_source && !messages.is_empty() {
+            Some(locator.to_source_code_buf())
+        } else {
+            None
+        };
+
         (
             messages
                 .into_iter()
                 .map(|diagnostic| {
-                    let source = if settings.show_source {
-                        Some(Source::from_diagnostic(&diagnostic, &locator))
-                    } else {
-                        None
-                    };
                     let lineno = diagnostic.location.row();
                     let noqa_row = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-                    Message::from_diagnostic(diagnostic, path_lossy.to_string(), source, noqa_row)
+                    Message::from_diagnostic(
+                        diagnostic,
+                        path_lossy.to_string(),
+                        source_code.clone(),
+                        noqa_row,
+                    )
                 })
                 .collect(),
             imports,
@@ -500,22 +507,23 @@ This indicates a bug in `{}`. If you could open an issue at:
         let path_lossy = path.to_string_lossy();
         return Ok(FixerResult {
             result: result.map(|(messages, imports)| {
+                let source_code = if settings.show_source && !messages.is_empty() {
+                    Some(locator.to_source_code_buf())
+                } else {
+                    None
+                };
+
                 (
                     messages
                         .into_iter()
                         .map(|diagnostic| {
-                            let source = if settings.show_source {
-                                Some(Source::from_diagnostic(&diagnostic, &locator))
-                            } else {
-                                None
-                            };
                             let lineno = diagnostic.location.row();
                             let noqa_row =
                                 *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
                             Message::from_diagnostic(
                                 diagnostic,
                                 path_lossy.to_string(),
-                                source,
+                                source_code.clone(),
                                 noqa_row,
                             )
                         })

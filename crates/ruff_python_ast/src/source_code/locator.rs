@@ -1,57 +1,65 @@
 //! Struct used to efficiently slice source code at (row, column) Locations.
 
 use crate::source_code::line_index::LineIndex;
+use crate::source_code::{SourceCode, SourceCodeBuf};
 use once_cell::unsync::OnceCell;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextSize;
 use rustpython_parser::ast::Location;
 
 use crate::types::Range;
 
 pub struct Locator<'a> {
     contents: &'a str,
-    index: OnceCell<LineIndex>,
+    line_index: OnceCell<LineIndex>,
 }
 
 impl<'a> Locator<'a> {
     pub const fn new(contents: &'a str) -> Self {
         Self {
             contents,
-            index: OnceCell::new(),
+            line_index: OnceCell::new(),
         }
     }
 
     fn get_or_init_index(&self) -> &LineIndex {
-        self.index
+        self.line_index
             .get_or_init(|| LineIndex::from_source_text(self.contents))
     }
 
+    fn source_code(&self) -> SourceCode<'a, '_> {
+        SourceCode {
+            index: self.get_or_init_index(),
+            text: self.contents,
+        }
+    }
+
+    #[inline]
+    pub fn to_source_code_buf(&self) -> SourceCodeBuf {
+        self.source_code().to_owned()
+    }
+
     /// Take the source code up to the given [`Location`].
-    pub fn take(&self, location: Location) -> &'a str {
-        let index = self.get_or_init_index();
-        let offset = index.location_offset(location, self.contents);
-        &self.contents[TextRange::up_to(offset)]
+    #[inline]
+    pub fn up_to(&self, location: Location) -> &'a str {
+        self.source_code().up_to(location)
     }
 
     /// Take the source code after the given [`Location`].
-    pub fn skip(&self, location: Location) -> &'a str {
-        let index = self.get_or_init_index();
-        let offset = index.location_offset(location, self.contents);
-        &self.contents[usize::from(offset)..]
+    #[inline]
+    pub fn after(&self, location: Location) -> &'a str {
+        self.source_code().after(location)
     }
 
     /// Take the source code between the given [`Range`].
+    #[inline]
     pub fn slice<R: Into<Range>>(&self, range: R) -> &'a str {
-        let index = self.get_or_init_index();
-        let range = range.into();
-        let start = index.location_offset(range.location, self.contents);
-        let end = index.location_offset(range.end_location, self.contents);
-        &self.contents[TextRange::new(start, end)]
+        self.source_code().slice(range)
     }
 
     /// Return the byte offset of the given [`Location`].
+    #[inline]
     pub fn offset(&self, location: Location) -> TextSize {
-        let index = self.get_or_init_index();
-        index.location_offset(location, self.contents)
+        self.source_code().offset(location)
     }
 
     /// Return the underlying source code.
@@ -62,7 +70,7 @@ impl<'a> Locator<'a> {
     /// Return the number of lines in the source code.
     pub fn count_lines(&self) -> usize {
         let index = self.get_or_init_index();
-        index.lines_count()
+        index.line_count()
     }
 
     /// Return the number of bytes in the source code.

@@ -103,7 +103,7 @@ fn is_lone_child(child: &Stmt, parent: &Stmt, deleted: &[&Stmt]) -> Result<bool>
 /// Return the location of a trailing semicolon following a `Stmt`, if it's part
 /// of a multi-statement line.
 fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
-    let contents = locator.skip(stmt.end_location.unwrap());
+    let contents = locator.after(stmt.end_location.unwrap());
     for (row, line) in NewlineWithTrailingNewline::from(contents).enumerate() {
         let trimmed = line.trim();
         if trimmed.starts_with(';') {
@@ -126,7 +126,7 @@ fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<Location> {
 /// Find the next valid break for a `Stmt` after a semicolon.
 fn next_stmt_break(semicolon: Location, locator: &Locator) -> Location {
     let start_location = Location::new(semicolon.row(), semicolon.column() + 1);
-    let contents = locator.skip(start_location);
+    let contents = locator.after(start_location);
     for (row, line) in NewlineWithTrailingNewline::from(contents).enumerate() {
         let trimmed = line.trim();
         // Skip past any continuations.
@@ -158,7 +158,7 @@ fn next_stmt_break(semicolon: Location, locator: &Locator) -> Location {
 
 /// Return `true` if a `Stmt` occurs at the end of a file.
 fn is_end_of_file(stmt: &Stmt, locator: &Locator) -> bool {
-    let contents = locator.skip(stmt.end_location.unwrap());
+    let contents = locator.after(stmt.end_location.unwrap());
     contents.is_empty()
 }
 
@@ -361,7 +361,7 @@ pub fn remove_argument(
     remove_parentheses: bool,
 ) -> Result<Edit> {
     // TODO(sbrugman): Preserve trailing comments.
-    let contents = locator.skip(call_at);
+    let contents = locator.after(call_at);
 
     let mut fix_start = None;
     let mut fix_end = None;

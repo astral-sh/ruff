@@ -1,12 +1,9 @@
 use crate::fs::relativize_path;
 use crate::jupyter::JupyterIndex;
-use crate::message::text::RuleCodeAndBody;
+use crate::message::text::{MessageCodeFrame, RuleCodeAndBody};
 use crate::message::{group_messages_by_filename, Emitter, EmitterContext, Message};
-use crate::registry::AsRule;
-use annotate_snippets::display_list::{DisplayList, FormatOptions};
-use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use colored::Colorize;
-use std::fmt::{Display, Formatter, Write as fmtWrite};
+use std::fmt::{Display, Formatter};
 use std::io::Write;
 
 #[derive(Default)]
@@ -116,47 +113,10 @@ impl Display for DisplayGroupedMessage<'_> {
             },
         )?;
 
-        if let Some(source) = &message.source {
-            let suggestion = message.kind.suggestion.clone();
-            let footer = if suggestion.is_some() {
-                vec![Annotation {
-                    id: None,
-                    label: suggestion.as_deref(),
-                    annotation_type: AnnotationType::Help,
-                }]
-            } else {
-                vec![]
-            };
-            let label = message.kind.rule().noqa_code().to_string();
-            let snippet = Snippet {
-                title: None,
-                footer,
-                slices: vec![Slice {
-                    source: &source.contents,
-                    line_start: message.location.row(),
-                    annotations: vec![SourceAnnotation {
-                        label: &label,
-                        annotation_type: AnnotationType::Error,
-                        range: source.range,
-                    }],
-                    // The origin (file name, line number, and column number) is already encoded
-                    // in the `label`.
-                    origin: None,
-                    fold: false,
-                }],
-                opt: FormatOptions {
-                    #[cfg(test)]
-                    color: false,
-                    #[cfg(not(test))]
-                    color: colored::control::SHOULD_COLORIZE.should_colorize(),
-                    ..FormatOptions::default()
-                },
-            };
-            // Skip the first line, since we format the `label` ourselves.
-            let message = DisplayList::from(snippet);
+        {
+            use std::fmt::Write;
             let mut padded = PadAdapter::new(f);
-
-            writeln!(&mut padded, "{message}")?;
+            write!(padded, "{}", MessageCodeFrame { message })?;
         }
 
         writeln!(f)?;

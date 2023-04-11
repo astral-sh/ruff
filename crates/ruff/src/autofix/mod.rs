@@ -80,7 +80,7 @@ fn apply_fixes<'a>(
     }
 
     // Add the remaining content.
-    let slice = locator.skip(last_pos.unwrap_or_default());
+    let slice = locator.after(last_pos.unwrap_or_default());
     output.push_str(slice);
 
     (output, fixed)
