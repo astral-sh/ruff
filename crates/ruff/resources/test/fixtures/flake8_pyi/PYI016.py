@@ -27,6 +27,6 @@ field7 = str | str
 # Should emit for strangely-bracketed unions
 field8: int | (str | int)  # PYI016 Duplicate union member `int`
 
-# Should handle user brackets when autorixing
+# Should handle user brackets when autofixing
 field9: int | (int | str)  # PYI016 Duplicate union member `int`
 field10: (str | int) | str  # PYI016 Duplicate union member `str`
