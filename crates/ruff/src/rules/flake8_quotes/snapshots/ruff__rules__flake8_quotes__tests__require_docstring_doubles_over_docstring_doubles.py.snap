@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
-./resources/test/fixtures/flake8_quotes/docstring_doubles.py:5:1: Q001 [*] Double quote multiline found but single quotes preferred
+docstring_doubles.py:5:1: Q001 [*] Double quote multiline found but single quotes preferred
    |
  5 |   """
  6 |   
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 9 9 | l = []
 10 10 | 
 
-./resources/test/fixtures/flake8_quotes/docstring_doubles.py:16:5: Q001 [*] Double quote multiline found but single quotes preferred
+docstring_doubles.py:16:5: Q001 [*] Double quote multiline found but single quotes preferred
    |
 16 |       """
 17 |   
@@ -54,7 +54,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 20 20 |     # The colon in the list indexing below is an edge case for the docstring scanner
 21 21 |     def f(self, bar="""
 
-./resources/test/fixtures/flake8_quotes/docstring_doubles.py:21:21: Q001 [*] Double quote multiline found but single quotes preferred
+docstring_doubles.py:21:21: Q001 [*] Double quote multiline found but single quotes preferred
    |
 21 |       # The colon in the list indexing below is an edge case for the docstring scanner
 22 |       def f(self, bar="""
@@ -78,7 +78,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 24 24 |         """
 25 25 |         Double quotes multiline function docstring
 
-./resources/test/fixtures/flake8_quotes/docstring_doubles.py:30:9: Q001 [*] Double quote multiline found but single quotes preferred
+docstring_doubles.py:30:9: Q001 [*] Double quote multiline found but single quotes preferred
    |
 30 |           some_expression = 'hello world'
 31 |   
@@ -105,7 +105,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 34 34 |         if l:
 35 35 |             """
 
-./resources/test/fixtures/flake8_quotes/docstring_doubles.py:35:13: Q001 [*] Double quote multiline found but single quotes preferred
+docstring_doubles.py:35:13: Q001 [*] Double quote multiline found but single quotes preferred
    |
 35 |           if l:
 36 |               """

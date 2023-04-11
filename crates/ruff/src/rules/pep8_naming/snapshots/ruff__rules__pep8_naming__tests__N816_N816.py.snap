@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 ---
-./resources/test/fixtures/pep8_naming/N816.py:7:1: N816 Variable `mixedCase` in global scope should not be mixedCase
+N816.py:7:1: N816 Variable `mixedCase` in global scope should not be mixedCase
    |
  7 | lower = 0
  8 | CONSTANT = 0
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 11 | mixed_Case = 0
    |
 
-./resources/test/fixtures/pep8_naming/N816.py:8:1: N816 Variable `_mixedCase` in global scope should not be mixedCase
+N816.py:8:1: N816 Variable `_mixedCase` in global scope should not be mixedCase
    |
  8 | CONSTANT = 0
  9 | mixedCase = 0
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 12 | myObj1 = collections.namedtuple("MyObj1", ["a", "b"])
    |
 
-./resources/test/fixtures/pep8_naming/N816.py:9:1: N816 Variable `mixed_Case` in global scope should not be mixedCase
+N816.py:9:1: N816 Variable `mixed_Case` in global scope should not be mixedCase
    |
  9 | mixedCase = 0
 10 | _mixedCase = 0

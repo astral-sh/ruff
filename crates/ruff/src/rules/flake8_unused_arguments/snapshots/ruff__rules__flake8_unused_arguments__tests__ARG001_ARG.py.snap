@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 ---
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:9:7: ARG001 Unused function argument: `self`
+ARG.py:9:7: ARG001 Unused function argument: `self`
    |
  9 | # Unused arguments on functions.
 10 | ###
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 12 |     print("Hello, world!")
    |
 
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:9:13: ARG001 Unused function argument: `x`
+ARG.py:9:13: ARG001 Unused function argument: `x`
    |
  9 | # Unused arguments on functions.
 10 | ###
@@ -19,42 +19,42 @@ source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 12 |     print("Hello, world!")
    |
 
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:13:7: ARG001 Unused function argument: `cls`
+ARG.py:13:7: ARG001 Unused function argument: `cls`
    |
 13 | def f(cls, x):
    |       ^^^ ARG001
 14 |     print("Hello, world!")
    |
 
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:13:12: ARG001 Unused function argument: `x`
+ARG.py:13:12: ARG001 Unused function argument: `x`
    |
 13 | def f(cls, x):
    |            ^ ARG001
 14 |     print("Hello, world!")
    |
 
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:17:7: ARG001 Unused function argument: `self`
+ARG.py:17:7: ARG001 Unused function argument: `self`
    |
 17 | def f(self, x):
    |       ^^^^ ARG001
 18 |     ...
    |
 
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:17:13: ARG001 Unused function argument: `x`
+ARG.py:17:13: ARG001 Unused function argument: `x`
    |
 17 | def f(self, x):
    |             ^ ARG001
 18 |     ...
    |
 
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:21:7: ARG001 Unused function argument: `cls`
+ARG.py:21:7: ARG001 Unused function argument: `cls`
    |
 21 | def f(cls, x):
    |       ^^^ ARG001
 22 |     ...
    |
 
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:21:12: ARG001 Unused function argument: `x`
+ARG.py:21:12: ARG001 Unused function argument: `x`
    |
 21 | def f(cls, x):
    |            ^ ARG001

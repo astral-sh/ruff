@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 ---
-./resources/test/fixtures/pep8_naming/N804.py:30:27: N804 First argument of a class method should be named `cls`
+N804.py:30:27: N804 First argument of a class method should be named `cls`
    |
 30 |         ...
 31 | 
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 33 |         ...
    |
 
-./resources/test/fixtures/pep8_naming/N804.py:38:56: N804 First argument of a class method should be named `cls`
+N804.py:38:56: N804 First argument of a class method should be named `cls`
    |
 38 |     @classmethod
 39 |     def bad_class_method_with_positional_only_argument(self, x, /, other):
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 40 |         ...
    |
 
-./resources/test/fixtures/pep8_naming/N804.py:43:20: N804 First argument of a class method should be named `cls`
+N804.py:43:20: N804 First argument of a class method should be named `cls`
    |
 43 | class MetaClass(ABCMeta):
 44 |     def bad_method(self):

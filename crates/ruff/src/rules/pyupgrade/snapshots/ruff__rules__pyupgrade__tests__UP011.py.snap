@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP011.py:5:21: UP011 [*] Unnecessary parameters to `functools.lru_cache`
+UP011.py:5:21: UP011 [*] Unnecessary parameters to `functools.lru_cache`
   |
 5 | @functools.lru_cache()
   |                     ^^ UP011
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 7 7 |     pass
 8 8 | 
 
-./resources/test/fixtures/pyupgrade/UP011.py:10:11: UP011 [*] Unnecessary parameters to `functools.lru_cache`
+UP011.py:10:11: UP011 [*] Unnecessary parameters to `functools.lru_cache`
    |
 10 | @lru_cache()
    |           ^^ UP011
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 12 12 |     pass
 13 13 | 
 
-./resources/test/fixtures/pyupgrade/UP011.py:16:21: UP011 [*] Unnecessary parameters to `functools.lru_cache`
+UP011.py:16:21: UP011 [*] Unnecessary parameters to `functools.lru_cache`
    |
 16 | @other_decorator
 17 | @functools.lru_cache()
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 18 18 |     pass
 19 19 | 
 
-./resources/test/fixtures/pyupgrade/UP011.py:21:21: UP011 [*] Unnecessary parameters to `functools.lru_cache`
+UP011.py:21:21: UP011 [*] Unnecessary parameters to `functools.lru_cache`
    |
 21 | @functools.lru_cache()
    |                     ^^ UP011

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F811_0.py:10:5: F811 Redefinition of unused `bar` from line 6
+F811_0.py:10:5: F811 Redefinition of unused `bar` from line 6
    |
 10 | def bar():
    |     ^^^ F811

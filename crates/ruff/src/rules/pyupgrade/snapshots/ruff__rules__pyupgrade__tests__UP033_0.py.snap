@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP033_0.py:4:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+UP033_0.py:4:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
   |
 4 | @functools.lru_cache(maxsize=None)
   |                     ^^^^^^^^^^^^^^ UP033
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 6 6 |     pass
 7 7 | 
 
-./resources/test/fixtures/pyupgrade/UP033_0.py:10:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+UP033_0.py:10:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
    |
 10 | @other_decorator
 11 | @functools.lru_cache(maxsize=None)
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 12 12 |     pass
 13 13 | 
 
-./resources/test/fixtures/pyupgrade/UP033_0.py:15:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+UP033_0.py:15:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
    |
 15 | @functools.lru_cache(maxsize=None)
    |                     ^^^^^^^^^^^^^^ UP033

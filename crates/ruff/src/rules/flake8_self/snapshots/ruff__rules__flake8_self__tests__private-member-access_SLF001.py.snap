@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_self/mod.rs
 ---
-./resources/test/fixtures/flake8_self/SLF001.py:34:12: SLF001 Private member accessed: `_private`
+SLF001.py:34:12: SLF001 Private member accessed: `_private`
    |
 34 |     def get_bar():
 35 |         if self.bar._private:  # SLF001
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_self/mod.rs
 37 |         if self.bar()._private:  # SLF001
    |
 
-./resources/test/fixtures/flake8_self/SLF001.py:36:12: SLF001 Private member accessed: `_private`
+SLF001.py:36:12: SLF001 Private member accessed: `_private`
    |
 36 |         if self.bar._private:  # SLF001
 37 |             return None
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_self/mod.rs
 40 |         if Bar._private_thing:  # SLF001
    |
 
-./resources/test/fixtures/flake8_self/SLF001.py:38:12: SLF001 Private member accessed: `_private_thing`
+SLF001.py:38:12: SLF001 Private member accessed: `_private_thing`
    |
 38 |         if self.bar()._private:  # SLF001
 39 |             return None
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/flake8_self/mod.rs
 42 |         if Foo._private_thing:
    |
 
-./resources/test/fixtures/flake8_self/SLF001.py:43:12: SLF001 Private member accessed: `_private_thing`
+SLF001.py:43:12: SLF001 Private member accessed: `_private_thing`
    |
 43 |             return None
 44 |         Foo = Bar()
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/flake8_self/mod.rs
 47 |         return self.bar
    |
 
-./resources/test/fixtures/flake8_self/SLF001.py:59:7: SLF001 Private member accessed: `_private_thing`
+SLF001.py:59:7: SLF001 Private member accessed: `_private_thing`
    |
 59 | foo = Foo()
 60 | 
@@ -50,7 +50,7 @@ source: crates/ruff/src/rules/flake8_self/mod.rs
 63 | print(foo._private_func())  # SLF001
    |
 
-./resources/test/fixtures/flake8_self/SLF001.py:60:7: SLF001 Private member accessed: `__really_private_thing`
+SLF001.py:60:7: SLF001 Private member accessed: `__really_private_thing`
    |
 60 | print(foo._private_thing)  # SLF001
 61 | print(foo.__really_private_thing)  # SLF001
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/flake8_self/mod.rs
 63 | print(foo.__really_private_func(1))  # SLF001
    |
 
-./resources/test/fixtures/flake8_self/SLF001.py:61:7: SLF001 Private member accessed: `_private_func`
+SLF001.py:61:7: SLF001 Private member accessed: `_private_func`
    |
 61 | print(foo._private_thing)  # SLF001
 62 | print(foo.__really_private_thing)  # SLF001
@@ -69,7 +69,7 @@ source: crates/ruff/src/rules/flake8_self/mod.rs
 65 | print(foo.bar._private)  # SLF001
    |
 
-./resources/test/fixtures/flake8_self/SLF001.py:62:7: SLF001 Private member accessed: `__really_private_func`
+SLF001.py:62:7: SLF001 Private member accessed: `__really_private_func`
    |
 62 | print(foo.__really_private_thing)  # SLF001
 63 | print(foo._private_func())  # SLF001
@@ -79,7 +79,7 @@ source: crates/ruff/src/rules/flake8_self/mod.rs
 66 | print(foo()._private_thing)  # SLF001
    |
 
-./resources/test/fixtures/flake8_self/SLF001.py:63:7: SLF001 Private member accessed: `_private`
+SLF001.py:63:7: SLF001 Private member accessed: `_private`
    |
 63 | print(foo._private_func())  # SLF001
 64 | print(foo.__really_private_func(1))  # SLF001
@@ -89,7 +89,7 @@ source: crates/ruff/src/rules/flake8_self/mod.rs
 67 | print(foo()._private_thing__)  # SLF001
    |
 
-./resources/test/fixtures/flake8_self/SLF001.py:64:7: SLF001 Private member accessed: `_private_thing`
+SLF001.py:64:7: SLF001 Private member accessed: `_private_thing`
    |
 64 | print(foo.__really_private_func(1))  # SLF001
 65 | print(foo.bar._private)  # SLF001
@@ -98,7 +98,7 @@ source: crates/ruff/src/rules/flake8_self/mod.rs
 67 | print(foo()._private_thing__)  # SLF001
    |
 
-./resources/test/fixtures/flake8_self/SLF001.py:65:7: SLF001 Private member accessed: `_private_thing__`
+SLF001.py:65:7: SLF001 Private member accessed: `_private_thing__`
    |
 65 | print(foo.bar._private)  # SLF001
 66 | print(foo()._private_thing)  # SLF001

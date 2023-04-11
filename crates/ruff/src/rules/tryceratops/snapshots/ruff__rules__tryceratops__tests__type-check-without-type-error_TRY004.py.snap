@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
-./resources/test/fixtures/tryceratops/TRY004.py:12:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:12:9: TRY004 Prefer `TypeError` exception for invalid type
    |
 12 |         pass
 13 |     else:
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
    |
 
-./resources/test/fixtures/tryceratops/TRY004.py:19:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:19:9: TRY004 Prefer `TypeError` exception for invalid type
    |
 19 |         pass
 20 |     else:
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
    |
 
-./resources/test/fixtures/tryceratops/TRY004.py:30:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:30:9: TRY004 Prefer `TypeError` exception for invalid type
    |
 30 |         pass
 31 |     else:
@@ -25,7 +25,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
    |
 
-./resources/test/fixtures/tryceratops/TRY004.py:37:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:37:9: TRY004 Prefer `TypeError` exception for invalid type
    |
 37 |         pass
 38 |     else:
@@ -33,7 +33,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
    |
 
-./resources/test/fixtures/tryceratops/TRY004.py:44:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:44:9: TRY004 Prefer `TypeError` exception for invalid type
    |
 44 |         pass
 45 |     else:
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
    |
 
-./resources/test/fixtures/tryceratops/TRY004.py:51:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:51:9: TRY004 Prefer `TypeError` exception for invalid type
    |
 51 |         pass
 52 |     else:
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
    |
 
-./resources/test/fixtures/tryceratops/TRY004.py:58:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:58:9: TRY004 Prefer `TypeError` exception for invalid type
    |
 58 |         pass
 59 |     else:
@@ -57,7 +57,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
    |
 
-./resources/test/fixtures/tryceratops/TRY004.py:65:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:65:9: TRY004 Prefer `TypeError` exception for invalid type
    |
 65 |         pass
 66 |     else:
@@ -65,7 +65,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |         ^^^^^^^^^^^^^^^^^ TRY004
    |
 
-./resources/test/fixtures/tryceratops/TRY004.py:72:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:72:9: TRY004 Prefer `TypeError` exception for invalid type
    |
 72 |         pass
 73 |     else:
@@ -73,7 +73,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |         ^^^^^^^^^^^^^^^^^^^^^ TRY004
    |
 
-./resources/test/fixtures/tryceratops/TRY004.py:79:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:79:9: TRY004 Prefer `TypeError` exception for invalid type
    |
 79 |         pass
 80 |     else:
@@ -81,7 +81,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |         ^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
    |
 
-./resources/test/fixtures/tryceratops/TRY004.py:86:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:86:9: TRY004 Prefer `TypeError` exception for invalid type
    |
 86 |         pass
 87 |     else:
@@ -89,7 +89,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |         ^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
    |
 
-./resources/test/fixtures/tryceratops/TRY004.py:95:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:95:9: TRY004 Prefer `TypeError` exception for invalid type
    |
 95 |           # should be typeerror
 96 |           # not multiline is on purpose for fix
@@ -100,7 +100,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    | |_________^ TRY004
    |
 
-./resources/test/fixtures/tryceratops/TRY004.py:104:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:104:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 104 |         pass
 105 |     else:
@@ -108,7 +108,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:111:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:111:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 111 |         pass
 112 |     else:
@@ -116,7 +116,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:118:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:118:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 118 |         pass
 119 |     else:
@@ -124,7 +124,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:125:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:125:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 125 |         pass
 126 |     else:
@@ -132,7 +132,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:132:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:132:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 132 |         pass
 133 |     else:
@@ -140,7 +140,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:139:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:139:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 139 |         pass
 140 |     else:
@@ -148,7 +148,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:146:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:146:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 146 |         pass
 147 |     else:
@@ -156,7 +156,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:153:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:153:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 153 |         pass
 154 |     else:
@@ -164,7 +164,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:160:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:160:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 160 |         pass
 161 |     else:
@@ -172,7 +172,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:167:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:167:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 167 |         pass
 168 |     else:
@@ -180,7 +180,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:174:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:174:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 174 |         pass
 175 |     else:
@@ -188,7 +188,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:181:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:181:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 181 |         pass
 182 |     else:
@@ -196,7 +196,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:188:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:188:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 188 |         pass
 189 |     else:
@@ -204,7 +204,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:195:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:195:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 195 |         pass
 196 |     else:
@@ -212,7 +212,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:202:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:202:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 202 |         pass
 203 |     else:
@@ -220,7 +220,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:209:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:209:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 209 |         pass
 210 |     else:
@@ -228,7 +228,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:216:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:216:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 216 |         pass
 217 |     else:
@@ -236,7 +236,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:223:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:223:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 223 |         pass
 224 |     else:
@@ -244,7 +244,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:230:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:230:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 230 |         pass
 231 |     elif isinstance(arg2, int):
@@ -252,7 +252,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:267:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:267:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 267 | def check_body(some_args):
 268 |     if isinstance(some_args, int):
@@ -260,7 +260,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
     |         ^^^^^^^^^^^^^^^^^^^^^^^ TRY004
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:277:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:277:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 277 | def multiple_elifs(some_args):
 278 |     if not isinstance(some_args, int):
@@ -270,7 +270,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 281 |         raise ValueError("...")  # this is ok
     |
 
-./resources/test/fixtures/tryceratops/TRY004.py:288:9: TRY004 Prefer `TypeError` exception for invalid type
+TRY004.py:288:9: TRY004 Prefer `TypeError` exception for invalid type
     |
 288 | def multiple_ifs(some_args):
 289 |     if not isinstance(some_args, int):

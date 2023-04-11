@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/mccabe/mod.rs
 ---
-./resources/test/fixtures/mccabe/C901.py:2:5: C901 `trivial` is too complex (1 > 0)
+C901.py:2:5: C901 `trivial` is too complex (1 > 0)
   |
 2 | # Complexity = 1
 3 | def trivial():
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 4 |     pass
   |
 
-./resources/test/fixtures/mccabe/C901.py:7:5: C901 `expr_as_statement` is too complex (1 > 0)
+C901.py:7:5: C901 `expr_as_statement` is too complex (1 > 0)
   |
 7 | # Complexity = 1
 8 | def expr_as_statement():
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 9 |     0xF00D
   |
 
-./resources/test/fixtures/mccabe/C901.py:12:5: C901 `sequential` is too complex (1 > 0)
+C901.py:12:5: C901 `sequential` is too complex (1 > 0)
    |
 12 | # Complexity = 1
 13 | def sequential(n):
@@ -26,7 +26,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 15 |     s = k + n
    |
 
-./resources/test/fixtures/mccabe/C901.py:19:5: C901 `if_elif_else_dead_path` is too complex (3 > 0)
+C901.py:19:5: C901 `if_elif_else_dead_path` is too complex (3 > 0)
    |
 19 | # Complexity = 3
 20 | def if_elif_else_dead_path(n):
@@ -35,7 +35,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 22 |         return "bigger than three"
    |
 
-./resources/test/fixtures/mccabe/C901.py:29:5: C901 `nested_ifs` is too complex (3 > 0)
+C901.py:29:5: C901 `nested_ifs` is too complex (3 > 0)
    |
 29 | # Complexity = 3
 30 | def nested_ifs():
@@ -44,7 +44,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 32 |         if n > 4:
    |
 
-./resources/test/fixtures/mccabe/C901.py:40:5: C901 `for_loop` is too complex (2 > 0)
+C901.py:40:5: C901 `for_loop` is too complex (2 > 0)
    |
 40 | # Complexity = 2
 41 | def for_loop():
@@ -53,7 +53,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 43 |         print(i)
    |
 
-./resources/test/fixtures/mccabe/C901.py:46:5: C901 `for_else` is too complex (2 > 0)
+C901.py:46:5: C901 `for_else` is too complex (2 > 0)
    |
 46 | # Complexity = 2
 47 | def for_else(mylist):
@@ -62,7 +62,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 49 |         print(i)
    |
 
-./resources/test/fixtures/mccabe/C901.py:54:5: C901 `recursive` is too complex (2 > 0)
+C901.py:54:5: C901 `recursive` is too complex (2 > 0)
    |
 54 | # Complexity = 2
 55 | def recursive(n):
@@ -71,7 +71,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 57 |         return f(n - 1)
    |
 
-./resources/test/fixtures/mccabe/C901.py:62:5: C901 `nested_functions` is too complex (3 > 0)
+C901.py:62:5: C901 `nested_functions` is too complex (3 > 0)
    |
 62 | # Complexity = 3
 63 | def nested_functions():
@@ -80,7 +80,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 65 |         def b():
    |
 
-./resources/test/fixtures/mccabe/C901.py:63:9: C901 `a` is too complex (2 > 0)
+C901.py:63:9: C901 `a` is too complex (2 > 0)
    |
 63 | # Complexity = 3
 64 | def nested_functions():
@@ -90,7 +90,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 67 |             pass
    |
 
-./resources/test/fixtures/mccabe/C901.py:64:13: C901 `b` is too complex (1 > 0)
+C901.py:64:13: C901 `b` is too complex (1 > 0)
    |
 64 | def nested_functions():
 65 |     def a():
@@ -99,7 +99,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 67 |             pass
    |
 
-./resources/test/fixtures/mccabe/C901.py:73:5: C901 `try_else` is too complex (4 > 0)
+C901.py:73:5: C901 `try_else` is too complex (4 > 0)
    |
 73 | # Complexity = 4
 74 | def try_else():
@@ -108,7 +108,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 76 |         print(1)
    |
 
-./resources/test/fixtures/mccabe/C901.py:85:5: C901 `nested_try_finally` is too complex (1 > 0)
+C901.py:85:5: C901 `nested_try_finally` is too complex (1 > 0)
    |
 85 | # Complexity = 3
 86 | def nested_try_finally():
@@ -117,7 +117,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 88 |         try:
    |
 
-./resources/test/fixtures/mccabe/C901.py:96:11: C901 `foobar` is too complex (3 > 0)
+C901.py:96:11: C901 `foobar` is too complex (3 > 0)
    |
 96 | # Complexity = 3
 97 | async def foobar(a, b, c):
@@ -126,7 +126,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 99 |     if await b:
    |
 
-./resources/test/fixtures/mccabe/C901.py:107:5: C901 `annotated_assign` is too complex (1 > 0)
+C901.py:107:5: C901 `annotated_assign` is too complex (1 > 0)
     |
 107 | # Complexity = 1
 108 | def annotated_assign():
@@ -134,7 +134,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 109 |     x: Any = None
     |
 
-./resources/test/fixtures/mccabe/C901.py:113:9: C901 `handle` is too complex (9 > 0)
+C901.py:113:9: C901 `handle` is too complex (9 > 0)
     |
 113 | # Complexity = 9
 114 | class Class:
@@ -144,7 +144,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 117 |             return
     |
 
-./resources/test/fixtures/mccabe/C901.py:118:17: C901 `a` is too complex (1 > 0)
+C901.py:118:17: C901 `a` is too complex (1 > 0)
     |
 118 |         class ServiceProvider:
 119 |             def a(self):
@@ -152,7 +152,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 120 |                 pass
     |
 
-./resources/test/fixtures/mccabe/C901.py:121:17: C901 `b` is too complex (2 > 0)
+C901.py:121:17: C901 `b` is too complex (2 > 0)
     |
 121 |                 pass
 122 | 
@@ -162,7 +162,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 125 |                     pass
     |
 
-./resources/test/fixtures/mccabe/C901.py:126:17: C901 `c` is too complex (1 > 0)
+C901.py:126:17: C901 `c` is too complex (1 > 0)
     |
 126 |         class Logger:
 127 |             def c(*args, **kwargs):
@@ -170,7 +170,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 128 |                 pass
     |
 
-./resources/test/fixtures/mccabe/C901.py:129:17: C901 `error` is too complex (1 > 0)
+C901.py:129:17: C901 `error` is too complex (1 > 0)
     |
 129 |                 pass
 130 | 
@@ -179,7 +179,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 132 |                 pass
     |
 
-./resources/test/fixtures/mccabe/C901.py:132:17: C901 `info` is too complex (1 > 0)
+C901.py:132:17: C901 `info` is too complex (1 > 0)
     |
 132 |                 pass
 133 | 
@@ -188,7 +188,7 @@ source: crates/ruff/src/rules/mccabe/mod.rs
 135 |                 pass
     |
 
-./resources/test/fixtures/mccabe/C901.py:135:17: C901 `exception` is too complex (1 > 0)
+C901.py:135:17: C901 `exception` is too complex (1 > 0)
     |
 135 |                 pass
 136 | 

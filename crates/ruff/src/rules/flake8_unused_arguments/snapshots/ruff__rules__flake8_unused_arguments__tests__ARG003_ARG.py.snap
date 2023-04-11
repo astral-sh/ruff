@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 ---
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:45:16: ARG003 Unused class method argument: `x`
+ARG.py:45:16: ARG003 Unused class method argument: `x`
    |
 45 |     @classmethod
 46 |     def f(cls, x):

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F622.py:1:1: F622 Two starred expressions in assignment
+F622.py:1:1: F622 Two starred expressions in assignment
   |
 1 | *a, *b, c = (1, 2, 3)
   | ^^^^^^^^^ F622

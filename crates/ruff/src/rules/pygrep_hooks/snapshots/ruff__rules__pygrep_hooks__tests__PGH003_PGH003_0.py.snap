@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 ---
-./resources/test/fixtures/pygrep-hooks/PGH003_0.py:1:8: PGH003 Use specific rule codes when ignoring type issues
+PGH003_0.py:1:8: PGH003 Use specific rule codes when ignoring type issues
   |
 1 | x = 1  # type: ignore
   |        ^^^^^^^^^^^^^^ PGH003
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 3 | x = 1  # type:ignore
   |
 
-./resources/test/fixtures/pygrep-hooks/PGH003_0.py:2:8: PGH003 Use specific rule codes when ignoring type issues
+PGH003_0.py:2:8: PGH003 Use specific rule codes when ignoring type issues
   |
 2 | x = 1  # type: ignore
 3 | x = 1  # type ignore
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 4 | x = 1  # type:ignore
   |
 
-./resources/test/fixtures/pygrep-hooks/PGH003_0.py:3:8: PGH003 Use specific rule codes when ignoring type issues
+PGH003_0.py:3:8: PGH003 Use specific rule codes when ignoring type issues
   |
 3 | x = 1  # type: ignore
 4 | x = 1  # type ignore

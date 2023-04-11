@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E25.py:46:15: E252 Missing whitespace around parameter equals
+E25.py:46:15: E252 Missing whitespace around parameter equals
    |
 46 |     return a + b
 47 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 50 | #: Okay
    |
 
-./resources/test/fixtures/pycodestyle/E25.py:46:16: E252 Missing whitespace around parameter equals
+E25.py:46:16: E252 Missing whitespace around parameter equals
    |
 46 |     return a + b
 47 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 50 | #: Okay
    |
 
-./resources/test/fixtures/pycodestyle/E25.py:46:27: E252 Missing whitespace around parameter equals
+E25.py:46:27: E252 Missing whitespace around parameter equals
    |
 46 |     return a + b
 47 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 50 | #: Okay
    |
 
-./resources/test/fixtures/pycodestyle/E25.py:46:36: E252 Missing whitespace around parameter equals
+E25.py:46:36: E252 Missing whitespace around parameter equals
    |
 46 |     return a + b
 47 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36

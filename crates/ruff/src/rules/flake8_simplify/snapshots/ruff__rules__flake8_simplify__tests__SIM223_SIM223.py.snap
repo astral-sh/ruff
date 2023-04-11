@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM223.py:1:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:1:4: SIM223 [*] Use `False` instead of `... and False`
   |
 1 | if a and False:  # SIM223
   |    ^^^^^^^^^^^ SIM223
@@ -16,7 +16,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 3 3 | 
 4 4 | if (a or b) and False:  # SIM223
 
-./resources/test/fixtures/flake8_simplify/SIM223.py:4:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:4:4: SIM223 [*] Use `False` instead of `... and False`
   |
 4 |     pass
 5 | 
@@ -36,7 +36,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 6 6 | 
 7 7 | if a or (b and False):  # SIM223
 
-./resources/test/fixtures/flake8_simplify/SIM223.py:7:10: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:7:10: SIM223 [*] Use `False` instead of `... and False`
    |
  7 |     pass
  8 | 
@@ -56,7 +56,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 9 9 | 
 10 10 | if a or False:
 
-./resources/test/fixtures/flake8_simplify/SIM223.py:19:18: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:19:18: SIM223 [*] Use `False` instead of `... and False`
    |
 19 |     pass
 20 | 
@@ -76,7 +76,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 21 21 | 
 22 22 | if False and f() and a and g() and b:  # SIM223
 
-./resources/test/fixtures/flake8_simplify/SIM223.py:22:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:22:4: SIM223 [*] Use `False` instead of `... and False`
    |
 22 |     pass
 23 | 
@@ -96,7 +96,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 24 24 | 
 25 25 | if a and False and f() and b and g():  # SIM223
 
-./resources/test/fixtures/flake8_simplify/SIM223.py:25:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:25:4: SIM223 [*] Use `False` instead of `... and False`
    |
 25 |     pass
 26 | 

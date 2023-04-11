@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E999.py:3:1: E999 SyntaxError: unindent does not match any outer indentation level
+E999.py:3:1: E999 SyntaxError: unindent does not match any outer indentation level
   |
 3 | def x():
 4 | 

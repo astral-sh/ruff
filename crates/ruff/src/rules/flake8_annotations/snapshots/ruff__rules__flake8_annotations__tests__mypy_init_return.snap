@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_annotations/mod.rs
 ---
-./resources/test/fixtures/flake8_annotations/mypy_init_return.py:5:9: ANN204 [*] Missing return type annotation for special method `__init__`
+mypy_init_return.py:5:9: ANN204 [*] Missing return type annotation for special method `__init__`
   |
 5 | # Error
 6 | class Foo:
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 7 7 | 
 8 8 | 
 
-./resources/test/fixtures/flake8_annotations/mypy_init_return.py:11:9: ANN204 [*] Missing return type annotation for special method `__init__`
+mypy_init_return.py:11:9: ANN204 [*] Missing return type annotation for special method `__init__`
    |
 11 | # Error
 12 | class Foo:
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 13 13 | 
 14 14 | 
 
-./resources/test/fixtures/flake8_annotations/mypy_init_return.py:40:5: ANN202 Missing return type annotation for private function `__init__`
+mypy_init_return.py:40:5: ANN202 Missing return type annotation for private function `__init__`
    |
 40 | # Error
 41 | def __init__(self, foo: int):
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 42 |     ...
    |
 
-./resources/test/fixtures/flake8_annotations/mypy_init_return.py:47:9: ANN204 [*] Missing return type annotation for special method `__init__`
+mypy_init_return.py:47:9: ANN204 [*] Missing return type annotation for special method `__init__`
    |
 47 | # of a vararg falsely indicated that the function has a typed argument.
 48 | class Foo:

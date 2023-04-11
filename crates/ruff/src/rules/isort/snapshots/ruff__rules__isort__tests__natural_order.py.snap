@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/isort/mod.rs
 ---
-./resources/test/fixtures/isort/natural_order.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+natural_order.py:1:1: I001 [*] Import block is un-sorted or un-formatted
    |
  1 | / import numpy1
  2 | | import numpy10

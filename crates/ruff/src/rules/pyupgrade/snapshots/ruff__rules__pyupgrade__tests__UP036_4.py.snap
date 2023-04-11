@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP036_4.py:4:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:4:5: UP036 [*] Version block is outdated for minimum Python version
   |
 4 |   if True:
 5 |       if sys.version_info < (3, 3):
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 7 6 | 
 8 7 | if True:
 
-./resources/test/fixtures/pyupgrade/UP036_4.py:11:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:11:5: UP036 [*] Version block is outdated for minimum Python version
    |
 11 |       if foo:
 12 |           pass
@@ -45,7 +45,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 14 12 | if True:
 15 13 |     if foo:
 
-./resources/test/fixtures/pyupgrade/UP036_4.py:17:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:17:5: UP036 [*] Version block is outdated for minimum Python version
    |
 17 |       if foo:
 18 |           pass
@@ -70,7 +70,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 18 |         cmd = [sys.executable, "-m", "test", "-j0"]
 21 19 | 
 
-./resources/test/fixtures/pyupgrade/UP036_4.py:24:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:24:5: UP036 [*] Version block is outdated for minimum Python version
    |
 24 |       if foo:
 25 |           pass
@@ -93,7 +93,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 27 25 |     if sys.version_info < (3, 3):
 28 26 |         cmd = [sys.executable, "-m", "test.regrtest"]
 
-./resources/test/fixtures/pyupgrade/UP036_4.py:27:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:27:5: UP036 [*] Version block is outdated for minimum Python version
    |
 27 |           cmd = [sys.executable, "-m", "test.regrtest"]
 28 |   
@@ -116,7 +116,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 30 28 |     if foo:
 31 29 |         pass
 
-./resources/test/fixtures/pyupgrade/UP036_4.py:32:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:32:5: UP036 [*] Version block is outdated for minimum Python version
    |
 32 |       if foo:
 33 |           pass
@@ -141,7 +141,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 35 33 |         cmd = [sys.executable, "-m", "test", "-j0"]
 36 34 | 
 
-./resources/test/fixtures/pyupgrade/UP036_4.py:37:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:37:5: UP036 [*] Version block is outdated for minimum Python version
    |
 37 |           cmd = [sys.executable, "-m", "test", "-j0"]
 38 |   
@@ -169,7 +169,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 42 39 |     if sys.version_info < (3, 3):
 43 40 |         cmd = [sys.executable, "-m", "test.regrtest"]
 
-./resources/test/fixtures/pyupgrade/UP036_4.py:42:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_4.py:42:5: UP036 [*] Version block is outdated for minimum Python version
    |
 42 |           cmd = [sys.executable, "-m", "test", "-j0"]
 43 |   

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 ---
-./resources/test/fixtures/flake8_import_conventions/custom.py:3:1: ICN001 `altair` should be imported as `alt`
+custom.py:3:1: ICN001 `altair` should be imported as `alt`
   |
 3 | import math  # not checked
 4 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 7 | import dask.dataframe  # unconventional
   |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:4:1: ICN001 `dask.array` should be imported as `da`
+custom.py:4:1: ICN001 `dask.array` should be imported as `da`
   |
 4 | import altair  # unconventional
 5 | import dask.array  # unconventional
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 7 | import matplotlib.pyplot  # unconventional
   |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:5:1: ICN001 `dask.dataframe` should be imported as `dd`
+custom.py:5:1: ICN001 `dask.dataframe` should be imported as `dd`
   |
 5 | import altair  # unconventional
 6 | import dask.array  # unconventional
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 9 | import numpy  # unconventional
   |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:6:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
+custom.py:6:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
    |
  6 | import dask.array  # unconventional
  7 | import dask.dataframe  # unconventional
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 10 | import pandas  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:7:1: ICN001 `numpy` should be imported as `np`
+custom.py:7:1: ICN001 `numpy` should be imported as `np`
    |
  7 | import dask.dataframe  # unconventional
  8 | import matplotlib.pyplot  # unconventional
@@ -50,7 +50,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 11 | import seaborn  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:8:1: ICN001 `pandas` should be imported as `pd`
+custom.py:8:1: ICN001 `pandas` should be imported as `pd`
    |
  8 | import matplotlib.pyplot  # unconventional
  9 | import numpy  # unconventional
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 12 | import tensorflow  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:9:1: ICN001 `seaborn` should be imported as `sns`
+custom.py:9:1: ICN001 `seaborn` should be imported as `sns`
    |
  9 | import numpy  # unconventional
 10 | import pandas  # unconventional
@@ -70,7 +70,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 13 | import holoviews  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:10:1: ICN001 `tensorflow` should be imported as `tf`
+custom.py:10:1: ICN001 `tensorflow` should be imported as `tf`
    |
 10 | import pandas  # unconventional
 11 | import seaborn  # unconventional
@@ -80,7 +80,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 14 | import panel  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:11:1: ICN001 `holoviews` should be imported as `hv`
+custom.py:11:1: ICN001 `holoviews` should be imported as `hv`
    |
 11 | import seaborn  # unconventional
 12 | import tensorflow  # unconventional
@@ -90,7 +90,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 15 | import plotly.express  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:12:1: ICN001 `panel` should be imported as `pn`
+custom.py:12:1: ICN001 `panel` should be imported as `pn`
    |
 12 | import tensorflow  # unconventional
 13 | import holoviews  # unconventional
@@ -100,7 +100,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 16 | import matplotlib  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:13:1: ICN001 `plotly.express` should be imported as `px`
+custom.py:13:1: ICN001 `plotly.express` should be imported as `px`
    |
 13 | import holoviews  # unconventional
 14 | import panel  # unconventional
@@ -110,7 +110,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 17 | import polars  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:14:1: ICN001 `matplotlib` should be imported as `mpl`
+custom.py:14:1: ICN001 `matplotlib` should be imported as `mpl`
    |
 14 | import panel  # unconventional
 15 | import plotly.express  # unconventional
@@ -120,7 +120,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 18 | import pyarrow  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:15:1: ICN001 `polars` should be imported as `pl`
+custom.py:15:1: ICN001 `polars` should be imported as `pl`
    |
 15 | import plotly.express  # unconventional
 16 | import matplotlib  # unconventional
@@ -129,7 +129,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 18 | import pyarrow  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:16:1: ICN001 `pyarrow` should be imported as `pa`
+custom.py:16:1: ICN001 `pyarrow` should be imported as `pa`
    |
 16 | import matplotlib  # unconventional
 17 | import polars  # unconventional
@@ -139,7 +139,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 20 | import altair as altr  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:18:1: ICN001 `altair` should be imported as `alt`
+custom.py:18:1: ICN001 `altair` should be imported as `alt`
    |
 18 | import pyarrow  # unconventional
 19 | 
@@ -149,7 +149,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 22 | import dask.array as darray  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:19:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
+custom.py:19:1: ICN001 `matplotlib.pyplot` should be imported as `plt`
    |
 19 | import altair as altr  # unconventional
 20 | import matplotlib.pyplot as plot  # unconventional
@@ -158,7 +158,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 22 | import dask.dataframe as ddf  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:20:1: ICN001 `dask.array` should be imported as `da`
+custom.py:20:1: ICN001 `dask.array` should be imported as `da`
    |
 20 | import altair as altr  # unconventional
 21 | import matplotlib.pyplot as plot  # unconventional
@@ -168,7 +168,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 24 | import numpy as nmp  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:21:1: ICN001 `dask.dataframe` should be imported as `dd`
+custom.py:21:1: ICN001 `dask.dataframe` should be imported as `dd`
    |
 21 | import matplotlib.pyplot as plot  # unconventional
 22 | import dask.array as darray  # unconventional
@@ -178,7 +178,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 25 | import pandas as pdas  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:22:1: ICN001 `numpy` should be imported as `np`
+custom.py:22:1: ICN001 `numpy` should be imported as `np`
    |
 22 | import dask.array as darray  # unconventional
 23 | import dask.dataframe as ddf  # unconventional
@@ -188,7 +188,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 26 | import seaborn as sbrn  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:23:1: ICN001 `pandas` should be imported as `pd`
+custom.py:23:1: ICN001 `pandas` should be imported as `pd`
    |
 23 | import dask.dataframe as ddf  # unconventional
 24 | import numpy as nmp  # unconventional
@@ -198,7 +198,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 27 | import tensorflow as tfz  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:24:1: ICN001 `seaborn` should be imported as `sns`
+custom.py:24:1: ICN001 `seaborn` should be imported as `sns`
    |
 24 | import numpy as nmp  # unconventional
 25 | import pandas as pdas  # unconventional
@@ -208,7 +208,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 28 | import holoviews as hsv  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:25:1: ICN001 `tensorflow` should be imported as `tf`
+custom.py:25:1: ICN001 `tensorflow` should be imported as `tf`
    |
 25 | import pandas as pdas  # unconventional
 26 | import seaborn as sbrn  # unconventional
@@ -218,7 +218,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 29 | import panel as pns  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:26:1: ICN001 `holoviews` should be imported as `hv`
+custom.py:26:1: ICN001 `holoviews` should be imported as `hv`
    |
 26 | import seaborn as sbrn  # unconventional
 27 | import tensorflow as tfz  # unconventional
@@ -228,7 +228,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 30 | import plotly.express as pltx  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:27:1: ICN001 `panel` should be imported as `pn`
+custom.py:27:1: ICN001 `panel` should be imported as `pn`
    |
 27 | import tensorflow as tfz  # unconventional
 28 | import holoviews as hsv  # unconventional
@@ -238,7 +238,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 31 | import matplotlib as ml  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:28:1: ICN001 `plotly.express` should be imported as `px`
+custom.py:28:1: ICN001 `plotly.express` should be imported as `px`
    |
 28 | import holoviews as hsv  # unconventional
 29 | import panel as pns  # unconventional
@@ -248,7 +248,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 32 | import polars as ps # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:29:1: ICN001 `matplotlib` should be imported as `mpl`
+custom.py:29:1: ICN001 `matplotlib` should be imported as `mpl`
    |
 29 | import panel as pns  # unconventional
 30 | import plotly.express as pltx  # unconventional
@@ -258,7 +258,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 33 | import pyarrow as arr  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:30:1: ICN001 `polars` should be imported as `pl`
+custom.py:30:1: ICN001 `polars` should be imported as `pl`
    |
 30 | import plotly.express as pltx  # unconventional
 31 | import matplotlib as ml  # unconventional
@@ -267,7 +267,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 33 | import pyarrow as arr  # unconventional
    |
 
-./resources/test/fixtures/flake8_import_conventions/custom.py:31:1: ICN001 `pyarrow` should be imported as `pa`
+custom.py:31:1: ICN001 `pyarrow` should be imported as `pa`
    |
 31 | import matplotlib as ml  # unconventional
 32 | import polars as ps # unconventional

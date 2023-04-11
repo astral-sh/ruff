@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D209_D400.py:2:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
+D209_D400.py:2:5: D209 [*] Multi-line docstring closing quotes should be on a separate line
   |
 2 |   def lorem():
 3 |       """lorem ipsum dolor sit amet consectetur adipiscing elit
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
   3 |+    sed do eiusmod tempor incididunt ut labore et dolore magna aliqua
   4 |+    """
 
-./resources/test/fixtures/pydocstyle/D209_D400.py:2:5: D400 [*] First line should end with a period
+D209_D400.py:2:5: D400 [*] First line should end with a period
   |
 2 |   def lorem():
 3 |       """lorem ipsum dolor sit amet consectetur adipiscing elit

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 ---
-./resources/test/fixtures/flake8_tidy_imports/TID251.py:2:8: TID251 `cgi` is banned: The cgi module is deprecated.
+TID251.py:2:8: TID251 `cgi` is banned: The cgi module is deprecated.
   |
 2 | ## Banned modules ##
 3 | import cgi
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 5 | from cgi import *
   |
 
-./resources/test/fixtures/flake8_tidy_imports/TID251.py:4:1: TID251 `cgi` is banned: The cgi module is deprecated.
+TID251.py:4:1: TID251 `cgi` is banned: The cgi module is deprecated.
   |
 4 | import cgi
 5 | 
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 8 | from cgi import a, b, c
   |
 
-./resources/test/fixtures/flake8_tidy_imports/TID251.py:6:1: TID251 `cgi` is banned: The cgi module is deprecated.
+TID251.py:6:1: TID251 `cgi` is banned: The cgi module is deprecated.
    |
  6 | from cgi import *
  7 | 
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 10 | # banning a module also bans any submodules
    |
 
-./resources/test/fixtures/flake8_tidy_imports/TID251.py:9:8: TID251 `cgi` is banned: The cgi module is deprecated.
+TID251.py:9:8: TID251 `cgi` is banned: The cgi module is deprecated.
    |
  9 | # banning a module also bans any submodules
 10 | import cgi.foo.bar
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 12 | from cgi.foo import bar
    |
 
-./resources/test/fixtures/flake8_tidy_imports/TID251.py:11:1: TID251 `cgi` is banned: The cgi module is deprecated.
+TID251.py:11:1: TID251 `cgi` is banned: The cgi module is deprecated.
    |
 11 | import cgi.foo.bar
 12 | 
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 15 | from cgi.foo.bar import *
    |
 
-./resources/test/fixtures/flake8_tidy_imports/TID251.py:13:1: TID251 `cgi` is banned: The cgi module is deprecated.
+TID251.py:13:1: TID251 `cgi` is banned: The cgi module is deprecated.
    |
 13 | from cgi.foo import bar
 14 | 
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 17 | ## Banned module members ##
    |
 
-./resources/test/fixtures/flake8_tidy_imports/TID251.py:17:20: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+TID251.py:17:20: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
    |
 17 | ## Banned module members ##
 18 | 
@@ -69,7 +69,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 21 | import typing
    |
 
-./resources/test/fixtures/flake8_tidy_imports/TID251.py:22:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+TID251.py:22:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
    |
 22 | # attribute access is checked
 23 | typing.TypedDict
@@ -78,7 +78,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 25 | typing.TypedDict.anything
    |
 
-./resources/test/fixtures/flake8_tidy_imports/TID251.py:24:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+TID251.py:24:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
    |
 24 | typing.TypedDict
 25 | 
@@ -88,7 +88,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 28 | # function calls are checked
    |
 
-./resources/test/fixtures/flake8_tidy_imports/TID251.py:27:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+TID251.py:27:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
    |
 27 | # function calls are checked
 28 | typing.TypedDict()
@@ -97,7 +97,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 30 | typing.TypedDict.anything()
    |
 
-./resources/test/fixtures/flake8_tidy_imports/TID251.py:29:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+TID251.py:29:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
    |
 29 | typing.TypedDict()
 30 | 
@@ -107,7 +107,7 @@ source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
 33 | # import aliases are resolved
    |
 
-./resources/test/fixtures/flake8_tidy_imports/TID251.py:33:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
+TID251.py:33:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.TypedDict instead.
    |
 33 | # import aliases are resolved
 34 | import typing as totally_not_typing

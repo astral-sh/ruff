@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 ---
-./resources/test/fixtures/pygrep-hooks/PGH004_0.py:1:8: PGH004 Use specific rule codes when using `noqa`
+PGH004_0.py:1:8: PGH004 Use specific rule codes when using `noqa`
   |
 1 | x = 1  # noqa
   |        ^^^^^^ PGH004
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 3 | # noqa
   |
 
-./resources/test/fixtures/pygrep-hooks/PGH004_0.py:2:8: PGH004 Use specific rule codes when using `noqa`
+PGH004_0.py:2:8: PGH004 Use specific rule codes when using `noqa`
   |
 2 | x = 1  # noqa
 3 | x = 1  # NOQA:F401,W203
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 5 | # NOQA
   |
 
-./resources/test/fixtures/pygrep-hooks/PGH004_0.py:3:1: PGH004 Use specific rule codes when using `noqa`
+PGH004_0.py:3:1: PGH004 Use specific rule codes when using `noqa`
   |
 3 | x = 1  # noqa
 4 | x = 1  # NOQA:F401,W203
@@ -28,7 +28,7 @@ source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 7 | # noqa:F401
   |
 
-./resources/test/fixtures/pygrep-hooks/PGH004_0.py:4:1: PGH004 Use specific rule codes when using `noqa`
+PGH004_0.py:4:1: PGH004 Use specific rule codes when using `noqa`
   |
 4 | x = 1  # NOQA:F401,W203
 5 | # noqa
@@ -38,7 +38,7 @@ source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 8 | # noqa:F401,W203
   |
 
-./resources/test/fixtures/pygrep-hooks/PGH004_0.py:5:1: PGH004 Use specific rule codes when using `noqa`
+PGH004_0.py:5:1: PGH004 Use specific rule codes when using `noqa`
   |
 5 | # noqa
 6 | # NOQA
@@ -47,7 +47,7 @@ source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 8 | # noqa:F401,W203
   |
 
-./resources/test/fixtures/pygrep-hooks/PGH004_0.py:6:1: PGH004 Use specific rule codes when using `noqa`
+PGH004_0.py:6:1: PGH004 Use specific rule codes when using `noqa`
    |
  6 | # NOQA
  7 | # noqa:F401

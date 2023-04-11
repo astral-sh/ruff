@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F523.py:2:1: F523 [*] `.format` call has unused arguments at position(s): 1
+F523.py:2:1: F523 [*] `.format` call has unused arguments at position(s): 1
   |
 2 | # With indexes
 3 | "{0}".format(1, 2)  # F523
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 4 4 | "{1:{0}}".format(1, 2)  # No issues
 5 5 | "{1:{0}}".format(1, 2, 3)  # F523
 
-./resources/test/fixtures/pyflakes/F523.py:3:1: F523 [*] `.format` call has unused arguments at position(s): 0, 2
+F523.py:3:1: F523 [*] `.format` call has unused arguments at position(s): 0, 2
   |
 3 | # With indexes
 4 | "{0}".format(1, 2)  # F523
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 5 5 | "{1:{0}}".format(1, 2, 3)  # F523
 6 6 | "{0}{2}".format(1, 2)  # F523, # F524
 
-./resources/test/fixtures/pyflakes/F523.py:5:1: F523 [*] `.format` call has unused arguments at position(s): 2
+F523.py:5:1: F523 [*] `.format` call has unused arguments at position(s): 2
   |
 5 | "{1}".format(1, 2, 3)  # F523
 6 | "{1:{0}}".format(1, 2)  # No issues
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 7 7 | "{1.arg[1]!r:0{2['arg']}{1}}".format(1, 2, 3, 4) # F523
 8 8 | 
 
-./resources/test/fixtures/pyflakes/F523.py:6:1: F523 [*] `.format` call has unused arguments at position(s): 1
+F523.py:6:1: F523 [*] `.format` call has unused arguments at position(s): 1
   |
 6 | "{1:{0}}".format(1, 2)  # No issues
 7 | "{1:{0}}".format(1, 2, 3)  # F523
@@ -80,7 +80,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 8 8 | 
 9 9 | # With no indexes
 
-./resources/test/fixtures/pyflakes/F523.py:7:1: F523 [*] `.format` call has unused arguments at position(s): 0, 3
+F523.py:7:1: F523 [*] `.format` call has unused arguments at position(s): 0, 3
    |
  7 | "{1:{0}}".format(1, 2, 3)  # F523
  8 | "{0}{2}".format(1, 2)  # F523, # F524
@@ -101,7 +101,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 9 9 | # With no indexes
 10 10 | "{}".format(1, 2)  # F523
 
-./resources/test/fixtures/pyflakes/F523.py:10:1: F523 [*] `.format` call has unused arguments at position(s): 1
+F523.py:10:1: F523 [*] `.format` call has unused arguments at position(s): 1
    |
 10 | # With no indexes
 11 | "{}".format(1, 2)  # F523
@@ -121,7 +121,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 12 12 | "{:{}}".format(1, 2)  # No issues
 13 13 | "{:{}}".format(1, 2, 3)  # F523
 
-./resources/test/fixtures/pyflakes/F523.py:11:1: F523 [*] `.format` call has unused arguments at position(s): 1, 2
+F523.py:11:1: F523 [*] `.format` call has unused arguments at position(s): 1, 2
    |
 11 | # With no indexes
 12 | "{}".format(1, 2)  # F523
@@ -142,7 +142,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 13 13 | "{:{}}".format(1, 2, 3)  # F523
 14 14 | 
 
-./resources/test/fixtures/pyflakes/F523.py:13:1: F523 [*] `.format` call has unused arguments at position(s): 2
+F523.py:13:1: F523 [*] `.format` call has unused arguments at position(s): 2
    |
 13 | "{}".format(1, 2, 3)  # F523
 14 | "{:{}}".format(1, 2)  # No issues
@@ -163,7 +163,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 15 15 | # With *args
 16 16 | "{0}{1}".format(*args)  # No issues
 
-./resources/test/fixtures/pyflakes/F523.py:19:1: F523 [*] `.format` call has unused arguments at position(s): 2
+F523.py:19:1: F523 [*] `.format` call has unused arguments at position(s): 2
    |
 19 | "{0}{1}".format(1, *args)  # No issues
 20 | "{0}{1}".format(1, 2, *args)  # No issues

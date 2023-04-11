@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/W292_0.py:2:9: W292 [*] No newline at end of file
+W292_0.py:2:9: W292 [*] No newline at end of file
   |
 2 | def fn() -> None:
 3 |     pass

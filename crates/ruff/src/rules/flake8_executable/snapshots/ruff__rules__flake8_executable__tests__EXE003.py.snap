@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_executable/mod.rs
 ---
-./resources/test/fixtures/flake8_executable/EXE003.py:1:1: EXE003 Shebang should contain `python`
+EXE003.py:1:1: EXE003 Shebang should contain `python`
   |
 1 | #!/usr/bin/bash
   | ^^^^^^^^^^^^^^^ EXE003

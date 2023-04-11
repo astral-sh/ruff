@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F50x.py:11:1: F508 `%`-format string `*` specifier requires sequence
+F50x.py:11:1: F508 `%`-format string `*` specifier requires sequence
    |
 11 | '%(bar)s' % (1, 2, 3)  # F502
 12 | '%s %s' % {'k': 'v'}  # F503

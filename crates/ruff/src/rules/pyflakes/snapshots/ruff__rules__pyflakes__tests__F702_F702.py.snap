@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F702.py:4:5: F702 `continue` not properly in loop
+F702.py:4:5: F702 `continue` not properly in loop
   |
 4 |     continue
 5 | else:
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 8 | i = 0
   |
 
-./resources/test/fixtures/pyflakes/F702.py:16:5: F702 `continue` not properly in loop
+F702.py:16:5: F702 `continue` not properly in loop
    |
 16 |         continue
 17 | 
@@ -19,14 +19,14 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
    |     ^^^^^^^^ F702
    |
 
-./resources/test/fixtures/pyflakes/F702.py:20:5: F702 `continue` not properly in loop
+F702.py:20:5: F702 `continue` not properly in loop
    |
 20 | class Foo:
 21 |     continue
    |     ^^^^^^^^ F702
    |
 
-./resources/test/fixtures/pyflakes/F702.py:23:1: F702 `continue` not properly in loop
+F702.py:23:1: F702 `continue` not properly in loop
    |
 23 | continue
    | ^^^^^^^^ F702

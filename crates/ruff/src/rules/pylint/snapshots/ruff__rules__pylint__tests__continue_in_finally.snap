@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/continue_in_finally.py:5:9: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:5:9: PLE0116 `continue` not supported inside `finally` clause
   |
 5 |         pass
 6 |     finally:
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 9 | while True:
   |
 
-./resources/test/fixtures/pylint/continue_in_finally.py:16:13: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:16:13: PLE0116 `continue` not supported inside `finally` clause
    |
 16 |             pass
 17 |         finally:
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 19 |         pass
    |
 
-./resources/test/fixtures/pylint/continue_in_finally.py:26:17: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:26:17: PLE0116 `continue` not supported inside `finally` clause
    |
 26 |         match test:
 27 |             case "aa":
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 30 | while True:
    |
 
-./resources/test/fixtures/pylint/continue_in_finally.py:33:13: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:33:13: PLE0116 `continue` not supported inside `finally` clause
    |
 33 |     finally:
 34 |         with "aa" as f:
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 37 | while True:
    |
 
-./resources/test/fixtures/pylint/continue_in_finally.py:40:13: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:40:13: PLE0116 `continue` not supported inside `finally` clause
    |
 40 |     finally:
 41 |         if True:
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 43 |         continue  # [continue-in-finally]
    |
 
-./resources/test/fixtures/pylint/continue_in_finally.py:41:9: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:41:9: PLE0116 `continue` not supported inside `finally` clause
    |
 41 |         if True:
 42 |             continue  # [continue-in-finally]
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 45 |         def test():
    |
 
-./resources/test/fixtures/pylint/continue_in_finally.py:49:17: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:49:17: PLE0116 `continue` not supported inside `finally` clause
    |
 49 |                 pass
 50 |             finally:
@@ -67,7 +67,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
    |                 ^^^^^^^^ PLE0116
    |
 
-./resources/test/fixtures/pylint/continue_in_finally.py:56:9: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:56:9: PLE0116 `continue` not supported inside `finally` clause
    |
 56 |         pass
 57 |     finally:
@@ -77,7 +77,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 60 |         def test():
    |
 
-./resources/test/fixtures/pylint/continue_in_finally.py:69:9: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:69:9: PLE0116 `continue` not supported inside `finally` clause
    |
 69 |         for i in range(12):
 70 |             continue
@@ -87,7 +87,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 73 |         while True:
    |
 
-./resources/test/fixtures/pylint/continue_in_finally.py:74:13: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:74:13: PLE0116 `continue` not supported inside `finally` clause
    |
 74 |             pass
 75 |         else:
@@ -97,7 +97,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 78 |         def test():
    |
 
-./resources/test/fixtures/pylint/continue_in_finally.py:89:13: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:89:13: PLE0116 `continue` not supported inside `finally` clause
    |
 89 |             pass
 90 |         elif False:
@@ -107,7 +107,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 93 |             continue  # [continue-in-finally]
    |
 
-./resources/test/fixtures/pylint/continue_in_finally.py:91:13: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:91:13: PLE0116 `continue` not supported inside `finally` clause
    |
 91 |             continue  # [continue-in-finally]
 92 |         else:
@@ -117,7 +117,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 95 |                 pass
    |
 
-./resources/test/fixtures/pylint/continue_in_finally.py:95:17: PLE0116 `continue` not supported inside `finally` clause
+continue_in_finally.py:95:17: PLE0116 `continue` not supported inside `finally` clause
    |
 95 |                 pass
 96 |             else:

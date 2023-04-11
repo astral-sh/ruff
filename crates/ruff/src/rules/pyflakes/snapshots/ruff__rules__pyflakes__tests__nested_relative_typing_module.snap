@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/project/foo/bop/baz.py:26:17: F821 Undefined name `foo`
+baz.py:26:17: F821 Undefined name `foo`
    |
 26 |     # F821
 27 |     x: Literal["foo"]
    |                 ^^^ F821
    |
 
-./resources/test/fixtures/pyflakes/project/foo/bop/baz.py:33:17: F821 Undefined name `foo`
+baz.py:33:17: F821 Undefined name `foo`
    |
 33 |     # F821
 34 |     x: Literal["foo"]

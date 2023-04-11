@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/return_in_init.py:14:9: PLE0101 Explicit return in `__init__`
+return_in_init.py:14:9: PLE0101 Explicit return in `__init__`
    |
 14 | class B:
 15 |     def __init__(self):
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 18 |     def gen(self):
    |
 
-./resources/test/fixtures/pylint/return_in_init.py:22:9: PLE0101 Explicit return in `__init__`
+return_in_init.py:22:9: PLE0101 Explicit return in `__init__`
    |
 22 |     def __init__(self):
 23 |         return 1

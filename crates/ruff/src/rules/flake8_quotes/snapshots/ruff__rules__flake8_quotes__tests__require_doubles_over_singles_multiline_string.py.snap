@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
-./resources/test/fixtures/flake8_quotes/singles_multiline_string.py:1:5: Q001 [*] Single quote multiline found but double quotes preferred
+singles_multiline_string.py:1:5: Q001 [*] Single quote multiline found but double quotes preferred
   |
 1 |   s = ''' This 'should'
   |  _____^

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM103.py:3:5: SIM103 [*] Return the condition `a` directly
+SIM103.py:3:5: SIM103 [*] Return the condition `a` directly
   |
 3 |   def f():
 4 |       # SIM103
@@ -26,7 +26,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 8 5 | 
 9 6 | def f():
 
-./resources/test/fixtures/flake8_simplify/SIM103.py:11:5: SIM103 [*] Return the condition `a == b` directly
+SIM103.py:11:5: SIM103 [*] Return the condition `a == b` directly
    |
 11 |   def f():
 12 |       # SIM103
@@ -52,7 +52,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 16 13 | 
 17 14 | def f():
 
-./resources/test/fixtures/flake8_simplify/SIM103.py:21:5: SIM103 [*] Return the condition `b` directly
+SIM103.py:21:5: SIM103 [*] Return the condition `b` directly
    |
 21 |       if a:
 22 |           return 1
@@ -78,7 +78,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 26 23 | 
 27 24 | def f():
 
-./resources/test/fixtures/flake8_simplify/SIM103.py:32:9: SIM103 [*] Return the condition `b` directly
+SIM103.py:32:9: SIM103 [*] Return the condition `b` directly
    |
 32 |           return 1
 33 |       else:
@@ -104,7 +104,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 37 34 | 
 38 35 | def f():
 
-./resources/test/fixtures/flake8_simplify/SIM103.py:57:5: SIM103 Return the condition `a` directly
+SIM103.py:57:5: SIM103 Return the condition `a` directly
    |
 57 |   def f():
 58 |       # SIM103 (but not fixable)
@@ -116,7 +116,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
    | |___________________^ SIM103
    |
 
-./resources/test/fixtures/flake8_simplify/SIM103.py:83:5: SIM103 Return the condition `a` directly
+SIM103.py:83:5: SIM103 Return the condition `a` directly
    |
 83 |       def bool():
 84 |           return False

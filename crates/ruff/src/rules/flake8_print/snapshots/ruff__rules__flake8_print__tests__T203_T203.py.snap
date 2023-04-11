@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_print/mod.rs
 ---
-./resources/test/fixtures/flake8_print/T203.py:3:1: T203 `pprint` found
+T203.py:3:1: T203 `pprint` found
   |
 3 | from pprint import pprint
 4 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_print/mod.rs
 7 | import pprint
   |
 
-./resources/test/fixtures/flake8_print/T203.py:7:1: T203 `pprint` found
+T203.py:7:1: T203 `pprint` found
    |
  7 | import pprint
  8 | 

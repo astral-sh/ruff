@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 ---
-./resources/test/fixtures/pygrep-hooks/PGH002_1.py:4:1: PGH002 `warn` is deprecated in favor of `warning`
+PGH002_1.py:4:1: PGH002 `warn` is deprecated in favor of `warning`
   |
 4 | from logging import warn
 5 | 
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 7 | warn("not ok")
   |
 
-./resources/test/fixtures/pygrep-hooks/PGH002_1.py:5:1: PGH002 `warn` is deprecated in favor of `warning`
+PGH002_1.py:5:1: PGH002 `warn` is deprecated in favor of `warning`
   |
 5 | logging.warn("this is not ok")
 6 | warn("not ok")

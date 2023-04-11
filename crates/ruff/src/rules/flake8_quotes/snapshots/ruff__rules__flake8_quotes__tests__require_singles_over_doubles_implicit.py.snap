@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
-./resources/test/fixtures/flake8_quotes/doubles_implicit.py:2:5: Q000 [*] Double quotes found but single quotes preferred
+doubles_implicit.py:2:5: Q000 [*] Double quotes found but single quotes preferred
   |
 2 | x = (
 3 |     "This"
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 4 4 |     "not"
 5 5 | )
 
-./resources/test/fixtures/flake8_quotes/doubles_implicit.py:3:5: Q000 [*] Double quotes found but single quotes preferred
+doubles_implicit.py:3:5: Q000 [*] Double quotes found but single quotes preferred
   |
 3 | x = (
 4 |     "This"
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 5 5 | )
 6 6 | 
 
-./resources/test/fixtures/flake8_quotes/doubles_implicit.py:4:5: Q000 [*] Double quotes found but single quotes preferred
+doubles_implicit.py:4:5: Q000 [*] Double quotes found but single quotes preferred
   |
 4 |     "This"
 5 |     "is"
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 6 6 | 
 7 7 | x = (
 
-./resources/test/fixtures/flake8_quotes/doubles_implicit.py:8:5: Q000 [*] Double quotes found but single quotes preferred
+doubles_implicit.py:8:5: Q000 [*] Double quotes found but single quotes preferred
    |
  8 | x = (
  9 |     "This" \
@@ -79,7 +79,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 10 10 |     "not"
 11 11 | )
 
-./resources/test/fixtures/flake8_quotes/doubles_implicit.py:9:5: Q000 [*] Double quotes found but single quotes preferred
+doubles_implicit.py:9:5: Q000 [*] Double quotes found but single quotes preferred
    |
  9 | x = (
 10 |     "This" \
@@ -100,7 +100,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 11 11 | )
 12 12 | 
 
-./resources/test/fixtures/flake8_quotes/doubles_implicit.py:10:5: Q000 [*] Double quotes found but single quotes preferred
+doubles_implicit.py:10:5: Q000 [*] Double quotes found but single quotes preferred
    |
 10 |     "This" \
 11 |     "is" \
@@ -120,7 +120,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 12 12 | 
 13 13 | x = (
 
-./resources/test/fixtures/flake8_quotes/doubles_implicit.py:27:1: Q000 [*] Double quotes found but single quotes preferred
+doubles_implicit.py:27:1: Q000 [*] Double quotes found but single quotes preferred
    |
 27 | if True:
 28 |     "This can use 'double' quotes"

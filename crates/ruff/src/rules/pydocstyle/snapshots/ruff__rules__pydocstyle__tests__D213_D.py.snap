@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:200:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:200:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 200 |   @expect('D213: Multi-line docstring summary should start at the second line')
 201 |   def multi_line_zero_separating_blanks():
@@ -25,7 +25,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 202 203 | 
 203 204 |     """
 
-./resources/test/fixtures/pydocstyle/D.py:210:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:210:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 210 |   @expect('D213: Multi-line docstring summary should start at the second line')
 211 |   def multi_line_two_separating_blanks():
@@ -51,7 +51,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 212 213 | 
 213 214 |     Description.
 
-./resources/test/fixtures/pydocstyle/D.py:220:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:220:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 220 |   @expect('D213: Multi-line docstring summary should start at the second line')
 221 |   def multi_line_one_separating_blanks():
@@ -76,7 +76,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 222 223 |     Description.
 223 224 | 
 
-./resources/test/fixtures/pydocstyle/D.py:230:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:230:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 230 |   @expect('D213: Multi-line docstring summary should start at the second line')
 231 |   def asdfsdf():
@@ -101,7 +101,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 232 233 | Description.
 233 234 | 
 
-./resources/test/fixtures/pydocstyle/D.py:240:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:240:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 240 |   @expect('D213: Multi-line docstring summary should start at the second line')
 241 |   def asdsdfsdffsdf():
@@ -126,7 +126,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 242 243 |     Description.
 243 244 | 
 
-./resources/test/fixtures/pydocstyle/D.py:250:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:250:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 250 |   @expect('D213: Multi-line docstring summary should start at the second line')
 251 |   def asdfsdsdf24():
@@ -151,7 +151,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 252 253 |        Description.
 253 254 | 
 
-./resources/test/fixtures/pydocstyle/D.py:260:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:260:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 260 |   @expect('D213: Multi-line docstring summary should start at the second line')
 261 |   def asdfsdsdfsdf24():
@@ -176,7 +176,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 262 263 |     Description.
 263 264 | 
 
-./resources/test/fixtures/pydocstyle/D.py:270:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:270:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 270 |   @expect('D213: Multi-line docstring summary should start at the second line')
 271 |   def asdfsdfsdsdsdfsdf24():
@@ -201,7 +201,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 272 273 |         Description.
 273 274 | 
 
-./resources/test/fixtures/pydocstyle/D.py:281:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:281:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 281 |   @expect('D213: Multi-line docstring summary should start at the second line')
 282 |   def asdfljdf24():
@@ -224,7 +224,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 283 284 |     Description."""
 284 285 | 
 
-./resources/test/fixtures/pydocstyle/D.py:299:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:299:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 299 |   @expect('D213: Multi-line docstring summary should start at the second line')
 300 |   def multiline():
@@ -248,7 +248,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 301 302 |     This is the end.
 302 303 |     """
 
-./resources/test/fixtures/pydocstyle/D.py:343:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:343:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 343 |   @expect('D213: Multi-line docstring summary should start at the second line')
 344 |   def exceptions_of_D301():
@@ -274,7 +274,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 345 346 |     In particular, line continuations \
 346 347 |     and unicode literals \u0394 and \N{GREEK CAPITAL LETTER DELTA}.
 
-./resources/test/fixtures/pydocstyle/D.py:383:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:383:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 383 |   @expect('D213: Multi-line docstring summary should start at the second line')
 384 |   def new_209():
@@ -299,7 +299,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 385 386 |     More lines.
 386 387 |     """
 
-./resources/test/fixtures/pydocstyle/D.py:392:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:392:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 392 |   @expect('D213: Multi-line docstring summary should start at the second line')
 393 |   def old_209():
@@ -324,7 +324,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 394 395 |     Multi-line comments. OK to have extra blank line
 395 396 | 
 
-./resources/test/fixtures/pydocstyle/D.py:438:37: D213 [*] Multi-line docstring summary should start at the second line
+D.py:438:37: D213 [*] Multi-line docstring summary should start at the second line
     |
 438 |   @expect("D207: Docstring is under-indented")
 439 |   @expect('D213: Multi-line docstring summary should start at the second line')
@@ -348,7 +348,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 440 441 |     Second Line
 441 442 |     """
 
-./resources/test/fixtures/pydocstyle/D.py:450:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:450:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 450 |   @expect('D213: Multi-line docstring summary should start at the second line')
 451 |   def a_following_valid_function(x=None):
@@ -373,7 +373,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 452 453 |     The assertion was caused in the next function, so this one is necessary.
 453 454 | 
 
-./resources/test/fixtures/pydocstyle/D.py:526:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:526:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 526 |   # parameters as functions for Google / Numpy conventions.
 527 |   class Blah:  # noqa: D203,D213
@@ -402,7 +402,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 528 529 |     Parameters
 529 530 |     ----------
 
-./resources/test/fixtures/pydocstyle/D.py:546:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:546:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 546 |   def multiline_leading_space():
 547 |   
@@ -426,7 +426,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 548 549 |     More content.
 549 550 |     """
 
-./resources/test/fixtures/pydocstyle/D.py:555:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:555:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 555 |   @expect('D213: Multi-line docstring summary should start at the second line')
 556 |   def multiline_trailing_space():
@@ -452,7 +452,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 557 558 |     More content.
 558 559 |     """
 
-./resources/test/fixtures/pydocstyle/D.py:568:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:568:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 568 |   def multiline_trailing_and_leading_space():
 569 |   
@@ -478,7 +478,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 570 571 |     More content.
 571 572 |     """
 
-./resources/test/fixtures/pydocstyle/D.py:588:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:588:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 588 |   @expect('D213: Multi-line docstring summary should start at the second line')
 589 |   def asdfljdjgf24():
@@ -501,7 +501,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 590 591 |     Description.  """
 591 592 | 
 
-./resources/test/fixtures/pydocstyle/D.py:606:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:606:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 606 |   @expect('D212: Multi-line docstring summary should start at the first line')
 607 |   def one_liner():
@@ -524,7 +524,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 608 609 |     """
 609 610 | 
 
-./resources/test/fixtures/pydocstyle/D.py:615:5: D213 [*] Multi-line docstring summary should start at the second line
+D.py:615:5: D213 [*] Multi-line docstring summary should start at the second line
     |
 615 |   @expect('D212: Multi-line docstring summary should start at the first line')
 616 |   def one_liner():

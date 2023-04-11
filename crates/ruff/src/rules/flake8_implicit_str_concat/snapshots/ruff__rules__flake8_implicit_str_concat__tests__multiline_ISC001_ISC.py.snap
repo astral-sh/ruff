@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 ---
-./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:1:5: ISC001 Implicitly concatenated string literals on one line
+ISC.py:1:5: ISC001 Implicitly concatenated string literals on one line
   |
 1 | _ = "a" "b" "c"
   |     ^^^^^^^ ISC001
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_implicit_str_concat/mod.rs
 3 | _ = "abc" + "def"
   |
 
-./resources/test/fixtures/flake8_implicit_str_concat/ISC.py:1:9: ISC001 Implicitly concatenated string literals on one line
+ISC.py:1:9: ISC001 Implicitly concatenated string literals on one line
   |
 1 | _ = "a" "b" "c"
   |         ^^^^^^^ ISC001

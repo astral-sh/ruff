@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E22.py:131:6: E228 Missing whitespace around modulo operator
+E22.py:131:6: E228 Missing whitespace around modulo operator
     |
 131 | c = b^a
 132 | #: E228
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 135 | msg = fmt%(errno, errmsg)
     |
 
-./resources/test/fixtures/pycodestyle/E22.py:133:10: E228 Missing whitespace around modulo operator
+E22.py:133:10: E228 Missing whitespace around modulo operator
     |
 133 | a = b%c
 134 | #: E228
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 137 | msg = "Error %d occurred"%errno
     |
 
-./resources/test/fixtures/pycodestyle/E22.py:135:26: E228 Missing whitespace around modulo operator
+E22.py:135:26: E228 Missing whitespace around modulo operator
     |
 135 | msg = fmt%(errno, errmsg)
 136 | #: E228

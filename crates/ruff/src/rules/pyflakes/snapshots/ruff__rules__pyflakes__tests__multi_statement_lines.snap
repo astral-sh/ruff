@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:3:12: F401 [*] `foo1` imported but unused
+multi_statement_lines.py:3:12: F401 [*] `foo1` imported but unused
   |
 3 | if True:
 4 |     import foo1; x = 1
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 5 5 | 
 6 6 | if True:
 
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:4:12: F401 [*] `foo2` imported but unused
+multi_statement_lines.py:4:12: F401 [*] `foo2` imported but unused
   |
 4 | if True:
 5 |     import foo1; x = 1
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 6 6 | if True:
 7 7 |     import foo3; \
 
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:7:12: F401 [*] `foo3` imported but unused
+multi_statement_lines.py:7:12: F401 [*] `foo3` imported but unused
   |
 7 | if True:
 8 |     import foo3; \
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 10 9 | if True:
 11 10 |     import foo4 \
 
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:11:12: F401 [*] `foo4` imported but unused
+multi_statement_lines.py:11:12: F401 [*] `foo4` imported but unused
    |
 11 | if True:
 12 |     import foo4 \
@@ -80,7 +80,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 14 13 | 
 15 14 | if True:
 
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:16:19: F401 [*] `foo5` imported but unused
+multi_statement_lines.py:16:19: F401 [*] `foo5` imported but unused
    |
 16 | if True:
 17 |     x = 1; import foo5
@@ -98,7 +98,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 18 18 | 
 19 19 | if True:
 
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:21:17: F401 [*] `foo6` imported but unused
+multi_statement_lines.py:21:17: F401 [*] `foo6` imported but unused
    |
 21 | if True:
 22 |     x = 1; \
@@ -117,7 +117,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 23 23 | 
 24 24 | if True:
 
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:26:18: F401 [*] `foo7` imported but unused
+multi_statement_lines.py:26:18: F401 [*] `foo7` imported but unused
    |
 26 | if True:
 27 |     x = 1 \
@@ -136,7 +136,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 28 28 | 
 29 29 | if True:
 
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:30:19: F401 [*] `foo8` imported but unused
+multi_statement_lines.py:30:19: F401 [*] `foo8` imported but unused
    |
 30 | if True:
 31 |     x = 1; import foo8; x = 1
@@ -155,7 +155,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 32 32 | 
 33 33 | if True:
 
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:31:23: F401 [*] `foo9` imported but unused
+multi_statement_lines.py:31:23: F401 [*] `foo9` imported but unused
    |
 31 | if True:
 32 |     x = 1; import foo8; x = 1
@@ -176,7 +176,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 33 33 | if True:
 34 34 |     x = 1; \
 
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:35:16: F401 [*] `foo10` imported but unused
+multi_statement_lines.py:35:16: F401 [*] `foo10` imported but unused
    |
 35 | if True:
 36 |     x = 1; \
@@ -197,7 +197,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 38 37 | if True:
 39 38 |     x = 1 \
 
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:40:17: F401 [*] `foo11` imported but unused
+multi_statement_lines.py:40:17: F401 [*] `foo11` imported but unused
    |
 40 | if True:
 41 |     x = 1 \
@@ -216,7 +216,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 42 41 | 
 43 42 | 
 
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:46:8: F401 [*] `foo12` imported but unused
+multi_statement_lines.py:46:8: F401 [*] `foo12` imported but unused
    |
 46 | # Continuation, but not as the last content in the file.
 47 | x = 1; \
@@ -238,7 +238,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 49 49 | # error.)
 50 50 | x = 1; \
 
-./resources/test/fixtures/pyflakes/multi_statement_lines.py:51:8: F401 [*] `foo13` imported but unused
+multi_statement_lines.py:51:8: F401 [*] `foo13` imported but unused
    |
 51 | # error.)
 52 | x = 1; \

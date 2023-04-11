@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 ---
-./resources/test/fixtures/flake8_import_conventions/from_imports.py:3:1: ICN001 `xml.dom.minidom` should be imported as `md`
+from_imports.py:3:1: ICN001 `xml.dom.minidom` should be imported as `md`
   |
 3 | # Test absolute imports
 4 | # Violation cases
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 7 | from xml.dom import minidom as wrong
   |
 
-./resources/test/fixtures/flake8_import_conventions/from_imports.py:4:1: ICN001 `xml.dom.minidom` should be imported as `md`
+from_imports.py:4:1: ICN001 `xml.dom.minidom` should be imported as `md`
   |
 4 | # Violation cases
 5 | import xml.dom.minidom
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 8 | from xml.dom import minidom
   |
 
-./resources/test/fixtures/flake8_import_conventions/from_imports.py:5:1: ICN001 `xml.dom.minidom` should be imported as `md`
+from_imports.py:5:1: ICN001 `xml.dom.minidom` should be imported as `md`
   |
 5 | import xml.dom.minidom
 6 | import xml.dom.minidom as wrong
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
   |
 
-./resources/test/fixtures/flake8_import_conventions/from_imports.py:6:1: ICN001 `xml.dom.minidom` should be imported as `md`
+from_imports.py:6:1: ICN001 `xml.dom.minidom` should be imported as `md`
    |
  6 | import xml.dom.minidom as wrong
  7 | from xml.dom import minidom as wrong
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 10 | from xml.dom.minidom import parseString
    |
 
-./resources/test/fixtures/flake8_import_conventions/from_imports.py:7:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
+from_imports.py:7:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
    |
  7 | from xml.dom import minidom as wrong
  8 | from xml.dom import minidom
@@ -51,7 +51,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 11 | from xml.dom.minidom import parse, parseString
    |
 
-./resources/test/fixtures/flake8_import_conventions/from_imports.py:8:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
+from_imports.py:8:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
    |
  8 | from xml.dom import minidom
  9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 12 | from xml.dom.minidom import parse as ps, parseString as wrong
    |
 
-./resources/test/fixtures/flake8_import_conventions/from_imports.py:9:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
+from_imports.py:9:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
    |
  9 | from xml.dom.minidom import parseString as wrong  # Ensure ICN001 throws on function import.
 10 | from xml.dom.minidom import parseString
@@ -70,7 +70,7 @@ source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
 12 | from xml.dom.minidom import parse as ps, parseString as wrong
    |
 
-./resources/test/fixtures/flake8_import_conventions/from_imports.py:10:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
+from_imports.py:10:1: ICN001 `xml.dom.minidom.parseString` should be imported as `pstr`
    |
 10 | from xml.dom.minidom import parseString
 11 | from xml.dom.minidom import parse, parseString

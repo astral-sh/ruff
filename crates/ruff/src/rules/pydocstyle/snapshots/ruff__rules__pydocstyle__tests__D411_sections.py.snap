@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/sections.py:76:5: D411 [*] Missing blank line before section ("Yields")
+sections.py:76:5: D411 [*] Missing blank line before section ("Yields")
    |
 76 |   @expect("D414: Section has no content ('Yields')")
 77 |   def consecutive_sections():  # noqa: D416
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 81 82 |     ------
 82 83 | 
 
-./resources/test/fixtures/pydocstyle/sections.py:131:5: D411 [*] Missing blank line before section ("Returns")
+sections.py:131:5: D411 [*] Missing blank line before section ("Returns")
     |
 131 |   @expect("D411: Missing blank line before section ('Returns')")
 132 |   def no_blank_line_before_section():  # noqa: D416
@@ -57,7 +57,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 135 136 |     -------
 136 137 |     A value of some sort.
 
-./resources/test/fixtures/pydocstyle/sections.py:216:5: D411 [*] Missing blank line before section ("Raises")
+sections.py:216:5: D411 [*] Missing blank line before section ("Raises")
     |
 216 |   @expect("D407: Missing dashed underline after section ('Raises')")
 217 |   def multiple_sections():  # noqa: D416

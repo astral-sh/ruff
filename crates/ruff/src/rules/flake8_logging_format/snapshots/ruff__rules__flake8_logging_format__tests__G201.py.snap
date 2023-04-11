@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 ---
-./resources/test/fixtures/flake8_logging_format/G201.py:8:13: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+G201.py:8:13: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
    |
  8 |     pass
  9 | except:
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 12 | try:
    |
 
-./resources/test/fixtures/flake8_logging_format/G201.py:13:13: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
+G201.py:13:13: G201 Logging `.exception(...)` should be used instead of `.error(..., exc_info=True)`
    |
 13 |     pass
 14 | except:

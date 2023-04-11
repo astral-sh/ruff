@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
-./resources/test/fixtures/flake8_quotes/doubles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
+doubles_escaped.py:1:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
   |
 1 | this_should_raise_Q003 = 'This is a \'string\''
   |                          ^^^^^^^^^^^^^^^^^^^^^^ Q003
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 3 3 | this_is_fine = '"This" is a \'string\''
 4 4 | this_is_fine = "This is a 'string'"
 
-./resources/test/fixtures/flake8_quotes/doubles_escaped.py:2:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
+doubles_escaped.py:2:26: Q003 [*] Change outer quotes to avoid escaping inner quotes
   |
 2 | this_should_raise_Q003 = 'This is a \'string\''
 3 | this_should_raise_Q003 = 'This is \\ a \\\'string\''
@@ -35,7 +35,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 4 4 | this_is_fine = "This is a 'string'"
 5 5 | this_is_fine = "\"This\" is a 'string'"
 
-./resources/test/fixtures/flake8_quotes/doubles_escaped.py:10:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
+doubles_escaped.py:10:5: Q003 [*] Change outer quotes to avoid escaping inner quotes
    |
 10 | this_should_raise = (
 11 |     'This is a'

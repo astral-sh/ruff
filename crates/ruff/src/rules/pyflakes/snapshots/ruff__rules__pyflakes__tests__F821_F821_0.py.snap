@@ -1,35 +1,35 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F821_0.py:2:12: F821 Undefined name `self`
+F821_0.py:2:12: F821 Undefined name `self`
   |
 2 | def get_name():
 3 |     return self.name
   |            ^^^^ F821
   |
 
-./resources/test/fixtures/pyflakes/F821_0.py:6:13: F821 Undefined name `self`
+F821_0.py:6:13: F821 Undefined name `self`
   |
 6 | def get_name():
 7 |     return (self.name,)
   |             ^^^^ F821
   |
 
-./resources/test/fixtures/pyflakes/F821_0.py:10:9: F821 Undefined name `self`
+F821_0.py:10:9: F821 Undefined name `self`
    |
 10 | def get_name():
 11 |     del self.name
    |         ^^^^ F821
    |
 
-./resources/test/fixtures/pyflakes/F821_0.py:21:12: F821 Undefined name `numeric_string`
+F821_0.py:21:12: F821 Undefined name `numeric_string`
    |
 21 | def randdec(maxprec, maxexp):
 22 |     return numeric_string(maxprec, maxexp)
    |            ^^^^^^^^^^^^^^ F821
    |
 
-./resources/test/fixtures/pyflakes/F821_0.py:58:5: F821 Undefined name `Bar`
+F821_0.py:58:5: F821 Undefined name `Bar`
    |
 58 | y: int = 1
 59 | 
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 62 | [first] = ["yup"]
    |
 
-./resources/test/fixtures/pyflakes/F821_0.py:83:11: F821 Undefined name `TOMATO`
+F821_0.py:83:11: F821 Undefined name `TOMATO`
    |
 83 | def update_tomato():
 84 |     print(TOMATO)
@@ -47,7 +47,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 85 |     TOMATO = "cherry tomato"
    |
 
-./resources/test/fixtures/pyflakes/F821_0.py:87:8: F821 Undefined name `B`
+F821_0.py:87:8: F821 Undefined name `B`
    |
 87 | A = f'{B}'
    |        ^ F821
@@ -55,7 +55,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 89 |     f'B'
    |
 
-./resources/test/fixtures/pyflakes/F821_0.py:90:8: F821 Undefined name `B`
+F821_0.py:90:8: F821 Undefined name `B`
    |
 90 | A = (
 91 |     f'B'
@@ -65,7 +65,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 94 | C = f'{A:{B}}'
    |
 
-./resources/test/fixtures/pyflakes/F821_0.py:92:11: F821 Undefined name `B`
+F821_0.py:92:11: F821 Undefined name `B`
    |
 92 |     f'{B}'
 93 | )
@@ -74,7 +74,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 95 | C = f'{A:{f"{B}"}}'
    |
 
-./resources/test/fixtures/pyflakes/F821_0.py:93:14: F821 Undefined name `B`
+F821_0.py:93:14: F821 Undefined name `B`
    |
 93 | )
 94 | C = f'{A:{B}}'
@@ -84,7 +84,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 97 | from typing import Annotated, Literal
    |
 
-./resources/test/fixtures/pyflakes/F821_0.py:115:10: F821 Undefined name `PEP593Test123`
+F821_0.py:115:10: F821 Undefined name `PEP593Test123`
     |
 115 |     ]
 116 |     field_with_undefined_stringified_type: Annotated[
@@ -94,7 +94,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 119 |     ]
     |
 
-./resources/test/fixtures/pyflakes/F821_0.py:123:15: F821 Undefined name `foo`
+F821_0.py:123:15: F821 Undefined name `foo`
     |
 123 |     ]
 124 |     field_with_undefined_nested_subscript: Annotated[
@@ -104,7 +104,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 127 |     ]
     |
 
-./resources/test/fixtures/pyflakes/F821_0.py:123:22: F821 Undefined name `bar`
+F821_0.py:123:22: F821 Undefined name `bar`
     |
 123 |     ]
 124 |     field_with_undefined_nested_subscript: Annotated[

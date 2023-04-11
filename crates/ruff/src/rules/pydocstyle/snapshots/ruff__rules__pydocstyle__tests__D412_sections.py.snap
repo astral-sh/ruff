@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/sections.py:216:5: D412 [*] No blank lines allowed between a section header and its content ("Short summary")
+sections.py:216:5: D412 [*] No blank lines allowed between a section header and its content ("Short summary")
     |
 216 |   @expect("D407: Missing dashed underline after section ('Raises')")
 217 |   def multiple_sections():  # noqa: D416

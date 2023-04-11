@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 ---
-./resources/test/fixtures/pep8_naming/N999/module/invalid_name/0001_initial.py:1:1: N999 Invalid module name: '0001_initial'
+0001_initial.py:1:1: N999 Invalid module name: '0001_initial'
  |
  |
 

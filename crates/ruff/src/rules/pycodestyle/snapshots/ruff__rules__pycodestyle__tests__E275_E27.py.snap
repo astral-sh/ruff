@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E27.py:37:14: E275 Missing whitespace after keyword
+E27.py:37:14: E275 Missing whitespace after keyword
    |
 37 | from w import  (e, f)
 38 | #: E275
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 41 | from importable.module import(e, f)
    |
 
-./resources/test/fixtures/pycodestyle/E27.py:39:30: E275 Missing whitespace after keyword
+E27.py:39:30: E275 Missing whitespace after keyword
    |
 39 | from w import(e, f)
 40 | #: E275
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 43 | try:
    |
 
-./resources/test/fixtures/pycodestyle/E27.py:42:34: E275 Missing whitespace after keyword
+E27.py:42:34: E275 Missing whitespace after keyword
    |
 42 | #: E275
 43 | try:
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 46 |     pass
    |
 
-./resources/test/fixtures/pycodestyle/E27.py:46:3: E275 Missing whitespace after keyword
+E27.py:46:3: E275 Missing whitespace after keyword
    |
 46 |     pass
 47 | #: E275
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 50 | else:
    |
 
-./resources/test/fixtures/pycodestyle/E27.py:54:11: E275 Missing whitespace after keyword
+E27.py:54:11: E275 Missing whitespace after keyword
    |
 54 | #: E275:2:11
 55 | if True:

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_builtins/mod.rs
 ---
-./resources/test/fixtures/flake8_builtins/A001.py:1:1: A001 Variable `sum` is shadowing a python builtin
+A001.py:1:1: A001 Variable `sum` is shadowing a python builtin
   |
 1 | import some as sum
   | ^^^^^^^^^^^^^^^^^^ A001
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 3 | from directory import new as dir
   |
 
-./resources/test/fixtures/flake8_builtins/A001.py:2:1: A001 Variable `int` is shadowing a python builtin
+A001.py:2:1: A001 Variable `int` is shadowing a python builtin
   |
 2 | import some as sum
 3 | from some import other as int
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 4 | from directory import new as dir
   |
 
-./resources/test/fixtures/flake8_builtins/A001.py:3:1: A001 Variable `dir` is shadowing a python builtin
+A001.py:3:1: A001 Variable `dir` is shadowing a python builtin
   |
 3 | import some as sum
 4 | from some import other as int
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 7 | print = 1
   |
 
-./resources/test/fixtures/flake8_builtins/A001.py:5:1: A001 Variable `print` is shadowing a python builtin
+A001.py:5:1: A001 Variable `print` is shadowing a python builtin
   |
 5 | from directory import new as dir
 6 | 
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 9 | (complex := 3)
   |
 
-./resources/test/fixtures/flake8_builtins/A001.py:6:1: A001 Variable `copyright` is shadowing a python builtin
+A001.py:6:1: A001 Variable `copyright` is shadowing a python builtin
   |
 6 | print = 1
 7 | copyright: 'annotation' = 2
@@ -46,7 +46,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 9 | float = object = 4
   |
 
-./resources/test/fixtures/flake8_builtins/A001.py:7:2: A001 Variable `complex` is shadowing a python builtin
+A001.py:7:2: A001 Variable `complex` is shadowing a python builtin
    |
  7 | print = 1
  8 | copyright: 'annotation' = 2
@@ -56,7 +56,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 11 | min, max = 5, 6
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:8:1: A001 Variable `float` is shadowing a python builtin
+A001.py:8:1: A001 Variable `float` is shadowing a python builtin
    |
  8 | copyright: 'annotation' = 2
  9 | (complex := 3)
@@ -65,7 +65,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 11 | min, max = 5, 6
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:8:9: A001 Variable `object` is shadowing a python builtin
+A001.py:8:9: A001 Variable `object` is shadowing a python builtin
    |
  8 | copyright: 'annotation' = 2
  9 | (complex := 3)
@@ -74,7 +74,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 11 | min, max = 5, 6
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:9:1: A001 Variable `min` is shadowing a python builtin
+A001.py:9:1: A001 Variable `min` is shadowing a python builtin
    |
  9 | (complex := 3)
 10 | float = object = 4
@@ -84,7 +84,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 13 | id = 4
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:9:6: A001 Variable `max` is shadowing a python builtin
+A001.py:9:6: A001 Variable `max` is shadowing a python builtin
    |
  9 | (complex := 3)
 10 | float = object = 4
@@ -94,7 +94,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 13 | id = 4
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:11:1: A001 Variable `id` is shadowing a python builtin
+A001.py:11:1: A001 Variable `id` is shadowing a python builtin
    |
 11 | min, max = 5, 6
 12 | 
@@ -104,7 +104,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 15 | def bytes():
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:13:1: A001 Variable `bytes` is shadowing a python builtin
+A001.py:13:1: A001 Variable `bytes` is shadowing a python builtin
    |
 13 |   id = 4
 14 |   
@@ -115,7 +115,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 18 |   class slice:
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:16:1: A001 Variable `slice` is shadowing a python builtin
+A001.py:16:1: A001 Variable `slice` is shadowing a python builtin
    |
 16 |       pass
 17 |   
@@ -126,7 +126,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 21 |   try:
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:21:1: A001 Variable `ValueError` is shadowing a python builtin
+A001.py:21:1: A001 Variable `ValueError` is shadowing a python builtin
    |
 21 |   try:
 22 |       ...
@@ -137,7 +137,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 26 |   for memoryview, *bytearray in []:
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:24:5: A001 Variable `memoryview` is shadowing a python builtin
+A001.py:24:5: A001 Variable `memoryview` is shadowing a python builtin
    |
 24 |     ...
 25 | 
@@ -146,7 +146,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 27 |     pass
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:24:18: A001 Variable `bytearray` is shadowing a python builtin
+A001.py:24:18: A001 Variable `bytearray` is shadowing a python builtin
    |
 24 |     ...
 25 | 
@@ -155,7 +155,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 27 |     pass
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:27:22: A001 Variable `str` is shadowing a python builtin
+A001.py:27:22: A001 Variable `str` is shadowing a python builtin
    |
 27 |     pass
 28 | 
@@ -164,7 +164,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 30 |     pass
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:27:45: A001 Variable `all` is shadowing a python builtin
+A001.py:27:45: A001 Variable `all` is shadowing a python builtin
    |
 27 |     pass
 28 | 
@@ -173,7 +173,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 30 |     pass
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:27:50: A001 Variable `any` is shadowing a python builtin
+A001.py:27:50: A001 Variable `any` is shadowing a python builtin
    |
 27 |     pass
 28 | 
@@ -182,7 +182,7 @@ source: crates/ruff/src/rules/flake8_builtins/mod.rs
 30 |     pass
    |
 
-./resources/test/fixtures/flake8_builtins/A001.py:30:8: A001 Variable `sum` is shadowing a python builtin
+A001.py:30:8: A001 Variable `sum` is shadowing a python builtin
    |
 30 |     pass
 31 | 

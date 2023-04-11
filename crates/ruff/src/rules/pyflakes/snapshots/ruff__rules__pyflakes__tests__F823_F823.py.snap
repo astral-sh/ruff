@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F823.py:6:5: F823 Local variable `my_var` referenced before assignment
+F823.py:6:5: F823 Local variable `my_var` referenced before assignment
   |
 6 | def foo():
 7 |     my_var += 1

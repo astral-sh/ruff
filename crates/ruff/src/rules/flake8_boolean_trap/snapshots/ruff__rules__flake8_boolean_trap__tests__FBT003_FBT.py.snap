@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
 ---
-./resources/test/fixtures/flake8_boolean_trap/FBT.py:42:11: FBT003 Boolean positional value in function call
+FBT.py:42:11: FBT003 Boolean positional value in function call
    |
 42 | used("a", True)
    |           ^^^^ FBT003
 43 | used(do=True)
    |
 
-./resources/test/fixtures/flake8_boolean_trap/FBT.py:57:11: FBT003 Boolean positional value in function call
+FBT.py:57:11: FBT003 Boolean positional value in function call
    |
 57 | {}.pop(True, False)
 58 | dict.fromkeys(("world",), True)
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
 61 | mylist.index(True)
    |
 
-./resources/test/fixtures/flake8_boolean_trap/FBT.py:57:17: FBT003 Boolean positional value in function call
+FBT.py:57:17: FBT003 Boolean positional value in function call
    |
 57 | {}.pop(True, False)
 58 | dict.fromkeys(("world",), True)

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT007.py:23:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+PT007.py:23:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
    |
 23 |     ("param1", "param2"),
 24 |     (
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 27 |     ),
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:24:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+PT007.py:24:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
    |
 24 |     (
 25 |         [1, 2],
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 28 | )
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:31:35: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+PT007.py:31:35: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
    |
 31 | @pytest.mark.parametrize("param", [1, 2])
    |                                   ^^^^^^ PT007
@@ -29,7 +29,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 33 |     ...
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:38:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+PT007.py:38:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
    |
 38 |   @pytest.mark.parametrize(
 39 |       ("param1", "param2"),
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 45 |   def test_list_of_tuples(param1, param2):
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:49:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+PT007.py:49:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
    |
 49 |   @pytest.mark.parametrize(
 50 |       ("param1", "param2"),
@@ -57,7 +57,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 56 |   def test_list_of_lists(param1, param2):
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:50:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+PT007.py:50:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
    |
 50 |     ("param1", "param2"),
 51 |     [
@@ -67,7 +67,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 54 |     ],
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:51:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+PT007.py:51:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
    |
 51 |     [
 52 |         [1, 2],
@@ -77,7 +77,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 55 | )
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:60:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+PT007.py:60:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
    |
 60 |   @pytest.mark.parametrize(
 61 |       "param1,param2",
@@ -91,7 +91,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 67 |   def test_csv_name_list_of_lists(param1, param2):
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:61:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+PT007.py:61:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
    |
 61 |     "param1,param2",
 62 |     [
@@ -101,7 +101,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 65 |     ],
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:62:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+PT007.py:62:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
    |
 62 |     [
 63 |         [1, 2],
@@ -111,7 +111,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 66 | )
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:71:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+PT007.py:71:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
    |
 71 |   @pytest.mark.parametrize(
 72 |       "param",
@@ -125,7 +125,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 78 |   def test_single_list_of_lists(param):
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:80:31: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
+PT007.py:80:31: PT007 Wrong values type in `@pytest.mark.parametrize` expected `tuple` of `tuple`
    |
 80 | @pytest.mark.parametrize("a", [1, 2])
    |                               ^^^^^^ PT007

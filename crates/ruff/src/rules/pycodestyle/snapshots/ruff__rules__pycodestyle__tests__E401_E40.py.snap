@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E40.py:2:1: E401 Multiple imports on one line
+E40.py:2:1: E401 Multiple imports on one line
   |
 2 | #: E401
 3 | import os, sys

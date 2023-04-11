@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E21.py:2:5: E211 [*] Whitespace before '('
+E21.py:2:5: E211 [*] Whitespace before '('
   |
 2 | #: E211
 3 | spam (1)
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 4 4 | dict ['key'] = list [index]
 5 5 | #: E211
 
-./resources/test/fixtures/pycodestyle/E21.py:4:5: E211 [*] Whitespace before '['
+E21.py:4:5: E211 [*] Whitespace before '['
   |
 4 | spam (1)
 5 | #: E211 E211
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 6 6 | dict['key'] ['subkey'] = list[index]
 7 7 | #: Okay
 
-./resources/test/fixtures/pycodestyle/E21.py:4:20: E211 [*] Whitespace before '['
+E21.py:4:20: E211 [*] Whitespace before '['
   |
 4 | spam (1)
 5 | #: E211 E211
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 6 6 | dict['key'] ['subkey'] = list[index]
 7 7 | #: Okay
 
-./resources/test/fixtures/pycodestyle/E21.py:6:12: E211 [*] Whitespace before '['
+E21.py:6:12: E211 [*] Whitespace before '['
    |
  6 | dict ['key'] = list [index]
  7 | #: E211

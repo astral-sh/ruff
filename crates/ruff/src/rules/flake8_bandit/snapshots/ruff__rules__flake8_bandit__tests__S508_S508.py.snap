@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
-./resources/test/fixtures/flake8_bandit/S508.py:3:33: S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+S508.py:3:33: S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
   |
 3 | from pysnmp.hlapi import CommunityData
 4 | 
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 6 | CommunityData("public", mpModel=1)  # S508
   |
 
-./resources/test/fixtures/flake8_bandit/S508.py:4:33: S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
+S508.py:4:33: S508 The use of SNMPv1 and SNMPv2 is insecure. Use SNMPv3 if able.
   |
 4 | CommunityData("public", mpModel=0)  # S508
 5 | CommunityData("public", mpModel=1)  # S508

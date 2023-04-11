@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E11.py:12:5: E113 Unexpected indentation
+E11.py:12:5: E113 Unexpected indentation
    |
 12 | #: E113
 13 | print()

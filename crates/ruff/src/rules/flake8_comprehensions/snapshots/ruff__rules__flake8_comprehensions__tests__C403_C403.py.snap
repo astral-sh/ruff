@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
-./resources/test/fixtures/flake8_comprehensions/C403.py:1:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+C403.py:1:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
   |
 1 | s = set([x for x in range(3)])
   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ C403
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 3 3 |     [x for x in range(3)]
 4 4 | )
 
-./resources/test/fixtures/flake8_comprehensions/C403.py:2:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
+C403.py:2:5: C403 [*] Unnecessary `list` comprehension (rewrite as a `set` comprehension)
   |
 2 |   s = set([x for x in range(3)])
 3 |   s = set(

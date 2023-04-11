@@ -99,7 +99,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
         }
     }
 
-    let source_code = SourceFileBuilder::new(&path.to_string_lossy())
+    let source_code = SourceFileBuilder::new(&path.file_name().unwrap().to_string_lossy())
         .source_text_string(contents)
         .finish();
 

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E11.py:15:6: E114 Indentation is not a multiple of 4 (comment)
+E11.py:15:6: E114 Indentation is not a multiple of 4 (comment)
    |
 15 | #: E114 E116
 16 | mimetype = 'application/x-directory'

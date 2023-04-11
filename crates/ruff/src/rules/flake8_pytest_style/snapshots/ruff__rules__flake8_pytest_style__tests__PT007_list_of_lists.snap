@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT007.py:4:35: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
+PT007.py:4:35: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
   |
 4 | @pytest.mark.parametrize("param", (1, 2))
   |                                   ^^^^^^ PT007
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 6 |     ...
   |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:11:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
+PT007.py:11:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
    |
 11 |   @pytest.mark.parametrize(
 12 |       ("param1", "param2"),
@@ -23,7 +23,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 18 |   def test_tuple_of_tuples(param1, param2):
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:12:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
+PT007.py:12:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
    |
 12 |     ("param1", "param2"),
 13 |     (
@@ -33,7 +33,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 16 |     ),
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:13:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
+PT007.py:13:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
    |
 13 |     (
 14 |         (1, 2),
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 17 | )
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:22:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
+PT007.py:22:5: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
    |
 22 |   @pytest.mark.parametrize(
 23 |       ("param1", "param2"),
@@ -57,7 +57,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 29 |   def test_tuple_of_lists(param1, param2):
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:39:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
+PT007.py:39:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
    |
 39 |     ("param1", "param2"),
 40 |     [
@@ -67,7 +67,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 43 |     ],
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:40:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
+PT007.py:40:9: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
    |
 40 |     [
 41 |         (1, 2),
@@ -77,7 +77,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 44 | )
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:81:38: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
+PT007.py:81:38: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
    |
 81 | @pytest.mark.parametrize("a", [1, 2])
 82 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
@@ -86,7 +86,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 84 |     pass
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:81:39: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
+PT007.py:81:39: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
    |
 81 | @pytest.mark.parametrize("a", [1, 2])
 82 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))
@@ -95,7 +95,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 84 |     pass
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT007.py:81:47: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
+PT007.py:81:47: PT007 Wrong values type in `@pytest.mark.parametrize` expected `list` of `list`
    |
 81 | @pytest.mark.parametrize("a", [1, 2])
 82 | @pytest.mark.parametrize(("b", "c"), ((3, 4), (5, 6)))

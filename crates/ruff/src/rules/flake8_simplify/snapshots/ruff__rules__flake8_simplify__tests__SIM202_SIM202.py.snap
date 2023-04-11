@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM202.py:2:4: SIM202 [*] Use `a == b` instead of `not a != b`
+SIM202.py:2:4: SIM202 [*] Use `a == b` instead of `not a != b`
   |
 2 | # SIM202
 3 | if not a != b:
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 4 4 | 
 5 5 | # SIM202
 
-./resources/test/fixtures/flake8_simplify/SIM202.py:6:4: SIM202 [*] Use `a == b + c` instead of `not a != b + c`
+SIM202.py:6:4: SIM202 [*] Use `a == b + c` instead of `not a != b + c`
   |
 6 | # SIM202
 7 | if not a != (b + c):
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 8 8 | 
 9 9 | # SIM202
 
-./resources/test/fixtures/flake8_simplify/SIM202.py:10:4: SIM202 [*] Use `a + b == c` instead of `not a + b != c`
+SIM202.py:10:4: SIM202 [*] Use `a + b == c` instead of `not a + b != c`
    |
 10 | # SIM202
 11 | if not (a + b) != c:

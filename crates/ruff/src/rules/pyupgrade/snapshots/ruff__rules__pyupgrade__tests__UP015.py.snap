@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP015.py:1:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:1:1: UP015 [*] Unnecessary open mode parameters
   |
 1 | open("foo", "U")
   | ^^^^^^^^^^^^^^^^ UP015
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 3 3 | open("foo", "Ub")
 4 4 | open("foo", "rUb")
 
-./resources/test/fixtures/pyupgrade/UP015.py:2:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:2:1: UP015 [*] Unnecessary open mode parameters
   |
 2 | open("foo", "U")
 3 | open("foo", "Ur")
@@ -35,7 +35,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 4 4 | open("foo", "rUb")
 5 5 | open("foo", "r")
 
-./resources/test/fixtures/pyupgrade/UP015.py:3:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:3:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
   |
 3 | open("foo", "U")
 4 | open("foo", "Ur")
@@ -55,7 +55,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 5 5 | open("foo", "r")
 6 6 | open("foo", "rt")
 
-./resources/test/fixtures/pyupgrade/UP015.py:4:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:4:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
   |
 4 | open("foo", "Ur")
 5 | open("foo", "Ub")
@@ -76,7 +76,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 6 6 | open("foo", "rt")
 7 7 | open("f", "r", encoding="UTF-8")
 
-./resources/test/fixtures/pyupgrade/UP015.py:5:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:5:1: UP015 [*] Unnecessary open mode parameters
   |
 5 | open("foo", "Ub")
 6 | open("foo", "rUb")
@@ -97,7 +97,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 7 7 | open("f", "r", encoding="UTF-8")
 8 8 | open("f", "wt")
 
-./resources/test/fixtures/pyupgrade/UP015.py:6:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:6:1: UP015 [*] Unnecessary open mode parameters
    |
  6 | open("foo", "rUb")
  7 | open("foo", "r")
@@ -118,7 +118,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 8 | open("f", "wt")
 9 9 | 
 
-./resources/test/fixtures/pyupgrade/UP015.py:7:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:7:1: UP015 [*] Unnecessary open mode parameters
    |
  7 | open("foo", "r")
  8 | open("foo", "rt")
@@ -138,7 +138,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 9 9 | 
 10 10 | with open("foo", "U") as f:
 
-./resources/test/fixtures/pyupgrade/UP015.py:8:1: UP015 [*] Unnecessary open mode parameters, use ""w""
+UP015.py:8:1: UP015 [*] Unnecessary open mode parameters, use ""w""
    |
  8 | open("foo", "rt")
  9 | open("f", "r", encoding="UTF-8")
@@ -159,7 +159,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 10 10 | with open("foo", "U") as f:
 11 11 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:10:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:10:6: UP015 [*] Unnecessary open mode parameters
    |
 10 | open("f", "wt")
 11 | 
@@ -180,7 +180,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 12 12 | with open("foo", "Ur") as f:
 13 13 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:12:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:12:6: UP015 [*] Unnecessary open mode parameters
    |
 12 | with open("foo", "U") as f:
 13 |     pass
@@ -201,7 +201,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 14 14 | with open("foo", "Ub") as f:
 15 15 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:14:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:14:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 14 | with open("foo", "Ur") as f:
 15 |     pass
@@ -222,7 +222,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 16 16 | with open("foo", "rUb") as f:
 17 17 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:16:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:16:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 16 | with open("foo", "Ub") as f:
 17 |     pass
@@ -243,7 +243,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 18 18 | with open("foo", "r") as f:
 19 19 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:18:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:18:6: UP015 [*] Unnecessary open mode parameters
    |
 18 | with open("foo", "rUb") as f:
 19 |     pass
@@ -264,7 +264,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 20 | with open("foo", "rt") as f:
 21 21 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:20:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:20:6: UP015 [*] Unnecessary open mode parameters
    |
 20 | with open("foo", "r") as f:
 21 |     pass
@@ -285,7 +285,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 22 22 | with open("foo", "r", encoding="UTF-8") as f:
 23 23 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:22:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:22:6: UP015 [*] Unnecessary open mode parameters
    |
 22 | with open("foo", "rt") as f:
 23 |     pass
@@ -306,7 +306,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 24 24 | with open("foo", "wt") as f:
 25 25 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:24:6: UP015 [*] Unnecessary open mode parameters, use ""w""
+UP015.py:24:6: UP015 [*] Unnecessary open mode parameters, use ""w""
    |
 24 | with open("foo", "r", encoding="UTF-8") as f:
 25 |     pass
@@ -326,7 +326,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 26 26 | 
 27 27 | open(f("a", "b", "c"), "U")
 
-./resources/test/fixtures/pyupgrade/UP015.py:27:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:27:1: UP015 [*] Unnecessary open mode parameters
    |
 27 |     pass
 28 | 
@@ -346,7 +346,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 29 29 | 
 30 30 | with open(f("a", "b", "c"), "U") as f:
 
-./resources/test/fixtures/pyupgrade/UP015.py:28:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:28:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 28 | open(f("a", "b", "c"), "U")
 29 | open(f("a", "b", "c"), "Ub")
@@ -366,7 +366,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 30 30 | with open(f("a", "b", "c"), "U") as f:
 31 31 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:30:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:30:6: UP015 [*] Unnecessary open mode parameters
    |
 30 | open(f("a", "b", "c"), "Ub")
 31 | 
@@ -387,7 +387,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 32 32 | with open(f("a", "b", "c"), "Ub") as f:
 33 33 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:32:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:32:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 32 | with open(f("a", "b", "c"), "U") as f:
 33 |     pass
@@ -407,7 +407,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 34 34 | 
 35 35 | with open("foo", "U") as fa, open("bar", "U") as fb:
 
-./resources/test/fixtures/pyupgrade/UP015.py:35:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:35:6: UP015 [*] Unnecessary open mode parameters
    |
 35 |     pass
 36 | 
@@ -428,7 +428,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 37 37 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
 38 38 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:35:30: UP015 [*] Unnecessary open mode parameters
+UP015.py:35:30: UP015 [*] Unnecessary open mode parameters
    |
 35 |     pass
 36 | 
@@ -449,7 +449,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 37 37 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
 38 38 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:37:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:37:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 37 | with open("foo", "U") as fa, open("bar", "U") as fb:
 38 |     pass
@@ -469,7 +469,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 39 39 | 
 40 40 | open("foo", mode="U")
 
-./resources/test/fixtures/pyupgrade/UP015.py:37:31: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:37:31: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 37 | with open("foo", "U") as fa, open("bar", "U") as fb:
 38 |     pass
@@ -489,7 +489,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 39 39 | 
 40 40 | open("foo", mode="U")
 
-./resources/test/fixtures/pyupgrade/UP015.py:40:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:40:1: UP015 [*] Unnecessary open mode parameters
    |
 40 |     pass
 41 | 
@@ -510,7 +510,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 42 42 | open(mode="U", name="foo")
 43 43 | 
 
-./resources/test/fixtures/pyupgrade/UP015.py:41:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:41:1: UP015 [*] Unnecessary open mode parameters
    |
 41 | open("foo", mode="U")
 42 | open(name="foo", mode="U")
@@ -529,7 +529,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 43 43 | 
 44 44 | with open("foo", mode="U") as f:
 
-./resources/test/fixtures/pyupgrade/UP015.py:42:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:42:1: UP015 [*] Unnecessary open mode parameters
    |
 42 | open("foo", mode="U")
 43 | open(name="foo", mode="U")
@@ -550,7 +550,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 44 44 | with open("foo", mode="U") as f:
 45 45 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:44:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:44:6: UP015 [*] Unnecessary open mode parameters
    |
 44 | open(mode="U", name="foo")
 45 | 
@@ -571,7 +571,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 46 46 | with open(name="foo", mode="U") as f:
 47 47 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:46:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:46:6: UP015 [*] Unnecessary open mode parameters
    |
 46 | with open("foo", mode="U") as f:
 47 |     pass
@@ -592,7 +592,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 48 48 | with open(mode="U", name="foo") as f:
 49 49 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:48:6: UP015 [*] Unnecessary open mode parameters
+UP015.py:48:6: UP015 [*] Unnecessary open mode parameters
    |
 48 | with open(name="foo", mode="U") as f:
 49 |     pass
@@ -612,7 +612,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 50 50 | 
 51 51 | open("foo", mode="Ub")
 
-./resources/test/fixtures/pyupgrade/UP015.py:51:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:51:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 51 |     pass
 52 | 
@@ -633,7 +633,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 53 53 | open(mode="Ub", name="foo")
 54 54 | 
 
-./resources/test/fixtures/pyupgrade/UP015.py:52:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:52:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 52 | open("foo", mode="Ub")
 53 | open(name="foo", mode="Ub")
@@ -652,7 +652,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 54 54 | 
 55 55 | with open("foo", mode="Ub") as f:
 
-./resources/test/fixtures/pyupgrade/UP015.py:53:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:53:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 53 | open("foo", mode="Ub")
 54 | open(name="foo", mode="Ub")
@@ -673,7 +673,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 55 55 | with open("foo", mode="Ub") as f:
 56 56 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:55:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:55:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 55 | open(mode="Ub", name="foo")
 56 | 
@@ -694,7 +694,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 57 57 | with open(name="foo", mode="Ub") as f:
 58 58 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:57:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:57:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 57 | with open("foo", mode="Ub") as f:
 58 |     pass
@@ -715,7 +715,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 59 59 | with open(mode="Ub", name="foo") as f:
 60 60 |     pass
 
-./resources/test/fixtures/pyupgrade/UP015.py:59:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:59:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 59 | with open(name="foo", mode="Ub") as f:
 60 |     pass
@@ -735,7 +735,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 61 61 | 
 62 62 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
-./resources/test/fixtures/pyupgrade/UP015.py:62:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:62:1: UP015 [*] Unnecessary open mode parameters
    |
 62 |     pass
 63 | 
@@ -756,7 +756,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 64 64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
 65 65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
-./resources/test/fixtures/pyupgrade/UP015.py:63:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:63:1: UP015 [*] Unnecessary open mode parameters
    |
 63 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 64 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
@@ -776,7 +776,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 65 65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 66 66 | 
 
-./resources/test/fixtures/pyupgrade/UP015.py:64:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:64:1: UP015 [*] Unnecessary open mode parameters
    |
 64 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 65 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
@@ -796,7 +796,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 66 66 | 
 67 67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
-./resources/test/fixtures/pyupgrade/UP015.py:65:1: UP015 [*] Unnecessary open mode parameters
+UP015.py:65:1: UP015 [*] Unnecessary open mode parameters
    |
 65 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
 66 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
@@ -817,7 +817,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 67 67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 68 68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
 
-./resources/test/fixtures/pyupgrade/UP015.py:67:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:67:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 67 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 68 | 
@@ -838,7 +838,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 69 69 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
 70 70 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 
-./resources/test/fixtures/pyupgrade/UP015.py:68:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:68:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 68 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 69 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
@@ -858,7 +858,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 70 70 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 71 71 | 
 
-./resources/test/fixtures/pyupgrade/UP015.py:69:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:69:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 69 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
 70 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
@@ -878,7 +878,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 71 71 | 
 72 72 | open = 1
 
-./resources/test/fixtures/pyupgrade/UP015.py:70:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+UP015.py:70:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
    |
 70 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
 71 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)

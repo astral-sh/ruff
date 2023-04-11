@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
-./resources/test/fixtures/flake8_comprehensions/C417.py:3:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+C417.py:3:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
   |
 3 | # Errors.
 4 | nums = [1, 2, 3]
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 5 5 | list(map(lambda x: x * 2, nums))
 6 6 | set(map(lambda x: x % 2 == 0, nums))
 
-./resources/test/fixtures/flake8_comprehensions/C417.py:4:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+C417.py:4:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
   |
 4 | nums = [1, 2, 3]
 5 | map(lambda x: x + 1, nums)
@@ -42,7 +42,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 6 6 | set(map(lambda x: x % 2 == 0, nums))
 7 7 | dict(map(lambda v: (v, v**2), nums))
 
-./resources/test/fixtures/flake8_comprehensions/C417.py:5:1: C417 [*] Unnecessary `map` usage (rewrite using a `list` comprehension)
+C417.py:5:1: C417 [*] Unnecessary `map` usage (rewrite using a `list` comprehension)
   |
 5 | map(lambda x: x + 1, nums)
 6 | map(lambda x: str(x), nums)
@@ -63,7 +63,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 7 7 | dict(map(lambda v: (v, v**2), nums))
 8 8 | map(lambda: "const", nums)
 
-./resources/test/fixtures/flake8_comprehensions/C417.py:6:1: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehension)
+C417.py:6:1: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehension)
    |
  6 | map(lambda x: str(x), nums)
  7 | list(map(lambda x: x * 2, nums))
@@ -84,7 +84,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 8 8 | map(lambda: "const", nums)
 9 9 | map(lambda _: 3.0, nums)
 
-./resources/test/fixtures/flake8_comprehensions/C417.py:7:1: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
+C417.py:7:1: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
    |
  7 | list(map(lambda x: x * 2, nums))
  8 | set(map(lambda x: x % 2 == 0, nums))
@@ -105,7 +105,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 9 9 | map(lambda _: 3.0, nums)
 10 10 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 
-./resources/test/fixtures/flake8_comprehensions/C417.py:8:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+C417.py:8:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
  8 | set(map(lambda x: x % 2 == 0, nums))
  9 | dict(map(lambda v: (v, v**2), nums))
@@ -126,7 +126,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 10 10 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 11 11 | all(map(lambda v: isinstance(v, dict), nums))
 
-./resources/test/fixtures/flake8_comprehensions/C417.py:9:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+C417.py:9:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
  9 | dict(map(lambda v: (v, v**2), nums))
 10 | map(lambda: "const", nums)
@@ -147,7 +147,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 11 11 | all(map(lambda v: isinstance(v, dict), nums))
 12 12 | filter(func, map(lambda v: v, nums))
 
-./resources/test/fixtures/flake8_comprehensions/C417.py:10:13: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+C417.py:10:13: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
 10 | map(lambda: "const", nums)
 11 | map(lambda _: 3.0, nums)
@@ -168,7 +168,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 12 12 | filter(func, map(lambda v: v, nums))
 13 13 | 
 
-./resources/test/fixtures/flake8_comprehensions/C417.py:11:5: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+C417.py:11:5: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
 11 | map(lambda _: 3.0, nums)
 12 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
@@ -188,7 +188,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 13 13 | 
 14 14 | # When inside f-string, then the fix should be surrounded by whitespace
 
-./resources/test/fixtures/flake8_comprehensions/C417.py:12:14: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+C417.py:12:14: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
 12 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
 13 | all(map(lambda v: isinstance(v, dict), nums))
@@ -209,7 +209,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 14 14 | # When inside f-string, then the fix should be surrounded by whitespace
 15 15 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
 
-./resources/test/fixtures/flake8_comprehensions/C417.py:15:8: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehension)
+C417.py:15:8: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehension)
    |
 15 | # When inside f-string, then the fix should be surrounded by whitespace
 16 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
@@ -228,7 +228,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 17 17 | 
 18 18 | # Error, but unfixable.
 
-./resources/test/fixtures/flake8_comprehensions/C417.py:16:8: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
+C417.py:16:8: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
    |
 16 | # When inside f-string, then the fix should be surrounded by whitespace
 17 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
@@ -249,7 +249,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 18 18 | # Error, but unfixable.
 19 19 | # For simple expressions, this could be: `(x if x else 1 for x in nums)`.
 
-./resources/test/fixtures/flake8_comprehensions/C417.py:21:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+C417.py:21:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
    |
 21 | # For simple expressions, this could be: `(x if x else 1 for x in nums)`.
 22 | # For more complex expressions, this would differ: `(x + 2 if x else 3 for x in nums)`.

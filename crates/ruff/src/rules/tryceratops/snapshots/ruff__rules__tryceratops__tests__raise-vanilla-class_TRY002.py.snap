@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
-./resources/test/fixtures/tryceratops/TRY002.py:13:15: TRY002 Create your own exception
+TRY002.py:13:15: TRY002 Create your own exception
    |
 13 |     a = 1
 14 |     if a == 1:
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 17 |     b = 1
    |
 
-./resources/test/fixtures/tryceratops/TRY002.py:17:15: TRY002 Create your own exception
+TRY002.py:17:15: TRY002 Create your own exception
    |
 17 |     b = 1
 18 |     if b == 1:

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D104/__init__.py:1:1: D104 Missing docstring in public package
+__init__.py:1:1: D104 Missing docstring in public package
  |
  |
 

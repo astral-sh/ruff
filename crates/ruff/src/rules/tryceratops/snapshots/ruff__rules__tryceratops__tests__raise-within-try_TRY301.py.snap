@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
-./resources/test/fixtures/tryceratops/TRY301.py:9:13: TRY301 Abstract `raise` to an inner function
+TRY301.py:9:13: TRY301 Abstract `raise` to an inner function
    |
  9 |         a = process()
 10 |         if not a:
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 13 |         raise MyException(a)
    |
 
-./resources/test/fixtures/tryceratops/TRY301.py:11:9: TRY301 Abstract `raise` to an inner function
+TRY301.py:11:9: TRY301 Abstract `raise` to an inner function
    |
 11 |             raise MyException(a)
 12 | 
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 15 |         try:
    |
 
-./resources/test/fixtures/tryceratops/TRY301.py:16:17: TRY301 Abstract `raise` to an inner function
+TRY301.py:16:17: TRY301 Abstract `raise` to an inner function
    |
 16 |             b = process()
 17 |             if not b:
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 20 |             logger.exception("something failed")
    |
 
-./resources/test/fixtures/tryceratops/TRY301.py:27:13: TRY301 Abstract `raise` to an inner function
+TRY301.py:27:13: TRY301 Abstract `raise` to an inner function
    |
 27 |         a = process()
 28 |         if not a:
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 31 |         raise MyException(a)
    |
 
-./resources/test/fixtures/tryceratops/TRY301.py:29:9: TRY301 Abstract `raise` to an inner function
+TRY301.py:29:9: TRY301 Abstract `raise` to an inner function
    |
 29 |             raise MyException(a)
 30 | 
@@ -51,7 +51,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
 33 |         try:
    |
 
-./resources/test/fixtures/tryceratops/TRY301.py:34:17: TRY301 Abstract `raise` to an inner function
+TRY301.py:34:17: TRY301 Abstract `raise` to an inner function
    |
 34 |             b = process()
 35 |             if not b:

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP038.py:1:1: UP038 [*] Use `X | Y` in `isinstance` call instead of `(X, Y)`
+UP038.py:1:1: UP038 [*] Use `X | Y` in `isinstance` call instead of `(X, Y)`
   |
 1 | isinstance(1, (int, float))  # UP038
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP038
@@ -16,7 +16,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 3 3 | 
 4 4 | isinstance(1, int)  # OK
 
-./resources/test/fixtures/pyupgrade/UP038.py:2:1: UP038 [*] Use `X | Y` in `issubclass` call instead of `(X, Y)`
+UP038.py:2:1: UP038 [*] Use `X | Y` in `issubclass` call instead of `(X, Y)`
   |
 2 | isinstance(1, (int, float))  # UP038
 3 | issubclass("yes", (int, float, str))  # UP038

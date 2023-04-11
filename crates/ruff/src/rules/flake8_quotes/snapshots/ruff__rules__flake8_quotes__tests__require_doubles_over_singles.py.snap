@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
 ---
-./resources/test/fixtures/flake8_quotes/singles.py:1:25: Q000 [*] Single quotes found but double quotes preferred
+singles.py:1:25: Q000 [*] Single quotes found but double quotes preferred
   |
 1 | this_should_be_linted = 'single quote string'
   |                         ^^^^^^^^^^^^^^^^^^^^^ Q000
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 3 3 | this_should_be_linted = f'double quote string'
 4 4 | this_should_be_linted = f'double {"quote"} string'
 
-./resources/test/fixtures/flake8_quotes/singles.py:2:25: Q000 [*] Single quotes found but double quotes preferred
+singles.py:2:25: Q000 [*] Single quotes found but double quotes preferred
   |
 2 | this_should_be_linted = 'single quote string'
 3 | this_should_be_linted = u'double quote string'
@@ -34,7 +34,7 @@ source: crates/ruff/src/rules/flake8_quotes/mod.rs
 3 3 | this_should_be_linted = f'double quote string'
 4 4 | this_should_be_linted = f'double {"quote"} string'
 
-./resources/test/fixtures/flake8_quotes/singles.py:3:25: Q000 [*] Single quotes found but double quotes preferred
+singles.py:3:25: Q000 [*] Single quotes found but double quotes preferred
   |
 3 | this_should_be_linted = 'single quote string'
 4 | this_should_be_linted = u'double quote string'

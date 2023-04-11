@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
-./resources/test/fixtures/flake8_comprehensions/C409.py:1:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
+C409.py:1:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
   |
 1 | t1 = tuple([])
   |      ^^^^^^^^^ C409
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 3 3 | t3 = tuple((1, 2))
 4 4 | t4 = tuple([
 
-./resources/test/fixtures/flake8_comprehensions/C409.py:2:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
+C409.py:2:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
   |
 2 | t1 = tuple([])
 3 | t2 = tuple([1, 2])
@@ -35,7 +35,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 4 4 | t4 = tuple([
 5 5 |     1,
 
-./resources/test/fixtures/flake8_comprehensions/C409.py:3:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:3:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
   |
 3 | t1 = tuple([])
 4 | t2 = tuple([1, 2])
@@ -55,7 +55,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 5 5 |     1,
 6 6 |     2
 
-./resources/test/fixtures/flake8_comprehensions/C409.py:4:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
+C409.py:4:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
    |
  4 |   t2 = tuple([1, 2])
  5 |   t3 = tuple((1, 2))
@@ -84,7 +84,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 9 9 |     (1, 2)
 10 10 | )
 
-./resources/test/fixtures/flake8_comprehensions/C409.py:8:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
+C409.py:8:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
    |
  8 |       2
  9 |   ])

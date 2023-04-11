@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP007.py:6:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:6:10: UP007 [*] Use `X | Y` for type annotations
   |
 6 | def f(x: Optional[str]) -> None:
   |          ^^^^^^^^^^^^^ UP007
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 8 | 
 9 9 | 
 
-./resources/test/fixtures/pyupgrade/UP007.py:10:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:10:10: UP007 [*] Use `X | Y` for type annotations
    |
 10 | def f(x: typing.Optional[str]) -> None:
    |          ^^^^^^^^^^^^^^^^^^^^ UP007
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 12 12 | 
 13 13 | 
 
-./resources/test/fixtures/pyupgrade/UP007.py:14:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:14:10: UP007 [*] Use `X | Y` for type annotations
    |
 14 | def f(x: Union[str, int, Union[float, bytes]]) -> None:
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007
@@ -55,7 +55,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 16 16 | 
 17 17 | 
 
-./resources/test/fixtures/pyupgrade/UP007.py:14:26: UP007 [*] Use `X | Y` for type annotations
+UP007.py:14:26: UP007 [*] Use `X | Y` for type annotations
    |
 14 | def f(x: Union[str, int, Union[float, bytes]]) -> None:
    |                          ^^^^^^^^^^^^^^^^^^^ UP007
@@ -73,7 +73,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 16 16 | 
 17 17 | 
 
-./resources/test/fixtures/pyupgrade/UP007.py:18:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:18:10: UP007 [*] Use `X | Y` for type annotations
    |
 18 | def f(x: typing.Union[str, int]) -> None:
    |          ^^^^^^^^^^^^^^^^^^^^^^ UP007
@@ -91,7 +91,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 20 | 
 21 21 | 
 
-./resources/test/fixtures/pyupgrade/UP007.py:22:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:22:10: UP007 [*] Use `X | Y` for type annotations
    |
 22 | def f(x: typing.Union[(str, int)]) -> None:
    |          ^^^^^^^^^^^^^^^^^^^^^^^^ UP007
@@ -109,7 +109,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 24 24 | 
 25 25 | 
 
-./resources/test/fixtures/pyupgrade/UP007.py:26:10: UP007 [*] Use `X | Y` for type annotations
+UP007.py:26:10: UP007 [*] Use `X | Y` for type annotations
    |
 26 | def f(x: typing.Union[(str, int), float]) -> None:
    |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007
@@ -127,7 +127,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 28 28 | 
 29 29 | 
 
-./resources/test/fixtures/pyupgrade/UP007.py:30:11: UP007 [*] Use `X | Y` for type annotations
+UP007.py:30:11: UP007 [*] Use `X | Y` for type annotations
    |
 30 | def f(x: "Union[str, int, Union[float, bytes]]") -> None:
    |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP007
@@ -145,7 +145,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 32 32 | 
 33 33 | 
 
-./resources/test/fixtures/pyupgrade/UP007.py:30:27: UP007 [*] Use `X | Y` for type annotations
+UP007.py:30:27: UP007 [*] Use `X | Y` for type annotations
    |
 30 | def f(x: "Union[str, int, Union[float, bytes]]") -> None:
    |                           ^^^^^^^^^^^^^^^^^^^ UP007
@@ -163,7 +163,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 32 32 | 
 33 33 | 
 
-./resources/test/fixtures/pyupgrade/UP007.py:34:11: UP007 [*] Use `X | Y` for type annotations
+UP007.py:34:11: UP007 [*] Use `X | Y` for type annotations
    |
 34 | def f(x: "typing.Union[str, int]") -> None:
    |           ^^^^^^^^^^^^^^^^^^^^^^ UP007
@@ -181,7 +181,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 36 36 | 
 37 37 | 
 
-./resources/test/fixtures/pyupgrade/UP007.py:47:8: UP007 [*] Use `X | Y` for type annotations
+UP007.py:47:8: UP007 [*] Use `X | Y` for type annotations
    |
 47 | def f() -> None:
 48 |     x: Optional[str]
@@ -200,7 +200,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 49 49 | 
 50 50 |     x = Union[str, int]
 
-./resources/test/fixtures/pyupgrade/UP007.py:52:8: UP007 [*] Use `X | Y` for type annotations
+UP007.py:52:8: UP007 [*] Use `X | Y` for type annotations
    |
 52 |     x = Union[str, int]
 53 |     x = Union["str", "int"]

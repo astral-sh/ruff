@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pie/mod.rs
 ---
-./resources/test/fixtures/flake8_pie/PIE810.py:2:1: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:2:1: PIE810 [*] Call `startswith` once with a `tuple`
   |
 2 | # error
 3 | obj.startswith("foo") or obj.startswith("bar")
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 4 4 | obj.endswith("foo") or obj.endswith("bar")
 5 5 | # error
 
-./resources/test/fixtures/flake8_pie/PIE810.py:4:1: PIE810 [*] Call `endswith` once with a `tuple`
+PIE810.py:4:1: PIE810 [*] Call `endswith` once with a `tuple`
   |
 4 | obj.startswith("foo") or obj.startswith("bar")
 5 | # error
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 6 6 | obj.startswith(foo) or obj.startswith(bar)
 7 7 | # error
 
-./resources/test/fixtures/flake8_pie/PIE810.py:6:1: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:6:1: PIE810 [*] Call `startswith` once with a `tuple`
    |
  6 | obj.endswith("foo") or obj.endswith("bar")
  7 | # error
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 8 8 | obj.startswith(foo) or obj.startswith("foo")
 9 9 | # error
 
-./resources/test/fixtures/flake8_pie/PIE810.py:8:1: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:8:1: PIE810 [*] Call `startswith` once with a `tuple`
    |
  8 | obj.startswith(foo) or obj.startswith(bar)
  9 | # error
@@ -82,7 +82,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 10 10 | obj.endswith(foo) or obj.startswith(foo) or obj.startswith("foo")
 11 11 | 
 
-./resources/test/fixtures/flake8_pie/PIE810.py:10:1: PIE810 [*] Call `startswith` once with a `tuple`
+PIE810.py:10:1: PIE810 [*] Call `startswith` once with a `tuple`
    |
 10 | obj.startswith(foo) or obj.startswith("foo")
 11 | # error

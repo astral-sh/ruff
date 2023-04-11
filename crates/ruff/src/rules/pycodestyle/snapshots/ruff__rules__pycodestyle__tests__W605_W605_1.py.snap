@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/W605_1.py:2:10: W605 [*] Invalid escape sequence: `\.`
+W605_1.py:2:10: W605 [*] Invalid escape sequence: `\.`
   |
 2 | #: W605:1:10
 3 | regex = '\.png$'
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 4 4 | #: W605:2:1
 5 5 | regex = '''
 
-./resources/test/fixtures/pycodestyle/W605_1.py:6:1: W605 [*] Invalid escape sequence: `\.`
+W605_1.py:6:1: W605 [*] Invalid escape sequence: `\.`
   |
 6 | #: W605:2:1
 7 | regex = '''
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 8 8 | 
 9 9 | #: W605:2:6
 
-./resources/test/fixtures/pycodestyle/W605_1.py:11:6: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:11:6: W605 [*] Invalid escape sequence: `\_`
    |
 11 | #: W605:2:6
 12 | f(
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 13 13 | 
 14 14 | #: W605:4:6
 
-./resources/test/fixtures/pycodestyle/W605_1.py:18:6: W605 [*] Invalid escape sequence: `\_`
+W605_1.py:18:6: W605 [*] Invalid escape sequence: `\_`
    |
 18 | multi-line
 19 | literal

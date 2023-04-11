@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
-./resources/test/fixtures/flake8_return/RET508.py:8:9: RET508 Unnecessary `elif` after `break` statement
+RET508.py:8:9: RET508 Unnecessary `elif` after `break` statement
    |
  8 |         if i > y:  # [no-else-break]
  9 |             break
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 12 |         else:
    |
 
-./resources/test/fixtures/flake8_return/RET508.py:22:9: RET508 Unnecessary `elif` after `break` statement
+RET508.py:22:9: RET508 Unnecessary `elif` after `break` statement
    |
 22 |                 b = 2
 23 |             break
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 26 |         else:
    |
 
-./resources/test/fixtures/flake8_return/RET508.py:33:9: RET508 Unnecessary `else` after `break` statement
+RET508.py:33:9: RET508 Unnecessary `else` after `break` statement
    |
 33 |         if i > y:  # [no-else-break]
 34 |             break
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 36 |             a = z
    |
 
-./resources/test/fixtures/flake8_return/RET508.py:44:13: RET508 Unnecessary `else` after `break` statement
+RET508.py:44:13: RET508 Unnecessary `else` after `break` statement
    |
 44 |                 b = 2
 45 |                 break
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 48 |                 break
    |
 
-./resources/test/fixtures/flake8_return/RET508.py:60:9: RET508 Unnecessary `else` after `break` statement
+RET508.py:60:9: RET508 Unnecessary `else` after `break` statement
    |
 60 |                 b = 2
 61 |             break
@@ -50,7 +50,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 64 |         break
    |
 
-./resources/test/fixtures/flake8_return/RET508.py:71:13: RET508 Unnecessary `else` after `break` statement
+RET508.py:71:13: RET508 Unnecessary `else` after `break` statement
    |
 71 |                 a = 4
 72 |                 break
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 75 |         else:
    |
 
-./resources/test/fixtures/flake8_return/RET508.py:82:9: RET508 Unnecessary `else` after `break` statement
+RET508.py:82:9: RET508 Unnecessary `else` after `break` statement
    |
 82 |         if x:  # [no-else-break]
 83 |             break

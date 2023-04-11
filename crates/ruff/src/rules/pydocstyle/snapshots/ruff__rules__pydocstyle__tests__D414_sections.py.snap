@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/sections.py:54:5: D414 Section has no content ("Returns")
+sections.py:54:5: D414 Section has no content ("Returns")
    |
 54 |   @expect("D414: Section has no content ('Returns')")
 55 |   def no_underline_and_no_description():  # noqa: D416
@@ -14,7 +14,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
    | |_______^ D414
    |
 
-./resources/test/fixtures/pydocstyle/sections.py:65:5: D414 Section has no content ("Returns")
+sections.py:65:5: D414 Section has no content ("Returns")
    |
 65 |   @expect("D414: Section has no content ('Returns')")
 66 |   def no_underline_and_no_newline():  # noqa: D416
@@ -25,7 +25,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
    | |______________^ D414
    |
 
-./resources/test/fixtures/pydocstyle/sections.py:76:5: D414 Section has no content ("Returns")
+sections.py:76:5: D414 Section has no content ("Returns")
    |
 76 |   @expect("D414: Section has no content ('Yields')")
 77 |   def consecutive_sections():  # noqa: D416
@@ -45,7 +45,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
    | |_______^ D414
    |
 
-./resources/test/fixtures/pydocstyle/sections.py:76:5: D414 Section has no content ("Yields")
+sections.py:76:5: D414 Section has no content ("Yields")
    |
 76 |   @expect("D414: Section has no content ('Yields')")
 77 |   def consecutive_sections():  # noqa: D416
@@ -65,7 +65,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
    | |_______^ D414
    |
 
-./resources/test/fixtures/pydocstyle/sections.py:170:5: D414 Section has no content ("Returns")
+sections.py:170:5: D414 Section has no content ("Returns")
     |
 170 |   @expect("D414: Section has no content ('Returns')")
 171 |   def section_underline_overindented_and_contentless():  # noqa: D416
@@ -78,7 +78,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
     | |_______^ D414
     |
 
-./resources/test/fixtures/pydocstyle/sections.py:261:5: D414 Section has no content ("Returns")
+sections.py:261:5: D414 Section has no content ("Returns")
     |
 261 |   @expect("D414: Section has no content ('Returns')")
 262 |   def valid_google_style_section():  # noqa: D406, D407

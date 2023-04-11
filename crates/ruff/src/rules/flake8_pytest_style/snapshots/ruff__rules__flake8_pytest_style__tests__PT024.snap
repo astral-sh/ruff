@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT024.py:14:2: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+PT024.py:14:2: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
 14 | @pytest.mark.asyncio()
    |  ^^^^^^^^^^^^^^^^^^^^^ PT024
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 16 15 | async def my_fixture():  # Error before
 17 16 |     return 0
 
-./resources/test/fixtures/flake8_pytest_style/PT024.py:20:2: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+PT024.py:20:2: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
 20 | @pytest.mark.asyncio
    |  ^^^^^^^^^^^^^^^^^^^ PT024
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 22 21 | async def my_fixture():  # Error before no parens
 23 22 |     return 0
 
-./resources/test/fixtures/flake8_pytest_style/PT024.py:27:2: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+PT024.py:27:2: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
 27 | @pytest.fixture()
 28 | @pytest.mark.asyncio()
@@ -56,7 +56,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 29 28 |     return 0
 30 29 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT024.py:33:2: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
+PT024.py:33:2: PT024 [*] `pytest.mark.asyncio` is unnecessary for fixtures
    |
 33 | @pytest.fixture()
 34 | @pytest.mark.asyncio

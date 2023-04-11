@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP036_3.py:3:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_3.py:3:1: UP036 [*] Version block is outdated for minimum Python version
    |
  3 |   import sys
  4 |   
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 12 7  | if False:
 13 8  |     if            sys.version_info < (3,0):
 
-./resources/test/fixtures/pyupgrade/UP036_3.py:13:5: UP036 [*] Version block is outdated for minimum Python version
+UP036_3.py:13:5: UP036 [*] Version block is outdated for minimum Python version
    |
 13 |   if False:
 14 |       if            sys.version_info < (3,0):
@@ -72,7 +72,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 22 17 | 
 23 18 | if            sys.version_info < (3,0): print("PY2!")
 
-./resources/test/fixtures/pyupgrade/UP036_3.py:23:1: UP036 [*] Version block is outdated for minimum Python version
+UP036_3.py:23:1: UP036 [*] Version block is outdated for minimum Python version
    |
 23 | / if            sys.version_info < (3,0): print("PY2!")
 24 | | else                               : print("PY3!")

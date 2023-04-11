@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F821_5.py:5:31: F821 Undefined name `InnerClass`
+F821_5.py:5:31: F821 Undefined name `InnerClass`
   |
 5 | class RandomClass:
 6 |     def random_func(self) -> "InnerClass":

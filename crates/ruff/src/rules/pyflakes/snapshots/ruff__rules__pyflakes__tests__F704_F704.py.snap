@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F704.py:6:5: F704 `yield` statement outside of a function
+F704.py:6:5: F704 `yield` statement outside of a function
   |
 6 | class Foo:
 7 |     yield 2
   |     ^^^^^^^ F704
   |
 
-./resources/test/fixtures/pyflakes/F704.py:9:1: F704 `yield` statement outside of a function
+F704.py:9:1: F704 `yield` statement outside of a function
    |
  9 | yield 3
    | ^^^^^^^ F704
@@ -16,7 +16,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 11 | await f()
    |
 
-./resources/test/fixtures/pyflakes/F704.py:10:1: F704 `yield from` statement outside of a function
+F704.py:10:1: F704 `yield from` statement outside of a function
    |
 10 | yield 3
 11 | yield from 3
@@ -24,7 +24,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 12 | await f()
    |
 
-./resources/test/fixtures/pyflakes/F704.py:11:1: F704 `await` statement outside of a function
+F704.py:11:1: F704 `await` statement outside of a function
    |
 11 | yield 3
 12 | yield from 3

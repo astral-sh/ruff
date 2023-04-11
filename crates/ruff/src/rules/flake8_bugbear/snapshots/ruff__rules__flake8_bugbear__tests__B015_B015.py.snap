@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B015.py:3:1: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+B015.py:3:1: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
   |
 3 | assert 1 == 1
 4 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 7 | assert 1 in (1, 2)
   |
 
-./resources/test/fixtures/flake8_bugbear/B015.py:7:1: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+B015.py:7:1: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
   |
 7 | assert 1 in (1, 2)
 8 | 
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
   | ^^^^^^^^^^^ B015
   |
 
-./resources/test/fixtures/flake8_bugbear/B015.py:17:5: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+B015.py:17:5: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
    |
 17 |     assert 1 in (1, 2)
 18 | 
@@ -27,7 +27,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    |     ^^^^^^^^^^^ B015
    |
 
-./resources/test/fixtures/flake8_bugbear/B015.py:24:5: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
+B015.py:24:5: B015 Pointless comparison. This comparison does nothing but waste CPU instructions. Either prepend `assert` or remove it.
    |
 24 | class TestClass:
 25 |     1 == 1

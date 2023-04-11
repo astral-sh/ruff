@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E11.py:15:6: E116 Unexpected indentation (comment)
+E11.py:15:6: E116 Unexpected indentation (comment)
    |
 15 | #: E114 E116
 16 | mimetype = 'application/x-directory'
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 19 | #: E116 E116 E116
    |
 
-./resources/test/fixtures/pycodestyle/E11.py:22:13: E116 Unexpected indentation (comment)
+E11.py:22:13: E116 Unexpected indentation (comment)
    |
 22 |         self.master.start()
 23 |         # try:
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 26 |             # self.shutdown()
    |
 
-./resources/test/fixtures/pycodestyle/E11.py:24:13: E116 Unexpected indentation (comment)
+E11.py:24:13: E116 Unexpected indentation (comment)
    |
 24 |             # self.master.start()
 25 |         # except MasterExit:
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 28 |             # sys.exit()
    |
 
-./resources/test/fixtures/pycodestyle/E11.py:26:13: E116 Unexpected indentation (comment)
+E11.py:26:13: E116 Unexpected indentation (comment)
    |
 26 |             # self.shutdown()
 27 |         # finally:

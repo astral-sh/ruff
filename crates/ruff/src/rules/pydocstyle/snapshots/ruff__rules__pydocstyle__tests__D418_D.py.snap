@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:34:9: D418 Function decorated with `@overload` shouldn't contain a docstring
+D.py:34:9: D418 Function decorated with `@overload` shouldn't contain a docstring
    |
 34 |     @overload
 35 |     def overloaded_method(self, a: str) -> str:
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 37 |         ...
    |
 
-./resources/test/fixtures/pydocstyle/D.py:90:9: D418 Function decorated with `@overload` shouldn't contain a docstring
+D.py:90:9: D418 Function decorated with `@overload` shouldn't contain a docstring
    |
 90 |     @overload
 91 |     def nested_overloaded_func(a: str) -> str:
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 93 |         ...
    |
 
-./resources/test/fixtures/pydocstyle/D.py:110:5: D418 Function decorated with `@overload` shouldn't contain a docstring
+D.py:110:5: D418 Function decorated with `@overload` shouldn't contain a docstring
     |
 110 | @overload
 111 | def overloaded_func(a: str) -> str:

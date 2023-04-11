@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_annotations/mod.rs
 ---
-./resources/test/fixtures/flake8_annotations/allow_star_arg_any.py:10:12: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+allow_star_arg_any.py:10:12: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
    |
 10 | # ANN401
 11 | def foo(a: Any, *args: str, **kwargs: str) -> int:
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 12 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/allow_star_arg_any.py:15:47: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo`
+allow_star_arg_any.py:15:47: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo`
    |
 15 | # ANN401
 16 | def foo(a: int, *args: str, **kwargs: str) -> Any:
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 17 |     pass
    |
 
-./resources/test/fixtures/flake8_annotations/allow_star_arg_any.py:40:29: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
+allow_star_arg_any.py:40:29: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `a`
    |
 40 |     # ANN401
 41 |     def foo_method(self, a: Any, *params: str, **options: str) -> int:
@@ -25,7 +25,7 @@ source: crates/ruff/src/rules/flake8_annotations/mod.rs
 42 |         pass
    |
 
-./resources/test/fixtures/flake8_annotations/allow_star_arg_any.py:44:67: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo_method`
+allow_star_arg_any.py:44:67: ANN401 Dynamically typed expressions (typing.Any) are disallowed in `foo_method`
    |
 44 |     # ANN401
 45 |     def foo_method(self, a: int, *params: str, **options: str) -> Any:

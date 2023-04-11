@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/future_annotations.py:40:4: UP007 [*] Use `X | Y` for type annotations
+future_annotations.py:40:4: UP007 [*] Use `X | Y` for type annotations
    |
 40 | x: Optional[int] = None
    |    ^^^^^^^^^^^^^ UP007
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 41 41 | 
 42 42 | MyList: TypeAlias = Union[List[int], List[str]]
 
-./resources/test/fixtures/pyupgrade/future_annotations.py:42:21: UP007 [*] Use `X | Y` for type annotations
+future_annotations.py:42:21: UP007 [*] Use `X | Y` for type annotations
    |
 42 | x: Optional[int] = None
 43 | 

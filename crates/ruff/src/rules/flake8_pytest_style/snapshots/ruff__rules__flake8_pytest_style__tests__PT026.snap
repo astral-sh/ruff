@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT026.py:19:2: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
+PT026.py:19:2: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
    |
 19 | @pytest.mark.usefixtures()
    |  ^^^^^^^^^^^^^^^^^^^^^^^^^ PT026
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 21 21 |     pass
 22 22 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT026.py:24:2: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
+PT026.py:24:2: PT026 [*] Useless `pytest.mark.usefixtures` without parameters
    |
 24 | @pytest.mark.usefixtures
    |  ^^^^^^^^^^^^^^^^^^^^^^^ PT026

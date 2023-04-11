@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 ---
-./resources/test/fixtures/pep8_naming/N999/module/mod-with-dashes/__init__.py:1:1: N999 Invalid module name: 'mod-with-dashes'
+__init__.py:1:1: N999 Invalid module name: 'mod-with-dashes'
  |
  |
 

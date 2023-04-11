@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D400.py:2:5: D400 [*] First line should end with a period
+D400.py:2:5: D400 [*] First line should end with a period
   |
 2 | def f():
 3 |     "Here's a line without a period"
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 4 4 | 
 5 5 | 
 
-./resources/test/fixtures/pydocstyle/D400.py:7:5: D400 [*] First line should end with a period
+D400.py:7:5: D400 [*] First line should end with a period
   |
 7 | def f():
 8 |     """Here's a line without a period"""
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 9 9 | 
 10 10 | 
 
-./resources/test/fixtures/pydocstyle/D400.py:12:5: D400 [*] First line should end with a period
+D400.py:12:5: D400 [*] First line should end with a period
    |
 12 |   def f():
 13 |       """
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 16 16 |     ...
 17 17 | 
 
-./resources/test/fixtures/pydocstyle/D400.py:20:5: D400 [*] First line should end with a period
+D400.py:20:5: D400 [*] First line should end with a period
    |
 20 | def f():
 21 |     """Here's a line without a period"""
@@ -79,7 +79,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 22 22 | 
 23 23 | 
 
-./resources/test/fixtures/pydocstyle/D400.py:25:5: D400 [*] First line should end with a period
+D400.py:25:5: D400 [*] First line should end with a period
    |
 25 |   def f():
 26 |       """
@@ -101,7 +101,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 29 29 | 
 30 30 | 
 
-./resources/test/fixtures/pydocstyle/D400.py:32:5: D400 [*] First line should end with a period
+D400.py:32:5: D400 [*] First line should end with a period
    |
 32 |   def f():
 33 |       """
@@ -123,7 +123,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 36 36 | 
 37 37 | 
 
-./resources/test/fixtures/pydocstyle/D400.py:39:5: D400 [*] First line should end with a period
+D400.py:39:5: D400 [*] First line should end with a period
    |
 39 | def f():
 40 |     r"Here's a line without a period"
@@ -142,7 +142,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 41 41 | 
 42 42 | 
 
-./resources/test/fixtures/pydocstyle/D400.py:44:5: D400 [*] First line should end with a period
+D400.py:44:5: D400 [*] First line should end with a period
    |
 44 | def f():
 45 |     r"""Here's a line without a period"""
@@ -161,7 +161,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 46 46 | 
 47 47 | 
 
-./resources/test/fixtures/pydocstyle/D400.py:49:5: D400 [*] First line should end with a period
+D400.py:49:5: D400 [*] First line should end with a period
    |
 49 |   def f():
 50 |       r"""
@@ -184,7 +184,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 53 53 |     ...
 54 54 | 
 
-./resources/test/fixtures/pydocstyle/D400.py:57:5: D400 [*] First line should end with a period
+D400.py:57:5: D400 [*] First line should end with a period
    |
 57 | def f():
 58 |     r"""Here's a line without a period"""
@@ -203,7 +203,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 59 59 | 
 60 60 | 
 
-./resources/test/fixtures/pydocstyle/D400.py:62:5: D400 [*] First line should end with a period
+D400.py:62:5: D400 [*] First line should end with a period
    |
 62 |   def f():
 63 |       r"""
@@ -225,7 +225,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 66 66 | 
 67 67 | 
 
-./resources/test/fixtures/pydocstyle/D400.py:69:5: D400 [*] First line should end with a period
+D400.py:69:5: D400 [*] First line should end with a period
    |
 69 |   def f():
 70 |       r"""

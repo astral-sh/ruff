@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP012.py:2:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:2:1: UP012 [*] Unnecessary call to `encode` as UTF-8
   |
 2 | # ASCII literals should be replaced by a bytes literal
 3 | "foo".encode("utf-8")  # b"foo"
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 4 4 | "foo".encode()  # b"foo"
 5 5 | "foo".encode("UTF8")  # b"foo"
 
-./resources/test/fixtures/pyupgrade/UP012.py:3:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:3:1: UP012 [*] Unnecessary call to `encode` as UTF-8
   |
 3 | # ASCII literals should be replaced by a bytes literal
 4 | "foo".encode("utf-8")  # b"foo"
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 5 5 | "foo".encode("UTF8")  # b"foo"
 6 6 | U"foo".encode("utf-8")  # b"foo"
 
-./resources/test/fixtures/pyupgrade/UP012.py:4:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:4:1: UP012 [*] Unnecessary call to `encode` as UTF-8
   |
 4 | "foo".encode("utf-8")  # b"foo"
 5 | "foo".encode("u8")  # b"foo"
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 6 6 | U"foo".encode("utf-8")  # b"foo"
 7 7 | "foo".encode(encoding="utf-8")  # b"foo"
 
-./resources/test/fixtures/pyupgrade/UP012.py:5:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:5:1: UP012 [*] Unnecessary call to `encode` as UTF-8
   |
 5 | "foo".encode("u8")  # b"foo"
 6 | "foo".encode()  # b"foo"
@@ -81,7 +81,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 7 7 | "foo".encode(encoding="utf-8")  # b"foo"
 8 8 | """
 
-./resources/test/fixtures/pyupgrade/UP012.py:6:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:6:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
  6 | "foo".encode()  # b"foo"
  7 | "foo".encode("UTF8")  # b"foo"
@@ -102,7 +102,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 8 | """
 9 9 | Lorem
 
-./resources/test/fixtures/pyupgrade/UP012.py:7:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:7:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
  7 | "foo".encode("UTF8")  # b"foo"
  8 | U"foo".encode("utf-8")  # b"foo"
@@ -123,7 +123,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 9 9 | Lorem
 10 10 | 
 
-./resources/test/fixtures/pyupgrade/UP012.py:8:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:8:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
  8 |   U"foo".encode("utf-8")  # b"foo"
  9 |   "foo".encode(encoding="utf-8")  # b"foo"
@@ -157,7 +157,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 16 14 |     "Lorem "
 17 15 |     "Ipsum".encode()
 
-./resources/test/fixtures/pyupgrade/UP012.py:16:5: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:16:5: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 16 |   )
 17 |   (
@@ -182,7 +182,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 19 19 | (
 20 20 |     "Lorem "  # Comment
 
-./resources/test/fixtures/pyupgrade/UP012.py:20:5: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:20:5: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 20 |   )
 21 |   (
@@ -207,7 +207,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 23 23 | (
 24 24 |     "Lorem " "Ipsum".encode()
 
-./resources/test/fixtures/pyupgrade/UP012.py:24:5: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:24:5: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 24 | )
 25 | (
@@ -227,7 +227,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 26 26 | 
 27 27 | # `encode` on variables should not be processed.
 
-./resources/test/fixtures/pyupgrade/UP012.py:32:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:32:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 32 | bar = "bar"
 33 | f"foo{bar}".encode("utf-8")
@@ -247,7 +247,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 34 34 | "foo".encode(encoding)
 35 35 | f"foo{bar}".encode(encoding)
 
-./resources/test/fixtures/pyupgrade/UP012.py:36:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:36:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 36 |   "foo".encode(encoding)
 37 |   f"foo{bar}".encode(encoding)
@@ -272,7 +272,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 40 38 | # `encode` with custom args and kwargs should not be processed.
 41 39 | "foo".encode("utf-8", errors="replace")
 
-./resources/test/fixtures/pyupgrade/UP012.py:53:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:53:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 53 | # Unicode literals should only be stripped of default encoding.
 54 | "unicode text©".encode("utf-8")  # "unicode text©".encode()
@@ -292,7 +292,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 55 55 | "unicode text©".encode(encoding="UTF8")  # "unicode text©".encode()
 56 56 | 
 
-./resources/test/fixtures/pyupgrade/UP012.py:55:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:55:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 55 | "unicode text©".encode("utf-8")  # "unicode text©".encode()
 56 | "unicode text©".encode()
@@ -313,7 +313,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 57 57 | r"foo\o".encode("utf-8")  # br"foo\o"
 58 58 | u"foo".encode("utf-8")  # b"foo"
 
-./resources/test/fixtures/pyupgrade/UP012.py:57:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:57:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 57 | "unicode text©".encode(encoding="UTF8")  # "unicode text©".encode()
 58 | 
@@ -334,7 +334,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 59 59 | R"foo\o".encode("utf-8")  # br"foo\o"
 60 60 | U"foo".encode("utf-8")  # b"foo"
 
-./resources/test/fixtures/pyupgrade/UP012.py:58:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:58:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 58 | r"foo\o".encode("utf-8")  # br"foo\o"
 59 | u"foo".encode("utf-8")  # b"foo"
@@ -354,7 +354,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 60 60 | U"foo".encode("utf-8")  # b"foo"
 61 61 | print("foo".encode())  # print(b"foo")
 
-./resources/test/fixtures/pyupgrade/UP012.py:59:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:59:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 59 | r"foo\o".encode("utf-8")  # br"foo\o"
 60 | u"foo".encode("utf-8")  # b"foo"
@@ -374,7 +374,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 60 60 | U"foo".encode("utf-8")  # b"foo"
 61 61 | print("foo".encode())  # print(b"foo")
 
-./resources/test/fixtures/pyupgrade/UP012.py:60:1: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:60:1: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 60 | u"foo".encode("utf-8")  # b"foo"
 61 | R"foo\o".encode("utf-8")  # br"foo\o"
@@ -392,7 +392,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
    60 |+b"foo"  # b"foo"
 61 61 | print("foo".encode())  # print(b"foo")
 
-./resources/test/fixtures/pyupgrade/UP012.py:61:7: UP012 [*] Unnecessary call to `encode` as UTF-8
+UP012.py:61:7: UP012 [*] Unnecessary call to `encode` as UTF-8
    |
 61 | R"foo\o".encode("utf-8")  # br"foo\o"
 62 | U"foo".encode("utf-8")  # b"foo"

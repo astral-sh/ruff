@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP032.py:5:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:5:1: UP032 [*] Use f-string instead of `format` call
   |
 5 | ###
 6 | 
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 7 7 | "{1} {0}".format(a, b)
 8 8 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:7:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:7:1: UP032 [*] Use f-string instead of `format` call
    |
  7 | "{} {}".format(a, b)
  8 | 
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 9 9 | "{x.y}".format(x=z)
 10 10 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:9:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:9:1: UP032 [*] Use f-string instead of `format` call
    |
  9 | "{1} {0}".format(a, b)
 10 | 
@@ -64,7 +64,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 11 11 | "{.x} {.y}".format(a, b)
 12 12 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:11:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:11:1: UP032 [*] Use f-string instead of `format` call
    |
 11 | "{x.y}".format(x=z)
 12 | 
@@ -85,7 +85,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 13 13 | "{} {}".format(a.b, c.d)
 14 14 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:13:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:13:1: UP032 [*] Use f-string instead of `format` call
    |
 13 | "{.x} {.y}".format(a, b)
 14 | 
@@ -106,7 +106,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 15 15 | "{}".format(a())
 16 16 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:15:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:15:1: UP032 [*] Use f-string instead of `format` call
    |
 15 | "{} {}".format(a.b, c.d)
 16 | 
@@ -127,7 +127,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 17 17 | "{}".format(a.b())
 18 18 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:17:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:17:1: UP032 [*] Use f-string instead of `format` call
    |
 17 | "{}".format(a())
 18 | 
@@ -148,7 +148,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 19 19 | "{}".format(a.b().c())
 20 20 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:19:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:19:1: UP032 [*] Use f-string instead of `format` call
    |
 19 | "{}".format(a.b())
 20 | 
@@ -169,7 +169,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 21 21 | "hello {}!".format(name)
 22 22 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:21:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:21:1: UP032 [*] Use f-string instead of `format` call
    |
 21 | "{}".format(a.b().c())
 22 | 
@@ -190,7 +190,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 23 23 | "{}{b}{}".format(a, c, b=b)
 24 24 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:23:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:23:1: UP032 [*] Use f-string instead of `format` call
    |
 23 | "hello {}!".format(name)
 24 | 
@@ -211,7 +211,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 25 25 | "{}".format(0x0)
 26 26 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:25:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:25:1: UP032 [*] Use f-string instead of `format` call
    |
 25 | "{}{b}{}".format(a, c, b=b)
 26 | 
@@ -232,7 +232,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 27 27 | "{} {}".format(a, b)
 28 28 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:27:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:27:1: UP032 [*] Use f-string instead of `format` call
    |
 27 | "{}".format(0x0)
 28 | 
@@ -253,7 +253,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 29 29 | """{} {}""".format(a, b)
 30 30 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:29:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:29:1: UP032 [*] Use f-string instead of `format` call
    |
 29 | "{} {}".format(a, b)
 30 | 
@@ -274,7 +274,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 31 31 | "foo{}".format(1)
 32 32 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:31:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:31:1: UP032 [*] Use f-string instead of `format` call
    |
 31 | """{} {}""".format(a, b)
 32 | 
@@ -295,7 +295,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 33 33 | r"foo{}".format(1)
 34 34 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:33:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:33:1: UP032 [*] Use f-string instead of `format` call
    |
 33 | "foo{}".format(1)
 34 | 
@@ -316,7 +316,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 35 35 | x = "{a}".format(a=1)
 36 36 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:35:5: UP032 [*] Use f-string instead of `format` call
+UP032.py:35:5: UP032 [*] Use f-string instead of `format` call
    |
 35 | r"foo{}".format(1)
 36 | 
@@ -337,7 +337,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 37 37 | print("foo {} ".format(x))
 38 38 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:37:7: UP032 [*] Use f-string instead of `format` call
+UP032.py:37:7: UP032 [*] Use f-string instead of `format` call
    |
 37 | x = "{a}".format(a=1)
 38 | 
@@ -358,7 +358,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 39 39 | "{a[b]}".format(a=a)
 40 40 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:39:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:39:1: UP032 [*] Use f-string instead of `format` call
    |
 39 | print("foo {} ".format(x))
 40 | 
@@ -379,7 +379,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 41 41 | "{a.a[b]}".format(a=a)
 42 42 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:41:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:41:1: UP032 [*] Use f-string instead of `format` call
    |
 41 | "{a[b]}".format(a=a)
 42 | 
@@ -400,7 +400,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 43 43 | "{}{{}}{}".format(escaped, y)
 44 44 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:43:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:43:1: UP032 [*] Use f-string instead of `format` call
    |
 43 | "{a.a[b]}".format(a=a)
 44 | 
@@ -421,7 +421,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 45 45 | "{}".format(a)
 46 46 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:45:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:45:1: UP032 [*] Use f-string instead of `format` call
    |
 45 | "{}{{}}{}".format(escaped, y)
 46 | 
@@ -442,7 +442,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 47 47 | '({}={{0!e}})'.format(a)
 48 48 | 
 
-./resources/test/fixtures/pyupgrade/UP032.py:47:1: UP032 [*] Use f-string instead of `format` call
+UP032.py:47:1: UP032 [*] Use f-string instead of `format` call
    |
 47 | "{}".format(a)
 48 | 
@@ -463,7 +463,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 49 49 | ###
 50 50 | # Non-errors
 
-./resources/test/fixtures/pyupgrade/UP032.py:92:11: UP032 [*] Use f-string instead of `format` call
+UP032.py:92:11: UP032 [*] Use f-string instead of `format` call
    |
 92 | def d(osname, version, release):
 93 |     return"{}-{}.{}".format(osname, version, release)
@@ -481,7 +481,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 94 94 | 
 95 95 | def e():
 
-./resources/test/fixtures/pyupgrade/UP032.py:96:10: UP032 [*] Use f-string instead of `format` call
+UP032.py:96:10: UP032 [*] Use f-string instead of `format` call
    |
 96 | def e():
 97 |     yield"{}".format(1)
@@ -499,7 +499,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 98 98 | 
 99 99 | assert"{}".format(1)
 
-./resources/test/fixtures/pyupgrade/UP032.py:99:7: UP032 [*] Use f-string instead of `format` call
+UP032.py:99:7: UP032 [*] Use f-string instead of `format` call
    |
 99 | assert"{}".format(1)
    |       ^^^^^^^^^^^^^^ UP032

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pie/mod.rs
 ---
-./resources/test/fixtures/flake8_pie/PIE802.py:2:5: PIE802 [*] Unnecessary list comprehension.
+PIE802.py:2:5: PIE802 [*] Unnecessary list comprehension.
   |
 2 | # PIE802
 3 | any([x.id for x in bar])
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 4 4 | any(  # first comment
 5 5 |     [x.id for x in bar],  # second comment
 
-./resources/test/fixtures/flake8_pie/PIE802.py:3:5: PIE802 [*] Unnecessary list comprehension.
+PIE802.py:3:5: PIE802 [*] Unnecessary list comprehension.
   |
 3 | # PIE802
 4 | any([x.id for x in bar])
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 5 5 |     [x.id for x in bar],  # second comment
 6 6 | )  # third comment
 
-./resources/test/fixtures/flake8_pie/PIE802.py:5:5: PIE802 [*] Unnecessary list comprehension.
+PIE802.py:5:5: PIE802 [*] Unnecessary list comprehension.
   |
 5 | all([x.id for x in bar])
 6 | any(  # first comment
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 7 7 | all(  # first comment
 8 8 |     [x.id for x in bar],  # second comment
 
-./resources/test/fixtures/flake8_pie/PIE802.py:8:5: PIE802 [*] Unnecessary list comprehension.
+PIE802.py:8:5: PIE802 [*] Unnecessary list comprehension.
    |
  8 | )  # third comment
  9 | all(  # first comment
@@ -81,7 +81,7 @@ source: crates/ruff/src/rules/flake8_pie/mod.rs
 10 10 | any({x.id for x in bar})
 11 11 | 
 
-./resources/test/fixtures/flake8_pie/PIE802.py:10:5: PIE802 [*] Unnecessary list comprehension.
+PIE802.py:10:5: PIE802 [*] Unnecessary list comprehension.
    |
 10 |     [x.id for x in bar],  # second comment
 11 | )  # third comment

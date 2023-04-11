@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F402.py:5:5: F402 Import `os` from line 1 shadowed by loop variable
+F402.py:5:5: F402 Import `os` from line 1 shadowed by loop variable
   |
 5 | for os in range(3):
   |     ^^ F402
 6 |     pass
   |
 
-./resources/test/fixtures/pyflakes/F402.py:8:5: F402 Import `path` from line 2 shadowed by loop variable
+F402.py:8:5: F402 Import `path` from line 2 shadowed by loop variable
    |
  8 |     pass
  9 | 

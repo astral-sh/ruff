@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
-./resources/test/fixtures/flake8_bandit/S112.py:3:1: S112 `try`-`except`-`continue` detected, consider logging the exception
+S112.py:3:1: S112 `try`-`except`-`continue` detected, consider logging the exception
   |
 3 |   try:
 4 |       pass
@@ -12,7 +12,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 8 |   try:
   |
 
-./resources/test/fixtures/flake8_bandit/S112.py:8:1: S112 `try`-`except`-`continue` detected, consider logging the exception
+S112.py:8:1: S112 `try`-`except`-`continue` detected, consider logging the exception
    |
  8 |   try:
  9 |       pass
@@ -23,7 +23,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 13 |   try:
    |
 
-./resources/test/fixtures/flake8_bandit/S112.py:13:1: S112 `try`-`except`-`continue` detected, consider logging the exception
+S112.py:13:1: S112 `try`-`except`-`continue` detected, consider logging the exception
    |
 13 |   try:
 14 |       pass
@@ -34,7 +34,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 18 |   try:
    |
 
-./resources/test/fixtures/flake8_bandit/S112.py:18:1: S112 `try`-`except`-`continue` detected, consider logging the exception
+S112.py:18:1: S112 `try`-`except`-`continue` detected, consider logging the exception
    |
 18 |   try:
 19 |       pass

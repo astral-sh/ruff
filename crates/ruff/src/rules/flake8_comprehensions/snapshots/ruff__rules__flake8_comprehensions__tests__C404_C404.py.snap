@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
-./resources/test/fixtures/flake8_comprehensions/C404.py:1:1: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+C404.py:1:1: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
   |
 1 | dict([(i, i) for i in range(3)])
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM210.py:1:5: SIM210 [*] Use `bool(b)` instead of `True if b else False`
+SIM210.py:1:5: SIM210 [*] Use `bool(b)` instead of `True if b else False`
   |
 1 | a = True if b else False  # SIM210
   |     ^^^^^^^^^^^^^^^^^^^^ SIM210
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 3 3 | a = True if b != c else False  # SIM210
 4 4 | 
 
-./resources/test/fixtures/flake8_simplify/SIM210.py:3:5: SIM210 [*] Use `bool(b != c)` instead of `True if b != c else False`
+SIM210.py:3:5: SIM210 [*] Use `bool(b != c)` instead of `True if b != c else False`
   |
 3 | a = True if b else False  # SIM210
 4 | 
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 5 5 | a = True if b + c else False  # SIM210
 6 6 | 
 
-./resources/test/fixtures/flake8_simplify/SIM210.py:5:5: SIM210 [*] Use `bool(b + c)` instead of `True if b + c else False`
+SIM210.py:5:5: SIM210 [*] Use `bool(b + c)` instead of `True if b + c else False`
   |
 5 | a = True if b != c else False  # SIM210
 6 | 
@@ -58,7 +58,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 7 7 | a = False if b else True  # OK
 8 8 | 
 
-./resources/test/fixtures/flake8_simplify/SIM210.py:14:9: SIM210 [*] Use `bool(b)` instead of `True if b else False`
+SIM210.py:14:9: SIM210 [*] Use `bool(b)` instead of `True if b else False`
    |
 14 |         return False
 15 | 

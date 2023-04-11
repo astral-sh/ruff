@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_django/mod.rs
 ---
-./resources/test/fixtures/flake8_django/DJ008.py:6:1: DJ008 Model does not define `__str__` method
+DJ008.py:6:1: DJ008 Model does not define `__str__` method
    |
  6 |   # Models without __str__
  7 | / class TestModel1(models.Model):
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
    | |________________^ DJ008
    |
 
-./resources/test/fixtures/flake8_django/DJ008.py:21:1: DJ008 Model does not define `__str__` method
+DJ008.py:21:1: DJ008 Model does not define `__str__` method
    |
 21 | / class TestModel2(Model):
 22 | |     new_field = models.CharField(max_length=10)
@@ -38,7 +38,7 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
    | |________________^ DJ008
    |
 
-./resources/test/fixtures/flake8_django/DJ008.py:36:1: DJ008 Model does not define `__str__` method
+DJ008.py:36:1: DJ008 Model does not define `__str__` method
    |
 36 | / class TestModel3(Model):
 37 | |     new_field = models.CharField(max_length=10)

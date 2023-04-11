@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
 ---
-./resources/test/fixtures/flake8_boolean_trap/FBT.py:12:31: FBT002 Boolean default value in function definition
+FBT.py:12:31: FBT002 Boolean default value in function definition
    |
 12 |     posorkw_nonvalued_boolhint: bool,
 13 |     posorkw_nonvalued_boolstrhint: "bool",
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
 16 |     posorkw_boolvalued_boolhint: bool = True,
    |
 
-./resources/test/fixtures/flake8_boolean_trap/FBT.py:13:43: FBT002 Boolean default value in function definition
+FBT.py:13:43: FBT002 Boolean default value in function definition
    |
 13 |     posorkw_nonvalued_boolstrhint: "bool",
 14 |     posorkw_boolvalued_nohint=True,
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
 17 |     posorkw_boolvalued_boolstrhint: "bool" = True,
    |
 
-./resources/test/fixtures/flake8_boolean_trap/FBT.py:14:41: FBT002 Boolean default value in function definition
+FBT.py:14:41: FBT002 Boolean default value in function definition
    |
 14 |     posorkw_boolvalued_nohint=True,
 15 |     posorkw_boolvalued_nonboolhint: int = True,
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
 18 |     posorkw_nonboolvalued_nohint=1,
    |
 
-./resources/test/fixtures/flake8_boolean_trap/FBT.py:15:46: FBT002 Boolean default value in function definition
+FBT.py:15:46: FBT002 Boolean default value in function definition
    |
 15 |     posorkw_boolvalued_nonboolhint: int = True,
 16 |     posorkw_boolvalued_boolhint: bool = True,

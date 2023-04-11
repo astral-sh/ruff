@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-./resources/test/fixtures/ruff/RUF007.py:16:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:16:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
    |
 16 | # Errors
 17 | zip(input, input[1:])
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 19 | zip(input[:-1], input[1:])
    |
 
-./resources/test/fixtures/ruff/RUF007.py:17:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:17:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
    |
 17 | # Errors
 18 | zip(input, input[1:])
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 21 | zip(input[1:], input[2:])
    |
 
-./resources/test/fixtures/ruff/RUF007.py:18:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:18:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
    |
 18 | zip(input, input[1:])
 19 | zip(input, input[1::1])
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 22 | zip(input[1:-1], input[2:])
    |
 
-./resources/test/fixtures/ruff/RUF007.py:19:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:19:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
    |
 19 | zip(input, input[1::1])
 20 | zip(input[:-1], input[1:])
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 23 | list(zip(input, input[1:]))
    |
 
-./resources/test/fixtures/ruff/RUF007.py:20:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:20:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
    |
 20 | zip(input[:-1], input[1:])
 21 | zip(input[1:], input[2:])
@@ -50,7 +50,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 24 | list(zip(input[:-1], input[1:]))
    |
 
-./resources/test/fixtures/ruff/RUF007.py:21:6: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:21:6: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
    |
 21 | zip(input[1:], input[2:])
 22 | zip(input[1:-1], input[2:])
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 25 | zip(foo[:-1], foo[1:], strict=True)
    |
 
-./resources/test/fixtures/ruff/RUF007.py:22:6: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:22:6: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
    |
 22 | zip(input[1:-1], input[2:])
 23 | list(zip(input, input[1:]))
@@ -70,7 +70,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 26 | zip(foo[:-1], foo[1:], strict=False)
    |
 
-./resources/test/fixtures/ruff/RUF007.py:23:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:23:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
    |
 23 | list(zip(input, input[1:]))
 24 | list(zip(input[:-1], input[1:]))
@@ -80,7 +80,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 27 | zip(foo[:-1], foo[1:], strict=bool(foo))
    |
 
-./resources/test/fixtures/ruff/RUF007.py:24:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:24:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
    |
 24 | list(zip(input[:-1], input[1:]))
 25 | zip(foo[:-1], foo[1:], strict=True)
@@ -89,7 +89,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 27 | zip(foo[:-1], foo[1:], strict=bool(foo))
    |
 
-./resources/test/fixtures/ruff/RUF007.py:25:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
+RUF007.py:25:1: RUF007 Prefer `itertools.pairwise()` over `zip()` when iterating over successive pairs
    |
 25 | zip(foo[:-1], foo[1:], strict=True)
 26 | zip(foo[:-1], foo[1:], strict=False)

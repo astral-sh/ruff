@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E22.py:3:6: E221 Multiple spaces before operator
+E22.py:3:6: E221 Multiple spaces before operator
   |
 3 | #: E221
 4 | a = 12 + 3
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 7 | x             = 1
   |
 
-./resources/test/fixtures/pycodestyle/E22.py:5:2: E221 Multiple spaces before operator
+E22.py:5:2: E221 Multiple spaces before operator
   |
 5 | b = 4  + 5
 6 | #: E221 E221
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 9 | long_variable = 3
   |
 
-./resources/test/fixtures/pycodestyle/E22.py:6:2: E221 Multiple spaces before operator
+E22.py:6:2: E221 Multiple spaces before operator
    |
  6 | #: E221 E221
  7 | x             = 1
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 10 | #: E221 E221
    |
 
-./resources/test/fixtures/pycodestyle/E22.py:9:5: E221 Multiple spaces before operator
+E22.py:9:5: E221 Multiple spaces before operator
    |
  9 | long_variable = 3
 10 | #: E221 E221
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 13 | long_variable = 3
    |
 
-./resources/test/fixtures/pycodestyle/E22.py:10:5: E221 Multiple spaces before operator
+E22.py:10:5: E221 Multiple spaces before operator
    |
 10 | #: E221 E221
 11 | x[0]          = 1
@@ -51,7 +51,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 14 | #: E221 E221
    |
 
-./resources/test/fixtures/pycodestyle/E22.py:13:9: E221 Multiple spaces before operator
+E22.py:13:9: E221 Multiple spaces before operator
    |
 13 | long_variable = 3
 14 | #: E221 E221
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 17 | z = x[0]          + 3
    |
 
-./resources/test/fixtures/pycodestyle/E22.py:15:9: E221 Multiple spaces before operator
+E22.py:15:9: E221 Multiple spaces before operator
    |
 15 | x = f(x)          + 1
 16 | y = long_variable + 2
@@ -71,7 +71,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 19 | text = """
    |
 
-./resources/test/fixtures/pycodestyle/E22.py:19:14: E221 Multiple spaces before operator
+E22.py:19:14: E221 Multiple spaces before operator
    |
 19 | text = """
 20 |     bar

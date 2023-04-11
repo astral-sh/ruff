@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:64:9: D105 Missing docstring in magic method
+D.py:64:9: D105 Missing docstring in magic method
    |
 64 |     @expect('D105: Missing docstring in magic method')
 65 |     def __str__(self=None):

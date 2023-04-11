@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F50x.py:7:1: F505 `%`-format string is missing argument(s) for placeholder(s): bar
+F50x.py:7:1: F505 `%`-format string is missing argument(s) for placeholder(s): bar
    |
  7 | '%s %s' % (1,)  # F507
  8 | '%s %s' % (1, 2, 3)  # F507

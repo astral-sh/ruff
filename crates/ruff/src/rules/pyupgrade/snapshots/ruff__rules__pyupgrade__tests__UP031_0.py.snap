@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP031_0.py:4:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:4:7: UP031 [*] Use format specifiers instead of percent format
   |
 4 | # UP031
 5 | print('%s %s' % (a, b))
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 6 6 | print('%s%s' % (a, b))
 7 7 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:6:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:6:7: UP031 [*] Use format specifiers instead of percent format
    |
  6 | print('%s %s' % (a, b))
  7 | 
@@ -42,7 +42,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 8 | print("trivial" % ())
 9 9 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:8:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:8:7: UP031 [*] Use format specifiers instead of percent format
    |
  8 | print('%s%s' % (a, b))
  9 | 
@@ -63,7 +63,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 10 10 | print("%s" % ("simple",))
 11 11 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:10:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:10:7: UP031 [*] Use format specifiers instead of percent format
    |
 10 | print("trivial" % ())
 11 | 
@@ -84,7 +84,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 12 12 | print("%s" % ("%s" % ("nested",),))
 13 13 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:12:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:12:7: UP031 [*] Use format specifiers instead of percent format
    |
 12 | print("%s" % ("simple",))
 13 | 
@@ -105,7 +105,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 14 14 | print("%s%% percent" % (15,))
 15 15 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:12:15: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:12:15: UP031 [*] Use format specifiers instead of percent format
    |
 12 | print("%s" % ("simple",))
 13 | 
@@ -126,7 +126,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 14 14 | print("%s%% percent" % (15,))
 15 15 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:14:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:14:7: UP031 [*] Use format specifiers instead of percent format
    |
 14 | print("%s" % ("%s" % ("nested",),))
 15 | 
@@ -147,7 +147,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 16 16 | print("%f" % (15,))
 17 17 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:16:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:16:7: UP031 [*] Use format specifiers instead of percent format
    |
 16 | print("%s%% percent" % (15,))
 17 | 
@@ -168,7 +168,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 18 18 | print("%.f" % (15,))
 19 19 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:18:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:18:7: UP031 [*] Use format specifiers instead of percent format
    |
 18 | print("%f" % (15,))
 19 | 
@@ -189,7 +189,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 20 | print("%.3f" % (15,))
 21 21 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:20:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:20:7: UP031 [*] Use format specifiers instead of percent format
    |
 20 | print("%.f" % (15,))
 21 | 
@@ -210,7 +210,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 22 22 | print("%3f" % (15,))
 23 23 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:22:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:22:7: UP031 [*] Use format specifiers instead of percent format
    |
 22 | print("%.3f" % (15,))
 23 | 
@@ -231,7 +231,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 24 24 | print("%-5f" % (5,))
 25 25 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:24:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:24:7: UP031 [*] Use format specifiers instead of percent format
    |
 24 | print("%3f" % (15,))
 25 | 
@@ -252,7 +252,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 26 26 | print("%9f" % (5,))
 27 27 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:26:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:26:7: UP031 [*] Use format specifiers instead of percent format
    |
 26 | print("%-5f" % (5,))
 27 | 
@@ -273,7 +273,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 28 28 | print("%#o" % (123,))
 29 29 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:28:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:28:7: UP031 [*] Use format specifiers instead of percent format
    |
 28 | print("%9f" % (5,))
 29 | 
@@ -294,7 +294,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 30 30 | print("brace {} %s" % (1,))
 31 31 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:30:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:30:7: UP031 [*] Use format specifiers instead of percent format
    |
 30 | print("%#o" % (123,))
 31 | 
@@ -315,7 +315,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 32 32 | print(
 33 33 |   "%s" % (
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:33:3: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:33:3: UP031 [*] Use format specifiers instead of percent format
    |
 33 |   print(
 34 |     "%s" % (
@@ -337,7 +337,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 35 35 |         )
 36 36 | )
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:38:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:38:7: UP031 [*] Use format specifiers instead of percent format
    |
 38 | )
 39 | 
@@ -358,7 +358,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 40 40 | print("%(k)s" % {"k": "v"})
 41 41 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:40:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:40:7: UP031 [*] Use format specifiers instead of percent format
    |
 40 | print("foo %s " % (x,))
 41 | 
@@ -379,7 +379,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 42 42 | print("%(k)s" % {
 43 43 |     "k": "v",
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:42:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:42:7: UP031 [*] Use format specifiers instead of percent format
    |
 42 |   print("%(k)s" % {"k": "v"})
 43 |   
@@ -410,7 +410,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 47 47 | print("%(to_list)s" % {"to_list": []})
 48 48 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:47:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:47:7: UP031 [*] Use format specifiers instead of percent format
    |
 47 | })
 48 | 
@@ -431,7 +431,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 49 49 | print("%(k)s" % {"k": "v", "i": 1, "j": []})
 50 50 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:49:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:49:7: UP031 [*] Use format specifiers instead of percent format
    |
 49 | print("%(to_list)s" % {"to_list": []})
 50 | 
@@ -452,7 +452,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 51 51 | print("%(ab)s" % {"a" "b": 1})
 52 52 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:51:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:51:7: UP031 [*] Use format specifiers instead of percent format
    |
 51 | print("%(k)s" % {"k": "v", "i": 1, "j": []})
 52 | 
@@ -473,7 +473,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 53 53 | print("%(a)s" % {"a"  :  1})
 54 54 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:53:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:53:7: UP031 [*] Use format specifiers instead of percent format
    |
 53 | print("%(ab)s" % {"a" "b": 1})
 54 | 
@@ -494,7 +494,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 55 55 | print((
 56 56 |     "foo %s "
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:56:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:56:5: UP031 [*] Use format specifiers instead of percent format
    |
 56 |   print((
 57 |       "foo %s "
@@ -517,7 +517,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 59 59 | 
 60 60 | print(
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:61:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:61:5: UP031 [*] Use format specifiers instead of percent format
    |
 61 |   print(
 62 |       "foo %(foo)s "
@@ -540,7 +540,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 64 64 | 
 65 65 | bar = {"bar": y}
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:67:5: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:67:5: UP031 [*] Use format specifiers instead of percent format
    |
 67 |   bar = {"bar": y}
 68 |   print(
@@ -564,7 +564,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 70 70 | 
 71 71 | print("%s \N{snowman}" % (a,))
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:71:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:71:7: UP031 [*] Use format specifiers instead of percent format
    |
 71 | )
 72 | 
@@ -585,7 +585,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 73 73 | print("%(foo)s \N{snowman}" % {"foo": 1})
 74 74 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:73:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:73:7: UP031 [*] Use format specifiers instead of percent format
    |
 73 | print("%s \N{snowman}" % (a,))
 74 | 
@@ -606,7 +606,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 75 75 | print(("foo %s " "bar %s") % (x, y))
 76 76 | 
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:75:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:75:7: UP031 [*] Use format specifiers instead of percent format
    |
 75 | print("%(foo)s \N{snowman}" % {"foo": 1})
 76 | 
@@ -627,7 +627,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 77 77 | # Single-value expressions
 78 78 | print('Hello %s' % "World")
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:78:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:78:7: UP031 [*] Use format specifiers instead of percent format
    |
 78 | # Single-value expressions
 79 | print('Hello %s' % "World")
@@ -647,7 +647,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 80 80 | print('Hello %s (%s)' % bar)
 81 81 | print('Hello %s (%s)' % bar.baz)
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:79:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:79:7: UP031 [*] Use format specifiers instead of percent format
    |
 79 | # Single-value expressions
 80 | print('Hello %s' % "World")
@@ -668,7 +668,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 81 81 | print('Hello %s (%s)' % bar.baz)
 82 82 | print('Hello %s (%s)' % bar['bop'])
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:80:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:80:7: UP031 [*] Use format specifiers instead of percent format
    |
 80 | print('Hello %s' % "World")
 81 | print('Hello %s' % f"World")
@@ -689,7 +689,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 82 82 | print('Hello %s (%s)' % bar['bop'])
 83 83 | print('Hello %(arg)s' % bar)
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:81:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:81:7: UP031 [*] Use format specifiers instead of percent format
    |
 81 | print('Hello %s' % f"World")
 82 | print('Hello %s (%s)' % bar)
@@ -710,7 +710,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 83 83 | print('Hello %(arg)s' % bar)
 84 84 | print('Hello %(arg)s' % bar.baz)
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:82:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:82:7: UP031 [*] Use format specifiers instead of percent format
    |
 82 | print('Hello %s (%s)' % bar)
 83 | print('Hello %s (%s)' % bar.baz)
@@ -731,7 +731,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 84 84 | print('Hello %(arg)s' % bar.baz)
 85 85 | print('Hello %(arg)s' % bar['bop'])
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:83:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:83:7: UP031 [*] Use format specifiers instead of percent format
    |
 83 | print('Hello %s (%s)' % bar.baz)
 84 | print('Hello %s (%s)' % bar['bop'])
@@ -751,7 +751,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 84 84 | print('Hello %(arg)s' % bar.baz)
 85 85 | print('Hello %(arg)s' % bar['bop'])
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:84:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:84:7: UP031 [*] Use format specifiers instead of percent format
    |
 84 | print('Hello %s (%s)' % bar['bop'])
 85 | print('Hello %(arg)s' % bar)
@@ -769,7 +769,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
    84 |+print('Hello {arg}'.format(**bar.baz))
 85 85 | print('Hello %(arg)s' % bar['bop'])
 
-./resources/test/fixtures/pyupgrade/UP031_0.py:85:7: UP031 [*] Use format specifiers instead of percent format
+UP031_0.py:85:7: UP031 [*] Use format specifiers instead of percent format
    |
 85 | print('Hello %(arg)s' % bar)
 86 | print('Hello %(arg)s' % bar.baz)

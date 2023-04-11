@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E23.py:2:7: E231 [*] Missing whitespace after ','
+E23.py:2:7: E231 [*] Missing whitespace after ','
   |
 2 | #: E231
 3 | a = (1,2)
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 4 4 | a[b1,:]
 5 5 | #: E231
 
-./resources/test/fixtures/pycodestyle/E23.py:4:5: E231 [*] Missing whitespace after ','
+E23.py:4:5: E231 [*] Missing whitespace after ','
   |
 4 | a = (1,2)
 5 | #: E231
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 6 6 | a = [{'a':''}]
 7 7 | #: Okay
 
-./resources/test/fixtures/pycodestyle/E23.py:6:10: E231 [*] Missing whitespace after ':'
+E23.py:6:10: E231 [*] Missing whitespace after ':'
    |
  6 | a[b1,:]
  7 | #: E231
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 8 8 | a = (4,)
 9 9 | b = (5, )
 
-./resources/test/fixtures/pycodestyle/E23.py:19:10: E231 [*] Missing whitespace after ','
+E23.py:19:10: E231 [*] Missing whitespace after ','
    |
 19 | def foo() -> None:
 20 |     #: E231

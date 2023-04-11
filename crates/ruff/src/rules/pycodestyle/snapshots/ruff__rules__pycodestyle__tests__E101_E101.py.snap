@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E101.py:11:1: E101 Indentation contains mixed spaces and tabs
+E101.py:11:1: E101 Indentation contains mixed spaces and tabs
    |
 11 | def func_mixed_start_with_tab():
 12 |     # E101
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 15 | def func_mixed_start_with_space():
    |
 
-./resources/test/fixtures/pycodestyle/E101.py:15:1: E101 Indentation contains mixed spaces and tabs
+E101.py:15:1: E101 Indentation contains mixed spaces and tabs
    |
 15 | def func_mixed_start_with_space():
 16 |     # E101
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 19 | def xyz():
    |
 
-./resources/test/fixtures/pycodestyle/E101.py:19:1: E101 Indentation contains mixed spaces and tabs
+E101.py:19:1: E101 Indentation contains mixed spaces and tabs
    |
 19 | def xyz():
 20 |     # E101

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT009.py:11:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:11:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 11 |         expr = 1
 12 |         msg = "Must be True"
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 13 13 |         self.assertTrue(expr, msg)  # Error
 14 14 |         self.assertTrue(expr=expr, msg=msg)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:12:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:12:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 12 |         msg = "Must be True"
 13 |         self.assertTrue(expr)  # Error
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 14 14 |         self.assertTrue(expr=expr, msg=msg)  # Error
 15 15 |         self.assertTrue(msg=msg, expr=expr)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:13:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:13:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 13 |         self.assertTrue(expr)  # Error
 14 |         self.assertTrue(expr=expr)  # Error
@@ -64,7 +64,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 15 15 |         self.assertTrue(msg=msg, expr=expr)  # Error
 16 16 |         self.assertTrue(*(expr, msg))  # Error, unfixable
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:14:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:14:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 14 |         self.assertTrue(expr=expr)  # Error
 15 |         self.assertTrue(expr, msg)  # Error
@@ -85,7 +85,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 16 16 |         self.assertTrue(*(expr, msg))  # Error, unfixable
 17 17 |         self.assertTrue(**{"expr": expr, "msg": msg})  # Error, unfixable
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:15:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:15:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 15 |         self.assertTrue(expr, msg)  # Error
 16 |         self.assertTrue(expr=expr, msg=msg)  # Error
@@ -106,7 +106,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 17 17 |         self.assertTrue(**{"expr": expr, "msg": msg})  # Error, unfixable
 18 18 |         self.assertTrue(msg=msg, expr=expr, unexpected_arg=False)  # Error, unfixable
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:16:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:16:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 16 |         self.assertTrue(expr=expr, msg=msg)  # Error
 17 |         self.assertTrue(msg=msg, expr=expr)  # Error
@@ -117,7 +117,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
    |
    = help: Replace `assertTrue(...)` with `assert ...`
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:17:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:17:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 17 |         self.assertTrue(msg=msg, expr=expr)  # Error
 18 |         self.assertTrue(*(expr, msg))  # Error, unfixable
@@ -128,7 +128,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
    |
    = help: Replace `assertTrue(...)` with `assert ...`
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:18:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:18:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 18 |         self.assertTrue(*(expr, msg))  # Error, unfixable
 19 |         self.assertTrue(**{"expr": expr, "msg": msg})  # Error, unfixable
@@ -139,7 +139,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
    |
    = help: Replace `assertTrue(...)` with `assert ...`
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:19:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
+PT009.py:19:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertTrue`
    |
 19 |         self.assertTrue(**{"expr": expr, "msg": msg})  # Error, unfixable
 20 |         self.assertTrue(msg=msg, expr=expr, unexpected_arg=False)  # Error, unfixable
@@ -150,7 +150,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
    |
    = help: Replace `assertTrue(...)` with `assert ...`
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:21:13: PT009 Use a regular `assert` instead of unittest-style `assertIsNotNone`
+PT009.py:21:13: PT009 Use a regular `assert` instead of unittest-style `assertIsNotNone`
    |
 21 |         self.assertTrue(msg=msg)  # Error, unfixable
 22 |         (
@@ -160,7 +160,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 25 |             else self.assertIsNone(value)  # Error, unfixable
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:23:18: PT009 Use a regular `assert` instead of unittest-style `assertIsNone`
+PT009.py:23:18: PT009 Use a regular `assert` instead of unittest-style `assertIsNone`
    |
 23 |             self.assertIsNotNone(value)  # Error, unfixable
 24 |             if expect_condition
@@ -170,7 +170,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 27 |         return self.assertEqual(True,  False)  # Error, unfixable
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:25:16: PT009 Use a regular `assert` instead of unittest-style `assertEqual`
+PT009.py:25:16: PT009 Use a regular `assert` instead of unittest-style `assertEqual`
    |
 25 |             else self.assertIsNone(value)  # Error, unfixable
 26 |         )
@@ -180,7 +180,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 29 |     def test_assert_false(self):
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:28:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertFalse`
+PT009.py:28:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertFalse`
    |
 28 |     def test_assert_false(self):
 29 |         self.assertFalse(True)  # Error
@@ -200,7 +200,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 30 30 |     def test_assert_equal(self):
 31 31 |         self.assertEqual(1, 2)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:31:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertEqual`
+PT009.py:31:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertEqual`
    |
 31 |     def test_assert_equal(self):
 32 |         self.assertEqual(1, 2)  # Error
@@ -220,7 +220,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 33 33 |     def test_assert_not_equal(self):
 34 34 |         self.assertNotEqual(1, 1)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:34:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotEqual`
+PT009.py:34:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotEqual`
    |
 34 |     def test_assert_not_equal(self):
 35 |         self.assertNotEqual(1, 1)  # Error
@@ -240,7 +240,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 36 36 |     def test_assert_greater(self):
 37 37 |         self.assertGreater(1, 2)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:37:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertGreater`
+PT009.py:37:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertGreater`
    |
 37 |     def test_assert_greater(self):
 38 |         self.assertGreater(1, 2)  # Error
@@ -260,7 +260,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 39 39 |     def test_assert_greater_equal(self):
 40 40 |         self.assertGreaterEqual(1, 2)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:40:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertGreaterEqual`
+PT009.py:40:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertGreaterEqual`
    |
 40 |     def test_assert_greater_equal(self):
 41 |         self.assertGreaterEqual(1, 2)  # Error
@@ -280,7 +280,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 42 42 |     def test_assert_less(self):
 43 43 |         self.assertLess(2, 1)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:43:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertLess`
+PT009.py:43:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertLess`
    |
 43 |     def test_assert_less(self):
 44 |         self.assertLess(2, 1)  # Error
@@ -300,7 +300,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 45 45 |     def test_assert_less_equal(self):
 46 46 |         self.assertLessEqual(1, 2)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:46:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertLessEqual`
+PT009.py:46:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertLessEqual`
    |
 46 |     def test_assert_less_equal(self):
 47 |         self.assertLessEqual(1, 2)  # Error
@@ -320,7 +320,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 48 48 |     def test_assert_in(self):
 49 49 |         self.assertIn(1, [2, 3])  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:49:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIn`
+PT009.py:49:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIn`
    |
 49 |     def test_assert_in(self):
 50 |         self.assertIn(1, [2, 3])  # Error
@@ -340,7 +340,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 51 51 |     def test_assert_not_in(self):
 52 52 |         self.assertNotIn(2, [2, 3])  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:52:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotIn`
+PT009.py:52:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotIn`
    |
 52 |     def test_assert_not_in(self):
 53 |         self.assertNotIn(2, [2, 3])  # Error
@@ -360,7 +360,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 54 54 |     def test_assert_is_none(self):
 55 55 |         self.assertIsNone(0)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:55:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIsNone`
+PT009.py:55:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIsNone`
    |
 55 |     def test_assert_is_none(self):
 56 |         self.assertIsNone(0)  # Error
@@ -380,7 +380,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 57 57 |     def test_assert_is_not_none(self):
 58 58 |         self.assertIsNotNone(0)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:58:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIsNotNone`
+PT009.py:58:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIsNotNone`
    |
 58 |     def test_assert_is_not_none(self):
 59 |         self.assertIsNotNone(0)  # Error
@@ -400,7 +400,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 60 60 |     def test_assert_is(self):
 61 61 |         self.assertIs([], [])  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:61:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIs`
+PT009.py:61:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIs`
    |
 61 |     def test_assert_is(self):
 62 |         self.assertIs([], [])  # Error
@@ -420,7 +420,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 63 63 |     def test_assert_is_not(self):
 64 64 |         self.assertIsNot(1, 1)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:64:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIsNot`
+PT009.py:64:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIsNot`
    |
 64 |     def test_assert_is_not(self):
 65 |         self.assertIsNot(1, 1)  # Error
@@ -440,7 +440,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 66 66 |     def test_assert_is_instance(self):
 67 67 |         self.assertIsInstance(1, str)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:67:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIsInstance`
+PT009.py:67:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertIsInstance`
    |
 67 |     def test_assert_is_instance(self):
 68 |         self.assertIsInstance(1, str)  # Error
@@ -460,7 +460,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 69 69 |     def test_assert_is_not_instance(self):
 70 70 |         self.assertNotIsInstance(1, int)  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:70:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotIsInstance`
+PT009.py:70:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotIsInstance`
    |
 70 |     def test_assert_is_not_instance(self):
 71 |         self.assertNotIsInstance(1, int)  # Error
@@ -480,7 +480,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 72 72 |     def test_assert_regex(self):
 73 73 |         self.assertRegex("abc", r"def")  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:73:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertRegex`
+PT009.py:73:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertRegex`
    |
 73 |     def test_assert_regex(self):
 74 |         self.assertRegex("abc", r"def")  # Error
@@ -500,7 +500,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 75 75 |     def test_assert_not_regex(self):
 76 76 |         self.assertNotRegex("abc", r"abc")  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:76:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotRegex`
+PT009.py:76:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotRegex`
    |
 76 |     def test_assert_not_regex(self):
 77 |         self.assertNotRegex("abc", r"abc")  # Error
@@ -520,7 +520,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 78 78 |     def test_assert_regexp_matches(self):
 79 79 |         self.assertRegexpMatches("abc", r"def")  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:79:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertRegexpMatches`
+PT009.py:79:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertRegexpMatches`
    |
 79 |     def test_assert_regexp_matches(self):
 80 |         self.assertRegexpMatches("abc", r"def")  # Error
@@ -540,7 +540,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 81 81 |     def test_assert_not_regexp_matches(self):
 82 82 |         self.assertNotRegex("abc", r"abc")  # Error
 
-./resources/test/fixtures/flake8_pytest_style/PT009.py:82:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotRegex`
+PT009.py:82:9: PT009 [*] Use a regular `assert` instead of unittest-style `assertNotRegex`
    |
 82 |     def test_assert_not_regexp_matches(self):
 83 |         self.assertNotRegex("abc", r"abc")  # Error

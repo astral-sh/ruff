@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F401_5.py:2:17: F401 [*] `a.b.c` imported but unused
+F401_5.py:2:17: F401 [*] `a.b.c` imported but unused
   |
 2 | """Test: removal of multi-segment and aliases imports."""
 3 | from a.b import c
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 4 3 | import h.i
 5 4 | import j.k as l
 
-./resources/test/fixtures/pyflakes/F401_5.py:3:17: F401 [*] `d.e.f` imported but unused
+F401_5.py:3:17: F401 [*] `d.e.f` imported but unused
   |
 3 | """Test: removal of multi-segment and aliases imports."""
 4 | from a.b import c
@@ -36,7 +36,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 4 3 | import h.i
 5 4 | import j.k as l
 
-./resources/test/fixtures/pyflakes/F401_5.py:4:8: F401 [*] `h.i` imported but unused
+F401_5.py:4:8: F401 [*] `h.i` imported but unused
   |
 4 | from a.b import c
 5 | from d.e import f as g
@@ -53,7 +53,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 4   |-import h.i
 5 4 | import j.k as l
 
-./resources/test/fixtures/pyflakes/F401_5.py:5:8: F401 [*] `j.k` imported but unused
+F401_5.py:5:8: F401 [*] `j.k` imported but unused
   |
 5 | from d.e import f as g
 6 | import h.i

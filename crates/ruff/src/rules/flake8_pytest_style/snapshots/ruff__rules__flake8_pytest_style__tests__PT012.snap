@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT012.py:28:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:28:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
 28 |   def test_error_multiple_statements():
 29 |       with pytest.raises(AttributeError):
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
    | |_______________^ PT012
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT012.py:34:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:34:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
 34 |   async def test_error_complex_statement():
 35 |       with pytest.raises(AttributeError):
@@ -23,7 +23,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 39 |       with pytest.raises(AttributeError):
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT012.py:38:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:38:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
 38 |               [].size
 39 |   
@@ -36,7 +36,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 44 |       with pytest.raises(AttributeError):
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT012.py:42:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:42:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
 42 |               [].size
 43 |   
@@ -49,7 +49,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 48 |       with pytest.raises(AttributeError):
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT012.py:46:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:46:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
 46 |               [].size
 47 |   
@@ -62,7 +62,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 52 |       with pytest.raises(AttributeError):
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT012.py:50:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:50:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
 50 |               [].size
 51 |   
@@ -75,7 +75,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 56 |       with pytest.raises(AttributeError):
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT012.py:54:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:54:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
 54 |               [].size
 55 |   
@@ -86,7 +86,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
    | |___________________^ PT012
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT012.py:60:5: PT012 `pytest.raises()` block should contain a single simple statement
+PT012.py:60:5: PT012 `pytest.raises()` block should contain a single simple statement
    |
 60 |   def test_error_try():
 61 |       with pytest.raises(AttributeError):

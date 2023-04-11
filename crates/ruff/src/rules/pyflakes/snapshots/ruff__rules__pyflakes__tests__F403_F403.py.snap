@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F403.py:1:1: F403 `from F634 import *` used; unable to detect undefined names
+F403.py:1:1: F403 `from F634 import *` used; unable to detect undefined names
   |
 1 | from F634 import *
   | ^^^^^^^^^^^^^^^^^^ F403
 2 | from F634 import *  # noqa: E501
   |
 
-./resources/test/fixtures/pyflakes/F403.py:2:1: F403 `from F634 import *` used; unable to detect undefined names
+F403.py:2:1: F403 `from F634 import *` used; unable to detect undefined names
   |
 2 | from F634 import *
 3 | from F634 import *  # noqa: E501

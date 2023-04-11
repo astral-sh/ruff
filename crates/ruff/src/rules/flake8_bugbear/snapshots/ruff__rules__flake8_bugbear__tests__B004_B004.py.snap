@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B004.py:3:8: B004 Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
+B004.py:3:8: B004 Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
   |
 3 | def this_is_a_bug():
 4 |     o = object()
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 7 |     if getattr(o, "__call__", False):
   |
 
-./resources/test/fixtures/flake8_bugbear/B004.py:5:8: B004 Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
+B004.py:5:8: B004 Using `hasattr(x, '__call__')` to test if x is callable is unreliable. Use `callable(x)` for consistent results.
   |
 5 |     if hasattr(o, "__call__"):
 6 |         print("Ooh, callable! Or is it?")

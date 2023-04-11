@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:10:14: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:10:14: PYI011 [*] Only simple default values allowed for typed arguments
    |
 10 | def f12(
 11 |     x,
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 12 12 | def f11(*, x: str = "x") -> None: ...  # OK
 13 13 | def f13(
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:38:9: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:38:9: PYI011 [*] Only simple default values allowed for typed arguments
    |
 38 |       x: dict[
 39 |           int, int
@@ -50,7 +50,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 43 40 | def f153(
 44 41 |     x: list[
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:46:9: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:46:9: PYI011 [*] Only simple default values allowed for typed arguments
    |
 46 |       x: list[
 47 |           int
@@ -96,7 +96,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 60 48 | def f154(
 61 49 |     x: tuple[
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:63:9: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:63:9: PYI011 [*] Only simple default values allowed for typed arguments
    |
 63 |       x: tuple[
 64 |           str, tuple[str, ...]
@@ -124,7 +124,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 68 65 | def f141(
 69 66 |     x: list[
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:71:9: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:71:9: PYI011 [*] Only simple default values allowed for typed arguments
    |
 71 |       x: list[
 72 |           int
@@ -150,7 +150,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 75 73 | def f142(
 76 74 |     x: list[
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:78:9: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:78:9: PYI011 [*] Only simple default values allowed for typed arguments
    |
 78 |       x: list[
 79 |           int
@@ -176,7 +176,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 82 80 | def f16(
 83 81 |     x: frozenset[
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:85:9: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:85:9: PYI011 [*] Only simple default values allowed for typed arguments
    |
 85 |       x: frozenset[
 86 |           bytes
@@ -202,7 +202,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 89 87 | def f17(
 90 88 |     x: str = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:90:14: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:90:14: PYI011 [*] Only simple default values allowed for typed arguments
    |
 90 |   ) -> None: ...
 91 |   def f17(
@@ -226,7 +226,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 93 92 | def f18(
 94 93 |     x: str = b"foo"  # Error PYI011 Only simple default values allowed for typed arguments
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:94:14: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:94:14: PYI011 [*] Only simple default values allowed for typed arguments
    |
 94 |   ) -> None: ...
 95 |   def f18(
@@ -250,7 +250,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 97 96 | def f19(
 98 97 |     x: object = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:98:17: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:98:17: PYI011 [*] Only simple default values allowed for typed arguments
     |
  98 |   ) -> None: ...
  99 |   def f19(
@@ -274,7 +274,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 101 100 | def f20(
 102 101 |     x: int = 5
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:102:14: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:102:14: PYI011 [*] Only simple default values allowed for typed arguments
     |
 102 |   ) -> None: ...
 103 |   def f20(
@@ -298,7 +298,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 105 104 | def f21(
 106 105 |     x: complex = 3j
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:106:18: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:106:18: PYI011 [*] Only simple default values allowed for typed arguments
     |
 106 |   ) -> None: ...
 107 |   def f21(
@@ -322,7 +322,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 109 108 | def f22(
 110 109 |     x: complex = -42.5j  # Error PYI011 Only simple default values allowed for typed arguments
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:110:18: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:110:18: PYI011 [*] Only simple default values allowed for typed arguments
     |
 110 |   ) -> None: ...
 111 |   def f22(
@@ -346,7 +346,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 113 112 | def f23(
 114 113 |     x: bool = True,  # OK
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:138:16: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:138:16: PYI011 [*] Only simple default values allowed for typed arguments
     |
 138 | ) -> None: ...
 139 | def f31(
@@ -367,7 +367,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 140 140 | def f32(
 141 141 |     x: float = np.inf,  # Error PYI011 Only simple default values allowed for typed arguments
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:141:16: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:141:16: PYI011 [*] Only simple default values allowed for typed arguments
     |
 141 | ) -> None: ...
 142 | def f32(
@@ -388,7 +388,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 143 143 | def f33(
 144 144 |     x: float = math.nan,  # OK
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:147:16: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:147:16: PYI011 [*] Only simple default values allowed for typed arguments
     |
 147 | ) -> None: ...
 148 | def f34(
@@ -409,7 +409,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 149 149 | def f35(
 150 150 |     x: complex = math.inf  # Error PYI011 Only simple default values allowed for typed arguments
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:150:18: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:150:18: PYI011 [*] Only simple default values allowed for typed arguments
     |
 150 |   ) -> None: ...
 151 |   def f35(
@@ -433,7 +433,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 153 152 | def f36(
 154 153 |     *,
 
-./resources/test/fixtures/flake8_pyi/PYI011.pyi:159:14: PYI011 [*] Only simple default values allowed for typed arguments
+PYI011.pyi:159:14: PYI011 [*] Only simple default values allowed for typed arguments
     |
 159 |   def f37(
 160 |       *,

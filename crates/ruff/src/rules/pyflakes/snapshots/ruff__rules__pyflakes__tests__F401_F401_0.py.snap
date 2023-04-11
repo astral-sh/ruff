@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F401_0.py:2:8: F401 [*] `functools` imported but unused
+F401_0.py:2:8: F401 [*] `functools` imported but unused
   |
 2 | from __future__ import all_feature_names
 3 | import functools, os
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 4 4 | from collections import (
 5 5 |     Counter,
 
-./resources/test/fixtures/pyflakes/F401_0.py:6:5: F401 [*] `collections.OrderedDict` imported but unused
+F401_0.py:6:5: F401 [*] `collections.OrderedDict` imported but unused
    |
  6 | from collections import (
  7 |     Counter,
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 8 7 | )
 9 8 | import multiprocessing.pool
 
-./resources/test/fixtures/pyflakes/F401_0.py:12:8: F401 [*] `logging.handlers` imported but unused
+F401_0.py:12:8: F401 [*] `logging.handlers` imported but unused
    |
 12 | import multiprocessing.process
 13 | import logging.config
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 14 13 |     TYPE_CHECKING,
 15 14 |     NamedTuple,
 
-./resources/test/fixtures/pyflakes/F401_0.py:32:12: F401 [*] `shelve` imported but unused
+F401_0.py:32:12: F401 [*] `shelve` imported but unused
    |
 32 | if TYPE_CHECKING:
 33 |     import shelve
@@ -77,7 +77,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 34 33 | 
 35 34 | if TYPE_CHECKING:
 
-./resources/test/fixtures/pyflakes/F401_0.py:33:12: F401 [*] `importlib` imported but unused
+F401_0.py:33:12: F401 [*] `importlib` imported but unused
    |
 33 | if TYPE_CHECKING:
 34 |     import shelve
@@ -98,7 +98,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 35 35 | if TYPE_CHECKING:
 36 36 |     """Hello, world!"""
 
-./resources/test/fixtures/pyflakes/F401_0.py:37:12: F401 [*] `pathlib` imported but unused
+F401_0.py:37:12: F401 [*] `pathlib` imported but unused
    |
 37 | if TYPE_CHECKING:
 38 |     """Hello, world!"""
@@ -118,7 +118,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 39 38 |     z = 1
 40 39 | 
 
-./resources/test/fixtures/pyflakes/F401_0.py:52:16: F401 [*] `pickle` imported but unused
+F401_0.py:52:16: F401 [*] `pickle` imported but unused
    |
 52 |     def b(self) -> None:
 53 |         import pickle
@@ -136,7 +136,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 54 54 | 
 55 55 | __all__ = ["ClassA"] + ["ClassB"]
 
-./resources/test/fixtures/pyflakes/F401_0.py:93:16: F401 [*] `x` imported but unused
+F401_0.py:93:16: F401 [*] `x` imported but unused
    |
 93 | match *0, 1, *2:
 94 |     case 0,:
@@ -153,7 +153,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 93    |-        import x
 94 93 |         import y
 
-./resources/test/fixtures/pyflakes/F401_0.py:94:16: F401 [*] `y` imported but unused
+F401_0.py:94:16: F401 [*] `y` imported but unused
    |
 94 |     case 0,:
 95 |         import x

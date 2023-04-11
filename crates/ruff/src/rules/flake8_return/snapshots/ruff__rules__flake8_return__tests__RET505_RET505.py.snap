@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
-./resources/test/fixtures/flake8_return/RET505.py:8:5: RET505 Unnecessary `elif` after `return` statement
+RET505.py:8:5: RET505 Unnecessary `elif` after `return` statement
    |
  8 |         a = 1
  9 |         return y
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 12 |         return w
    |
 
-./resources/test/fixtures/flake8_return/RET505.py:23:5: RET505 Unnecessary `elif` after `return` statement
+RET505.py:23:5: RET505 Unnecessary `elif` after `return` statement
    |
 23 |             b = 2
 24 |         return
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 27 |     else:
    |
 
-./resources/test/fixtures/flake8_return/RET505.py:41:5: RET505 Unnecessary `elif` after `return` statement
+RET505.py:41:5: RET505 Unnecessary `elif` after `return` statement
    |
 41 |         a = 1
 42 |         return y
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 45 |         return w
    |
 
-./resources/test/fixtures/flake8_return/RET505.py:53:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:53:5: RET505 Unnecessary `else` after `return` statement
    |
 53 |         a = 1
 54 |         return y
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 57 |         return z
    |
 
-./resources/test/fixtures/flake8_return/RET505.py:64:9: RET505 Unnecessary `else` after `return` statement
+RET505.py:64:9: RET505 Unnecessary `else` after `return` statement
    |
 64 |             b = 2
 65 |             return y
@@ -51,7 +51,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 68 |             return x
    |
 
-./resources/test/fixtures/flake8_return/RET505.py:79:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:79:5: RET505 Unnecessary `else` after `return` statement
    |
 79 |             b = 2
 80 |         return
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 83 |     return
    |
 
-./resources/test/fixtures/flake8_return/RET505.py:89:9: RET505 Unnecessary `else` after `return` statement
+RET505.py:89:9: RET505 Unnecessary `else` after `return` statement
    |
 89 |             a = 4
 90 |             return
@@ -71,7 +71,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 93 |     else:
    |
 
-./resources/test/fixtures/flake8_return/RET505.py:99:5: RET505 Unnecessary `else` after `return` statement
+RET505.py:99:5: RET505 Unnecessary `else` after `return` statement
     |
  99 |     if x:  # [no-else-return]
 100 |         return True

@@ -1,21 +1,21 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E743.py:1:5: E743 Ambiguous function name: `l`
+E743.py:1:5: E743 Ambiguous function name: `l`
   |
 1 | def l():
   |     ^ E743
 2 |     pass
   |
 
-./resources/test/fixtures/pycodestyle/E743.py:5:5: E743 Ambiguous function name: `I`
+E743.py:5:5: E743 Ambiguous function name: `I`
   |
 5 | def I():
   |     ^ E743
 6 |     pass
   |
 
-./resources/test/fixtures/pycodestyle/E743.py:10:9: E743 Ambiguous function name: `O`
+E743.py:10:9: E743 Ambiguous function name: `O`
    |
 10 | class X:
 11 |     def O(self):

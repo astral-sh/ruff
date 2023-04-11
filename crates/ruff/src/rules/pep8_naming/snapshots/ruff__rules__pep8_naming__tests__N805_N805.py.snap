@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
 ---
-./resources/test/fixtures/pep8_naming/N805.py:7:20: N805 First argument of a method should be named `self`
+N805.py:7:20: N805 First argument of a method should be named `self`
   |
 7 | class Class:
 8 |     def bad_method(this):
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 9 |         pass
   |
 
-./resources/test/fixtures/pep8_naming/N805.py:12:30: N805 First argument of a method should be named `self`
+N805.py:12:30: N805 First argument of a method should be named `self`
    |
 12 |     if False:
 13 | 
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 15 |             pass
    |
 
-./resources/test/fixtures/pep8_naming/N805.py:27:15: N805 First argument of a method should be named `self`
+N805.py:27:15: N805 First argument of a method should be named `self`
    |
 27 |     @pydantic.validator
 28 |     def lower(cls, my_field: str) -> str:
@@ -26,7 +26,7 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 29 |         pass
    |
 
-./resources/test/fixtures/pep8_naming/N805.py:31:15: N805 First argument of a method should be named `self`
+N805.py:31:15: N805 First argument of a method should be named `self`
    |
 31 |     @pydantic.validator("my_field")
 32 |     def lower(cls, my_field: str) -> str:
@@ -34,7 +34,7 @@ source: crates/ruff/src/rules/pep8_naming/mod.rs
 33 |         pass
    |
 
-./resources/test/fixtures/pep8_naming/N805.py:60:29: N805 First argument of a method should be named `self`
+N805.py:60:29: N805 First argument of a method should be named `self`
    |
 60 |         pass
 61 | 

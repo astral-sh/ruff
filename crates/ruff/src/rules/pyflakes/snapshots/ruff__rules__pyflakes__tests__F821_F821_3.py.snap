@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F821_3.py:11:10: F821 Undefined name `key`
+F821_3.py:11:10: F821 Undefined name `key`
    |
 11 | # F821 Undefined name `key`
 12 | # F821 Undefined name `value`
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 15 | # OK
    |
 
-./resources/test/fixtures/pyflakes/F821_3.py:11:17: F821 Undefined name `value`
+F821_3.py:11:17: F821 Undefined name `value`
    |
 11 | # F821 Undefined name `key`
 12 | # F821 Undefined name `value`

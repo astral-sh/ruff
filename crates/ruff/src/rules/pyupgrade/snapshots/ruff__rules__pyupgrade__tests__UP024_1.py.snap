@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP024_1.py:5:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_1.py:5:8: UP024 [*] Replace aliased errors with `OSError`
   |
 5 | try:
 6 |     pass
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 7 7 | except (OSError, socket.error, KeyError):
 8 8 |     pass
 
-./resources/test/fixtures/pyupgrade/UP024_1.py:7:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_1.py:7:8: UP024 [*] Replace aliased errors with `OSError`
    |
  7 | except (OSError, mmap.error, IOError):
  8 |     pass
@@ -42,7 +42,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 9 9 | 
 10 10 | try:
 
-./resources/test/fixtures/pyupgrade/UP024_1.py:12:8: UP024 [*] Replace aliased errors with `OSError`
+UP024_1.py:12:8: UP024 [*] Replace aliased errors with `OSError`
    |
 12 |   try:
 13 |       pass

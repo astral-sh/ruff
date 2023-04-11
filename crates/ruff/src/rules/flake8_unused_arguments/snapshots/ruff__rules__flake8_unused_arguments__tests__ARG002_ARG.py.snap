@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 ---
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:35:17: ARG002 Unused method argument: `x`
+ARG.py:35:17: ARG002 Unused method argument: `x`
    |
 35 |     # Unused arguments.
 36 |     ###
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 38 |         print("Hello, world!")
    |
 
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:38:20: ARG002 Unused method argument: `x`
+ARG.py:38:20: ARG002 Unused method argument: `x`
    |
 38 |         print("Hello, world!")
 39 | 
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 41 |         print("Hello, world!")
    |
 
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:41:16: ARG002 Unused method argument: `x`
+ARG.py:41:16: ARG002 Unused method argument: `x`
    |
 41 |         print("Hello, world!")
 42 | 
@@ -28,7 +28,7 @@ source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
 44 |         print("Hello, world!")
    |
 
-./resources/test/fixtures/flake8_unused_arguments/ARG.py:190:24: ARG002 Unused method argument: `x`
+ARG.py:190:24: ARG002 Unused method argument: `x`
     |
 190 | ###
 191 | class C:

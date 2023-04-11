@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/binary_op_exception.py:3:8: PLW0711 Exception to catch is the result of a binary `or` operation
+binary_op_exception.py:3:8: PLW0711 Exception to catch is the result of a binary `or` operation
   |
 3 | try:
 4 |     1 / 0
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 6 |     pass
   |
 
-./resources/test/fixtures/pylint/binary_op_exception.py:8:8: PLW0711 Exception to catch is the result of a binary `and` operation
+binary_op_exception.py:8:8: PLW0711 Exception to catch is the result of a binary `and` operation
    |
  8 | try:
  9 |     raise ValueError

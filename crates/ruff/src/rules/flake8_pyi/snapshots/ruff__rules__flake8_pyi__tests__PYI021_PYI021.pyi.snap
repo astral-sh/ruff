@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-./resources/test/fixtures/flake8_pyi/PYI021.pyi:1:1: PYI021 Docstrings should not be included in stubs
+PYI021.pyi:1:1: PYI021 Docstrings should not be included in stubs
   |
 1 | """foo"""  # ERROR PYI021
   | ^^^^^^^^^ PYI021
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 3 | def foo():
   |
 
-./resources/test/fixtures/flake8_pyi/PYI021.pyi:4:5: PYI021 Docstrings should not be included in stubs
+PYI021.pyi:4:5: PYI021 Docstrings should not be included in stubs
   |
 4 | def foo():
 5 |     """foo"""  # ERROR PYI021
@@ -18,7 +18,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 7 | class Bar:
   |
 
-./resources/test/fixtures/flake8_pyi/PYI021.pyi:7:5: PYI021 Docstrings should not be included in stubs
+PYI021.pyi:7:5: PYI021 Docstrings should not be included in stubs
    |
  7 | class Bar:
  8 |     """bar"""  # ERROR PYI021

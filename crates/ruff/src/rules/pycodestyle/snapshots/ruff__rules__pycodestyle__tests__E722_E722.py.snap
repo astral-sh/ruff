@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E722.py:4:1: E722 Do not use bare `except`
+E722.py:4:1: E722 Do not use bare `except`
   |
 4 | try:
 5 |     pass
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 8 | #: E722
   |
 
-./resources/test/fixtures/pycodestyle/E722.py:11:1: E722 Do not use bare `except`
+E722.py:11:1: E722 Do not use bare `except`
    |
 11 | except Exception:
 12 |     pass
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 15 | #: E722
    |
 
-./resources/test/fixtures/pycodestyle/E722.py:16:1: E722 Do not use bare `except`
+E722.py:16:1: E722 Do not use bare `except`
    |
 16 | try:
 17 |     pass

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
 ---
-./resources/test/fixtures/ruff/RUF009.py:15:41: RUF009 Do not perform function call `default_function` in dataclass defaults
+RUF009.py:15:41: RUF009 Do not perform function call `default_function` in dataclass defaults
    |
 15 | @dataclass()
 16 | class A:
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
    |                                         ^^^^^^^^^^^^^^^^^^ RUF009
    |
 
-./resources/test/fixtures/ruff/RUF009.py:24:41: RUF009 Do not perform function call `default_function` in dataclass defaults
+RUF009.py:24:41: RUF009 Do not perform function call `default_function` in dataclass defaults
    |
 24 | @dataclass
 25 | class B:
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 28 |     not_optimal: ImmutableType = ImmutableType(20)
    |
 
-./resources/test/fixtures/ruff/RUF009.py:25:28: RUF009 Do not perform function call `A` in dataclass defaults
+RUF009.py:25:28: RUF009 Do not perform function call `A` in dataclass defaults
    |
 25 | class B:
 26 |     hidden_mutable_default: list[int] = default_function()
@@ -29,7 +29,7 @@ source: crates/ruff/src/rules/ruff/mod.rs
 29 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
    |
 
-./resources/test/fixtures/ruff/RUF009.py:26:34: RUF009 Do not perform function call `ImmutableType` in dataclass defaults
+RUF009.py:26:34: RUF009 Do not perform function call `ImmutableType` in dataclass defaults
    |
 26 |     hidden_mutable_default: list[int] = default_function()
 27 |     another_dataclass: A = A()

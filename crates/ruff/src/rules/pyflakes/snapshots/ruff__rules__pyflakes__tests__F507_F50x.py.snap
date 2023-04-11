@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F50x.py:5:1: F507 `%`-format string has 2 placeholder(s) but 1 substitution(s)
+F50x.py:5:1: F507 `%`-format string has 2 placeholder(s) but 1 substitution(s)
   |
 5 | '%(foo)s %s' % {'foo': 'bar'}  # F506
 6 | '%j' % (1,)  # F509
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 9 | '%(bar)s' % {}  # F505
   |
 
-./resources/test/fixtures/pyflakes/F50x.py:6:1: F507 `%`-format string has 2 placeholder(s) but 3 substitution(s)
+F50x.py:6:1: F507 `%`-format string has 2 placeholder(s) but 3 substitution(s)
    |
  6 | '%j' % (1,)  # F509
  7 | '%s %s' % (1,)  # F507

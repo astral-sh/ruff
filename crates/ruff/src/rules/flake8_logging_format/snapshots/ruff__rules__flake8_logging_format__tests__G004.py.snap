@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 ---
-./resources/test/fixtures/flake8_logging_format/G004.py:4:14: G004 Logging statement uses f-string
+G004.py:4:14: G004 Logging statement uses f-string
   |
 4 | name = "world"
 5 | logging.info(f"Hello {name}")
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 6 | logging.log(logging.INFO, f"Hello {name}")
   |
 
-./resources/test/fixtures/flake8_logging_format/G004.py:5:27: G004 Logging statement uses f-string
+G004.py:5:27: G004 Logging statement uses f-string
   |
 5 | name = "world"
 6 | logging.info(f"Hello {name}")

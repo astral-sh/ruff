@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
-./resources/test/fixtures/flake8_bandit/S701.py:9:68: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+S701.py:9:68: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
    |
  9 | templateEnv = jinja2.Environment(autoescape=True,
 10 |         loader=templateLoader )
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 13 | Environment(loader=templateLoader,
    |
 
-./resources/test/fixtures/flake8_bandit/S701.py:10:45: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+S701.py:10:45: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
    |
 10 |         loader=templateLoader )
 11 | Environment(loader=templateLoader, load=templateLoader, autoescape=something)  # S701
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 14 |             load=templateLoader,
    |
 
-./resources/test/fixtures/flake8_bandit/S701.py:13:24: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+S701.py:13:24: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
    |
 13 | Environment(loader=templateLoader,
 14 |             load=templateLoader,
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 17 | Environment(loader=templateLoader,  # S701
    |
 
-./resources/test/fixtures/flake8_bandit/S701.py:15:1: S701 By default, jinja2 sets `autoescape` to `False`. Consider using `autoescape=True` or the `select_autoescape` function to mitigate XSS vulnerabilities.
+S701.py:15:1: S701 By default, jinja2 sets `autoescape` to `False`. Consider using `autoescape=True` or the `select_autoescape` function to mitigate XSS vulnerabilities.
    |
 15 |             autoescape=False)  # S701
 16 | 
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 18 |             load=templateLoader)
    |
 
-./resources/test/fixtures/flake8_bandit/S701.py:29:47: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+S701.py:29:47: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
    |
 29 | def fake_func():
 30 |     return 'foobar'

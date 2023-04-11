@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM222.py:1:4: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:1:4: SIM222 [*] Use `True` instead of `... or True`
   |
 1 | if a or True:  # SIM222
   |    ^^^^^^^^^ SIM222
@@ -16,7 +16,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 3 3 | 
 4 4 | if (a or b) or True:  # SIM222
 
-./resources/test/fixtures/flake8_simplify/SIM222.py:4:4: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:4:4: SIM222 [*] Use `True` instead of `... or True`
   |
 4 |     pass
 5 | 
@@ -36,7 +36,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 6 6 | 
 7 7 | if a or (b or True):  # SIM222
 
-./resources/test/fixtures/flake8_simplify/SIM222.py:7:10: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:7:10: SIM222 [*] Use `True` instead of `... or True`
    |
  7 |     pass
  8 | 
@@ -56,7 +56,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 9 9 | 
 10 10 | if a and True:  # OK
 
-./resources/test/fixtures/flake8_simplify/SIM222.py:24:16: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:24:16: SIM222 [*] Use `True` instead of `... or True`
    |
 24 |     pass
 25 | 
@@ -76,7 +76,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 26 26 | 
 27 27 | if True or f() or a or g() or b:  # SIM222
 
-./resources/test/fixtures/flake8_simplify/SIM222.py:27:4: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:27:4: SIM222 [*] Use `True` instead of `... or True`
    |
 27 |     pass
 28 | 
@@ -96,7 +96,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 29 29 | 
 30 30 | if a or True or f() or b or g():  # SIM222
 
-./resources/test/fixtures/flake8_simplify/SIM222.py:30:4: SIM222 [*] Use `True` instead of `... or True`
+SIM222.py:30:4: SIM222 [*] Use `True` instead of `... or True`
    |
 30 |     pass
 31 | 

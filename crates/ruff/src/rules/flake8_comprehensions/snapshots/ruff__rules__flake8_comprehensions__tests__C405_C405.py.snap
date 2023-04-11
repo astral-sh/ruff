@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 ---
-./resources/test/fixtures/flake8_comprehensions/C405.py:1:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:1:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
   |
 1 | set([1, 2])
   | ^^^^^^^^^^^ C405
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 3 3 | set([])
 4 4 | set(())
 
-./resources/test/fixtures/flake8_comprehensions/C405.py:2:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+C405.py:2:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
   |
 2 | set([1, 2])
 3 | set((1, 2))
@@ -35,7 +35,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 4 4 | set(())
 5 5 | set()
 
-./resources/test/fixtures/flake8_comprehensions/C405.py:3:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:3:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
   |
 3 | set([1, 2])
 4 | set((1, 2))
@@ -55,7 +55,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 5 5 | set()
 6 6 | set((1,))
 
-./resources/test/fixtures/flake8_comprehensions/C405.py:4:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+C405.py:4:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
   |
 4 | set((1, 2))
 5 | set([])
@@ -77,7 +77,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 7 7 | set((
 8 8 |     1,
 
-./resources/test/fixtures/flake8_comprehensions/C405.py:6:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+C405.py:6:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
    |
  6 | set(())
  7 | set()
@@ -98,7 +98,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 8 8 |     1,
 9 9 | ))
 
-./resources/test/fixtures/flake8_comprehensions/C405.py:7:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+C405.py:7:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
    |
  7 |   set()
  8 |   set((1,))
@@ -124,7 +124,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 11 11 |     1,
 12 12 | ])
 
-./resources/test/fixtures/flake8_comprehensions/C405.py:10:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:10:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
 10 |       1,
 11 |   ))
@@ -150,7 +150,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 14 14 |     (1,)
 15 15 | )
 
-./resources/test/fixtures/flake8_comprehensions/C405.py:13:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
+C405.py:13:1: C405 [*] Unnecessary `tuple` literal (rewrite as a `set` literal)
    |
 13 |       1,
 14 |   ])
@@ -175,7 +175,7 @@ source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
 17 15 |     [1,]
 18 16 | )
 
-./resources/test/fixtures/flake8_comprehensions/C405.py:16:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
+C405.py:16:1: C405 [*] Unnecessary `list` literal (rewrite as a `set` literal)
    |
 16 |       (1,)
 17 |   )

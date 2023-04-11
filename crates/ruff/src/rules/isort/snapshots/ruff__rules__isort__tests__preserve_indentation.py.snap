@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/isort/mod.rs
 ---
-./resources/test/fixtures/isort/preserve_indentation.py:2:1: I001 [*] Import block is un-sorted or un-formatted
+preserve_indentation.py:2:1: I001 [*] Import block is un-sorted or un-formatted
   |
 2 |   if True:
 3 | /     import sys
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/isort/mod.rs
 5 5 |     import sys
 6 6 |     import os
 
-./resources/test/fixtures/isort/preserve_indentation.py:5:1: I001 [*] Import block is un-sorted or un-formatted
+preserve_indentation.py:5:1: I001 [*] Import block is un-sorted or un-formatted
   |
 5 |       import os
 6 |   else:

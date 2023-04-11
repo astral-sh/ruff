@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
 ---
-./resources/test/fixtures/flake8_pyi/PYI009.pyi:3:5: PYI009 Empty body should contain `...`, not `pass`
+PYI009.pyi:3:5: PYI009 Empty body should contain `...`, not `pass`
   |
 3 | def bar(): ...  # OK
 4 | def foo():
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 7 | class Bar: ...  # OK
   |
 
-./resources/test/fixtures/flake8_pyi/PYI009.pyi:8:5: PYI009 Empty body should contain `...`, not `pass`
+PYI009.pyi:8:5: PYI009 Empty body should contain `...`, not `pass`
   |
 8 | class Foo:
 9 |     pass  # ERROR PYI009, since we're in a stub file

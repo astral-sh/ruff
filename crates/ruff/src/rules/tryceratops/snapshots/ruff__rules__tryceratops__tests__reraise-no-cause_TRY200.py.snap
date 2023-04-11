@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/tryceratops/mod.rs
 ---
-./resources/test/fixtures/tryceratops/TRY200.py:15:9: TRY200 Use `raise from` to specify exception cause
+TRY200.py:15:9: TRY200 Use `raise from` to specify exception cause
    |
 15 |         a = 1
 16 |     except Exception:
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/tryceratops/mod.rs
    |         ^^^^^^^^^^^^^^^^^^^ TRY200
    |
 
-./resources/test/fixtures/tryceratops/TRY200.py:23:13: TRY200 Use `raise from` to specify exception cause
+TRY200.py:23:13: TRY200 Use `raise from` to specify exception cause
    |
 23 |     except Exception:
 24 |         if True:

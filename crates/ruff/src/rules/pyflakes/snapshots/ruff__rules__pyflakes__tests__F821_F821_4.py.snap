@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F821_4.py:4:11: F821 Undefined name `Model`
+F821_4.py:4:11: F821 Undefined name `Model`
   |
 4 | from typing import List
 5 | 
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
   |           ^^^^^ F821
   |
 
-./resources/test/fixtures/pyflakes/F821_4.py:9:12: F821 Undefined name `Model`
+F821_4.py:9:12: F821 Undefined name `Model`
    |
  9 | from typing import List as IList
 10 | 
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
    |            ^^^^^ F821
    |
 
-./resources/test/fixtures/pyflakes/F821_4.py:14:16: F821 Undefined name `Model`
+F821_4.py:14:16: F821 Undefined name `Model`
    |
 14 | from collections.abc import ItemsView
 15 | 
@@ -25,7 +25,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
    |                ^^^^^ F821
    |
 
-./resources/test/fixtures/pyflakes/F821_4.py:19:32: F821 Undefined name `Model`
+F821_4.py:19:32: F821 Undefined name `Model`
    |
 19 | import collections.abc
 20 | 
@@ -33,7 +33,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
    |                                ^^^^^ F821
    |
 
-./resources/test/fixtures/pyflakes/F821_4.py:24:20: F821 Undefined name `Model`
+F821_4.py:24:20: F821 Undefined name `Model`
    |
 24 | from collections import abc
 25 | 

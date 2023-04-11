@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:355:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:355:5: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 355 |         "or exclamation point (not 'y')")
 356 | def lwnlkjl():
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 357 357 | 
 358 358 | @expect("D401: First line should be in imperative mood "
 
-./resources/test/fixtures/pydocstyle/D.py:406:25: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:406:25: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 406 | @expect("D415: First line should end with a period, question mark,"
 407 |         " or exclamation point (not 'r')")
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 408 408 | 
 409 409 | def ignored_decorator(func):   # noqa: D400,D401,D415
 
-./resources/test/fixtures/pydocstyle/D.py:410:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:410:5: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 410 | def ignored_decorator(func):   # noqa: D400,D401,D415
 411 |     """Runs something"""
@@ -59,7 +59,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 412 412 |     pass
 413 413 | 
 
-./resources/test/fixtures/pydocstyle/D.py:416:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:416:5: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 416 | def decorator_for_test(func):   # noqa: D400,D401,D415
 417 |     """Runs something"""
@@ -79,7 +79,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 418 418 |     pass
 419 419 | 
 
-./resources/test/fixtures/pydocstyle/D.py:422:35: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:422:35: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 422 | @ignored_decorator
 423 | def oneliner_ignored_decorator(): """One liner"""
@@ -97,7 +97,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 424 424 | 
 425 425 | @decorator_for_test
 
-./resources/test/fixtures/pydocstyle/D.py:429:49: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:429:49: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 429 | @expect("D415: First line should end with a period, question mark,"
 430 |         " or exclamation point (not 'r')")
@@ -116,7 +116,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 431 431 | 
 432 432 | @decorator_for_test
 
-./resources/test/fixtures/pydocstyle/D.py:470:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:470:5: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 470 |         "or exclamation point (not 'g')")
 471 | def docstring_bad():
@@ -136,7 +136,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 472 472 | 
 473 473 | 
 
-./resources/test/fixtures/pydocstyle/D.py:475:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:475:5: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 475 | def docstring_bad_ignore_all():  # noqa
 476 |     """Runs something"""
@@ -155,7 +155,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 477 477 | 
 478 478 | 
 
-./resources/test/fixtures/pydocstyle/D.py:480:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:480:5: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 480 | def docstring_bad_ignore_one():  # noqa: D400,D401,D415
 481 |     """Runs something"""
@@ -174,7 +174,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 482 482 | 
 483 483 | 
 
-./resources/test/fixtures/pydocstyle/D.py:487:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:487:5: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 487 |         "(perhaps 'Run', not 'Runs')")
 488 | def docstring_ignore_some_violations_but_catch_D401():  # noqa: E501,D400,D415
@@ -194,7 +194,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 489 489 | 
 490 490 | 
 
-./resources/test/fixtures/pydocstyle/D.py:520:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:520:5: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 520 |         "or exclamation point (not 'g')")
 521 | def bad_google_string():  # noqa: D400
@@ -213,7 +213,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 522 522 | 
 523 523 | # This is reproducing a bug where AttributeError is raised when parsing class
 
-./resources/test/fixtures/pydocstyle/D.py:581:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:581:5: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 581 |         "or exclamation point (not '\"')")
 582 | def endswith_quote():
@@ -232,7 +232,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 583 583 | 
 584 584 | @expect('D209: Multi-line docstring closing quotes should be on a separate '
 
-./resources/test/fixtures/pydocstyle/D.py:615:5: D415 [*] First line should end with a period, question mark, or exclamation point
+D.py:615:5: D415 [*] First line should end with a period, question mark, or exclamation point
     |
 615 |   @expect('D212: Multi-line docstring summary should start at the first line')
 616 |   def one_liner():

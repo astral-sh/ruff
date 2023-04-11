@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E22.py:48:5: E224 Tab after operator
+E22.py:48:5: E224 Tab after operator
    |
 48 | #: E224
 49 | a +=	1

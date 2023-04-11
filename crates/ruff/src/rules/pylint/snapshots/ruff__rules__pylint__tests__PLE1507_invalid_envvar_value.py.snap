@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
 ---
-./resources/test/fixtures/pylint/invalid_envvar_value.py:3:11: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
+invalid_envvar_value.py:3:11: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
   |
 3 | import os
 4 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 7 | os.getenv("test")
   |
 
-./resources/test/fixtures/pylint/invalid_envvar_value.py:7:15: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
+invalid_envvar_value.py:7:15: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
    |
  7 | os.getenv("test")
  8 | os.getenv(key="testingAgain")
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 11 | os.getenv(key="foo", default="bar")
    |
 
-./resources/test/fixtures/pylint/invalid_envvar_value.py:8:11: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
+invalid_envvar_value.py:8:11: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
    |
  8 | os.getenv(key="testingAgain")
  9 | os.getenv(key=11)  # [invalid-envvar-value]
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/pylint/mod.rs
 12 | os.getenv(key=f"foo", default="bar")
    |
 
-./resources/test/fixtures/pylint/invalid_envvar_value.py:12:15: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
+invalid_envvar_value.py:12:15: PLE1507 Invalid type for initial `os.getenv` argument; expected `str`
    |
 12 | os.getenv(key=f"foo", default="bar")
 13 | os.getenv(key="foo" + "bar", default=1)

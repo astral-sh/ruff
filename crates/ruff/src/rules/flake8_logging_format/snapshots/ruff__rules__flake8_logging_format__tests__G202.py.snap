@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 ---
-./resources/test/fixtures/flake8_logging_format/G202.py:8:38: G202 Logging statement has redundant `exc_info`
+G202.py:8:38: G202 Logging statement has redundant `exc_info`
    |
  8 |     pass
  9 | except:
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 12 | try:
    |
 
-./resources/test/fixtures/flake8_logging_format/G202.py:13:38: G202 Logging statement has redundant `exc_info`
+G202.py:13:38: G202 Logging statement has redundant `exc_info`
    |
 13 |     pass
 14 | except:

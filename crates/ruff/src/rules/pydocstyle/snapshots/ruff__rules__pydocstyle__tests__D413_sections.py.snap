@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/sections.py:65:5: D413 [*] Missing blank line after last section ("Returns")
+sections.py:65:5: D413 [*] Missing blank line after last section ("Returns")
    |
 65 |   @expect("D414: Section has no content ('Returns')")
 66 |   def no_underline_and_no_newline():  # noqa: D416

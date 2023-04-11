@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B019.py:78:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+B019.py:78:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
    |
 78 |     # Remaining methods should emit B019
 79 |     @functools.cache
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 81 |         ...
    |
 
-./resources/test/fixtures/flake8_bugbear/B019.py:82:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+B019.py:82:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
    |
 82 |         ...
 83 | 
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 86 |         ...
    |
 
-./resources/test/fixtures/flake8_bugbear/B019.py:86:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+B019.py:86:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
    |
 86 |         ...
 87 | 
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 90 |         ...
    |
 
-./resources/test/fixtures/flake8_bugbear/B019.py:90:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+B019.py:90:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
    |
 90 |         ...
 91 | 
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 94 |         ...
    |
 
-./resources/test/fixtures/flake8_bugbear/B019.py:94:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+B019.py:94:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
    |
 94 |         ...
 95 | 
@@ -50,7 +50,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 98 |         ...
    |
 
-./resources/test/fixtures/flake8_bugbear/B019.py:98:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+B019.py:98:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
     |
  98 |         ...
  99 | 
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 102 |         ...
     |
 
-./resources/test/fixtures/flake8_bugbear/B019.py:102:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+B019.py:102:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
     |
 102 |         ...
 103 | 
@@ -70,7 +70,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 106 |         ...
     |
 
-./resources/test/fixtures/flake8_bugbear/B019.py:106:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
+B019.py:106:6: B019 Use of `functools.lru_cache` or `functools.cache` on methods can lead to memory leaks
     |
 106 |         ...
 107 | 

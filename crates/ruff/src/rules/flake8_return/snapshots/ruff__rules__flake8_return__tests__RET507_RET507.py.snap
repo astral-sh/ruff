@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
-./resources/test/fixtures/flake8_return/RET507.py:8:9: RET507 Unnecessary `elif` after `continue` statement
+RET507.py:8:9: RET507 Unnecessary `elif` after `continue` statement
    |
  8 |         if i < y:  # [no-else-continue]
  9 |             continue
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 12 |         else:
    |
 
-./resources/test/fixtures/flake8_return/RET507.py:22:9: RET507 Unnecessary `elif` after `continue` statement
+RET507.py:22:9: RET507 Unnecessary `elif` after `continue` statement
    |
 22 |                 b = 2
 23 |             continue
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 26 |         else:
    |
 
-./resources/test/fixtures/flake8_return/RET507.py:36:9: RET507 Unnecessary `else` after `continue` statement
+RET507.py:36:9: RET507 Unnecessary `else` after `continue` statement
    |
 36 |         if i < y:  # [no-else-continue]
 37 |             continue
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 39 |             a = z
    |
 
-./resources/test/fixtures/flake8_return/RET507.py:47:13: RET507 Unnecessary `else` after `continue` statement
+RET507.py:47:13: RET507 Unnecessary `else` after `continue` statement
    |
 47 |                 b = 2
 48 |                 continue
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 51 |                 continue
    |
 
-./resources/test/fixtures/flake8_return/RET507.py:63:9: RET507 Unnecessary `else` after `continue` statement
+RET507.py:63:9: RET507 Unnecessary `else` after `continue` statement
    |
 63 |                 b = 2
 64 |             continue
@@ -50,7 +50,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 67 |         continue
    |
 
-./resources/test/fixtures/flake8_return/RET507.py:74:13: RET507 Unnecessary `else` after `continue` statement
+RET507.py:74:13: RET507 Unnecessary `else` after `continue` statement
    |
 74 |                 a = 4
 75 |                 continue
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 78 |         else:
    |
 
-./resources/test/fixtures/flake8_return/RET507.py:85:9: RET507 Unnecessary `else` after `continue` statement
+RET507.py:85:9: RET507 Unnecessary `else` after `continue` statement
    |
 85 |         if x:  # [no-else-continue]
 86 |             continue

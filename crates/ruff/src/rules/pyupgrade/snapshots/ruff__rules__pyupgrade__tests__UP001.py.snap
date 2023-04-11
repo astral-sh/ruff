@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP001.py:2:5: UP001 [*] `__metaclass__ = type` is implied
+UP001.py:2:5: UP001 [*] `__metaclass__ = type` is implied
   |
 2 | class A:
 3 |     __metaclass__ = type
@@ -17,7 +17,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 4 4 | 
 5 5 | class B:
 
-./resources/test/fixtures/pyupgrade/UP001.py:6:5: UP001 [*] `__metaclass__ = type` is implied
+UP001.py:6:5: UP001 [*] `__metaclass__ = type` is implied
   |
 6 | class B:
 7 |     __metaclass__ = type

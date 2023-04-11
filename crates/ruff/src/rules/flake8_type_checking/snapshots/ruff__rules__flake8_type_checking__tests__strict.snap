@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 ---
-./resources/test/fixtures/flake8_type_checking/strict.py:24:21: TCH002 Move third-party import `pkg.A` into a type-checking block
+strict.py:24:21: TCH002 Move third-party import `pkg.A` into a type-checking block
    |
 24 |     # In un-strict mode, this shouldn't rase an error, since `pkg` is used at runtime.
 25 |     import pkg
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 28 |     def test(value: A):
    |
 
-./resources/test/fixtures/flake8_type_checking/strict.py:32:21: TCH002 Move third-party import `pkg.A` into a type-checking block
+strict.py:32:21: TCH002 Move third-party import `pkg.A` into a type-checking block
    |
 32 | def f():
 33 |     # In un-strict mode, this shouldn't rase an error, since `pkg` is used at runtime.
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 36 |     def test(value: A):
    |
 
-./resources/test/fixtures/flake8_type_checking/strict.py:51:25: TCH002 Move third-party import `pkg.bar.A` into a type-checking block
+strict.py:51:25: TCH002 Move third-party import `pkg.bar.A` into a type-checking block
    |
 51 |     # In un-strict mode, this _should_ rase an error, since `pkg` is used at runtime.
 52 |     import pkg

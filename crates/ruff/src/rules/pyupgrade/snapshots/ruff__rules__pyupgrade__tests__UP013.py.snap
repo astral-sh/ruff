@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP013.py:5:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:5:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
   |
 5 | # dict literal
 6 | MyType = TypedDict("MyType", {"a": int, "b": str})
@@ -23,7 +23,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 7 9 | # dict call
 8 10 | MyType = TypedDict("MyType", dict(a=int, b=str))
 
-./resources/test/fixtures/pyupgrade/UP013.py:8:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:8:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
  8 | # dict call
  9 | MyType = TypedDict("MyType", dict(a=int, b=str))
@@ -45,7 +45,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 10 12 | # kwargs
 11 13 | MyType = TypedDict("MyType", a=int, b=str)
 
-./resources/test/fixtures/pyupgrade/UP013.py:11:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:11:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 11 | # kwargs
 12 | MyType = TypedDict("MyType", a=int, b=str)
@@ -67,7 +67,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 13 15 | # Empty TypedDict
 14 16 | MyType = TypedDict("MyType")
 
-./resources/test/fixtures/pyupgrade/UP013.py:14:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:14:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 14 | # Empty TypedDict
 15 | MyType = TypedDict("MyType")
@@ -88,7 +88,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 16 17 | # Literal values
 17 18 | MyType = TypedDict("MyType", {"a": "hello"})
 
-./resources/test/fixtures/pyupgrade/UP013.py:17:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:17:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 17 | # Literal values
 18 | MyType = TypedDict("MyType", {"a": "hello"})
@@ -108,7 +108,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 19 20 | 
 20 21 | # NotRequired
 
-./resources/test/fixtures/pyupgrade/UP013.py:18:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:18:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 18 | # Literal values
 19 | MyType = TypedDict("MyType", {"a": "hello"})
@@ -130,7 +130,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 20 21 | # NotRequired
 21 22 | MyType = TypedDict("MyType", {"a": NotRequired[dict]})
 
-./resources/test/fixtures/pyupgrade/UP013.py:21:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:21:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 21 | # NotRequired
 22 | MyType = TypedDict("MyType", {"a": NotRequired[dict]})
@@ -151,7 +151,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 23 24 | # total
 24 25 | MyType = TypedDict("MyType", {"x": int, "y": int}, total=False)
 
-./resources/test/fixtures/pyupgrade/UP013.py:24:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:24:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 24 | # total
 25 | MyType = TypedDict("MyType", {"x": int, "y": int}, total=False)
@@ -173,7 +173,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 26 28 | # using Literal type
 27 29 | MyType = TypedDict("MyType", {"key": Literal["value"]})
 
-./resources/test/fixtures/pyupgrade/UP013.py:27:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:27:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 27 | # using Literal type
 28 | MyType = TypedDict("MyType", {"key": Literal["value"]})
@@ -194,7 +194,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 29 30 | # using namespace TypedDict
 30 31 | MyType = typing.TypedDict("MyType", {"key": int})
 
-./resources/test/fixtures/pyupgrade/UP013.py:30:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:30:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 30 | # using namespace TypedDict
 31 | MyType = typing.TypedDict("MyType", {"key": int})
@@ -215,7 +215,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 32 33 | # invalid identifiers (OK)
 33 34 | MyType = TypedDict("MyType", {"in": int, "x-y": int})
 
-./resources/test/fixtures/pyupgrade/UP013.py:40:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:40:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 40 | # Empty dict literal
 41 | MyType = TypedDict("MyType", {})
@@ -236,7 +236,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 42 43 | # Empty dict call
 43 44 | MyType = TypedDict("MyType", dict())
 
-./resources/test/fixtures/pyupgrade/UP013.py:43:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
+UP013.py:43:1: UP013 [*] Convert `MyType` from `TypedDict` functional to class syntax
    |
 43 | # Empty dict call
 44 | MyType = TypedDict("MyType", dict())

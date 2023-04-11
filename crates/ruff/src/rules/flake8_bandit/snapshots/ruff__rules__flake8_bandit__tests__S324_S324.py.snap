@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
-./resources/test/fixtures/flake8_bandit/S324.py:7:13: S324 Probable use of insecure hash functions in `hashlib`: `md5`
+S324.py:7:13: S324 Probable use of insecure hash functions in `hashlib`: `md5`
    |
  7 | # Invalid
  8 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 11 | hashlib.new('md4', b'test')
    |
 
-./resources/test/fixtures/flake8_bandit/S324.py:9:13: S324 Probable use of insecure hash functions in `hashlib`: `md4`
+S324.py:9:13: S324 Probable use of insecure hash functions in `hashlib`: `md4`
    |
  9 | hashlib.new('md5')
 10 | 
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 13 | hashlib.new(name='md5', data=b'test')
    |
 
-./resources/test/fixtures/flake8_bandit/S324.py:11:18: S324 Probable use of insecure hash functions in `hashlib`: `md5`
+S324.py:11:18: S324 Probable use of insecure hash functions in `hashlib`: `md5`
    |
 11 | hashlib.new('md4', b'test')
 12 | 
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 15 | hashlib.new('MD4', data=b'test')
    |
 
-./resources/test/fixtures/flake8_bandit/S324.py:13:13: S324 Probable use of insecure hash functions in `hashlib`: `MD4`
+S324.py:13:13: S324 Probable use of insecure hash functions in `hashlib`: `MD4`
    |
 13 | hashlib.new(name='md5', data=b'test')
 14 | 
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 17 | hashlib.new('sha1')
    |
 
-./resources/test/fixtures/flake8_bandit/S324.py:15:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:15:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
    |
 15 | hashlib.new('MD4', data=b'test')
 16 | 
@@ -51,7 +51,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 19 | hashlib.new('sha1', data=b'test')
    |
 
-./resources/test/fixtures/flake8_bandit/S324.py:17:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:17:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
    |
 17 | hashlib.new('sha1')
 18 | 
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 21 | hashlib.new('sha', data=b'test')
    |
 
-./resources/test/fixtures/flake8_bandit/S324.py:19:13: S324 Probable use of insecure hash functions in `hashlib`: `sha`
+S324.py:19:13: S324 Probable use of insecure hash functions in `hashlib`: `sha`
    |
 19 | hashlib.new('sha1', data=b'test')
 20 | 
@@ -71,7 +71,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 23 | hashlib.new(name='SHA', data=b'test')
    |
 
-./resources/test/fixtures/flake8_bandit/S324.py:21:18: S324 Probable use of insecure hash functions in `hashlib`: `SHA`
+S324.py:21:18: S324 Probable use of insecure hash functions in `hashlib`: `SHA`
    |
 21 | hashlib.new('sha', data=b'test')
 22 | 
@@ -81,7 +81,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 25 | hashlib.sha(data=b'test')
    |
 
-./resources/test/fixtures/flake8_bandit/S324.py:23:1: S324 Probable use of insecure hash functions in `hashlib`: `sha`
+S324.py:23:1: S324 Probable use of insecure hash functions in `hashlib`: `sha`
    |
 23 | hashlib.new(name='SHA', data=b'test')
 24 | 
@@ -91,7 +91,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 27 | hashlib.md5()
    |
 
-./resources/test/fixtures/flake8_bandit/S324.py:25:1: S324 Probable use of insecure hash functions in `hashlib`: `md5`
+S324.py:25:1: S324 Probable use of insecure hash functions in `hashlib`: `md5`
    |
 25 | hashlib.sha(data=b'test')
 26 | 
@@ -101,7 +101,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 29 | hashlib_new('sha1')
    |
 
-./resources/test/fixtures/flake8_bandit/S324.py:27:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:27:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
    |
 27 | hashlib.md5()
 28 | 
@@ -111,7 +111,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 31 | hashlib_sha1('sha1')
    |
 
-./resources/test/fixtures/flake8_bandit/S324.py:29:1: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:29:1: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
    |
 29 | hashlib_new('sha1')
 30 | 
@@ -121,7 +121,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 33 | # usedforsecurity arg only available in Python 3.9+
    |
 
-./resources/test/fixtures/flake8_bandit/S324.py:32:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
+S324.py:32:13: S324 Probable use of insecure hash functions in `hashlib`: `sha1`
    |
 32 | # usedforsecurity arg only available in Python 3.9+
 33 | hashlib.new('sha1', usedforsecurity=True)

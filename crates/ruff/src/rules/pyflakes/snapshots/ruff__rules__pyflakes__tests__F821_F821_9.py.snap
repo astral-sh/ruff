@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F821_9.py:22:20: F821 Undefined name `captured`
+F821_9.py:22:20: F821 Undefined name `captured`
    |
 22 |     match provided:
 23 |         case True:

@@ -1,14 +1,14 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F405.py:5:11: F405 `name` may be undefined, or defined from star imports: `mymodule`
+F405.py:5:11: F405 `name` may be undefined, or defined from star imports: `mymodule`
   |
 5 | def print_name():
 6 |     print(name)
   |           ^^^^ F405
   |
 
-./resources/test/fixtures/pyflakes/F405.py:11:1: F405 `a` may be undefined, or defined from star imports: `mymodule`
+F405.py:11:1: F405 `a` may be undefined, or defined from star imports: `mymodule`
    |
 11 |     print(name)
 12 | 

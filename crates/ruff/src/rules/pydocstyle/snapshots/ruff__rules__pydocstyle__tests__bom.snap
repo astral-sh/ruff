@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/bom.py:1:1: D300 Use triple double quotes `"""`
+bom.py:1:1: D300 Use triple double quotes `"""`
   |
 1 | ﻿''' SAM macro definitions '''
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ D300

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E721.py:2:4: E721 Do not compare types, use `isinstance()`
+E721.py:2:4: E721 Do not compare types, use `isinstance()`
   |
 2 | #: E721
 3 | if type(res) == type(42):
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 5 | #: E721
   |
 
-./resources/test/fixtures/pycodestyle/E721.py:5:4: E721 Do not compare types, use `isinstance()`
+E721.py:5:4: E721 Do not compare types, use `isinstance()`
   |
 5 |     pass
 6 | #: E721
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 9 | #: E721
   |
 
-./resources/test/fixtures/pycodestyle/E721.py:10:4: E721 Do not compare types, use `isinstance()`
+E721.py:10:4: E721 Do not compare types, use `isinstance()`
    |
 10 | import types
 11 | 
@@ -30,7 +30,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 14 | #: E721
    |
 
-./resources/test/fixtures/pycodestyle/E721.py:15:4: E721 Do not compare types, use `isinstance()`
+E721.py:15:4: E721 Do not compare types, use `isinstance()`
    |
 15 | import types
 16 | 
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 19 | #: E721
    |
 
-./resources/test/fixtures/pycodestyle/E721.py:18:8: E721 Do not compare types, use `isinstance()`
+E721.py:18:8: E721 Do not compare types, use `isinstance()`
    |
 18 |     pass
 19 | #: E721
@@ -50,7 +50,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 22 | assert type(res) == type([])
    |
 
-./resources/test/fixtures/pycodestyle/E721.py:20:8: E721 Do not compare types, use `isinstance()`
+E721.py:20:8: E721 Do not compare types, use `isinstance()`
    |
 20 | assert type(res) == type(False)
 21 | #: E721
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 24 | assert type(res) == type(())
    |
 
-./resources/test/fixtures/pycodestyle/E721.py:22:8: E721 Do not compare types, use `isinstance()`
+E721.py:22:8: E721 Do not compare types, use `isinstance()`
    |
 22 | assert type(res) == type([])
 23 | #: E721
@@ -70,7 +70,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 26 | assert type(res) == type((0,))
    |
 
-./resources/test/fixtures/pycodestyle/E721.py:24:8: E721 Do not compare types, use `isinstance()`
+E721.py:24:8: E721 Do not compare types, use `isinstance()`
    |
 24 | assert type(res) == type(())
 25 | #: E721
@@ -80,7 +80,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 28 | assert type(res) == type((0))
    |
 
-./resources/test/fixtures/pycodestyle/E721.py:26:8: E721 Do not compare types, use `isinstance()`
+E721.py:26:8: E721 Do not compare types, use `isinstance()`
    |
 26 | assert type(res) == type((0,))
 27 | #: E721
@@ -90,7 +90,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 30 | assert type(res) != type((1,))
    |
 
-./resources/test/fixtures/pycodestyle/E721.py:28:8: E721 Do not compare types, use `isinstance()`
+E721.py:28:8: E721 Do not compare types, use `isinstance()`
    |
 28 | assert type(res) == type((0))
 29 | #: E721
@@ -100,7 +100,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 32 | assert type(res) is type((1,))
    |
 
-./resources/test/fixtures/pycodestyle/E721.py:30:8: E721 Do not compare types, use `isinstance()`
+E721.py:30:8: E721 Do not compare types, use `isinstance()`
    |
 30 | assert type(res) != type((1,))
 31 | #: E721
@@ -110,7 +110,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 34 | assert type(res) is not type((1,))
    |
 
-./resources/test/fixtures/pycodestyle/E721.py:32:8: E721 Do not compare types, use `isinstance()`
+E721.py:32:8: E721 Do not compare types, use `isinstance()`
    |
 32 | assert type(res) is type((1,))
 33 | #: E721
@@ -120,7 +120,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 36 | assert type(res) == type(
    |
 
-./resources/test/fixtures/pycodestyle/E721.py:34:8: E721 Do not compare types, use `isinstance()`
+E721.py:34:8: E721 Do not compare types, use `isinstance()`
    |
 34 |   assert type(res) is not type((1,))
 35 |   #: E211 E721
@@ -135,7 +135,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 42 |   assert type(res) == type(())
    |
 
-./resources/test/fixtures/pycodestyle/E721.py:40:8: E721 Do not compare types, use `isinstance()`
+E721.py:40:8: E721 Do not compare types, use `isinstance()`
    |
 40 | )
 41 | #: E201 E201 E202 E721
@@ -145,7 +145,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 44 | assert type(res) == type((0,))
    |
 
-./resources/test/fixtures/pycodestyle/E721.py:42:8: E721 Do not compare types, use `isinstance()`
+E721.py:42:8: E721 Do not compare types, use `isinstance()`
    |
 42 | assert type(res) == type(())
 43 | #: E201 E202 E721

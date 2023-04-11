@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT011.py:12:24: PT011 `pytest.raises(ZeroDivisionError)` is too broad, set the `match` parameter or use a more specific exception
+PT011.py:12:24: PT011 `pytest.raises(ZeroDivisionError)` is too broad, set the `match` parameter or use a more specific exception
    |
 12 | def test_ok_different_error_from_config():
 13 |     with pytest.raises(ZeroDivisionError):

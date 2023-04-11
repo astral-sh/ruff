@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F821_13.py:8:19: F821 Undefined name `List`
+F821_13.py:8:19: F821 Undefined name `List`
    |
  8 | Y: ForwardRef("List[int]")
  9 | 

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
 ---
-./resources/test/fixtures/flake8_return/RET501.py:4:5: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
+RET501.py:4:5: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
   |
 4 |     if not y:
 5 |         return
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_return/mod.rs
 6 6 | 
 7 7 | class BaseCache:
 
-./resources/test/fixtures/flake8_return/RET501.py:14:9: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
+RET501.py:14:9: RET501 [*] Do not explicitly `return None` in function if it is the only possible return value
    |
 14 |     def get(self, key: str) -> None:
 15 |         print(f"{key} not found")

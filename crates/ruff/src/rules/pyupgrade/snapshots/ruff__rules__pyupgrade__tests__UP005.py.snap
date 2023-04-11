@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP005.py:6:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
+UP005.py:6:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
    |
  6 | class Suite(unittest.TestCase):
  7 |     def test(self) -> None:
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 8 8 |         self.assertEqual(3, 4)
 9 9 |         self.failUnlessAlmostEqual(1, 1.1)
 
-./resources/test/fixtures/pyupgrade/UP005.py:7:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
+UP005.py:7:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
    |
  7 |     def test(self) -> None:
  8 |         self.assertEquals (1, 2)
@@ -43,7 +43,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 9 9 |         self.failUnlessAlmostEqual(1, 1.1)
 10 10 |         self.assertNotRegexpMatches("a", "b")
 
-./resources/test/fixtures/pyupgrade/UP005.py:9:9: UP005 [*] `failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`
+UP005.py:9:9: UP005 [*] `failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`
    |
  9 |         self.assertEquals(1, 2)
 10 |         self.assertEqual(3, 4)
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
    9  |+        self.assertAlmostEqual(1, 1.1)
 10 10 |         self.assertNotRegexpMatches("a", "b")
 
-./resources/test/fixtures/pyupgrade/UP005.py:10:9: UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotRegex`
+UP005.py:10:9: UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotRegex`
    |
 10 |         self.assertEqual(3, 4)
 11 |         self.failUnlessAlmostEqual(1, 1.1)

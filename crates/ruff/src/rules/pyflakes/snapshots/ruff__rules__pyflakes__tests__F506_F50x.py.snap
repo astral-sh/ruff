@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F50x.py:2:1: F506 `%`-format string has mixed positional and named placeholders
+F50x.py:2:1: F506 `%`-format string has mixed positional and named placeholders
   |
 2 | '%(foo)' % {'foo': 'bar'}  # F501
 3 | '%s %(foo)s' % {'foo': 'bar'}  # F506
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 5 | '%j' % (1,)  # F509
   |
 
-./resources/test/fixtures/pyflakes/F50x.py:3:1: F506 `%`-format string has mixed positional and named placeholders
+F50x.py:3:1: F506 `%`-format string has mixed positional and named placeholders
   |
 3 | '%(foo)' % {'foo': 'bar'}  # F501
 4 | '%s %(foo)s' % {'foo': 'bar'}  # F506
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 7 | '%s %s' % (1,)  # F507
   |
 
-./resources/test/fixtures/pyflakes/F50x.py:11:1: F506 `%`-format string has mixed positional and named placeholders
+F50x.py:11:1: F506 `%`-format string has mixed positional and named placeholders
    |
 11 | '%(bar)s' % (1, 2, 3)  # F502
 12 | '%s %s' % {'k': 'v'}  # F503

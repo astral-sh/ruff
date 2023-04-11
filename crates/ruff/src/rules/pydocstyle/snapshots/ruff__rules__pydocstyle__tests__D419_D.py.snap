@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:20:9: D419 Docstring is empty
+D.py:20:9: D419 Docstring is empty
    |
 20 |     class meta:
 21 |         """"""
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 23 |     @expect('D102: Missing docstring in public method')
    |
 
-./resources/test/fixtures/pydocstyle/D.py:74:5: D419 Docstring is empty
+D.py:74:5: D419 Docstring is empty
    |
 74 | @expect('D419: Docstring is empty')
 75 | def function():
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 78 |         pass
    |
 
-./resources/test/fixtures/pydocstyle/D.py:80:9: D419 Docstring is empty
+D.py:80:9: D419 Docstring is empty
    |
 80 |     @expect('D419: Docstring is empty')
 81 |     def nested():

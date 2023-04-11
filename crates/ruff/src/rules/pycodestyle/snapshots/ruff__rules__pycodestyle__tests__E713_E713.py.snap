@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E713.py:2:8: E713 [*] Test for membership should be `not in`
+E713.py:2:8: E713 [*] Test for membership should be `not in`
   |
 2 | #: E713
 3 | if not X in Y:
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 4 4 | #: E713
 5 5 | if not X.B in Y:
 
-./resources/test/fixtures/pycodestyle/E713.py:5:8: E713 [*] Test for membership should be `not in`
+E713.py:5:8: E713 [*] Test for membership should be `not in`
   |
 5 |     pass
 6 | #: E713
@@ -40,7 +40,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 7 7 | #: E713
 8 8 | if not X in Y and Z == "zero":
 
-./resources/test/fixtures/pycodestyle/E713.py:8:8: E713 [*] Test for membership should be `not in`
+E713.py:8:8: E713 [*] Test for membership should be `not in`
    |
  8 |     pass
  9 | #: E713
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 10 10 | #: E713
 11 11 | if X == "zero" or not Y in Z:
 
-./resources/test/fixtures/pycodestyle/E713.py:11:23: E713 [*] Test for membership should be `not in`
+E713.py:11:23: E713 [*] Test for membership should be `not in`
    |
 11 |     pass
 12 | #: E713
@@ -82,7 +82,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 13 13 | #: E713
 14 14 | if not (X in Y):
 
-./resources/test/fixtures/pycodestyle/E713.py:14:9: E713 [*] Test for membership should be `not in`
+E713.py:14:9: E713 [*] Test for membership should be `not in`
    |
 14 |     pass
 15 | #: E713

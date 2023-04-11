@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_print/mod.rs
 ---
-./resources/test/fixtures/flake8_print/T201.py:4:1: T201 `print` found
+T201.py:4:1: T201 `print` found
   |
 4 | import tempfile
 5 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/flake8_print/mod.rs
 8 | print("Hello, world!", file=sys.stdout)  # T201
   |
 
-./resources/test/fixtures/flake8_print/T201.py:5:1: T201 `print` found
+T201.py:5:1: T201 `print` found
   |
 5 | print("Hello, world!")  # T201
 6 | print("Hello, world!", file=None)  # T201
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_print/mod.rs
 8 | print("Hello, world!", file=sys.stderr)  # T201
   |
 
-./resources/test/fixtures/flake8_print/T201.py:6:1: T201 `print` found
+T201.py:6:1: T201 `print` found
   |
 6 | print("Hello, world!")  # T201
 7 | print("Hello, world!", file=None)  # T201
@@ -29,7 +29,7 @@ source: crates/ruff/src/rules/flake8_print/mod.rs
 9 | print("Hello, world!", file=sys.stderr)  # T201
   |
 
-./resources/test/fixtures/flake8_print/T201.py:7:1: T201 `print` found
+T201.py:7:1: T201 `print` found
    |
  7 | print("Hello, world!", file=None)  # T201
  8 | print("Hello, world!", file=sys.stdout)  # T201

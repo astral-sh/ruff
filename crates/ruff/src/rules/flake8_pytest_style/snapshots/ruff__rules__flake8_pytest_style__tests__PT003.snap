@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT003.py:14:17: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:14:17: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 14 | @pytest.fixture(scope="function")
    |                 ^^^^^^^^^^^^^^^^ PT003
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 16 16 |     ...
 17 17 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT003.py:19:17: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:19:17: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 19 | @pytest.fixture(scope="function", name="my_fixture")
    |                 ^^^^^^^^^^^^^^^^ PT003
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 21 21 |     ...
 22 22 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT003.py:24:36: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:24:36: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 24 | @pytest.fixture(name="my_fixture", scope="function")
    |                                    ^^^^^^^^^^^^^^^^ PT003
@@ -58,7 +58,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 26 26 |     ...
 27 27 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT003.py:29:36: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:29:36: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 29 | @pytest.fixture(name="my_fixture", scope="function", **kwargs)
    |                                    ^^^^^^^^^^^^^^^^ PT003
@@ -77,7 +77,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 31 31 |     ...
 32 32 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT003.py:37:31: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:37:31: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 37 | # tests the general case as we use a helper function that should
 38 | # work for all cases.
@@ -98,7 +98,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 39 39 |     ...
 40 40 | 
 
-./resources/test/fixtures/flake8_pytest_style/PT003.py:43:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:43:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 43 | @pytest.fixture(
 44 |     scope="function",
@@ -117,7 +117,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 45 44 | )
 46 45 | def error_multiple_args():
 
-./resources/test/fixtures/flake8_pytest_style/PT003.py:52:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:52:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 52 | @pytest.fixture(
 53 |     name="my_fixture",
@@ -137,7 +137,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 54 53 | def error_multiple_args():
 55 54 |     ...
 
-./resources/test/fixtures/flake8_pytest_style/PT003.py:66:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
+PT003.py:66:5: PT003 [*] `scope='function'` is implied in `@pytest.fixture()`
    |
 66 |       # another comment ,)
 67 |       

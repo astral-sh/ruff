@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
 ---
-./resources/test/fixtures/pydocstyle/D.py:252:1: D208 [*] Docstring is over-indented
+D.py:252:1: D208 [*] Docstring is over-indented
     |
 252 |     """Summary.
 253 | 
@@ -22,7 +22,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 254 254 |     """
 255 255 | 
 
-./resources/test/fixtures/pydocstyle/D.py:264:1: D208 [*] Docstring is over-indented
+D.py:264:1: D208 [*] Docstring is over-indented
     |
 264 |     Description.
 265 | 
@@ -41,7 +41,7 @@ source: crates/ruff/src/rules/pydocstyle/mod.rs
 266 266 | 
 267 267 | @expect('D208: Docstring is over-indented')
 
-./resources/test/fixtures/pydocstyle/D.py:272:1: D208 [*] Docstring is over-indented
+D.py:272:1: D208 [*] Docstring is over-indented
     |
 272 |     """Summary.
 273 | 

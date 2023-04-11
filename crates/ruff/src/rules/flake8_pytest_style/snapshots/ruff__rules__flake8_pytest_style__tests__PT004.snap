@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
 ---
-./resources/test/fixtures/flake8_pytest_style/PT004.py:51:1: PT004 Fixture `patch_something` does not return anything, add leading underscore
+PT004.py:51:1: PT004 Fixture `patch_something` does not return anything, add leading underscore
    |
 51 |   @pytest.fixture()
 52 | / def patch_something(mocker):  # Error simple
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
    | |______________________________^ PT004
    |
 
-./resources/test/fixtures/flake8_pytest_style/PT004.py:56:1: PT004 Fixture `activate_context` does not return anything, add leading underscore
+PT004.py:56:1: PT004 Fixture `activate_context` does not return anything, add leading underscore
    |
 56 |   @pytest.fixture()
 57 | / def activate_context():  # Error with yield

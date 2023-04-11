@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
 ---
-./resources/test/fixtures/pyupgrade/UP017.py:7:7: UP017 Use `datetime.UTC` alias
+UP017.py:7:7: UP017 Use `datetime.UTC` alias
   |
 7 | print(datetime.timezone(-1))
 8 | print(timezone.utc)
@@ -9,7 +9,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 9 | print(tz.utc)
   |
 
-./resources/test/fixtures/pyupgrade/UP017.py:8:7: UP017 Use `datetime.UTC` alias
+UP017.py:8:7: UP017 Use `datetime.UTC` alias
    |
  8 | print(datetime.timezone(-1))
  9 | print(timezone.utc)
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
 12 | print(datetime.timezone.utc)
    |
 
-./resources/test/fixtures/pyupgrade/UP017.py:10:7: UP017 [*] Use `datetime.UTC` alias
+UP017.py:10:7: UP017 [*] Use `datetime.UTC` alias
    |
 10 | print(tz.utc)
 11 | 
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/pyupgrade/mod.rs
    10 |+print(datetime.UTC)
 11 11 | print(dt.timezone.utc)
 
-./resources/test/fixtures/pyupgrade/UP017.py:11:7: UP017 Use `datetime.UTC` alias
+UP017.py:11:7: UP017 Use `datetime.UTC` alias
    |
 11 | print(datetime.timezone.utc)
 12 | print(dt.timezone.utc)

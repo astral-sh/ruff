@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F503.py:17:1: F503 `%`-format string expected sequence but got mapping
+F503.py:17:1: F503 `%`-format string expected sequence but got mapping
    |
 17 | # Multiple placeholders
 18 | "%s %s" % dog
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 21 | "%s %s" % ["bob"]
    |
 
-./resources/test/fixtures/pyflakes/F503.py:18:1: F503 `%`-format string expected sequence but got mapping
+F503.py:18:1: F503 `%`-format string expected sequence but got mapping
    |
 18 | "%s %s" % dog
 19 | "%s %s" % {"bob": "bob"}  # F503
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 22 | "%s %s" % ("bob",)
    |
 
-./resources/test/fixtures/pyflakes/F503.py:23:1: F503 `%`-format string expected sequence but got mapping
+F503.py:23:1: F503 `%`-format string expected sequence but got mapping
    |
 23 | "%s %s" % {"bob"}
 24 | "%s %s" % [*["bob"]]

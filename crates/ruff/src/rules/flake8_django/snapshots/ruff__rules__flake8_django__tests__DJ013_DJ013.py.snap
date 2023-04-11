@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_django/mod.rs
 ---
-./resources/test/fixtures/flake8_django/DJ013.py:15:2: DJ013 `@receiver` decorator must be on top of all the other decorators
+DJ013.py:15:2: DJ013 `@receiver` decorator must be on top of all the other decorators
    |
 15 | @test_decorator
 16 | @receiver(pre_save, sender=MyModel)
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_django/mod.rs
 18 |     pass
    |
 
-./resources/test/fixtures/flake8_django/DJ013.py:35:2: DJ013 `@receiver` decorator must be on top of all the other decorators
+DJ013.py:35:2: DJ013 `@receiver` decorator must be on top of all the other decorators
    |
 35 | @receiver(pre_save, sender=MyModel)
 36 | @test_decorator

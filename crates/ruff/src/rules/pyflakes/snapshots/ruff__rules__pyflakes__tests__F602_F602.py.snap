@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F602.py:5:5: F602 Dictionary key `a` repeated
+F602.py:5:5: F602 Dictionary key `a` repeated
   |
 5 | x = {
 6 |     a: 1,
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 9 | }
   |
 
-./resources/test/fixtures/pyflakes/F602.py:11:5: F602 Dictionary key `a` repeated
+F602.py:11:5: F602 Dictionary key `a` repeated
    |
 11 | x = {
 12 |     a: 1,
@@ -21,7 +21,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 15 |     a: 3,
    |
 
-./resources/test/fixtures/pyflakes/F602.py:12:5: F602 Dictionary key `a` repeated
+F602.py:12:5: F602 Dictionary key `a` repeated
    |
 12 |     a: 1,
 13 |     a: 2,
@@ -31,7 +31,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 16 | }
    |
 
-./resources/test/fixtures/pyflakes/F602.py:13:5: F602 [*] Dictionary key `a` repeated
+F602.py:13:5: F602 [*] Dictionary key `a` repeated
    |
 13 |     a: 2,
 14 |     a: 3,
@@ -50,7 +50,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 15 14 | 
 16 15 | x = {
 
-./resources/test/fixtures/pyflakes/F602.py:18:5: F602 Dictionary key `a` repeated
+F602.py:18:5: F602 Dictionary key `a` repeated
    |
 18 | x = {
 19 |     a: 1,
@@ -60,7 +60,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 22 |     a: 3,
    |
 
-./resources/test/fixtures/pyflakes/F602.py:19:5: F602 Dictionary key `a` repeated
+F602.py:19:5: F602 Dictionary key `a` repeated
    |
 19 |     a: 1,
 20 |     a: 2,
@@ -70,7 +70,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 23 |     a: 4,
    |
 
-./resources/test/fixtures/pyflakes/F602.py:20:5: F602 [*] Dictionary key `a` repeated
+F602.py:20:5: F602 [*] Dictionary key `a` repeated
    |
 20 |     a: 2,
 21 |     a: 3,
@@ -90,7 +90,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 22 21 | }
 23 22 | 
 
-./resources/test/fixtures/pyflakes/F602.py:21:5: F602 Dictionary key `a` repeated
+F602.py:21:5: F602 Dictionary key `a` repeated
    |
 21 |     a: 3,
 22 |     a: 3,
@@ -99,7 +99,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 24 | }
    |
 
-./resources/test/fixtures/pyflakes/F602.py:26:5: F602 [*] Dictionary key `a` repeated
+F602.py:26:5: F602 [*] Dictionary key `a` repeated
    |
 26 | x = {
 27 |     a: 1,
@@ -119,7 +119,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 28 27 |     a: 3,
 29 28 |     a: 4,
 
-./resources/test/fixtures/pyflakes/F602.py:27:5: F602 Dictionary key `a` repeated
+F602.py:27:5: F602 Dictionary key `a` repeated
    |
 27 |     a: 1,
 28 |     a: 1,
@@ -129,7 +129,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 31 |     a: 4,
    |
 
-./resources/test/fixtures/pyflakes/F602.py:28:5: F602 Dictionary key `a` repeated
+F602.py:28:5: F602 Dictionary key `a` repeated
    |
 28 |     a: 1,
 29 |     a: 2,
@@ -139,7 +139,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 32 | }
    |
 
-./resources/test/fixtures/pyflakes/F602.py:29:5: F602 Dictionary key `a` repeated
+F602.py:29:5: F602 Dictionary key `a` repeated
    |
 29 |     a: 2,
 30 |     a: 3,
@@ -148,7 +148,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 32 | }
    |
 
-./resources/test/fixtures/pyflakes/F602.py:35:5: F602 [*] Dictionary key `a` repeated
+F602.py:35:5: F602 [*] Dictionary key `a` repeated
    |
 35 |     a: 1,
 36 |     "a": 1,
@@ -168,7 +168,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 37 36 |     a: 2,
 38 37 |     "a": 3,
 
-./resources/test/fixtures/pyflakes/F602.py:37:5: F602 Dictionary key `a` repeated
+F602.py:37:5: F602 Dictionary key `a` repeated
    |
 37 |     a: 1,
 38 |     "a": 2,
@@ -178,7 +178,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 41 |     a: 3,
    |
 
-./resources/test/fixtures/pyflakes/F602.py:39:5: F602 Dictionary key `a` repeated
+F602.py:39:5: F602 Dictionary key `a` repeated
    |
 39 |     a: 2,
 40 |     "a": 3,
@@ -188,7 +188,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 43 |     a: 4,
    |
 
-./resources/test/fixtures/pyflakes/F602.py:41:5: F602 Dictionary key `a` repeated
+F602.py:41:5: F602 Dictionary key `a` repeated
    |
 41 |     a: 3,
 42 |     "a": 3,
@@ -197,7 +197,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 44 | }
    |
 
-./resources/test/fixtures/pyflakes/F602.py:44:12: F602 [*] Dictionary key `a` repeated
+F602.py:44:12: F602 [*] Dictionary key `a` repeated
    |
 44 | }
 45 | 
@@ -215,7 +215,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
    44 |+x = {a: 1}
 45 45 | x = {a: 1, b: 2, a: 1}
 
-./resources/test/fixtures/pyflakes/F602.py:45:18: F602 [*] Dictionary key `a` repeated
+F602.py:45:18: F602 [*] Dictionary key `a` repeated
    |
 45 | x = {a: 1, a: 1}
 46 | x = {a: 1, b: 2, a: 1}

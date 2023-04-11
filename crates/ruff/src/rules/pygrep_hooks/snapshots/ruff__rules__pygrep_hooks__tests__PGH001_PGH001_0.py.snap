@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 ---
-./resources/test/fixtures/pygrep-hooks/PGH001_0.py:3:1: PGH001 No builtin `eval()` allowed
+PGH001_0.py:3:1: PGH001 No builtin `eval()` allowed
   |
 3 | from ast import literal_eval
 4 | 
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pygrep_hooks/mod.rs
 7 | literal_eval({1: 2})
   |
 
-./resources/test/fixtures/pygrep-hooks/PGH001_0.py:9:5: PGH001 No builtin `eval()` allowed
+PGH001_0.py:9:5: PGH001 No builtin `eval()` allowed
    |
  9 | def fn() -> None:
 10 |     eval("3 + 4")

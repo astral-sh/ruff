@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B023.py:12:30: B023 Function definition does not bind loop variable `x`
+B023.py:12:30: B023 Function definition does not bind loop variable `x`
    |
 12 |     y = x + 1
 13 |     # Subject to late-binding problems
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 15 |     functions.append(lambda: y)  # not just the loop var
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:13:30: B023 Function definition does not bind loop variable `y`
+B023.py:13:30: B023 Function definition does not bind loop variable `y`
    |
 13 |     # Subject to late-binding problems
 14 |     functions.append(lambda: x)
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 17 |     def f_bad_1():
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:16:16: B023 Function definition does not bind loop variable `x`
+B023.py:16:16: B023 Function definition does not bind loop variable `x`
    |
 16 |     def f_bad_1():
 17 |         return x
@@ -29,7 +29,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 19 |     # Actually OK
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:28:19: B023 Function definition does not bind loop variable `x`
+B023.py:28:19: B023 Function definition does not bind loop variable `x`
    |
 28 | def check_inside_functions_too():
 29 |     ls = [lambda: x for x in range(2)]  # error
@@ -38,7 +38,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 31 |     gn = (lambda: x for x in range(2))  # error
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:29:19: B023 Function definition does not bind loop variable `x`
+B023.py:29:19: B023 Function definition does not bind loop variable `x`
    |
 29 | def check_inside_functions_too():
 30 |     ls = [lambda: x for x in range(2)]  # error
@@ -48,7 +48,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 33 |     dt = {x: lambda: x for x in range(2)}  # error
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:30:19: B023 Function definition does not bind loop variable `x`
+B023.py:30:19: B023 Function definition does not bind loop variable `x`
    |
 30 |     ls = [lambda: x for x in range(2)]  # error
 31 |     st = {lambda: x for x in range(2)}  # error
@@ -57,7 +57,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 33 |     dt = {x: lambda: x for x in range(2)}  # error
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:31:22: B023 Function definition does not bind loop variable `x`
+B023.py:31:22: B023 Function definition does not bind loop variable `x`
    |
 31 |     st = {lambda: x for x in range(2)}  # error
 32 |     gn = (lambda: x for x in range(2))  # error
@@ -65,7 +65,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    |                      ^ B023
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:40:34: B023 Function definition does not bind loop variable `x`
+B023.py:40:34: B023 Function definition does not bind loop variable `x`
    |
 40 | async def container_for_problems():
 41 |     async for x in pointless_async_iterable():
@@ -75,7 +75,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 44 |     [lambda: x async for x in pointless_async_iterable()]  # error
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:42:14: B023 Function definition does not bind loop variable `x`
+B023.py:42:14: B023 Function definition does not bind loop variable `x`
    |
 42 |         functions.append(lambda: x)  # error
 43 | 
@@ -83,7 +83,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    |              ^ B023
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:50:30: B023 Function definition does not bind loop variable `a`
+B023.py:50:30: B023 Function definition does not bind loop variable `a`
    |
 50 |     a = a_ = a - 1
 51 |     b += 1
@@ -93,7 +93,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 54 |     functions.append(lambda: b)  # error
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:51:30: B023 Function definition does not bind loop variable `a_`
+B023.py:51:30: B023 Function definition does not bind loop variable `a_`
    |
 51 |     b += 1
 52 |     functions.append(lambda: a)  # error
@@ -103,7 +103,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 55 |     functions.append(lambda: c)  # error, but not a name error due to late binding
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:52:30: B023 Function definition does not bind loop variable `b`
+B023.py:52:30: B023 Function definition does not bind loop variable `b`
    |
 52 |     functions.append(lambda: a)  # error
 53 |     functions.append(lambda: a_)  # error
@@ -113,7 +113,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 56 |     c: bool = a > 3
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:53:30: B023 Function definition does not bind loop variable `c`
+B023.py:53:30: B023 Function definition does not bind loop variable `c`
    |
 53 |     functions.append(lambda: a_)  # error
 54 |     functions.append(lambda: b)  # error
@@ -123,7 +123,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 57 |     if not c:
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:61:17: B023 Function definition does not bind loop variable `j`
+B023.py:61:17: B023 Function definition does not bind loop variable `j`
    |
 61 | for j in range(2):
 62 |     for k in range(3):
@@ -131,7 +131,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    |                 ^ B023
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:61:21: B023 Function definition does not bind loop variable `k`
+B023.py:61:21: B023 Function definition does not bind loop variable `k`
    |
 61 | for j in range(2):
 62 |     for k in range(3):
@@ -139,7 +139,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
    |                     ^ B023
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:68:10: B023 Function definition does not bind loop variable `l`
+B023.py:68:10: B023 Function definition does not bind loop variable `l`
    |
 68 |     def f():
 69 |         j = None  # OK because it's an assignment
@@ -149,14 +149,14 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 72 |         assert a and functions
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:82:16: B023 Function definition does not bind loop variable `i`
+B023.py:82:16: B023 Function definition does not bind loop variable `i`
    |
 82 | for i in range(3):
 83 |     lambda: f"{i}"
    |                ^ B023
    |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:117:24: B023 Function definition does not bind loop variable `x`
+B023.py:117:24: B023 Function definition does not bind loop variable `x`
     |
 117 | for x in range(2):
 118 |     # It's not a complete get-out-of-linting-free construct - these should fail:
@@ -166,7 +166,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 121 |     any(filter(bool, [None, lambda: x]))
     |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:118:27: B023 Function definition does not bind loop variable `x`
+B023.py:118:27: B023 Function definition does not bind loop variable `x`
     |
 118 |     # It's not a complete get-out-of-linting-free construct - these should fail:
 119 |     min([None, lambda: x], key=repr)
@@ -176,7 +176,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 122 |     list(filter(bool, [None, lambda: x]))
     |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:119:37: B023 Function definition does not bind loop variable `x`
+B023.py:119:37: B023 Function definition does not bind loop variable `x`
     |
 119 |     min([None, lambda: x], key=repr)
 120 |     sorted([None, lambda: x], key=repr)
@@ -186,7 +186,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 123 |     all(reduce(bool, [None, lambda: x]))
     |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:120:38: B023 Function definition does not bind loop variable `x`
+B023.py:120:38: B023 Function definition does not bind loop variable `x`
     |
 120 |     sorted([None, lambda: x], key=repr)
 121 |     any(filter(bool, [None, lambda: x]))
@@ -195,7 +195,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 123 |     all(reduce(bool, [None, lambda: x]))
     |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:121:37: B023 Function definition does not bind loop variable `x`
+B023.py:121:37: B023 Function definition does not bind loop variable `x`
     |
 121 |     any(filter(bool, [None, lambda: x]))
 122 |     list(filter(bool, [None, lambda: x]))
@@ -205,7 +205,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 125 |     # But all these should be OK:
     |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:171:29: B023 Function definition does not bind loop variable `name`
+B023.py:171:29: B023 Function definition does not bind loop variable `name`
     |
 171 |         if foo(name):
 172 |             return [lambda: name]  # known false alarm
@@ -214,7 +214,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 174 |         if False:
     |
 
-./resources/test/fixtures/flake8_bugbear/B023.py:174:29: B023 Function definition does not bind loop variable `i`
+B023.py:174:29: B023 Function definition does not bind loop variable `i`
     |
 174 |         if False:
 175 |             return [lambda: i for i in range(3)]  # error

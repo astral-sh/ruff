@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
 ---
-./resources/test/fixtures/pyflakes/F841_0.py:3:22: F841 [*] Local variable `e` is assigned to but never used
+F841_0.py:3:22: F841 [*] Local variable `e` is assigned to but never used
   |
 3 | try:
 4 |     1 / 0
@@ -20,7 +20,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 5 5 | 
 6 6 | 
 
-./resources/test/fixtures/pyflakes/F841_0.py:16:5: F841 [*] Local variable `z` is assigned to but never used
+F841_0.py:16:5: F841 [*] Local variable `z` is assigned to but never used
    |
 16 |     x = 1
 17 |     y = 2
@@ -39,7 +39,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 18 18 | 
 19 19 | def f():
 
-./resources/test/fixtures/pyflakes/F841_0.py:20:5: F841 [*] Local variable `foo` is assigned to but never used
+F841_0.py:20:5: F841 [*] Local variable `foo` is assigned to but never used
    |
 20 | def f():
 21 |     foo = (1, 2)
@@ -57,7 +57,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 22 21 | 
 23 22 |     bar = (1, 2)
 
-./resources/test/fixtures/pyflakes/F841_0.py:21:6: F841 [*] Local variable `a` is assigned to but never used
+F841_0.py:21:6: F841 [*] Local variable `a` is assigned to but never used
    |
 21 | def f():
 22 |     foo = (1, 2)
@@ -68,7 +68,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
    |
    = help: Remove assignment to unused variable `a`
 
-./resources/test/fixtures/pyflakes/F841_0.py:21:9: F841 [*] Local variable `b` is assigned to but never used
+F841_0.py:21:9: F841 [*] Local variable `b` is assigned to but never used
    |
 21 | def f():
 22 |     foo = (1, 2)
@@ -79,7 +79,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
    |
    = help: Remove assignment to unused variable `b`
 
-./resources/test/fixtures/pyflakes/F841_0.py:26:14: F841 [*] Local variable `baz` is assigned to but never used
+F841_0.py:26:14: F841 [*] Local variable `baz` is assigned to but never used
    |
 26 |     (c, d) = bar
 27 | 
@@ -98,7 +98,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 28 28 | 
 29 29 | def f():
 
-./resources/test/fixtures/pyflakes/F841_0.py:51:9: F841 [*] Local variable `b` is assigned to but never used
+F841_0.py:51:9: F841 [*] Local variable `b` is assigned to but never used
    |
 51 |     def c():
 52 |         # F841
@@ -119,7 +119,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 53 53 |     def d():
 54 54 |         nonlocal b
 
-./resources/test/fixtures/pyflakes/F841_0.py:79:26: F841 [*] Local variable `my_file` is assigned to but never used
+F841_0.py:79:26: F841 [*] Local variable `my_file` is assigned to but never used
    |
 79 | def f():
 80 |     with open("file") as my_file, open("") as ((this, that)):
@@ -138,7 +138,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 81 81 | 
 82 82 | 
 
-./resources/test/fixtures/pyflakes/F841_0.py:85:25: F841 [*] Local variable `my_file` is assigned to but never used
+F841_0.py:85:25: F841 [*] Local variable `my_file` is assigned to but never used
    |
 85 | def f():
 86 |     with (
@@ -159,7 +159,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 87 87 |     ):
 88 88 |         print("hello")
 
-./resources/test/fixtures/pyflakes/F841_0.py:102:5: F841 [*] Local variable `msg3` is assigned to but never used
+F841_0.py:102:5: F841 [*] Local variable `msg3` is assigned to but never used
     |
 102 |     msg1 = "Hello, world!"
 103 |     msg2 = "Hello, world!"
@@ -179,7 +179,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 104 103 |         case 1:
 105 104 |             print(msg1)
 
-./resources/test/fixtures/pyflakes/F841_0.py:115:5: F841 [*] Local variable `Baz` is assigned to but never used
+F841_0.py:115:5: F841 [*] Local variable `Baz` is assigned to but never used
     |
 115 |     Foo = enum.Enum("Foo", "A B")
 116 |     Bar = enum.Enum("Bar", "A B")
@@ -200,7 +200,7 @@ source: crates/ruff/src/rules/pyflakes/mod.rs
 117 117 |     match x:
 118 118 |         case (Foo.A):
 
-./resources/test/fixtures/pyflakes/F841_0.py:122:14: F841 [*] Local variable `y` is assigned to but never used
+F841_0.py:122:14: F841 [*] Local variable `y` is assigned to but never used
     |
 122 |         case [Bar.A, *_]:
 123 |             print("A")

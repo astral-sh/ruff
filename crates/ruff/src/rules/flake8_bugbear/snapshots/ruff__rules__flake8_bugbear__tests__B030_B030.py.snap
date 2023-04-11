@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 ---
-./resources/test/fixtures/flake8_bugbear/B030.py:12:8: B030 `except` handlers should only be exception classes or tuples of exception classes
+B030.py:12:8: B030 `except` handlers should only be exception classes or tuples of exception classes
    |
 12 | try:
 13 |     pass
@@ -10,7 +10,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 15 |     pass
    |
 
-./resources/test/fixtures/flake8_bugbear/B030.py:17:9: B030 `except` handlers should only be exception classes or tuples of exception classes
+B030.py:17:9: B030 `except` handlers should only be exception classes or tuples of exception classes
    |
 17 | try:
 18 |     pass
@@ -19,7 +19,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 20 |     pass
    |
 
-./resources/test/fixtures/flake8_bugbear/B030.py:22:21: B030 `except` handlers should only be exception classes or tuples of exception classes
+B030.py:22:21: B030 `except` handlers should only be exception classes or tuples of exception classes
    |
 22 | try:
 23 |     pass
@@ -28,7 +28,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 25 |     pass
    |
 
-./resources/test/fixtures/flake8_bugbear/B030.py:27:37: B030 `except` handlers should only be exception classes or tuples of exception classes
+B030.py:27:37: B030 `except` handlers should only be exception classes or tuples of exception classes
    |
 27 | try:
 28 |     pass
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_bugbear/mod.rs
 30 |     pass
    |
 
-./resources/test/fixtures/flake8_bugbear/B030.py:33:29: B030 `except` handlers should only be exception classes or tuples of exception classes
+B030.py:33:29: B030 `except` handlers should only be exception classes or tuples of exception classes
    |
 33 | try:
 34 |     pass

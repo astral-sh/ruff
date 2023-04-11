@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
 ---
-./resources/test/fixtures/flake8_simplify/SIM108.py:2:1: SIM108 [*] Use ternary operator `b = c if a else d` instead of `if`-`else`-block
+SIM108.py:2:1: SIM108 [*] Use ternary operator `b = c if a else d` instead of `if`-`else`-block
   |
 2 |   # SIM108
 3 | / if a:
@@ -25,7 +25,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 7 4 | # OK
 8 5 | b = c if a else d
 
-./resources/test/fixtures/flake8_simplify/SIM108.py:58:1: SIM108 Use ternary operator `abc = x if x > 0 else -x` instead of `if`-`else`-block
+SIM108.py:58:1: SIM108 Use ternary operator `abc = x if x > 0 else -x` instead of `if`-`else`-block
    |
 58 |   # SIM108 (without fix due to comments)
 59 | / if x > 0:
@@ -37,7 +37,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
    | |____________^ SIM108
    |
 
-./resources/test/fixtures/flake8_simplify/SIM108.py:82:1: SIM108 [*] Use ternary operator `b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd` instead of `if`-`else`-block
+SIM108.py:82:1: SIM108 [*] Use ternary operator `b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd` instead of `if`-`else`-block
    |
 82 |   # SIM108
 83 | / if a:
@@ -61,7 +61,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
 87 84 | 
 88 85 | # OK (too long)
 
-./resources/test/fixtures/flake8_simplify/SIM108.py:97:1: SIM108 Use ternary operator `exitcode = 0 if True else 1` instead of `if`-`else`-block
+SIM108.py:97:1: SIM108 Use ternary operator `exitcode = 0 if True else 1` instead of `if`-`else`-block
     |
  97 |   # SIM108 (without fix due to trailing comment)
  98 | / if True:
@@ -71,7 +71,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
     | |________________^ SIM108
     |
 
-./resources/test/fixtures/flake8_simplify/SIM108.py:104:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
+SIM108.py:104:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
     |
 104 |   # SIM108
 105 | / if True: x = 3  # Foo
@@ -79,7 +79,7 @@ source: crates/ruff/src/rules/flake8_simplify/mod.rs
     | |___________^ SIM108
     |
 
-./resources/test/fixtures/flake8_simplify/SIM108.py:109:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
+SIM108.py:109:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
     |
 109 |   # SIM108
 110 | / if True:  # Foo

@@ -1,7 +1,7 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
 ---
-./resources/test/fixtures/pycodestyle/E27.py:28:3: E274 Tab before keyword
+E27.py:28:3: E274 Tab before keyword
    |
 28 | a and	b
 29 | #: E274
@@ -11,7 +11,7 @@ source: crates/ruff/src/rules/pycodestyle/mod.rs
 32 | this		and	False
    |
 
-./resources/test/fixtures/pycodestyle/E27.py:30:6: E274 Tab before keyword
+E27.py:30:6: E274 Tab before keyword
    |
 30 | a		and b
 31 | #: E273 E274
