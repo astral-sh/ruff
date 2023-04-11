@@ -73,7 +73,7 @@ impl Serialize for ExpandedEdits<'_> {
 
         for edit in self.edits {
             let value = json!({
-                "content": edit.content(),
+                "content": edit.content().unwrap_or_default(),
                 "location": edit.location(),
                 "end_location": edit.end_location()
             });

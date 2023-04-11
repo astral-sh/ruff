@@ -96,7 +96,7 @@ fn test_stdin_json() -> Result<()> {
       "message": "Remove unused import: `os`",
       "edits": [
         {{
-          "content": null,
+          "content": "",
           "location": {{
             "row": 1,
             "column": 0
