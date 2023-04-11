@@ -25,7 +25,7 @@ impl Emitter for JunitEmitter {
             for message in messages {
                 let mut status = TestCaseStatus::non_success(NonSuccessKind::Failure);
                 status.set_message(message.kind.body.clone());
-                let (row, col) = if context.is_jupyter_notebook(&message.filename) {
+                let (row, col) = if context.is_jupyter_notebook(message.filename()) {
                     // We can't give a reasonable location for the structured formats,
                     // so we show one that's clearly a fallback
                     (1, 0)

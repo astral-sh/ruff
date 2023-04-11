@@ -15,7 +15,7 @@ impl Emitter for AzureEmitter {
         context: &EmitterContext,
     ) -> anyhow::Result<()> {
         for message in messages {
-            let (line, col) = if context.is_jupyter_notebook(&message.filename) {
+            let (line, col) = if context.is_jupyter_notebook(message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 (1, 0)
@@ -27,7 +27,7 @@ impl Emitter for AzureEmitter {
                 writer,
                 "##vso[task.logissue type=error\
                         ;sourcepath={filename};linenumber={line};columnnumber={col};code={code};]{body}",
-                filename = message.filename,
+                filename = message.filename(),
                 code = message.kind.rule().noqa_code(),
                 body = message.kind.body,
             )?;

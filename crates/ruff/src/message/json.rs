@@ -49,7 +49,7 @@ impl Serialize for ExpandedMessages<'_> {
                 "fix": fix,
                 "location": message.location,
                 "end_location": message.end_location,
-                "filename": message.filename,
+                "filename": message.filename(),
                 "noqa_row": message.noqa_row
             });
 

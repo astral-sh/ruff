@@ -56,7 +56,7 @@ impl Serialize for SerializedMessages<'_> {
         let mut s = serializer.serialize_seq(Some(self.messages.len()))?;
 
         for message in self.messages {
-            let lines = if self.context.is_jupyter_notebook(&message.filename) {
+            let lines = if self.context.is_jupyter_notebook(message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
                 json!({
@@ -71,8 +71,8 @@ impl Serialize for SerializedMessages<'_> {
             };
 
             let path = self.project_dir.as_ref().map_or_else(
-                || relativize_path(&message.filename),
-                |project_dir| relativize_path_to(&message.filename, project_dir),
+                || relativize_path(message.filename()),
+                |project_dir| relativize_path_to(message.filename(), project_dir),
             );
 
             let value = json!({
@@ -99,8 +99,7 @@ fn fingerprint(message: &Message) -> String {
         location,
         end_location,
         fix: _fix,
-        filename,
-        source: _source,
+        file,
         noqa_row: _noqa_row,
     } = message;
 
@@ -111,7 +110,7 @@ fn fingerprint(message: &Message) -> String {
     location.column().hash(&mut hasher);
     end_location.row().hash(&mut hasher);
     end_location.column().hash(&mut hasher);
-    filename.hash(&mut hasher);
+    file.name().hash(&mut hasher);
 
     format!("{:x}", hasher.finish())
 }

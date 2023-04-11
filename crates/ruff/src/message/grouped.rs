@@ -57,7 +57,7 @@ impl Emitter for GroupedEmitter {
                         show_fix_status: self.show_fix_status,
                         row_length,
                         column_length,
-                        jupyter_index: context.jupyter_index(&message.filename),
+                        jupyter_index: context.jupyter_index(message.filename()),
                     }
                 )?;
             }

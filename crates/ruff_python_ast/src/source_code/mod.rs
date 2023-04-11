@@ -13,6 +13,7 @@ use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser as parser;
 use rustpython_parser::ast::Location;
 use rustpython_parser::{lexer, Mode, ParseError};
+use std::fmt::{Debug, Formatter};
 
 use std::sync::Arc;
 pub use stylist::{LineEnding, Stylist};
@@ -107,21 +108,15 @@ impl<'src, 'index> SourceCode<'src, 'index> {
         &self.text[range]
     }
 
+    /// Returns the source text
     pub fn text(&self) -> &'src str {
         self.text
     }
 
+    /// Returns the number of lines
     #[inline]
     pub fn line_count(&self) -> usize {
         self.index.line_count()
-    }
-
-    pub fn to_source_code_buf(&self) -> SourceCodeBuf {
-        self.to_owned()
-    }
-
-    pub fn to_owned(&self) -> SourceCodeBuf {
-        SourceCodeBuf::new(self.text, self.index.clone())
     }
 }
 
@@ -133,117 +128,133 @@ impl PartialEq<Self> for SourceCode<'_, '_> {
 
 impl Eq for SourceCode<'_, '_> {}
 
-impl PartialEq<SourceCodeBuf> for SourceCode<'_, '_> {
-    fn eq(&self, other: &SourceCodeBuf) -> bool {
-        self.text == &*other.text
+/// A Builder for constructing a [`SourceFile`]
+pub struct SourceFileBuilder {
+    name: Box<str>,
+    code: Option<FileSourceCode>,
+}
+
+impl SourceFileBuilder {
+    /// Creates a new builder for a file named `name`.
+    pub fn new(name: &str) -> Self {
+        Self {
+            name: Box::from(name),
+            code: None,
+        }
+    }
+
+    /// Creates a enw builder for a file named `name`
+    pub fn from_string(name: String) -> Self {
+        Self {
+            name: Box::from(name),
+            code: None,
+        }
+    }
+
+    /// Consumes `self` and returns a builder for a file with the source text and the [`LineIndex`] copied
+    /// from `source`.
+    #[must_use]
+    pub fn source_code(mut self, source: &SourceCode) -> Self {
+        self.set_source_code(source);
+        self
+    }
+
+    /// Copies the source text and [`LineIndex`] from `source`.
+    pub fn set_source_code(&mut self, source: &SourceCode) {
+        self.code = Some(FileSourceCode {
+            text: Box::from(source.text()),
+            index: source.index.clone(),
+        });
+    }
+
+    /// Consumes `self` and returns a builder for a file with the source text `text`. Builds the [`LineIndex`] from `text`.
+    #[must_use]
+    pub fn source_text(self, text: &str) -> Self {
+        self.source_code(&SourceCode::new(text, &LineIndex::from_source_text(text)))
+    }
+
+    /// Consumes `self` and returns a builder for a file with the source text `text`. Builds the [`LineIndex`] from `text`.
+    #[must_use]
+    pub fn source_text_string(mut self, text: String) -> Self {
+        self.set_source_text_string(text);
+        self
+    }
+
+    /// Copies the source text `text` and builds the [`LineIndex`] from `text`.
+    pub fn set_source_text_string(&mut self, text: String) {
+        self.code = Some(FileSourceCode {
+            index: LineIndex::from_source_text(&text),
+            text: Box::from(text),
+        });
+    }
+
+    /// Consumes `self` and returns the [`SourceFile`].
+    pub fn finish(self) -> SourceFile {
+        SourceFile {
+            inner: Arc::new(SourceFileInner {
+                name: self.name,
+                code: self.code,
+            }),
+        }
     }
 }
 
-/// Gives access to the source code of a file and allows mapping between [`Location`] and byte offsets.
+/// A source file that is identified by its name. Optionally stores the source code and [`LineIndex`].
 ///
-/// This is the owned pendant to [`SourceCode`]. Cloning only requires bumping reference counters.
-#[derive(Clone, Debug)]
-pub struct SourceCodeBuf {
-    text: Arc<str>,
+/// Cloning a [`SourceFile`] is cheap, because it only requires bumping a reference count.
+#[derive(Clone, Eq, PartialEq)]
+pub struct SourceFile {
+    inner: Arc<SourceFileInner>,
+}
+
+impl Debug for SourceFile {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SourceFile")
+            .field("name", &self.name())
+            .field("code", &self.source_code())
+            .finish()
+    }
+}
+
+impl SourceFile {
+    /// Returns the name of the source file (filename).
+    #[inline]
+    pub fn name(&self) -> &str {
+        &self.inner.name
+    }
+
+    /// Returns `Some` with the source code if set, or `None`.
+    #[inline]
+    pub fn source_code(&self) -> Option<SourceCode> {
+        self.inner.code.as_ref().map(|code| SourceCode {
+            text: &code.text,
+            index: &code.index,
+        })
+    }
+
+    /// Returns `Some` with the source text if set, or `None`.
+    #[inline]
+    pub fn source_text(&self) -> Option<&str> {
+        self.inner.code.as_ref().map(|code| &*code.text)
+    }
+}
+
+#[derive(Eq, PartialEq)]
+struct SourceFileInner {
+    name: Box<str>,
+    code: Option<FileSourceCode>,
+}
+
+struct FileSourceCode {
+    text: Box<str>,
     index: LineIndex,
 }
 
-impl SourceCodeBuf {
-    pub fn new(content: &str, index: LineIndex) -> Self {
-        Self {
-            text: Arc::from(content),
-            index,
-        }
-    }
-
-    /// Creates the [`LineIndex`] for `text` and returns the [`SourceCodeBuf`].
-    pub fn from_content(text: &str) -> Self {
-        Self::new(text, LineIndex::from_source_text(text))
-    }
-
-    #[inline]
-    fn as_source_code(&self) -> SourceCode {
-        SourceCode {
-            text: &self.text,
-            index: &self.index,
-        }
-    }
-
-    /// Take the source code up to the given [`Location`].
-    pub fn up_to(&self, location: Location) -> &str {
-        self.as_source_code().up_to(location)
-    }
-
-    /// Take the source code after the given [`Location`].
-    pub fn after(&self, location: Location) -> &str {
-        self.as_source_code().after(location)
-    }
-
-    /// Take the source code between the given [`Range`].
-    #[inline]
-    pub fn slice<R: Into<Range>>(&self, range: R) -> &str {
-        self.as_source_code().slice(range)
-    }
-
-    /// Converts a [`Location`] range to a byte offset range
-    #[inline]
-    pub fn text_range<R: Into<Range>>(&self, range: R) -> TextRange {
-        self.as_source_code().text_range(range)
-    }
-
-    #[inline]
-    pub fn line_range(&self, line: OneIndexed) -> TextRange {
-        self.as_source_code().line_range(line)
-    }
-
-    /// Return the byte offset of the given [`Location`].
-    #[inline]
-    pub fn offset(&self, location: Location) -> TextSize {
-        self.as_source_code().offset(location)
-    }
-
-    #[inline]
-    pub fn line_end(&self, line: OneIndexed) -> TextSize {
-        self.as_source_code().line_end(line)
-    }
-
-    #[inline]
-    pub fn line_start(&self, line: OneIndexed) -> TextSize {
-        self.as_source_code().line_start(line)
-    }
-
-    #[inline]
-    pub fn lines(&self, range: Range) -> &str {
-        self.as_source_code().lines(range)
-    }
-
-    /// Returns the source text of the line with the given index
-    #[inline]
-    pub fn line_text(&self, index: OneIndexed) -> &str {
-        self.as_source_code().line_text(index)
-    }
-
-    #[inline]
-    pub fn line_count(&self) -> usize {
-        self.index.line_count()
-    }
-
-    pub fn text(&self) -> &str {
-        &self.text
-    }
-}
-
-impl PartialEq<Self> for SourceCodeBuf {
-    // The same source text should have the same index
+impl PartialEq for FileSourceCode {
     fn eq(&self, other: &Self) -> bool {
+        // It should be safe to assume that the index for two source files are identical
         self.text == other.text
     }
 }
 
-impl PartialEq<SourceCode<'_, '_>> for SourceCodeBuf {
-    fn eq(&self, other: &SourceCode<'_, '_>) -> bool {
-        &*self.text == other.text
-    }
-}
-
-impl Eq for SourceCodeBuf {}
+impl Eq for FileSourceCode {}
