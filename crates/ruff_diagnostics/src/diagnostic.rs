@@ -58,6 +58,7 @@ impl Diagnostic {
 
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
     /// Otherwise, log the error.
+    #[inline]
     pub fn try_set_fix<T: Into<Fix>>(&mut self, func: impl FnOnce() -> Result<T>) {
         match func() {
             Ok(fix) => self.fix = fix.into(),
@@ -66,6 +67,7 @@ impl Diagnostic {
     }
 
     /// Set the location of the diagnostic's parent node.
+    #[inline]
     pub fn set_parent(&mut self, parent: Location) {
         self.parent = Some(parent);
     }

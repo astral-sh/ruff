@@ -2177,6 +2177,7 @@ dependencies = [
  "once_cell",
  "regex",
  "ruff_rustpython",
+ "ruff_text_size",
  "rustc-hash",
  "rustpython-common",
  "rustpython-parser",

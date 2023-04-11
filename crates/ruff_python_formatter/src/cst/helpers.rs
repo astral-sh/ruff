@@ -3,6 +3,7 @@ use rustpython_parser::ast::Location;
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
+use ruff_text_size::TextRange;
 
 /// Return `true` if the given string is a radix literal (e.g., `0b101`).
 pub fn is_radix_literal(content: &str) -> bool {
@@ -55,7 +56,7 @@ pub fn expand_indented_block(
     let mut nesting = 0;
     let mut colon = None;
     for (start, tok, _end) in rustpython_parser::lexer::lex_located(
-        &contents[start_index..end_index],
+        &contents[TextRange::new(start_index, end_index)],
         rustpython_parser::Mode::Module,
         location,
     )
@@ -80,7 +81,7 @@ pub fn expand_indented_block(
 
     // From here, we have two options: simple statement or compound statement.
     let indent = rustpython_parser::lexer::lex_located(
-        &contents[colon_index..end_index],
+        &contents[TextRange::new(colon_index, end_index)],
         rustpython_parser::Mode::Module,
         colon_location,
     )
@@ -97,7 +98,7 @@ pub fn expand_indented_block(
 
     // Compound statement: from the colon to the end of the block.
     let mut offset = 0;
-    for (index, line) in contents[end_index..]
+    for (index, line) in contents[usize::from(end_index)..]
         .universal_newlines()
         .skip(1)
         .enumerate()
