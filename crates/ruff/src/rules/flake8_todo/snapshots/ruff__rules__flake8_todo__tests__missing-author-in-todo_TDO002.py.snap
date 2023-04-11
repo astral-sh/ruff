@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/flake8_todo/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MissingAuthorInTodo
-    body: Missing author into TODO
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 26
-  fix:
-    edits: []
-  parent: ~
+TDO002.py:4:1: TDO002 Missing author into TODO
+  |
+4 | # TODO(evanrittenhouse): this has an author
+5 | # T002 - errors
+6 | # TODO: this has no author
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ TDO002
+  |
+
 

@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/flake8_todo/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MissingSpaceAfterColonInTodo
-    body: Missing space after colon in TODO
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 55
-  fix:
-    edits: []
-  parent: ~
+TDO007.py:4:1: TDO007 Missing space after colon in TODO
+  |
+4 | # TODO(evanrittenhouse): this has a space after a colon
+5 | # T007 - errors
+6 | # TODO(evanrittenhouse):this has no space after a colon
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TDO007
+  |
+
 

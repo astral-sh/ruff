@@ -1,33 +1,21 @@
 ---
 source: crates/ruff/src/rules/flake8_todo/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MissingTextInTodo
-    body: Missing text in TODO
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MissingTextInTodo
-    body: Missing text in TODO
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 23
-  fix:
-    edits: []
-  parent: ~
+TDO005.py:4:1: TDO005 Missing text in TODO
+  |
+4 | # TODO(evanrittenhouse): this has text, while the errors do not
+5 | # T005 - errors
+6 | # TODO(evanrittenhouse):
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ TDO005
+7 | # TODO(evanrittenhouse)
+  |
+
+TDO005.py:5:1: TDO005 Missing text in TODO
+  |
+5 | # T005 - errors
+6 | # TODO(evanrittenhouse):
+7 | # TODO(evanrittenhouse)
+  | ^^^^^^^^^^^^^^^^^^^^^^^ TDO005
+  |
+
 

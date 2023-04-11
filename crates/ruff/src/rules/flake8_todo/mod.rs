@@ -6,12 +6,11 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::InvalidTodoTag, Path::new("TDO001.py"); "TDO001")]
     #[test_case(Rule::MissingAuthorInTodo, Path::new("TDO002.py"); "TDO002")]
@@ -24,7 +23,7 @@ mod tests {
             Path::new("flake8_todo").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }
