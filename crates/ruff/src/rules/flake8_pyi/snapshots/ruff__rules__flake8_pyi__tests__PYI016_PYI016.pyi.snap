@@ -3,9 +3,9 @@ source: crates/ruff/src/rules/flake8_pyi/mod.rs
 expression: diagnostics
 ---
 - kind:
-    name: DuplicateTypesInUnion
-    body: Duplicate name in union
-    suggestion: Remove latter name from union
+    name: DuplicateUnionMember
+    body: "Duplicate union member `str`"
+    suggestion: "Remove duplicate union member `str`"
     fixable: true
   location:
     row: 5
@@ -24,9 +24,9 @@ expression: diagnostics
           column: 17
   parent: ~
 - kind:
-    name: DuplicateTypesInUnion
-    body: Duplicate name in union
-    suggestion: Remove latter name from union
+    name: DuplicateUnionMember
+    body: "Duplicate union member `int`"
+    suggestion: "Remove duplicate union member `int`"
     fixable: true
   location:
     row: 8
@@ -45,9 +45,9 @@ expression: diagnostics
           column: 25
   parent: ~
 - kind:
-    name: DuplicateTypesInUnion
-    body: Duplicate name in union
-    suggestion: Remove latter name from union
+    name: DuplicateUnionMember
+    body: "Duplicate union member `str`"
+    suggestion: "Remove duplicate union member `str`"
     fixable: true
   location:
     row: 12
@@ -66,9 +66,9 @@ expression: diagnostics
           column: 24
   parent: ~
 - kind:
-    name: DuplicateTypesInUnion
-    body: Duplicate name in union
-    suggestion: Remove latter name from union
+    name: DuplicateUnionMember
+    body: "Duplicate union member `str`"
+    suggestion: "Remove duplicate union member `str`"
     fixable: true
   location:
     row: 16
@@ -87,9 +87,9 @@ expression: diagnostics
           column: 17
   parent: ~
 - kind:
-    name: DuplicateTypesInUnion
-    body: Duplicate name in union
-    suggestion: Remove latter name from union
+    name: DuplicateUnionMember
+    body: "Duplicate union member `int`"
+    suggestion: "Remove duplicate union member `int`"
     fixable: true
   location:
     row: 17
@@ -108,9 +108,9 @@ expression: diagnostics
           column: 17
   parent: ~
 - kind:
-    name: DuplicateTypesInUnion
-    body: Duplicate name in union
-    suggestion: Remove latter name from union
+    name: DuplicateUnionMember
+    body: "Duplicate union member `str`"
+    suggestion: "Remove duplicate union member `str`"
     fixable: true
   location:
     row: 18
@@ -129,9 +129,9 @@ expression: diagnostics
           column: 23
   parent: ~
 - kind:
-    name: DuplicateTypesInUnion
-    body: Duplicate name in union
-    suggestion: Remove latter name from union
+    name: DuplicateUnionMember
+    body: "Duplicate union member `int`"
+    suggestion: "Remove duplicate union member `int`"
     fixable: true
   location:
     row: 19
@@ -150,9 +150,9 @@ expression: diagnostics
           column: 30
   parent: ~
 - kind:
-    name: DuplicateTypesInUnion
-    body: Duplicate name in union
-    suggestion: Remove latter name from union
+    name: DuplicateUnionMember
+    body: "Duplicate union member `int`"
+    suggestion: "Remove duplicate union member `int`"
     fixable: true
   location:
     row: 25
