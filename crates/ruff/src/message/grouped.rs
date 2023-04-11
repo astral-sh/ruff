@@ -104,7 +104,7 @@ impl Display for DisplayGroupedMessage<'_> {
 
         writeln!(
             f,
-            "{row}{sep}{col}{col_padding}  {code_and_body}",
+            "{row}{sep}{col}{col_padding} {code_and_body}",
             sep = ":".cyan(),
             col_padding = " ".repeat(self.column_length - num_digits(message.location.column())),
             code_and_body = RuleCodeAndBody {
