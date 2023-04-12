@@ -67,22 +67,22 @@ fn traverse_union<'a>(
         );
         if checker.patch(diagnostic.kind.rule()) {
             // Delete the "|" character as well as the duplicate value by reconstructing the
-            // parent without the duplicate
+            // parent without the duplicate.
 
             // SAFETY: impossible to have a duplicate without a `parent` node.
-            let parent = parent.unwrap();
+            let parent = parent.expect("Parent node must exist");
 
-            // SAFETY: Parent node must have been a BinOp in order for us to have traversed it
-            let ExprKind::BinOp { left, right, .. } = &parent.node
-            else {
-                unreachable!();
+            // SAFETY: Parent node must have been a `BinOp` in order for us to have traversed it.
+            let ExprKind::BinOp { left, right, .. } = &parent.node else {
+                panic!("Parent node must be a BinOp");
             };
 
-            // Replace parent with the non-duplicate of its children
-            let fixed_parent = if expr.node == left.node { right } else { left };
-
+            // Replace the parent with its non-duplicate child.
             diagnostic.set_fix(Edit::replacement(
-                unparse_expr(fixed_parent, checker.stylist),
+                unparse_expr(
+                    if expr.node == left.node { right } else { left },
+                    checker.stylist,
+                ),
                 parent.location,
                 parent.end_location.unwrap(),
             ));
