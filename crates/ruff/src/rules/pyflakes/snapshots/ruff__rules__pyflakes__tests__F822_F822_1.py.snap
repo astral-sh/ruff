@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndefinedExport
-    body: "Undefined name `b` in `__all__`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 7
-  fix:
-    edits: []
-  parent: ~
+F822_1.py:3:1: F822 Undefined name `b` in `__all__`
+  |
+3 | a = 1
+4 | 
+5 | __all__ = list(["a", "b"])
+  | ^^^^^^^ F822
+  |
+
 

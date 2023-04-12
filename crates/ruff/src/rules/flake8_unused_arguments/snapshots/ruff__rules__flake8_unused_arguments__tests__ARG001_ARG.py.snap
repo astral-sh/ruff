@@ -1,117 +1,64 @@
 ---
 source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `self`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 6
-  end_location:
-    row: 9
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `x`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 12
-  end_location:
-    row: 9
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `cls`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 6
-  end_location:
-    row: 13
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `x`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 11
-  end_location:
-    row: 13
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `self`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 6
-  end_location:
-    row: 17
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `x`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 12
-  end_location:
-    row: 17
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `cls`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 6
-  end_location:
-    row: 21
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedFunctionArgument
-    body: "Unused function argument: `x`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 11
-  end_location:
-    row: 21
-    column: 12
-  fix:
-    edits: []
-  parent: ~
+ARG.py:9:7: ARG001 Unused function argument: `self`
+   |
+ 9 | # Unused arguments on functions.
+10 | ###
+11 | def f(self, x):
+   |       ^^^^ ARG001
+12 |     print("Hello, world!")
+   |
+
+ARG.py:9:13: ARG001 Unused function argument: `x`
+   |
+ 9 | # Unused arguments on functions.
+10 | ###
+11 | def f(self, x):
+   |             ^ ARG001
+12 |     print("Hello, world!")
+   |
+
+ARG.py:13:7: ARG001 Unused function argument: `cls`
+   |
+13 | def f(cls, x):
+   |       ^^^ ARG001
+14 |     print("Hello, world!")
+   |
+
+ARG.py:13:12: ARG001 Unused function argument: `x`
+   |
+13 | def f(cls, x):
+   |            ^ ARG001
+14 |     print("Hello, world!")
+   |
+
+ARG.py:17:7: ARG001 Unused function argument: `self`
+   |
+17 | def f(self, x):
+   |       ^^^^ ARG001
+18 |     ...
+   |
+
+ARG.py:17:13: ARG001 Unused function argument: `x`
+   |
+17 | def f(self, x):
+   |             ^ ARG001
+18 |     ...
+   |
+
+ARG.py:21:7: ARG001 Unused function argument: `cls`
+   |
+21 | def f(cls, x):
+   |       ^^^ ARG001
+22 |     ...
+   |
+
+ARG.py:21:12: ARG001 Unused function argument: `x`
+   |
+21 | def f(cls, x):
+   |            ^ ARG001
+22 |     ...
+   |
+
 

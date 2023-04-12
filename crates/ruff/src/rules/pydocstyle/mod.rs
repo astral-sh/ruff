@@ -9,12 +9,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     use super::settings::{Convention, Settings};
 
@@ -89,7 +89,7 @@ mod tests {
                 ..settings::Settings::for_rule(rule_code)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -99,7 +99,7 @@ mod tests {
             Path::new("pydocstyle/bom.py"),
             &settings::Settings::for_rule(Rule::TripleSingleQuotes),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -118,7 +118,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -136,7 +136,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -154,7 +154,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::UndocumentedParam)
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -164,7 +164,7 @@ mod tests {
             Path::new("pydocstyle/D209_D400.py"),
             &settings::Settings::for_rules([Rule::NewLineAfterLastParagraph, Rule::EndsInPeriod]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

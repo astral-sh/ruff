@@ -110,11 +110,13 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         exclude: None,
         extend: None,
         extend_exclude: None,
+        extend_include: None,
         fix: None,
         fix_only: None,
         fixable: None,
         force_exclude: None,
         format: None,
+        include: None,
         ignore_init_module_imports: None,
         namespace_packages: None,
         per_file_ignores: None,
@@ -213,7 +215,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
             } else {
                 Some(ExpandedFix {
                     message: message.kind.suggestion,
-                    edits: message.fix.edits().to_vec(),
+                    edits: message.fix.into_edits(),
                 })
             },
         })

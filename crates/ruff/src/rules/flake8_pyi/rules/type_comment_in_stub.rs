@@ -35,11 +35,6 @@ impl Violation for TypeCommentInStub {
     }
 }
 
-static TYPE_COMMENT_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#\s*type:\s*([^#]+)(\s*#.*?)?$").unwrap());
-static TYPE_IGNORE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#\s*type:\s*ignore([^#]+)?(\s*#.*?)?$").unwrap());
-
 /// PYI033
 pub fn type_comment_in_stub(tokens: &[LexResult]) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
@@ -60,3 +55,9 @@ pub fn type_comment_in_stub(tokens: &[LexResult]) -> Vec<Diagnostic> {
 
     diagnostics
 }
+
+static TYPE_COMMENT_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^#\s*(type|pyright):\s*([^#]+)(\s*#.*?)?$").unwrap());
+
+static TYPE_IGNORE_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^#\s*(type|pyright):\s*ignore([^#]+)?(\s*#.*?)?$").unwrap());

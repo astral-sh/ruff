@@ -482,6 +482,7 @@ ruff_macros::register_rules!(
     rules::flake8_unused_arguments::rules::UnusedLambdaArgument,
     // flake8-import-conventions
     rules::flake8_import_conventions::rules::UnconventionalImportAlias,
+    rules::flake8_import_conventions::rules::BannedImportAlias,
     // flake8-datetimez
     rules::flake8_datetimez::rules::CallDatetimeWithoutTzinfo,
     rules::flake8_datetimez::rules::CallDatetimeToday,
@@ -645,6 +646,8 @@ ruff_macros::register_rules!(
     rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,
     rules::ruff::rules::PairwiseOverZipped,
+    rules::ruff::rules::MutableDataclassDefault,
+    rules::ruff::rules::FunctionCallInDataclassDefaultArgument,
     // flake8-django
     rules::flake8_django::rules::DjangoNullableModelStringField,
     rules::flake8_django::rules::DjangoLocalsInRenderFunction,

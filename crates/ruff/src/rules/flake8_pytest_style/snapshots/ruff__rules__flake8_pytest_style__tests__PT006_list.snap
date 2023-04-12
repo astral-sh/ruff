@@ -1,131 +1,118 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestParametrizeNamesWrongType
-    body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `list`"
-    suggestion: "Use a `list` for parameter names"
-    fixable: true
-  location:
-    row: 9
-    column: 25
-  end_location:
-    row: 9
-    column: 40
-  fix:
-    edits:
-      - content: "[\"param1\", \"param2\"]"
-        location:
-          row: 9
-          column: 25
-        end_location:
-          row: 9
-          column: 40
-  parent: ~
-- kind:
-    name: PytestParametrizeNamesWrongType
-    body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `list`"
-    suggestion: "Use a `list` for parameter names"
-    fixable: true
-  location:
-    row: 14
-    column: 25
-  end_location:
-    row: 14
-    column: 56
-  fix:
-    edits:
-      - content: "[\"param1\", \"param2\"]"
-        location:
-          row: 14
-          column: 25
-        end_location:
-          row: 14
-          column: 56
-  parent: ~
-- kind:
-    name: PytestParametrizeNamesWrongType
-    body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `list`"
-    suggestion: "Use a `list` for parameter names"
-    fixable: true
-  location:
-    row: 19
-    column: 25
-  end_location:
-    row: 19
-    column: 40
-  fix:
-    edits:
-      - content: "[\"param1\", \"param2\"]"
-        location:
-          row: 19
-          column: 25
-        end_location:
-          row: 19
-          column: 40
-  parent: ~
-- kind:
-    name: PytestParametrizeNamesWrongType
-    body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `list`"
-    suggestion: "Use a `list` for parameter names"
-    fixable: true
-  location:
-    row: 24
-    column: 25
-  end_location:
-    row: 24
-    column: 45
-  fix:
-    edits:
-      - content: "[\"param1\", \"param2\"]"
-        location:
-          row: 24
-          column: 25
-        end_location:
-          row: 24
-          column: 45
-  parent: ~
-- kind:
-    name: PytestParametrizeNamesWrongType
-    body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
-    suggestion: "Use a `csv` for parameter names"
-    fixable: true
-  location:
-    row: 29
-    column: 25
-  end_location:
-    row: 29
-    column: 36
-  fix:
-    edits:
-      - content: "\"param1\""
-        location:
-          row: 29
-          column: 25
-        end_location:
-          row: 29
-          column: 36
-  parent: ~
-- kind:
-    name: PytestParametrizeNamesWrongType
-    body: "Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`"
-    suggestion: "Use a `csv` for parameter names"
-    fixable: true
-  location:
-    row: 39
-    column: 25
-  end_location:
-    row: 39
-    column: 35
-  fix:
-    edits:
-      - content: "\"param1\""
-        location:
-          row: 39
-          column: 25
-        end_location:
-          row: 39
-          column: 35
-  parent: ~
+PT006.py:9:26: PT006 [*] Wrong name(s) type in `@pytest.mark.parametrize`, expected `list`
+   |
+ 9 | @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
+   |                          ^^^^^^^^^^^^^^^ PT006
+10 | def test_csv(param1, param2):
+11 |     ...
+   |
+   = help: Use a `list` for parameter names
+
+ℹ Suggested fix
+6  6  |     ...
+7  7  | 
+8  8  | 
+9     |-@pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
+   9  |+@pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
+10 10 | def test_csv(param1, param2):
+11 11 |     ...
+12 12 | 
+
+PT006.py:14:26: PT006 [*] Wrong name(s) type in `@pytest.mark.parametrize`, expected `list`
+   |
+14 | @pytest.mark.parametrize("   param1,   ,    param2   , ", [(1, 2), (3, 4)])
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
+15 | def test_csv_with_whitespace(param1, param2):
+16 |     ...
+   |
+   = help: Use a `list` for parameter names
+
+ℹ Suggested fix
+11 11 |     ...
+12 12 | 
+13 13 | 
+14    |-@pytest.mark.parametrize("   param1,   ,    param2   , ", [(1, 2), (3, 4)])
+   14 |+@pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
+15 15 | def test_csv_with_whitespace(param1, param2):
+16 16 |     ...
+17 17 | 
+
+PT006.py:19:26: PT006 [*] Wrong name(s) type in `@pytest.mark.parametrize`, expected `list`
+   |
+19 | @pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
+   |                          ^^^^^^^^^^^^^^^ PT006
+20 | def test_csv_bad_quotes(param1, param2):
+21 |     ...
+   |
+   = help: Use a `list` for parameter names
+
+ℹ Suggested fix
+16 16 |     ...
+17 17 | 
+18 18 | 
+19    |-@pytest.mark.parametrize("param1,param2", [(1, 2), (3, 4)])
+   19 |+@pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
+20 20 | def test_csv_bad_quotes(param1, param2):
+21 21 |     ...
+22 22 | 
+
+PT006.py:24:26: PT006 [*] Wrong name(s) type in `@pytest.mark.parametrize`, expected `list`
+   |
+24 | @pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
+   |                          ^^^^^^^^^^^^^^^^^^^^ PT006
+25 | def test_tuple(param1, param2):
+26 |     ...
+   |
+   = help: Use a `list` for parameter names
+
+ℹ Suggested fix
+21 21 |     ...
+22 22 | 
+23 23 | 
+24    |-@pytest.mark.parametrize(("param1", "param2"), [(1, 2), (3, 4)])
+   24 |+@pytest.mark.parametrize(["param1", "param2"], [(1, 2), (3, 4)])
+25 25 | def test_tuple(param1, param2):
+26 26 |     ...
+27 27 | 
+
+PT006.py:29:26: PT006 [*] Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`
+   |
+29 | @pytest.mark.parametrize(("param1",), [1, 2, 3])
+   |                          ^^^^^^^^^^^ PT006
+30 | def test_tuple_one_elem(param1, param2):
+31 |     ...
+   |
+   = help: Use a `csv` for parameter names
+
+ℹ Suggested fix
+26 26 |     ...
+27 27 | 
+28 28 | 
+29    |-@pytest.mark.parametrize(("param1",), [1, 2, 3])
+   29 |+@pytest.mark.parametrize("param1", [1, 2, 3])
+30 30 | def test_tuple_one_elem(param1, param2):
+31 31 |     ...
+32 32 | 
+
+PT006.py:39:26: PT006 [*] Wrong name(s) type in `@pytest.mark.parametrize`, expected `csv`
+   |
+39 | @pytest.mark.parametrize(["param1"], [1, 2, 3])
+   |                          ^^^^^^^^^^ PT006
+40 | def test_list_one_elem(param1, param2):
+41 |     ...
+   |
+   = help: Use a `csv` for parameter names
+
+ℹ Suggested fix
+36 36 |     ...
+37 37 | 
+38 38 | 
+39    |-@pytest.mark.parametrize(["param1"], [1, 2, 3])
+   39 |+@pytest.mark.parametrize("param1", [1, 2, 3])
+40 40 | def test_list_one_elem(param1, param2):
+41 41 |     ...
+42 42 | 
+
 

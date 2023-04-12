@@ -10,13 +10,13 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings;
     use crate::settings::types::PythonVersion;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::UselessMetaclassType, Path::new("UP001.py"); "UP001")]
     #[test_case(Rule::TypeOfPrimitive, Path::new("UP003.py"); "UP003")]
@@ -76,7 +76,7 @@ mod tests {
             Path::new("pyupgrade").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -89,7 +89,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -102,7 +102,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::NonPEP585Annotation)
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -115,7 +115,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::NonPEP604Annotation)
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -128,7 +128,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::NonPEP604Annotation)
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -141,7 +141,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::DatetimeTimezoneUTC)
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

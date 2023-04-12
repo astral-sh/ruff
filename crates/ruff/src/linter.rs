@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::ops::Deref;
 use std::path::Path;
 
 use anyhow::{anyhow, Result};
@@ -10,7 +11,7 @@ use rustpython_parser::ParseError;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist};
 use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::autofix::fix_file;
@@ -22,7 +23,7 @@ use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
-use crate::message::{Message, Source};
+use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
@@ -353,26 +354,39 @@ pub fn lint_only(
         autofix,
     );
 
-    // Convert from diagnostics to messages.
-    let path_lossy = path.to_string_lossy();
-    result.map(|(messages, imports)| {
+    result.map(|(diagnostics, imports)| {
         (
-            messages
-                .into_iter()
-                .map(|diagnostic| {
-                    let source = if settings.show_source {
-                        Some(Source::from_diagnostic(&diagnostic, &locator))
-                    } else {
-                        None
-                    };
-                    let lineno = diagnostic.location.row();
-                    let noqa_row = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-                    Message::from_diagnostic(diagnostic, path_lossy.to_string(), source, noqa_row)
-                })
-                .collect(),
+            diagnostics_to_messages(diagnostics, path, settings, &locator, &directives),
             imports,
         )
     })
+}
+
+/// Convert from diagnostics to messages.
+fn diagnostics_to_messages(
+    diagnostics: Vec<Diagnostic>,
+    path: &Path,
+    settings: &Settings,
+    locator: &Locator,
+    directives: &Directives,
+) -> Vec<Message> {
+    let file = once_cell::unsync::Lazy::new(|| {
+        let mut builder = SourceFileBuilder::new(&path.to_string_lossy());
+        if settings.show_source {
+            builder.set_source_code(&locator.to_source_code());
+        }
+
+        builder.finish()
+    });
+
+    diagnostics
+        .into_iter()
+        .map(|diagnostic| {
+            let lineno = diagnostic.location.row();
+            let noqa_row = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
+            Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_row)
+        })
+        .collect()
 }
 
 /// Generate `Diagnostic`s from source code content, iteratively autofixing
@@ -496,30 +510,10 @@ This indicates a bug in `{}`. If you could open an issue at:
             }
         }
 
-        // Convert to messages.
-        let path_lossy = path.to_string_lossy();
         return Ok(FixerResult {
-            result: result.map(|(messages, imports)| {
+            result: result.map(|(diagnostics, imports)| {
                 (
-                    messages
-                        .into_iter()
-                        .map(|diagnostic| {
-                            let source = if settings.show_source {
-                                Some(Source::from_diagnostic(&diagnostic, &locator))
-                            } else {
-                                None
-                            };
-                            let lineno = diagnostic.location.row();
-                            let noqa_row =
-                                *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-                            Message::from_diagnostic(
-                                diagnostic,
-                                path_lossy.to_string(),
-                                source,
-                                noqa_row,
-                            )
-                        })
-                        .collect(),
+                    diagnostics_to_messages(diagnostics, path, settings, &locator, &directives),
                     imports,
                 )
             }),

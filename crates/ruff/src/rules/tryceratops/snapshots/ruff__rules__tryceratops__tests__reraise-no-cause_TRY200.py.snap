@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/tryceratops/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ReraiseNoCause
-    body: "Use `raise from` to specify exception cause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 8
-  end_location:
-    row: 15
-    column: 27
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ReraiseNoCause
-    body: "Use `raise from` to specify exception cause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 12
-  end_location:
-    row: 23
-    column: 31
-  fix:
-    edits: []
-  parent: ~
+TRY200.py:15:9: TRY200 Use `raise from` to specify exception cause
+   |
+15 |         a = 1
+16 |     except Exception:
+17 |         raise MyException()
+   |         ^^^^^^^^^^^^^^^^^^^ TRY200
+   |
+
+TRY200.py:23:13: TRY200 Use `raise from` to specify exception cause
+   |
+23 |     except Exception:
+24 |         if True:
+25 |             raise MyException()
+   |             ^^^^^^^^^^^^^^^^^^^ TRY200
+   |
+
 

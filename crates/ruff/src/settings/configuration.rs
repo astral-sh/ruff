@@ -47,18 +47,20 @@ pub struct Configuration {
     pub exclude: Option<Vec<FilePattern>>,
     pub extend: Option<PathBuf>,
     pub extend_exclude: Vec<FilePattern>,
+    pub extend_include: Vec<FilePattern>,
     pub external: Option<Vec<String>>,
     pub fix: Option<bool>,
     pub fix_only: Option<bool>,
     pub force_exclude: Option<bool>,
     pub format: Option<SerializationFormat>,
     pub ignore_init_module_imports: Option<bool>,
+    pub include: Option<Vec<FilePattern>>,
     pub line_length: Option<usize>,
     pub namespace_packages: Option<Vec<PathBuf>>,
     pub required_version: Option<Version>,
     pub respect_gitignore: Option<bool>,
-    pub show_source: Option<bool>,
     pub show_fixes: Option<bool>,
+    pub show_source: Option<bool>,
     pub src: Option<Vec<PathBuf>>,
     pub target_version: Option<PythonVersion>,
     pub task_tags: Option<Vec<String>>,
@@ -148,12 +150,33 @@ impl Configuration {
                         .collect()
                 })
                 .unwrap_or_default(),
+            extend_include: options
+                .extend_include
+                .map(|paths| {
+                    paths
+                        .into_iter()
+                        .map(|pattern| {
+                            let absolute = fs::normalize_path_to(&pattern, project_root);
+                            FilePattern::User(pattern, absolute)
+                        })
+                        .collect()
+                })
+                .unwrap_or_default(),
             external: options.external,
             fix: options.fix,
             fix_only: options.fix_only,
             format: options.format,
             force_exclude: options.force_exclude,
             ignore_init_module_imports: options.ignore_init_module_imports,
+            include: options.include.map(|paths| {
+                paths
+                    .into_iter()
+                    .map(|pattern| {
+                        let absolute = fs::normalize_path_to(&pattern, project_root);
+                        FilePattern::User(pattern, absolute)
+                    })
+                    .collect()
+            }),
             line_length: options.line_length,
             namespace_packages: options
                 .namespace_packages
@@ -224,11 +247,17 @@ impl Configuration {
                 .into_iter()
                 .chain(self.extend_exclude.into_iter())
                 .collect(),
+            extend_include: config
+                .extend_include
+                .into_iter()
+                .chain(self.extend_include.into_iter())
+                .collect(),
             external: self.external.or(config.external),
             fix: self.fix.or(config.fix),
             fix_only: self.fix_only.or(config.fix_only),
             format: self.format.or(config.format),
             force_exclude: self.force_exclude.or(config.force_exclude),
+            include: self.include.or(config.include),
             ignore_init_module_imports: self
                 .ignore_init_module_imports
                 .or(config.ignore_init_module_imports),

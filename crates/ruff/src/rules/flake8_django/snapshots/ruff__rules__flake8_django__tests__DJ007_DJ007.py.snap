@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/flake8_django/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DjangoAllWithModelForm
-    body: "Do not use `__all__` with `ModelForm`, use `fields` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 8
-  end_location:
-    row: 6
-    column: 26
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DjangoAllWithModelForm
-    body: "Do not use `__all__` with `ModelForm`, use `fields` instead"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 8
-  end_location:
-    row: 11
-    column: 27
-  fix:
-    edits: []
-  parent: ~
+DJ007.py:6:9: DJ007 Do not use `__all__` with `ModelForm`, use `fields` instead
+  |
+6 | class TestModelForm1(forms.ModelForm):
+7 |     class Meta:
+8 |         fields = "__all__"
+  |         ^^^^^^^^^^^^^^^^^^ DJ007
+  |
+
+DJ007.py:11:9: DJ007 Do not use `__all__` with `ModelForm`, use `fields` instead
+   |
+11 | class TestModelForm2(forms.ModelForm):
+12 |     class Meta:
+13 |         fields = b"__all__"
+   |         ^^^^^^^^^^^^^^^^^^^ DJ007
+   |
+
 

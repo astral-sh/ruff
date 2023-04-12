@@ -525,6 +525,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // flake8-import-conventions
         (Flake8ImportConventions, "001") => Rule::UnconventionalImportAlias,
+        (Flake8ImportConventions, "002") => Rule::BannedImportAlias,
 
         // flake8-datetimez
         (Flake8Datetimez, "001") => Rule::CallDatetimeWithoutTzinfo,
@@ -701,6 +702,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Ruff, "005") => Rule::CollectionLiteralConcatenation,
         (Ruff, "006") => Rule::AsyncioDanglingTask,
         (Ruff, "007") => Rule::PairwiseOverZipped,
+        (Ruff, "008") => Rule::MutableDataclassDefault,
+        (Ruff, "009") => Rule::FunctionCallInDataclassDefaultArgument,
         (Ruff, "100") => Rule::UnusedNOQA,
 
         // flake8-django

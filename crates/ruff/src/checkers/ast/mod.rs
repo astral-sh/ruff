@@ -819,6 +819,24 @@ where
                     flake8_pie::rules::non_unique_enums(self, stmt, body);
                 }
 
+                if self.settings.rules.any_enabled(&[
+                    Rule::MutableDataclassDefault,
+                    Rule::FunctionCallInDataclassDefaultArgument,
+                ]) && ruff::rules::is_dataclass(self, decorator_list)
+                {
+                    if self.settings.rules.enabled(Rule::MutableDataclassDefault) {
+                        ruff::rules::mutable_dataclass_default(self, body);
+                    }
+
+                    if self
+                        .settings
+                        .rules
+                        .enabled(Rule::FunctionCallInDataclassDefaultArgument)
+                    {
+                        ruff::rules::function_call_in_dataclass_defaults(self, body);
+                    }
+                }
+
                 self.check_builtin_shadowing(name, stmt, false);
 
                 for expr in bases {
@@ -1056,6 +1074,21 @@ where
                             )
                         {
                             self.diagnostics.push(diagnostic);
+                        }
+                    }
+
+                    if self.settings.rules.enabled(Rule::BannedImportAlias) {
+                        if let Some(asname) = &alias.node.asname {
+                            if let Some(diagnostic) =
+                                flake8_import_conventions::rules::check_banned_import(
+                                    stmt,
+                                    &alias.node.name,
+                                    asname,
+                                    &self.settings.flake8_import_conventions.banned_aliases,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
+                            }
                         }
                     }
 
@@ -1318,6 +1351,26 @@ where
                             )
                         {
                             self.diagnostics.push(diagnostic);
+                        }
+                    }
+
+                    if self.settings.rules.enabled(Rule::BannedImportAlias) {
+                        if let Some(asname) = &alias.node.asname {
+                            let full_name = helpers::format_import_from_member(
+                                *level,
+                                module.as_deref(),
+                                &alias.node.name,
+                            );
+                            if let Some(diagnostic) =
+                                flake8_import_conventions::rules::check_banned_import(
+                                    stmt,
+                                    &full_name,
+                                    asname,
+                                    &self.settings.flake8_import_conventions.banned_aliases,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
+                            }
                         }
                     }
 
@@ -5099,7 +5152,7 @@ impl<'a> Checker<'a> {
                             self.stylist,
                         ) {
                             Ok(fix) => {
-                                if fix.content.is_empty() || fix.content == "pass" {
+                                if fix.is_deletion() || fix.content() == Some("pass") {
                                     self.deletions.insert(*defined_by);
                                 }
                                 Some(fix)

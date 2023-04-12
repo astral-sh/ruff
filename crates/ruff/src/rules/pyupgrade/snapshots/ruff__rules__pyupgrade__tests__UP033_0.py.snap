@@ -1,89 +1,62 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: LRUCacheWithMaxsizeNone
-    body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
-    suggestion: "Rewrite with `@functools.cache"
-    fixable: true
-  location:
-    row: 4
-    column: 20
-  end_location:
-    row: 4
-    column: 34
-  fix:
-    edits:
-      - content: import functools
-        location:
-          row: 1
-          column: 0
-        end_location:
-          row: 1
-          column: 16
-      - content: functools.cache
-        location:
-          row: 4
-          column: 1
-        end_location:
-          row: 4
-          column: 34
-  parent: ~
-- kind:
-    name: LRUCacheWithMaxsizeNone
-    body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
-    suggestion: "Rewrite with `@functools.cache"
-    fixable: true
-  location:
-    row: 10
-    column: 20
-  end_location:
-    row: 10
-    column: 34
-  fix:
-    edits:
-      - content: import functools
-        location:
-          row: 1
-          column: 0
-        end_location:
-          row: 1
-          column: 16
-      - content: functools.cache
-        location:
-          row: 10
-          column: 1
-        end_location:
-          row: 10
-          column: 34
-  parent: ~
-- kind:
-    name: LRUCacheWithMaxsizeNone
-    body: "Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`"
-    suggestion: "Rewrite with `@functools.cache"
-    fixable: true
-  location:
-    row: 15
-    column: 20
-  end_location:
-    row: 15
-    column: 34
-  fix:
-    edits:
-      - content: import functools
-        location:
-          row: 1
-          column: 0
-        end_location:
-          row: 1
-          column: 16
-      - content: functools.cache
-        location:
-          row: 15
-          column: 1
-        end_location:
-          row: 15
-          column: 34
-  parent: ~
+UP033_0.py:4:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+  |
+4 | @functools.lru_cache(maxsize=None)
+  |                     ^^^^^^^^^^^^^^ UP033
+5 | def fixme():
+6 |     pass
+  |
+  = help: Rewrite with `@functools.cache
+
+ℹ Suggested fix
+1 1 | import functools
+2 2 | 
+3 3 | 
+4   |-@functools.lru_cache(maxsize=None)
+  4 |+@functools.cache
+5 5 | def fixme():
+6 6 |     pass
+7 7 | 
+
+UP033_0.py:10:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+   |
+10 | @other_decorator
+11 | @functools.lru_cache(maxsize=None)
+   |                     ^^^^^^^^^^^^^^ UP033
+12 | def fixme():
+13 |     pass
+   |
+   = help: Rewrite with `@functools.cache
+
+ℹ Suggested fix
+7  7  | 
+8  8  | 
+9  9  | @other_decorator
+10    |-@functools.lru_cache(maxsize=None)
+   10 |+@functools.cache
+11 11 | def fixme():
+12 12 |     pass
+13 13 | 
+
+UP033_0.py:15:21: UP033 [*] Use `@functools.cache` instead of `@functools.lru_cache(maxsize=None)`
+   |
+15 | @functools.lru_cache(maxsize=None)
+   |                     ^^^^^^^^^^^^^^ UP033
+16 | @other_decorator
+17 | def fixme():
+   |
+   = help: Rewrite with `@functools.cache
+
+ℹ Suggested fix
+12 12 |     pass
+13 13 | 
+14 14 | 
+15    |-@functools.lru_cache(maxsize=None)
+   15 |+@functools.cache
+16 16 | @other_decorator
+17 17 | def fixme():
+18 18 |     pass
+
 

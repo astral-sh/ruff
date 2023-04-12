@@ -1,110 +1,102 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestIncorrectMarkParenthesesStyle
-    body: "Use `@pytest.mark.foo` over `@pytest.mark.foo()`"
-    suggestion: Add/remove parentheses
-    fixable: true
-  location:
-    row: 46
-    column: 1
-  end_location:
-    row: 46
-    column: 18
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 46
-          column: 16
-        end_location:
-          row: 46
-          column: 18
-  parent: ~
-- kind:
-    name: PytestIncorrectMarkParenthesesStyle
-    body: "Use `@pytest.mark.foo` over `@pytest.mark.foo()`"
-    suggestion: Add/remove parentheses
-    fixable: true
-  location:
-    row: 51
-    column: 1
-  end_location:
-    row: 51
-    column: 18
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 51
-          column: 16
-        end_location:
-          row: 51
-          column: 18
-  parent: ~
-- kind:
-    name: PytestIncorrectMarkParenthesesStyle
-    body: "Use `@pytest.mark.foo` over `@pytest.mark.foo()`"
-    suggestion: Add/remove parentheses
-    fixable: true
-  location:
-    row: 58
-    column: 5
-  end_location:
-    row: 58
-    column: 22
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 58
-          column: 20
-        end_location:
-          row: 58
-          column: 22
-  parent: ~
-- kind:
-    name: PytestIncorrectMarkParenthesesStyle
-    body: "Use `@pytest.mark.foo` over `@pytest.mark.foo()`"
-    suggestion: Add/remove parentheses
-    fixable: true
-  location:
-    row: 64
-    column: 5
-  end_location:
-    row: 64
-    column: 22
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 64
-          column: 20
-        end_location:
-          row: 64
-          column: 22
-  parent: ~
-- kind:
-    name: PytestIncorrectMarkParenthesesStyle
-    body: "Use `@pytest.mark.foo` over `@pytest.mark.foo()`"
-    suggestion: Add/remove parentheses
-    fixable: true
-  location:
-    row: 72
-    column: 9
-  end_location:
-    row: 72
-    column: 26
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 72
-          column: 24
-        end_location:
-          row: 72
-          column: 26
-  parent: ~
+PT023.py:46:2: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+46 | @pytest.mark.foo()
+   |  ^^^^^^^^^^^^^^^^^ PT023
+47 | def test_something():
+48 |     pass
+   |
+   = help: Add/remove parentheses
+
+ℹ Suggested fix
+43 43 | # With parentheses
+44 44 | 
+45 45 | 
+46    |-@pytest.mark.foo()
+   46 |+@pytest.mark.foo
+47 47 | def test_something():
+48 48 |     pass
+49 49 | 
+
+PT023.py:51:2: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+51 | @pytest.mark.foo()
+   |  ^^^^^^^^^^^^^^^^^ PT023
+52 | class TestClass:
+53 |     def test_something():
+   |
+   = help: Add/remove parentheses
+
+ℹ Suggested fix
+48 48 |     pass
+49 49 | 
+50 50 | 
+51    |-@pytest.mark.foo()
+   51 |+@pytest.mark.foo
+52 52 | class TestClass:
+53 53 |     def test_something():
+54 54 |         pass
+
+PT023.py:58:6: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+58 | class TestClass:
+59 |     @pytest.mark.foo()
+   |      ^^^^^^^^^^^^^^^^^ PT023
+60 |     def test_something():
+61 |         pass
+   |
+   = help: Add/remove parentheses
+
+ℹ Suggested fix
+55 55 | 
+56 56 | 
+57 57 | class TestClass:
+58    |-    @pytest.mark.foo()
+   58 |+    @pytest.mark.foo
+59 59 |     def test_something():
+60 60 |         pass
+61 61 | 
+
+PT023.py:64:6: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+64 | class TestClass:
+65 |     @pytest.mark.foo()
+   |      ^^^^^^^^^^^^^^^^^ PT023
+66 |     class TestNestedClass:
+67 |         def test_something():
+   |
+   = help: Add/remove parentheses
+
+ℹ Suggested fix
+61 61 | 
+62 62 | 
+63 63 | class TestClass:
+64    |-    @pytest.mark.foo()
+   64 |+    @pytest.mark.foo
+65 65 |     class TestNestedClass:
+66 66 |         def test_something():
+67 67 |             pass
+
+PT023.py:72:10: PT023 [*] Use `@pytest.mark.foo` over `@pytest.mark.foo()`
+   |
+72 | class TestClass:
+73 |     class TestNestedClass:
+74 |         @pytest.mark.foo()
+   |          ^^^^^^^^^^^^^^^^^ PT023
+75 |         def test_something():
+76 |             pass
+   |
+   = help: Add/remove parentheses
+
+ℹ Suggested fix
+69 69 | 
+70 70 | class TestClass:
+71 71 |     class TestNestedClass:
+72    |-        @pytest.mark.foo()
+   72 |+        @pytest.mark.foo
+73 73 |         def test_something():
+74 74 |             pass
+
 

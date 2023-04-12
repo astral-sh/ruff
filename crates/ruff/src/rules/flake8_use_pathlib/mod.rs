@@ -49,7 +49,7 @@ mod tests {
                 Rule::BuiltinOpen,
             ]),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        crate::assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -61,7 +61,7 @@ mod tests {
             Path::new("flake8_use_pathlib").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        crate::assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

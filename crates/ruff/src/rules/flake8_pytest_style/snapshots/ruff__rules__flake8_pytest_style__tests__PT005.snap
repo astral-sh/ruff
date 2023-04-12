@@ -1,47 +1,33 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestIncorrectFixtureNameUnderscore
-    body: "Fixture `_my_fixture` returns a value, remove leading underscore"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 41
-    column: 0
-  end_location:
-    row: 42
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestIncorrectFixtureNameUnderscore
-    body: "Fixture `_activate_context` returns a value, remove leading underscore"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 0
-  end_location:
-    row: 48
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestIncorrectFixtureNameUnderscore
-    body: "Fixture `_activate_context` returns a value, remove leading underscore"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 52
-    column: 0
-  end_location:
-    row: 57
-    column: 34
-  fix:
-    edits: []
-  parent: ~
+PT005.py:41:1: PT005 Fixture `_my_fixture` returns a value, remove leading underscore
+   |
+41 |   @pytest.fixture()
+42 | / def _my_fixture(mocker):  # Error with return
+43 | |     return 0
+   | |____________^ PT005
+   |
+
+PT005.py:46:1: PT005 Fixture `_activate_context` returns a value, remove leading underscore
+   |
+46 |   @pytest.fixture()
+47 | / def _activate_context():  # Error with yield
+48 | |     with get_context() as context:
+49 | |         yield context
+   | |_____________________^ PT005
+   |
+
+PT005.py:52:1: PT005 Fixture `_activate_context` returns a value, remove leading underscore
+   |
+52 |   @pytest.fixture()
+53 | / def _activate_context():  # Error with conditional yield from
+54 | |     if some_condition:
+55 | |         with get_context() as context:
+56 | |             yield context
+57 | |     else:
+58 | |         yield from other_context()
+   | |__________________________________^ PT005
+   |
+
 

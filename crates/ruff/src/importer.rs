@@ -174,7 +174,7 @@ fn match_docstring_end(body: &[Stmt]) -> Option<Location> {
 /// along with a trailing newline suffix.
 fn end_of_statement_insertion(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Insertion {
     let location = stmt.end_location.unwrap();
-    let mut tokens = lexer::lex_located(locator.skip(location), Mode::Module, location).flatten();
+    let mut tokens = lexer::lex_located(locator.after(location), Mode::Module, location).flatten();
     if let Some((.., Tok::Semi, end)) = tokens.next() {
         // If the first token after the docstring is a semicolon, insert after the semicolon as an
         // inline statement;
@@ -207,7 +207,7 @@ fn top_of_file_insertion(body: &[Stmt], locator: &Locator, stylist: &Stylist) ->
     let mut location = if let Some(location) = match_docstring_end(body) {
         // If the first token after the docstring is a semicolon, insert after the semicolon as an
         // inline statement;
-        let first_token = lexer::lex_located(locator.skip(location), Mode::Module, location)
+        let first_token = lexer::lex_located(locator.after(location), Mode::Module, location)
             .flatten()
             .next();
         if let Some((.., Tok::Semi, end)) = first_token {
@@ -222,7 +222,7 @@ fn top_of_file_insertion(body: &[Stmt], locator: &Locator, stylist: &Stylist) ->
 
     // Skip over any comments and empty lines.
     for (.., tok, end) in
-        lexer::lex_located(locator.skip(location), Mode::Module, location).flatten()
+        lexer::lex_located(locator.after(location), Mode::Module, location).flatten()
     {
         if matches!(tok, Tok::Comment(..) | Tok::Newline) {
             location = Location::new(end.row() + 1, 0);

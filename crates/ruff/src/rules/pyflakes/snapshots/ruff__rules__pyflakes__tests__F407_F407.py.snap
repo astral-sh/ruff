@@ -1,19 +1,11 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: FutureFeatureNotDefined
-    body: "Future feature `non_existent_feature` is not defined"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 23
-  end_location:
-    row: 2
-    column: 43
-  fix:
-    edits: []
-  parent: ~
+F407.py:2:24: F407 Future feature `non_existent_feature` is not defined
+  |
+2 | from __future__ import print_function
+3 | from __future__ import non_existent_feature
+  |                        ^^^^^^^^^^^^^^^^^^^^ F407
+  |
+
 

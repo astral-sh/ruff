@@ -1,110 +1,106 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryGeneratorSet
-    body: "Unnecessary generator (rewrite as a `set` comprehension)"
-    suggestion: "Rewrite as a `set` comprehension"
-    fixable: true
-  location:
-    row: 1
-    column: 4
-  end_location:
-    row: 1
-    column: 28
-  fix:
-    edits:
-      - content: "{x for x in range(3)}"
-        location:
-          row: 1
-          column: 4
-        end_location:
-          row: 1
-          column: 28
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorSet
-    body: "Unnecessary generator (rewrite as a `set` comprehension)"
-    suggestion: "Rewrite as a `set` comprehension"
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 4
-    column: 1
-  fix:
-    edits:
-      - content: "{\n    x for x in range(3)\n}"
-        location:
-          row: 2
-          column: 4
-        end_location:
-          row: 4
-          column: 1
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorSet
-    body: "Unnecessary generator (rewrite as a `set` comprehension)"
-    suggestion: "Rewrite as a `set` comprehension"
-    fixable: true
-  location:
-    row: 5
-    column: 7
-  end_location:
-    row: 5
-    column: 48
-  fix:
-    edits:
-      - content: " {a if a < 6 else 0  for a in range(3)} "
-        location:
-          row: 5
-          column: 7
-        end_location:
-          row: 5
-          column: 48
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorSet
-    body: "Unnecessary generator (rewrite as a `set` comprehension)"
-    suggestion: "Rewrite as a `set` comprehension"
-    fixable: true
-  location:
-    row: 6
-    column: 16
-  end_location:
-    row: 6
-    column: 57
-  fix:
-    edits:
-      - content: "{a if a < 6 else 0  for a in range(3)}"
-        location:
-          row: 6
-          column: 16
-        end_location:
-          row: 6
-          column: 57
-  parent: ~
-- kind:
-    name: UnnecessaryGeneratorSet
-    body: "Unnecessary generator (rewrite as a `set` comprehension)"
-    suggestion: "Rewrite as a `set` comprehension"
-    fixable: true
-  location:
-    row: 7
-    column: 15
-  end_location:
-    row: 7
-    column: 39
-  fix:
-    edits:
-      - content: " {a for a in range(3)} "
-        location:
-          row: 7
-          column: 15
-        end_location:
-          row: 7
-          column: 39
-  parent: ~
+C401.py:1:5: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+  |
+1 | x = set(x for x in range(3))
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^ C401
+2 | x = set(
+3 |     x for x in range(3)
+  |
+  = help: Rewrite as a `set` comprehension
+
+ℹ Suggested fix
+1   |-x = set(x for x in range(3))
+  1 |+x = {x for x in range(3)}
+2 2 | x = set(
+3 3 |     x for x in range(3)
+4 4 | )
+
+C401.py:2:5: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+  |
+2 |   x = set(x for x in range(3))
+3 |   x = set(
+  |  _____^
+4 | |     x for x in range(3)
+5 | | )
+  | |_^ C401
+6 |   y = f'{set(a if a < 6 else 0  for a in range(3))}'
+7 |   _ = '{}'.format(set(a if a < 6 else 0  for a in range(3)))
+  |
+  = help: Rewrite as a `set` comprehension
+
+ℹ Suggested fix
+1 1 | x = set(x for x in range(3))
+2   |-x = set(
+  2 |+x = {
+3 3 |     x for x in range(3)
+4   |-)
+  4 |+}
+5 5 | y = f'{set(a if a < 6 else 0  for a in range(3))}'
+6 6 | _ = '{}'.format(set(a if a < 6 else 0  for a in range(3)))
+7 7 | print(f'Hello {set(a for a in range(3))} World')
+
+C401.py:5:8: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+  |
+5 |     x for x in range(3)
+6 | )
+7 | y = f'{set(a if a < 6 else 0  for a in range(3))}'
+  |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
+8 | _ = '{}'.format(set(a if a < 6 else 0  for a in range(3)))
+9 | print(f'Hello {set(a for a in range(3))} World')
+  |
+  = help: Rewrite as a `set` comprehension
+
+ℹ Suggested fix
+2 2 | x = set(
+3 3 |     x for x in range(3)
+4 4 | )
+5   |-y = f'{set(a if a < 6 else 0  for a in range(3))}'
+  5 |+y = f'{ {a if a < 6 else 0  for a in range(3)} }'
+6 6 | _ = '{}'.format(set(a if a < 6 else 0  for a in range(3)))
+7 7 | print(f'Hello {set(a for a in range(3))} World')
+8 8 | 
+
+C401.py:6:17: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+  |
+6 | )
+7 | y = f'{set(a if a < 6 else 0  for a in range(3))}'
+8 | _ = '{}'.format(set(a if a < 6 else 0  for a in range(3)))
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C401
+9 | print(f'Hello {set(a for a in range(3))} World')
+  |
+  = help: Rewrite as a `set` comprehension
+
+ℹ Suggested fix
+3 3 |     x for x in range(3)
+4 4 | )
+5 5 | y = f'{set(a if a < 6 else 0  for a in range(3))}'
+6   |-_ = '{}'.format(set(a if a < 6 else 0  for a in range(3)))
+  6 |+_ = '{}'.format({a if a < 6 else 0  for a in range(3)})
+7 7 | print(f'Hello {set(a for a in range(3))} World')
+8 8 | 
+9 9 | def set(*args, **kwargs):
+
+C401.py:7:16: C401 [*] Unnecessary generator (rewrite as a `set` comprehension)
+   |
+ 7 | y = f'{set(a if a < 6 else 0  for a in range(3))}'
+ 8 | _ = '{}'.format(set(a if a < 6 else 0  for a in range(3)))
+ 9 | print(f'Hello {set(a for a in range(3))} World')
+   |                ^^^^^^^^^^^^^^^^^^^^^^^^ C401
+10 | 
+11 | def set(*args, **kwargs):
+   |
+   = help: Rewrite as a `set` comprehension
+
+ℹ Suggested fix
+4 4 | )
+5 5 | y = f'{set(a if a < 6 else 0  for a in range(3))}'
+6 6 | _ = '{}'.format(set(a if a < 6 else 0  for a in range(3)))
+7   |-print(f'Hello {set(a for a in range(3))} World')
+  7 |+print(f'Hello { {a for a in range(3)} } World')
+8 8 | 
+9 9 | def set(*args, **kwargs):
+10 10 |     return None
+
 

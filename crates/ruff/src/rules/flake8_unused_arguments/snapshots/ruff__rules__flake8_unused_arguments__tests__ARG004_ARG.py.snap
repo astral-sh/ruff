@@ -1,47 +1,28 @@
 ---
 source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedStaticMethodArgument
-    body: "Unused static method argument: `cls`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 49
-    column: 10
-  end_location:
-    row: 49
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedStaticMethodArgument
-    body: "Unused static method argument: `x`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 49
-    column: 15
-  end_location:
-    row: 49
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedStaticMethodArgument
-    body: "Unused static method argument: `x`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 53
-    column: 10
-  end_location:
-    row: 53
-    column: 11
-  fix:
-    edits: []
-  parent: ~
+ARG.py:49:11: ARG004 Unused static method argument: `cls`
+   |
+49 |     @staticmethod
+50 |     def f(cls, x):
+   |           ^^^ ARG004
+51 |         print("Hello, world!")
+   |
+
+ARG.py:49:16: ARG004 Unused static method argument: `x`
+   |
+49 |     @staticmethod
+50 |     def f(cls, x):
+   |                ^ ARG004
+51 |         print("Hello, world!")
+   |
+
+ARG.py:53:11: ARG004 Unused static method argument: `x`
+   |
+53 |     @staticmethod
+54 |     def f(x):
+   |           ^ ARG004
+55 |         print("Hello, world!")
+   |
+
 

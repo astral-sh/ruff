@@ -1,187 +1,117 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `self`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 11
-  end_location:
-    row: 2
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `self`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 12
-  end_location:
-    row: 6
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `self`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 8
-  end_location:
-    row: 10
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `numeric_string`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 11
-  end_location:
-    row: 21
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Bar`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 58
-    column: 4
-  end_location:
-    row: 58
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `TOMATO`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 83
-    column: 10
-  end_location:
-    row: 83
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `B`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 87
-    column: 7
-  end_location:
-    row: 87
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `B`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 90
-    column: 7
-  end_location:
-    row: 90
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `B`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 92
-    column: 10
-  end_location:
-    row: 92
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `B`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 93
-    column: 13
-  end_location:
-    row: 93
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `PEP593Test123`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 115
-    column: 9
-  end_location:
-    row: 115
-    column: 22
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `foo`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 123
-    column: 14
-  end_location:
-    row: 123
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `bar`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 123
-    column: 21
-  end_location:
-    row: 123
-    column: 24
-  fix:
-    edits: []
-  parent: ~
+F821_0.py:2:12: F821 Undefined name `self`
+  |
+2 | def get_name():
+3 |     return self.name
+  |            ^^^^ F821
+  |
+
+F821_0.py:6:13: F821 Undefined name `self`
+  |
+6 | def get_name():
+7 |     return (self.name,)
+  |             ^^^^ F821
+  |
+
+F821_0.py:10:9: F821 Undefined name `self`
+   |
+10 | def get_name():
+11 |     del self.name
+   |         ^^^^ F821
+   |
+
+F821_0.py:21:12: F821 Undefined name `numeric_string`
+   |
+21 | def randdec(maxprec, maxexp):
+22 |     return numeric_string(maxprec, maxexp)
+   |            ^^^^^^^^^^^^^^ F821
+   |
+
+F821_0.py:58:5: F821 Undefined name `Bar`
+   |
+58 | y: int = 1
+59 | 
+60 | x: "Bar" = 1
+   |     ^^^ F821
+61 | 
+62 | [first] = ["yup"]
+   |
+
+F821_0.py:83:11: F821 Undefined name `TOMATO`
+   |
+83 | def update_tomato():
+84 |     print(TOMATO)
+   |           ^^^^^^ F821
+85 |     TOMATO = "cherry tomato"
+   |
+
+F821_0.py:87:8: F821 Undefined name `B`
+   |
+87 | A = f'{B}'
+   |        ^ F821
+88 | A = (
+89 |     f'B'
+   |
+
+F821_0.py:90:8: F821 Undefined name `B`
+   |
+90 | A = (
+91 |     f'B'
+92 |     f'{B}'
+   |        ^ F821
+93 | )
+94 | C = f'{A:{B}}'
+   |
+
+F821_0.py:92:11: F821 Undefined name `B`
+   |
+92 |     f'{B}'
+93 | )
+94 | C = f'{A:{B}}'
+   |           ^ F821
+95 | C = f'{A:{f"{B}"}}'
+   |
+
+F821_0.py:93:14: F821 Undefined name `B`
+   |
+93 | )
+94 | C = f'{A:{B}}'
+95 | C = f'{A:{f"{B}"}}'
+   |              ^ F821
+96 | 
+97 | from typing import Annotated, Literal
+   |
+
+F821_0.py:115:10: F821 Undefined name `PEP593Test123`
+    |
+115 |     ]
+116 |     field_with_undefined_stringified_type: Annotated[
+117 |         "PEP593Test123",
+    |          ^^^^^^^^^^^^^ F821
+118 |         123,
+119 |     ]
+    |
+
+F821_0.py:123:15: F821 Undefined name `foo`
+    |
+123 |     ]
+124 |     field_with_undefined_nested_subscript: Annotated[
+125 |         dict["foo", "bar"],  # Expected to fail as undefined.
+    |               ^^^ F821
+126 |         123,
+127 |     ]
+    |
+
+F821_0.py:123:22: F821 Undefined name `bar`
+    |
+123 |     ]
+124 |     field_with_undefined_nested_subscript: Annotated[
+125 |         dict["foo", "bar"],  # Expected to fail as undefined.
+    |                      ^^^ F821
+126 |         123,
+127 |     ]
+    |
+
 

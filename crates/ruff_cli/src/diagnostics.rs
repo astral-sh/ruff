@@ -18,6 +18,7 @@ use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff_python_ast::imports::ImportMap;
+use ruff_python_ast::source_code::SourceFileBuilder;
 
 use crate::cache;
 
@@ -85,8 +86,7 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Box<Diag
             return Err(Box::new(Diagnostics {
                 messages: vec![Message::from_diagnostic(
                     *diagnostic,
-                    path.to_string_lossy().to_string(),
-                    None,
+                    SourceFileBuilder::new(&path.to_string_lossy()).finish(),
                     1,
                 )],
                 ..Diagnostics::default()
@@ -118,7 +118,7 @@ pub fn lint_path(
     {
         let metadata = path.metadata()?;
         if let Some((messages, imports)) =
-            cache::get(path, package.as_ref(), &metadata, settings, autofix.into())
+            cache::get(path, package, &metadata, settings, autofix.into())
         {
             debug!("Cache hit for: {}", path.display());
             return Ok(Diagnostics::new(messages, imports));
@@ -207,14 +207,14 @@ pub fn lint_path(
 
         // Purge the cache.
         if let Some(metadata) = metadata {
-            cache::del(path, package.as_ref(), &metadata, settings, autofix.into());
+            cache::del(path, package, &metadata, settings, autofix.into());
         }
     } else {
         // Re-populate the cache.
         if let Some(metadata) = metadata {
             cache::set(
                 path,
-                package.as_ref(),
+                package,
                 &metadata,
                 settings,
                 autofix.into(),

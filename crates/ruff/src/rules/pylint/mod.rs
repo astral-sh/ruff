@@ -7,8 +7,9 @@ pub mod settings;
 mod tests {
     use std::path::Path;
 
+    use crate::assert_messages;
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use regex::Regex;
     use test_case::test_case;
 
@@ -71,7 +72,7 @@ mod tests {
             Path::new("pylint").join(path).as_path(),
             &Settings::for_rules(vec![rule_code]),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -84,7 +85,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::ContinueInFinally])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -100,7 +101,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::MagicValueComparison])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -116,7 +117,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::TooManyArguments])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -129,7 +130,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::TooManyArguments])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -145,7 +146,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::TooManyBranches])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -161,7 +162,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::TooManyStatements])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -177,7 +178,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::TooManyReturnStatements])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

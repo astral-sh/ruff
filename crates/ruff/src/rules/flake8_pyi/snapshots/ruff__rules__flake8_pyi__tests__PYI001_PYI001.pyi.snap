@@ -1,47 +1,34 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnprefixedTypeParam
-    body: "Name of private `TypeVar` must start with `_`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnprefixedTypeParam
-    body: "Name of private `TypeVarTuple` must start with `_`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 9
-  end_location:
-    row: 5
-    column: 31
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnprefixedTypeParam
-    body: "Name of private `ParamSpec` must start with `_`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 4
-  end_location:
-    row: 7
-    column: 18
-  fix:
-    edits: []
-  parent: ~
+PYI001.pyi:3:5: PYI001 Name of private `TypeVar` must start with `_`
+  |
+3 | from typing import ParamSpec, TypeVar, TypeVarTuple
+4 | 
+5 | T = TypeVar("T")  # Error: TypeVars in stubs must start with _
+  |     ^^^^^^^^^^^^ PYI001
+6 | 
+7 | TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
+  |
+
+PYI001.pyi:5:10: PYI001 Name of private `TypeVarTuple` must start with `_`
+  |
+5 | T = TypeVar("T")  # Error: TypeVars in stubs must start with _
+6 | 
+7 | TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
+  |          ^^^^^^^^^^^^^^^^^^^^^^ PYI001
+8 | 
+9 | P = ParamSpec("P")  # Error: ParamSpecs must start with _
+  |
+
+PYI001.pyi:7:5: PYI001 Name of private `ParamSpec` must start with `_`
+   |
+ 7 | TTuple = TypeVarTuple("TTuple")  # Error: TypeVarTuples must also start with _
+ 8 | 
+ 9 | P = ParamSpec("P")  # Error: ParamSpecs must start with _
+   |     ^^^^^^^^^^^^^^ PYI001
+10 | 
+11 | _T = TypeVar("_T")  # OK
+   |
+
 

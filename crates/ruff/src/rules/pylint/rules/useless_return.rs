@@ -117,7 +117,7 @@ pub fn useless_return<'a>(
             checker.stylist,
         ) {
             Ok(fix) => {
-                if fix.content.is_empty() || fix.content == "pass" {
+                if fix.is_deletion() || fix.content() == Some("pass") {
                     checker.deletions.insert(RefEquality(last_stmt));
                 }
                 diagnostic.set_fix(fix);

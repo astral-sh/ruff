@@ -1,19 +1,16 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: AssertRaisesException
-    body: "`assertRaises(Exception)` should be considered evil"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 8
-  end_location:
-    row: 23
-    column: 42
-  fix:
-    edits: []
-  parent: ~
+B017.py:22:9: B017 `assertRaises(Exception)` should be considered evil
+   |
+22 |   class Foobar(unittest.TestCase):
+23 |       def evil_raises(self) -> None:
+24 |           with self.assertRaises(Exception):
+   |  _________^
+25 | |             raise Exception("Evil I say!")
+   | |__________________________________________^ B017
+26 |   
+27 |       def context_manager_raises(self) -> None:
+   |
+
 

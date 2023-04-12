@@ -1,40 +1,40 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BlankLineAfterSummary
-    body: 1 blank line required between summary line and description
-    suggestion: ~
-    fixable: false
-  location:
-    row: 200
-    column: 4
-  end_location:
-    row: 203
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BlankLineAfterSummary
-    body: 1 blank line required between summary line and description (found 2)
-    suggestion: Insert single blank line
-    fixable: true
-  location:
-    row: 210
-    column: 4
-  end_location:
-    row: 215
-    column: 7
-  fix:
-    edits:
-      - content: "\n"
-        location:
-          row: 211
-          column: 0
-        end_location:
-          row: 213
-          column: 0
-  parent: ~
+D.py:200:5: D205 1 blank line required between summary line and description
+    |
+200 |   @expect('D213: Multi-line docstring summary should start at the second line')
+201 |   def multi_line_zero_separating_blanks():
+202 |       """Summary.
+    |  _____^
+203 | |     Description.
+204 | | 
+205 | |     """
+    | |_______^ D205
+    |
+
+D.py:210:5: D205 [*] 1 blank line required between summary line and description (found 2)
+    |
+210 |   @expect('D213: Multi-line docstring summary should start at the second line')
+211 |   def multi_line_two_separating_blanks():
+212 |       """Summary.
+    |  _____^
+213 | | 
+214 | | 
+215 | |     Description.
+216 | | 
+217 | |     """
+    | |_______^ D205
+    |
+    = help: Insert single blank line
+
+ℹ Suggested fix
+209 209 | def multi_line_two_separating_blanks():
+210 210 |     """Summary.
+211 211 | 
+212     |-
+213 212 |     Description.
+214 213 | 
+215 214 |     """
+
 

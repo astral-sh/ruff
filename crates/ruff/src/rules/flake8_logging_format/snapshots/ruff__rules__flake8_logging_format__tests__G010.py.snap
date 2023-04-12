@@ -1,26 +1,22 @@
 ---
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: LoggingWarn
-    body: "Logging statement uses `warn` instead of `warning`"
-    suggestion: "Convert to `warn`"
-    fixable: true
-  location:
-    row: 4
-    column: 8
-  end_location:
-    row: 4
-    column: 12
-  fix:
-    edits:
-      - content: warning
-        location:
-          row: 4
-          column: 8
-        end_location:
-          row: 4
-          column: 12
-  parent: ~
+G010.py:4:9: G010 [*] Logging statement uses `warn` instead of `warning`
+  |
+4 | from distutils import log
+5 | 
+6 | logging.warn("Hello World!")
+  |         ^^^^ G010
+7 | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
+  |
+  = help: Convert to `warn`
+
+ℹ Suggested fix
+1 1 | import logging
+2 2 | from distutils import log
+3 3 | 
+4   |-logging.warn("Hello World!")
+  4 |+logging.warning("Hello World!")
+5 5 | log.warn("Hello world!")  # This shouldn't be considered as a logger candidate
+
 

@@ -1,110 +1,110 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SuperCallWithParameters
-    body: "Use `super()` instead of `super(__class__, self)`"
-    suggestion: "Remove `__super__` parameters"
-    fixable: true
-  location:
-    row: 17
-    column: 17
-  end_location:
-    row: 17
-    column: 35
-  fix:
-    edits:
-      - content: super()
-        location:
-          row: 17
-          column: 17
-        end_location:
-          row: 17
-          column: 35
-  parent: ~
-- kind:
-    name: SuperCallWithParameters
-    body: "Use `super()` instead of `super(__class__, self)`"
-    suggestion: "Remove `__super__` parameters"
-    fixable: true
-  location:
-    row: 18
-    column: 8
-  end_location:
-    row: 18
-    column: 26
-  fix:
-    edits:
-      - content: super()
-        location:
-          row: 18
-          column: 8
-        end_location:
-          row: 18
-          column: 26
-  parent: ~
-- kind:
-    name: SuperCallWithParameters
-    body: "Use `super()` instead of `super(__class__, self)`"
-    suggestion: "Remove `__super__` parameters"
-    fixable: true
-  location:
-    row: 19
-    column: 8
-  end_location:
-    row: 22
-    column: 9
-  fix:
-    edits:
-      - content: super()
-        location:
-          row: 19
-          column: 8
-        end_location:
-          row: 22
-          column: 9
-  parent: ~
-- kind:
-    name: SuperCallWithParameters
-    body: "Use `super()` instead of `super(__class__, self)`"
-    suggestion: "Remove `__super__` parameters"
-    fixable: true
-  location:
-    row: 36
-    column: 8
-  end_location:
-    row: 36
-    column: 28
-  fix:
-    edits:
-      - content: super()
-        location:
-          row: 36
-          column: 8
-        end_location:
-          row: 36
-          column: 28
-  parent: ~
-- kind:
-    name: SuperCallWithParameters
-    body: "Use `super()` instead of `super(__class__, self)`"
-    suggestion: "Remove `__super__` parameters"
-    fixable: true
-  location:
-    row: 50
-    column: 12
-  end_location:
-    row: 50
-    column: 32
-  fix:
-    edits:
-      - content: super()
-        location:
-          row: 50
-          column: 12
-        end_location:
-          row: 50
-          column: 32
-  parent: ~
+UP008.py:17:18: UP008 [*] Use `super()` instead of `super(__class__, self)`
+   |
+17 |     def wrong(self):
+18 |         parent = super(Child, self)  # wrong
+   |                  ^^^^^^^^^^^^^^^^^^ UP008
+19 |         super(Child, self).method  # wrong
+20 |         super(
+   |
+   = help: Remove `super` parameters
+
+ℹ Suggested fix
+14 14 |         Parent.super(1, 2)  # ok
+15 15 | 
+16 16 |     def wrong(self):
+17    |-        parent = super(Child, self)  # wrong
+   17 |+        parent = super()  # wrong
+18 18 |         super(Child, self).method  # wrong
+19 19 |         super(
+20 20 |             Child,
+
+UP008.py:18:9: UP008 [*] Use `super()` instead of `super(__class__, self)`
+   |
+18 |     def wrong(self):
+19 |         parent = super(Child, self)  # wrong
+20 |         super(Child, self).method  # wrong
+   |         ^^^^^^^^^^^^^^^^^^ UP008
+21 |         super(
+22 |             Child,
+   |
+   = help: Remove `super` parameters
+
+ℹ Suggested fix
+15 15 | 
+16 16 |     def wrong(self):
+17 17 |         parent = super(Child, self)  # wrong
+18    |-        super(Child, self).method  # wrong
+   18 |+        super().method  # wrong
+19 19 |         super(
+20 20 |             Child,
+21 21 |             self,
+
+UP008.py:19:9: UP008 [*] Use `super()` instead of `super(__class__, self)`
+   |
+19 |           parent = super(Child, self)  # wrong
+20 |           super(Child, self).method  # wrong
+21 |           super(
+   |  _________^
+22 | |             Child,
+23 | |             self,
+24 | |         ).method()  # wrong
+   | |_________^ UP008
+   |
+   = help: Remove `super` parameters
+
+ℹ Suggested fix
+16 16 |     def wrong(self):
+17 17 |         parent = super(Child, self)  # wrong
+18 18 |         super(Child, self).method  # wrong
+19    |-        super(
+20    |-            Child,
+21    |-            self,
+22    |-        ).method()  # wrong
+   19 |+        super().method()  # wrong
+23 20 | 
+24 21 | 
+25 22 | class BaseClass:
+
+UP008.py:36:9: UP008 [*] Use `super()` instead of `super(__class__, self)`
+   |
+36 | class MyClass(BaseClass):
+37 |     def normal(self):
+38 |         super(MyClass, self).f()  # can use super()
+   |         ^^^^^^^^^^^^^^^^^^^^ UP008
+39 |         super().f()
+   |
+   = help: Remove `super` parameters
+
+ℹ Suggested fix
+33 33 | 
+34 34 | class MyClass(BaseClass):
+35 35 |     def normal(self):
+36    |-        super(MyClass, self).f()  # can use super()
+   36 |+        super().f()  # can use super()
+37 37 |         super().f()
+38 38 | 
+39 39 |     def different_argument(self, other):
+
+UP008.py:50:13: UP008 [*] Use `super()` instead of `super(__class__, self)`
+   |
+50 |         def inner_argument(self):
+51 |             super(MyClass, self).f()  # can use super()
+   |             ^^^^^^^^^^^^^^^^^^^^ UP008
+52 |             super().f()
+   |
+   = help: Remove `super` parameters
+
+ℹ Suggested fix
+47 47 |             super(MyClass, self).f()  # CANNOT use super()
+48 48 | 
+49 49 |         def inner_argument(self):
+50    |-            super(MyClass, self).f()  # can use super()
+   50 |+            super().f()  # can use super()
+51 51 |             super().f()
+52 52 | 
+53 53 |         outer_argument()
+
 

@@ -1,19 +1,14 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NoIndentedBlock
-    body: Expected an indented block
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 0
-  fix:
-    edits: []
-  parent: ~
+E11.py:9:1: E112 Expected an indented block
+   |
+ 9 | #: E112
+10 | if False:
+11 | print()
+   |  E112
+12 | #: E113
+13 | print()
+   |
+
 

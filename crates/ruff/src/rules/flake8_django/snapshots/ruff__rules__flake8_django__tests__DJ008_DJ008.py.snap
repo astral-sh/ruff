@@ -1,47 +1,58 @@
 ---
 source: crates/ruff/src/rules/flake8_django/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DjangoModelWithoutDunderStr
-    body: "Model does not define `__str__` method"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 18
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DjangoModelWithoutDunderStr
-    body: "Model does not define `__str__` method"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 0
-  end_location:
-    row: 33
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DjangoModelWithoutDunderStr
-    body: "Model does not define `__str__` method"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 36
-    column: 0
-  end_location:
-    row: 47
-    column: 16
-  fix:
-    edits: []
-  parent: ~
+DJ008.py:6:1: DJ008 Model does not define `__str__` method
+   |
+ 6 |   # Models without __str__
+ 7 | / class TestModel1(models.Model):
+ 8 | |     new_field = models.CharField(max_length=10)
+ 9 | | 
+10 | |     class Meta:
+11 | |         verbose_name = "test model"
+12 | |         verbose_name_plural = "test models"
+13 | | 
+14 | |     @property
+15 | |     def my_brand_new_property(self):
+16 | |         return 1
+17 | | 
+18 | |     def my_beautiful_method(self):
+19 | |         return 2
+   | |________________^ DJ008
+   |
+
+DJ008.py:21:1: DJ008 Model does not define `__str__` method
+   |
+21 | / class TestModel2(Model):
+22 | |     new_field = models.CharField(max_length=10)
+23 | | 
+24 | |     class Meta:
+25 | |         verbose_name = "test model"
+26 | |         verbose_name_plural = "test models"
+27 | | 
+28 | |     @property
+29 | |     def my_brand_new_property(self):
+30 | |         return 1
+31 | | 
+32 | |     def my_beautiful_method(self):
+33 | |         return 2
+   | |________________^ DJ008
+   |
+
+DJ008.py:36:1: DJ008 Model does not define `__str__` method
+   |
+36 | / class TestModel3(Model):
+37 | |     new_field = models.CharField(max_length=10)
+38 | | 
+39 | |     class Meta:
+40 | |         abstract = False
+41 | | 
+42 | |     @property
+43 | |     def my_brand_new_property(self):
+44 | |         return 1
+45 | | 
+46 | |     def my_beautiful_method(self):
+47 | |         return 2
+   | |________________^ DJ008
+   |
+
 

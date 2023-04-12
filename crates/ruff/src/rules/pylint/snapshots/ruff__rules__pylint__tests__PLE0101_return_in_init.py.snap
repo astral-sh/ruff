@@ -1,33 +1,23 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ReturnInInit
-    body: "Explicit return in `__init__`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 8
-  end_location:
-    row: 14
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ReturnInInit
-    body: "Explicit return in `__init__`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 8
-  end_location:
-    row: 22
-    column: 16
-  fix:
-    edits: []
-  parent: ~
+return_in_init.py:14:9: PLE0101 Explicit return in `__init__`
+   |
+14 | class B:
+15 |     def __init__(self):
+16 |         return 3
+   |         ^^^^^^^^ PLE0101
+17 | 
+18 |     def gen(self):
+   |
+
+return_in_init.py:22:9: PLE0101 Explicit return in `__init__`
+   |
+22 |     def __init__(self):
+23 |         return 1
+   |         ^^^^^^^^ PLE0101
+24 | 
+25 | class MyClass2:
+   |
+
 

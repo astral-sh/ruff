@@ -1,187 +1,128 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 8
-  end_location:
-    row: 5
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 12
-  end_location:
-    row: 16
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 16
-  end_location:
-    row: 26
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 33
-    column: 12
-  end_location:
-    row: 33
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 12
-  end_location:
-    row: 40
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 41
-    column: 8
-  end_location:
-    row: 41
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 49
-    column: 16
-  end_location:
-    row: 49
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 56
-    column: 8
-  end_location:
-    row: 56
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 69
-    column: 8
-  end_location:
-    row: 69
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 74
-    column: 12
-  end_location:
-    row: 74
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 89
-    column: 12
-  end_location:
-    row: 89
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 91
-    column: 12
-  end_location:
-    row: 91
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueInFinally
-    body: "`continue` not supported inside `finally` clause"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 95
-    column: 16
-  end_location:
-    row: 95
-    column: 24
-  fix:
-    edits: []
-  parent: ~
+continue_in_finally.py:5:9: PLE0116 `continue` not supported inside `finally` clause
+  |
+5 |         pass
+6 |     finally:
+7 |         continue  # [continue-in-finally]
+  |         ^^^^^^^^ PLE0116
+8 | 
+9 | while True:
+  |
+
+continue_in_finally.py:16:13: PLE0116 `continue` not supported inside `finally` clause
+   |
+16 |             pass
+17 |         finally:
+18 |             continue  # [continue-in-finally]
+   |             ^^^^^^^^ PLE0116
+19 |         pass
+   |
+
+continue_in_finally.py:26:17: PLE0116 `continue` not supported inside `finally` clause
+   |
+26 |         match test:
+27 |             case "aa":
+28 |                 continue  # [continue-in-finally]
+   |                 ^^^^^^^^ PLE0116
+29 | 
+30 | while True:
+   |
+
+continue_in_finally.py:33:13: PLE0116 `continue` not supported inside `finally` clause
+   |
+33 |     finally:
+34 |         with "aa" as f:
+35 |             continue  # [continue-in-finally]
+   |             ^^^^^^^^ PLE0116
+36 | 
+37 | while True:
+   |
+
+continue_in_finally.py:40:13: PLE0116 `continue` not supported inside `finally` clause
+   |
+40 |     finally:
+41 |         if True:
+42 |             continue  # [continue-in-finally]
+   |             ^^^^^^^^ PLE0116
+43 |         continue  # [continue-in-finally]
+   |
+
+continue_in_finally.py:41:9: PLE0116 `continue` not supported inside `finally` clause
+   |
+41 |         if True:
+42 |             continue  # [continue-in-finally]
+43 |         continue  # [continue-in-finally]
+   |         ^^^^^^^^ PLE0116
+44 | 
+45 |         def test():
+   |
+
+continue_in_finally.py:49:17: PLE0116 `continue` not supported inside `finally` clause
+   |
+49 |                 pass
+50 |             finally:
+51 |                 continue  # [continue-in-finally]
+   |                 ^^^^^^^^ PLE0116
+   |
+
+continue_in_finally.py:56:9: PLE0116 `continue` not supported inside `finally` clause
+   |
+56 |         pass
+57 |     finally:
+58 |         continue  # [continue-in-finally]
+   |         ^^^^^^^^ PLE0116
+59 | 
+60 |         def test():
+   |
+
+continue_in_finally.py:69:9: PLE0116 `continue` not supported inside `finally` clause
+   |
+69 |         for i in range(12):
+70 |             continue
+71 |         continue  # [continue-in-finally]
+   |         ^^^^^^^^ PLE0116
+72 | 
+73 |         while True:
+   |
+
+continue_in_finally.py:74:13: PLE0116 `continue` not supported inside `finally` clause
+   |
+74 |             pass
+75 |         else:
+76 |             continue  # [continue-in-finally]
+   |             ^^^^^^^^ PLE0116
+77 | 
+78 |         def test():
+   |
+
+continue_in_finally.py:89:13: PLE0116 `continue` not supported inside `finally` clause
+   |
+89 |             pass
+90 |         elif False:
+91 |             continue  # [continue-in-finally]
+   |             ^^^^^^^^ PLE0116
+92 |         else:
+93 |             continue  # [continue-in-finally]
+   |
+
+continue_in_finally.py:91:13: PLE0116 `continue` not supported inside `finally` clause
+   |
+91 |             continue  # [continue-in-finally]
+92 |         else:
+93 |             continue  # [continue-in-finally]
+   |             ^^^^^^^^ PLE0116
+94 |             for i in range(10):
+95 |                 pass
+   |
+
+continue_in_finally.py:95:17: PLE0116 `continue` not supported inside `finally` clause
+   |
+95 |                 pass
+96 |             else:
+97 |                 continue  # [continue-in-finally]
+   |                 ^^^^^^^^ PLE0116
+   |
+
 

@@ -1,271 +1,263 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    suggestion: "Replace `map` using a generator expression"
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 26
-  fix:
-    edits:
-      - content: (x + 1 for x in nums)
-        location:
-          row: 3
-          column: 0
-        end_location:
-          row: 3
-          column: 26
-  parent: ~
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    suggestion: "Replace `map` using a generator expression"
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 27
-  fix:
-    edits:
-      - content: (str(x) for x in nums)
-        location:
-          row: 4
-          column: 0
-        end_location:
-          row: 4
-          column: 27
-  parent: ~
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a `list` comprehension)"
-    suggestion: "Replace `map` using a `list` comprehension"
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 32
-  fix:
-    edits:
-      - content: "[x * 2 for x in nums]"
-        location:
-          row: 5
-          column: 0
-        end_location:
-          row: 5
-          column: 32
-  parent: ~
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a `set` comprehension)"
-    suggestion: "Replace `map` using a `set` comprehension"
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 36
-  fix:
-    edits:
-      - content: "{x % 2 == 0 for x in nums}"
-        location:
-          row: 6
-          column: 0
-        end_location:
-          row: 6
-          column: 36
-  parent: ~
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a `dict` comprehension)"
-    suggestion: "Replace `map` using a `dict` comprehension"
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 36
-  fix:
-    edits:
-      - content: "{v: v**2 for v in nums}"
-        location:
-          row: 7
-          column: 0
-        end_location:
-          row: 7
-          column: 36
-  parent: ~
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    suggestion: "Replace `map` using a generator expression"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 26
-  fix:
-    edits:
-      - content: "(\"const\" for _ in nums)"
-        location:
-          row: 8
-          column: 0
-        end_location:
-          row: 8
-          column: 26
-  parent: ~
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    suggestion: "Replace `map` using a generator expression"
-    fixable: true
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 24
-  fix:
-    edits:
-      - content: (3.0 for _ in nums)
-        location:
-          row: 9
-          column: 0
-        end_location:
-          row: 9
-          column: 24
-  parent: ~
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    suggestion: "Replace `map` using a generator expression"
-    fixable: true
-  location:
-    row: 10
-    column: 12
-  end_location:
-    row: 10
-    column: 63
-  fix:
-    edits:
-      - content: "(x in nums and \"1\" or \"0\" for x in range(123))"
-        location:
-          row: 10
-          column: 12
-        end_location:
-          row: 10
-          column: 63
-  parent: ~
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    suggestion: "Replace `map` using a generator expression"
-    fixable: true
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 11
-    column: 44
-  fix:
-    edits:
-      - content: "(isinstance(v, dict) for v in nums)"
-        location:
-          row: 11
-          column: 4
-        end_location:
-          row: 11
-          column: 44
-  parent: ~
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    suggestion: "Replace `map` using a generator expression"
-    fixable: true
-  location:
-    row: 12
-    column: 13
-  end_location:
-    row: 12
-    column: 35
-  fix:
-    edits:
-      - content: (v for v in nums)
-        location:
-          row: 12
-          column: 13
-        end_location:
-          row: 12
-          column: 35
-  parent: ~
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a `set` comprehension)"
-    suggestion: "Replace `map` using a `set` comprehension"
-    fixable: true
-  location:
-    row: 15
-    column: 7
-  end_location:
-    row: 15
-    column: 43
-  fix:
-    edits:
-      - content: " {x % 2 == 0 for x in nums} "
-        location:
-          row: 15
-          column: 7
-        end_location:
-          row: 15
-          column: 43
-  parent: ~
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a `dict` comprehension)"
-    suggestion: "Replace `map` using a `dict` comprehension"
-    fixable: true
-  location:
-    row: 16
-    column: 7
-  end_location:
-    row: 16
-    column: 43
-  fix:
-    edits:
-      - content: " {v: v**2 for v in nums} "
-        location:
-          row: 16
-          column: 7
-        end_location:
-          row: 16
-          column: 43
-  parent: ~
-- kind:
-    name: UnnecessaryMap
-    body: "Unnecessary `map` usage (rewrite using a generator expression)"
-    suggestion: "Replace `map` using a generator expression"
-    fixable: true
-  location:
-    row: 21
-    column: 0
-  end_location:
-    row: 21
-    column: 24
-  fix:
-    edits: []
-  parent: ~
+C417.py:3:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+  |
+3 | # Errors.
+4 | nums = [1, 2, 3]
+5 | map(lambda x: x + 1, nums)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+6 | map(lambda x: str(x), nums)
+7 | list(map(lambda x: x * 2, nums))
+  |
+  = help: Replace `map` using a generator expression
+
+ℹ Suggested fix
+1 1 | # Errors.
+2 2 | nums = [1, 2, 3]
+3   |-map(lambda x: x + 1, nums)
+  3 |+(x + 1 for x in nums)
+4 4 | map(lambda x: str(x), nums)
+5 5 | list(map(lambda x: x * 2, nums))
+6 6 | set(map(lambda x: x % 2 == 0, nums))
+
+C417.py:4:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+  |
+4 | nums = [1, 2, 3]
+5 | map(lambda x: x + 1, nums)
+6 | map(lambda x: str(x), nums)
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+7 | list(map(lambda x: x * 2, nums))
+8 | set(map(lambda x: x % 2 == 0, nums))
+  |
+  = help: Replace `map` using a generator expression
+
+ℹ Suggested fix
+1 1 | # Errors.
+2 2 | nums = [1, 2, 3]
+3 3 | map(lambda x: x + 1, nums)
+4   |-map(lambda x: str(x), nums)
+  4 |+(str(x) for x in nums)
+5 5 | list(map(lambda x: x * 2, nums))
+6 6 | set(map(lambda x: x % 2 == 0, nums))
+7 7 | dict(map(lambda v: (v, v**2), nums))
+
+C417.py:5:1: C417 [*] Unnecessary `map` usage (rewrite using a `list` comprehension)
+  |
+5 | map(lambda x: x + 1, nums)
+6 | map(lambda x: str(x), nums)
+7 | list(map(lambda x: x * 2, nums))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+8 | set(map(lambda x: x % 2 == 0, nums))
+9 | dict(map(lambda v: (v, v**2), nums))
+  |
+  = help: Replace `map` using a `list` comprehension
+
+ℹ Suggested fix
+2 2 | nums = [1, 2, 3]
+3 3 | map(lambda x: x + 1, nums)
+4 4 | map(lambda x: str(x), nums)
+5   |-list(map(lambda x: x * 2, nums))
+  5 |+[x * 2 for x in nums]
+6 6 | set(map(lambda x: x % 2 == 0, nums))
+7 7 | dict(map(lambda v: (v, v**2), nums))
+8 8 | map(lambda: "const", nums)
+
+C417.py:6:1: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehension)
+   |
+ 6 | map(lambda x: str(x), nums)
+ 7 | list(map(lambda x: x * 2, nums))
+ 8 | set(map(lambda x: x % 2 == 0, nums))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+ 9 | dict(map(lambda v: (v, v**2), nums))
+10 | map(lambda: "const", nums)
+   |
+   = help: Replace `map` using a `set` comprehension
+
+ℹ Suggested fix
+3 3 | map(lambda x: x + 1, nums)
+4 4 | map(lambda x: str(x), nums)
+5 5 | list(map(lambda x: x * 2, nums))
+6   |-set(map(lambda x: x % 2 == 0, nums))
+  6 |+{x % 2 == 0 for x in nums}
+7 7 | dict(map(lambda v: (v, v**2), nums))
+8 8 | map(lambda: "const", nums)
+9 9 | map(lambda _: 3.0, nums)
+
+C417.py:7:1: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
+   |
+ 7 | list(map(lambda x: x * 2, nums))
+ 8 | set(map(lambda x: x % 2 == 0, nums))
+ 9 | dict(map(lambda v: (v, v**2), nums))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+10 | map(lambda: "const", nums)
+11 | map(lambda _: 3.0, nums)
+   |
+   = help: Replace `map` using a `dict` comprehension
+
+ℹ Suggested fix
+4 4 | map(lambda x: str(x), nums)
+5 5 | list(map(lambda x: x * 2, nums))
+6 6 | set(map(lambda x: x % 2 == 0, nums))
+7   |-dict(map(lambda v: (v, v**2), nums))
+  7 |+{v: v**2 for v in nums}
+8 8 | map(lambda: "const", nums)
+9 9 | map(lambda _: 3.0, nums)
+10 10 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+
+C417.py:8:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+   |
+ 8 | set(map(lambda x: x % 2 == 0, nums))
+ 9 | dict(map(lambda v: (v, v**2), nums))
+10 | map(lambda: "const", nums)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+11 | map(lambda _: 3.0, nums)
+12 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+   |
+   = help: Replace `map` using a generator expression
+
+ℹ Suggested fix
+5 5 | list(map(lambda x: x * 2, nums))
+6 6 | set(map(lambda x: x % 2 == 0, nums))
+7 7 | dict(map(lambda v: (v, v**2), nums))
+8   |-map(lambda: "const", nums)
+  8 |+("const" for _ in nums)
+9 9 | map(lambda _: 3.0, nums)
+10 10 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+11 11 | all(map(lambda v: isinstance(v, dict), nums))
+
+C417.py:9:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+   |
+ 9 | dict(map(lambda v: (v, v**2), nums))
+10 | map(lambda: "const", nums)
+11 | map(lambda _: 3.0, nums)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ C417
+12 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+13 | all(map(lambda v: isinstance(v, dict), nums))
+   |
+   = help: Replace `map` using a generator expression
+
+ℹ Suggested fix
+6  6  | set(map(lambda x: x % 2 == 0, nums))
+7  7  | dict(map(lambda v: (v, v**2), nums))
+8  8  | map(lambda: "const", nums)
+9     |-map(lambda _: 3.0, nums)
+   9  |+(3.0 for _ in nums)
+10 10 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+11 11 | all(map(lambda v: isinstance(v, dict), nums))
+12 12 | filter(func, map(lambda v: v, nums))
+
+C417.py:10:13: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+   |
+10 | map(lambda: "const", nums)
+11 | map(lambda _: 3.0, nums)
+12 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+   |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+13 | all(map(lambda v: isinstance(v, dict), nums))
+14 | filter(func, map(lambda v: v, nums))
+   |
+   = help: Replace `map` using a generator expression
+
+ℹ Suggested fix
+7  7  | dict(map(lambda v: (v, v**2), nums))
+8  8  | map(lambda: "const", nums)
+9  9  | map(lambda _: 3.0, nums)
+10    |-_ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+   10 |+_ = "".join((x in nums and "1" or "0" for x in range(123)))
+11 11 | all(map(lambda v: isinstance(v, dict), nums))
+12 12 | filter(func, map(lambda v: v, nums))
+13 13 | 
+
+C417.py:11:5: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+   |
+11 | map(lambda _: 3.0, nums)
+12 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+13 | all(map(lambda v: isinstance(v, dict), nums))
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+14 | filter(func, map(lambda v: v, nums))
+   |
+   = help: Replace `map` using a generator expression
+
+ℹ Suggested fix
+8  8  | map(lambda: "const", nums)
+9  9  | map(lambda _: 3.0, nums)
+10 10 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+11    |-all(map(lambda v: isinstance(v, dict), nums))
+   11 |+all((isinstance(v, dict) for v in nums))
+12 12 | filter(func, map(lambda v: v, nums))
+13 13 | 
+14 14 | # When inside f-string, then the fix should be surrounded by whitespace
+
+C417.py:12:14: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+   |
+12 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+13 | all(map(lambda v: isinstance(v, dict), nums))
+14 | filter(func, map(lambda v: v, nums))
+   |              ^^^^^^^^^^^^^^^^^^^^^^ C417
+15 | 
+16 | # When inside f-string, then the fix should be surrounded by whitespace
+   |
+   = help: Replace `map` using a generator expression
+
+ℹ Suggested fix
+9  9  | map(lambda _: 3.0, nums)
+10 10 | _ = "".join(map(lambda x: x in nums and "1" or "0", range(123)))
+11 11 | all(map(lambda v: isinstance(v, dict), nums))
+12    |-filter(func, map(lambda v: v, nums))
+   12 |+filter(func, (v for v in nums))
+13 13 | 
+14 14 | # When inside f-string, then the fix should be surrounded by whitespace
+15 15 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
+
+C417.py:15:8: C417 [*] Unnecessary `map` usage (rewrite using a `set` comprehension)
+   |
+15 | # When inside f-string, then the fix should be surrounded by whitespace
+16 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+17 | _ = f"{dict(map(lambda v: (v, v**2), nums))}"
+   |
+   = help: Replace `map` using a `set` comprehension
+
+ℹ Suggested fix
+12 12 | filter(func, map(lambda v: v, nums))
+13 13 | 
+14 14 | # When inside f-string, then the fix should be surrounded by whitespace
+15    |-_ = f"{set(map(lambda x: x % 2 == 0, nums))}"
+   15 |+_ = f"{ {x % 2 == 0 for x in nums} }"
+16 16 | _ = f"{dict(map(lambda v: (v, v**2), nums))}"
+17 17 | 
+18 18 | # Error, but unfixable.
+
+C417.py:16:8: C417 [*] Unnecessary `map` usage (rewrite using a `dict` comprehension)
+   |
+16 | # When inside f-string, then the fix should be surrounded by whitespace
+17 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
+18 | _ = f"{dict(map(lambda v: (v, v**2), nums))}"
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C417
+19 | 
+20 | # Error, but unfixable.
+   |
+   = help: Replace `map` using a `dict` comprehension
+
+ℹ Suggested fix
+13 13 | 
+14 14 | # When inside f-string, then the fix should be surrounded by whitespace
+15 15 | _ = f"{set(map(lambda x: x % 2 == 0, nums))}"
+16    |-_ = f"{dict(map(lambda v: (v, v**2), nums))}"
+   16 |+_ = f"{ {v: v**2 for v in nums} }"
+17 17 | 
+18 18 | # Error, but unfixable.
+19 19 | # For simple expressions, this could be: `(x if x else 1 for x in nums)`.
+
+C417.py:21:1: C417 [*] Unnecessary `map` usage (rewrite using a generator expression)
+   |
+21 | # For simple expressions, this could be: `(x if x else 1 for x in nums)`.
+22 | # For more complex expressions, this would differ: `(x + 2 if x else 3 for x in nums)`.
+23 | map(lambda x=1: x, nums)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^ C417
+24 | 
+25 | # False negatives.
+   |
+   = help: Replace `map` using a generator expression
+
 

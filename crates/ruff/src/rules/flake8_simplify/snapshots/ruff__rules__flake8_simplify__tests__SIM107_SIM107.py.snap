@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ReturnInTryExceptFinally
-    body: "Don't use `return` in `try`/`except` and `finally`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 8
-  end_location:
-    row: 9
-    column: 18
-  fix:
-    edits: []
-  parent: ~
+SIM107.py:9:9: SIM107 Don't use `return` in `try`/`except` and `finally`
+   |
+ 9 |         return "2"
+10 |     finally:
+11 |         return "3"
+   |         ^^^^^^^^^^ SIM107
+   |
+
 

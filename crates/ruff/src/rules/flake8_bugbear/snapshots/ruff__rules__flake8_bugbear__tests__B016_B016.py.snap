@@ -1,47 +1,33 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CannotRaiseLiteral
-    body: Cannot raise a literal. Did you intend to return it or raise an Exception?
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 6
-  end_location:
-    row: 6
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CannotRaiseLiteral
-    body: Cannot raise a literal. Did you intend to return it or raise an Exception?
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 6
-  end_location:
-    row: 7
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: CannotRaiseLiteral
-    body: Cannot raise a literal. Did you intend to return it or raise an Exception?
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 6
-  end_location:
-    row: 8
-    column: 14
-  fix:
-    edits: []
-  parent: ~
+B016.py:6:7: B016 Cannot raise a literal. Did you intend to return it or raise an Exception?
+   |
+ 6 | """
+ 7 | 
+ 8 | raise False
+   |       ^^^^^ B016
+ 9 | raise 1
+10 | raise "string"
+   |
+
+B016.py:7:7: B016 Cannot raise a literal. Did you intend to return it or raise an Exception?
+   |
+ 7 | raise False
+ 8 | raise 1
+   |       ^ B016
+ 9 | raise "string"
+10 | raise Exception(False)
+   |
+
+B016.py:8:7: B016 Cannot raise a literal. Did you intend to return it or raise an Exception?
+   |
+ 8 | raise False
+ 9 | raise 1
+10 | raise "string"
+   |       ^^^^^^^^ B016
+11 | raise Exception(False)
+12 | raise Exception(1)
+   |
+
 

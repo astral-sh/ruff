@@ -299,7 +299,8 @@ pub fn nested_if_statements(
         match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
             Ok(fix) => {
                 if fix
-                    .content
+                    .content()
+                    .unwrap_or_default()
                     .universal_newlines()
                     .all(|line| line.width() <= checker.settings.line_length)
                 {

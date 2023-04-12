@@ -1,635 +1,455 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 9
-  end_location:
-    row: 2
-    column: 40
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 9
-  end_location:
-    row: 3
-    column: 35
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 9
-  end_location:
-    row: 4
-    column: 43
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 9
-  end_location:
-    row: 5
-    column: 44
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 9
-  end_location:
-    row: 6
-    column: 49
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 9
-  end_location:
-    row: 8
-    column: 52
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 9
-  end_location:
-    row: 9
-    column: 47
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 9
-  end_location:
-    row: 10
-    column: 54
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 9
-  end_location:
-    row: 11
-    column: 55
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 10
-  end_location:
-    row: 12
-    column: 48
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 10
-  end_location:
-    row: 14
-    column: 50
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 10
-  end_location:
-    row: 15
-    column: 50
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 10
-  end_location:
-    row: 16
-    column: 57
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 10
-  end_location:
-    row: 17
-    column: 51
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 10
-  end_location:
-    row: 19
-    column: 49
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 10
-  end_location:
-    row: 20
-    column: 49
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 10
-  end_location:
-    row: 21
-    column: 53
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 10
-  end_location:
-    row: 22
-    column: 43
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 10
-  end_location:
-    row: 24
-    column: 41
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 25
-    column: 10
-  end_location:
-    row: 25
-    column: 36
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 10
-  end_location:
-    row: 26
-    column: 44
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 27
-    column: 10
-  end_location:
-    row: 27
-    column: 45
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 28
-    column: 10
-  end_location:
-    row: 28
-    column: 50
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 30
-    column: 10
-  end_location:
-    row: 30
-    column: 53
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 31
-    column: 10
-  end_location:
-    row: 31
-    column: 48
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 10
-  end_location:
-    row: 32
-    column: 55
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 33
-    column: 10
-  end_location:
-    row: 33
-    column: 56
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 34
-    column: 10
-  end_location:
-    row: 34
-    column: 48
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 36
-    column: 10
-  end_location:
-    row: 36
-    column: 50
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 37
-    column: 10
-  end_location:
-    row: 37
-    column: 50
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 10
-  end_location:
-    row: 38
-    column: 57
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 39
-    column: 10
-  end_location:
-    row: 39
-    column: 51
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 41
-    column: 10
-  end_location:
-    row: 41
-    column: 49
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 42
-    column: 10
-  end_location:
-    row: 42
-    column: 49
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 10
-  end_location:
-    row: 43
-    column: 53
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 10
-  end_location:
-    row: 44
-    column: 43
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 48
-    column: 11
-  end_location:
-    row: 52
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 55
-    column: 11
-  end_location:
-    row: 59
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 62
-    column: 11
-  end_location:
-    row: 66
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 69
-    column: 11
-  end_location:
-    row: 73
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 77
-    column: 8
-  end_location:
-    row: 79
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 83
-    column: 25
-  end_location:
-    row: 83
-    column: 67
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 84
-    column: 25
-  end_location:
-    row: 84
-    column: 65
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 85
-    column: 25
-  end_location:
-    row: 85
-    column: 73
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedSQLExpression
-    body: Possible SQL injection vector through string-based query construction
-    suggestion: ~
-    fixable: false
-  location:
-    row: 86
-    column: 29
-  end_location:
-    row: 86
-    column: 71
-  fix:
-    edits: []
-  parent: ~
+S608.py:2:10: S608 Possible SQL injection vector through string-based query construction
+  |
+2 | # single-line failures
+3 | query1 = "SELECT %s FROM table" % (var,) # bad
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+4 | query2 = "SELECT var FROM " + table
+5 | query3 = "SELECT " + val + " FROM " + table
+  |
+
+S608.py:3:10: S608 Possible SQL injection vector through string-based query construction
+  |
+3 | # single-line failures
+4 | query1 = "SELECT %s FROM table" % (var,) # bad
+5 | query2 = "SELECT var FROM " + table
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+6 | query3 = "SELECT " + val + " FROM " + table
+7 | query4 = "SELECT {} FROM table;".format(var)
+  |
+
+S608.py:4:10: S608 Possible SQL injection vector through string-based query construction
+  |
+4 | query1 = "SELECT %s FROM table" % (var,) # bad
+5 | query2 = "SELECT var FROM " + table
+6 | query3 = "SELECT " + val + " FROM " + table
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+7 | query4 = "SELECT {} FROM table;".format(var)
+8 | query5 = f"SELECT * FROM table WHERE var = {var}"
+  |
+
+S608.py:5:10: S608 Possible SQL injection vector through string-based query construction
+  |
+5 | query2 = "SELECT var FROM " + table
+6 | query3 = "SELECT " + val + " FROM " + table
+7 | query4 = "SELECT {} FROM table;".format(var)
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+8 | query5 = f"SELECT * FROM table WHERE var = {var}"
+  |
+
+S608.py:6:10: S608 Possible SQL injection vector through string-based query construction
+   |
+ 6 | query3 = "SELECT " + val + " FROM " + table
+ 7 | query4 = "SELECT {} FROM table;".format(var)
+ 8 | query5 = f"SELECT * FROM table WHERE var = {var}"
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+ 9 | 
+10 | query6 = "DELETE FROM table WHERE var = %s" % (var,)
+   |
+
+S608.py:8:10: S608 Possible SQL injection vector through string-based query construction
+   |
+ 8 | query5 = f"SELECT * FROM table WHERE var = {var}"
+ 9 | 
+10 | query6 = "DELETE FROM table WHERE var = %s" % (var,)
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+11 | query7 = "DELETE FROM table WHERE VAR = " + var
+12 | query8 = "DELETE FROM " + table + "WHERE var = " + var
+   |
+
+S608.py:9:10: S608 Possible SQL injection vector through string-based query construction
+   |
+ 9 | query6 = "DELETE FROM table WHERE var = %s" % (var,)
+10 | query7 = "DELETE FROM table WHERE VAR = " + var
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+11 | query8 = "DELETE FROM " + table + "WHERE var = " + var
+12 | query9 = "DELETE FROM table WHERE var = {}".format(var)
+   |
+
+S608.py:10:10: S608 Possible SQL injection vector through string-based query construction
+   |
+10 | query6 = "DELETE FROM table WHERE var = %s" % (var,)
+11 | query7 = "DELETE FROM table WHERE VAR = " + var
+12 | query8 = "DELETE FROM " + table + "WHERE var = " + var
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+13 | query9 = "DELETE FROM table WHERE var = {}".format(var)
+14 | query10 = f"DELETE FROM table WHERE var = {var}"
+   |
+
+S608.py:11:10: S608 Possible SQL injection vector through string-based query construction
+   |
+11 | query7 = "DELETE FROM table WHERE VAR = " + var
+12 | query8 = "DELETE FROM " + table + "WHERE var = " + var
+13 | query9 = "DELETE FROM table WHERE var = {}".format(var)
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+14 | query10 = f"DELETE FROM table WHERE var = {var}"
+   |
+
+S608.py:12:11: S608 Possible SQL injection vector through string-based query construction
+   |
+12 | query8 = "DELETE FROM " + table + "WHERE var = " + var
+13 | query9 = "DELETE FROM table WHERE var = {}".format(var)
+14 | query10 = f"DELETE FROM table WHERE var = {var}"
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+15 | 
+16 | query11 = "INSERT INTO table VALUES (%s)" % (var,)
+   |
+
+S608.py:14:11: S608 Possible SQL injection vector through string-based query construction
+   |
+14 | query10 = f"DELETE FROM table WHERE var = {var}"
+15 | 
+16 | query11 = "INSERT INTO table VALUES (%s)" % (var,)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+17 | query12 = "INSERT INTO TABLE VALUES (" + var + ")"
+18 | query13 = "INSERT INTO {} VALUES ({})".format(table, var)
+   |
+
+S608.py:15:11: S608 Possible SQL injection vector through string-based query construction
+   |
+15 | query11 = "INSERT INTO table VALUES (%s)" % (var,)
+16 | query12 = "INSERT INTO TABLE VALUES (" + var + ")"
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+17 | query13 = "INSERT INTO {} VALUES ({})".format(table, var)
+18 | query14 = f"INSERT INTO {table} VALUES var = {var}"
+   |
+
+S608.py:16:11: S608 Possible SQL injection vector through string-based query construction
+   |
+16 | query11 = "INSERT INTO table VALUES (%s)" % (var,)
+17 | query12 = "INSERT INTO TABLE VALUES (" + var + ")"
+18 | query13 = "INSERT INTO {} VALUES ({})".format(table, var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+19 | query14 = f"INSERT INTO {table} VALUES var = {var}"
+   |
+
+S608.py:17:11: S608 Possible SQL injection vector through string-based query construction
+   |
+17 | query12 = "INSERT INTO TABLE VALUES (" + var + ")"
+18 | query13 = "INSERT INTO {} VALUES ({})".format(table, var)
+19 | query14 = f"INSERT INTO {table} VALUES var = {var}"
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+20 | 
+21 | query15 = "UPDATE %s SET var = %s" % (table, var)
+   |
+
+S608.py:19:11: S608 Possible SQL injection vector through string-based query construction
+   |
+19 | query14 = f"INSERT INTO {table} VALUES var = {var}"
+20 | 
+21 | query15 = "UPDATE %s SET var = %s" % (table, var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+22 | query16 = "UPDATE " + table + " SET var = " + var
+23 | query17 = "UPDATE {} SET var = {}".format(table, var)
+   |
+
+S608.py:20:11: S608 Possible SQL injection vector through string-based query construction
+   |
+20 | query15 = "UPDATE %s SET var = %s" % (table, var)
+21 | query16 = "UPDATE " + table + " SET var = " + var
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+22 | query17 = "UPDATE {} SET var = {}".format(table, var)
+23 | query18 = f"UPDATE {table} SET var = {var}"
+   |
+
+S608.py:21:11: S608 Possible SQL injection vector through string-based query construction
+   |
+21 | query15 = "UPDATE %s SET var = %s" % (table, var)
+22 | query16 = "UPDATE " + table + " SET var = " + var
+23 | query17 = "UPDATE {} SET var = {}".format(table, var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+24 | query18 = f"UPDATE {table} SET var = {var}"
+   |
+
+S608.py:22:11: S608 Possible SQL injection vector through string-based query construction
+   |
+22 | query16 = "UPDATE " + table + " SET var = " + var
+23 | query17 = "UPDATE {} SET var = {}".format(table, var)
+24 | query18 = f"UPDATE {table} SET var = {var}"
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+25 | 
+26 | query19 = "select %s from table" % (var,)
+   |
+
+S608.py:24:11: S608 Possible SQL injection vector through string-based query construction
+   |
+24 | query18 = f"UPDATE {table} SET var = {var}"
+25 | 
+26 | query19 = "select %s from table" % (var,)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+27 | query20 = "select var from " + table
+28 | query21 = "select " + val + " from " + table
+   |
+
+S608.py:25:11: S608 Possible SQL injection vector through string-based query construction
+   |
+25 | query19 = "select %s from table" % (var,)
+26 | query20 = "select var from " + table
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+27 | query21 = "select " + val + " from " + table
+28 | query22 = "select {} from table;".format(var)
+   |
+
+S608.py:26:11: S608 Possible SQL injection vector through string-based query construction
+   |
+26 | query19 = "select %s from table" % (var,)
+27 | query20 = "select var from " + table
+28 | query21 = "select " + val + " from " + table
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+29 | query22 = "select {} from table;".format(var)
+30 | query23 = f"select * from table where var = {var}"
+   |
+
+S608.py:27:11: S608 Possible SQL injection vector through string-based query construction
+   |
+27 | query20 = "select var from " + table
+28 | query21 = "select " + val + " from " + table
+29 | query22 = "select {} from table;".format(var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+30 | query23 = f"select * from table where var = {var}"
+   |
+
+S608.py:28:11: S608 Possible SQL injection vector through string-based query construction
+   |
+28 | query21 = "select " + val + " from " + table
+29 | query22 = "select {} from table;".format(var)
+30 | query23 = f"select * from table where var = {var}"
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+31 | 
+32 | query24 = "delete from table where var = %s" % (var,)
+   |
+
+S608.py:30:11: S608 Possible SQL injection vector through string-based query construction
+   |
+30 | query23 = f"select * from table where var = {var}"
+31 | 
+32 | query24 = "delete from table where var = %s" % (var,)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+33 | query25 = "delete from table where var = " + var
+34 | query26 = "delete from " + table + "where var = " + var
+   |
+
+S608.py:31:11: S608 Possible SQL injection vector through string-based query construction
+   |
+31 | query24 = "delete from table where var = %s" % (var,)
+32 | query25 = "delete from table where var = " + var
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+33 | query26 = "delete from " + table + "where var = " + var
+34 | query27 = "delete from table where var = {}".format(var)
+   |
+
+S608.py:32:11: S608 Possible SQL injection vector through string-based query construction
+   |
+32 | query24 = "delete from table where var = %s" % (var,)
+33 | query25 = "delete from table where var = " + var
+34 | query26 = "delete from " + table + "where var = " + var
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+35 | query27 = "delete from table where var = {}".format(var)
+36 | query28 = f"delete from table where var = {var}"
+   |
+
+S608.py:33:11: S608 Possible SQL injection vector through string-based query construction
+   |
+33 | query25 = "delete from table where var = " + var
+34 | query26 = "delete from " + table + "where var = " + var
+35 | query27 = "delete from table where var = {}".format(var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+36 | query28 = f"delete from table where var = {var}"
+   |
+
+S608.py:34:11: S608 Possible SQL injection vector through string-based query construction
+   |
+34 | query26 = "delete from " + table + "where var = " + var
+35 | query27 = "delete from table where var = {}".format(var)
+36 | query28 = f"delete from table where var = {var}"
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+37 | 
+38 | query29 = "insert into table values (%s)" % (var,)
+   |
+
+S608.py:36:11: S608 Possible SQL injection vector through string-based query construction
+   |
+36 | query28 = f"delete from table where var = {var}"
+37 | 
+38 | query29 = "insert into table values (%s)" % (var,)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+39 | query30 = "insert into table values (" + var + ")"
+40 | query31 = "insert into {} values ({})".format(table, var)
+   |
+
+S608.py:37:11: S608 Possible SQL injection vector through string-based query construction
+   |
+37 | query29 = "insert into table values (%s)" % (var,)
+38 | query30 = "insert into table values (" + var + ")"
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+39 | query31 = "insert into {} values ({})".format(table, var)
+40 | query32 = f"insert into {table} values var = {var}"
+   |
+
+S608.py:38:11: S608 Possible SQL injection vector through string-based query construction
+   |
+38 | query29 = "insert into table values (%s)" % (var,)
+39 | query30 = "insert into table values (" + var + ")"
+40 | query31 = "insert into {} values ({})".format(table, var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+41 | query32 = f"insert into {table} values var = {var}"
+   |
+
+S608.py:39:11: S608 Possible SQL injection vector through string-based query construction
+   |
+39 | query30 = "insert into table values (" + var + ")"
+40 | query31 = "insert into {} values ({})".format(table, var)
+41 | query32 = f"insert into {table} values var = {var}"
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+42 | 
+43 | query33 = "update %s set var = %s" % (table, var)
+   |
+
+S608.py:41:11: S608 Possible SQL injection vector through string-based query construction
+   |
+41 | query32 = f"insert into {table} values var = {var}"
+42 | 
+43 | query33 = "update %s set var = %s" % (table, var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+44 | query34 = "update " + table + " set var = " + var
+45 | query35 = "update {} set var = {}".format(table, var)
+   |
+
+S608.py:42:11: S608 Possible SQL injection vector through string-based query construction
+   |
+42 | query33 = "update %s set var = %s" % (table, var)
+43 | query34 = "update " + table + " set var = " + var
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+44 | query35 = "update {} set var = {}".format(table, var)
+45 | query36 = f"update {table} set var = {var}"
+   |
+
+S608.py:43:11: S608 Possible SQL injection vector through string-based query construction
+   |
+43 | query33 = "update %s set var = %s" % (table, var)
+44 | query34 = "update " + table + " set var = " + var
+45 | query35 = "update {} set var = {}".format(table, var)
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+46 | query36 = f"update {table} set var = {var}"
+   |
+
+S608.py:44:11: S608 Possible SQL injection vector through string-based query construction
+   |
+44 | query34 = "update " + table + " set var = " + var
+45 | query35 = "update {} set var = {}".format(table, var)
+46 | query36 = f"update {table} set var = {var}"
+   |           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+47 | 
+48 | # multi-line failures
+   |
+
+S608.py:48:12: S608 Possible SQL injection vector through string-based query construction
+   |
+48 |   # multi-line failures
+49 |   def query37():
+50 |       return """
+   |  ____________^
+51 | |     SELECT *
+52 | |     FROM table
+53 | |     WHERE var = %s
+54 | |     """ % var
+   | |_____________^ S608
+55 |   
+56 |   def query38():
+   |
+
+S608.py:55:12: S608 Possible SQL injection vector through string-based query construction
+   |
+55 |   def query38():
+56 |       return """
+   |  ____________^
+57 | |     SELECT *
+58 | |     FROM TABLE
+59 | |     WHERE var =
+60 | |     """ + var
+   | |_____________^ S608
+61 |   
+62 |   def query39():
+   |
+
+S608.py:62:12: S608 Possible SQL injection vector through string-based query construction
+   |
+62 |   def query39():
+63 |       return """
+   |  ____________^
+64 | |     SELECT *
+65 | |     FROM table
+66 | |     WHERE var = {}
+67 | |     """.format(var)
+   | |___________________^ S608
+68 |   
+69 |   def query40():
+   |
+
+S608.py:69:12: S608 Possible SQL injection vector through string-based query construction
+   |
+69 |   def query40():
+70 |       return f"""
+   |  ____________^
+71 | |     SELECT *
+72 | |     FROM table
+73 | |     WHERE var = {var}
+74 | |     """
+   | |_______^ S608
+75 |   
+76 |   def query41():
+   |
+
+S608.py:77:9: S608 Possible SQL injection vector through string-based query construction
+   |
+77 |   def query41():
+78 |       return (
+79 |           "SELECT *"
+   |  _________^
+80 | |         "FROM table"
+81 | |         f"WHERE var = {var}"
+   | |____________________________^ S608
+82 |       )
+   |
+
+S608.py:83:26: S608 Possible SQL injection vector through string-based query construction
+   |
+83 | # # cursor-wrapped failures
+84 | query42 = cursor.execute("SELECT * FROM table WHERE var = %s" % var)
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+85 | query43 = cursor.execute(f"SELECT * FROM table WHERE var = {var}")
+86 | query44 = cursor.execute("SELECT * FROM table WHERE var = {}".format(var))
+   |
+
+S608.py:84:26: S608 Possible SQL injection vector through string-based query construction
+   |
+84 | # # cursor-wrapped failures
+85 | query42 = cursor.execute("SELECT * FROM table WHERE var = %s" % var)
+86 | query43 = cursor.execute(f"SELECT * FROM table WHERE var = {var}")
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+87 | query44 = cursor.execute("SELECT * FROM table WHERE var = {}".format(var))
+88 | query45 = cursor.executemany("SELECT * FROM table WHERE var = %s" % var, [])
+   |
+
+S608.py:85:26: S608 Possible SQL injection vector through string-based query construction
+   |
+85 | query42 = cursor.execute("SELECT * FROM table WHERE var = %s" % var)
+86 | query43 = cursor.execute(f"SELECT * FROM table WHERE var = {var}")
+87 | query44 = cursor.execute("SELECT * FROM table WHERE var = {}".format(var))
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+88 | query45 = cursor.executemany("SELECT * FROM table WHERE var = %s" % var, [])
+   |
+
+S608.py:86:30: S608 Possible SQL injection vector through string-based query construction
+   |
+86 | query43 = cursor.execute(f"SELECT * FROM table WHERE var = {var}")
+87 | query44 = cursor.execute("SELECT * FROM table WHERE var = {}".format(var))
+88 | query45 = cursor.executemany("SELECT * FROM table WHERE var = %s" % var, [])
+   |                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S608
+89 |  
+90 | # # pass
+   |
+
 
