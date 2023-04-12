@@ -6,25 +6,25 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
 /// ## What it does
-/// Checks for imports that should not be using a non-standard convention,
-/// like `import tensorflow.keras.backend as K`, and suggest avoiding such practice.
+/// Checks for imports that use non-standard naming conventions, like
+/// `import tensorflow.keras.backend as K`.
 ///
 /// ## Why is this bad?
-/// Consistency is good. Avoid using a non-standard convention for imports violating
-/// PEP 8 principle to make your code more readable idiomatic.
+/// Consistency is good. Avoid using a non-standard naming convention for
+/// imports, and, in particular, choosing import aliases that violate PEP 8.
 ///
-/// For example, `import tensorflow.keras.backend as K` is an example of violating
-/// PEP 8 principle, and users should typically avoid such imports in large codebases.
+/// For example, aliasing via `import tensorflow.keras.backend as K` violates
+/// the guidance of PEP 8, and is thus avoided in some projects.
 ///
 /// ## Example
 /// ```python
 /// import tensorflow.keras.backend as K
 /// ```
 ///
-/// Use instead, for example,:
+/// Use instead:
 /// ```python
 /// import tensorflow as tf
-/// ...
+///
 /// tf.keras.backend
 /// ```
 #[violation]
@@ -42,26 +42,16 @@ impl Violation for BannedImportAlias {
 pub fn check_banned_import(
     import_from: &Stmt,
     name: &str,
-    asname: Option<&str>,
+    asname: &str,
     banned_conventions: &FxHashMap<String, Vec<String>>,
 ) -> Option<Diagnostic> {
     if let Some(banned_aliases) = banned_conventions.get(name) {
-        let mut is_valid_import = true;
-        for banned_alias in banned_aliases {
-            if !banned_alias.is_empty() {
-                if let Some(alias) = asname {
-                    if banned_alias == alias {
-                        is_valid_import = false;
-                    }
-                } else {
-                    is_valid_import = false;
-                }
-                break;
-            }
-        }
-        if !is_valid_import {
+        if banned_aliases
+            .iter()
+            .any(|banned_alias| banned_alias == asname)
+        {
             return Some(Diagnostic::new(
-                BannedImportAlias(name.to_string(), banned_aliases.join(", ")),
+                BannedImportAlias(name.to_string(), asname.to_string()),
                 Range::from(import_from),
             ));
         }

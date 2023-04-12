@@ -1078,15 +1078,17 @@ where
                     }
 
                     if self.settings.rules.enabled(Rule::BannedImportAlias) {
-                        if let Some(diagnostic) =
-                            flake8_import_conventions::rules::check_banned_import(
-                                stmt,
-                                &alias.node.name,
-                                alias.node.asname.as_deref(),
-                                &self.settings.flake8_import_conventions.banned_aliases,
-                            )
-                        {
-                            self.diagnostics.push(diagnostic);
+                        if let Some(asname) = &alias.node.asname {
+                            if let Some(diagnostic) =
+                                flake8_import_conventions::rules::check_banned_import(
+                                    stmt,
+                                    &alias.node.name,
+                                    asname,
+                                    &self.settings.flake8_import_conventions.banned_aliases,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
+                            }
                         }
                     }
 
@@ -1353,20 +1355,22 @@ where
                     }
 
                     if self.settings.rules.enabled(Rule::BannedImportAlias) {
-                        let full_name = helpers::format_import_from_member(
-                            *level,
-                            module.as_deref(),
-                            &alias.node.name,
-                        );
-                        if let Some(diagnostic) =
-                            flake8_import_conventions::rules::check_banned_import(
-                                stmt,
-                                &full_name,
-                                alias.node.asname.as_deref(),
-                                &self.settings.flake8_import_conventions.banned_aliases,
-                            )
-                        {
-                            self.diagnostics.push(diagnostic);
+                        if let Some(asname) = &alias.node.asname {
+                            let full_name = helpers::format_import_from_member(
+                                *level,
+                                module.as_deref(),
+                                &alias.node.name,
+                            );
+                            if let Some(diagnostic) =
+                                flake8_import_conventions::rules::check_banned_import(
+                                    stmt,
+                                    &full_name,
+                                    asname,
+                                    &self.settings.flake8_import_conventions.banned_aliases,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
+                            }
                         }
                     }
 

@@ -56,8 +56,8 @@ pub struct Options {
             "dask.dataframe" = "dd"
         "#
     )]
-    /// A mapping of modules to their conventional import aliases. These aliases
-    /// will be added to the `aliases` mapping.
+    /// A mapping from module to conventional import alias. These aliases will
+    /// be added to the `aliases` mapping.
     pub extend_aliases: Option<FxHashMap<String, String>>,
     #[option(
         default = r#"{}"#,
@@ -68,7 +68,7 @@ pub struct Options {
             "tensorflow.keras.backend" = ["K"]
     "#
     )]
-    /// A mapping of modules to their banned import aliases.
+    /// A mapping from module to its banned import aliases.
     pub banned_aliases: Option<FxHashMap<String, Vec<String>>>,
 }
 

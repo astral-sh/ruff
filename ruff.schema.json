@@ -756,7 +756,7 @@
           }
         },
         "banned-aliases": {
-          "description": "A mapping of modules to their banned import aliases.",
+          "description": "A mapping from module to its banned import aliases.",
           "type": [
             "object",
             "null"
@@ -769,7 +769,7 @@
           }
         },
         "extend-aliases": {
-          "description": "A mapping of modules to their conventional import aliases. These aliases will be added to the `aliases` mapping.",
+          "description": "A mapping from module to conventional import alias. These aliases will be added to the `aliases` mapping.",
           "type": [
             "object",
             "null"
