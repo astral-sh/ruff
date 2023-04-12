@@ -3,6 +3,7 @@ use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator, Unar
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -221,21 +222,21 @@ fn is_valid_default_value_with_annotation(
     false
 }
 
-pub fn is_type_var_call(checker: &Checker, expr: &Expr) -> bool {
+/// Returns `true` if an [`Expr`] appears to be `TypeVar`, `TypeVarTuple`, `NewType`, or `ParamSpec`
+/// call.
+fn is_type_var_like_call(context: &Context, expr: &Expr) -> bool {
     let ExprKind::Call {func, ..} = &expr.node else {
         return false;
     };
-    checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["typing", "TypeVar"]
-                || call_path.as_slice() == ["typing", "TypeVarTuple"]
-                || call_path.as_slice() == ["typing_extensions", "TypeVarTuple"]
-                || call_path.as_slice() == ["typing", "NewType"]
-                || call_path.as_slice() == ["typing", "ParamSpec"]
-                || call_path.as_slice() == ["typing_extensions", "ParamSpec"]
-        })
+    context.resolve_call_path(func).map_or(false, |call_path| {
+        matches!(
+            call_path.as_slice(),
+            [
+                "typing" | "typing_extensions",
+                "TypeVar" | "TypeVarTuple" | "NewType" | "ParamSpec"
+            ]
+        )
+    })
 }
 
 /// PYI011
@@ -359,7 +360,7 @@ pub fn assignment_default_in_stub(checker: &mut Checker, value: &Expr, annotatio
     }) {
         return;
     }
-    if is_type_var_call(checker, value) {
+    if is_type_var_like_call(&checker.ctx, value) {
         return;
     }
     if !is_valid_default_value_with_annotation(value, checker, true) {
