@@ -1,4 +1,4 @@
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 use std::{fs, iter};
 
@@ -12,6 +12,7 @@ use ruff_macros::CacheKey;
 use ruff_python_stdlib::sys::KNOWN_STANDARD_LIBRARY;
 
 use crate::settings::types::PythonVersion;
+use crate::warn_user_once;
 
 use super::types::{ImportBlock, Importable};
 
@@ -214,15 +215,17 @@ pub fn categorize_imports<'a>(
 #[derive(Debug, Default, CacheKey)]
 pub struct KnownModules {
     /// A set of user-provided first-party modules.
-    pub first_party: BTreeSet<String>,
+    pub first_party: Vec<String>,
     /// A set of user-provided third-party modules.
-    pub third_party: BTreeSet<String>,
+    pub third_party: Vec<String>,
     /// A set of user-provided local folder modules.
-    pub local_folder: BTreeSet<String>,
+    pub local_folder: Vec<String>,
     /// A set of user-provided standard library modules.
-    pub standard_library: BTreeSet<String>,
+    pub standard_library: Vec<String>,
     /// A map of additional user-provided sections.
-    pub sections: FxHashMap<String, BTreeSet<String>>,
+    pub sections: FxHashMap<String, Vec<String>>,
+    /// A map of known modules to their section.
+    pub known: FxHashMap<String, ImportSection>,
     /// Whether any of the known modules are submodules (e.g., `foo.bar`, as opposed to `foo`).
     has_submodules: bool,
 }
@@ -235,27 +238,58 @@ impl KnownModules {
         standard_library: Vec<String>,
         sections: FxHashMap<String, Vec<String>>,
     ) -> Self {
-        let first_party = BTreeSet::from_iter(first_party);
-        let third_party = BTreeSet::from_iter(third_party);
-        let local_folder = BTreeSet::from_iter(local_folder);
-        let standard_library = BTreeSet::from_iter(standard_library);
-        let sections: FxHashMap<_, _> = sections
-            .into_iter()
-            .map(|(k, v)| (k, BTreeSet::from_iter(v)))
-            .collect();
-        let has_submodules = first_party
+        let modules = sections
             .iter()
-            .chain(third_party.iter())
-            .chain(local_folder.iter())
-            .chain(standard_library.iter())
-            .chain(sections.values().flatten())
-            .any(|m| m.contains('.'));
+            .flat_map(|(section, modules)| {
+                modules
+                    .iter()
+                    .cloned()
+                    .map(|module| (module, ImportSection::UserDefined(section.clone())))
+            })
+            .chain(
+                first_party
+                    .iter()
+                    .cloned()
+                    .map(|module| (module, ImportSection::Known(ImportType::FirstParty))),
+            )
+            .chain(
+                third_party
+                    .iter()
+                    .cloned()
+                    .map(|module| (module, ImportSection::Known(ImportType::ThirdParty))),
+            )
+            .chain(
+                local_folder
+                    .iter()
+                    .cloned()
+                    .map(|module| (module, ImportSection::Known(ImportType::LocalFolder))),
+            )
+            .chain(
+                standard_library
+                    .iter()
+                    .cloned()
+                    .map(|module| (module, ImportSection::Known(ImportType::StandardLibrary))),
+            );
+
+        let mut known = FxHashMap::with_capacity_and_hasher(
+            modules.size_hint().0,
+            std::hash::BuildHasherDefault::default(),
+        );
+        modules.for_each(|(module, section)| {
+            if known.insert(module, section).is_some() {
+                warn_user_once!("One or more modules are part of multiple import sections.");
+            }
+        });
+
+        let has_submodules = known.keys().any(|m| m.contains('.'));
+
         Self {
             first_party,
             third_party,
             local_folder,
             standard_library,
             sections,
+            known,
             has_submodules,
         }
     }
@@ -287,31 +321,16 @@ impl KnownModules {
     }
 
     fn categorize_submodule(&self, submodule: &str) -> Option<(ImportSection, Reason)> {
-        if let Some((section, _)) = self.sections.iter().find(|(_, v)| v.contains(submodule)) {
-            Some((
-                ImportSection::UserDefined(section.clone()),
-                Reason::UserDefinedSection,
-            ))
-        } else if self.first_party.contains(submodule) {
-            Some((
-                ImportSection::Known(ImportType::FirstParty),
-                Reason::KnownFirstParty,
-            ))
-        } else if self.third_party.contains(submodule) {
-            Some((
-                ImportSection::Known(ImportType::ThirdParty),
-                Reason::KnownThirdParty,
-            ))
-        } else if self.local_folder.contains(submodule) {
-            Some((
-                ImportSection::Known(ImportType::LocalFolder),
-                Reason::KnownLocalFolder,
-            ))
-        } else if self.standard_library.contains(submodule) {
-            Some((
-                ImportSection::Known(ImportType::StandardLibrary),
-                Reason::ExtraStandardLibrary,
-            ))
+        if let Some(section) = self.known.get(submodule) {
+            let reason = match section {
+                ImportSection::UserDefined(_) => Reason::UserDefinedSection,
+                ImportSection::Known(ImportType::FirstParty) => Reason::KnownFirstParty,
+                ImportSection::Known(ImportType::ThirdParty) => Reason::KnownThirdParty,
+                ImportSection::Known(ImportType::LocalFolder) => Reason::KnownLocalFolder,
+                ImportSection::Known(ImportType::StandardLibrary) => Reason::ExtraStandardLibrary,
+                ImportSection::Known(ImportType::Future) => unreachable!(),
+            };
+            Some((section.clone(), reason))
         } else {
             None
         }

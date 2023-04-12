@@ -379,20 +379,14 @@ impl From<Settings> for Options {
         Self {
             required_imports: Some(settings.required_imports.into_iter().collect()),
             combine_as_imports: Some(settings.combine_as_imports),
-            extra_standard_library: Some(
-                settings
-                    .known_modules
-                    .standard_library
-                    .into_iter()
-                    .collect(),
-            ),
+            extra_standard_library: Some(settings.known_modules.standard_library),
             force_single_line: Some(settings.force_single_line),
             force_sort_within_sections: Some(settings.force_sort_within_sections),
             force_wrap_aliases: Some(settings.force_wrap_aliases),
             force_to_top: Some(settings.force_to_top.into_iter().collect()),
-            known_first_party: Some(settings.known_modules.first_party.into_iter().collect()),
-            known_third_party: Some(settings.known_modules.third_party.into_iter().collect()),
-            known_local_folder: Some(settings.known_modules.local_folder.into_iter().collect()),
+            known_first_party: Some(settings.known_modules.first_party),
+            known_third_party: Some(settings.known_modules.third_party),
+            known_local_folder: Some(settings.known_modules.local_folder),
             order_by_type: Some(settings.order_by_type),
             relative_imports_order: Some(settings.relative_imports_order),
             single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),
@@ -405,14 +399,7 @@ impl From<Settings> for Options {
             lines_between_types: Some(settings.lines_between_types),
             forced_separate: Some(settings.forced_separate.into_iter().collect()),
             section_order: Some(settings.section_order.into_iter().collect()),
-            sections: Some(
-                settings
-                    .known_modules
-                    .sections
-                    .into_iter()
-                    .map(|(k, v)| (k, v.into_iter().collect()))
-                    .collect(),
-            ),
+            sections: Some(settings.known_modules.sections),
         }
     }
 }

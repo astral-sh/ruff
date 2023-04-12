@@ -22,6 +22,7 @@ use types::{AliasData, CommentSet, EitherImport, OrderedImportBlock, TrailingCom
 
 use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
+use crate::warn_user_once;
 
 mod annotate;
 mod categorize;
@@ -157,6 +158,7 @@ pub fn format_imports(
         .map(|section| ImportSection::UserDefined(section.clone()))
     {
         if !section_order.contains(&section) {
+            warn_user_once!("Not all user-defined sections are present in the section order.");
             section_order.push(section);
         }
     }
