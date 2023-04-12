@@ -3267,6 +3267,27 @@ where
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
                 }
             }
+            ExprKind::BinOp {
+                op: Operator::BitOr,
+                ..
+            } => {
+                if self.is_stub {
+                    if self.settings.rules.enabled(Rule::DuplicateUnionMember)
+                        && self.ctx.in_type_definition
+                        && self.ctx.current_expr_parent().map_or(true, |parent| {
+                            !matches!(
+                                parent.node,
+                                ExprKind::BinOp {
+                                    op: Operator::BitOr,
+                                    ..
+                                }
+                            )
+                        })
+                    {
+                        flake8_pyi::rules::duplicate_union_member(self, expr);
+                    }
+                }
+            }
             ExprKind::UnaryOp { op, operand } => {
                 let check_not_in = self.settings.rules.enabled(Rule::NotInTest);
                 let check_not_is = self.settings.rules.enabled(Rule::NotIsTest);
