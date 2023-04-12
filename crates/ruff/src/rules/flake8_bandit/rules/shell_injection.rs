@@ -217,8 +217,7 @@ fn find_shell_keyword(keywords: &[Keyword]) -> Option<&Keyword> {
             .node
             .arg
             .as_ref()
-            .and_then(|arg| if arg == "shell" { Some(()) } else { None })
-            .is_some()
+            .map_or(false, |arg| arg == "shell")
     })
 }
 
