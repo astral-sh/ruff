@@ -8,8 +8,8 @@ use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::helpers::collect_arg_names;
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::Range;
-use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_ast::{helpers, visitor};
 
 use crate::autofix::actions::remove_argument;
 use crate::checkers::ast::Checker;
@@ -310,7 +310,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
             {
                 let scope_keyword = keywords
                     .iter()
-                    .find(|kw| kw.node.arg == Some("scope".to_string()));
+                    .find(|kw| kw.node.arg.as_ref().map_or(false, |arg| arg == "scope"));
 
                 if let Some(scope_keyword) = scope_keyword {
                     if keyword_is_literal(scope_keyword, "function") {
@@ -352,7 +352,7 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
 }
 
 /// PT004, PT005, PT022
-fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, body: &[Stmt]) {
+fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &[Stmt]) {
     let mut visitor = SkipFunctionsVisitor::default();
 
     for stmt in body {
@@ -364,13 +364,13 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         .rules
         .enabled(Rule::PytestIncorrectFixtureNameUnderscore)
         && visitor.has_return_with_value
-        && func_name.starts_with('_')
+        && name.starts_with('_')
     {
         checker.diagnostics.push(Diagnostic::new(
             PytestIncorrectFixtureNameUnderscore {
-                function: func_name.to_string(),
+                function: name.to_string(),
             },
-            Range::from(func),
+            helpers::identifier_range(stmt, checker.locator),
         ));
     } else if checker
         .settings
@@ -378,13 +378,13 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
         .enabled(Rule::PytestMissingFixtureNameUnderscore)
         && !visitor.has_return_with_value
         && !visitor.has_yield_from
-        && !func_name.starts_with('_')
+        && !name.starts_with('_')
     {
         checker.diagnostics.push(Diagnostic::new(
             PytestMissingFixtureNameUnderscore {
-                function: func_name.to_string(),
+                function: name.to_string(),
             },
-            Range::from(func),
+            helpers::identifier_range(stmt, checker.locator),
         ));
     }
 
@@ -399,7 +399,7 @@ fn check_fixture_returns(checker: &mut Checker, func: &Stmt, func_name: &str, bo
                     if visitor.yield_statements.len() == 1 {
                         let mut diagnostic = Diagnostic::new(
                             PytestUselessYieldFixture {
-                                name: func_name.to_string(),
+                                name: name.to_string(),
                             },
                             Range::from(stmt),
                         );
@@ -508,8 +508,8 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
 
 pub fn fixture(
     checker: &mut Checker,
-    func: &Stmt,
-    func_name: &str,
+    stmt: &Stmt,
+    name: &str,
     args: &Arguments,
     decorators: &[Expr],
     body: &[Stmt],
@@ -529,7 +529,7 @@ pub fn fixture(
                 .rules
                 .enabled(Rule::PytestExtraneousScopeFunction)
         {
-            check_fixture_decorator(checker, func_name, decorator);
+            check_fixture_decorator(checker, name, decorator);
         }
 
         if checker
@@ -555,7 +555,7 @@ pub fn fixture(
                 .enabled(Rule::PytestUselessYieldFixture))
             && !has_abstractmethod_decorator(decorators, checker)
         {
-            check_fixture_returns(checker, func, func_name, body);
+            check_fixture_returns(checker, stmt, name, body);
         }
 
         if checker
@@ -583,7 +583,7 @@ pub fn fixture(
         .settings
         .rules
         .enabled(Rule::PytestFixtureParamWithoutValue)
-        && func_name.starts_with("test_")
+        && name.starts_with("test_")
     {
         check_test_function_args(checker, args);
     }
