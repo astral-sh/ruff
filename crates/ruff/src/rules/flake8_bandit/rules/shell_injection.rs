@@ -141,6 +141,7 @@ static CONFIG: Lazy<Config> = Lazy::new(|| Config {
     ],
 });
 
+#[derive(Copy, Clone, Debug)]
 enum HasShell {
     // The shell keyword argument is set and it evaluates to false
     Falsey,
