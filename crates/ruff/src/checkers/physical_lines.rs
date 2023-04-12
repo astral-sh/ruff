@@ -80,9 +80,7 @@ pub fn check_physical_lines(
             }
 
             if enforce_blanket_noqa {
-                if let Some(diagnostic) = blanket_noqa(index, line) {
-                    diagnostics.push(diagnostic);
-                }
+                blanket_noqa(&mut diagnostics, index, line);
             }
 
             if enforce_shebang_missing
