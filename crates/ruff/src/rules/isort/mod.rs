@@ -714,6 +714,7 @@ mod tests {
     }
 
     #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
     #[test_case(Path::new("multiline_docstring.py"))]
     #[test_case(Path::new("empty.py"))]
@@ -737,6 +738,7 @@ mod tests {
     }
 
     #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
     #[test_case(Path::new("empty.py"))]
     fn required_imports(path: &Path) -> Result<()> {
@@ -760,6 +762,7 @@ mod tests {
     }
 
     #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
     #[test_case(Path::new("empty.py"))]
     fn combined_required_imports(path: &Path) -> Result<()> {
@@ -782,6 +785,7 @@ mod tests {
     }
 
     #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
     #[test_case(Path::new("empty.py"))]
     fn straight_required_import(path: &Path) -> Result<()> {
