@@ -12,8 +12,6 @@ use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::FxHashSet;
 
-use ruff_python_stdlib::path::is_python_file;
-
 use crate::fs;
 use crate::settings::configuration::Configuration;
 use crate::settings::pyproject::settings_toml;
