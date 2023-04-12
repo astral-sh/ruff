@@ -3274,7 +3274,15 @@ where
                 if self.is_stub {
                     if self.settings.rules.enabled(Rule::DuplicateUnionMember)
                         && self.ctx.in_type_definition
-                        && self.ctx.current_expr_parent().is_none()
+                        && self.ctx.current_expr_parent().map_or(true, |parent| {
+                            !matches!(
+                                parent.node,
+                                ExprKind::BinOp {
+                                    op: Operator::BitOr,
+                                    ..
+                                }
+                            )
+                        })
                     {
                         flake8_pyi::rules::duplicate_union_member(self, expr);
                     }
