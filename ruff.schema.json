@@ -755,8 +755,21 @@
             "type": "string"
           }
         },
+        "banned-aliases": {
+          "description": "A mapping from module to its banned import aliases.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
         "extend-aliases": {
-          "description": "A mapping of modules to their conventional import aliases. These aliases will be added to the `aliases` mapping.",
+          "description": "A mapping from module to conventional import alias. These aliases will be added to the `aliases` mapping.",
           "type": [
             "object",
             "null"
@@ -1775,6 +1788,7 @@
         "ICN0",
         "ICN00",
         "ICN001",
+        "ICN002",
         "INP",
         "INP0",
         "INP00",
