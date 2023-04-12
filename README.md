@@ -367,6 +367,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Pandas](https://github.com/pandas-dev/pandas)
 - [Polars](https://github.com/pola-rs/polars)
 - [PostHog](https://github.com/PostHog/posthog)
+- Prefect ([Marvin](https://github.com/PrefectHQ/marvin))
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [Pylint](https://github.com/PyCQA/pylint)
 - [Pynecone](https://github.com/pynecone-io/pynecone)
