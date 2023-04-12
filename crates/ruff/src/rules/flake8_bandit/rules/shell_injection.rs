@@ -142,7 +142,7 @@ static CONFIG: Lazy<Config> = Lazy::new(|| Config {
 });
 
 #[derive(Copy, Clone, Debug)]
-enum HasShell {
+enum Truthiness {
     // The shell keyword argument is set and it evaluates to false
     Falsey,
     // The shell keyword argument is set and it evaluates to true
@@ -151,17 +151,17 @@ enum HasShell {
     Unknown,
 }
 
-fn has_shell(keywords: &[Keyword]) -> Option<HasShell> {
-    if let Some(keyword) = find_shell_keyword(keywords) {
-        match &keyword.node.value.node {
+impl From<&Keyword> for Truthiness {
+    fn from(value: &Keyword) -> Self {
+        match &value.node.value.node {
             ExprKind::Constant {
                 value: Constant::Bool(b),
                 ..
             } => {
                 if *b {
-                    Some(HasShell::Truthy)
+                    Truthiness::Truthy
                 } else {
-                    Some(HasShell::Falsey)
+                    Truthiness::Falsey
                 }
             }
             ExprKind::Constant {
@@ -169,9 +169,9 @@ fn has_shell(keywords: &[Keyword]) -> Option<HasShell> {
                 ..
             } => {
                 if int == &BigInt::from(0u8) {
-                    Some(HasShell::Falsey)
+                    Truthiness::Falsey
                 } else {
-                    Some(HasShell::Truthy)
+                    Truthiness::Truthy
                 }
             }
             ExprKind::Constant {
@@ -179,47 +179,57 @@ fn has_shell(keywords: &[Keyword]) -> Option<HasShell> {
                 ..
             } => {
                 if (float - 0.0).abs() < f64::EPSILON {
-                    Some(HasShell::Falsey)
+                    Truthiness::Falsey
                 } else {
-                    Some(HasShell::Truthy)
+                    Truthiness::Truthy
                 }
             }
             ExprKind::List { elts, .. } => {
                 if elts.is_empty() {
-                    Some(HasShell::Falsey)
+                    Truthiness::Falsey
                 } else {
-                    Some(HasShell::Truthy)
+                    Truthiness::Truthy
                 }
             }
             ExprKind::Dict { keys, .. } => {
                 if keys.is_empty() {
-                    Some(HasShell::Falsey)
+                    Truthiness::Falsey
                 } else {
-                    Some(HasShell::Truthy)
+                    Truthiness::Truthy
                 }
             }
             ExprKind::Tuple { elts, .. } => {
                 if elts.is_empty() {
-                    Some(HasShell::Falsey)
+                    Truthiness::Falsey
                 } else {
-                    Some(HasShell::Truthy)
+                    Truthiness::Truthy
                 }
             }
-            _ => Some(HasShell::Unknown),
+            _ => Truthiness::Unknown,
         }
-    } else {
-        None
     }
 }
 
-fn find_shell_keyword(keywords: &[Keyword]) -> Option<&Keyword> {
-    keywords.iter().find(|keyword| {
-        keyword
-            .node
-            .arg
-            .as_ref()
-            .map_or(false, |arg| arg == "shell")
-    })
+#[derive(Copy, Clone, Debug)]
+struct ShellKeyword<'a> {
+    has_shell: Truthiness,
+    keyword: &'a Keyword,
+}
+
+fn find_shell_keyword(keywords: &[Keyword]) -> Option<ShellKeyword> {
+    keywords
+        .iter()
+        .find(|keyword| {
+            keyword
+                .node
+                .arg
+                .as_ref()
+                .map_or(false, |arg| arg == "shell")
+        })
+        .map(|keyword| ShellKeyword {
+            has_shell: keyword.into(),
+            keyword,
+        })
 }
 
 fn shell_call_looks_safe(arg: &Expr) -> bool {
@@ -277,9 +287,12 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
 
     if let Some(CallKind::Subprocess) = call_kind {
         if !args.is_empty() {
-            match has_shell(keywords) {
+            match find_shell_keyword(keywords) {
                 // S602
-                Some(HasShell::Truthy) => {
+                Some(ShellKeyword {
+                    has_shell: Truthiness::Truthy,
+                    keyword,
+                }) => {
                     if checker
                         .settings
                         .rules
@@ -289,12 +302,15 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                             SubprocessPopenWithShellEqualsTrue {
                                 looks_safe: shell_call_looks_safe(&args[0]),
                             },
-                            Range::from(find_shell_keyword(keywords).unwrap()),
+                            Range::from(keyword),
                         ));
                     }
                 }
                 // S603
-                Some(HasShell::Falsey | HasShell::Unknown) => {
+                Some(ShellKeyword {
+                    has_shell: Truthiness::Falsey | Truthiness::Unknown,
+                    keyword,
+                }) => {
                     if checker
                         .settings
                         .rules
@@ -302,7 +318,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue {},
-                            Range::from(find_shell_keyword(keywords).unwrap()),
+                            Range::from(keyword),
                         ));
                     }
                 }
@@ -321,7 +337,11 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                 }
             }
         }
-    } else if let Some(HasShell::Truthy) = has_shell(keywords) {
+    } else if let Some(ShellKeyword {
+        has_shell: Truthiness::Truthy,
+        keyword,
+    }) = find_shell_keyword(keywords)
+    {
         // S604
         if checker
             .settings
@@ -330,7 +350,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
         {
             checker.diagnostics.push(Diagnostic::new(
                 AnyOtherFunctionWithShellEqualsTrue {},
-                Range::from(find_shell_keyword(keywords).unwrap()),
+                Range::from(keyword),
             ));
         }
     }
