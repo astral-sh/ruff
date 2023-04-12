@@ -18,6 +18,7 @@ mod tests {
     #[test_case(Rule::DeprecatedLogWarn, Path::new("PGH002_0.py"); "PGH002_0")]
     #[test_case(Rule::DeprecatedLogWarn, Path::new("PGH002_1.py"); "PGH002_1")]
     #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_0.py"); "PGH003_0")]
+    #[test_case(Rule::BlanketTypeIgnore, Path::new("PGH003_1.py"); "PGH003_1")]
     #[test_case(Rule::BlanketNOQA, Path::new("PGH004_0.py"); "PGH004_0")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
