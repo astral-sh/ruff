@@ -16,16 +16,18 @@ static FULL_PATH_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^([A-Za-z]:|[\\/
 
 #[violation]
 pub struct SubprocessPopenWithShellEqualsTrue {
-    looks_safe: bool,
+    seems_safe: bool,
 }
 
 impl Violation for SubprocessPopenWithShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        if self.looks_safe {
-            format!("subprocess call with shell=True seems safe, but may be changed in the future, consider rewriting without shell")
+        if self.seems_safe {
+            format!(
+                "`subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`"
+            )
         } else {
-            format!("subprocess call with shell=True identified, security issue")
+            format!("`subprocess` call with `shell=True` identified")
         }
     }
 }
@@ -36,32 +38,32 @@ pub struct SubprocessWithoutShellEqualsTrue;
 impl Violation for SubprocessWithoutShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("subprocess call: check for execution of untrusted input")
+        format!("`subprocess` call: check for execution of untrusted input")
     }
 }
 
 #[violation]
-pub struct AnyOtherFunctionWithShellEqualsTrue;
+pub struct CallWithShellEqualsTrue;
 
-impl Violation for AnyOtherFunctionWithShellEqualsTrue {
+impl Violation for CallWithShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Function call with shell=True parameter identified, possible security issue")
+        format!("Function call with `shell=True` parameter identified")
     }
 }
 
 #[violation]
 pub struct StartProcessWithAShell {
-    looks_safe: bool,
+    seems_safe: bool,
 }
 
 impl Violation for StartProcessWithAShell {
     #[derive_message_formats]
     fn message(&self) -> String {
-        if self.looks_safe {
-            format!("Starting a process with a shell: Seems safe, but may be changed in the future, consider rewriting without shell")
+        if self.seems_safe {
+            format!("Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`")
         } else {
-            format!("Starting a process with a shell, possible injection detected, security issue.")
+            format!("Starting a process with a shell, possible injection detected")
         }
     }
 }
@@ -72,7 +74,7 @@ pub struct StartProcessWithNoShell;
 impl Violation for StartProcessWithNoShell {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Starting a process without a shell.")
+        format!("Starting a process without a shell")
     }
 }
 
@@ -82,10 +84,11 @@ pub struct StartProcessWithPartialPath;
 impl Violation for StartProcessWithPartialPath {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Starting a process with a partial executable path.")
+        format!("Starting a process with a partial executable path")
     }
 }
 
+#[derive(Copy, Clone, Debug)]
 enum CallKind {
     Subprocess,
     Shell,
@@ -143,11 +146,11 @@ static CONFIG: Lazy<Config> = Lazy::new(|| Config {
 
 #[derive(Copy, Clone, Debug)]
 enum Truthiness {
-    // The shell keyword argument is set and it evaluates to false
+    // The `shell` keyword argument is set and evaluates to `False`.
     Falsey,
-    // The shell keyword argument is set and it evaluates to true
+    // The `shell` keyword argument is set and evaluates to `True`.
     Truthy,
-    // The shell keyword argument is set but we cannot evaluate it
+    // The `shell` keyword argument is set, but its value is unknown.
     Unknown,
 }
 
@@ -232,7 +235,7 @@ fn find_shell_keyword(keywords: &[Keyword]) -> Option<ShellKeyword> {
         })
 }
 
-fn shell_call_looks_safe(arg: &Expr) -> bool {
+fn shell_call_seems_safe(arg: &Expr) -> bool {
     matches!(
         arg.node,
         ExprKind::Constant {
@@ -300,7 +303,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessPopenWithShellEqualsTrue {
-                                looks_safe: shell_call_looks_safe(&args[0]),
+                                seems_safe: shell_call_seems_safe(&args[0]),
                             },
                             Range::from(keyword),
                         ));
@@ -346,10 +349,10 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
         if checker
             .settings
             .rules
-            .enabled(Rule::AnyOtherFunctionWithShellEqualsTrue)
+            .enabled(Rule::CallWithShellEqualsTrue)
         {
             checker.diagnostics.push(Diagnostic::new(
-                AnyOtherFunctionWithShellEqualsTrue {},
+                CallWithShellEqualsTrue {},
                 Range::from(keyword),
             ));
         }
@@ -360,7 +363,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
         if !args.is_empty() && checker.settings.rules.enabled(Rule::StartProcessWithAShell) {
             checker.diagnostics.push(Diagnostic::new(
                 StartProcessWithAShell {
-                    looks_safe: shell_call_looks_safe(&args[0]),
+                    seems_safe: shell_call_seems_safe(&args[0]),
                 },
                 Range::from(&args[0]),
             ));

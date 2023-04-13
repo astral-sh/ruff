@@ -509,7 +509,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bandit, "509") => Rule::SnmpWeakCryptography,
         (Flake8Bandit, "602") => Rule::SubprocessPopenWithShellEqualsTrue,
         (Flake8Bandit, "603") => Rule::SubprocessWithoutShellEqualsTrue,
-        (Flake8Bandit, "604") => Rule::AnyOtherFunctionWithShellEqualsTrue,
+        (Flake8Bandit, "604") => Rule::CallWithShellEqualsTrue,
         (Flake8Bandit, "605") => Rule::StartProcessWithAShell,
         (Flake8Bandit, "606") => Rule::StartProcessWithNoShell,
         (Flake8Bandit, "607") => Rule::StartProcessWithPartialPath,

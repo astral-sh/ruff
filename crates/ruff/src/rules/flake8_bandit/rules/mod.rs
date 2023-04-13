@@ -23,8 +23,8 @@ pub use request_with_no_cert_validation::{
 };
 pub use request_without_timeout::{request_without_timeout, RequestWithoutTimeout};
 pub use shell_injection::{
-    shell_injection, AnyOtherFunctionWithShellEqualsTrue, StartProcessWithAShell,
-    StartProcessWithNoShell, StartProcessWithPartialPath, SubprocessPopenWithShellEqualsTrue,
+    shell_injection, CallWithShellEqualsTrue, StartProcessWithAShell, StartProcessWithNoShell,
+    StartProcessWithPartialPath, SubprocessPopenWithShellEqualsTrue,
     SubprocessWithoutShellEqualsTrue,
 };
 pub use snmp_insecure_version::{snmp_insecure_version, SnmpInsecureVersion};

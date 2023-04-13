@@ -448,7 +448,7 @@ ruff_macros::register_rules!(
     rules::flake8_bandit::rules::SnmpWeakCryptography,
     rules::flake8_bandit::rules::SubprocessPopenWithShellEqualsTrue,
     rules::flake8_bandit::rules::SubprocessWithoutShellEqualsTrue,
-    rules::flake8_bandit::rules::AnyOtherFunctionWithShellEqualsTrue,
+    rules::flake8_bandit::rules::CallWithShellEqualsTrue,
     rules::flake8_bandit::rules::StartProcessWithAShell,
     rules::flake8_bandit::rules::StartProcessWithNoShell,
     rules::flake8_bandit::rules::StartProcessWithPartialPath,

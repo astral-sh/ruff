@@ -2652,7 +2652,7 @@ where
                 if self.settings.rules.any_enabled(&[
                     Rule::SubprocessWithoutShellEqualsTrue,
                     Rule::SubprocessPopenWithShellEqualsTrue,
-                    Rule::AnyOtherFunctionWithShellEqualsTrue,
+                    Rule::CallWithShellEqualsTrue,
                     Rule::StartProcessWithAShell,
                     Rule::StartProcessWithNoShell,
                     Rule::StartProcessWithPartialPath,
