@@ -4,9 +4,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use itertools::Either::{Left, Right};
-use strum::IntoEnumIterator;
 
-use crate::rules::isort::categorize::KnownModules;
 use annotate::annotate_imports;
 use categorize::categorize_imports;
 pub use categorize::{categorize, ImportSection, ImportType};
@@ -20,9 +18,9 @@ use track::{Block, Trailer};
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, CommentSet, EitherImport, OrderedImportBlock, TrailingComma};
 
+use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
-use crate::warn_user_once;
 
 mod annotate;
 mod categorize;
@@ -145,50 +143,7 @@ pub fn format_imports(
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block, combine_as_imports, force_single_line);
 
-    // Make sure all sections (built-in and user-defined) are present in the section order.
-    let mut section_order: Vec<_> = section_order.to_vec();
-    for known_section in ImportType::iter().map(ImportSection::Known) {
-        if !section_order.contains(&known_section) {
-            section_order.push(known_section);
-        }
-    }
-
-    // Verify that all sections listed in `section-order` are defined in `sections`.
-    for user_defined in &section_order {
-        if let ImportSection::UserDefined(section_name) = user_defined {
-            if !known_modules.user_defined.contains_key(section_name) {
-                warn_user_once!(
-                    "`section-order` contains unknown user-defined section: `{}`.",
-                    section_name
-                );
-            }
-        }
-    }
-
-    // Verify that all sections listed in `no-lines-before` are defined in `sections`.
-    for user_defined in no_lines_before {
-        if let ImportSection::UserDefined(section_name) = user_defined {
-            if !known_modules.user_defined.contains_key(section_name) {
-                warn_user_once!(
-                    "`no-lines-before` contains unknown user-defined section: `{}`.",
-                    section_name
-                );
-            }
-        }
-    }
-
-    // Verify that all sections defined in `sections` are listed in `section-order`.
-    for section_name in known_modules.user_defined.keys() {
-        let section = ImportSection::UserDefined(section_name.clone());
-        if !section_order.contains(&section) {
-            warn_user_once!(
-                "`section-order` is missing user-defined section: `{}`.",
-                section_name
-            );
-            section_order.push(section);
-        }
-    }
-
+    // Categorize imports.
     let mut output = String::new();
 
     for block in split::split_by_forced_separate(block, forced_separate) {
@@ -213,7 +168,7 @@ pub fn format_imports(
             no_lines_before,
             lines_between_types,
             target_version,
-            &section_order,
+            section_order,
         );
 
         if !block_output.is_empty() && !output.is_empty() {
@@ -375,15 +330,14 @@ fn format_import_block(
 
 #[cfg(test)]
 mod tests {
-    use rustc_hash::FxHashMap;
     use std::collections::BTreeSet;
     use std::path::Path;
 
-    use crate::assert_messages;
     use anyhow::Result;
-
+    use rustc_hash::FxHashMap;
     use test_case::test_case;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::rules::isort::categorize::{ImportSection, KnownModules};
     use crate::settings::Settings;
@@ -1003,6 +957,15 @@ mod tests {
                         vec![],
                         FxHashMap::from_iter([("django".to_string(), vec!["django".to_string()])]),
                     ),
+                    section_order: vec![
+                        ImportSection::Known(ImportType::Future),
+                        ImportSection::Known(ImportType::StandardLibrary),
+                        ImportSection::Known(ImportType::ThirdParty),
+                        ImportSection::Known(ImportType::FirstParty),
+                        ImportSection::Known(ImportType::LocalFolder),
+                        ImportSection::UserDefined("django".to_string()),
+                    ],
+
                     ..super::settings::Settings::default()
                 },
                 ..Settings::for_rule(Rule::UnsortedImports)
