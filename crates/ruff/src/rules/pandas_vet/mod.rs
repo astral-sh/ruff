@@ -8,7 +8,7 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
     use textwrap::dedent;
@@ -19,7 +19,7 @@ mod tests {
     use crate::registry::{AsRule, Linter, Rule};
     use crate::settings::flags;
     use crate::test::test_path;
-    use crate::{directives, settings};
+    use crate::{assert_messages, directives, settings};
 
     fn rule_code(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
@@ -259,7 +259,7 @@ mod tests {
             Path::new("pandas_vet").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

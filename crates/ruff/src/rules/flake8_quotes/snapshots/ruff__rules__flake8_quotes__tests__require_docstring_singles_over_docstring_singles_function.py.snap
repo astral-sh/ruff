@@ -1,110 +1,106 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 26
-  fix:
-    edits:
-      - content: "\"\"\" not a docstring\"\"\""
-        location:
-          row: 3
-          column: 4
-        end_location:
-          row: 3
-          column: 26
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 11
-    column: 26
-  fix:
-    edits:
-      - content: "\"\"\" not a docstring\"\"\""
-        location:
-          row: 11
-          column: 4
-        end_location:
-          row: 11
-          column: 26
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 15
-    column: 38
-  end_location:
-    row: 17
-    column: 3
-  fix:
-    edits:
-      - content: "\"\"\"\n    not a\n\"\"\""
-        location:
-          row: 15
-          column: 38
-        end_location:
-          row: 17
-          column: 3
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 17
-    column: 19
-  fix:
-    edits:
-      - content: "\"\"\"docstring\"\"\""
-        location:
-          row: 17
-          column: 4
-        end_location:
-          row: 17
-          column: 19
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 22
-    column: 4
-  end_location:
-    row: 22
-    column: 27
-  fix:
-    edits:
-      - content: "\"\"\" not a docstring \"\"\""
-        location:
-          row: 22
-          column: 4
-        end_location:
-          row: 22
-          column: 27
-  parent: ~
+docstring_singles_function.py:3:5: Q001 [*] Single quote multiline found but double quotes preferred
+  |
+3 | def foo():
+4 |     '''function without params, single line docstring'''
+5 |     ''' not a docstring'''
+  |     ^^^^^^^^^^^^^^^^^^^^^^ Q001
+6 |     return
+  |
+  = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+1 1 | def foo():
+2 2 |     '''function without params, single line docstring'''
+3   |-    ''' not a docstring'''
+  3 |+    """ not a docstring"""
+4 4 |     return
+5 5 | 
+6 6 | 
+
+docstring_singles_function.py:11:5: Q001 [*] Single quote multiline found but double quotes preferred
+   |
+11 |         function without params, multiline docstring
+12 |     '''
+13 |     ''' not a docstring'''
+   |     ^^^^^^^^^^^^^^^^^^^^^^ Q001
+14 |     return
+   |
+   = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+8  8  |     '''
+9  9  |         function without params, multiline docstring
+10 10 |     '''
+11    |-    ''' not a docstring'''
+   11 |+    """ not a docstring"""
+12 12 |     return
+13 13 | 
+14 14 | 
+
+docstring_singles_function.py:15:39: Q001 [*] Single quote multiline found but double quotes preferred
+   |
+15 |   def fun_with_params_no_docstring(a, b='''
+   |  _______________________________________^
+16 | |     not a
+17 | | ''' '''docstring'''):
+   | |___^ Q001
+18 |       pass
+   |
+   = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+12 12 |     return
+13 13 | 
+14 14 | 
+15    |-def fun_with_params_no_docstring(a, b='''
+   15 |+def fun_with_params_no_docstring(a, b="""
+16 16 |     not a
+17    |-''' '''docstring'''):
+   17 |+""" '''docstring'''):
+18 18 |     pass
+19 19 | 
+20 20 | 
+
+docstring_singles_function.py:17:5: Q001 [*] Single quote multiline found but double quotes preferred
+   |
+17 | def fun_with_params_no_docstring(a, b='''
+18 |     not a
+19 | ''' '''docstring'''):
+   |     ^^^^^^^^^^^^^^^ Q001
+20 |     pass
+   |
+   = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+14 14 | 
+15 15 | def fun_with_params_no_docstring(a, b='''
+16 16 |     not a
+17    |-''' '''docstring'''):
+   17 |+''' """docstring"""):
+18 18 |     pass
+19 19 | 
+20 20 | 
+
+docstring_singles_function.py:22:5: Q001 [*] Single quote multiline found but double quotes preferred
+   |
+22 | def fun_with_params_no_docstring2(a, b=c[foo():], c=\
+23 |     ''' not a docstring '''):
+   |     ^^^^^^^^^^^^^^^^^^^^^^^ Q001
+24 |     pass
+   |
+   = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+19 19 | 
+20 20 | 
+21 21 | def fun_with_params_no_docstring2(a, b=c[foo():], c=\
+22    |-    ''' not a docstring '''):
+   22 |+    """ not a docstring """):
+23 23 |     pass
+24 24 | 
+25 25 | 
+
 

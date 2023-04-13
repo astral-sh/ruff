@@ -1,481 +1,335 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 0
-  end_location:
-    row: 16
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 0
-  end_location:
-    row: 21
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 0
-  end_location:
-    row: 26
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 0
-  end_location:
-    row: 32
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 0
-  end_location:
-    row: 38
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 0
-  end_location:
-    row: 44
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 45
-    column: 0
-  end_location:
-    row: 45
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 0
-  end_location:
-    row: 54
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 58
-    column: 0
-  end_location:
-    row: 58
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 61
-    column: 0
-  end_location:
-    row: 61
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 62
-    column: 0
-  end_location:
-    row: 62
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 63
-    column: 0
-  end_location:
-    row: 63
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 64
-    column: 0
-  end_location:
-    row: 64
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 65
-    column: 0
-  end_location:
-    row: 65
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 66
-    column: 0
-  end_location:
-    row: 66
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 73
-    column: 0
-  end_location:
-    row: 73
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 78
-    column: 0
-  end_location:
-    row: 78
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 83
-    column: 0
-  end_location:
-    row: 83
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 88
-    column: 0
-  end_location:
-    row: 88
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 91
-    column: 0
-  end_location:
-    row: 91
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 92
-    column: 0
-  end_location:
-    row: 92
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 98
-    column: 0
-  end_location:
-    row: 98
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 99
-    column: 0
-  end_location:
-    row: 99
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 125
-    column: 0
-  end_location:
-    row: 125
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 131
-    column: 0
-  end_location:
-    row: 131
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 132
-    column: 0
-  end_location:
-    row: 132
-    column: 2
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 133
-    column: 0
-  end_location:
-    row: 133
-    column: 2
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 137
-    column: 0
-  end_location:
-    row: 137
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 138
-    column: 0
-  end_location:
-    row: 138
-    column: 2
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 139
-    column: 0
-  end_location:
-    row: 139
-    column: 2
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 140
-    column: 0
-  end_location:
-    row: 140
-    column: 1
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TabIndentation
-    body: Indentation contains tabs
-    suggestion: ~
-    fixable: false
-  location:
-    row: 143
-    column: 0
-  end_location:
-    row: 143
-    column: 1
-  fix:
-    edits: []
-  parent: ~
+W19.py:3:1: W191 Indentation contains tabs
+  |
+3 | #: W191
+4 | if False:
+5 | 	print  # indented with 1 tab
+  |  W191
+6 | #:
+  |
+
+W19.py:9:1: W191 Indentation contains tabs
+   |
+ 9 | #: W191
+10 | y = x == 2 \
+11 | 	or x == 3
+   |  W191
+12 | #: E101 W191 W504
+13 | if (
+   |
+
+W19.py:16:1: W191 Indentation contains tabs
+   |
+16 |         ) or
+17 |         y == 4):
+18 | 	pass
+   |  W191
+19 | #: E101 W191
+20 | if x == 2 \
+   |
+
+W19.py:21:1: W191 Indentation contains tabs
+   |
+21 |     or y > 1 \
+22 |         or x == 3:
+23 | 	pass
+   |  W191
+24 | #: E101 W191
+25 | if x == 2 \
+   |
+
+W19.py:26:1: W191 Indentation contains tabs
+   |
+26 |         or y > 1 \
+27 |         or x == 3:
+28 | 	pass
+   |  W191
+29 | #:
+   |
+
+W19.py:32:1: W191 Indentation contains tabs
+   |
+32 | if (foo == bar and
+33 |         baz == bop):
+34 | 	pass
+   |  W191
+35 | #: E101 W191 W504
+36 | if (
+   |
+
+W19.py:38:1: W191 Indentation contains tabs
+   |
+38 |     baz == bop
+39 | ):
+40 | 	pass
+   |  W191
+41 | #:
+   |
+
+W19.py:44:1: W191 Indentation contains tabs
+   |
+44 | if start[1] > end_col and not (
+45 |         over_indent == 4 and indent_next):
+46 | 	return (0, "E121 continuation line over-"
+   |  W191
+47 | 	        "indented for visual indent")
+48 | #:
+   |
+
+W19.py:45:1: W191 Indentation contains tabs
+   |
+45 |         over_indent == 4 and indent_next):
+46 | 	return (0, "E121 continuation line over-"
+47 | 	        "indented for visual indent")
+   | ^^^^^^^^ W191
+48 | #:
+   |
+
+W19.py:54:1: W191 Indentation contains tabs
+   |
+54 |         var_one, var_two, var_three,
+55 |         var_four):
+56 | 	print(var_one)
+   |  W191
+57 | #: E101 W191 W504
+58 | if ((row < 0 or self.moduleCount <= row or
+   |
+
+W19.py:58:1: W191 Indentation contains tabs
+   |
+58 | if ((row < 0 or self.moduleCount <= row or
+59 |      col < 0 or self.moduleCount <= col)):
+60 | 	raise Exception("%s,%s - %s" % (row, col, self.moduleCount))
+   |  W191
+61 | #: E101 E101 E101 E101 W191 W191 W191 W191 W191 W191
+62 | if bar:
+   |
+
+W19.py:61:1: W191 Indentation contains tabs
+   |
+61 | #: E101 E101 E101 E101 W191 W191 W191 W191 W191 W191
+62 | if bar:
+63 | 	return (
+   |  W191
+64 | 	    start, 'E121 lines starting with a '
+65 | 	    'closing bracket should be indented '
+   |
+
+W19.py:62:1: W191 Indentation contains tabs
+   |
+62 | if bar:
+63 | 	return (
+64 | 	    start, 'E121 lines starting with a '
+   | ^^^^ W191
+65 | 	    'closing bracket should be indented '
+66 | 	    "to match that of the opening "
+   |
+
+W19.py:63:1: W191 Indentation contains tabs
+   |
+63 | 	return (
+64 | 	    start, 'E121 lines starting with a '
+65 | 	    'closing bracket should be indented '
+   | ^^^^ W191
+66 | 	    "to match that of the opening "
+67 | 	    "bracket's line"
+   |
+
+W19.py:64:1: W191 Indentation contains tabs
+   |
+64 | 	    start, 'E121 lines starting with a '
+65 | 	    'closing bracket should be indented '
+66 | 	    "to match that of the opening "
+   | ^^^^ W191
+67 | 	    "bracket's line"
+68 | 	)
+   |
+
+W19.py:65:1: W191 Indentation contains tabs
+   |
+65 | 	    'closing bracket should be indented '
+66 | 	    "to match that of the opening "
+67 | 	    "bracket's line"
+   | ^^^^ W191
+68 | 	)
+69 | #
+   |
+
+W19.py:66:1: W191 Indentation contains tabs
+   |
+66 | 	    "to match that of the opening "
+67 | 	    "bracket's line"
+68 | 	)
+   |  W191
+69 | #
+70 | #: E101 W191 W504
+   |
+
+W19.py:73:1: W191 Indentation contains tabs
+   |
+73 |      foo.bar("bop")
+74 |      )):
+75 | 	print "yes"
+   |  W191
+76 | #: E101 W191 W504
+77 | # also ok, but starting to look like LISP
+   |
+
+W19.py:78:1: W191 Indentation contains tabs
+   |
+78 | if ((foo.bar("baz") and
+79 |      foo.bar("bop"))):
+80 | 	print "yes"
+   |  W191
+81 | #: E101 W191 W504
+82 | if (a == 2 or
+   |
+
+W19.py:83:1: W191 Indentation contains tabs
+   |
+83 |     b == "abc def ghi"
+84 |          "jkl mno"):
+85 | 	return True
+   |  W191
+86 | #: E101 W191 W504
+87 | if (a == 2 or
+   |
+
+W19.py:88:1: W191 Indentation contains tabs
+   |
+88 |     b == """abc def ghi
+89 | jkl mno"""):
+90 | 	return True
+   |  W191
+91 | #: W191:2:1 W191:3:1 E101:3:2
+92 | if length > options.max_line_length:
+   |
+
+W19.py:91:1: W191 Indentation contains tabs
+   |
+91 | #: W191:2:1 W191:3:1 E101:3:2
+92 | if length > options.max_line_length:
+93 | 	return options.max_line_length, \
+   |  W191
+94 | 	    "E501 line too long (%d characters)" % length
+   |
+
+W19.py:92:1: W191 Indentation contains tabs
+   |
+92 | if length > options.max_line_length:
+93 | 	return options.max_line_length, \
+94 | 	    "E501 line too long (%d characters)" % length
+   | ^^^^ W191
+   |
+
+W19.py:98:1: W191 Indentation contains tabs
+    |
+ 98 | #: E101 W191 W191 W504
+ 99 | if os.path.exists(os.path.join(path, PEP8_BIN)):
+100 | 	cmd = ([os.path.join(path, PEP8_BIN)] +
+    |  W191
+101 | 	       self._pep8_options(targetfile))
+102 | #: W191 - okay
+    |
+
+W19.py:99:1: W191 Indentation contains tabs
+    |
+ 99 | if os.path.exists(os.path.join(path, PEP8_BIN)):
+100 | 	cmd = ([os.path.join(path, PEP8_BIN)] +
+101 | 	       self._pep8_options(targetfile))
+    | ^^^^^^^ W191
+102 | #: W191 - okay
+103 | '''
+    |
+
+W19.py:125:1: W191 Indentation contains tabs
+    |
+125 | if foo is None and bar is "bop" and \
+126 |         blah == 'yeah':
+127 | 	blah = 'yeahnah'
+    |  W191
+    |
+
+W19.py:131:1: W191 Indentation contains tabs
+    |
+131 | #: W191 W191 W191
+132 | if True:
+133 | 	foo(
+    |  W191
+134 | 		1,
+135 | 		2)
+    |
+
+W19.py:132:1: W191 Indentation contains tabs
+    |
+132 | if True:
+133 | 	foo(
+134 | 		1,
+    |  W191
+135 | 		2)
+136 | #: W191 W191 W191 W191 W191
+    |
+
+W19.py:133:1: W191 Indentation contains tabs
+    |
+133 | 	foo(
+134 | 		1,
+135 | 		2)
+    |  W191
+136 | #: W191 W191 W191 W191 W191
+137 | def test_keys(self):
+    |
+
+W19.py:137:1: W191 Indentation contains tabs
+    |
+137 | def test_keys(self):
+138 | 	"""areas.json - All regions are accounted for."""
+139 | 	expected = set([
+    |  W191
+140 | 		u'Norrbotten',
+141 | 		u'V\xe4sterbotten',
+    |
+
+W19.py:138:1: W191 Indentation contains tabs
+    |
+138 | 	"""areas.json - All regions are accounted for."""
+139 | 	expected = set([
+140 | 		u'Norrbotten',
+    |  W191
+141 | 		u'V\xe4sterbotten',
+142 | 	])
+    |
+
+W19.py:139:1: W191 Indentation contains tabs
+    |
+139 | 	expected = set([
+140 | 		u'Norrbotten',
+141 | 		u'V\xe4sterbotten',
+    |  W191
+142 | 	])
+143 | #: W191
+    |
+
+W19.py:140:1: W191 Indentation contains tabs
+    |
+140 | 		u'Norrbotten',
+141 | 		u'V\xe4sterbotten',
+142 | 	])
+    |  W191
+143 | #: W191
+144 | x = [
+    |
+
+W19.py:143:1: W191 Indentation contains tabs
+    |
+143 | #: W191
+144 | x = [
+145 | 	'abc'
+    |  W191
+146 | ]
+147 | #: W191 - okay
+    |
+
 

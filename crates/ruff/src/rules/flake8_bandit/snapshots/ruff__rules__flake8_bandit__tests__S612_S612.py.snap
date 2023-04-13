@@ -1,19 +1,14 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: LoggingConfigInsecureListen
-    body: "Use of insecure `logging.config.listen` detected"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 25
-  fix:
-    edits: []
-  parent: ~
+S612.py:3:5: S612 Use of insecure `logging.config.listen` detected
+  |
+3 | import logging.config
+4 | 
+5 | t = logging.config.listen(9999)
+  |     ^^^^^^^^^^^^^^^^^^^^^ S612
+6 | 
+7 | def verify_func():
+  |
+
 

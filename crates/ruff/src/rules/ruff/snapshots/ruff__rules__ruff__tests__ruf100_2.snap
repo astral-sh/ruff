@@ -1,26 +1,15 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedNOQA
-    body: "Unused `noqa` directive (unused: `F401`)"
-    suggestion: "Remove unused `noqa` directive"
-    fixable: true
-  location:
-    row: 1
-    column: 18
-  end_location:
-    row: 1
-    column: 30
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 1
-          column: 16
-        end_location:
-          row: 1
-          column: 30
-  parent: ~
+RUF100_2.py:1:19: RUF100 [*] Unused `noqa` directive (unused: `F401`)
+  |
+1 | import itertools  # noqa: F401
+  |                   ^^^^^^^^^^^^ RUF100
+  |
+  = help: Remove unused `noqa` directive
+
+ℹ Suggested fix
+1   |-import itertools  # noqa: F401
+  1 |+import itertools
+
 

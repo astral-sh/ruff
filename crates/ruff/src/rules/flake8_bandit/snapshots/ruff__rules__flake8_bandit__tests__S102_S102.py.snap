@@ -1,33 +1,22 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ExecBuiltin
-    body: "Use of `exec` detected"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ExecBuiltin
-    body: "Use of `exec` detected"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 13
-  fix:
-    edits: []
-  parent: ~
+S102.py:3:5: S102 Use of `exec` detected
+  |
+3 | def fn():
+4 |     # Error
+5 |     exec('x = 2')
+  |     ^^^^^^^^^^^^^ S102
+6 | 
+7 | exec('y = 3')
+  |
+
+S102.py:5:1: S102 Use of `exec` detected
+  |
+5 |     exec('x = 2')
+6 | 
+7 | exec('y = 3')
+  | ^^^^^^^^^^^^^ S102
+  |
+
 

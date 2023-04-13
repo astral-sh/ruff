@@ -531,6 +531,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // flake8-import-conventions
         (Flake8ImportConventions, "001") => Rule::UnconventionalImportAlias,
+        (Flake8ImportConventions, "002") => Rule::BannedImportAlias,
 
         // flake8-datetimez
         (Flake8Datetimez, "001") => Rule::CallDatetimeWithoutTzinfo,
@@ -579,6 +580,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "012") => Rule::PassInClassBody,
         (Flake8Pyi, "014") => Rule::ArgumentDefaultInStub,
         (Flake8Pyi, "015") => Rule::AssignmentDefaultInStub,
+        (Flake8Pyi, "016") => Rule::DuplicateUnionMember,
         (Flake8Pyi, "021") => Rule::DocstringInStub,
         (Flake8Pyi, "033") => Rule::TypeCommentInStub,
 

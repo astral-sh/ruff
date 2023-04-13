@@ -1,19 +1,11 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SyntaxError
-    body: "SyntaxError: unindent does not match any outer indentation level"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 0
-  fix:
-    edits: []
-  parent: ~
+E999.py:3:1: E999 SyntaxError: unindent does not match any outer indentation level
+  |
+3 | def x():
+4 | 
+  |  E999
+  |
+
 

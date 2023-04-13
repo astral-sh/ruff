@@ -66,6 +66,16 @@
         "type": "string"
       }
     },
+    "extend-include": {
+      "description": "A list of file patterns to include when linting, in addition to those specified by `include`.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
+    },
     "extend-select": {
       "description": "A list of rule codes or prefixes to enable, in addition to those specified by `select`.",
       "type": [
@@ -309,6 +319,16 @@
         "boolean",
         "null"
       ]
+    },
+    "include": {
+      "description": "A list of file patterns to include when linting.\n\nInclusion are based on globs, and should be single-path patterns, like `*.pyw`, to include any file with the `.pyw` extension.\n\nFor more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).",
+      "type": [
+        "array",
+        "null"
+      ],
+      "items": {
+        "type": "string"
+      }
     },
     "isort": {
       "description": "Options for the `isort` plugin.",
@@ -755,8 +775,21 @@
             "type": "string"
           }
         },
+        "banned-aliases": {
+          "description": "A mapping from module to its banned import aliases.",
+          "type": [
+            "object",
+            "null"
+          ],
+          "additionalProperties": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
         "extend-aliases": {
-          "description": "A mapping of modules to their conventional import aliases. These aliases will be added to the `aliases` mapping.",
+          "description": "A mapping from module to conventional import alias. These aliases will be added to the `aliases` mapping.",
           "type": [
             "object",
             "null"
@@ -1775,6 +1808,7 @@
         "ICN0",
         "ICN00",
         "ICN001",
+        "ICN002",
         "INP",
         "INP0",
         "INP00",
@@ -2039,6 +2073,7 @@
         "PYI012",
         "PYI014",
         "PYI015",
+        "PYI016",
         "PYI02",
         "PYI021",
         "PYI03",

@@ -1,89 +1,73 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: InvalidCharacterZeroWidthSpace
-    body: "Invalid unescaped character zero-width-space, use \"\\u200B\" instead"
-    suggestion: Replace with escape sequence
-    fixable: true
-  location:
-    row: 34
-    column: 12
-  end_location:
-    row: 34
-    column: 13
-  fix:
-    edits:
-      - content: "\\u200b"
-        location:
-          row: 34
-          column: 12
-        end_location:
-          row: 34
-          column: 13
-  parent: ~
-- kind:
-    name: InvalidCharacterZeroWidthSpace
-    body: "Invalid unescaped character zero-width-space, use \"\\u200B\" instead"
-    suggestion: Replace with escape sequence
-    fixable: true
-  location:
-    row: 38
-    column: 35
-  end_location:
-    row: 38
-    column: 36
-  fix:
-    edits:
-      - content: "\\u200b"
-        location:
-          row: 38
-          column: 35
-        end_location:
-          row: 38
-          column: 36
-  parent: ~
-- kind:
-    name: InvalidCharacterZeroWidthSpace
-    body: "Invalid unescaped character zero-width-space, use \"\\u200B\" instead"
-    suggestion: Replace with escape sequence
-    fixable: true
-  location:
-    row: 39
-    column: 59
-  end_location:
-    row: 39
-    column: 60
-  fix:
-    edits:
-      - content: "\\u200b"
-        location:
-          row: 39
-          column: 59
-        end_location:
-          row: 39
-          column: 60
-  parent: ~
-- kind:
-    name: InvalidCharacterZeroWidthSpace
-    body: "Invalid unescaped character zero-width-space, use \"\\u200B\" instead"
-    suggestion: Replace with escape sequence
-    fixable: true
-  location:
-    row: 39
-    column: 60
-  end_location:
-    row: 39
-    column: 61
-  fix:
-    edits:
-      - content: "\\u200b"
-        location:
-          row: 39
-          column: 60
-        end_location:
-          row: 39
-          column: 61
-  parent: ~
+invalid_characters.py:34:13: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
+   |
+34 | nul_ok = '\0'
+35 | 
+36 | zwsp = 'zero​width'
+   |              PLE2515
+37 | 
+38 | zwsp_ok = '\u200b'
+   |
+   = help: Replace with escape sequence
+
+ℹ Suggested fix
+31 31 | 
+32 32 | nul_ok = '\0'
+33 33 | 
+34    |-zwsp = 'zero​width'
+   34 |+zwsp = 'zero\u200bwidth'
+35 35 | 
+36 36 | zwsp_ok = '\u200b'
+37 37 | 
+
+invalid_characters.py:38:36: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
+   |
+38 | zwsp_ok = '\u200b'
+39 | 
+40 | zwsp_after_multibyte_character = "ಫ​"
+   |                                     PLE2515
+41 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |
+   = help: Replace with escape sequence
+
+ℹ Suggested fix
+35 35 | 
+36 36 | zwsp_ok = '\u200b'
+37 37 | 
+38    |-zwsp_after_multibyte_character = "ಫ​"
+   38 |+zwsp_after_multibyte_character = "ಫ\u200b"
+39 39 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+
+invalid_characters.py:39:60: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
+   |
+39 | zwsp_after_multibyte_character = "ಫ​"
+40 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |                                                         PLE2515
+   |
+   = help: Replace with escape sequence
+
+ℹ Suggested fix
+36 36 | zwsp_ok = '\u200b'
+37 37 | 
+38 38 | zwsp_after_multibyte_character = "ಫ​"
+39    |-zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   39 |+zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ \u200b​"
+
+invalid_characters.py:39:61: PLE2515 [*] Invalid unescaped character zero-width-space, use "\u200B" instead
+   |
+39 | zwsp_after_multibyte_character = "ಫ​"
+40 | zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   |                                                         PLE2515
+   |
+   = help: Replace with escape sequence
+
+ℹ Suggested fix
+36 36 | zwsp_ok = '\u200b'
+37 37 | 
+38 38 | zwsp_after_multibyte_character = "ಫ​"
+39    |-zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​​"
+   39 |+zwsp_after_multicharacter_grapheme_cluster = "ಫ್ರಾನ್ಸಿಸ್ಕೊ ​\u200b"
+
 

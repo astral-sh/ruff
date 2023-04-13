@@ -10,8 +10,8 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Path::new("G_argparse_parser_error_ok.py"); "G_argparse_parser_error_ok")]
     #[test_case(Path::new("G_extra_ok.py"); "G_extra_ok")]
@@ -42,7 +42,7 @@ mod tests {
                 Rule::LoggingRedundantExcInfo,
             ]),
         )?;
-        insta::assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

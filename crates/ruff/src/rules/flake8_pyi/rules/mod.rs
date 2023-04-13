@@ -1,5 +1,6 @@
 pub use bad_version_info_comparison::{bad_version_info_comparison, BadVersionInfoComparison};
 pub use docstring_in_stubs::{docstring_in_stubs, DocstringInStub};
+pub use duplicate_union_member::{duplicate_union_member, DuplicateUnionMember};
 pub use non_empty_stub_body::{non_empty_stub_body, NonEmptyStubBody};
 pub use pass_in_class_body::{pass_in_class_body, PassInClassBody};
 pub use pass_statement_stub_body::{pass_statement_stub_body, PassStatementStubBody};
@@ -15,6 +16,7 @@ pub use unrecognized_platform::{
 
 mod bad_version_info_comparison;
 mod docstring_in_stubs;
+mod duplicate_union_member;
 mod non_empty_stub_body;
 mod pass_in_class_body;
 mod pass_statement_stub_body;

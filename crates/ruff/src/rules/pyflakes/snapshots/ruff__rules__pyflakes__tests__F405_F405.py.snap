@@ -1,33 +1,19 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndefinedLocalWithImportStarUsage
-    body: "`name` may be undefined, or defined from star imports: `mymodule`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 10
-  end_location:
-    row: 5
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedLocalWithImportStarUsage
-    body: "`a` may be undefined, or defined from star imports: `mymodule`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 7
-  fix:
-    edits: []
-  parent: ~
+F405.py:5:11: F405 `name` may be undefined, or defined from star imports: `mymodule`
+  |
+5 | def print_name():
+6 |     print(name)
+  |           ^^^^ F405
+  |
+
+F405.py:11:1: F405 `a` may be undefined, or defined from star imports: `mymodule`
+   |
+11 |     print(name)
+12 | 
+13 | __all__ = ['a']
+   | ^^^^^^^ F405
+   |
+
 

@@ -1,103 +1,73 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `elif` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 8
-  end_location:
-    row: 8
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `elif` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 8
-  end_location:
-    row: 22
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `else` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 33
-    column: 8
-  end_location:
-    row: 33
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `else` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 44
-    column: 12
-  end_location:
-    row: 44
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `else` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 60
-    column: 8
-  end_location:
-    row: 60
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `else` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 71
-    column: 12
-  end_location:
-    row: 71
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: SuperfluousElseBreak
-    body: "Unnecessary `else` after `break` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 82
-    column: 8
-  end_location:
-    row: 82
-    column: 12
-  fix:
-    edits: []
-  parent: ~
+RET508.py:8:9: RET508 Unnecessary `elif` after `break` statement
+   |
+ 8 |         if i > y:  # [no-else-break]
+ 9 |             break
+10 |         elif i > w:
+   |         ^^^^ RET508
+11 |             break
+12 |         else:
+   |
+
+RET508.py:22:9: RET508 Unnecessary `elif` after `break` statement
+   |
+22 |                 b = 2
+23 |             break
+24 |         elif z:
+   |         ^^^^ RET508
+25 |             c = 2
+26 |         else:
+   |
+
+RET508.py:33:9: RET508 Unnecessary `else` after `break` statement
+   |
+33 |         if i > y:  # [no-else-break]
+34 |             break
+35 |         else:
+   |         ^^^^ RET508
+36 |             a = z
+   |
+
+RET508.py:44:13: RET508 Unnecessary `else` after `break` statement
+   |
+44 |                 b = 2
+45 |                 break
+46 |             else:
+   |             ^^^^ RET508
+47 |                 c = 3
+48 |                 break
+   |
+
+RET508.py:60:9: RET508 Unnecessary `else` after `break` statement
+   |
+60 |                 b = 2
+61 |             break
+62 |         else:
+   |         ^^^^ RET508
+63 |             c = 3
+64 |         break
+   |
+
+RET508.py:71:13: RET508 Unnecessary `else` after `break` statement
+   |
+71 |                 a = 4
+72 |                 break
+73 |             else:
+   |             ^^^^ RET508
+74 |                 b = 2
+75 |         else:
+   |
+
+RET508.py:82:9: RET508 Unnecessary `else` after `break` statement
+   |
+82 |         if x:  # [no-else-break]
+83 |             break
+84 |         else:
+   |         ^^^^ RET508
+85 |             try:
+86 |                 return
+   |
+
 

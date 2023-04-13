@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedLambdaArgument
-    body: "Unused lambda argument: `x`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 28
-    column: 7
-  end_location:
-    row: 28
-    column: 8
-  fix:
-    edits: []
-  parent: ~
+ARG.py:28:8: ARG005 Unused lambda argument: `x`
+   |
+28 | # Unused arguments on lambdas.
+29 | ###
+30 | lambda x: print("Hello, world!")
+   |        ^ ARG005
+   |
+
 

@@ -19,15 +19,17 @@ impl Violation for BlanketNOQA {
 static BLANKET_NOQA_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"(?i)# noqa($|\s|:[^ ])").unwrap());
 
-/// PGH004 - use of blanket noqa comments
-pub fn blanket_noqa(lineno: usize, line: &str) -> Option<Diagnostic> {
-    BLANKET_NOQA_REGEX.find(line).map(|m| {
-        Diagnostic::new(
+/// PGH004
+pub fn blanket_noqa(diagnostics: &mut Vec<Diagnostic>, lineno: usize, line: &str) {
+    if let Some(match_) = BLANKET_NOQA_REGEX.find(line) {
+        let start = line[..match_.start()].chars().count();
+        let end = start + line[match_.start()..match_.end()].chars().count();
+        diagnostics.push(Diagnostic::new(
             BlanketNOQA,
             Range::new(
-                Location::new(lineno + 1, m.start()),
-                Location::new(lineno + 1, m.end()),
+                Location::new(lineno + 1, start),
+                Location::new(lineno + 1, end),
             ),
-        )
-    })
+        ));
+    }
 }

@@ -1,47 +1,39 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UselessMetaclassType
-    body: "`__metaclass__ = type` is implied"
-    suggestion: "Remove `__metaclass__ = type`"
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 24
-  fix:
-    edits:
-      - content: pass
-        location:
-          row: 2
-          column: 4
-        end_location:
-          row: 2
-          column: 24
-  parent: ~
-- kind:
-    name: UselessMetaclassType
-    body: "`__metaclass__ = type` is implied"
-    suggestion: "Remove `__metaclass__ = type`"
-    fixable: true
-  location:
-    row: 6
-    column: 4
-  end_location:
-    row: 6
-    column: 24
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 6
-          column: 0
-        end_location:
-          row: 7
-          column: 0
-  parent: ~
+UP001.py:2:5: UP001 [*] `__metaclass__ = type` is implied
+  |
+2 | class A:
+3 |     __metaclass__ = type
+  |     ^^^^^^^^^^^^^^^^^^^^ UP001
+  |
+  = help: Remove `metaclass = type`
+
+ℹ Suggested fix
+1 1 | class A:
+2   |-    __metaclass__ = type
+  2 |+    pass
+3 3 | 
+4 4 | 
+5 5 | class B:
+
+UP001.py:6:5: UP001 [*] `__metaclass__ = type` is implied
+  |
+6 | class B:
+7 |     __metaclass__ = type
+  |     ^^^^^^^^^^^^^^^^^^^^ UP001
+8 | 
+9 |     def __init__(self) -> None:
+  |
+  = help: Remove `metaclass = type`
+
+ℹ Suggested fix
+3 3 | 
+4 4 | 
+5 5 | class B:
+6   |-    __metaclass__ = type
+7 6 | 
+8 7 |     def __init__(self) -> None:
+9 8 |         pass
+
 

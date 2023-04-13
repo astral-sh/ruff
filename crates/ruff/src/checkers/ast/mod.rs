@@ -1077,6 +1077,21 @@ where
                         }
                     }
 
+                    if self.settings.rules.enabled(Rule::BannedImportAlias) {
+                        if let Some(asname) = &alias.node.asname {
+                            if let Some(diagnostic) =
+                                flake8_import_conventions::rules::check_banned_import(
+                                    stmt,
+                                    &alias.node.name,
+                                    asname,
+                                    &self.settings.flake8_import_conventions.banned_aliases,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
+                            }
+                        }
+                    }
+
                     if self
                         .settings
                         .rules
@@ -1339,6 +1354,26 @@ where
                         }
                     }
 
+                    if self.settings.rules.enabled(Rule::BannedImportAlias) {
+                        if let Some(asname) = &alias.node.asname {
+                            let full_name = helpers::format_import_from_member(
+                                *level,
+                                module.as_deref(),
+                                &alias.node.name,
+                            );
+                            if let Some(diagnostic) =
+                                flake8_import_conventions::rules::check_banned_import(
+                                    stmt,
+                                    &full_name,
+                                    asname,
+                                    &self.settings.flake8_import_conventions.banned_aliases,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
+                            }
+                        }
+                    }
+
                     if let Some(asname) = &alias.node.asname {
                         if self
                             .settings
@@ -1591,7 +1626,6 @@ where
                         msg.as_deref(),
                     );
                 }
-
                 if self.settings.rules.enabled(Rule::AssertOnStringLiteral) {
                     pylint::rules::assert_on_string_literal(self, test);
                 }
@@ -3209,7 +3243,7 @@ where
                     }
 
                     if self.settings.rules.enabled(Rule::PrintfStringFormatting) {
-                        pyupgrade::rules::printf_string_formatting(self, expr, left, right);
+                        pyupgrade::rules::printf_string_formatting(self, expr, right);
                     }
                     if self.settings.rules.enabled(Rule::BadStringFormatType) {
                         pylint::rules::bad_string_format_type(self, expr, right);
@@ -3240,6 +3274,27 @@ where
                 }
                 if self.settings.rules.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
+                }
+            }
+            ExprKind::BinOp {
+                op: Operator::BitOr,
+                ..
+            } => {
+                if self.is_stub {
+                    if self.settings.rules.enabled(Rule::DuplicateUnionMember)
+                        && self.ctx.in_type_definition
+                        && self.ctx.current_expr_parent().map_or(true, |parent| {
+                            !matches!(
+                                parent.node,
+                                ExprKind::BinOp {
+                                    op: Operator::BitOr,
+                                    ..
+                                }
+                            )
+                        })
+                    {
+                        flake8_pyi::rules::duplicate_union_member(self, expr);
+                    }
                 }
             }
             ExprKind::UnaryOp { op, operand } => {
@@ -5114,7 +5169,7 @@ impl<'a> Checker<'a> {
                             self.stylist,
                         ) {
                             Ok(fix) => {
-                                if fix.content.is_empty() || fix.content == "pass" {
+                                if fix.is_deletion() || fix.content() == Some("pass") {
                                     self.deletions.insert(*defined_by);
                                 }
                                 Some(fix)

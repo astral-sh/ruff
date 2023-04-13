@@ -1,201 +1,175 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ReplaceStdoutStderr
-    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    suggestion: "Replace with `capture_output` keyword argument"
-    fixable: true
-  location:
-    row: 4
-    column: 9
-  end_location:
-    row: 4
-    column: 69
-  fix:
-    edits:
-      - content: capture_output=True
-        location:
-          row: 4
-          column: 22
-        end_location:
-          row: 4
-          column: 44
-      - content: ""
-        location:
-          row: 4
-          column: 44
-        end_location:
-          row: 4
-          column: 68
-  parent: ~
-- kind:
-    name: ReplaceStdoutStderr
-    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    suggestion: "Replace with `capture_output` keyword argument"
-    fixable: true
-  location:
-    row: 6
-    column: 9
-  end_location:
-    row: 6
-    column: 80
-  fix:
-    edits:
-      - content: capture_output=True
-        location:
-          row: 6
-          column: 33
-        end_location:
-          row: 6
-          column: 55
-      - content: ""
-        location:
-          row: 6
-          column: 55
-        end_location:
-          row: 6
-          column: 79
-  parent: ~
-- kind:
-    name: ReplaceStdoutStderr
-    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    suggestion: "Replace with `capture_output` keyword argument"
-    fixable: true
-  location:
-    row: 8
-    column: 9
-  end_location:
-    row: 8
-    column: 86
-  fix:
-    edits:
-      - content: capture_output=True
-        location:
-          row: 8
-          column: 24
-        end_location:
-          row: 8
-          column: 46
-      - content: ""
-        location:
-          row: 8
-          column: 60
-        end_location:
-          row: 8
-          column: 85
-  parent: ~
-- kind:
-    name: ReplaceStdoutStderr
-    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    suggestion: "Replace with `capture_output` keyword argument"
-    fixable: true
-  location:
-    row: 10
-    column: 9
-  end_location:
-    row: 12
-    column: 1
-  fix:
-    edits:
-      - content: capture_output=True
-        location:
-          row: 11
-          column: 13
-        end_location:
-          row: 11
-          column: 35
-      - content: ""
-        location:
-          row: 11
-          column: 47
-        end_location:
-          row: 11
-          column: 71
-  parent: ~
-- kind:
-    name: ReplaceStdoutStderr
-    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    suggestion: "Replace with `capture_output` keyword argument"
-    fixable: true
-  location:
-    row: 14
-    column: 9
-  end_location:
-    row: 16
-    column: 1
-  fix:
-    edits:
-      - content: capture_output=True
-        location:
-          row: 15
-          column: 13
-        end_location:
-          row: 15
-          column: 35
-      - content: ""
-        location:
-          row: 15
-          column: 47
-        end_location:
-          row: 15
-          column: 71
-  parent: ~
-- kind:
-    name: ReplaceStdoutStderr
-    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    suggestion: "Replace with `capture_output` keyword argument"
-    fixable: true
-  location:
-    row: 18
-    column: 9
-  end_location:
-    row: 26
-    column: 1
-  fix:
-    edits:
-      - content: capture_output=True
-        location:
-          row: 20
-          column: 4
-        end_location:
-          row: 20
-          column: 26
-      - content: ""
-        location:
-          row: 22
-          column: 4
-        end_location:
-          row: 23
-          column: 4
-  parent: ~
-- kind:
-    name: ReplaceStdoutStderr
-    body: "Sending stdout and stderr to pipe is deprecated, use `capture_output`"
-    suggestion: "Replace with `capture_output` keyword argument"
-    fixable: true
-  location:
-    row: 29
-    column: 13
-  end_location:
-    row: 36
-    column: 5
-  fix:
-    edits:
-      - content: capture_output=True
-        location:
-          row: 31
-          column: 8
-        end_location:
-          row: 31
-          column: 30
-      - content: ""
-        location:
-          row: 33
-          column: 8
-        end_location:
-          row: 34
-          column: 8
-  parent: ~
+UP022.py:4:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+  |
+4 | import subprocess
+5 | 
+6 | output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP022
+7 | 
+8 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  |
+  = help: Replace with `capture_output` keyword argument
+
+ℹ Suggested fix
+1 1 | from subprocess import run
+2 2 | import subprocess
+3 3 | 
+4   |-output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  4 |+output = run(["foo"], capture_output=True)
+5 5 | 
+6 6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+7 7 | 
+
+UP022.py:6:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+   |
+ 6 | output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+ 7 | 
+ 8 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP022
+ 9 | 
+10 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
+   |
+   = help: Replace with `capture_output` keyword argument
+
+ℹ Suggested fix
+3 3 | 
+4 4 | output = run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+5 5 | 
+6   |-output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+  6 |+output = subprocess.run(["foo"], capture_output=True)
+7 7 | 
+8 8 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
+9 9 | 
+
+UP022.py:8:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+   |
+ 8 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+ 9 | 
+10 | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP022
+11 | 
+12 | output = subprocess.run(
+   |
+   = help: Replace with `capture_output` keyword argument
+
+ℹ Suggested fix
+5 5 | 
+6 6 | output = subprocess.run(["foo"], stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+7 7 | 
+8   |-output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
+  8 |+output = subprocess.run(capture_output=True, args=["foo"])
+9 9 | 
+10 10 | output = subprocess.run(
+11 11 |     ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
+
+UP022.py:10:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+   |
+10 |   output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
+11 |   
+12 |   output = subprocess.run(
+   |  __________^
+13 | |     ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
+14 | | )
+   | |_^ UP022
+15 |   
+16 |   output = subprocess.run(
+   |
+   = help: Replace with `capture_output` keyword argument
+
+ℹ Suggested fix
+8  8  | output = subprocess.run(stdout=subprocess.PIPE, args=["foo"],  stderr=subprocess.PIPE)
+9  9  | 
+10 10 | output = subprocess.run(
+11    |-    ["foo"], stdout=subprocess.PIPE, check=True, stderr=subprocess.PIPE
+   11 |+    ["foo"], capture_output=True, check=True
+12 12 | )
+13 13 | 
+14 14 | output = subprocess.run(
+
+UP022.py:14:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+   |
+14 |   )
+15 |   
+16 |   output = subprocess.run(
+   |  __________^
+17 | |     ["foo"], stderr=subprocess.PIPE, check=True, stdout=subprocess.PIPE
+18 | | )
+   | |_^ UP022
+19 |   
+20 |   output = subprocess.run(
+   |
+   = help: Replace with `capture_output` keyword argument
+
+ℹ Suggested fix
+12 12 | )
+13 13 | 
+14 14 | output = subprocess.run(
+15    |-    ["foo"], stderr=subprocess.PIPE, check=True, stdout=subprocess.PIPE
+   15 |+    ["foo"], capture_output=True, check=True
+16 16 | )
+17 17 | 
+18 18 | output = subprocess.run(
+
+UP022.py:18:10: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+   |
+18 |   )
+19 |   
+20 |   output = subprocess.run(
+   |  __________^
+21 | |     ["foo"],
+22 | |     stdout=subprocess.PIPE,
+23 | |     check=True,
+24 | |     stderr=subprocess.PIPE,
+25 | |     text=True,
+26 | |     encoding="utf-8",
+27 | |     close_fds=True,
+28 | | )
+   | |_^ UP022
+29 |   
+30 |   if output:
+   |
+   = help: Replace with `capture_output` keyword argument
+
+ℹ Suggested fix
+17 17 | 
+18 18 | output = subprocess.run(
+19 19 |     ["foo"],
+20    |-    stdout=subprocess.PIPE,
+   20 |+    capture_output=True,
+21 21 |     check=True,
+22    |-    stderr=subprocess.PIPE,
+23 22 |     text=True,
+24 23 |     encoding="utf-8",
+25 24 |     close_fds=True,
+
+UP022.py:29:14: UP022 [*] Sending stdout and stderr to pipe is deprecated, use `capture_output`
+   |
+29 |   if output:
+30 |       output = subprocess.run(
+   |  ______________^
+31 | |         ["foo"],
+32 | |         stdout=subprocess.PIPE,
+33 | |         check=True,
+34 | |         stderr=subprocess.PIPE,
+35 | |         text=True,
+36 | |         encoding="utf-8",
+37 | |     )
+   | |_____^ UP022
+   |
+   = help: Replace with `capture_output` keyword argument
+
+ℹ Suggested fix
+28 28 | if output:
+29 29 |     output = subprocess.run(
+30 30 |         ["foo"],
+31    |-        stdout=subprocess.PIPE,
+   31 |+        capture_output=True,
+32 32 |         check=True,
+33    |-        stderr=subprocess.PIPE,
+34 33 |         text=True,
+35 34 |         encoding="utf-8",
+36 35 |     )
+
 

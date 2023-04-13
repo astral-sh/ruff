@@ -897,7 +897,7 @@ pub fn match_trailing_comment<T>(located: &Located<T>, locator: &Locator) -> Opt
 
 /// Return the number of trailing empty lines following a statement.
 pub fn count_trailing_lines(stmt: &Stmt, locator: &Locator) -> usize {
-    let suffix = locator.skip(Location::new(stmt.end_location.unwrap().row() + 1, 0));
+    let suffix = locator.after(Location::new(stmt.end_location.unwrap().row() + 1, 0));
     suffix
         .lines()
         .take_while(|line| line.trim().is_empty())
@@ -906,7 +906,7 @@ pub fn count_trailing_lines(stmt: &Stmt, locator: &Locator) -> usize {
 
 /// Return the range of the first parenthesis pair after a given [`Location`].
 pub fn match_parens(start: Location, locator: &Locator) -> Option<Range> {
-    let contents = locator.skip(start);
+    let contents = locator.after(start);
     let mut fix_start = None;
     let mut fix_end = None;
     let mut count: usize = 0;

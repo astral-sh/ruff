@@ -1,47 +1,41 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BlankLineBeforeClass
-    body: No blank lines allowed before class docstring
-    suggestion: Remove blank line(s) before class docstring
-    fixable: true
-  location:
-    row: 170
-    column: 4
-  end_location:
-    row: 170
-    column: 29
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 169
-          column: 0
-        end_location:
-          row: 170
-          column: 0
-  parent: ~
-- kind:
-    name: BlankLineBeforeClass
-    body: No blank lines allowed before class docstring
-    suggestion: Remove blank line(s) before class docstring
-    fixable: true
-  location:
-    row: 181
-    column: 4
-  end_location:
-    row: 181
-    column: 24
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 180
-          column: 0
-        end_location:
-          row: 181
-          column: 0
-  parent: ~
+D.py:170:5: D211 [*] No blank lines allowed before class docstring
+    |
+170 | class WithLeadingSpace:
+171 | 
+172 |     """With leading space."""
+    |     ^^^^^^^^^^^^^^^^^^^^^^^^^ D211
+    |
+    = help: Remove blank line(s) before class docstring
+
+ℹ Suggested fix
+166 166 | 
+167 167 | 
+168 168 | class WithLeadingSpace:
+169     |-
+170 169 |     """With leading space."""
+171 170 | 
+172 171 | 
+
+D.py:181:5: D211 [*] No blank lines allowed before class docstring
+    |
+181 | class TrailingSpace:
+182 | 
+183 |     """TrailingSpace."""
+    |     ^^^^^^^^^^^^^^^^^^^^ D211
+184 |     pass
+    |
+    = help: Remove blank line(s) before class docstring
+
+ℹ Suggested fix
+177 177 | 
+178 178 | 
+179 179 | class TrailingSpace:
+180     |-
+181 180 |     """TrailingSpace."""
+182 181 |     pass
+183 182 | 
+
 

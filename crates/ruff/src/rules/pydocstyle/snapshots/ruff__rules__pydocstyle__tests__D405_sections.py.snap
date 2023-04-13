@@ -1,47 +1,64 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CapitalizeSectionName
-    body: "Section name should be properly capitalized (\"returns\")"
-    suggestion: "Capitalize \"returns\""
-    fixable: true
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 23
-    column: 7
-  fix:
-    edits:
-      - content: Returns
-        location:
-          row: 19
-          column: 4
-        end_location:
-          row: 19
-          column: 11
-  parent: ~
-- kind:
-    name: CapitalizeSectionName
-    body: "Section name should be properly capitalized (\"Short summary\")"
-    suggestion: "Capitalize \"Short summary\""
-    fixable: true
-  location:
-    row: 216
-    column: 4
-  end_location:
-    row: 230
-    column: 7
-  fix:
-    edits:
-      - content: Short Summary
-        location:
-          row: 218
-          column: 4
-        end_location:
-          row: 218
-          column: 17
-  parent: ~
+sections.py:17:5: D405 [*] Section name should be properly capitalized ("returns")
+   |
+17 |           "('Returns', not 'returns')")
+18 |   def not_capitalized():  # noqa: D416
+19 |       """Toggle the gizmo.
+   |  _____^
+20 | | 
+21 | |     returns
+22 | |     -------
+23 | |     A value of some sort.
+24 | | 
+25 | |     """
+   | |_______^ D405
+   |
+   = help: Capitalize "returns"
+
+ℹ Suggested fix
+16 16 | def not_capitalized():  # noqa: D416
+17 17 |     """Toggle the gizmo.
+18 18 | 
+19    |-    returns
+   19 |+    Returns
+20 20 |     -------
+21 21 |     A value of some sort.
+22 22 | 
+
+sections.py:216:5: D405 [*] Section name should be properly capitalized ("Short summary")
+    |
+216 |   @expect("D407: Missing dashed underline after section ('Raises')")
+217 |   def multiple_sections():  # noqa: D416
+218 |       """Toggle the gizmo.
+    |  _____^
+219 | | 
+220 | |     Short summary
+221 | |     -------------
+222 | | 
+223 | |     This is the function's description, which will also specify what it
+224 | |     returns.
+225 | | 
+226 | |     Returns
+227 | |     ------
+228 | |     Many many wonderful things.
+229 | |     Raises:
+230 | |     My attention.
+231 | | 
+232 | |     """
+    | |_______^ D405
+    |
+    = help: Capitalize "Short summary"
+
+ℹ Suggested fix
+215 215 | def multiple_sections():  # noqa: D416
+216 216 |     """Toggle the gizmo.
+217 217 | 
+218     |-    Short summary
+    218 |+    Short Summary
+219 219 |     -------------
+220 220 | 
+221 221 |     This is the function's description, which will also specify what it
+
 

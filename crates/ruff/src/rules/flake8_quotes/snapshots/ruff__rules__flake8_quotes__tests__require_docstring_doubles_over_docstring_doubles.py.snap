@@ -1,110 +1,131 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 7
-    column: 3
-  fix:
-    edits:
-      - content: "'''\nthis is not a docstring\n'''"
-        location:
-          row: 5
-          column: 0
-        end_location:
-          row: 7
-          column: 3
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 16
-    column: 4
-  end_location:
-    row: 18
-    column: 7
-  fix:
-    edits:
-      - content: "'''\n    this is not a docstring\n    '''"
-        location:
-          row: 16
-          column: 4
-        end_location:
-          row: 18
-          column: 7
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 21
-    column: 20
-  end_location:
-    row: 22
-    column: 37
-  fix:
-    edits:
-      - content: "'''\n        definitely not a docstring'''"
-        location:
-          row: 21
-          column: 20
-        end_location:
-          row: 22
-          column: 37
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 30
-    column: 8
-  end_location:
-    row: 32
-    column: 11
-  fix:
-    edits:
-      - content: "'''\n        this is not a docstring\n        '''"
-        location:
-          row: 30
-          column: 8
-        end_location:
-          row: 32
-          column: 11
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Double quote multiline found but single quotes preferred
-    suggestion: Replace double multiline quotes with single quotes
-    fixable: true
-  location:
-    row: 35
-    column: 12
-  end_location:
-    row: 37
-    column: 15
-  fix:
-    edits:
-      - content: "'''\n            Looks like a docstring, but in reality it isn't - only modules, classes and functions\n            '''"
-        location:
-          row: 35
-          column: 12
-        end_location:
-          row: 37
-          column: 15
-  parent: ~
+docstring_doubles.py:5:1: Q001 [*] Double quote multiline found but single quotes preferred
+   |
+ 5 |   """
+ 6 |   
+ 7 | / """
+ 8 | | this is not a docstring
+ 9 | | """
+   | |___^ Q001
+10 |   
+11 |   l = []
+   |
+   = help: Replace double multiline quotes with single quotes
+
+ℹ Suggested fix
+2 2 | Double quotes multiline module docstring
+3 3 | """
+4 4 | 
+5   |-"""
+  5 |+'''
+6 6 | this is not a docstring
+7   |-"""
+  7 |+'''
+8 8 | 
+9 9 | l = []
+10 10 | 
+
+docstring_doubles.py:16:5: Q001 [*] Double quote multiline found but single quotes preferred
+   |
+16 |       """
+17 |   
+18 |       """
+   |  _____^
+19 | |     this is not a docstring
+20 | |     """
+   | |_______^ Q001
+21 |   
+22 |       # The colon in the list indexing below is an edge case for the docstring scanner
+   |
+   = help: Replace double multiline quotes with single quotes
+
+ℹ Suggested fix
+13 13 |     Double quotes multiline class docstring
+14 14 |     """
+15 15 | 
+16    |-    """
+   16 |+    '''
+17 17 |     this is not a docstring
+18    |-    """
+   18 |+    '''
+19 19 | 
+20 20 |     # The colon in the list indexing below is an edge case for the docstring scanner
+21 21 |     def f(self, bar="""
+
+docstring_doubles.py:21:21: Q001 [*] Double quote multiline found but single quotes preferred
+   |
+21 |       # The colon in the list indexing below is an edge case for the docstring scanner
+22 |       def f(self, bar="""
+   |  _____________________^
+23 | |         definitely not a docstring""",
+   | |_____________________________________^ Q001
+24 |           val=l[Cls():3]):
+25 |           """
+   |
+   = help: Replace double multiline quotes with single quotes
+
+ℹ Suggested fix
+18 18 |     """
+19 19 | 
+20 20 |     # The colon in the list indexing below is an edge case for the docstring scanner
+21    |-    def f(self, bar="""
+22    |-        definitely not a docstring""",
+   21 |+    def f(self, bar='''
+   22 |+        definitely not a docstring''',
+23 23 |         val=l[Cls():3]):
+24 24 |         """
+25 25 |         Double quotes multiline function docstring
+
+docstring_doubles.py:30:9: Q001 [*] Double quote multiline found but single quotes preferred
+   |
+30 |           some_expression = 'hello world'
+31 |   
+32 |           """
+   |  _________^
+33 | |         this is not a docstring
+34 | |         """
+   | |___________^ Q001
+35 |   
+36 |           if l:
+   |
+   = help: Replace double multiline quotes with single quotes
+
+ℹ Suggested fix
+27 27 | 
+28 28 |         some_expression = 'hello world'
+29 29 | 
+30    |-        """
+   30 |+        '''
+31 31 |         this is not a docstring
+32    |-        """
+   32 |+        '''
+33 33 | 
+34 34 |         if l:
+35 35 |             """
+
+docstring_doubles.py:35:13: Q001 [*] Double quote multiline found but single quotes preferred
+   |
+35 |           if l:
+36 |               """
+   |  _____________^
+37 | |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
+38 | |             """
+   | |_______________^ Q001
+39 |               pass
+   |
+   = help: Replace double multiline quotes with single quotes
+
+ℹ Suggested fix
+32 32 |         """
+33 33 | 
+34 34 |         if l:
+35    |-            """
+   35 |+            '''
+36 36 |             Looks like a docstring, but in reality it isn't - only modules, classes and functions
+37    |-            """
+   37 |+            '''
+38 38 |             pass
+
 

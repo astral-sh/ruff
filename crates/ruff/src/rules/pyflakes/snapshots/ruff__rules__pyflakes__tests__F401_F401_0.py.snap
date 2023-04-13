@@ -1,196 +1,172 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedImport
-    body: "`functools` imported but unused"
-    suggestion: "Remove unused import: `functools`"
-    fixable: true
-  location:
-    row: 2
-    column: 7
-  end_location:
-    row: 2
-    column: 16
-  fix:
-    edits:
-      - content: import os
-        location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 20
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`collections.OrderedDict` imported but unused"
-    suggestion: "Remove unused import: `collections.OrderedDict`"
-    fixable: true
-  location:
-    row: 6
-    column: 4
-  end_location:
-    row: 6
-    column: 15
-  fix:
-    edits:
-      - content: "from collections import (\n    Counter,\n    namedtuple,\n)"
-        location:
-          row: 4
-          column: 0
-        end_location:
-          row: 8
-          column: 1
-  parent:
-    row: 4
-    column: 0
-- kind:
-    name: UnusedImport
-    body: "`logging.handlers` imported but unused"
-    suggestion: "Remove unused import: `logging.handlers`"
-    fixable: true
-  location:
-    row: 12
-    column: 7
-  end_location:
-    row: 12
-    column: 23
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 12
-          column: 0
-        end_location:
-          row: 13
-          column: 0
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`shelve` imported but unused"
-    suggestion: "Remove unused import: `shelve`"
-    fixable: true
-  location:
-    row: 32
-    column: 11
-  end_location:
-    row: 32
-    column: 17
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 32
-          column: 0
-        end_location:
-          row: 33
-          column: 0
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`importlib` imported but unused"
-    suggestion: "Remove unused import: `importlib`"
-    fixable: true
-  location:
-    row: 33
-    column: 11
-  end_location:
-    row: 33
-    column: 20
-  fix:
-    edits:
-      - content: pass
-        location:
-          row: 33
-          column: 4
-        end_location:
-          row: 33
-          column: 20
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`pathlib` imported but unused"
-    suggestion: "Remove unused import: `pathlib`"
-    fixable: true
-  location:
-    row: 37
-    column: 11
-  end_location:
-    row: 37
-    column: 18
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 37
-          column: 0
-        end_location:
-          row: 38
-          column: 0
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`pickle` imported but unused"
-    suggestion: "Remove unused import: `pickle`"
-    fixable: true
-  location:
-    row: 52
-    column: 15
-  end_location:
-    row: 52
-    column: 21
-  fix:
-    edits:
-      - content: pass
-        location:
-          row: 52
-          column: 8
-        end_location:
-          row: 52
-          column: 21
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`x` imported but unused"
-    suggestion: "Remove unused import: `x`"
-    fixable: true
-  location:
-    row: 93
-    column: 15
-  end_location:
-    row: 93
-    column: 16
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 93
-          column: 0
-        end_location:
-          row: 94
-          column: 0
-  parent: ~
-- kind:
-    name: UnusedImport
-    body: "`y` imported but unused"
-    suggestion: "Remove unused import: `y`"
-    fixable: true
-  location:
-    row: 94
-    column: 15
-  end_location:
-    row: 94
-    column: 16
-  fix:
-    edits:
-      - content: pass
-        location:
-          row: 94
-          column: 8
-        end_location:
-          row: 94
-          column: 16
-  parent: ~
+F401_0.py:2:8: F401 [*] `functools` imported but unused
+  |
+2 | from __future__ import all_feature_names
+3 | import functools, os
+  |        ^^^^^^^^^ F401
+4 | from datetime import datetime
+5 | from collections import (
+  |
+  = help: Remove unused import: `functools`
+
+ℹ Suggested fix
+1 1 | from __future__ import all_feature_names
+2   |-import functools, os
+  2 |+import os
+3 3 | from datetime import datetime
+4 4 | from collections import (
+5 5 |     Counter,
+
+F401_0.py:6:5: F401 [*] `collections.OrderedDict` imported but unused
+   |
+ 6 | from collections import (
+ 7 |     Counter,
+ 8 |     OrderedDict,
+   |     ^^^^^^^^^^^ F401
+ 9 |     namedtuple,
+10 | )
+   |
+   = help: Remove unused import: `collections.OrderedDict`
+
+ℹ Suggested fix
+3 3 | from datetime import datetime
+4 4 | from collections import (
+5 5 |     Counter,
+6   |-    OrderedDict,
+7 6 |     namedtuple,
+8 7 | )
+9 8 | import multiprocessing.pool
+
+F401_0.py:12:8: F401 [*] `logging.handlers` imported but unused
+   |
+12 | import multiprocessing.process
+13 | import logging.config
+14 | import logging.handlers
+   |        ^^^^^^^^^^^^^^^^ F401
+15 | from typing import (
+16 |     TYPE_CHECKING,
+   |
+   = help: Remove unused import: `logging.handlers`
+
+ℹ Suggested fix
+9  9  | import multiprocessing.pool
+10 10 | import multiprocessing.process
+11 11 | import logging.config
+12    |-import logging.handlers
+13 12 | from typing import (
+14 13 |     TYPE_CHECKING,
+15 14 |     NamedTuple,
+
+F401_0.py:32:12: F401 [*] `shelve` imported but unused
+   |
+32 | if TYPE_CHECKING:
+33 |     import shelve
+   |            ^^^^^^ F401
+34 |     import importlib
+   |
+   = help: Remove unused import: `shelve`
+
+ℹ Suggested fix
+29 29 |     from models import Fruit, Nut, Vegetable
+30 30 | 
+31 31 | if TYPE_CHECKING:
+32    |-    import shelve
+33 32 |     import importlib
+34 33 | 
+35 34 | if TYPE_CHECKING:
+
+F401_0.py:33:12: F401 [*] `importlib` imported but unused
+   |
+33 | if TYPE_CHECKING:
+34 |     import shelve
+35 |     import importlib
+   |            ^^^^^^^^^ F401
+36 | 
+37 | if TYPE_CHECKING:
+   |
+   = help: Remove unused import: `importlib`
+
+ℹ Suggested fix
+30 30 | 
+31 31 | if TYPE_CHECKING:
+32 32 |     import shelve
+33    |-    import importlib
+   33 |+    pass
+34 34 | 
+35 35 | if TYPE_CHECKING:
+36 36 |     """Hello, world!"""
+
+F401_0.py:37:12: F401 [*] `pathlib` imported but unused
+   |
+37 | if TYPE_CHECKING:
+38 |     """Hello, world!"""
+39 |     import pathlib
+   |            ^^^^^^^ F401
+40 | 
+41 |     z = 1
+   |
+   = help: Remove unused import: `pathlib`
+
+ℹ Suggested fix
+34 34 | 
+35 35 | if TYPE_CHECKING:
+36 36 |     """Hello, world!"""
+37    |-    import pathlib
+38 37 | 
+39 38 |     z = 1
+40 39 | 
+
+F401_0.py:52:16: F401 [*] `pickle` imported but unused
+   |
+52 |     def b(self) -> None:
+53 |         import pickle
+   |                ^^^^^^ F401
+   |
+   = help: Remove unused import: `pickle`
+
+ℹ Suggested fix
+49 49 |         z = multiprocessing.pool.ThreadPool()
+50 50 | 
+51 51 |     def b(self) -> None:
+52    |-        import pickle
+   52 |+        pass
+53 53 | 
+54 54 | 
+55 55 | __all__ = ["ClassA"] + ["ClassB"]
+
+F401_0.py:93:16: F401 [*] `x` imported but unused
+   |
+93 | match *0, 1, *2:
+94 |     case 0,:
+95 |         import x
+   |                ^ F401
+96 |         import y
+   |
+   = help: Remove unused import: `x`
+
+ℹ Suggested fix
+90 90 | # Test: match statements.
+91 91 | match *0, 1, *2:
+92 92 |     case 0,:
+93    |-        import x
+94 93 |         import y
+
+F401_0.py:94:16: F401 [*] `y` imported but unused
+   |
+94 |     case 0,:
+95 |         import x
+96 |         import y
+   |                ^ F401
+   |
+   = help: Remove unused import: `y`
+
+ℹ Suggested fix
+91 91 | match *0, 1, *2:
+92 92 |     case 0,:
+93 93 |         import x
+94    |-        import y
+   94 |+        pass
+
 

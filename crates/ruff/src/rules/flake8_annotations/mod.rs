@@ -8,8 +8,8 @@ pub mod settings;
 mod tests {
     use std::path::Path;
 
+    use crate::assert_messages;
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
 
     use crate::registry::Rule;
     use crate::settings::Settings;
@@ -35,7 +35,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -63,7 +63,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -85,7 +85,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -107,7 +107,7 @@ mod tests {
                 ])
             },
         )?;
-        insta::assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -135,7 +135,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -151,7 +151,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::AnyType])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -169,7 +169,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -187,7 +187,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -197,7 +197,7 @@ mod tests {
             Path::new("flake8_annotations/simple_magic_methods.py"),
             &Settings::for_rule(Rule::MissingReturnTypeSpecialMethod),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

@@ -12,10 +12,7 @@ use log::debug;
 use path_absolutize::path_dedot;
 use rustc_hash::FxHashSet;
 
-use ruff_python_stdlib::path::is_python_file;
-
 use crate::fs;
-use crate::jupyter::is_jupyter_notebook;
 use crate::settings::configuration::Configuration;
 use crate::settings::pyproject::settings_toml;
 use crate::settings::{pyproject, AllSettings, Settings};
@@ -200,14 +197,6 @@ fn match_exclusion<P: AsRef<Path>, R: AsRef<Path>>(
     exclusion.is_match(file_path) || exclusion.is_match(file_basename)
 }
 
-/// Return `true` if the [`DirEntry`] appears to be that of a Python file or jupyter notebook.
-pub fn is_python_entry(entry: &DirEntry) -> bool {
-    (is_python_file(entry.path()) || is_jupyter_notebook(entry.path()))
-        && !entry
-            .file_type()
-            .map_or(false, |file_type| file_type.is_dir())
-}
-
 /// Find all Python (`.py`, `.pyi` and `.ipynb` files) in a set of paths.
 pub fn python_files_in_path(
     paths: &[PathBuf],
@@ -325,10 +314,24 @@ pub fn python_files_in_path(
             }
 
             if result.as_ref().map_or(true, |entry| {
-                // Accept all files that are passed-in directly.
-                (entry.depth() == 0 && entry.file_type().map_or(false, |ft| ft.is_file()))
-                    // Accept all Python files.
-                    || is_python_entry(entry)
+                if entry.depth() == 0 {
+                    // Accept all files that are passed-in directly.
+                    entry.file_type().map_or(false, |ft| ft.is_file())
+                } else {
+                    // Otherwise, check if the file is included.
+                    let path = entry.path();
+                    let resolver = resolver.read().unwrap();
+                    let settings = resolver.resolve(path, pyproject_strategy);
+                    if settings.include.is_match(path) {
+                        debug!("Included path via `include`: {:?}", path);
+                        true
+                    } else if settings.extend_include.is_match(path) {
+                        debug!("Included path via `extend-include`: {:?}", path);
+                        true
+                    } else {
+                        false
+                    }
+                }
             }) {
                 files.lock().unwrap().push(result);
             }

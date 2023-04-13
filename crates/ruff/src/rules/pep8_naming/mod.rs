@@ -8,13 +8,13 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::rules::pep8_naming;
-    use crate::settings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::InvalidClassName, Path::new("N801.py"); "N801")]
     #[test_case(Rule::InvalidFunctionName, Path::new("N802.py"); "N802")]
@@ -53,7 +53,7 @@ mod tests {
                 ..settings::Settings::for_rule(rule_code)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -72,7 +72,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::InvalidFirstArgumentNameForMethod)
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

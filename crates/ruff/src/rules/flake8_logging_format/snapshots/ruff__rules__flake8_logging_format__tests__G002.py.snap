@@ -1,33 +1,20 @@
 ---
 source: crates/ruff/src/rules/flake8_logging_format/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: LoggingPercentFormat
-    body: "Logging statement uses `%`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 13
-  end_location:
-    row: 3
-    column: 34
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: LoggingPercentFormat
-    body: "Logging statement uses `%`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 26
-  end_location:
-    row: 4
-    column: 47
-  fix:
-    edits: []
-  parent: ~
+G002.py:3:14: G002 Logging statement uses `%`
+  |
+3 | import logging
+4 | 
+5 | logging.info("Hello %s" % "World!")
+  |              ^^^^^^^^^^^^^^^^^^^^^ G002
+6 | logging.log(logging.INFO, "Hello %s" % "World!")
+  |
+
+G002.py:4:27: G002 Logging statement uses `%`
+  |
+4 | logging.info("Hello %s" % "World!")
+5 | logging.log(logging.INFO, "Hello %s" % "World!")
+  |                           ^^^^^^^^^^^^^^^^^^^^^ G002
+  |
+
 

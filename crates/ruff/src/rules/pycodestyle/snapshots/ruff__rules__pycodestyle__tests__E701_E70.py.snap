@@ -1,201 +1,143 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 39
-  end_location:
-    row: 4
-    column: 40
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 25
-    column: 7
-  end_location:
-    row: 25
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 27
-    column: 7
-  end_location:
-    row: 27
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 9
-  end_location:
-    row: 29
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 31
-    column: 3
-  end_location:
-    row: 31
-    column: 4
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 17
-  end_location:
-    row: 32
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 33
-    column: 7
-  end_location:
-    row: 33
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 35
-    column: 7
-  end_location:
-    row: 35
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 37
-    column: 8
-  end_location:
-    row: 37
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 39
-    column: 14
-  end_location:
-    row: 39
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 7
-  end_location:
-    row: 54
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 56
-    column: 7
-  end_location:
-    row: 56
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineColon
-    body: Multiple statements on one line (colon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 59
-    column: 11
-  end_location:
-    row: 59
-    column: 12
-  fix:
-    edits: []
-  parent: ~
+E70.py:2:5: E701 Multiple statements on one line (colon)
+  |
+2 | #: E701:1:5
+3 | if a: a = False
+  |     ^ E701
+4 | #: E701:1:40
+5 | if not header or header[:6] != 'bytes=': return
+  |
+
+E70.py:4:40: E701 Multiple statements on one line (colon)
+  |
+4 | if a: a = False
+5 | #: E701:1:40
+6 | if not header or header[:6] != 'bytes=': return
+  |                                        ^ E701
+7 | #: E702:1:10
+8 | a = False; b = True
+  |
+
+E70.py:25:8: E701 Multiple statements on one line (colon)
+   |
+25 |     def f(x): return 2*x
+26 | #: E704:1:8 E702:1:11 E703:1:14
+27 | if True: x; y;
+   |        ^ E701
+28 | #: E701:1:8
+29 | if True: lambda a: b
+   |
+
+E70.py:27:8: E701 Multiple statements on one line (colon)
+   |
+27 | if True: x; y;
+28 | #: E701:1:8
+29 | if True: lambda a: b
+   |        ^ E701
+30 | #: E701:1:10
+31 | if a := 1: pass
+   |
+
+E70.py:29:10: E701 Multiple statements on one line (colon)
+   |
+29 | if True: lambda a: b
+30 | #: E701:1:10
+31 | if a := 1: pass
+   |          ^ E701
+32 | # E701:1:4 E701:2:18 E701:3:8
+33 | try: lambda foo: bar
+   |
+
+E70.py:31:4: E701 Multiple statements on one line (colon)
+   |
+31 | if a := 1: pass
+32 | # E701:1:4 E701:2:18 E701:3:8
+33 | try: lambda foo: bar
+   |    ^ E701
+34 | except ValueError: pass
+35 | finally: pass
+   |
+
+E70.py:32:18: E701 Multiple statements on one line (colon)
+   |
+32 | # E701:1:4 E701:2:18 E701:3:8
+33 | try: lambda foo: bar
+34 | except ValueError: pass
+   |                  ^ E701
+35 | finally: pass
+36 | # E701:1:7
+   |
+
+E70.py:33:8: E701 Multiple statements on one line (colon)
+   |
+33 | try: lambda foo: bar
+34 | except ValueError: pass
+35 | finally: pass
+   |        ^ E701
+36 | # E701:1:7
+37 | class C: pass
+   |
+
+E70.py:35:8: E701 Multiple statements on one line (colon)
+   |
+35 | finally: pass
+36 | # E701:1:7
+37 | class C: pass
+   |        ^ E701
+38 | # E701:1:7
+39 | with C(): pass
+   |
+
+E70.py:37:9: E701 Multiple statements on one line (colon)
+   |
+37 | class C: pass
+38 | # E701:1:7
+39 | with C(): pass
+   |         ^ E701
+40 | # E701:1:14
+41 | async with C(): pass
+   |
+
+E70.py:39:15: E701 Multiple statements on one line (colon)
+   |
+39 | with C(): pass
+40 | # E701:1:14
+41 | async with C(): pass
+   |               ^ E701
+42 | #:
+43 | lambda a: b
+   |
+
+E70.py:54:8: E701 Multiple statements on one line (colon)
+   |
+54 | def f(): ...
+55 | #: E701:1:8 E702:1:13
+56 | class C: ...; x = 1
+   |        ^ E701
+57 | #: E701:1:8 E702:1:13
+58 | class C: ...; ...
+   |
+
+E70.py:56:8: E701 Multiple statements on one line (colon)
+   |
+56 | class C: ...; x = 1
+57 | #: E701:1:8 E702:1:13
+58 | class C: ...; ...
+   |        ^ E701
+59 | #: E701:2:12
+60 | match *0, 1, *2:
+   |
+
+E70.py:59:12: E701 Multiple statements on one line (colon)
+   |
+59 | #: E701:2:12
+60 | match *0, 1, *2:
+61 |     case 0,: y = 0
+   |            ^ E701
+62 | #:
+63 | class Foo:
+   |
+
 

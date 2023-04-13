@@ -62,7 +62,7 @@ pub fn has_comment_break(stmt: &Stmt, locator: &Locator) -> bool {
     //   # Direct comment.
     //   def f(): pass
     let mut seen_blank = false;
-    for line in locator.take(stmt.location).universal_newlines().rev() {
+    for line in locator.up_to(stmt.location).universal_newlines().rev() {
         let line = line.trim();
         if seen_blank {
             if line.starts_with('#') {

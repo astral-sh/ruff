@@ -45,7 +45,7 @@ pub fn pass_in_class_body<'a>(checker: &mut Checker<'a>, parent: &'a Stmt, body:
                     checker.stylist,
                 ) {
                     Ok(fix) => {
-                        if fix.content.is_empty() || fix.content == "pass" {
+                        if fix.is_deletion() || fix.content() == Some("pass") {
                             checker.deletions.insert(RefEquality(stmt));
                         }
                         diagnostic.set_fix(fix);

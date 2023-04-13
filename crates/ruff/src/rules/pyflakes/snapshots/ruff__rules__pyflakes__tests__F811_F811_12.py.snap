@@ -1,19 +1,13 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: RedefinedWhileUnused
-    body: "Redefinition of unused `mixer` from line 2"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 19
-  end_location:
-    row: 6
-    column: 24
-  fix:
-    edits: []
-  parent: ~
+F811_12.py:6:20: F811 Redefinition of unused `mixer` from line 2
+  |
+6 |     pass
+7 | else:
+8 |     from bb import mixer
+  |                    ^^^^^ F811
+9 | mixer(123)
+  |
+
 

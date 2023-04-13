@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/flake8_annotations/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MissingReturnTypeUndocumentedPublicFunction
-    body: "Missing return type annotation for public function `bar`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 8
-  end_location:
-    row: 29
-    column: 11
-  fix:
-    edits: []
-  parent: ~
+allow_overload.py:29:9: ANN201 Missing return type annotation for public function `bar`
+   |
+29 | class X:
+30 |     def bar(i):
+   |         ^^^ ANN201
+31 |         return i
+   |
+
 

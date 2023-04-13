@@ -1,19 +1,13 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PercentFormatExpectedSequence
-    body: "`%`-format string expected sequence but got mapping"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 20
-  fix:
-    edits: []
-  parent: ~
+F50x.py:10:1: F503 `%`-format string expected sequence but got mapping
+   |
+10 | '%(bar)s' % {'bar': 1, 'baz': 2}  # F504
+11 | '%(bar)s' % (1, 2, 3)  # F502
+12 | '%s %s' % {'k': 'v'}  # F503
+   | ^^^^^^^^^^^^^^^^^^^^ F503
+13 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
+   |
+
 
