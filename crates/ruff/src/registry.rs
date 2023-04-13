@@ -679,6 +679,7 @@ ruff_macros::register_rules!(
     rules::flake8_todo::rules::MissingColonInTodo,
     rules::flake8_todo::rules::MissingSpaceAfterColonInTodo,
     rules::flake8_todo::rules::MissingTextInTodo,
+    rules::flake8_todo::rules::InvalidCapitalizationInTodo,
 );
 
 pub trait AsRule {
@@ -951,6 +952,7 @@ impl Rule {
             | Rule::MissingAuthorInTodo
             | Rule::MissingSpaceAfterColonInTodo
             | Rule::MissingTextInTodo
+            | Rule::InvalidCapitalizationInTodo
             | Rule::MissingColonInTodo => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,

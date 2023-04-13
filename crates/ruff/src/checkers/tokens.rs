@@ -65,7 +65,7 @@ pub(crate) fn check_tokens(
         Rule::MissingColonInTodo,
         Rule::MissingTextInTodo,
         Rule::MissingSpaceAfterColonInTodo,
-        // Rule::InvalidTodoCapitalization,
+        Rule::InvalidCapitalizationInTodo,
         //     Rule::TodoMissingLink,
     ]);
 

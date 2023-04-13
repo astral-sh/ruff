@@ -60,11 +60,17 @@ impl Violation for MissingTextInTodo {
     }
 }
 
-// TODO
-// #[violation]
-// pub struct InvalidTODOCapitalization {
-//     pub tag: String,
-// }
+#[violation]
+pub struct InvalidCapitalizationInTodo {
+    pub tag: String,
+}
+impl Violation for InvalidCapitalizationInTodo {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let InvalidCapitalizationInTodo { tag } = self;
+        format!("Invalid TODO capitalization: `{tag}` should be `TODO`")
+    }
+}
 
 #[violation]
 pub struct MissingSpaceAfterColonInTodo;
@@ -100,7 +106,7 @@ impl Violation for MissingSpaceAfterColonInTodo {
 // Note: Tags taken from https://github.com/orsinium-labs/flake8-todos/blob/master/flake8_todos/_rules.py#L12.
 static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
     // TODO BEFORE COMMITTING - <space> should be a nested group inside of <colon>
-    Regex::new(r"^#\s*(TODO|BUG|FIXME|XXX)(\(.*\))?(:)?( )?(.+)?$").unwrap()
+    Regex::new(r"^#\s*([tT][oO][dD][oO]|BUG|FIXME|XXX)(\(.*\))?(:)?( )?(.+)?$").unwrap()
 });
 static NUM_CAPTURE_GROUPS: usize = 5usize;
 
@@ -138,7 +144,14 @@ fn get_tag_regex_errors(text: &str, start: Location, end: Location) -> Vec<Diagn
                 Range::new(start, end),
             ));
 
-            // TODO: T006 check can go here
+            if tag.to_uppercase() == "TODO" {
+                diagnostics.push(Diagnostic::new(
+                    InvalidCapitalizationInTodo {
+                        tag: String::from(tag),
+                    },
+                    Range::new(start, end),
+                ));
+            }
         }
 
         // Note: This initially looks bad from a speed perspective, but is O(1) given that we

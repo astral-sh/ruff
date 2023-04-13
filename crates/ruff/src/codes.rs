@@ -747,6 +747,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Todo, "002") => Rule::MissingAuthorInTodo,
         (Flake8Todo, "004") => Rule::MissingColonInTodo,
         (Flake8Todo, "005") => Rule::MissingTextInTodo,
+        (Flake8Todo, "006") => Rule::InvalidCapitalizationInTodo,
         (Flake8Todo, "007") => Rule::MissingSpaceAfterColonInTodo,
         _ => return None,
     })
