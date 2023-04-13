@@ -227,7 +227,7 @@ pub struct Options {
     pub variables: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
-        value_type = r#"list[str]"#,
+        value_type = r#"list["future" | "standard-library" | "third-party" | "first-party" | "local-folder" | str]"#,
         example = r#"
             no-lines-before = ["future", "standard-library"]
         "#
@@ -268,7 +268,7 @@ pub struct Options {
     pub forced_separate: Option<Vec<String>>,
     #[option(
         default = r#"[]"#,
-        value_type = "list[str]",
+        value_type = r#"list["future" | "standard-library" | "third-party" | "first-party" | "local-folder" | str]"#,
         example = r#"
             section-order = ["future", "standard-library", "first-party", "local-folder", "third-party"]
         "#
@@ -399,7 +399,7 @@ impl From<Settings> for Options {
             lines_between_types: Some(settings.lines_between_types),
             forced_separate: Some(settings.forced_separate.into_iter().collect()),
             section_order: Some(settings.section_order.into_iter().collect()),
-            sections: Some(settings.known_modules.sections),
+            sections: Some(settings.known_modules.user_defined),
         }
     }
 }

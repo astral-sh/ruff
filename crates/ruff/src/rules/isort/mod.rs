@@ -152,13 +152,39 @@ pub fn format_imports(
             section_order.push(known_section);
         }
     }
-    for section in known_modules
-        .sections
-        .keys()
-        .map(|section| ImportSection::UserDefined(section.clone()))
-    {
+
+    // Verify that all sections listed in `section-order` are defined in `sections`.
+    for user_defined in &section_order {
+        if let ImportSection::UserDefined(section_name) = user_defined {
+            if !known_modules.user_defined.contains_key(section_name) {
+                warn_user_once!(
+                    "`section-order` contains unknown user-defined section: `{}`.",
+                    section_name
+                );
+            }
+        }
+    }
+
+    // Verify that all sections listed in `no-lines-before` are defined in `sections`.
+    for user_defined in no_lines_before {
+        if let ImportSection::UserDefined(section_name) = user_defined {
+            if !known_modules.user_defined.contains_key(section_name) {
+                warn_user_once!(
+                    "`no-lines-before` contains unknown user-defined section: `{}`.",
+                    section_name
+                );
+            }
+        }
+    }
+
+    // Verify that all sections defined in `sections` are listed in `section-order`.
+    for section_name in known_modules.user_defined.keys() {
+        let section = ImportSection::UserDefined(section_name.clone());
         if !section_order.contains(&section) {
-            warn_user_once!("Not all user-defined sections are present in the section order.");
+            warn_user_once!(
+                "`section-order` is missing user-defined section: `{}`.",
+                section_name
+            );
             section_order.push(section);
         }
     }

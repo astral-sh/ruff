@@ -64,23 +64,23 @@ enum Reason<'a> {
 }
 
 #[allow(clippy::too_many_arguments)]
-pub fn categorize(
+pub fn categorize<'a>(
     module_name: &str,
     level: Option<usize>,
     src: &[PathBuf],
     package: Option<&Path>,
-    known_modules: &KnownModules,
+    known_modules: &'a KnownModules,
     target_version: PythonVersion,
-) -> ImportSection {
+) -> &'a ImportSection {
     let module_base = module_name.split('.').next().unwrap();
     let (import_type, reason) = {
         if level.map_or(false, |level| level > 0) {
             (
-                ImportSection::Known(ImportType::LocalFolder),
+                &ImportSection::Known(ImportType::LocalFolder),
                 Reason::NonZeroLevel,
             )
         } else if module_base == "__future__" {
-            (ImportSection::Known(ImportType::Future), Reason::Future)
+            (&ImportSection::Known(ImportType::Future), Reason::Future)
         } else if let Some((import_type, reason)) = known_modules.categorize(module_name) {
             (import_type, reason)
         } else if KNOWN_STANDARD_LIBRARY
@@ -89,22 +89,22 @@ pub fn categorize(
             .contains(module_base)
         {
             (
-                ImportSection::Known(ImportType::StandardLibrary),
+                &ImportSection::Known(ImportType::StandardLibrary),
                 Reason::KnownStandardLibrary,
             )
         } else if same_package(package, module_base) {
             (
-                ImportSection::Known(ImportType::FirstParty),
+                &ImportSection::Known(ImportType::FirstParty),
                 Reason::SamePackage,
             )
         } else if let Some(src) = match_sources(src, module_base) {
             (
-                ImportSection::Known(ImportType::FirstParty),
+                &ImportSection::Known(ImportType::FirstParty),
                 Reason::SourceMatch(src),
             )
         } else {
             (
-                ImportSection::Known(ImportType::ThirdParty),
+                &ImportSection::Known(ImportType::ThirdParty),
                 Reason::NoMatch,
             )
         }
@@ -141,10 +141,10 @@ pub fn categorize_imports<'a>(
     block: ImportBlock<'a>,
     src: &[PathBuf],
     package: Option<&Path>,
-    known_modules: &KnownModules,
+    known_modules: &'a KnownModules,
     target_version: PythonVersion,
-) -> BTreeMap<ImportSection, ImportBlock<'a>> {
-    let mut block_by_type: BTreeMap<ImportSection, ImportBlock> = BTreeMap::default();
+) -> BTreeMap<&'a ImportSection, ImportBlock<'a>> {
+    let mut block_by_type: BTreeMap<&ImportSection, ImportBlock> = BTreeMap::default();
     // Categorize `StmtKind::Import`.
     for (alias, comments) in block.import {
         let import_type = categorize(
@@ -223,7 +223,7 @@ pub struct KnownModules {
     /// A set of user-provided standard library modules.
     pub standard_library: Vec<String>,
     /// A map of additional user-provided sections.
-    pub sections: FxHashMap<String, Vec<String>>,
+    pub user_defined: FxHashMap<String, Vec<String>>,
     /// A map of known modules to their section.
     pub known: FxHashMap<String, ImportSection>,
     /// Whether any of the known modules are submodules (e.g., `foo.bar`, as opposed to `foo`).
@@ -236,9 +236,9 @@ impl KnownModules {
         third_party: Vec<String>,
         local_folder: Vec<String>,
         standard_library: Vec<String>,
-        sections: FxHashMap<String, Vec<String>>,
+        user_defined: FxHashMap<String, Vec<String>>,
     ) -> Self {
-        let modules = sections
+        let modules = user_defined
             .iter()
             .flat_map(|(section, modules)| {
                 modules
@@ -281,14 +281,14 @@ impl KnownModules {
             }
         });
 
-        let has_submodules = known.keys().any(|m| m.contains('.'));
+        let has_submodules = known.keys().any(|module| module.contains('.'));
 
         Self {
             first_party,
             third_party,
             local_folder,
             standard_library,
-            sections,
+            user_defined,
             known,
             has_submodules,
         }
@@ -296,7 +296,7 @@ impl KnownModules {
 
     /// Return the [`ImportSection`] for a given module, if it's been categorized as a known module
     /// by the user.
-    fn categorize(&self, module_name: &str) -> Option<(ImportSection, Reason)> {
+    fn categorize(&self, module_name: &str) -> Option<(&ImportSection, Reason)> {
         if self.has_submodules {
             // Check all module prefixes from the longest to the shortest (e.g., given
             // `foo.bar.baz`, check `foo.bar.baz`, then `foo.bar`, then `foo`, taking the first,
@@ -320,7 +320,7 @@ impl KnownModules {
         }
     }
 
-    fn categorize_submodule(&self, submodule: &str) -> Option<(ImportSection, Reason)> {
+    fn categorize_submodule(&self, submodule: &str) -> Option<(&ImportSection, Reason)> {
         if let Some(section) = self.known.get(submodule) {
             let reason = match section {
                 ImportSection::UserDefined(_) => Reason::UserDefinedSection,
@@ -328,9 +328,11 @@ impl KnownModules {
                 ImportSection::Known(ImportType::ThirdParty) => Reason::KnownThirdParty,
                 ImportSection::Known(ImportType::LocalFolder) => Reason::KnownLocalFolder,
                 ImportSection::Known(ImportType::StandardLibrary) => Reason::ExtraStandardLibrary,
-                ImportSection::Known(ImportType::Future) => unreachable!(),
+                ImportSection::Known(ImportType::Future) => {
+                    unreachable!("__future__ imports are not known")
+                }
             };
-            Some((section.clone(), reason))
+            Some((section, reason))
         } else {
             None
         }
