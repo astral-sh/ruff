@@ -1,11 +1,11 @@
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
+use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 use ruff_python_ast::types::Range;
-use rustpython_parser::{lexer, Mode, Tok};
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
