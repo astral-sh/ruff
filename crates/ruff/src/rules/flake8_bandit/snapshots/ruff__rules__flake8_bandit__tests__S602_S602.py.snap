@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
 S602.py:4:15: S602 `subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`
   |
-4 | # Check different Popen wrappers are checked
+4 | # Check different Popen wrappers are checked.
 5 | Popen("true", shell=True)
   |               ^^^^^^^^^^ S602
 6 | call("true", shell=True)
@@ -12,7 +12,7 @@ S602.py:4:15: S602 `subprocess` call with `shell=True` seems safe, but may be ch
 
 S602.py:5:14: S602 `subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`
   |
-5 | # Check different Popen wrappers are checked
+5 | # Check different Popen wrappers are checked.
 6 | Popen("true", shell=True)
 7 | call("true", shell=True)
   |              ^^^^^^^^^^ S602
@@ -46,12 +46,12 @@ S602.py:8:13: S602 `subprocess` call with `shell=True` seems safe, but may be ch
 10 | run("true", shell=True)
    |             ^^^^^^^^^^ S602
 11 | 
-12 | # Check values that truthy values are treated as true
+12 | # Check values that truthy values are treated as true.
    |
 
 S602.py:11:15: S602 `subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`
    |
-11 | # Check values that truthy values are treated as true
+11 | # Check values that truthy values are treated as true.
 12 | Popen("true", shell=1)
    |               ^^^^^^^ S602
 13 | Popen("true", shell=[1])
@@ -60,7 +60,7 @@ S602.py:11:15: S602 `subprocess` call with `shell=True` seems safe, but may be c
 
 S602.py:12:15: S602 `subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`
    |
-12 | # Check values that truthy values are treated as true
+12 | # Check values that truthy values are treated as true.
 13 | Popen("true", shell=1)
 14 | Popen("true", shell=[1])
    |               ^^^^^^^^^ S602
@@ -84,12 +84,12 @@ S602.py:14:15: S602 `subprocess` call with `shell=True` seems safe, but may be c
 16 | Popen("true", shell=(1,))
    |               ^^^^^^^^^^ S602
 17 | 
-18 | # Check command argument looks unsafe
+18 | # Check command argument looks unsafe.
    |
 
-S602.py:18:19: S602 `subprocess` call with `shell=True` identified
+S602.py:18:19: S602 `subprocess` call with `shell=True` identified, security issue
    |
-18 | # Check command argument looks unsafe
+18 | # Check command argument looks unsafe.
 19 | var_string = "true"
 20 | Popen(var_string, shell=True)
    |                   ^^^^^^^^^^ S602
@@ -97,7 +97,7 @@ S602.py:18:19: S602 `subprocess` call with `shell=True` identified
 22 | Popen([var_string, ""], shell=True)
    |
 
-S602.py:19:21: S602 `subprocess` call with `shell=True` identified
+S602.py:19:21: S602 `subprocess` call with `shell=True` identified, security issue
    |
 19 | var_string = "true"
 20 | Popen(var_string, shell=True)
@@ -106,7 +106,7 @@ S602.py:19:21: S602 `subprocess` call with `shell=True` identified
 22 | Popen([var_string, ""], shell=True)
    |
 
-S602.py:20:25: S602 `subprocess` call with `shell=True` identified
+S602.py:20:25: S602 `subprocess` call with `shell=True` identified, security issue
    |
 20 | Popen(var_string, shell=True)
 21 | Popen([var_string], shell=True)

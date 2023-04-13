@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
 S606.py:4:1: S606 Starting a process without a shell
   |
-4 | # Check all shell functions
+4 | # Check all shell functions.
 5 | os.execl("true")
   | ^^^^^^^^ S606
 6 | os.execle("true")
@@ -12,7 +12,7 @@ S606.py:4:1: S606 Starting a process without a shell
 
 S606.py:5:1: S606 Starting a process without a shell
   |
-5 | # Check all shell functions
+5 | # Check all shell functions.
 6 | os.execl("true")
 7 | os.execle("true")
   | ^^^^^^^^^ S606

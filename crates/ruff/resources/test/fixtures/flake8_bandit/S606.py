@@ -1,6 +1,6 @@
 import os
 
-# Check all shell functions
+# Check all shell functions.
 os.execl("true")
 os.execle("true")
 os.execlp("true")

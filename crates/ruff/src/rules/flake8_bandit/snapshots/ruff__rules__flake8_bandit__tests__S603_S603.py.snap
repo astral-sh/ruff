@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
 S603.py:4:15: S603 `subprocess` call: check for execution of untrusted input
   |
-4 | # Different Popen wrappers are checked
+4 | # Different Popen wrappers are checked.
 5 | Popen("true", shell=False)
   |               ^^^^^^^^^^^ S603
 6 | call("true", shell=False)
@@ -12,7 +12,7 @@ S603.py:4:15: S603 `subprocess` call: check for execution of untrusted input
 
 S603.py:5:14: S603 `subprocess` call: check for execution of untrusted input
   |
-5 | # Different Popen wrappers are checked
+5 | # Different Popen wrappers are checked.
 6 | Popen("true", shell=False)
 7 | call("true", shell=False)
   |              ^^^^^^^^^^^ S603
@@ -46,12 +46,12 @@ S603.py:8:13: S603 `subprocess` call: check for execution of untrusted input
 10 | run("true", shell=False)
    |             ^^^^^^^^^^^ S603
 11 | 
-12 | # Values that falsey values are treated as false
+12 | # Values that falsey values are treated as false.
    |
 
 S603.py:11:15: S603 `subprocess` call: check for execution of untrusted input
    |
-11 | # Values that falsey values are treated as false
+11 | # Values that falsey values are treated as false.
 12 | Popen("true", shell=0)
    |               ^^^^^^^ S603
 13 | Popen("true", shell=[])
@@ -60,7 +60,7 @@ S603.py:11:15: S603 `subprocess` call: check for execution of untrusted input
 
 S603.py:12:15: S603 `subprocess` call: check for execution of untrusted input
    |
-12 | # Values that falsey values are treated as false
+12 | # Values that falsey values are treated as false.
 13 | Popen("true", shell=0)
 14 | Popen("true", shell=[])
    |               ^^^^^^^^ S603
@@ -84,21 +84,21 @@ S603.py:14:15: S603 `subprocess` call: check for execution of untrusted input
 16 | Popen("true", shell=None)
    |               ^^^^^^^^^^ S603
 17 | 
-18 | # Unknown values are treated as falsey
+18 | # Unknown values are treated as falsey.
    |
 
 S603.py:17:15: S603 `subprocess` call: check for execution of untrusted input
    |
-17 | # Unknown values are treated as falsey
+17 | # Unknown values are treated as falsey.
 18 | Popen("true", shell=True if True else False)
    |               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ S603
 19 | 
-20 | # No value is also caught
+20 | # No value is also caught.
    |
 
 S603.py:20:7: S603 `subprocess` call: check for execution of untrusted input
    |
-20 | # No value is also caught
+20 | # No value is also caught.
 21 | Popen("true")
    |       ^^^^^^ S603
    |

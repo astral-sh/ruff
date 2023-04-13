@@ -3,7 +3,7 @@ import os
 import commands
 import popen2
 
-# Check all shell functions
+# Check all shell functions.
 os.system("true")
 os.popen("true")
 os.popen2("true")
@@ -18,7 +18,7 @@ commands.getoutput("true")
 commands.getstatusoutput("true")
 
 
-# Check command argument looks unsafe
+# Check command argument looks unsafe.
 var_string = "true"
 os.system(var_string)
 os.system([var_string])

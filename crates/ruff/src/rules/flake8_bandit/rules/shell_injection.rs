@@ -1,18 +1,19 @@
-//! Checks relating to shell injection
+//! Checks relating to shell injection.
 
 use num_bigint::BigInt;
 use once_cell::sync::Lazy;
 use regex::Regex;
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
 };
 
-static FULL_PATH_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^([A-Za-z]:|[\\/\.])").unwrap());
+static FULL_PATH_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r"^([A-Za-z]:|[\\/.])").unwrap());
 
 #[violation]
 pub struct SubprocessPopenWithShellEqualsTrue {
@@ -27,7 +28,7 @@ impl Violation for SubprocessPopenWithShellEqualsTrue {
                 "`subprocess` call with `shell=True` seems safe, but may be changed in the future; consider rewriting without `shell`"
             )
         } else {
-            format!("`subprocess` call with `shell=True` identified")
+            format!("`subprocess` call with `shell=True` identified, security issue")
         }
     }
 }
@@ -48,7 +49,7 @@ pub struct CallWithShellEqualsTrue;
 impl Violation for CallWithShellEqualsTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Function call with `shell=True` parameter identified")
+        format!("Function call with `shell=True` parameter identified, security issue")
     }
 }
 
@@ -187,7 +188,13 @@ impl From<&Keyword> for Truthiness {
                     Truthiness::Truthy
                 }
             }
-            ExprKind::List { elts, .. } => {
+            ExprKind::Constant {
+                value: Constant::None,
+                ..
+            } => Truthiness::Falsey,
+            ExprKind::List { elts, .. }
+            | ExprKind::Set { elts, .. }
+            | ExprKind::Tuple { elts, .. } => {
                 if elts.is_empty() {
                     Truthiness::Falsey
                 } else {
@@ -196,13 +203,6 @@ impl From<&Keyword> for Truthiness {
             }
             ExprKind::Dict { keys, .. } => {
                 if keys.is_empty() {
-                    Truthiness::Falsey
-                } else {
-                    Truthiness::Truthy
-                }
-            }
-            ExprKind::Tuple { elts, .. } => {
-                if elts.is_empty() {
                     Truthiness::Falsey
                 } else {
                     Truthiness::Truthy
@@ -289,7 +289,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
     let call_kind = get_call_kind(checker, func);
 
     if let Some(CallKind::Subprocess) = call_kind {
-        if !args.is_empty() {
+        if let Some(arg) = args.first() {
             match find_shell_keyword(keywords) {
                 // S602
                 Some(ShellKeyword {
@@ -303,7 +303,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessPopenWithShellEqualsTrue {
-                                seems_safe: shell_call_seems_safe(&args[0]),
+                                seems_safe: shell_call_seems_safe(arg),
                             },
                             Range::from(keyword),
                         ));
@@ -320,7 +320,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                         .enabled(Rule::SubprocessWithoutShellEqualsTrue)
                     {
                         checker.diagnostics.push(Diagnostic::new(
-                            SubprocessWithoutShellEqualsTrue {},
+                            SubprocessWithoutShellEqualsTrue,
                             Range::from(keyword),
                         ));
                     }
@@ -333,8 +333,8 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                         .enabled(Rule::SubprocessWithoutShellEqualsTrue)
                     {
                         checker.diagnostics.push(Diagnostic::new(
-                            SubprocessWithoutShellEqualsTrue {},
-                            Range::from(&args[0]),
+                            SubprocessWithoutShellEqualsTrue,
+                            Range::from(arg),
                         ));
                     }
                 }
@@ -352,7 +352,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
             .enabled(Rule::CallWithShellEqualsTrue)
         {
             checker.diagnostics.push(Diagnostic::new(
-                CallWithShellEqualsTrue {},
+                CallWithShellEqualsTrue,
                 Range::from(keyword),
             ));
         }
@@ -360,13 +360,15 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
 
     // S605
     if let Some(CallKind::Shell) = call_kind {
-        if !args.is_empty() && checker.settings.rules.enabled(Rule::StartProcessWithAShell) {
-            checker.diagnostics.push(Diagnostic::new(
-                StartProcessWithAShell {
-                    seems_safe: shell_call_seems_safe(&args[0]),
-                },
-                Range::from(&args[0]),
-            ));
+        if let Some(arg) = args.first() {
+            if checker.settings.rules.enabled(Rule::StartProcessWithAShell) {
+                checker.diagnostics.push(Diagnostic::new(
+                    StartProcessWithAShell {
+                        seems_safe: shell_call_seems_safe(arg),
+                    },
+                    Range::from(arg),
+                ));
+            }
         }
     }
 
@@ -377,26 +379,28 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
             .rules
             .enabled(Rule::StartProcessWithNoShell)
         {
-            checker.diagnostics.push(Diagnostic::new(
-                StartProcessWithNoShell {},
-                Range::from(func),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(StartProcessWithNoShell, Range::from(func)));
         }
     }
 
     // S607
-    if call_kind.is_some() && !args.is_empty() {
-        if let Some(value) = string_literal_including_list(&args[0]) {
-            if FULL_PATH_REGEX.find(value).is_none()
-                && checker
-                    .settings
-                    .rules
-                    .enabled(Rule::StartProcessWithPartialPath)
+    if call_kind.is_some() {
+        if let Some(arg) = args.first() {
+            if checker
+                .settings
+                .rules
+                .enabled(Rule::StartProcessWithPartialPath)
             {
-                checker.diagnostics.push(Diagnostic::new(
-                    StartProcessWithPartialPath {},
-                    Range::from(&args[0]),
-                ));
+                if let Some(value) = string_literal_including_list(arg) {
+                    if FULL_PATH_REGEX.find(value).is_none() {
+                        checker.diagnostics.push(Diagnostic::new(
+                            StartProcessWithPartialPath,
+                            Range::from(arg),
+                        ));
+                    }
+                }
             }
         }
     }

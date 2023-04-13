@@ -217,7 +217,7 @@ S607.py:37:14: S607 Starting a process with a partial executable path
 39 | os.startfile("true")
    |              ^^^^^^ S607
 40 | 
-41 | # Check it does not fail for full paths
+41 | # Check it does not fail for full paths.
    |
 
 

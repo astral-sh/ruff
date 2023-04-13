@@ -1,6 +1,6 @@
 import os
 
-# Check all functions
+# Check all functions.
 subprocess.Popen("true")
 subprocess.call("true")
 subprocess.check_call("true")
@@ -36,7 +36,7 @@ os.spawnvp("true")
 os.spawnvpe("true")
 os.startfile("true")
 
-# Check it does not fail for full paths
+# Check it does not fail for full paths.
 os.system("/bin/ls")
 os.system("./bin/ls")
 os.system(["/bin/ls"])

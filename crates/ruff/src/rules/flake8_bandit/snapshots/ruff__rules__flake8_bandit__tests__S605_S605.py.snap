@@ -3,7 +3,7 @@ source: crates/ruff/src/rules/flake8_bandit/mod.rs
 ---
 S605.py:7:11: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
- 7 | # Check all shell functions
+ 7 | # Check all shell functions.
  8 | os.system("true")
    |           ^^^^^^ S605
  9 | os.popen("true")
@@ -12,7 +12,7 @@ S605.py:7:11: S605 Starting a process with a shell: seems safe, but may be chang
 
 S605.py:8:10: S605 Starting a process with a shell: seems safe, but may be changed in the future; consider rewriting without `shell`
    |
- 8 | # Check all shell functions
+ 8 | # Check all shell functions.
  9 | os.system("true")
 10 | os.popen("true")
    |          ^^^^^^ S605
@@ -119,7 +119,7 @@ S605.py:18:26: S605 Starting a process with a shell: seems safe, but may be chan
 
 S605.py:23:11: S605 Starting a process with a shell, possible injection detected
    |
-23 | # Check command argument looks unsafe
+23 | # Check command argument looks unsafe.
 24 | var_string = "true"
 25 | os.system(var_string)
    |           ^^^^^^^^^^ S605
