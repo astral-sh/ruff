@@ -143,8 +143,7 @@ pub fn run(
             acc += item;
             acc
         });
-    // TODO(chris): actually check the imports?
-    debug!("{:#?}", diagnostics.imports);
+
     diagnostics.messages.sort_unstable();
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);
