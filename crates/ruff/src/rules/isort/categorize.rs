@@ -214,18 +214,8 @@ pub fn categorize_imports<'a>(
 
 #[derive(Debug, Default, CacheKey)]
 pub struct KnownModules {
-    /// A set of user-provided first-party modules.
-    pub first_party: Vec<String>,
-    /// A set of user-provided third-party modules.
-    pub third_party: Vec<String>,
-    /// A set of user-provided local folder modules.
-    pub local_folder: Vec<String>,
-    /// A set of user-provided standard library modules.
-    pub standard_library: Vec<String>,
-    /// A map of additional user-provided sections.
-    pub user_defined: FxHashMap<String, Vec<String>>,
     /// A map of known modules to their section.
-    pub known: FxHashMap<String, ImportSection>,
+    known: FxHashMap<String, ImportSection>,
     /// Whether any of the known modules are submodules (e.g., `foo.bar`, as opposed to `foo`).
     has_submodules: bool,
 }
@@ -239,35 +229,30 @@ impl KnownModules {
         user_defined: FxHashMap<String, Vec<String>>,
     ) -> Self {
         let modules = user_defined
-            .iter()
+            .into_iter()
             .flat_map(|(section, modules)| {
                 modules
-                    .iter()
-                    .cloned()
-                    .map(|module| (module, ImportSection::UserDefined(section.clone())))
+                    .into_iter()
+                    .map(move |module| (module, ImportSection::UserDefined(section.clone())))
             })
             .chain(
                 first_party
-                    .iter()
-                    .cloned()
+                    .into_iter()
                     .map(|module| (module, ImportSection::Known(ImportType::FirstParty))),
             )
             .chain(
                 third_party
-                    .iter()
-                    .cloned()
+                    .into_iter()
                     .map(|module| (module, ImportSection::Known(ImportType::ThirdParty))),
             )
             .chain(
                 local_folder
-                    .iter()
-                    .cloned()
+                    .into_iter()
                     .map(|module| (module, ImportSection::Known(ImportType::LocalFolder))),
             )
             .chain(
                 standard_library
-                    .iter()
-                    .cloned()
+                    .into_iter()
                     .map(|module| (module, ImportSection::Known(ImportType::StandardLibrary))),
             );
 
@@ -284,11 +269,6 @@ impl KnownModules {
         let has_submodules = known.keys().any(|module| module.contains('.'));
 
         Self {
-            first_party,
-            third_party,
-            local_folder,
-            standard_library,
-            user_defined,
             known,
             has_submodules,
         }
@@ -336,5 +316,37 @@ impl KnownModules {
         } else {
             None
         }
+    }
+
+    /// Return the list of modules that are known to be of a given type.
+    pub fn modules_for_known_type(&self, import_type: ImportType) -> Vec<String> {
+        self.known
+            .iter()
+            .filter_map(|(module, known_section)| {
+                if let ImportSection::Known(section) = known_section {
+                    if *section == import_type {
+                        Some(module.clone())
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect()
+    }
+
+    /// Return the list of user-defined modules, indexed by section.
+    pub fn user_defined(&self) -> FxHashMap<String, Vec<String>> {
+        let mut user_defined: FxHashMap<String, Vec<String>> = FxHashMap::default();
+        for (module, section) in &self.known {
+            if let ImportSection::UserDefined(section) = section {
+                user_defined
+                    .entry(section.clone())
+                    .or_default()
+                    .push(module.clone());
+            }
+        }
+        user_defined
     }
 }

@@ -1,13 +1,17 @@
 //! Settings for the `isort` plugin.
 
-use rustc_hash::FxHashMap;
 use std::collections::BTreeSet;
 
+use rustc_hash::FxHashMap;
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
+use strum::IntoEnumIterator;
+
+use ruff_macros::{CacheKey, ConfigurationOptions};
 
 use crate::rules::isort::categorize::KnownModules;
-use ruff_macros::{CacheKey, ConfigurationOptions};
+use crate::rules::isort::ImportType;
+use crate::warn_user_once;
 
 use super::categorize::ImportSection;
 
@@ -335,13 +339,69 @@ impl Default for Settings {
             lines_after_imports: -1,
             lines_between_types: 0,
             forced_separate: Vec::new(),
-            section_order: Vec::new(),
+            section_order: ImportType::iter().map(ImportSection::Known).collect(),
         }
     }
 }
 
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
+        // Extract any configuration options that deal with user-defined sections.
+        let mut section_order: Vec<_> = options.section_order.unwrap_or_default();
+        let known_first_party = options.known_first_party.unwrap_or_default();
+        let known_third_party = options.known_third_party.unwrap_or_default();
+        let known_local_folder = options.known_local_folder.unwrap_or_default();
+        let extra_standard_library = options.extra_standard_library.unwrap_or_default();
+        let sections = options.sections.unwrap_or_default();
+        let no_lines_before = options.no_lines_before.unwrap_or_default();
+
+        // Verify that all sections listed in `section_order` are defined in `sections`.
+        for section in &section_order {
+            if let ImportSection::UserDefined(section_name) = section {
+                if !sections.contains_key(section_name) {
+                    warn_user_once!(
+                        "`section-order` contains unknown user-defined section: `{}`.",
+                        section_name
+                    );
+                }
+            }
+        }
+
+        // Verify that all sections listed in `no_lines_before` are defined in `sections`.
+        for section in &no_lines_before {
+            if let ImportSection::UserDefined(section_name) = section {
+                if !sections.contains_key(section_name) {
+                    warn_user_once!(
+                        "`no-lines-before` contains unknown user-defined section: `{}`.",
+                        section_name
+                    );
+                }
+            }
+        }
+
+        // Add all built-in sections to `section_order`, if not already present.
+        for section in ImportType::iter().map(ImportSection::Known) {
+            if !section_order.contains(&section) {
+                warn_user_once!(
+                    "`section-order` is missing built-in section: `{:?}`.",
+                    section
+                );
+                section_order.push(section);
+            }
+        }
+
+        // Add all user-defined sections to `section-order`, if not already present.
+        for section_name in sections.keys() {
+            let section = ImportSection::UserDefined(section_name.clone());
+            if !section_order.contains(&section) {
+                warn_user_once!(
+                    "`section-order` is missing user-defined section: `{}`.",
+                    section_name
+                );
+                section_order.push(section);
+            }
+        }
+
         Self {
             required_imports: BTreeSet::from_iter(options.required_imports.unwrap_or_default()),
             combine_as_imports: options.combine_as_imports.unwrap_or(false),
@@ -350,11 +410,11 @@ impl From<Options> for Settings {
             force_wrap_aliases: options.force_wrap_aliases.unwrap_or(false),
             force_to_top: BTreeSet::from_iter(options.force_to_top.unwrap_or_default()),
             known_modules: KnownModules::new(
-                options.known_first_party.unwrap_or_default(),
-                options.known_third_party.unwrap_or_default(),
-                options.known_local_folder.unwrap_or_default(),
-                options.extra_standard_library.unwrap_or_default(),
-                options.sections.unwrap_or_default(),
+                known_first_party,
+                known_third_party,
+                known_local_folder,
+                extra_standard_library,
+                sections,
             ),
             order_by_type: options.order_by_type.unwrap_or(true),
             relative_imports_order: options.relative_imports_order.unwrap_or_default(),
@@ -365,11 +425,11 @@ impl From<Options> for Settings {
             classes: BTreeSet::from_iter(options.classes.unwrap_or_default()),
             constants: BTreeSet::from_iter(options.constants.unwrap_or_default()),
             variables: BTreeSet::from_iter(options.variables.unwrap_or_default()),
-            no_lines_before: BTreeSet::from_iter(options.no_lines_before.unwrap_or_default()),
+            no_lines_before: BTreeSet::from_iter(no_lines_before),
             lines_after_imports: options.lines_after_imports.unwrap_or(-1),
             lines_between_types: options.lines_between_types.unwrap_or_default(),
             forced_separate: Vec::from_iter(options.forced_separate.unwrap_or_default()),
-            section_order: Vec::from_iter(options.section_order.unwrap_or_default()),
+            section_order,
         }
     }
 }
@@ -379,14 +439,30 @@ impl From<Settings> for Options {
         Self {
             required_imports: Some(settings.required_imports.into_iter().collect()),
             combine_as_imports: Some(settings.combine_as_imports),
-            extra_standard_library: Some(settings.known_modules.standard_library),
+            extra_standard_library: Some(
+                settings
+                    .known_modules
+                    .modules_for_known_type(ImportType::StandardLibrary),
+            ),
             force_single_line: Some(settings.force_single_line),
             force_sort_within_sections: Some(settings.force_sort_within_sections),
             force_wrap_aliases: Some(settings.force_wrap_aliases),
             force_to_top: Some(settings.force_to_top.into_iter().collect()),
-            known_first_party: Some(settings.known_modules.first_party),
-            known_third_party: Some(settings.known_modules.third_party),
-            known_local_folder: Some(settings.known_modules.local_folder),
+            known_first_party: Some(
+                settings
+                    .known_modules
+                    .modules_for_known_type(ImportType::FirstParty),
+            ),
+            known_third_party: Some(
+                settings
+                    .known_modules
+                    .modules_for_known_type(ImportType::ThirdParty),
+            ),
+            known_local_folder: Some(
+                settings
+                    .known_modules
+                    .modules_for_known_type(ImportType::LocalFolder),
+            ),
             order_by_type: Some(settings.order_by_type),
             relative_imports_order: Some(settings.relative_imports_order),
             single_line_exclusions: Some(settings.single_line_exclusions.into_iter().collect()),
@@ -399,7 +475,7 @@ impl From<Settings> for Options {
             lines_between_types: Some(settings.lines_between_types),
             forced_separate: Some(settings.forced_separate.into_iter().collect()),
             section_order: Some(settings.section_order.into_iter().collect()),
-            sections: Some(settings.known_modules.user_defined),
+            sections: Some(settings.known_modules.user_defined()),
         }
     }
 }

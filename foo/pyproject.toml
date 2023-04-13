@@ -1,0 +1,7 @@
+[tool.ruff.isort]
+section-order = ["future", "standard-library", "django", "third-party", "baz", "django", "first-party", "local-folder"]
+no-lines-before = ["bug"]
+
+[tool.ruff.isort.sections]
+django = ["django"]
+bop = ["bop"]
