@@ -2651,6 +2651,16 @@ where
                         self, func, args, keywords,
                     );
                 }
+                if self.settings.rules.any_enabled(&[
+                    Rule::SubprocessWithoutShellEqualsTrue,
+                    Rule::SubprocessPopenWithShellEqualsTrue,
+                    Rule::CallWithShellEqualsTrue,
+                    Rule::StartProcessWithAShell,
+                    Rule::StartProcessWithNoShell,
+                    Rule::StartProcessWithPartialPath,
+                ]) {
+                    flake8_bandit::rules::shell_injection(self, func, args, keywords);
+                }
 
                 // flake8-comprehensions
                 if self.settings.rules.enabled(Rule::UnnecessaryGeneratorList) {
