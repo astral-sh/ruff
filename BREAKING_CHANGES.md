@@ -1,5 +1,40 @@
 # Breaking Changes
 
+## 0.0.260
+
+### Fixes are now represented as a list of edits ([#3709](https://github.com/charliermarsh/ruff/pull/3709))
+
+Previously, Ruff represented each fix as a single edit, which prohibited Ruff from automatically
+fixing violations that required multiple edits across a file. As such, Ruff now represents each
+fix as a list of edits.
+
+This primarily affects the JSON API. Ruff's JSON representation used to represent the `fix` field as
+a single edit, like so:
+
+```json
+{
+    "message": "Remove unused import: `sys`",
+    "content": "",
+    "location": {"row": 1, "column": 0},
+    "end_location": {"row": 2, "column": 0}
+}
+```
+
+The updated representation instead includes a list of edits:
+
+```json
+{
+    "message": "Remove unused import: `sys`",
+    "edits": [
+        {
+            "content": "",
+            "location": {"row": 1, "column": 0},
+            "end_location": {"row": 2, "column": 0},
+        }
+    ]
+}
+```
+
 ## 0.0.246
 
 ### `multiple-statements-on-one-line-def` (`E704`) was removed ([#2773](https://github.com/charliermarsh/ruff/pull/2773))
