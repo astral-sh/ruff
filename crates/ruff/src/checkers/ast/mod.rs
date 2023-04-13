@@ -1603,15 +1603,17 @@ where
                 }
             }
             StmtKind::Assert { test, msg } => {
+                if !self.ctx.in_type_checking_block {
+                    if self.settings.rules.enabled(Rule::Assert) {
+                        self.diagnostics
+                            .push(flake8_bandit::rules::assert_used(stmt));
+                    }
+                }
                 if self.settings.rules.enabled(Rule::AssertTuple) {
                     pyflakes::rules::assert_tuple(self, stmt, test);
                 }
                 if self.settings.rules.enabled(Rule::AssertFalse) {
                     flake8_bugbear::rules::assert_false(self, stmt, test, msg.as_deref());
-                }
-                if self.settings.rules.enabled(Rule::Assert) {
-                    self.diagnostics
-                        .push(flake8_bandit::rules::assert_used(stmt));
                 }
                 if self.settings.rules.enabled(Rule::PytestAssertAlwaysFalse) {
                     if let Some(diagnostic) = flake8_pytest_style::rules::assert_falsy(stmt, test) {
