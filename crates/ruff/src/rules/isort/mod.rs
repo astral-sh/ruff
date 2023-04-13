@@ -9,7 +9,7 @@ use strum::IntoEnumIterator;
 use crate::rules::isort::categorize::KnownModules;
 use annotate::annotate_imports;
 use categorize::categorize_imports;
-pub use categorize::{categorize, ImportType};
+pub use categorize::{categorize, ImportSection, ImportType};
 use comments::Comment;
 use normalize::normalize_imports;
 use order::order_imports;
@@ -22,6 +22,7 @@ use types::{AliasData, CommentSet, EitherImport, OrderedImportBlock, TrailingCom
 
 use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
+use crate::warn_user_once;
 
 mod annotate;
 mod categorize;
@@ -131,17 +132,62 @@ pub fn format_imports(
     classes: &BTreeSet<String>,
     constants: &BTreeSet<String>,
     variables: &BTreeSet<String>,
-    no_lines_before: &BTreeSet<ImportType>,
+    no_lines_before: &BTreeSet<ImportSection>,
     lines_after_imports: isize,
     lines_between_types: usize,
     forced_separate: &[String],
     target_version: PythonVersion,
+    section_order: &[ImportSection],
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
 
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block, combine_as_imports, force_single_line);
+
+    // Make sure all sections (built-in and user-defined) are present in the section order.
+    let mut section_order: Vec<_> = section_order.to_vec();
+    for known_section in ImportType::iter().map(ImportSection::Known) {
+        if !section_order.contains(&known_section) {
+            section_order.push(known_section);
+        }
+    }
+
+    // Verify that all sections listed in `section-order` are defined in `sections`.
+    for user_defined in &section_order {
+        if let ImportSection::UserDefined(section_name) = user_defined {
+            if !known_modules.user_defined.contains_key(section_name) {
+                warn_user_once!(
+                    "`section-order` contains unknown user-defined section: `{}`.",
+                    section_name
+                );
+            }
+        }
+    }
+
+    // Verify that all sections listed in `no-lines-before` are defined in `sections`.
+    for user_defined in no_lines_before {
+        if let ImportSection::UserDefined(section_name) = user_defined {
+            if !known_modules.user_defined.contains_key(section_name) {
+                warn_user_once!(
+                    "`no-lines-before` contains unknown user-defined section: `{}`.",
+                    section_name
+                );
+            }
+        }
+    }
+
+    // Verify that all sections defined in `sections` are listed in `section-order`.
+    for section_name in known_modules.user_defined.keys() {
+        let section = ImportSection::UserDefined(section_name.clone());
+        if !section_order.contains(&section) {
+            warn_user_once!(
+                "`section-order` is missing user-defined section: `{}`.",
+                section_name
+            );
+            section_order.push(section);
+        }
+    }
 
     let mut output = String::new();
 
@@ -167,6 +213,7 @@ pub fn format_imports(
             no_lines_before,
             lines_between_types,
             target_version,
+            &section_order,
         );
 
         if !block_output.is_empty() && !output.is_empty() {
@@ -221,9 +268,10 @@ fn format_import_block(
     classes: &BTreeSet<String>,
     constants: &BTreeSet<String>,
     variables: &BTreeSet<String>,
-    no_lines_before: &BTreeSet<ImportType>,
+    no_lines_before: &BTreeSet<ImportSection>,
     lines_between_types: usize,
     target_version: PythonVersion,
+    section_order: &[ImportSection],
 ) -> String {
     // Categorize by type (e.g., first-party vs. third-party).
     let mut block_by_type = categorize_imports(block, src, package, known_modules, target_version);
@@ -233,10 +281,10 @@ fn format_import_block(
     // Generate replacement source code.
     let mut is_first_block = true;
     let mut pending_lines_before = false;
-    for import_type in ImportType::iter() {
-        let import_block = block_by_type.remove(&import_type);
+    for import_section in section_order {
+        let import_block = block_by_type.remove(import_section);
 
-        if !no_lines_before.contains(&import_type) {
+        if !no_lines_before.contains(import_section) {
             pending_lines_before = true;
         }
         let Some(import_block) = import_block else {
@@ -327,6 +375,7 @@ fn format_import_block(
 
 #[cfg(test)]
 mod tests {
+    use rustc_hash::FxHashMap;
     use std::collections::BTreeSet;
     use std::path::Path;
 
@@ -336,7 +385,7 @@ mod tests {
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::rules::isort::categorize::KnownModules;
+    use crate::rules::isort::categorize::{ImportSection, KnownModules};
     use crate::settings::Settings;
     use crate::test::{test_path, test_resource_path};
 
@@ -413,6 +462,7 @@ mod tests {
                         vec!["foo".to_string(), "__future__".to_string()],
                         vec![],
                         vec![],
+                        FxHashMap::default(),
                     ),
                     ..super::settings::Settings::default()
                 },
@@ -436,6 +486,7 @@ mod tests {
                         vec!["foo.bar".to_string()],
                         vec![],
                         vec![],
+                        FxHashMap::default(),
                     ),
                     ..super::settings::Settings::default()
                 },
@@ -477,6 +528,7 @@ mod tests {
                         vec![],
                         vec!["ruff".to_string()],
                         vec![],
+                        FxHashMap::default(),
                     ),
                     ..super::settings::Settings::default()
                 },
@@ -831,11 +883,11 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     no_lines_before: BTreeSet::from([
-                        ImportType::Future,
-                        ImportType::StandardLibrary,
-                        ImportType::ThirdParty,
-                        ImportType::FirstParty,
-                        ImportType::LocalFolder,
+                        ImportSection::Known(ImportType::Future),
+                        ImportSection::Known(ImportType::StandardLibrary),
+                        ImportSection::Known(ImportType::ThirdParty),
+                        ImportSection::Known(ImportType::FirstParty),
+                        ImportSection::Known(ImportType::LocalFolder),
                     ]),
                     ..super::settings::Settings::default()
                 },
@@ -859,8 +911,8 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     no_lines_before: BTreeSet::from([
-                        ImportType::StandardLibrary,
-                        ImportType::LocalFolder,
+                        ImportSection::Known(ImportType::StandardLibrary),
+                        ImportSection::Known(ImportType::LocalFolder),
                     ]),
                     ..super::settings::Settings::default()
                 },
@@ -926,6 +978,62 @@ mod tests {
                         "tests".to_string(),
                         "not_there".to_string(), // doesn't appear, shouldn't matter
                         "experiments".to_string(),
+                    ],
+                    ..super::settings::Settings::default()
+                },
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("sections.py"))]
+    fn sections(path: &Path) -> Result<()> {
+        let snapshot = format!("sections_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec![],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::from_iter([("django".to_string(), vec!["django".to_string()])]),
+                    ),
+                    ..super::settings::Settings::default()
+                },
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("sections.py"))]
+    fn section_order(path: &Path) -> Result<()> {
+        let snapshot = format!("section_order_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec!["library".to_string()],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::from_iter([("django".to_string(), vec!["django".to_string()])]),
+                    ),
+                    section_order: vec![
+                        ImportSection::Known(ImportType::Future),
+                        ImportSection::Known(ImportType::StandardLibrary),
+                        ImportSection::Known(ImportType::ThirdParty),
+                        ImportSection::UserDefined("django".to_string()),
+                        ImportSection::Known(ImportType::FirstParty),
+                        ImportSection::Known(ImportType::LocalFolder),
                     ],
                     ..super::settings::Settings::default()
                 },
