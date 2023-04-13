@@ -196,10 +196,27 @@ project. See [#283](https://github.com/charliermarsh/ruff/issues/283) for more.
 
 ## How does Ruff's import sorting compare to [isort](https://pypi.org/project/isort/)?
 
-Ruff's import sorting is intended to be nearly equivalent to isort when used `profile = "black"`.
-There are a few known, minor differences in how Ruff and isort break ties between similar imports,
-and in how Ruff and isort treat inline comments in some cases (see: [#1381](https://github.com/charliermarsh/ruff/issues/1381),
+Ruff's import sorting is intended to be near-equivalent to isort's when using isort's
+`profile = "black"`.
+
+There are a few known differences in how Ruff and isort treat aliased imports, and in how Ruff and
+isort treat inline comments in some cases (see: [#1381](https://github.com/charliermarsh/ruff/issues/1381),
 [#2104](https://github.com/charliermarsh/ruff/issues/2104)).
+
+For example, Ruff tends to group non-aliased imports from the same module:
+
+```py
+from numpy import cos, int8, int16, int32, int64, tan, uint8, uint16, uint32, uint64
+from numpy import sin as np_sin
+```
+
+Whereas isort splits them into separate import statements at each aliased boundary:
+
+```py
+from numpy import cos, int8, int16, int32, int64
+from numpy import sin as np_sin
+from numpy import tan, uint8, uint16, uint32, uint64
+```
 
 Like isort, Ruff's import sorting is compatible with Black.
 

@@ -8,7 +8,7 @@ use crate::checkers::ast::Checker;
 
 const ITERABLE_INITIALIZERS: &[&str] = &["dict", "frozenset", "list", "tuple", "set"];
 
-pub fn get_mark_decorators(decorators: &[Expr]) -> impl Iterator<Item = (&Expr, CallPath)> {
+pub(super) fn get_mark_decorators(decorators: &[Expr]) -> impl Iterator<Item = (&Expr, CallPath)> {
     decorators.iter().filter_map(|decorator| {
         let Some(call_path) = collect_call_path(map_callable(decorator)) else {
             return None;
@@ -21,7 +21,7 @@ pub fn get_mark_decorators(decorators: &[Expr]) -> impl Iterator<Item = (&Expr, 
     })
 }
 
-pub fn is_pytest_fail(call: &Expr, checker: &Checker) -> bool {
+pub(super) fn is_pytest_fail(call: &Expr, checker: &Checker) -> bool {
     checker
         .ctx
         .resolve_call_path(call)
@@ -30,7 +30,7 @@ pub fn is_pytest_fail(call: &Expr, checker: &Checker) -> bool {
         })
 }
 
-pub fn is_pytest_fixture(decorator: &Expr, checker: &Checker) -> bool {
+pub(super) fn is_pytest_fixture(decorator: &Expr, checker: &Checker) -> bool {
     checker
         .ctx
         .resolve_call_path(if let ExprKind::Call { func, .. } = &decorator.node {
@@ -43,7 +43,7 @@ pub fn is_pytest_fixture(decorator: &Expr, checker: &Checker) -> bool {
         })
 }
 
-pub fn is_pytest_yield_fixture(decorator: &Expr, checker: &Checker) -> bool {
+pub(super) fn is_pytest_yield_fixture(decorator: &Expr, checker: &Checker) -> bool {
     checker
         .ctx
         .resolve_call_path(map_callable(decorator))
@@ -52,7 +52,7 @@ pub fn is_pytest_yield_fixture(decorator: &Expr, checker: &Checker) -> bool {
         })
 }
 
-pub fn is_abstractmethod_decorator(decorator: &Expr, checker: &Checker) -> bool {
+pub(super) fn is_abstractmethod_decorator(decorator: &Expr, checker: &Checker) -> bool {
     checker
         .ctx
         .resolve_call_path(decorator)
@@ -62,10 +62,10 @@ pub fn is_abstractmethod_decorator(decorator: &Expr, checker: &Checker) -> bool 
 }
 
 /// Check if the expression is a constant that evaluates to false.
-pub fn is_falsy_constant(expr: &Expr) -> bool {
+pub(super) fn is_falsy_constant(expr: &Expr) -> bool {
     match &expr.node {
         ExprKind::Constant { value, .. } => match value {
-            Constant::Bool(value) => !value,
+            Constant::Bool(value) => !*value,
             Constant::None => true,
             Constant::Str(string) => string.is_empty(),
             Constant::Bytes(bytes) => bytes.is_empty(),
@@ -103,7 +103,7 @@ pub fn is_falsy_constant(expr: &Expr) -> bool {
     }
 }
 
-pub fn is_pytest_parametrize(decorator: &Expr, checker: &Checker) -> bool {
+pub(super) fn is_pytest_parametrize(decorator: &Expr, checker: &Checker) -> bool {
     checker
         .ctx
         .resolve_call_path(map_callable(decorator))
@@ -112,7 +112,7 @@ pub fn is_pytest_parametrize(decorator: &Expr, checker: &Checker) -> bool {
         })
 }
 
-pub fn keyword_is_literal(kw: &Keyword, literal: &str) -> bool {
+pub(super) fn keyword_is_literal(kw: &Keyword, literal: &str) -> bool {
     if let ExprKind::Constant {
         value: Constant::Str(string),
         ..
@@ -124,7 +124,7 @@ pub fn keyword_is_literal(kw: &Keyword, literal: &str) -> bool {
     }
 }
 
-pub fn is_empty_or_null_string(expr: &Expr) -> bool {
+pub(super) fn is_empty_or_null_string(expr: &Expr) -> bool {
     match &expr.node {
         ExprKind::Constant {
             value: Constant::Str(string),
@@ -139,7 +139,7 @@ pub fn is_empty_or_null_string(expr: &Expr) -> bool {
     }
 }
 
-pub fn split_names(names: &str) -> Vec<&str> {
+pub(super) fn split_names(names: &str) -> Vec<&str> {
     // Match the following pytest code:
     //    [x.strip() for x in argnames.split(",") if x.strip()]
     names

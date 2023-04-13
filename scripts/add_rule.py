@@ -103,23 +103,22 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
     # Add the relevant rule function.
     with (rules_dir / f"{rule_name_snake}.rs").open("w") as fp:
         fp.write(
-            """\
+            f"""\
 use ruff_diagnostics::Violation;
-use ruff_macros::{derive_message_formats, violation};
+use ruff_macros::{{derive_message_formats, violation}};
 
 use crate::checkers::ast::Checker;
 
 #[violation]
-pub struct %s;
-impl Violation for %s {
+pub struct {name};
+impl Violation for {name} {{
     #[derive_message_formats]
-    fn message(&self) -> String {
+    fn message(&self) -> String {{
         todo!("implement message");
         format!("TODO: write message")
-    }
-}
-"""
-            % (name, name),
+    }}
+}}
+""",
         )
         fp.write(
             f"""

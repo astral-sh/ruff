@@ -151,5 +151,62 @@ PT006.py:49:26: PT006 [*] Wrong name(s) type in `@pytest.mark.parametrize`, expe
    49 |+@pytest.mark.parametrize((some_expr, "param2"), [1, 2, 3])
 50 50 | def test_list_mixed_expr_literal(param1, param2):
 51 51 |     ...
+52 52 | 
+
+PT006.py:54:26: PT006 [*] Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple`
+   |
+54 | @pytest.mark.parametrize(("param1, " "param2, " "param3"), [(1, 2, 3), (4, 5, 6)])
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
+55 | def test_implicit_str_concat_with_parens(param1, param2, param3):
+56 |     ...
+   |
+   = help: Use a `tuple` for parameter names
+
+ℹ Suggested fix
+51 51 |     ...
+52 52 | 
+53 53 | 
+54    |-@pytest.mark.parametrize(("param1, " "param2, " "param3"), [(1, 2, 3), (4, 5, 6)])
+   54 |+@pytest.mark.parametrize(("param1", "param2", "param3"), [(1, 2, 3), (4, 5, 6)])
+55 55 | def test_implicit_str_concat_with_parens(param1, param2, param3):
+56 56 |     ...
+57 57 | 
+
+PT006.py:59:26: PT006 [*] Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple`
+   |
+59 | @pytest.mark.parametrize("param1, " "param2, " "param3", [(1, 2, 3), (4, 5, 6)])
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
+60 | def test_implicit_str_concat_no_parens(param1, param2, param3):
+61 |     ...
+   |
+   = help: Use a `tuple` for parameter names
+
+ℹ Suggested fix
+56 56 |     ...
+57 57 | 
+58 58 | 
+59    |-@pytest.mark.parametrize("param1, " "param2, " "param3", [(1, 2, 3), (4, 5, 6)])
+   59 |+@pytest.mark.parametrize(("param1", "param2", "param3"), [(1, 2, 3), (4, 5, 6)])
+60 60 | def test_implicit_str_concat_no_parens(param1, param2, param3):
+61 61 |     ...
+62 62 | 
+
+PT006.py:64:26: PT006 [*] Wrong name(s) type in `@pytest.mark.parametrize`, expected `tuple`
+   |
+64 | @pytest.mark.parametrize((("param1, " "param2, " "param3")), [(1, 2, 3), (4, 5, 6)])
+   |                          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT006
+65 | def test_implicit_str_concat_with_multi_parens(param1, param2, param3):
+66 |     ...
+   |
+   = help: Use a `tuple` for parameter names
+
+ℹ Suggested fix
+61 61 |     ...
+62 62 | 
+63 63 | 
+64    |-@pytest.mark.parametrize((("param1, " "param2, " "param3")), [(1, 2, 3), (4, 5, 6)])
+   64 |+@pytest.mark.parametrize(("param1", "param2", "param3"), [(1, 2, 3), (4, 5, 6)])
+65 65 | def test_implicit_str_concat_with_multi_parens(param1, param2, param3):
+66 66 |     ...
 
 

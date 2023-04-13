@@ -1603,15 +1603,17 @@ where
                 }
             }
             StmtKind::Assert { test, msg } => {
+                if !self.ctx.in_type_checking_block {
+                    if self.settings.rules.enabled(Rule::Assert) {
+                        self.diagnostics
+                            .push(flake8_bandit::rules::assert_used(stmt));
+                    }
+                }
                 if self.settings.rules.enabled(Rule::AssertTuple) {
                     pyflakes::rules::assert_tuple(self, stmt, test);
                 }
                 if self.settings.rules.enabled(Rule::AssertFalse) {
                     flake8_bugbear::rules::assert_false(self, stmt, test, msg.as_deref());
-                }
-                if self.settings.rules.enabled(Rule::Assert) {
-                    self.diagnostics
-                        .push(flake8_bandit::rules::assert_used(stmt));
                 }
                 if self.settings.rules.enabled(Rule::PytestAssertAlwaysFalse) {
                     if let Some(diagnostic) = flake8_pytest_style::rules::assert_falsy(stmt, test) {
@@ -1626,7 +1628,6 @@ where
                         msg.as_deref(),
                     );
                 }
-
                 if self.settings.rules.enabled(Rule::AssertOnStringLiteral) {
                     pylint::rules::assert_on_string_literal(self, test);
                 }
@@ -2650,6 +2651,16 @@ where
                         self, func, args, keywords,
                     );
                 }
+                if self.settings.rules.any_enabled(&[
+                    Rule::SubprocessWithoutShellEqualsTrue,
+                    Rule::SubprocessPopenWithShellEqualsTrue,
+                    Rule::CallWithShellEqualsTrue,
+                    Rule::StartProcessWithAShell,
+                    Rule::StartProcessWithNoShell,
+                    Rule::StartProcessWithPartialPath,
+                ]) {
+                    flake8_bandit::rules::shell_injection(self, func, args, keywords);
+                }
 
                 // flake8-comprehensions
                 if self.settings.rules.enabled(Rule::UnnecessaryGeneratorList) {
@@ -3234,7 +3245,7 @@ where
                     }
 
                     if self.settings.rules.enabled(Rule::PrintfStringFormatting) {
-                        pyupgrade::rules::printf_string_formatting(self, expr, left, right);
+                        pyupgrade::rules::printf_string_formatting(self, expr, right);
                     }
                     if self.settings.rules.enabled(Rule::BadStringFormatType) {
                         pylint::rules::bad_string_format_type(self, expr, right);
