@@ -92,6 +92,8 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
 /// def test(a, b):
 ///     ...
 /// ```
+///
+/// This method assumes that the first argument is a string.
 fn get_parametrize_name_range(checker: &Checker, decorator: &Expr, expr: &Expr) -> Range {
     let mut locations = Vec::new();
     let mut implicit_concat = None;

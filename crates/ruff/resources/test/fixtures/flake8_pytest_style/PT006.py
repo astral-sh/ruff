@@ -59,3 +59,8 @@ def test_implicit_str_concat_with_parens(param1, param2, param3):
 @pytest.mark.parametrize("param1, " "param2, " "param3", [(1, 2, 3), (4, 5, 6)])
 def test_implicit_str_concat_no_parens(param1, param2, param3):
     ...
+
+
+@pytest.mark.parametrize((("param1, " "param2, " "param3")), [(1, 2, 3), (4, 5, 6)])
+def test_implicit_str_concat_with_multi_parens(param1, param2, param3):
+    ...
