@@ -20,6 +20,9 @@ pub use unnecessary_list_comprehension_set::{
 };
 pub use unnecessary_literal_dict::{unnecessary_literal_dict, UnnecessaryLiteralDict};
 pub use unnecessary_literal_set::{unnecessary_literal_set, UnnecessaryLiteralSet};
+pub use unnecessary_literal_within_dict_call::{
+    unnecessary_literal_within_dict_call, UnnecessaryLiteralWithinDictCall,
+};
 pub use unnecessary_literal_within_list_call::{
     unnecessary_literal_within_list_call, UnnecessaryLiteralWithinListCall,
 };
@@ -44,6 +47,7 @@ mod unnecessary_list_comprehension_dict;
 mod unnecessary_list_comprehension_set;
 mod unnecessary_literal_dict;
 mod unnecessary_literal_set;
+mod unnecessary_literal_within_dict_call;
 mod unnecessary_literal_within_list_call;
 mod unnecessary_literal_within_tuple_call;
 mod unnecessary_map;
