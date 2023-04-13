@@ -1,8 +1,9 @@
 //! Settings for the `isort` plugin.
 
 use std::collections::BTreeSet;
+use std::hash::BuildHasherDefault;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 use strum::IntoEnumIterator;
@@ -291,7 +292,7 @@ pub struct Options {
     )]
     /// A list of mappings from section names to modules.
     /// By default custom sections are output last, but this can be overridden with `section-order`.
-    pub sections: Option<FxHashMap<String, Vec<String>>>,
+    pub sections: Option<FxHashMap<ImportSection, Vec<String>>>,
 }
 
 #[derive(Debug, CacheKey)]
@@ -352,17 +353,38 @@ impl From<Options> for Settings {
         let known_third_party = options.known_third_party.unwrap_or_default();
         let known_local_folder = options.known_local_folder.unwrap_or_default();
         let extra_standard_library = options.extra_standard_library.unwrap_or_default();
-        let sections = options.sections.unwrap_or_default();
         let no_lines_before = options.no_lines_before.unwrap_or_default();
+        let sections = options.sections.unwrap_or_default();
+
+        // Verify that `sections` doesn't contain any built-in sections.
+        let sections: FxHashMap<String, Vec<String>> = sections
+            .into_iter()
+            .filter_map(|(section, modules)| match section {
+                ImportSection::Known(section) => {
+                    warn_user_once!("`sections` contains built-in section: `{:?}`", section);
+                    None
+                }
+                ImportSection::UserDefined(section) => Some((section, modules)),
+            })
+            .collect();
+
+        // Verify that `section_order` doesn't contain any duplicates.
+        let mut seen =
+            FxHashSet::with_capacity_and_hasher(section_order.len(), BuildHasherDefault::default());
+        for section in &section_order {
+            if !seen.insert(section) {
+                warn_user_once!(
+                    "`section-order` contains duplicate section: `{:?}`",
+                    section
+                );
+            }
+        }
 
         // Verify that all sections listed in `section_order` are defined in `sections`.
         for section in &section_order {
             if let ImportSection::UserDefined(section_name) = section {
                 if !sections.contains_key(section_name) {
-                    warn_user_once!(
-                        "`section-order` contains unknown user-defined section: `{}`.",
-                        section_name
-                    );
+                    warn_user_once!("`section-order` contains unknown section: `{:?}`", section,);
                 }
             }
         }
@@ -372,8 +394,8 @@ impl From<Options> for Settings {
             if let ImportSection::UserDefined(section_name) = section {
                 if !sections.contains_key(section_name) {
                     warn_user_once!(
-                        "`no-lines-before` contains unknown user-defined section: `{}`.",
-                        section_name
+                        "`no-lines-before` contains unknown section: `{:?}`",
+                        section,
                     );
                 }
             }
@@ -383,7 +405,7 @@ impl From<Options> for Settings {
         for section in ImportType::iter().map(ImportSection::Known) {
             if !section_order.contains(&section) {
                 warn_user_once!(
-                    "`section-order` is missing built-in section: `{:?}`.",
+                    "`section-order` is missing built-in section: `{:?}`",
                     section
                 );
                 section_order.push(section);
@@ -394,10 +416,7 @@ impl From<Options> for Settings {
         for section_name in sections.keys() {
             let section = ImportSection::UserDefined(section_name.clone());
             if !section_order.contains(&section) {
-                warn_user_once!(
-                    "`section-order` is missing user-defined section: `{}`.",
-                    section_name
-                );
+                warn_user_once!("`section-order` is missing section: `{:?}`", section);
                 section_order.push(section);
             }
         }
@@ -475,7 +494,14 @@ impl From<Settings> for Options {
             lines_between_types: Some(settings.lines_between_types),
             forced_separate: Some(settings.forced_separate.into_iter().collect()),
             section_order: Some(settings.section_order.into_iter().collect()),
-            sections: Some(settings.known_modules.user_defined()),
+            sections: Some(
+                settings
+                    .known_modules
+                    .user_defined()
+                    .into_iter()
+                    .map(|(section, modules)| (ImportSection::UserDefined(section), modules))
+                    .collect(),
+            ),
         }
     }
 }

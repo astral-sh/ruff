@@ -24,6 +24,7 @@ use super::types::{ImportBlock, Importable};
     Eq,
     Copy,
     Clone,
+    Hash,
     Serialize,
     Deserialize,
     JsonSchema,
@@ -40,7 +41,7 @@ pub enum ImportType {
 }
 
 #[derive(
-    Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Serialize, Deserialize, JsonSchema, CacheKey,
+    Debug, PartialOrd, Ord, PartialEq, Eq, Clone, Hash, Serialize, Deserialize, JsonSchema, CacheKey,
 )]
 #[serde(untagged)]
 pub enum ImportSection {
@@ -340,9 +341,9 @@ impl KnownModules {
     pub fn user_defined(&self) -> FxHashMap<String, Vec<String>> {
         let mut user_defined: FxHashMap<String, Vec<String>> = FxHashMap::default();
         for (module, section) in &self.known {
-            if let ImportSection::UserDefined(section) = section {
+            if let ImportSection::UserDefined(section_name) = section {
                 user_defined
-                    .entry(section.clone())
+                    .entry(section_name.clone())
                     .or_default()
                     .push(module.clone());
             }
