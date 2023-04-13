@@ -750,6 +750,7 @@ UP031_0.py:83:7: UP031 [*] Use format specifiers instead of percent format
    83 |+print('Hello {arg}'.format(**bar))
 84 84 | print('Hello %(arg)s' % bar.baz)
 85 85 | print('Hello %(arg)s' % bar['bop'])
+86 86 | 
 
 UP031_0.py:84:7: UP031 [*] Use format specifiers instead of percent format
    |
@@ -768,6 +769,8 @@ UP031_0.py:84:7: UP031 [*] Use format specifiers instead of percent format
 84    |-print('Hello %(arg)s' % bar.baz)
    84 |+print('Hello {arg}'.format(**bar.baz))
 85 85 | print('Hello %(arg)s' % bar['bop'])
+86 86 | 
+87 87 | # Hanging modulos
 
 UP031_0.py:85:7: UP031 [*] Use format specifiers instead of percent format
    |
@@ -775,6 +778,8 @@ UP031_0.py:85:7: UP031 [*] Use format specifiers instead of percent format
 86 | print('Hello %(arg)s' % bar.baz)
 87 | print('Hello %(arg)s' % bar['bop'])
    |       ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP031
+88 | 
+89 | # Hanging modulos
    |
    = help: Replace with format specifiers
 
@@ -784,5 +789,109 @@ UP031_0.py:85:7: UP031 [*] Use format specifiers instead of percent format
 84 84 | print('Hello %(arg)s' % bar.baz)
 85    |-print('Hello %(arg)s' % bar['bop'])
    85 |+print('Hello {arg}'.format(**bar['bop']))
+86 86 | 
+87 87 | # Hanging modulos
+88 88 | (
+
+UP031_0.py:88:1: UP031 [*] Use format specifiers instead of percent format
+   |
+88 |   # Hanging modulos
+89 | / (
+90 | |     "foo %s "
+91 | |     "bar %s"
+92 | | ) % (x, y)
+   | |__________^ UP031
+93 |   
+94 |   (
+   |
+   = help: Replace with format specifiers
+
+ℹ Suggested fix
+86 86 | 
+87 87 | # Hanging modulos
+88 88 | (
+89    |-    "foo %s "
+90    |-    "bar %s"
+91    |-) % (x, y)
+   89 |+    "foo {} "
+   90 |+    "bar {}"
+   91 |+).format(x, y)
+92 92 | 
+93 93 | (
+94 94 |     "foo %(foo)s "
+
+UP031_0.py:93:1: UP031 [*] Use format specifiers instead of percent format
+    |
+ 93 |   ) % (x, y)
+ 94 |   
+ 95 | / (
+ 96 | |     "foo %(foo)s "
+ 97 | |     "bar %(bar)s"
+ 98 | | ) % {"foo": x, "bar": y}
+    | |________________________^ UP031
+ 99 |   
+100 |   (
+    |
+    = help: Replace with format specifiers
+
+ℹ Suggested fix
+91 91 | ) % (x, y)
+92 92 | 
+93 93 | (
+94    |-    "foo %(foo)s "
+95    |-    "bar %(bar)s"
+96    |-) % {"foo": x, "bar": y}
+   94 |+    "foo {foo} "
+   95 |+    "bar {bar}"
+   96 |+).format(foo=x, bar=y)
+97 97 | 
+98 98 | (
+99 99 |     """foo %s"""
+
+UP031_0.py:99:5: UP031 [*] Use format specifiers instead of percent format
+    |
+ 99 |   (
+100 |       """foo %s"""
+    |  _____^
+101 | |     % (x,)
+    | |__________^ UP031
+102 |   )
+    |
+    = help: Replace with format specifiers
+
+ℹ Suggested fix
+96  96  | ) % {"foo": x, "bar": y}
+97  97  | 
+98  98  | (
+99      |-    """foo %s"""
+100     |-    % (x,)
+    99  |+    """foo {}""".format(x)
+101 100 | )
+102 101 | 
+103 102 | (
+
+UP031_0.py:104:5: UP031 [*] Use format specifiers instead of percent format
+    |
+104 |   (
+105 |       """
+    |  _____^
+106 | |     foo %s
+107 | |     """
+108 | |     % (x,)
+    | |__________^ UP031
+109 |   )
+    |
+    = help: Replace with format specifiers
+
+ℹ Suggested fix
+102 102 | 
+103 103 | (
+104 104 |     """
+105     |-    foo %s
+106     |-    """
+107     |-    % (x,)
+    105 |+    foo {}
+    106 |+    """.format(x)
+108 107 | )
 
 
