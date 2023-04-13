@@ -8,6 +8,7 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::context::Context;
 
 use crate::{
     checkers::ast::Checker, registry::Rule, rules::flake8_bandit::helpers::string_literal,
@@ -96,54 +97,38 @@ enum CallKind {
     NoShell,
 }
 
-struct Config<'a> {
-    subprocess: Vec<Vec<&'a str>>,
-    shell: Vec<Vec<&'a str>>,
-    no_shell: Vec<Vec<&'a str>>,
+/// Return the [`CallKind`] of the given function call.
+fn get_call_kind(func: &Expr, context: &Context) -> Option<CallKind> {
+    context
+        .resolve_call_path(func)
+        .and_then(|call_path| match call_path.as_slice() {
+            &[module, submodule] => match module {
+                "os" => match submodule {
+                    "execl" | "execle" | "execlp" | "execlpe" | "execv" | "execve" | "execvp"
+                    | "execvpe" | "spawnl" | "spawnle" | "spawnlp" | "spawnlpe" | "spawnv"
+                    | "spawnve" | "spawnvp" | "spawnvpe" | "startfile" => Some(CallKind::NoShell),
+                    "system" | "popen" | "popen2" | "popen3" | "popen4" => Some(CallKind::Shell),
+                    _ => None,
+                },
+                "subprocess" => match submodule {
+                    "Popen" | "call" | "check_call" | "check_output" | "run" => {
+                        Some(CallKind::Subprocess)
+                    }
+                    _ => None,
+                },
+                "popen2" => match submodule {
+                    "popen2" | "popen3" | "popen4" | "Popen3" | "Popen4" => Some(CallKind::Shell),
+                    _ => None,
+                },
+                "commands" => match submodule {
+                    "getoutput" | "getstatusoutput" => Some(CallKind::Shell),
+                    _ => None,
+                },
+                _ => None,
+            },
+            _ => None,
+        })
 }
-
-static CONFIG: Lazy<Config> = Lazy::new(|| Config {
-    subprocess: vec![
-        vec!["subprocess", "Popen"],
-        vec!["subprocess", "call"],
-        vec!["subprocess", "check_call"],
-        vec!["subprocess", "check_output"],
-        vec!["subprocess", "run"],
-    ],
-    shell: vec![
-        vec!["os", "system"],
-        vec!["os", "popen"],
-        vec!["os", "popen2"],
-        vec!["os", "popen3"],
-        vec!["os", "popen4"],
-        vec!["popen2", "popen2"],
-        vec!["popen2", "popen3"],
-        vec!["popen2", "popen4"],
-        vec!["popen2", "Popen3"],
-        vec!["popen2", "Popen4"],
-        vec!["commands", "getoutput"],
-        vec!["commands", "getstatusoutput"],
-    ],
-    no_shell: vec![
-        vec!["os", "execl"],
-        vec!["os", "execle"],
-        vec!["os", "execlp"],
-        vec!["os", "execlpe"],
-        vec!["os", "execv"],
-        vec!["os", "execve"],
-        vec!["os", "execvp"],
-        vec!["os", "execvpe"],
-        vec!["os", "spawnl"],
-        vec!["os", "spawnle"],
-        vec!["os", "spawnlp"],
-        vec!["os", "spawnlpe"],
-        vec!["os", "spawnv"],
-        vec!["os", "spawnve"],
-        vec!["os", "spawnvp"],
-        vec!["os", "spawnvpe"],
-        vec!["os", "startfile"],
-    ],
-});
 
 #[derive(Copy, Clone, Debug)]
 enum Truthiness {
@@ -215,10 +200,13 @@ impl From<&Keyword> for Truthiness {
 
 #[derive(Copy, Clone, Debug)]
 struct ShellKeyword<'a> {
-    has_shell: Truthiness,
+    /// Whether the `shell` keyword argument is set and evaluates to `True`.
+    truthiness: Truthiness,
+    /// The `shell` keyword argument.
     keyword: &'a Keyword,
 }
 
+/// Return the `shell` keyword argument to the given function call, if any.
 fn find_shell_keyword(keywords: &[Keyword]) -> Option<ShellKeyword> {
     keywords
         .iter()
@@ -230,11 +218,13 @@ fn find_shell_keyword(keywords: &[Keyword]) -> Option<ShellKeyword> {
                 .map_or(false, |arg| arg == "shell")
         })
         .map(|keyword| ShellKeyword {
-            has_shell: keyword.into(),
+            truthiness: keyword.into(),
             keyword,
         })
 }
 
+/// Return `true` if the value provided to the `shell` call seems safe. This is based on Bandit's
+/// definition: string literals are considered okay, but dynamically-computed values are not.
 fn shell_call_seems_safe(arg: &Expr) -> bool {
     matches!(
         arg.node,
@@ -245,33 +235,8 @@ fn shell_call_seems_safe(arg: &Expr) -> bool {
     )
 }
 
-fn get_call_kind(checker: &mut Checker, func: &Expr) -> Option<CallKind> {
-    checker.ctx.resolve_call_path(func).and_then(|call_path| {
-        if CONFIG
-            .subprocess
-            .iter()
-            .any(|subprocess| call_path.as_slice() == subprocess.as_slice())
-        {
-            Some(CallKind::Subprocess)
-        } else if CONFIG
-            .shell
-            .iter()
-            .any(|shell| call_path.as_slice() == shell.as_slice())
-        {
-            Some(CallKind::Shell)
-        } else if CONFIG
-            .no_shell
-            .iter()
-            .any(|no_shell| call_path.as_slice() == no_shell.as_slice())
-        {
-            Some(CallKind::NoShell)
-        } else {
-            None
-        }
-    })
-}
-
-fn string_literal_including_list(expr: &Expr) -> Option<&str> {
+/// Return the [`Expr`] as a string literal, if it's a string or a list of strings.
+fn try_string_literal(expr: &Expr) -> Option<&str> {
     match &expr.node {
         ExprKind::List { elts, .. } => {
             if elts.is_empty() {
@@ -286,14 +251,14 @@ fn string_literal_including_list(expr: &Expr) -> Option<&str> {
 
 /// S602, S603, S604, S605, S606, S607
 pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: &[Keyword]) {
-    let call_kind = get_call_kind(checker, func);
+    let call_kind = get_call_kind(func, &checker.ctx);
 
-    if let Some(CallKind::Subprocess) = call_kind {
+    if matches!(call_kind, Some(CallKind::Subprocess)) {
         if let Some(arg) = args.first() {
             match find_shell_keyword(keywords) {
                 // S602
                 Some(ShellKeyword {
-                    has_shell: Truthiness::Truthy,
+                    truthiness: Truthiness::Truthy,
                     keyword,
                 }) => {
                     if checker
@@ -311,7 +276,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                 }
                 // S603
                 Some(ShellKeyword {
-                    has_shell: Truthiness::Falsey | Truthiness::Unknown,
+                    truthiness: Truthiness::Falsey | Truthiness::Unknown,
                     keyword,
                 }) => {
                     if checker
@@ -341,7 +306,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
             }
         }
     } else if let Some(ShellKeyword {
-        has_shell: Truthiness::Truthy,
+        truthiness: Truthiness::Truthy,
         keyword,
     }) = find_shell_keyword(keywords)
     {
@@ -359,7 +324,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
     }
 
     // S605
-    if let Some(CallKind::Shell) = call_kind {
+    if matches!(call_kind, Some(CallKind::Shell)) {
         if let Some(arg) = args.first() {
             if checker.settings.rules.enabled(Rule::StartProcessWithAShell) {
                 checker.diagnostics.push(Diagnostic::new(
@@ -373,7 +338,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
     }
 
     // S606
-    if let Some(CallKind::NoShell) = call_kind {
+    if matches!(call_kind, Some(CallKind::NoShell)) {
         if checker
             .settings
             .rules
@@ -393,7 +358,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                 .rules
                 .enabled(Rule::StartProcessWithPartialPath)
             {
-                if let Some(value) = string_literal_including_list(arg) {
+                if let Some(value) = try_string_literal(arg) {
                     if FULL_PATH_REGEX.find(value).is_none() {
                         checker.diagnostics.push(Diagnostic::new(
                             StartProcessWithPartialPath,
