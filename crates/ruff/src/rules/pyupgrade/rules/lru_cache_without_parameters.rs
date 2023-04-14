@@ -48,10 +48,9 @@ pub fn lru_cache_without_parameters(checker: &mut Checker, decorator_list: &[Exp
                 TextRange::new(func.end(), expr.end()),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::replacement(
+                diagnostic.set_fix(Edit::range_replacement(
                     unparse_expr(func, checker.stylist),
-                    expr.start(),
-                    expr.end(),
+                    expr.range(),
                 ));
             }
             checker.diagnostics.push(diagnostic);

@@ -1,4 +1,4 @@
-use ruff_text_size::TextLen;
+use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
@@ -71,10 +71,9 @@ pub fn capitalized(checker: &mut Checker, docstring: &Docstring) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             capitalized_word,
-            body.start(),
-            body.start() + first_word.text_len(),
+            TextRange::at(body.start(), first_word.text_len()),
         ));
     }
 

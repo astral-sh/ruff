@@ -145,7 +145,7 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
         if let Ok(contents) =
             generate_call(expr, &summary.indices, checker.locator, checker.stylist)
         {
-            diagnostic.set_fix(Edit::replacement(contents, expr.start(), expr.end()));
+            diagnostic.set_fix(Edit::range_replacement(contents, expr.range()));
         };
     }
     checker.diagnostics.push(diagnostic);

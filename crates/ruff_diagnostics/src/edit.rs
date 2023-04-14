@@ -17,20 +17,32 @@ pub struct Edit {
 
 impl Edit {
     /// Creates an edit that deletes the content in the `start` to `end` range.
+    #[inline]
     pub const fn deletion(start: TextSize, end: TextSize) -> Self {
+        Self::range_deletion(TextRange::new(start, end))
+    }
+
+    /// Creates an edit that deletes the content in `range`.
+    pub const fn range_deletion(range: TextRange) -> Self {
         Self {
             content: None,
-            range: TextRange::new(start, end),
+            range,
         }
     }
 
     /// Creates an edit that replaces the content in the `start` to `end` range with `content`.
+    #[inline]
     pub fn replacement(content: String, start: TextSize, end: TextSize) -> Self {
+        Self::range_replacement(content, TextRange::new(start, end))
+    }
+
+    /// Creates an edit that replaces the content in `range` with `content`.
+    pub fn range_replacement(content: String, range: TextRange) -> Self {
         debug_assert!(!content.is_empty(), "Prefer `Fix::deletion`");
 
         Self {
             content: Some(Box::from(content)),
-            range: TextRange::new(start, end),
+            range,
         }
     }
 

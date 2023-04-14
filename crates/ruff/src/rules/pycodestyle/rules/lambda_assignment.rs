@@ -103,7 +103,7 @@ pub fn lambda_assignment(
                         indented.push_str(&line);
                     }
                 }
-                diagnostic.set_fix(Edit::replacement(indented, stmt.start(), stmt.end()));
+                diagnostic.set_fix(Edit::range_replacement(indented, stmt.range()));
             }
 
             checker.diagnostics.push(diagnostic);

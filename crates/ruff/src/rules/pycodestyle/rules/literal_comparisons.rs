@@ -270,11 +270,7 @@ pub fn literal_comparisons(
             .collect::<Vec<_>>();
         let content = compare(left, &ops, comparators, checker.stylist);
         for diagnostic in &mut diagnostics {
-            diagnostic.set_fix(Edit::replacement(
-                content.to_string(),
-                expr.start(),
-                expr.end(),
-            ));
+            diagnostic.set_fix(Edit::range_replacement(content.to_string(), expr.range()));
         }
     }
 

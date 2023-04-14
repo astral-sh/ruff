@@ -38,11 +38,7 @@ pub fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
             .map_or(true, |binding| binding.kind.is_builtin());
         let mut diagnostic = Diagnostic::new(OpenAlias { fixable }, expr.range());
         if fixable && checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
-                "open".to_string(),
-                func.start(),
-                func.end(),
-            ));
+            diagnostic.set_fix(Edit::range_replacement("open".to_string(), func.range()));
         }
         checker.diagnostics.push(diagnostic);
     }

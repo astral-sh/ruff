@@ -198,11 +198,7 @@ pub fn invalid_string_characters(
 
         let mut diagnostic = Diagnostic::new(rule, range);
         if autofix {
-            diagnostic.set_fix(Edit::replacement(
-                replacement.to_string(),
-                range.start(),
-                range.end(),
-            ));
+            diagnostic.set_fix(Edit::range_replacement(replacement.to_string(), range));
         }
         diagnostics.push(diagnostic);
     }

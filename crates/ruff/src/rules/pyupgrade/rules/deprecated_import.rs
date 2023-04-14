@@ -551,7 +551,7 @@ pub fn deprecated_import(
         );
         if checker.patch(Rule::DeprecatedImport) {
             if let Some(content) = fix {
-                diagnostic.set_fix(Edit::replacement(content, stmt.start(), stmt.end()));
+                diagnostic.set_fix(Edit::range_replacement(content, stmt.range()));
             }
         }
         checker.diagnostics.push(diagnostic);

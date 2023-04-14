@@ -64,7 +64,7 @@ pub fn native_literals(
                 LiteralType::Bytes
             }}, expr.range());
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::replacement(
+                diagnostic.set_fix(Edit::range_replacement(
                     if id == "bytes" {
                         let mut content = String::with_capacity(3);
                         content.push('b');
@@ -77,8 +77,7 @@ pub fn native_literals(
                         content.push(checker.stylist.quote().into());
                         content
                     },
-                    expr.start(),
-                    expr.end(),
+                    expr.range(),
                 ));
             }
             checker.diagnostics.push(diagnostic);
@@ -128,11 +127,7 @@ pub fn native_literals(
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
-                arg_code.to_string(),
-                expr.start(),
-                expr.end(),
-            ));
+            diagnostic.set_fix(Edit::range_replacement(arg_code.to_string(), expr.range()));
         }
         checker.diagnostics.push(diagnostic);
     }

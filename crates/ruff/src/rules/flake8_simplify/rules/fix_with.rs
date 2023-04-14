@@ -92,5 +92,5 @@ pub(crate) fn fix_multiple_with_statements(
 
     let range = locator.lines_range(stmt.range());
 
-    Ok(Edit::replacement(contents, range.start(), range.end()))
+    Ok(Edit::range_replacement(contents, range))
 }

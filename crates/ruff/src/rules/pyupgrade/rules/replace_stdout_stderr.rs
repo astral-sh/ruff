@@ -39,11 +39,7 @@ fn generate_fix(
         (stderr, stdout)
     };
     Ok(Fix::new(vec![
-        Edit::replacement(
-            "capture_output=True".to_string(),
-            first.start(),
-            first.end(),
-        ),
+        Edit::range_replacement("capture_output=True".to_string(), first.range()),
         remove_argument(
             locator,
             func.start(),

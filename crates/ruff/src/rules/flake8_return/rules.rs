@@ -143,11 +143,7 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
-                "return".to_string(),
-                stmt.start(),
-                stmt.end(),
-            ));
+            diagnostic.set_fix(Edit::range_replacement("return".to_string(), stmt.range()));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -161,10 +157,9 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         }
         let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 "return None".to_string(),
-                stmt.start(),
-                stmt.end(),
+                stmt.range(),
             ));
         }
         checker.diagnostics.push(diagnostic);

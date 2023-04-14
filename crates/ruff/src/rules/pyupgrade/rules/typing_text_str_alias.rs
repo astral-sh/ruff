@@ -31,11 +31,7 @@ pub fn typing_text_str_alias(checker: &mut Checker, expr: &Expr) {
     {
         let mut diagnostic = Diagnostic::new(TypingTextStrAlias, expr.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
-                "str".to_string(),
-                expr.start(),
-                expr.end(),
-            ));
+            diagnostic.set_fix(Edit::range_replacement("str".to_string(), expr.range()));
         }
         checker.diagnostics.push(diagnostic);
     }

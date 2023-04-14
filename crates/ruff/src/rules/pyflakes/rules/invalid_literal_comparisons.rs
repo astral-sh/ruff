@@ -78,10 +78,9 @@ pub fn invalid_literal_comparison(
                             None
                         }
                     } {
-                        diagnostic.set_fix(Edit::replacement(
+                        diagnostic.set_fix(Edit::range_replacement(
                             content,
-                            location.start() + located_op.start(),
-                            location.start() + located_op.end(),
+                            located_op.range() + location.start(),
                         ));
                     }
                 } else {

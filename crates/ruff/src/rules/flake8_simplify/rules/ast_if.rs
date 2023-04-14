@@ -370,20 +370,19 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     if fixable && checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
             // If the condition is a comparison, we can replace it with the condition.
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
                         value: Some(test.clone()),
                     }),
                     checker.stylist,
                 ),
-                stmt.start(),
-                stmt.end(),
+                stmt.range(),
             ));
         } else {
             // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
             // verified, above, that `bool` is a builtin.)
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
                         value: Some(Box::new(create_expr(ExprKind::Call {
@@ -397,8 +396,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     }),
                     checker.stylist,
                 ),
-                stmt.start(),
-                stmt.end(),
+                stmt.range(),
             ));
         };
     }

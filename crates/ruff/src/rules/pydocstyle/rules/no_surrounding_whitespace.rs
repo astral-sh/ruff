@@ -1,7 +1,7 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
-use ruff_text_size::TextLen;
+use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
@@ -44,10 +44,9 @@ pub fn no_surrounding_whitespace(checker: &mut Checker, docstring: &Docstring) {
         // characters, avoid applying the fix.
         if !trimmed.ends_with(quote) && !trimmed.starts_with(quote) && !ends_with_backslash(trimmed)
         {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 trimmed.to_string(),
-                body.start(),
-                body.start() + line.text_len(),
+                TextRange::at(body.start(), line.text_len()),
             ));
         }
     }

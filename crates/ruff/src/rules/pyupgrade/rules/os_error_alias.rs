@@ -63,10 +63,9 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
         target.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             "OSError".to_string(),
-            target.start(),
-            target.end(),
+            target.range(),
         ));
     }
     checker.diagnostics.push(diagnostic);
@@ -104,13 +103,12 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
         }
 
         if remaining.len() == 1 {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 "OSError".to_string(),
-                target.start(),
-                target.end(),
+                target.range(),
             ));
         } else {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 format!(
                     "({})",
                     unparse_expr(
@@ -121,8 +119,7 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
                         checker.stylist,
                     )
                 ),
-                target.start(),
-                target.end(),
+                target.range(),
             ));
         }
     }

@@ -131,5 +131,5 @@ pub(crate) fn fix_nested_if_statements(
     };
 
     let range = locator.lines_range(stmt.range());
-    Ok(Edit::replacement(contents, range.start(), range.end()))
+    Ok(Edit::range_replacement(contents, range))
 }

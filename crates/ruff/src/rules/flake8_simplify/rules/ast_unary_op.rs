@@ -107,7 +107,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             unparse_expr(
                 &create_expr(ExprKind::Compare {
                     left: left.clone(),
@@ -116,8 +116,7 @@ pub fn negation_with_equal_op(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
                 }),
                 checker.stylist,
             ),
-            expr.start(),
-            expr.end(),
+            expr.range(),
         ));
     }
     checker.diagnostics.push(diagnostic);
@@ -158,7 +157,7 @@ pub fn negation_with_not_equal_op(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             unparse_expr(
                 &create_expr(ExprKind::Compare {
                     left: left.clone(),
@@ -167,8 +166,7 @@ pub fn negation_with_not_equal_op(
                 }),
                 checker.stylist,
             ),
-            expr.start(),
-            expr.end(),
+            expr.range(),
         ));
     }
     checker.diagnostics.push(diagnostic);
@@ -193,10 +191,9 @@ pub fn double_negation(checker: &mut Checker, expr: &Expr, op: &Unaryop, operand
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             unparse_expr(operand, checker.stylist),
-            expr.start(),
-            expr.end(),
+            expr.range(),
         ));
     }
     checker.diagnostics.push(diagnostic);

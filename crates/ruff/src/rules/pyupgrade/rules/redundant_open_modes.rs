@@ -116,10 +116,9 @@ fn create_check(
     );
     if patch {
         if let Some(content) = replacement_value {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 content.to_string(),
-                mode_param.start(),
-                mode_param.end(),
+                mode_param.range(),
             ));
         } else {
             diagnostic.try_set_fix(|| create_remove_param_fix(locator, expr, mode_param));

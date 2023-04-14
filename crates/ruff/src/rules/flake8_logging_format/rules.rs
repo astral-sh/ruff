@@ -171,10 +171,9 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
             {
                 let mut diagnostic = Diagnostic::new(LoggingWarn, level_call_range);
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
+                    diagnostic.set_fix(Edit::range_replacement(
                         "warning".to_string(),
-                        level_call_range.start(),
-                        level_call_range.end(),
+                        level_call_range,
                     ));
                 }
                 checker.diagnostics.push(diagnostic);

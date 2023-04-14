@@ -114,11 +114,7 @@ impl<'a> Importer<'a> {
             ..CodegenState::default()
         };
         tree.codegen(&mut state);
-        Ok(Edit::replacement(
-            state.to_string(),
-            stmt.start(),
-            stmt.end(),
-        ))
+        Ok(Edit::range_replacement(state.to_string(), stmt.range()))
     }
 }
 

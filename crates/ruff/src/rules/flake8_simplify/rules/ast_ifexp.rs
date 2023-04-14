@@ -100,13 +100,12 @@ pub fn explicit_true_false_in_ifexpr(
     );
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 unparse_expr(&test.clone(), checker.stylist),
-                expr.start(),
-                expr.end(),
+                expr.range(),
             ));
         } else if checker.ctx.is_builtin("bool") {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 unparse_expr(
                     &create_expr(ExprKind::Call {
                         func: Box::new(create_expr(ExprKind::Name {
@@ -118,8 +117,7 @@ pub fn explicit_true_false_in_ifexpr(
                     }),
                     checker.stylist,
                 ),
-                expr.start(),
-                expr.end(),
+                expr.range(),
             ));
         };
     }
@@ -154,7 +152,7 @@ pub fn explicit_false_true_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             unparse_expr(
                 &create_expr(ExprKind::UnaryOp {
                     op: Unaryop::Not,
@@ -162,8 +160,7 @@ pub fn explicit_false_true_in_ifexpr(
                 }),
                 checker.stylist,
             ),
-            expr.start(),
-            expr.end(),
+            expr.range(),
         ));
     }
     checker.diagnostics.push(diagnostic);
@@ -203,7 +200,7 @@ pub fn twisted_arms_in_ifexpr(
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             unparse_expr(
                 &create_expr(ExprKind::IfExp {
                     test: Box::new(create_expr(orelse.node.clone())),
@@ -212,8 +209,7 @@ pub fn twisted_arms_in_ifexpr(
                 }),
                 checker.stylist,
             ),
-            expr.start(),
-            expr.end(),
+            expr.range(),
         ));
     }
     checker.diagnostics.push(diagnostic);

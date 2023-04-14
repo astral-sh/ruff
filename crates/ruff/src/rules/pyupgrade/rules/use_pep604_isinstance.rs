@@ -93,10 +93,9 @@ pub fn use_pep604_isinstance(checker: &mut Checker, expr: &Expr, func: &Expr, ar
 
                 let mut diagnostic = Diagnostic::new(NonPEP604Isinstance { kind }, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
+                    diagnostic.set_fix(Edit::range_replacement(
                         unparse_expr(&union(elts), checker.stylist),
-                        types.start(),
-                        types.end(),
+                        types.range(),
                     ));
                 }
                 checker.diagnostics.push(diagnostic);

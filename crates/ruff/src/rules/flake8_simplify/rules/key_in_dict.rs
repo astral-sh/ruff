@@ -91,7 +91,7 @@ fn key_in_dict(checker: &mut Checker, left: &Expr, right: &Expr, range: TextRang
         range,
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(value_content, right.start(), right.end()));
+        diagnostic.set_fix(Edit::range_replacement(value_content, right.range()));
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -1,6 +1,5 @@
 use std::collections::BTreeMap;
 use std::iter;
-use std::ops::Add;
 
 use itertools::Either::{Left, Right};
 use log::error;
@@ -137,10 +136,7 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                 let mut diagnostic = Diagnostic::new(UnnecessaryPass, pass_stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(index) = trailing_comment_start_offset(pass_stmt, checker.locator) {
-                        diagnostic.set_fix(Edit::deletion(
-                            pass_stmt.start(),
-                            pass_stmt.end().add(index),
-                        ));
+                        diagnostic.set_fix(Edit::range_deletion(pass_stmt.range().add_end(index)));
                     } else {
                         diagnostic.try_set_fix(|| {
                             delete_stmt(
@@ -418,10 +414,9 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                         .collect(),
                 });
 
-                diagnostic.set_fix(Edit::replacement(
+                diagnostic.set_fix(Edit::range_replacement(
                     unparse_expr(&bool_op, checker.stylist),
-                    expr.start(),
-                    expr.end(),
+                    expr.range(),
                 ));
             }
             checker.diagnostics.push(diagnostic);
@@ -444,11 +439,7 @@ pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
-                        "list".to_string(),
-                        expr.start(),
-                        expr.end(),
-                    ));
+                    diagnostic.set_fix(Edit::range_replacement("list".to_string(), expr.range()));
                 }
                 checker.diagnostics.push(diagnostic);
             }

@@ -176,11 +176,7 @@ pub fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
             if checker.patch(diagnostic.kind.rule()) {
                 let contents = checker.locator.slice(item.iter.range());
                 let contents = format!("yield from {contents}");
-                diagnostic.set_fix(Edit::replacement(
-                    contents,
-                    item.stmt.start(),
-                    item.stmt.end(),
-                ));
+                diagnostic.set_fix(Edit::range_replacement(contents, item.stmt.range()));
             }
             checker.diagnostics.push(diagnostic);
         }

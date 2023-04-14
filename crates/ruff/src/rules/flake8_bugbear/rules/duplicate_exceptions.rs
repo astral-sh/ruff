@@ -96,14 +96,13 @@ fn duplicate_handler_exceptions<'a>(
                 expr.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::replacement(
+                diagnostic.set_fix(Edit::range_replacement(
                     if unique_elts.len() == 1 {
                         unparse_expr(unique_elts[0], checker.stylist)
                     } else {
                         unparse_expr(&type_pattern(unique_elts), checker.stylist)
                     },
-                    expr.start(),
-                    expr.end(),
+                    expr.range(),
                 ));
             }
             checker.diagnostics.push(diagnostic);

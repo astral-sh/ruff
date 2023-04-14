@@ -53,7 +53,7 @@ pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
                     &checker.importer,
                     checker.locator,
                 )?;
-                let reference_edit = Edit::replacement(binding, func.start(), func.end());
+                let reference_edit = Edit::range_replacement(binding, func.range());
                 Ok(Fix::from_iter([import_edit, reference_edit]))
             });
         }

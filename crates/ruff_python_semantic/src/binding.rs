@@ -5,7 +5,7 @@ use bitflags::bitflags;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::Stmt;
 
-use ruff_python_ast::types::{RefEquality};
+use ruff_python_ast::types::RefEquality;
 
 use crate::scope::ScopeId;
 

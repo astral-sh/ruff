@@ -77,11 +77,7 @@ pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr)
     };
     tree.codegen(&mut state);
 
-    Some(Edit::replacement(
-        state.to_string(),
-        range.start(),
-        range.end(),
-    ))
+    Some(Edit::range_replacement(state.to_string(), range))
 }
 
 /// Remove any imports matching `members` from an import-from statement.

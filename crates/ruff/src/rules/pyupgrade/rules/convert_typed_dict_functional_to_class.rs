@@ -210,13 +210,12 @@ fn convert_to_class(
     base_class: &Expr,
     stylist: &Stylist,
 ) -> Edit {
-    Edit::replacement(
+    Edit::range_replacement(
         unparse_stmt(
             &create_class_def_stmt(class_name, body, total_keyword, base_class),
             stylist,
         ),
-        stmt.start(),
-        stmt.end(),
+        stmt.range(),
     )
 }
 

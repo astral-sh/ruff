@@ -77,13 +77,12 @@ fn traverse_union<'a>(
             };
 
             // Replace the parent with its non-duplicate child.
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 unparse_expr(
                     if expr.node == left.node { right } else { left },
                     checker.stylist,
                 ),
-                parent.start(),
-                parent.end(),
+                parent.range(),
             ));
         }
         checker.diagnostics.push(diagnostic);

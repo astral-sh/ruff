@@ -38,11 +38,7 @@ pub fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[
         );
         let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, range);
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
-                "text".to_string(),
-                range.start(),
-                range.end(),
-            ));
+            diagnostic.set_fix(Edit::range_replacement("text".to_string(), range));
         }
         checker.diagnostics.push(diagnostic);
     }

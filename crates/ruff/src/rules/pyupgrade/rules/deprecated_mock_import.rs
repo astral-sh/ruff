@@ -257,11 +257,7 @@ pub fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
                 value.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::replacement(
-                    "mock".to_string(),
-                    value.start(),
-                    value.end(),
-                ));
+                diagnostic.set_fix(Edit::range_replacement("mock".to_string(), value.range()));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -304,11 +300,8 @@ pub fn deprecated_mock_import(checker: &mut Checker, stmt: &Stmt) {
                             name.range(),
                         );
                         if let Some(content) = content.as_ref() {
-                            diagnostic.set_fix(Edit::replacement(
-                                content.clone(),
-                                stmt.start(),
-                                stmt.end(),
-                            ));
+                            diagnostic
+                                .set_fix(Edit::range_replacement(content.clone(), stmt.range()));
                         }
                         checker.diagnostics.push(diagnostic);
                     }

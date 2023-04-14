@@ -115,7 +115,7 @@ fn fix_banned_relative_import(
         stylist,
     );
 
-    Some(Edit::replacement(content, stmt.start(), stmt.end()))
+    Some(Edit::range_replacement(content, stmt.range()))
 }
 
 /// TID252

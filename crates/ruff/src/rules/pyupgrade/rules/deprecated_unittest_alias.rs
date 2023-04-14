@@ -69,10 +69,9 @@ pub fn deprecated_unittest_alias(checker: &mut Checker, expr: &Expr) {
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             format!("self.{target}"),
-            expr.start(),
-            expr.end(),
+            expr.range(),
         ));
     }
     checker.diagnostics.push(diagnostic);

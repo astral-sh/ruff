@@ -130,7 +130,7 @@ fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, constant: &Expr) -
         }
         prev = Some(end);
     }
-    Edit::replacement(replacement, expr.start(), expr.end())
+    Edit::range_replacement(replacement, expr.range())
 }
 
 /// UP012

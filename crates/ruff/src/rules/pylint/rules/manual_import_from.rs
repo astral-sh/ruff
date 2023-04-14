@@ -53,7 +53,7 @@ pub fn manual_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, nam
         alias.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             unparse_stmt(
                 &create_stmt(StmtKind::ImportFrom {
                     module: Some(module.to_string()),
@@ -69,8 +69,7 @@ pub fn manual_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, nam
                 }),
                 checker.stylist,
             ),
-            stmt.start(),
-            stmt.end(),
+            stmt.range(),
         ));
     }
     checker.diagnostics.push(diagnostic);

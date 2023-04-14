@@ -193,13 +193,12 @@ fn fix_py2_block(
 
         if indentation(checker.locator, start).is_none() {
             // Inline `else` block (e.g., `else: x = 1`).
-            Some(Edit::replacement(
+            Some(Edit::range_replacement(
                 checker
                     .locator
                     .slice(TextRange::new(start.start(), end.end()))
                     .to_string(),
-                stmt.start(),
-                stmt.end(),
+                stmt.range(),
             ))
         } else {
             indentation(checker.locator, stmt)
@@ -255,13 +254,12 @@ fn fix_py3_block(
 
             if indentation(checker.locator, start).is_none() {
                 // Inline `if` block (e.g., `if ...: x = 1`).
-                Some(Edit::replacement(
+                Some(Edit::range_replacement(
                     checker
                         .locator
                         .slice(TextRange::new(start.start(), end.end()))
                         .to_string(),
-                    stmt.start(),
-                    stmt.end(),
+                    stmt.range(),
                 ))
             } else {
                 indentation(checker.locator, stmt)
@@ -288,11 +286,7 @@ fn fix_py3_block(
             // the rest.
             let end = body.last().unwrap();
             let text = checker.locator.slice(TextRange::new(test.end(), end.end()));
-            Some(Edit::replacement(
-                format!("else{text}"),
-                stmt.start(),
-                stmt.end(),
-            ))
+            Some(Edit::range_replacement(format!("else{text}"), stmt.range()))
         }
         _ => None,
     }

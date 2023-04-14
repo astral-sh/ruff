@@ -203,10 +203,9 @@ pub fn unittest_assertion(
                 );
                 if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Ok(stmt) = unittest_assert.generate_assert(args, keywords) {
-                        diagnostic.set_fix(Edit::replacement(
+                        diagnostic.set_fix(Edit::range_replacement(
                             unparse_stmt(&stmt, checker.stylist),
-                            expr.start(),
-                            expr.end(),
+                            expr.range(),
                         ));
                     }
                 }
@@ -415,7 +414,7 @@ fn fix_composite_condition(stmt: &Stmt, locator: &Locator, stylist: &Stylist) ->
 
     let range = locator.full_lines_range(stmt.range());
 
-    Ok(Edit::replacement(contents, range.start(), range.end()))
+    Ok(Edit::range_replacement(contents, range))
 }
 
 /// PT018

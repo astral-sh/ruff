@@ -60,7 +60,7 @@ pub fn commented_out_code(
         let mut diagnostic = Diagnostic::new(CommentedOutCode, TextRange::new(start, end));
         if autofix.into() && settings.rules.should_fix(Rule::CommentedOutCode) {
             let range = locator.full_lines_range(TextRange::new(start, end));
-            diagnostic.set_fix(Edit::deletion(range.start(), range.end()));
+            diagnostic.set_fix(Edit::range_deletion(range));
         }
         Some(diagnostic)
     } else {

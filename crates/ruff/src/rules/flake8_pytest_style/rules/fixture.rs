@@ -1,7 +1,6 @@
 use anyhow::Result;
-use ruff_text_size::{TextLen, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{Arguments, Expr, ExprKind, Keyword, Stmt, StmtKind};
-use std::ops::Add;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
@@ -402,10 +401,9 @@ fn check_fixture_returns(checker: &mut Checker, stmt: &Stmt, name: &str, body: &
                             stmt.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            diagnostic.set_fix(Edit::range_replacement(
                                 "return".to_string(),
-                                stmt.start(),
-                                stmt.start().add("yield".text_len()),
+                                TextRange::at(stmt.start(), "yield".text_len()),
                             ));
                         }
                         checker.diagnostics.push(diagnostic);
@@ -475,7 +473,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                     Diagnostic::new(PytestUnnecessaryAsyncioMarkOnFixture, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     let range = checker.locator.full_lines_range(expr.range());
-                    diagnostic.set_fix(Edit::deletion(range.start(), range.end()));
+                    diagnostic.set_fix(Edit::range_deletion(range));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -491,7 +489,7 @@ fn check_fixture_marks(checker: &mut Checker, decorators: &[Expr]) {
                     Diagnostic::new(PytestErroneousUseFixturesOnFixture, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     let line_range = checker.locator.full_lines_range(expr.range());
-                    diagnostic.set_fix(Edit::deletion(line_range.start(), line_range.end()));
+                    diagnostic.set_fix(Edit::range_deletion(line_range));
                 }
                 checker.diagnostics.push(diagnostic);
             }

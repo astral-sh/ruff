@@ -436,7 +436,7 @@ pub(crate) fn printf_string_formatting(
 
     let mut diagnostic = Diagnostic::new(PrintfStringFormatting, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(contents, expr.start(), expr.end()));
+        diagnostic.set_fix(Edit::range_replacement(contents, expr.range()));
     }
     checker.diagnostics.push(diagnostic);
 }

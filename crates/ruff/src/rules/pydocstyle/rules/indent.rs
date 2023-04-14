@@ -90,10 +90,9 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(UnderIndentation, TextRange::empty(line.start()));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
+                    diagnostic.set_fix(Edit::range_replacement(
                         whitespace::clean(docstring.indentation),
-                        line.start(),
-                        line.start() + line_indent.text_len(),
+                        TextRange::at(line.start(), line_indent.text_len()),
                     ));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -131,10 +130,9 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 // enables autofix.
                 let mut diagnostic = Diagnostic::new(OverIndentation, TextRange::empty(offset));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
+                    diagnostic.set_fix(Edit::range_replacement(
                         whitespace::clean(docstring.indentation),
-                        offset,
-                        offset + indent_len,
+                        TextRange::at(offset, indent_len),
                     ));
                 }
                 checker.diagnostics.push(diagnostic);
@@ -148,10 +146,9 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(last.start()));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
+                    diagnostic.set_fix(Edit::range_replacement(
                         whitespace::clean(docstring.indentation),
-                        last.start(),
-                        last.start() + line_indent.text_len(),
+                        TextRange::at(last.start(), line_indent.text_len()),
                     ));
                 }
                 checker.diagnostics.push(diagnostic);

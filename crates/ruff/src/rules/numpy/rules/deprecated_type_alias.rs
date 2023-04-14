@@ -70,15 +70,14 @@ pub fn deprecated_type_alias(checker: &mut Checker, expr: &Expr) {
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 match type_name {
                     "unicode" => "str",
                     "long" => "int",
                     _ => type_name,
                 }
                 .to_string(),
-                expr.start(),
-                expr.end(),
+                expr.range(),
             ));
         }
         checker.diagnostics.push(diagnostic);

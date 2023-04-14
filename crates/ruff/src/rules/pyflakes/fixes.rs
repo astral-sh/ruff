@@ -40,11 +40,7 @@ pub fn remove_unused_format_arguments_from_dict(
     };
     tree.codegen(&mut state);
 
-    Ok(Edit::replacement(
-        state.to_string(),
-        stmt.start(),
-        stmt.end(),
-    ))
+    Ok(Edit::range_replacement(state.to_string(), stmt.range()))
 }
 
 /// Generate a [`Edit`] to remove unused keyword arguments from a `format` call.
@@ -68,11 +64,7 @@ pub fn remove_unused_keyword_arguments_from_format_call(
     };
     tree.codegen(&mut state);
 
-    Ok(Edit::replacement(
-        state.to_string(),
-        location.start(),
-        location.end(),
-    ))
+    Ok(Edit::range_replacement(state.to_string(), location))
 }
 
 fn unparse_format_part(format_part: FormatPart) -> String {
@@ -176,11 +168,7 @@ pub fn remove_unused_positional_arguments_from_format_call(
     };
     tree.codegen(&mut state);
 
-    Ok(Edit::replacement(
-        state.to_string(),
-        location.start(),
-        location.end(),
-    ))
+    Ok(Edit::range_replacement(state.to_string(), location))
 }
 
 /// Generate a [`Edit`] to remove the binding from an exception handler.

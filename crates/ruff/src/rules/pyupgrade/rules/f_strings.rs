@@ -266,7 +266,7 @@ pub(crate) fn f_strings(checker: &mut Checker, summary: &FormatSummary, expr: &E
 
     let mut diagnostic = Diagnostic::new(FString, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(contents, expr.start(), expr.end()));
+        diagnostic.set_fix(Edit::range_replacement(contents, expr.range()));
     };
     checker.diagnostics.push(diagnostic);
 }

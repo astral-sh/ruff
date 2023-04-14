@@ -178,10 +178,9 @@ pub fn check_noqa(
                                     locator,
                                 ));
                             } else {
-                                diagnostic.set_fix(Edit::replacement(
+                                diagnostic.set_fix(Edit::range_replacement(
                                     format!("# noqa: {}", valid_codes.join(", ")),
-                                    range.start(),
-                                    range.end(),
+                                    *range,
                                 ));
                             }
                         }

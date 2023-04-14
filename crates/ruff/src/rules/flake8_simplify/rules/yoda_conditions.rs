@@ -161,7 +161,7 @@ pub fn yoda_conditions(
             expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(suggestion, expr.start(), expr.end()));
+            diagnostic.set_fix(Edit::range_replacement(suggestion, expr.range()));
         }
         checker.diagnostics.push(diagnostic);
     } else {

@@ -187,27 +187,23 @@ pub fn delete_stmt(
     {
         // If removing this node would lead to an invalid syntax tree, replace
         // it with a `pass`.
-        Ok(Edit::replacement(
-            "pass".to_string(),
-            stmt.start(),
-            stmt.end(),
-        ))
+        Ok(Edit::range_replacement("pass".to_string(), stmt.range()))
     } else {
         Ok(if let Some(semicolon) = trailing_semicolon(stmt, locator) {
             let next = next_stmt_break(semicolon, locator);
             Edit::deletion(stmt.start(), next)
         } else if helpers::has_leading_content(stmt, locator) {
-            Edit::deletion(stmt.start(), stmt.end())
+            Edit::range_deletion(stmt.range())
         } else if helpers::preceded_by_continuation(stmt, indexer, locator) {
             if is_end_of_file(stmt, locator) && locator.is_at_start_of_line(stmt.start()) {
                 // Special-case: a file can't end in a continuation.
-                Edit::replacement(stylist.line_ending().to_string(), stmt.start(), stmt.end())
+                Edit::range_replacement(stylist.line_ending().to_string(), stmt.range())
             } else {
-                Edit::deletion(stmt.start(), stmt.end())
+                Edit::range_deletion(stmt.range())
             }
         } else {
             let range = locator.full_lines_range(stmt.range());
-            Edit::deletion(range.start(), range.end())
+            Edit::range_deletion(range)
         })
     }
 }
@@ -328,11 +324,7 @@ pub fn remove_unused_imports<'a>(
         };
         tree.codegen(&mut state);
 
-        Ok(Edit::replacement(
-            state.to_string(),
-            stmt.start(),
-            stmt.end(),
-        ))
+        Ok(Edit::range_replacement(state.to_string(), stmt.range()))
     }
 }
 
@@ -473,11 +465,8 @@ pub fn get_or_import_symbol(
         //
         // By adding this no-op edit, we force the `unused-imports` fix to conflict with the
         // `sys-exit-alias` fix, and thus will avoid applying both fixes in the same pass.
-        let import_edit = Edit::replacement(
-            locator.slice(source.range()).to_string(),
-            source.start(),
-            source.end(),
-        );
+        let import_edit =
+            Edit::range_replacement(locator.slice(source.range()).to_string(), source.range());
         Ok((import_edit, binding))
     } else {
         if let Some(stmt) = importer.get_import_from(module) {

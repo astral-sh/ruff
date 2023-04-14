@@ -148,10 +148,9 @@ pub fn organize_imports(
     } else {
         let mut diagnostic = Diagnostic::new(UnsortedImports, range);
         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 indent(&expected, indentation),
-                range.start(),
-                range.end(),
+                range,
             ));
         }
         Some(diagnostic)

@@ -32,7 +32,10 @@ pub fn shebang_whitespace(
                 TextRange::at(range.start(), *n_spaces),
             );
             if autofix {
-                diagnostic.set_fix(Edit::deletion(range.start(), range.start() + n_spaces));
+                diagnostic.set_fix(Edit::range_deletion(TextRange::at(
+                    range.start(),
+                    *n_spaces,
+                )));
             }
             Some(diagnostic)
         } else {
