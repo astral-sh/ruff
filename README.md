@@ -371,6 +371,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PostHog](https://github.com/PostHog/posthog)
 - Prefect ([Marvin](https://github.com/PrefectHQ/marvin))
 - [Pydantic](https://github.com/pydantic/pydantic)
+- [PyInstaller](https://github.com/pyinstaller/pyinstaller)
 - [Pylint](https://github.com/PyCQA/pylint)
 - [Pynecone](https://github.com/pynecone-io/pynecone)
 - Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
