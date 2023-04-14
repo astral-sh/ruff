@@ -46,7 +46,7 @@ impl<'tok> Token<'tok> {
     }
 
     const fn from_spanned(spanned: &'tok Spanned) -> Token<'tok> {
-        let type_ = match &spanned.1 {
+        let type_ = match &spanned.0 {
             Tok::NonLogicalNewline => TokenType::NonLogicalNewline,
             Tok::Newline => TokenType::Newline,
             Tok::For => TokenType::For,
@@ -161,7 +161,7 @@ pub fn trailing_commas(
         .iter()
         .flatten()
         // Completely ignore comments -- they just interfere with the logic.
-        .filter(|&r| !matches!(r, (_, Tok::Comment(_), _)))
+        .filter(|&r| !matches!(r, (Tok::Comment(_), _)))
         .map(Token::from_spanned);
     let tokens = [Token::irrelevant(), Token::irrelevant()]
         .into_iter()
@@ -253,8 +253,7 @@ pub fn trailing_commas(
         };
         if comma_prohibited {
             let comma = prev.spanned.unwrap();
-            let mut diagnostic =
-                Diagnostic::new(ProhibitedTrailingComma, TextRange::new(comma.0, comma.2));
+            let mut diagnostic = Diagnostic::new(ProhibitedTrailingComma, comma.1);
             if autofix.into() && settings.rules.should_fix(Rule::ProhibitedTrailingComma) {
                 diagnostic.set_fix(Edit::range_deletion(diagnostic.range()));
             }
@@ -267,10 +266,7 @@ pub fn trailing_commas(
             prev.type_ == TokenType::Comma && token.type_ == TokenType::Newline;
         if bare_comma_prohibited {
             let comma = prev.spanned.unwrap();
-            diagnostics.push(Diagnostic::new(
-                TrailingCommaOnBareTuple,
-                TextRange::new(comma.0, comma.2),
-            ));
+            diagnostics.push(Diagnostic::new(TrailingCommaOnBareTuple, comma.1));
         }
 
         // Comma is required if:
@@ -289,15 +285,20 @@ pub fn trailing_commas(
             );
         if comma_required {
             let missing_comma = prev_prev.spanned.unwrap();
-            let range = TextRange::new(missing_comma.2, missing_comma.2);
-            let mut diagnostic = Diagnostic::new(MissingTrailingComma, range);
+            let mut diagnostic = Diagnostic::new(
+                MissingTrailingComma,
+                TextRange::empty(missing_comma.1.end()),
+            );
             if autofix.into() && settings.rules.should_fix(Rule::MissingTrailingComma) {
                 // Create a replacement that includes the final bracket (or other token),
                 // rather than just inserting a comma at the end. This prevents the UP034 autofix
                 // removing any brackets in the same linter pass - doing both at the same time could
                 // lead to a syntax error.
-                let contents = locator.slice(range);
-                diagnostic.set_fix(Edit::range_replacement(format!("{contents},"), range));
+                let contents = locator.slice(missing_comma.1);
+                diagnostic.set_fix(Edit::range_replacement(
+                    format!("{contents},"),
+                    missing_comma.1,
+                ));
             }
             diagnostics.push(diagnostic);
         }

@@ -1,4 +1,4 @@
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use std::str::FromStr;
 
 use rustpython_common::cformat::{
@@ -308,9 +308,9 @@ pub(crate) fn printf_string_formatting(
     locator: &Locator,
 ) {
     // Grab each string segment (in case there's an implicit concatenation).
-    let mut strings: Vec<(TextSize, TextSize)> = vec![];
+    let mut strings: Vec<TextRange> = vec![];
     let mut extension = None;
-    for (start, tok, end) in lexer::lex_located(
+    for (tok, range) in lexer::lex_located(
         checker.locator.slice(expr.range()),
         Mode::Module,
         expr.start(),
@@ -318,10 +318,10 @@ pub(crate) fn printf_string_formatting(
     .flatten()
     {
         if matches!(tok, Tok::String { .. }) {
-            strings.push((start, end));
+            strings.push(range);
         } else if matches!(tok, Tok::Rpar) {
             // If we hit a right paren, we have to preserve it.
-            extension = Some((start, end));
+            extension = Some(range);
         } else if matches!(tok, Tok::Percent) {
             // Break as soon as we find the modulo symbol.
             break;
@@ -337,8 +337,8 @@ pub(crate) fn printf_string_formatting(
     let mut num_positional_arguments = 0;
     let mut num_keyword_arguments = 0;
     let mut format_strings = Vec::with_capacity(strings.len());
-    for (start, end) in &strings {
-        let string = checker.locator.slice(TextRange::new(*start, *end));
+    for range in &strings {
+        let string = checker.locator.slice(*range);
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };
@@ -412,23 +412,31 @@ pub(crate) fn printf_string_formatting(
     // Reconstruct the string.
     let mut contents = String::new();
     let mut prev = None;
-    for ((start, end), format_string) in strings.iter().zip(format_strings) {
+    for (range, format_string) in strings.iter().zip(format_strings) {
         // Add the content before the string segment.
         match prev {
             None => {
-                contents.push_str(checker.locator.slice(TextRange::new(expr.start(), *start)));
+                contents.push_str(
+                    checker
+                        .locator
+                        .slice(TextRange::new(expr.start(), range.start())),
+                );
             }
             Some(prev) => {
-                contents.push_str(checker.locator.slice(TextRange::new(prev, *start)));
+                contents.push_str(checker.locator.slice(TextRange::new(prev, range.start())));
             }
         }
         // Add the string itself.
         contents.push_str(&format_string);
-        prev = Some(*end);
+        prev = Some(range.end());
     }
 
-    if let Some((.., end)) = extension {
-        contents.push_str(checker.locator.slice(TextRange::new(prev.unwrap(), end)));
+    if let Some(range) = extension {
+        contents.push_str(
+            checker
+                .locator
+                .slice(TextRange::new(prev.unwrap(), range.end())),
+        );
     }
 
     // Add the `.format` call.

@@ -61,7 +61,7 @@ impl AlwaysAutofixableViolation for UnusedVariable {
     }
 }
 
-/// Return the start and end [`Location`] of the token after the next match of
+/// Return the [`TextRange`] of the token after the next match of
 /// the predicate, skipping over any bracketed expressions.
 fn match_token_after<F, T>(located: &Located<T>, locator: &Locator, f: F) -> TextRange
 where
@@ -74,10 +74,9 @@ where
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for ((_, tok, _), (start, _, end)) in
-        lexer::lex_located(contents, Mode::Module, located.start())
-            .flatten()
-            .tuple_windows()
+    for ((tok, _), (_, range)) in lexer::lex_located(contents, Mode::Module, located.start())
+        .flatten()
+        .tuple_windows()
     {
         match tok {
             Tok::Lpar => {
@@ -118,13 +117,13 @@ where
         }
 
         if f(tok) {
-            return TextRange::new(start, end);
+            return range;
         }
     }
     unreachable!("No token after matched");
 }
 
-/// Return the start and end [`Location`] of the token matching the predicate,
+/// Return the [`TextRange`] of the token matching the predicate,
 /// skipping over any bracketed expressions.
 fn match_token<F, T>(located: &Located<T>, locator: &Locator, f: F) -> TextRange
 where
@@ -137,7 +136,7 @@ where
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for (start, tok, end) in lexer::lex_located(contents, Mode::Module, located.start()).flatten() {
+    for (tok, range) in lexer::lex_located(contents, Mode::Module, located.start()).flatten() {
         match tok {
             Tok::Lpar => {
                 par_count += 1;
@@ -177,7 +176,7 @@ where
         }
 
         if f(tok) {
-            return TextRange::new(start, end);
+            return range;
         }
     }
     unreachable!("No token after matched");
@@ -190,7 +189,7 @@ enum DeletionKind {
 }
 
 /// Generate a [`Edit`] to remove an unused variable assignment, given the
-/// enclosing [`Stmt`] and the [`Range`] of the variable binding.
+/// enclosing [`Stmt`] and the [`TextRange`] of the variable binding.
 fn remove_unused_variable(
     stmt: &Stmt,
     range: TextRange,

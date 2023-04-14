@@ -1,4 +1,4 @@
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
@@ -48,19 +48,20 @@ fn is_standalone_comment(line: &str) -> bool {
 /// ERA001
 pub fn commented_out_code(
     locator: &Locator,
-    start: TextSize,
-    end: TextSize,
+    range: TextRange,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Option<Diagnostic> {
-    let line = locator.lines(TextRange::new(start, end));
+    let line = locator.full_lines(range);
 
     // Verify that the comment is on its own line, and that it contains code.
     if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
-        let mut diagnostic = Diagnostic::new(CommentedOutCode, TextRange::new(start, end));
+        let mut diagnostic = Diagnostic::new(CommentedOutCode, range);
         if autofix.into() && settings.rules.should_fix(Rule::CommentedOutCode) {
-            let range = locator.full_lines_range(TextRange::new(start, end));
-            diagnostic.set_fix(Edit::range_deletion(range));
+            diagnostic.set_fix(Edit::range_deletion(TextRange::at(
+                range.start(),
+                line.text_len(),
+            )));
         }
         Some(diagnostic)
     } else {

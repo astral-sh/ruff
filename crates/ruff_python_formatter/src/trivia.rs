@@ -193,21 +193,19 @@ impl Trivia {
 pub fn extract_trivia_tokens(lxr: &[LexResult], text: &str) -> Vec<TriviaToken> {
     let mut tokens = vec![];
     let mut prev_end = TextSize::default();
-    let mut prev_tok: Option<(&TextSize, &Tok, &TextSize)> = None;
-    let mut prev_semantic_tok: Option<(&TextSize, &Tok, &TextSize)> = None;
+    let mut prev_tok: Option<(&Tok, TextRange)> = None;
+    let mut prev_semantic_tok: Option<(&Tok, TextRange)> = None;
     let mut parens = vec![];
 
-    for (start, tok, end) in lxr.iter().flatten() {
+    for (tok, range) in lxr.iter().flatten() {
         // Add empty lines.
-        let trivia = &text[TextRange::new(prev_end, *start)];
+        let trivia = &text[TextRange::new(prev_end, range.start())];
         let bytes = trivia.as_bytes();
 
         let mut bytes_iter = bytes.iter().enumerate();
 
-        let mut after_new_line = matches!(
-            prev_tok,
-            Some((_, Tok::Newline | Tok::NonLogicalNewline, _))
-        );
+        let mut after_new_line =
+            matches!(prev_tok, Some((Tok::Newline | Tok::NonLogicalNewline, _)));
 
         while let Some((index, byte)) = bytes_iter.next() {
             let len = match byte {
@@ -236,7 +234,7 @@ pub fn extract_trivia_tokens(lxr: &[LexResult], text: &str) -> Vec<TriviaToken> 
         // Add comments.
         if let Tok::Comment(_) = tok {
             tokens.push(TriviaToken {
-                range: TextRange::new(*start, *end),
+                range: *range,
                 // Used to use prev_non-newline_tok
                 kind: if after_new_line || prev_tok.is_none() {
                     TriviaTokenKind::OwnLineComment
@@ -251,10 +249,10 @@ pub fn extract_trivia_tokens(lxr: &[LexResult], text: &str) -> Vec<TriviaToken> 
             tok,
             Tok::Rpar | Tok::Rsqb | Tok::Rbrace | Tok::Equal | Tok::Newline
         ) {
-            if let Some((prev_start, prev_tok, prev_end)) = prev_semantic_tok {
+            if let Some((prev_tok, prev_range)) = prev_semantic_tok {
                 if prev_tok == &Tok::Comma {
                     tokens.push(TriviaToken {
-                        range: TextRange::new(*prev_start, *prev_end),
+                        range: prev_range,
                         kind: TriviaTokenKind::MagicTrailingComma,
                     });
                 }
@@ -262,7 +260,7 @@ pub fn extract_trivia_tokens(lxr: &[LexResult], text: &str) -> Vec<TriviaToken> 
         }
 
         if matches!(tok, Tok::Lpar) {
-            if prev_tok.map_or(true, |(_, prev_tok, _)| {
+            if prev_tok.map_or(true, |(prev_tok, _)| {
                 !matches!(
                     prev_tok,
                     Tok::Name { .. }
@@ -272,31 +270,31 @@ pub fn extract_trivia_tokens(lxr: &[LexResult], text: &str) -> Vec<TriviaToken> 
                         | Tok::String { .. }
                 )
             }) {
-                parens.push((start, true));
+                parens.push((range.start(), true));
             } else {
-                parens.push((start, false));
+                parens.push((range.start(), false));
             }
         } else if matches!(tok, Tok::Rpar) {
             let (start, explicit) = parens.pop().unwrap();
             if explicit {
                 tokens.push(TriviaToken {
-                    range: TextRange::new(*start, *end),
+                    range: TextRange::new(start, range.end()),
                     kind: TriviaTokenKind::Parentheses,
                 });
             }
         }
 
-        prev_tok = Some((start, tok, end));
+        prev_tok = Some((tok, *range));
 
         // Track the most recent semantic token.
         if !matches!(
             tok,
             Tok::Newline | Tok::NonLogicalNewline | Tok::Comment(..)
         ) {
-            prev_semantic_tok = Some((start, tok, end));
+            prev_semantic_tok = Some((tok, *range));
         }
 
-        prev_end = *end;
+        prev_end = range.end();
     }
     tokens
 }

@@ -30,9 +30,11 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
     for stmt in blocks.iter().flat_map(|block| &block.imports) {
         match &stmt.node {
             StmtKind::Import { names } => {
-                module_imports.extend(names.iter().map(|name| {
-                    ModuleImport::new(name.node.name.clone(), stmt.start(), stmt.end())
-                }));
+                module_imports.extend(
+                    names
+                        .iter()
+                        .map(|name| ModuleImport::new(name.node.name.clone(), stmt.range())),
+                );
             }
             StmtKind::ImportFrom {
                 module,
@@ -57,11 +59,7 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
                     Cow::Owned(module_path[..module_path.len() - level].join("."))
                 };
                 module_imports.extend(names.iter().map(|name| {
-                    ModuleImport::new(
-                        format!("{}.{}", module, name.node.name),
-                        name.start(),
-                        name.end(),
-                    )
+                    ModuleImport::new(format!("{}.{}", module, name.node.name), name.range())
                 }));
             }
             _ => panic!("Expected StmtKind::Import | StmtKind::ImportFrom"),

@@ -32,10 +32,7 @@ pub fn replace_universal_newlines(checker: &mut Checker, func: &Expr, kwargs: &[
         })
     {
         let Some(kwarg) = find_keyword(kwargs, "universal_newlines") else { return; };
-        let range = TextRange::new(
-            kwarg.start(),
-            kwarg.start() + "universal_newlines".text_len(),
-        );
+        let range = TextRange::at(kwarg.start(), "universal_newlines".text_len());
         let mut diagnostic = Diagnostic::new(ReplaceUniversalNewlines, range);
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.set_fix(Edit::range_replacement("text".to_string(), range));

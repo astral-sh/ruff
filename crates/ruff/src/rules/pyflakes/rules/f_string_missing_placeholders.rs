@@ -1,7 +1,6 @@
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{Expr, ExprKind};
 use rustpython_parser::{lexer, Mode, StringKind, Tok};
-use std::ops::Add;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
@@ -57,23 +56,23 @@ fn find_useless_f_strings<'a>(
     let contents = locator.slice(expr.range());
     lexer::lex_located(contents, Mode::Module, expr.start())
         .flatten()
-        .filter_map(|(location, tok, end_location)| match tok {
+        .filter_map(|(tok, range)| match tok {
             Tok::String {
                 kind: StringKind::FString | StringKind::RawFString,
                 ..
             } => {
                 let first_char =
-                    &locator.contents()[TextRange::new(location, location.add(TextSize::from(1)))];
+                    &locator.contents()[TextRange::at(range.start(), TextSize::from(1))];
                 // f"..."  => f_position = 0
                 // fr"..." => f_position = 0
                 // rf"..." => f_position = 1
                 let f_position = u32::from(!(first_char == "f" || first_char == "F"));
                 Some((
-                    TextRange::new(
-                        location.add(TextSize::from(f_position)),
-                        location.add(TextSize::from(f_position + 1)),
+                    TextRange::at(
+                        range.start() + TextSize::from(f_position),
+                        TextSize::from(1),
                     ),
-                    TextRange::new(location, end_location),
+                    range,
                 ))
             }
             _ => None,

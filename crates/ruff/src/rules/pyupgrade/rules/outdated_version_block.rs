@@ -64,9 +64,9 @@ fn metadata<T>(locator: &Locator, located: &Located<T>) -> Option<BlockMetadata>
     let mut elif = None;
     let mut else_ = None;
 
-    for (start, tok, _) in lexer::lex_located(text, Mode::Module, line_start)
+    for (tok, range) in lexer::lex_located(text, Mode::Module, line_start)
         .flatten()
-        .filter(|(_, tok, _)| {
+        .filter(|(tok, _)| {
             !matches!(
                 tok,
                 Tok::Indent
@@ -81,10 +81,10 @@ fn metadata<T>(locator: &Locator, located: &Located<T>) -> Option<BlockMetadata>
             starter = Some(tok.clone());
         } else {
             if matches!(tok, Tok::Elif) && elif.is_none() {
-                elif = Some(start);
+                elif = Some(range.start());
             }
             if matches!(tok, Tok::Else) && else_.is_none() {
-                else_ = Some(start);
+                else_ = Some(range.start());
             }
         }
         if starter.is_some() && elif.is_some() && else_.is_some() {

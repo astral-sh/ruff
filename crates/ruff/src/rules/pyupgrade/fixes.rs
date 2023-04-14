@@ -12,7 +12,7 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 
 use crate::cst::matchers::match_module;
 
-/// Safely adjust the indentation of the indented block at [`Range`].
+/// Safely adjust the indentation of the indented block at [`TextRange`].
 pub fn adjust_indentation(
     range: TextRange,
     indentation: &str,
@@ -89,23 +89,23 @@ pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
     // Find all Tok::Name tokens that are not preceded by Tok::As, and all
     // Tok::Comma tokens.
     let mut prev_tok = None;
-    for (start, tok, end) in lexer::lex(contents, Mode::Module)
+    for (tok, range) in lexer::lex(contents, Mode::Module)
         .flatten()
-        .skip_while(|(_, tok, _)| !matches!(tok, Tok::Import))
+        .skip_while(|(tok, _)| !matches!(tok, Tok::Import))
     {
         if let Tok::Name { name } = &tok {
             if matches!(prev_tok, Some(Tok::As)) {
                 // Adjust the location to take the alias into account.
                 let last_range = names.last_mut().unwrap();
-                *last_range = TextRange::new(last_range.start(), end);
+                *last_range = TextRange::new(last_range.start(), range.end());
             } else {
                 if members.contains(&name.as_str()) {
                     removal_indices.push(names.len());
                 }
-                names.push(TextRange::new(start, end));
+                names.push(range);
             }
         } else if matches!(tok, Tok::Comma) {
-            commas.push(TextRange::new(start, end));
+            commas.push(range);
         }
         prev_tok = Some(tok);
     }
@@ -121,21 +121,21 @@ pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
             continue;
         }
 
-        let (start_location, end_location) = if is_first {
-            (names[index].start(), names[index + 1].start())
+        let range = if is_first {
+            TextRange::new(names[index].start(), names[index + 1].start())
         } else {
-            (commas[index - 1].start(), names[index].end())
+            TextRange::new(commas[index - 1].start(), names[index].end())
         };
 
         // Add all contents from `last_pos` to `fix.location`.
         // It's possible that `last_pos` is after `fix.location`, if we're removing the
         // first _two_ members.
-        if start_location > last_pos {
-            let slice = locator.slice(TextRange::new(last_pos, start_location));
+        if range.start() > last_pos {
+            let slice = locator.slice(TextRange::new(last_pos, range.start()));
             output.push_str(slice);
         }
 
-        last_pos = end_location;
+        last_pos = range.end();
     }
 
     // Add the remaining content.

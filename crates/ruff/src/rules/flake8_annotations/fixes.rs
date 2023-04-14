@@ -13,10 +13,10 @@ pub fn add_return_annotation(locator: &Locator, stmt: &Stmt, annotation: &str) -
     let mut seen_lpar = false;
     let mut seen_rpar = false;
     let mut count: usize = 0;
-    for (start, tok, ..) in lexer::lex_located(contents, Mode::Module, stmt.start()).flatten() {
+    for (tok, range) in lexer::lex_located(contents, Mode::Module, stmt.start()).flatten() {
         if seen_lpar && seen_rpar {
             if matches!(tok, Tok::Colon) {
-                return Ok(Edit::insertion(format!(" -> {annotation}"), start));
+                return Ok(Edit::insertion(format!(" -> {annotation}"), range.start()));
             }
         }
 

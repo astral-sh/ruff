@@ -89,9 +89,9 @@ impl<'a> LogicalLines<'a> {
         let mut builder = LogicalLinesBuilder::with_capacity(tokens.len());
         let mut parens: u32 = 0;
 
-        for (start, token, end) in tokens.iter().flatten() {
+        for (token, range) in tokens.iter().flatten() {
             let token_kind = TokenKind::from_token(token);
-            builder.push_token(*start, token_kind, *end);
+            builder.push_token(token_kind, *range);
 
             match token_kind {
                 TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
@@ -261,7 +261,7 @@ impl<'a> LogicalLine<'a> {
         }
     }
 
-    /// Returns the [`Location`] of the first token on the line or [`None`].
+    /// Returns the [`TextSize`] of the first token on the line or [`None`].
     pub fn first_token_location(&self) -> Option<TextSize> {
         self.tokens().first().map(|t| t.start())
     }
@@ -469,8 +469,8 @@ impl<'a> LogicalLineToken<'a> {
 
     /// Returns a tuple with the token's `(start, end)` locations
     #[inline]
-    pub fn range(&self) -> (TextSize, TextSize) {
-        (self.start(), self.end())
+    pub fn range(&self) -> TextRange {
+        TextRange::new(self.start(), self.end())
     }
 }
 
@@ -564,7 +564,7 @@ impl LogicalLinesBuilder {
 
     // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
     #[allow(clippy::cast_possible_truncation)]
-    fn push_token(&mut self, start: TextSize, kind: TokenKind, end: TextSize) {
+    fn push_token(&mut self, kind: TokenKind, range: TextRange) {
         let tokens_start = self.tokens.len();
 
         let line = self.current_line.get_or_insert_with(|| CurrentLine {
@@ -609,7 +609,7 @@ impl LogicalLinesBuilder {
             ),
         );
 
-        self.tokens.push(kind, start, end);
+        self.tokens.push(kind, range);
     }
 
     // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
@@ -669,10 +669,10 @@ impl Tokens {
         self.kinds.len()
     }
 
-    /// Adds a new token with the given `kind` and `start`, `end` location.
-    fn push(&mut self, kind: TokenKind, start: TextSize, end: TextSize) {
+    /// Adds a new token with the given `kind` and `range`
+    fn push(&mut self, kind: TokenKind, range: TextRange) {
         self.kinds.push(kind);
-        self.starts.push(start);
-        self.ends.push(end);
+        self.starts.push(range.start());
+        self.ends.push(range.end());
     }
 }

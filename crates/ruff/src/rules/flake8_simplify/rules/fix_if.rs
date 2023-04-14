@@ -4,6 +4,7 @@ use libcst_native::{
     LeftParen, ParenthesizableWhitespace, ParenthesizedNode, RightParen, SimpleWhitespace,
     Statement, Suite,
 };
+use std::borrow::Cow;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -46,9 +47,9 @@ pub(crate) fn fix_nested_if_statements(
     // If this is an `elif`, we have to remove the `elif` keyword for now. (We'll
     // restore the `el` later on.)
     let module_text = if is_elif {
-        contents.replacen("elif", "if", 1)
+        Cow::Owned(contents.replacen("elif", "if", 1))
     } else {
-        contents.to_string()
+        Cow::Borrowed(contents)
     };
 
     // If the block is indented, "embed" it in a function definition, to preserve
@@ -57,7 +58,10 @@ pub(crate) fn fix_nested_if_statements(
     let module_text = if outer_indent.is_empty() {
         module_text
     } else {
-        format!("def f():{}{module_text}", stylist.line_ending().as_str())
+        Cow::Owned(format!(
+            "def f():{}{module_text}",
+            stylist.line_ending().as_str()
+        ))
     };
 
     // Parse the CST.
@@ -125,11 +129,11 @@ pub(crate) fn fix_nested_if_statements(
             .unwrap()
     };
     let contents = if is_elif {
-        module_text.replacen("if", "elif", 1)
+        Cow::Owned(module_text.replacen("if", "elif", 1))
     } else {
-        module_text.to_string()
+        Cow::Borrowed(module_text)
     };
 
     let range = locator.lines_range(stmt.range());
-    Ok(Edit::range_replacement(contents, range))
+    Ok(Edit::range_replacement(contents.to_string(), range))
 }

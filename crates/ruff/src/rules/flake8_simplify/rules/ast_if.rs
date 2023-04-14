@@ -528,7 +528,7 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         stmt.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(contents, stmt.start(), stmt.end()));
+        diagnostic.set_fix(Edit::range_replacement(contents, stmt.range()));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -875,7 +875,7 @@ pub fn use_dict_get_with_default(
         stmt.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(contents, stmt.start(), stmt.end()));
+        diagnostic.set_fix(Edit::range_replacement(contents, stmt.range()));
     }
     checker.diagnostics.push(diagnostic);
 }

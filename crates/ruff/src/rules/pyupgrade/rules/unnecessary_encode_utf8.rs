@@ -112,23 +112,22 @@ fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, constant: &Expr) -
     let contents = locator.slice(constant.range());
     let mut replacement = String::with_capacity(contents.len() + 1);
     let mut prev = None;
-    for (start, tok, end) in lexer::lex_located(contents, Mode::Module, constant.start()).flatten()
-    {
+    for (tok, range) in lexer::lex_located(contents, Mode::Module, constant.start()).flatten() {
         if matches!(tok, Tok::String { .. }) {
             if let Some(prev) = prev {
-                replacement.push_str(locator.slice(TextRange::new(prev, start)));
+                replacement.push_str(locator.slice(TextRange::new(prev, range.start())));
             }
-            let string = locator.slice(TextRange::new(start, end));
+            let string = locator.slice(range);
             replacement.push_str(&format!(
                 "b{}",
                 &string.trim_start_matches('u').trim_start_matches('U')
             ));
         } else {
             if let Some(prev) = prev {
-                replacement.push_str(locator.slice(TextRange::new(prev, end)));
+                replacement.push_str(locator.slice(TextRange::new(prev, range.end())));
             }
         }
-        prev = Some(end);
+        prev = Some(range.end());
     }
     Edit::range_replacement(replacement, expr.range())
 }
@@ -181,8 +180,7 @@ pub fn unnecessary_encode_utf8(
                             remove_argument(
                                 checker.locator,
                                 func.start(),
-                                kwarg.start(),
-                                kwarg.end(),
+                                kwarg.range(),
                                 args,
                                 kwargs,
                                 false,
@@ -203,8 +201,7 @@ pub fn unnecessary_encode_utf8(
                             remove_argument(
                                 checker.locator,
                                 func.start(),
-                                arg.start(),
-                                arg.end(),
+                                arg.range(),
                                 args,
                                 kwargs,
                                 false,
@@ -232,8 +229,7 @@ pub fn unnecessary_encode_utf8(
                             remove_argument(
                                 checker.locator,
                                 func.start(),
-                                kwarg.start(),
-                                kwarg.end(),
+                                kwarg.range(),
                                 args,
                                 kwargs,
                                 false,
@@ -254,8 +250,7 @@ pub fn unnecessary_encode_utf8(
                             remove_argument(
                                 checker.locator,
                                 func.start(),
-                                arg.start(),
-                                arg.end(),
+                                arg.range(),
                                 args,
                                 kwargs,
                                 false,

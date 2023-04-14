@@ -131,7 +131,7 @@ pub fn compound_statements(
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for &(start, ref tok, end) in lxr.iter().flatten() {
+    for &(ref tok, range) in lxr.iter().flatten() {
         match tok {
             Tok::Lpar => {
                 par_count += 1;
@@ -199,12 +199,12 @@ pub fn compound_statements(
                     || while_.is_some()
                     || with.is_some()
                 {
-                    colon = Some((start, end));
+                    colon = Some((range.start(), range.end()));
                     allow_ellipsis = true;
                 }
             }
             Tok::Semi => {
-                semi = Some((start, end));
+                semi = Some((range.start(), range.end()));
             }
             Tok::Comment(..) | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
             Tok::Ellipsis if allow_ellipsis => {
@@ -264,40 +264,40 @@ pub fn compound_statements(
                 with = None;
             }
             Tok::Case => {
-                case = Some((start, end));
+                case = Some((range.start(), range.end()));
             }
             Tok::If => {
-                if_ = Some((start, end));
+                if_ = Some((range.start(), range.end()));
             }
             Tok::While => {
-                while_ = Some((start, end));
+                while_ = Some((range.start(), range.end()));
             }
             Tok::For => {
-                for_ = Some((start, end));
+                for_ = Some((range.start(), range.end()));
             }
             Tok::Try => {
-                try_ = Some((start, end));
+                try_ = Some((range.start(), range.end()));
             }
             Tok::Except => {
-                except = Some((start, end));
+                except = Some((range.start(), range.end()));
             }
             Tok::Finally => {
-                finally = Some((start, end));
+                finally = Some((range.start(), range.end()));
             }
             Tok::Elif => {
-                elif = Some((start, end));
+                elif = Some((range.start(), range.end()));
             }
             Tok::Else => {
-                else_ = Some((start, end));
+                else_ = Some((range.start(), range.end()));
             }
             Tok::Class => {
-                class = Some((start, end));
+                class = Some((range.start(), range.end()));
             }
             Tok::With => {
-                with = Some((start, end));
+                with = Some((range.start(), range.end()));
             }
             Tok::Match => {
-                match_ = Some((start, end));
+                match_ = Some((range.start(), range.end()));
             }
             _ => {}
         };

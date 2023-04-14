@@ -57,13 +57,12 @@ pub fn manual_from_import(checker: &mut Checker, stmt: &Stmt, alias: &Alias, nam
             unparse_stmt(
                 &create_stmt(StmtKind::ImportFrom {
                     module: Some(module.to_string()),
-                    names: vec![Located::new(
-                        stmt.start(),
-                        stmt.end(),
+                    names: vec![Located::with_range(
                         AliasData {
                             name: asname.into(),
                             asname: None,
                         },
+                        stmt.range(),
                     )],
                     level: Some(0),
                 }),

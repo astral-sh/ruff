@@ -86,8 +86,7 @@ pub fn inplace_argument(
                     if let Some(fix) = convert_inplace_argument_to_assignment(
                         checker.locator,
                         expr,
-                        diagnostic.start(),
-                        diagnostic.end(),
+                        diagnostic.range(),
                         args,
                         keywords,
                     ) {

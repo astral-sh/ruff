@@ -107,7 +107,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
         // the over-indentation status of every line.
         if i < lines.len() - 1 {
             if line_indent.len() > docstring.indentation.len() {
-                over_indented_lines.push((line.start(), line_indent.text_len()));
+                over_indented_lines.push(TextRange::at(line.start(), line_indent.text_len()));
             } else {
                 is_over_indented = false;
             }
@@ -125,14 +125,15 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
     if checker.settings.rules.enabled(Rule::OverIndentation) {
         // If every line (except the last) is over-indented...
         if is_over_indented {
-            for (offset, indent_len) in over_indented_lines {
+            for over_indented in over_indented_lines {
                 // We report over-indentation on every line. This isn't great, but
                 // enables autofix.
-                let mut diagnostic = Diagnostic::new(OverIndentation, TextRange::empty(offset));
+                let mut diagnostic =
+                    Diagnostic::new(OverIndentation, TextRange::empty(over_indented.start()));
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.set_fix(Edit::range_replacement(
                         whitespace::clean(docstring.indentation),
-                        TextRange::at(offset, indent_len),
+                        over_indented,
                     ));
                 }
                 checker.diagnostics.push(diagnostic);

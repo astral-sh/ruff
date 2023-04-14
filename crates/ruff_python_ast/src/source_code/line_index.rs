@@ -8,7 +8,7 @@ use std::num::NonZeroUsize;
 use std::ops::Deref;
 use std::sync::Arc;
 
-/// Index for fast [`Location`] to [byte offset](TextSize) conversions.
+/// Index for fast [byte offset](TextSize) to [`SourceLocation`] conversions.
 ///
 /// Cloning a [`LineIndex`] is cheap because it only requires bumping a reference count.
 #[derive(Clone)]
@@ -105,7 +105,7 @@ impl LineIndex {
                 } else {
                     // Don't count the BOM character as a column.
                     if line_start == TextSize::from(0) && content.starts_with('\u{feff}') {
-                        line_start += '\u{feff}'.text_len();
+                        line_start = '\u{feff}'.text_len();
                     }
 
                     content[TextRange::new(line_start, offset)].chars().count()

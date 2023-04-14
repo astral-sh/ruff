@@ -37,6 +37,6 @@ pub fn syntax_error(diagnostics: &mut Vec<Diagnostic>, parse_error: &ParseError)
         SyntaxError {
             message: parse_error.error.to_string(),
         },
-        TextRange::new(parse_error.location, parse_error.location),
+        TextRange::empty(parse_error.location),
     ));
 }

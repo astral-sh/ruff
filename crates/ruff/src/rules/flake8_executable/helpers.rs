@@ -15,8 +15,8 @@ static SHEBANG_REGEX: Lazy<Regex> =
 #[derive(Debug, PartialEq, Eq)]
 pub enum ShebangDirective<'a> {
     None,
-    // whitespace length, start of shebang, end, shebang contents
-    Match(TextSize, TextSize, TextSize, &'a str),
+    // whitespace length, start of the shebang, contents
+    Match(TextSize, TextSize, &'a str),
 }
 
 pub fn extract_shebang(line: &str) -> ShebangDirective {
@@ -30,7 +30,6 @@ pub fn extract_shebang(line: &str) -> ShebangDirective {
                 Some(matches) => ShebangDirective::Match(
                     spaces.as_str().text_len(),
                     TextSize::try_from(matches.start()).unwrap(),
-                    TextSize::try_from(matches.end()).unwrap(),
                     matches.as_str(),
                 ),
                 None => ShebangDirective::None,
@@ -75,21 +74,11 @@ mod tests {
         assert_eq!(extract_shebang("not a match"), ShebangDirective::None);
         assert_eq!(
             extract_shebang("#!/usr/bin/env python"),
-            ShebangDirective::Match(
-                TextSize::from(0),
-                TextSize::from(2),
-                TextSize::from(21),
-                "/usr/bin/env python"
-            )
+            ShebangDirective::Match(TextSize::from(0), TextSize::from(2), "/usr/bin/env python")
         );
         assert_eq!(
             extract_shebang("  #!/usr/bin/env python"),
-            ShebangDirective::Match(
-                TextSize::from(2),
-                TextSize::from(4),
-                TextSize::from(23),
-                "/usr/bin/env python"
-            )
+            ShebangDirective::Match(TextSize::from(2), TextSize::from(4), "/usr/bin/env python")
         );
         assert_eq!(
             extract_shebang("print('test')  #!/usr/bin/python"),

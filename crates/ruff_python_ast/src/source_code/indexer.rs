@@ -24,8 +24,8 @@ impl Indexer {
         let mut prev_token: Option<&Tok> = None;
         let mut line_start = TextSize::default();
 
-        for (start, tok, end) in tokens.iter().flatten() {
-            let trivia = &locator.contents()[TextRange::new(prev_end, *start)];
+        for (tok, range) in tokens.iter().flatten() {
+            let trivia = &locator.contents()[TextRange::new(prev_end, range.start())];
 
             for (index, text) in trivia.match_indices(['\n', '\r']) {
                 if text == "\r" && trivia.as_bytes().get(index + 1) == Some(&b'\n') {
@@ -46,20 +46,20 @@ impl Indexer {
 
             match tok {
                 Tok::Comment(..) => {
-                    commented_lines.push(TextRange::new(*start, *end));
+                    commented_lines.push(*range);
                 }
                 Tok::Newline | Tok::NonLogicalNewline => {
-                    line_start = *end;
+                    line_start = range.end();
                 }
                 Tok::String {
                     triple_quoted: true,
                     ..
-                } => string_ranges.push(TextRange::new(*start, *end)),
+                } => string_ranges.push(*range),
                 _ => {}
             }
 
             prev_token = Some(tok);
-            prev_end = *end;
+            prev_end = range.end();
         }
         Self {
             comments: commented_lines,

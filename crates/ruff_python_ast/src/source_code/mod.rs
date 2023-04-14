@@ -29,7 +29,7 @@ pub fn round_trip(code: &str, source_path: &str) -> Result<String, ParseError> {
     Ok(generator.generate())
 }
 
-/// Gives access to the source code of a file and allows mapping between [`Location`] and byte offsets.
+/// Gives access to the source code of a file and allows mapping between [`TextSize`] and [`SourceLocation`].
 #[derive(Debug)]
 pub struct SourceCode<'src, 'index> {
     text: &'src str,
@@ -45,28 +45,31 @@ impl<'src, 'index> SourceCode<'src, 'index> {
     }
 
     /// Computes the one indexed row and column numbers for `offset`.
+    #[inline]
     pub fn source_location(&self, offset: TextSize) -> SourceLocation {
         self.index.source_location(offset, self.text)
     }
 
+    #[inline]
     pub fn line_index(&self, offset: TextSize) -> OneIndexed {
         self.index.line_index(offset)
     }
 
-    // TODO inline
-    /// Take the source code up to the given [`Location`].
+    /// Take the source code up to the given [`TextSize`].
+    #[inline]
     pub fn up_to(&self, offset: TextSize) -> &'src str {
         &self.text[TextRange::up_to(offset)]
     }
 
-    /// Take the source code after the given [`Location`].
+    /// Take the source code after the given [`TextSize`].
+    #[inline]
     pub fn after(&self, offset: TextSize) -> &'src str {
         &self.text[usize::from(offset)..]
     }
 
-    /// Take the source code between the given [`Range`].
-    pub fn slice<R: Into<TextRange>>(&self, range: R) -> &'src str {
-        &self.text[range.into()]
+    /// Take the source code between the given [`TextRange`].
+    pub fn slice(&self, range: TextRange) -> &'src str {
+        &self.text[range]
     }
 
     pub fn line_start(&self, line: OneIndexed) -> TextSize {

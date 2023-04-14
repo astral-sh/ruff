@@ -3,7 +3,7 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Boolop, Cmpop, Expr, ExprContext, ExprKind, Unaryop};
 
@@ -579,8 +579,7 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
 
 pub fn get_short_circuit_edit(
     expr: &Expr,
-    location: Location,
-    end_location: Location,
+    range: TextRange,
     truthiness: Truthiness,
     in_boolean_test: bool,
     stylist: &Stylist,
@@ -596,7 +595,7 @@ pub fn get_short_circuit_edit(
     } else {
         unparse_expr(expr, stylist)
     };
-    Edit::replacement(content, location, end_location)
+    Edit::range_replacement(content, range)
 }
 
 fn is_short_circuit(
@@ -645,8 +644,7 @@ fn is_short_circuit(
             });
             edit = Some(get_short_circuit_edit(
                 value,
-                location,
-                expr.end(),
+                TextRange::new(location, expr.end()),
                 short_circuit_truthiness,
                 context.in_boolean_test,
                 stylist,
@@ -664,8 +662,7 @@ fn is_short_circuit(
             });
             edit = Some(get_short_circuit_edit(
                 next_value,
-                location,
-                expr.end(),
+                TextRange::new(location, expr.end()),
                 short_circuit_truthiness,
                 context.in_boolean_test,
                 stylist,

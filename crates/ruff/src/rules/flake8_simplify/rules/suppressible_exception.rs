@@ -1,4 +1,4 @@
-use ruff_text_size::TextLen;
+use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{
     Constant, Excepthandler, ExcepthandlerKind, ExprKind, Located, Stmt, StmtKind,
 };
@@ -98,11 +98,9 @@ pub fn suppressible_exception(
                         &checker.importer,
                         checker.locator,
                     )?;
-                    let try_ending = stmt.start() + "try".text_len();
-                    let replace_try = Edit::replacement(
+                    let replace_try = Edit::range_replacement(
                         format!("with {binding}({exception})"),
-                        stmt.start(),
-                        try_ending,
+                        TextRange::at(stmt.start(), "try".text_len()),
                     );
                     let handler_line_begin = checker.locator.line_start(handler.start());
                     let remove_handler = Edit::deletion(handler_line_begin, handler.end());

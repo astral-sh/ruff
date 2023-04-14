@@ -108,7 +108,7 @@ impl Serialize for SerializeMessage<'_> {
             noqa_offset: noqa_row,
         } = self.message;
 
-        let mut s = serializer.serialize_struct("Message", 6)?;
+        let mut s = serializer.serialize_struct("Message", 5)?;
 
         s.serialize_field("kind", &kind)?;
         s.serialize_field("range", &range)?;
@@ -222,11 +222,9 @@ pub fn get(
             let source_files: Vec<_> = sources
                 .into_iter()
                 .map(|(filename, text)| {
-                    let mut builder = SourceFileBuilder::from_string(filename);
-
-                    builder.set_source_text_string(text);
-
-                    builder.finish()
+                    SourceFileBuilder::from_string(filename)
+                        .source_text_string(text)
+                        .finish()
                 })
                 .collect();
 

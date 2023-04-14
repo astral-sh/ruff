@@ -64,14 +64,12 @@ pub fn useless_object_inheritance(
 ) {
     if let Some(mut diagnostic) = rule(name, bases, checker.ctx.scope(), &checker.ctx.bindings) {
         if checker.patch(diagnostic.kind.rule()) {
-            let location = diagnostic.start();
-            let end_location = diagnostic.end();
+            let expr_range = diagnostic.range();
             diagnostic.try_set_fix(|| {
                 remove_argument(
                     checker.locator,
                     stmt.start(),
-                    location,
-                    end_location,
+                    expr_range,
                     bases,
                     keywords,
                     true,

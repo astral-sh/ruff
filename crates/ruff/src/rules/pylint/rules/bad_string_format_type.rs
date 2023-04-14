@@ -1,4 +1,4 @@
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use std::str::FromStr;
 
 use rustc_hash::FxHashMap;
@@ -244,10 +244,10 @@ fn is_valid_dict(
 pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
     let content = checker.locator.slice(expr.range());
-    let mut strings: Vec<(TextSize, TextSize)> = vec![];
-    for (start, tok, end) in lexer::lex_located(content, Mode::Module, expr.start()).flatten() {
+    let mut strings: Vec<TextRange> = vec![];
+    for (tok, range) in lexer::lex_located(content, Mode::Module, expr.start()).flatten() {
         if matches!(tok, Tok::String { .. }) {
-            strings.push((start, end));
+            strings.push(range);
         } else if matches!(tok, Tok::Percent) {
             // Break as soon as we find the modulo symbol.
             break;
@@ -261,8 +261,8 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) 
 
     // Parse each string segment.
     let mut format_strings = vec![];
-    for (start, end) in &strings {
-        let string = checker.locator.slice(TextRange::new(*start, *end));
+    for range in &strings {
+        let string = checker.locator.slice(*range);
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };

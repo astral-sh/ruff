@@ -31,7 +31,7 @@ pub fn backslashes(checker: &mut Checker, docstring: &Docstring) {
     if BACKSLASH_REGEX.is_match(contents) {
         checker.diagnostics.push(Diagnostic::new(
             EscapeSequenceInDocstring,
-            docstring.expr.range(),
+            docstring.range(),
         ));
     }
 }

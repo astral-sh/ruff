@@ -1,4 +1,4 @@
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -257,14 +257,13 @@ impl<'a> From<&'a str> for Trivia<'a> {
 /// Q003
 fn docstring(
     locator: &Locator,
-    start: TextSize,
-    end: TextSize,
+    range: TextRange,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Option<Diagnostic> {
     let quotes_settings = &settings.flake8_quotes;
 
-    let text = locator.slice(TextRange::new(start, end));
+    let text = locator.slice(range);
     let trivia: Trivia = text.into();
 
     if trivia
@@ -278,7 +277,7 @@ fn docstring(
         BadQuotesDocstring {
             quote: quotes_settings.docstring_quotes,
         },
-        TextRange::new(start, end),
+        range,
     );
     if autofix.into() && settings.rules.should_fix(Rule::BadQuotesDocstring) {
         let quote_count = if trivia.is_multiline { 3 } else { 1 };
@@ -290,7 +289,7 @@ fn docstring(
         fixed_contents.push_str(&quote);
         fixed_contents.push_str(string_contents);
         fixed_contents.push_str(&quote);
-        diagnostic.set_fix(Edit::replacement(fixed_contents, start, end));
+        diagnostic.set_fix(Edit::range_replacement(fixed_contents, range));
     }
     Some(diagnostic)
 }
@@ -298,7 +297,7 @@ fn docstring(
 /// Q001, Q002
 fn strings(
     locator: &Locator,
-    sequence: &[(TextSize, TextSize)],
+    sequence: &[TextRange],
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
@@ -308,8 +307,8 @@ fn strings(
 
     let trivia = sequence
         .iter()
-        .map(|(start, end)| {
-            let text = locator.slice(TextRange::new(*start, *end));
+        .map(|range| {
+            let text = locator.slice(*range);
             let trivia: Trivia = text.into();
             trivia
         })
@@ -330,7 +329,7 @@ fn strings(
         string_contents.contains(good_single(quotes_settings.inline_quotes))
     });
 
-    for ((start, end), trivia) in sequence.iter().zip(trivia.into_iter()) {
+    for (range, trivia) in sequence.iter().zip(trivia.into_iter()) {
         if trivia.is_multiline {
             // If our string is or contains a known good string, ignore it.
             if trivia
@@ -352,7 +351,7 @@ fn strings(
                 BadQuotesMultilineString {
                     quote: quotes_settings.multiline_quotes,
                 },
-                TextRange::new(*start, *end),
+                *range,
             );
 
             if autofix.into() && settings.rules.should_fix(Rule::BadQuotesMultilineString) {
@@ -365,7 +364,7 @@ fn strings(
                 fixed_contents.push_str(quote);
                 fixed_contents.push_str(string_contents);
                 fixed_contents.push_str(quote);
-                diagnostic.set_fix(Edit::replacement(fixed_contents, *start, *end));
+                diagnostic.set_fix(Edit::range_replacement(fixed_contents, *range));
             }
             diagnostics.push(diagnostic);
         } else {
@@ -383,8 +382,7 @@ fn strings(
                 if string_contents.contains(good_single(quotes_settings.inline_quotes))
                     && !string_contents.contains(bad_single(quotes_settings.inline_quotes))
                 {
-                    let mut diagnostic =
-                        Diagnostic::new(AvoidableEscapedQuote, TextRange::new(*start, *end));
+                    let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, *range);
                     if autofix.into() && settings.rules.should_fix(Rule::AvoidableEscapedQuote) {
                         let quote = bad_single(quotes_settings.inline_quotes);
 
@@ -429,7 +427,7 @@ fn strings(
 
                         fixed_contents.push(quote);
 
-                        diagnostic.set_fix(Edit::replacement(fixed_contents, *start, *end));
+                        diagnostic.set_fix(Edit::range_replacement(fixed_contents, *range));
                     }
                     diagnostics.push(diagnostic);
                 }
@@ -442,7 +440,7 @@ fn strings(
                     BadQuotesInlineString {
                         quote: quotes_settings.inline_quotes,
                     },
-                    TextRange::new(*start, *end),
+                    *range,
                 );
                 if autofix.into() && settings.rules.should_fix(Rule::BadQuotesInlineString) {
                     let quote = good_single(quotes_settings.inline_quotes);
@@ -452,7 +450,7 @@ fn strings(
                     fixed_contents.push(quote);
                     fixed_contents.push_str(string_contents);
                     fixed_contents.push(quote);
-                    diagnostic.set_fix(Edit::replacement(fixed_contents, *start, *end));
+                    diagnostic.set_fix(Edit::range_replacement(fixed_contents, *range));
                 }
                 diagnostics.push(diagnostic);
             }
@@ -475,7 +473,7 @@ pub fn from_tokens(
     // concatenation, and should thus be handled as a single unit.
     let mut sequence = vec![];
     let mut state_machine = StateMachine::default();
-    for &(start, ref tok, end) in lxr.iter().flatten() {
+    for &(ref tok, range) in lxr.iter().flatten() {
         let is_docstring = state_machine.consume(tok);
 
         // If this is a docstring, consume the existing sequence, then consume the
@@ -485,13 +483,13 @@ pub fn from_tokens(
                 diagnostics.extend(strings(locator, &sequence, settings, autofix));
                 sequence.clear();
             }
-            if let Some(diagnostic) = docstring(locator, start, end, settings, autofix) {
+            if let Some(diagnostic) = docstring(locator, range, settings, autofix) {
                 diagnostics.push(diagnostic);
             }
         } else {
             if matches!(tok, Tok::String { .. }) {
                 // If this is a string, add it to the sequence.
-                sequence.push((start, end));
+                sequence.push(range);
             } else if !matches!(tok, Tok::Comment(..) | Tok::NonLogicalNewline) {
                 // Otherwise, consume the sequence.
                 if !sequence.is_empty() {

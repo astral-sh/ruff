@@ -1,0 +1,15 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+assertion_line: 114
+---
+E11.py:12:5: E113 Unexpected indentation
+   |
+12 | #: E113
+13 | print()
+14 |     print()
+   |      E113
+15 | #: E114 E116
+16 | mimetype = 'application/x-directory'
+   |
+
+

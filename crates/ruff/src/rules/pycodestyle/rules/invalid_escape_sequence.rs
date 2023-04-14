@@ -4,7 +4,6 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Locator;
 
 /// ## What it does
@@ -58,13 +57,12 @@ fn extract_quote(text: &str) -> Result<&str> {
 /// W605
 pub fn invalid_escape_sequence(
     locator: &Locator,
-    start: TextSize,
-    end: TextSize,
+    range: TextRange,
     autofix: bool,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    let text = locator.slice(TextRange::new(start, end));
+    let text = locator.slice(range);
 
     // Determine whether the string is single- or triple-quoted.
     let Ok(quote) = extract_quote(text) else {
@@ -73,46 +71,44 @@ pub fn invalid_escape_sequence(
     };
     let quote_pos = text.find(quote).unwrap();
     let prefix = text[..quote_pos].to_lowercase();
-    let body = &text[(quote_pos + quote.len())..(text.len() - quote.len())];
+    let body = &text[quote_pos + quote.len()..text.len() - quote.len()];
 
     if !prefix.contains('r') {
-        for line in body.universal_newlines() {
-            let mut chars_iter = line.char_indices().peekable();
+        let start_offset =
+            range.start() + TextSize::try_from(quote_pos).unwrap() + quote.text_len();
 
-            while let Some((i, c)) = chars_iter.next() {
-                if c != '\\' {
-                    continue;
-                }
+        let mut chars_iter = body.char_indices().peekable();
 
-                // If the previous character was also a backslash, skip.
-                if i > 0 && line.as_bytes()[i - 1] == b'\\' {
-                    continue;
-                }
+        while let Some((i, c)) = chars_iter.next() {
+            if c != '\\' {
+                continue;
+            }
 
-                // If we're at the end of the line, skip.
-                let Some((_, next_char)) = chars_iter.peek() else {
+            // If the previous character was also a backslash, skip.
+            if i > 0 && body.as_bytes()[i - 1] == b'\\' {
+                continue;
+            }
+
+            // If we're at the end of the line, skip.
+            let Some((_, next_char)) = chars_iter.peek() else {
                     continue;
                 };
 
-                // If the next character is a valid escape sequence, skip.
-                if VALID_ESCAPE_SEQUENCES.contains(next_char) {
-                    continue;
-                }
-
-                let location = start
-                    + line.start()
-                    + quote.text_len()
-                    + TextSize::try_from(quote_pos + i).unwrap();
-                let range = TextRange::at(location, TextSize::from(2));
-                let mut diagnostic = Diagnostic::new(InvalidEscapeSequence(*next_char), range);
-                if autofix {
-                    diagnostic.set_fix(Edit::insertion(
-                        r"\".to_string(),
-                        range.start() + TextSize::from(1),
-                    ));
-                }
-                diagnostics.push(diagnostic);
+            // If the next character is a valid escape sequence, skip.
+            if VALID_ESCAPE_SEQUENCES.contains(next_char) {
+                continue;
             }
+
+            let location = start_offset + TextSize::try_from(i).unwrap();
+            let range = TextRange::at(location, next_char.text_len() + TextSize::from(1));
+            let mut diagnostic = Diagnostic::new(InvalidEscapeSequence(*next_char), range);
+            if autofix {
+                diagnostic.set_fix(Edit::insertion(
+                    r"\".to_string(),
+                    range.start() + TextSize::from(1),
+                ));
+            }
+            diagnostics.push(diagnostic);
         }
     }
 

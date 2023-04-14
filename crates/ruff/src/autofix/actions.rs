@@ -4,7 +4,7 @@ use itertools::Itertools;
 use libcst_native::{
     Codegen, CodegenState, ImportNames, ParenthesizableWhitespace, SmallStatement, Statement,
 };
-use ruff_text_size::{TextLen, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ast::{ExcepthandlerKind, Expr, Keyword, Stmt, StmtKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
@@ -120,12 +120,6 @@ fn trailing_semicolon(stmt: &Stmt, locator: &Locator) -> Option<TextSize> {
     None
 }
 
-// How about a trivia struct that maps offset -> Trivia
-// where trivia is
-// * whitespace (indent)?
-// * newline
-// * comment
-
 /// Find the next valid break for a `Stmt` after a semicolon.
 fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
     let start_location = semicolon + TextSize::from(1);
@@ -146,7 +140,7 @@ fn next_stmt_break(semicolon: TextSize, locator: &Locator) -> TextSize {
             } else {
                 // Otherwise, find the start of the next statement. (Or, anything that isn't
                 // whitespace.)
-                let relative_offset = line.chars().position(|c| !c.is_whitespace()).unwrap();
+                let relative_offset = line.find(|c: char| !c.is_whitespace()).unwrap();
                 line.start() + TextSize::try_from(relative_offset).unwrap()
             };
     }
@@ -337,8 +331,7 @@ pub fn remove_unused_imports<'a>(
 pub fn remove_argument(
     locator: &Locator,
     call_at: TextSize,
-    expr_at: TextSize,
-    expr_end: TextSize,
+    expr_range: TextRange,
     args: &[Expr],
     keywords: &[Keyword],
     remove_parentheses: bool,
@@ -357,13 +350,13 @@ pub fn remove_argument(
     if n_arguments == 1 {
         // Case 1: there is only one argument.
         let mut count: usize = 0;
-        for (start, tok, end) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
             if matches!(tok, Tok::Lpar) {
                 if count == 0 {
                     fix_start = Some(if remove_parentheses {
-                        start
+                        range.start()
                     } else {
-                        start + TextSize::from(1)
+                        range.start() + TextSize::from(1)
                     });
                 }
                 count += 1;
@@ -373,9 +366,9 @@ pub fn remove_argument(
                 count -= 1;
                 if count == 0 {
                     fix_end = Some(if remove_parentheses {
-                        end
+                        range.end()
                     } else {
-                        end - TextSize::from(1)
+                        range.end() - TextSize::from(1)
                     });
                     break;
                 }
@@ -385,25 +378,25 @@ pub fn remove_argument(
         .iter()
         .map(Expr::start)
         .chain(keywords.iter().map(Keyword::start))
-        .any(|location| location > expr_at)
+        .any(|location| location > expr_range.start())
     {
         // Case 2: argument or keyword is _not_ the last node.
         let mut seen_comma = false;
-        for (start, tok, end) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
             if seen_comma {
                 if matches!(tok, Tok::NonLogicalNewline) {
                     // Also delete any non-logical newlines after the comma.
                     continue;
                 }
                 fix_end = Some(if matches!(tok, Tok::Newline) {
-                    end
+                    range.end()
                 } else {
-                    start
+                    range.start()
                 });
                 break;
             }
-            if start == expr_at {
-                fix_start = Some(start);
+            if range.start() == expr_range.start() {
+                fix_start = Some(range.start());
             }
             if fix_start.is_some() && matches!(tok, Tok::Comma) {
                 seen_comma = true;
@@ -412,13 +405,13 @@ pub fn remove_argument(
     } else {
         // Case 3: argument or keyword is the last node, so we have to find the last
         // comma in the stmt.
-        for (start, tok, _) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
-            if start == expr_at {
-                fix_end = Some(expr_end);
+        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
+            if range.start() == expr_range.start() {
+                fix_end = Some(expr_range.end());
                 break;
             }
             if matches!(tok, Tok::Comma) {
-                fix_start = Some(start);
+                fix_start = Some(range.start());
             }
         }
     }

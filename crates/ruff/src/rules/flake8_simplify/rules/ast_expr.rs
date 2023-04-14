@@ -176,7 +176,7 @@ pub fn dict_get_with_none_default(checker: &mut Checker, expr: &Expr) {
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(expected, expr.start(), expr.end()));
+        diagnostic.set_fix(Edit::range_replacement(expected, expr.range()));
     }
     checker.diagnostics.push(diagnostic);
 }

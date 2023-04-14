@@ -1,6 +1,6 @@
 #![allow(unused_imports)]
 
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -28,11 +28,11 @@ pub fn shebang_not_executable(
     range: TextRange,
     shebang: &ShebangDirective,
 ) -> Option<Diagnostic> {
-    if let ShebangDirective::Match(_, start, end, _) = shebang {
+    if let ShebangDirective::Match(_, start, content) = shebang {
         if let Ok(false) = is_executable(filepath) {
             let diagnostic = Diagnostic::new(
                 ShebangNotExecutable,
-                TextRange::new(range.start() + start, range.start() + end),
+                TextRange::at(range.start() + start, content.text_len()),
             );
             return Some(diagnostic);
         }
@@ -43,7 +43,7 @@ pub fn shebang_not_executable(
 #[cfg(not(target_family = "unix"))]
 pub fn shebang_not_executable(
     _filepath: &Path,
-    _lineno: usize,
+    _range: TextRange,
     _shebang: &ShebangDirective,
 ) -> Option<Diagnostic> {
     None

@@ -259,12 +259,11 @@ fn pytest_fixture_parentheses(
 pub fn fix_extraneous_scope_function(
     locator: &Locator,
     stmt_at: TextSize,
-    expr_at: TextSize,
-    expr_end: TextSize,
+    expr_range: TextRange,
     args: &[Expr],
     keywords: &[Keyword],
 ) -> Result<Edit> {
-    remove_argument(locator, stmt_at, expr_at, expr_end, args, keywords, false)
+    remove_argument(locator, stmt_at, expr_range, args, keywords, false)
 }
 
 /// PT001, PT002, PT003
@@ -316,14 +315,12 @@ fn check_fixture_decorator(checker: &mut Checker, func_name: &str, decorator: &E
                         let mut diagnostic =
                             Diagnostic::new(PytestExtraneousScopeFunction, scope_keyword.range());
                         if checker.patch(diagnostic.kind.rule()) {
-                            let location = diagnostic.start();
-                            let end_location = diagnostic.end();
+                            let expr_range = diagnostic.range();
                             diagnostic.try_set_fix(|| {
                                 fix_extraneous_scope_function(
                                     checker.locator,
                                     decorator.start(),
-                                    location,
-                                    end_location,
+                                    expr_range,
                                     args,
                                     keywords,
                                 )

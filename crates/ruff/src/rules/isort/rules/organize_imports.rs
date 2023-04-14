@@ -100,7 +100,7 @@ pub fn organize_imports(
 
     // Extract comments. Take care to grab any inline comments from the last line.
     let comments = comments::collect_comments(
-        TextRange::new(range.start(), locator.line_end(range.end())),
+        TextRange::new(range.start(), locator.full_line_end(range.end())),
         locator,
     );
 

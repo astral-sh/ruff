@@ -1684,23 +1684,24 @@ static CONFUSABLES: Lazy<FxHashMap<u32, u8>> = Lazy::new(|| {
 
 pub fn ambiguous_unicode_character(
     locator: &Locator,
-    start: TextSize,
-    end: TextSize,
+    range: TextRange,
     context: Context,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    let text = locator.slice(TextRange::new(start, end));
+    let text = locator.slice(range);
 
     for (relative_offset, current_char) in text.char_indices() {
         if !current_char.is_ascii() {
             // Search for confusing characters.
             if let Some(representant) = CONFUSABLES.get(&(current_char as u32)).copied() {
                 if !settings.allowed_confusables.contains(&current_char) {
-                    let start = TextSize::try_from(relative_offset).unwrap() + start;
-                    let end = start + current_char.text_len();
+                    let char_range = TextRange::at(
+                        TextSize::try_from(relative_offset).unwrap() + range.start(),
+                        current_char.text_len(),
+                    );
 
                     let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
                         match context {
@@ -1720,14 +1721,13 @@ pub fn ambiguous_unicode_character(
                             }
                             .into(),
                         },
-                        TextRange::new(start, end),
+                        char_range,
                     );
                     if settings.rules.enabled(diagnostic.kind.rule()) {
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            diagnostic.set_fix(Edit::range_replacement(
                                 (representant as char).to_string(),
-                                start,
-                                end,
+                                char_range,
                             ));
                         }
                         diagnostics.push(diagnostic);

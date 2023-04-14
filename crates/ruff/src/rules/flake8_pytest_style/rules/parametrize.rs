@@ -100,7 +100,7 @@ fn get_parametrize_name_range(checker: &Checker, decorator: &Expr, expr: &Expr) 
 
     // The parenthesis are not part of the AST, so we need to tokenize the
     // decorator to find them.
-    for (start, tok, end) in lexer::lex_located(
+    for (tok, range) in lexer::lex_located(
         checker.locator.slice(decorator.range()),
         Mode::Module,
         decorator.start(),
@@ -108,10 +108,10 @@ fn get_parametrize_name_range(checker: &Checker, decorator: &Expr, expr: &Expr) 
     .flatten()
     {
         match tok {
-            Tok::Lpar => locations.push(start),
+            Tok::Lpar => locations.push(range.start()),
             Tok::Rpar => {
                 if let Some(start) = locations.pop() {
-                    implicit_concat = Some(TextRange::new(start, end));
+                    implicit_concat = Some(TextRange::new(start, range.end()));
                 }
             }
             // Stop after the first argument.
@@ -197,7 +197,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                                     }),
                                     checker.stylist,
                                 ),
-                                expr.range(),
+                                name_range,
                             ));
                         }
                         checker.diagnostics.push(diagnostic);

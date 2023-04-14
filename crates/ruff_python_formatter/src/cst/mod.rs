@@ -2078,7 +2078,7 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                 let mut second_colon = None;
                 let mut lambda = 0;
                 let mut nesting = 0;
-                for (start, tok, ..) in tokens.flatten() {
+                for (tok, range) in tokens.flatten() {
                     match tok {
                         rustpython_parser::Tok::Lambda if nesting == 0 => lambda += 1,
                         rustpython_parser::Tok::Colon if nesting == 0 => {
@@ -2086,9 +2086,9 @@ impl From<(rustpython_parser::ast::Expr, &Locator<'_>)> for Expr {
                                 lambda -= 1;
                             } else {
                                 if first_colon.is_none() {
-                                    first_colon = Some(start);
+                                    first_colon = Some(range.start());
                                 } else {
-                                    second_colon = Some(start);
+                                    second_colon = Some(range.start());
                                     break;
                                 }
                             }

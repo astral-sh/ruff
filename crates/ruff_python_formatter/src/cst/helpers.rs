@@ -1,6 +1,5 @@
 use ruff_python_ast::source_code::Locator;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use std::ops::{Add, Sub};
 
 /// Return `true` if the given string is a radix literal (e.g., `0b101`).
 pub fn is_radix_literal(content: &str) -> bool {
@@ -18,7 +17,7 @@ pub fn find_tok(
     locator: &Locator,
     f: impl Fn(rustpython_parser::Tok) -> bool,
 ) -> TextRange {
-    for (start, tok, end) in rustpython_parser::lexer::lex_located(
+    for (tok, tok_range) in rustpython_parser::lexer::lex_located(
         &locator.contents()[range],
         rustpython_parser::Mode::Module,
         range.start(),
@@ -26,7 +25,7 @@ pub fn find_tok(
     .flatten()
     {
         if f(tok) {
-            return TextRange::new(start, end);
+            return tok_range;
         }
     }
     unreachable!("Failed to find token in range {:?}", range)
@@ -46,7 +45,7 @@ pub fn expand_indented_block(
     // Find the colon, which indicates the end of the header.
     let mut nesting = 0;
     let mut colon = None;
-    for (start, tok, _end) in rustpython_parser::lexer::lex_located(
+    for (tok, tok_range) in rustpython_parser::lexer::lex_located(
         &contents[TextRange::new(location, end_location)],
         rustpython_parser::Mode::Module,
         location,
@@ -55,7 +54,7 @@ pub fn expand_indented_block(
     {
         match tok {
             rustpython_parser::Tok::Colon if nesting == 0 => {
-                colon = Some(start);
+                colon = Some(tok_range.start());
                 break;
             }
             rustpython_parser::Tok::Lpar
@@ -76,8 +75,8 @@ pub fn expand_indented_block(
         colon_location,
     )
     .flatten()
-    .find_map(|(_, tok, end)| match tok {
-        rustpython_parser::Tok::Indent => Some(end),
+    .find_map(|(tok, range)| match tok {
+        rustpython_parser::Tok::Indent => Some(range.end()),
         _ => None,
     });
 
@@ -88,7 +87,7 @@ pub fn expand_indented_block(
         return TextRange::new(colon_location, line_end);
     };
 
-    let indent_width = indent_end.sub(locator.line_start(indent_end));
+    let indent_width = indent_end - locator.line_start(indent_end);
 
     // Compound statement: from the colon to the end of the block.
     // For each line that follows, check that there's no content up to the expected indent.
@@ -106,9 +105,7 @@ pub fn expand_indented_block(
             '\n' | '\r' => {
                 // Ignore empty lines
                 if line_offset > TextSize::from(0) {
-                    offset = TextSize::try_from(relative_offset)
-                        .unwrap()
-                        .add(TextSize::from(1));
+                    offset = TextSize::try_from(relative_offset).unwrap() + TextSize::from(1);
                 }
                 line_offset = TextSize::from(0);
             }
@@ -122,7 +119,7 @@ pub fn expand_indented_block(
     let end = if line_offset >= indent_width {
         contents.text_len()
     } else {
-        line_end.add(offset)
+        line_end + offset
     };
 
     TextRange::new(colon_location, end)

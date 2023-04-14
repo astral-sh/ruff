@@ -1,6 +1,5 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -40,12 +39,9 @@ pub fn type_comment_in_stub(tokens: &[LexResult]) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     for token in tokens.iter().flatten() {
-        if let (location, Tok::Comment(comment), end_location) = token {
+        if let (Tok::Comment(comment), range) = token {
             if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
-                diagnostics.push(Diagnostic::new(
-                    TypeCommentInStub,
-                    TextRange::new(*location, *end_location),
-                ));
+                diagnostics.push(Diagnostic::new(TypeCommentInStub, *range));
             }
         }
     }

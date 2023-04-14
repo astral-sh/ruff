@@ -1,4 +1,4 @@
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextRange, TextSize};
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
@@ -14,8 +14,8 @@ pub struct Stack<'a> {
     pub references: FxHashMap<&'a str, Vec<TextSize>>,
     pub non_locals: FxHashSet<&'a str>,
     pub assignments: FxHashMap<&'a str, Vec<TextSize>>,
-    pub loops: Vec<(TextSize, TextSize)>,
-    pub tries: Vec<(TextSize, TextSize)>,
+    pub loops: Vec<TextRange>,
+    pub tries: Vec<TextRange>,
 }
 
 #[derive(Default)]
@@ -147,14 +147,14 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
                 }
             }
             StmtKind::For { .. } | StmtKind::AsyncFor { .. } | StmtKind::While { .. } => {
-                self.stack.loops.push((stmt.start(), stmt.end()));
+                self.stack.loops.push(stmt.range());
 
                 self.parents.push(stmt);
                 visitor::walk_stmt(self, stmt);
                 self.parents.pop();
             }
             StmtKind::Try { .. } | StmtKind::TryStar { .. } => {
-                self.stack.tries.push((stmt.start(), stmt.end()));
+                self.stack.tries.push(stmt.range());
 
                 self.parents.push(stmt);
                 visitor::walk_stmt(self, stmt);

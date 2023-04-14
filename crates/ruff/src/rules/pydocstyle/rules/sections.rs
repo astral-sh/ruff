@@ -275,14 +275,14 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
             parse_google_sections(
                 checker,
                 docstring,
-                &SectionContexts::from_docstring(&lines, SectionStyle::Google),
+                &SectionContexts::from_docstring(docstring, SectionStyle::Google),
             );
         }
         Some(Convention::Numpy) => {
             parse_numpy_sections(
                 checker,
                 docstring,
-                &SectionContexts::from_docstring(&lines, SectionStyle::Numpy),
+                &SectionContexts::from_docstring(docstring, SectionStyle::Numpy),
             );
         }
         Some(Convention::Pep257) | None => {
@@ -306,7 +306,7 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
             }
 
             // If the docstring contains any argument specifier, use the Google convention.
-            let google_sections = section_contexts(&lines, SectionStyle::Google);
+            let google_sections = SectionContexts::from_docstring(docstring, SectionStyle::Google);
             if google_sections.iter().any(|context| {
                 matches!(
                     context.kind(),
@@ -773,9 +773,9 @@ static GOOGLE_ARGS_REGEX: Lazy<Regex> =
 
 fn args_section(context: &SectionContext) -> FxHashSet<String> {
     let mut following_lines = context.following_lines().peekable();
-    if following_lines.peek().is_none() {
+    let Some(first_line) = following_lines.next() else {
         return FxHashSet::default();
-    }
+    };
 
     // Normalize leading whitespace, by removing any lines with less indentation
     // than the first.
@@ -925,20 +925,20 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
 fn parse_numpy_sections(
     checker: &mut Checker,
     docstring: &Docstring,
-    section_contexts: &[SectionContext],
+    section_contexts: &SectionContexts,
 ) {
     for section_context in section_contexts {
-        numpy_section(checker, docstring, section_context);
+        numpy_section(checker, docstring, &section_context);
     }
 }
 
 fn parse_google_sections(
     checker: &mut Checker,
     docstring: &Docstring,
-    section_contexts: &[SectionContext],
+    section_contexts: &SectionContexts,
 ) {
     for section_context in section_contexts {
-        google_section(checker, docstring, section_context);
+        google_section(checker, docstring, &section_context);
     }
 
     if checker.settings.rules.enabled(Rule::UndocumentedParam) {
@@ -958,7 +958,7 @@ fn parse_google_sections(
                     | SectionKind::OtherArguments
             ) {
                 has_args = true;
-                documented_args.extend(args_section(section_context));
+                documented_args.extend(args_section(&section_context));
             }
         }
         if has_args {

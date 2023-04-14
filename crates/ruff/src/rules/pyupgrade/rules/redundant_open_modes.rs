@@ -135,27 +135,27 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
     let mut fix_end: Option<TextSize> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    for (start, tok, end) in lexer::lex_located(content, Mode::Module, expr.start()).flatten() {
-        if start == mode_param.start() {
+    for (tok, range) in lexer::lex_located(content, Mode::Module, expr.start()).flatten() {
+        if range.start() == mode_param.start() {
             if is_first_arg {
                 delete_first_arg = true;
                 continue;
             }
-            fix_end = Some(end);
+            fix_end = Some(range.end());
             break;
         }
         if delete_first_arg && matches!(tok, Tok::Name { .. }) {
-            fix_end = Some(start);
+            fix_end = Some(range.start());
             break;
         }
         if matches!(tok, Tok::Lpar) {
             is_first_arg = true;
-            fix_start = Some(end);
+            fix_start = Some(range.end());
         }
         if matches!(tok, Tok::Comma) {
             is_first_arg = false;
             if !delete_first_arg {
-                fix_start = Some(start);
+                fix_start = Some(range.start());
             }
         }
     }

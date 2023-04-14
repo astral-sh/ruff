@@ -5,6 +5,7 @@ use js_sys;
 use wasm_bindgen_test::*;
 
 use ruff::registry::Rule;
+use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
 use ruff_wasm::*;
 
 macro_rules! check {

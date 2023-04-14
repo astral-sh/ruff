@@ -64,7 +64,7 @@ pub fn check_tokens(
     // RUF001, RUF002, RUF003
     if enforce_ambiguous_unicode_character {
         let mut state_machine = StateMachine::default();
-        for &(start, ref tok, end) in tokens.iter().flatten() {
+        for &(ref tok, range) in tokens.iter().flatten() {
             let is_docstring = if enforce_ambiguous_unicode_character {
                 state_machine.consume(tok)
             } else {
@@ -74,8 +74,7 @@ pub fn check_tokens(
             if matches!(tok, Tok::String { .. } | Tok::Comment(_)) {
                 diagnostics.extend(ruff::rules::ambiguous_unicode_character(
                     locator,
-                    start,
-                    end,
+                    range,
                     if matches!(tok, Tok::String { .. }) {
                         if is_docstring {
                             Context::Docstring
@@ -94,10 +93,10 @@ pub fn check_tokens(
 
     // ERA001
     if enforce_commented_out_code {
-        for (start, tok, end) in tokens.iter().flatten() {
+        for (tok, range) in tokens.iter().flatten() {
             if matches!(tok, Tok::Comment(_)) {
                 if let Some(diagnostic) =
-                    eradicate::rules::commented_out_code(locator, *start, *end, settings, autofix)
+                    eradicate::rules::commented_out_code(locator, *range, settings, autofix)
                 {
                     diagnostics.push(diagnostic);
                 }
@@ -107,12 +106,11 @@ pub fn check_tokens(
 
     // W605
     if enforce_invalid_escape_sequence {
-        for (start, tok, end) in tokens.iter().flatten() {
+        for (tok, range) in tokens.iter().flatten() {
             if matches!(tok, Tok::String { .. }) {
                 diagnostics.extend(pycodestyle::rules::invalid_escape_sequence(
                     locator,
-                    *start,
-                    *end,
+                    *range,
                     autofix.into() && settings.rules.should_fix(Rule::InvalidEscapeSequence),
                 ));
             }
@@ -120,10 +118,10 @@ pub fn check_tokens(
     }
     // PLE2510, PLE2512, PLE2513
     if enforce_invalid_string_character {
-        for (start, tok, end) in tokens.iter().flatten() {
+        for (tok, range) in tokens.iter().flatten() {
             if matches!(tok, Tok::String { .. }) {
                 diagnostics.extend(
-                    pylint::rules::invalid_string_characters(locator, *start, *end, autofix.into())
+                    pylint::rules::invalid_string_characters(locator, *range, autofix.into())
                         .into_iter()
                         .filter(|diagnostic| settings.rules.enabled(diagnostic.kind.rule())),
                 );

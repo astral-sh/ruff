@@ -40,15 +40,7 @@ fn generate_fix(
     };
     Ok(Fix::new(vec![
         Edit::range_replacement("capture_output=True".to_string(), first.range()),
-        remove_argument(
-            locator,
-            func.start(),
-            second.start(),
-            second.end(),
-            args,
-            keywords,
-            false,
-        )?,
+        remove_argument(locator, func.start(), second.range(), args, keywords, false)?,
     ]))
 }
 

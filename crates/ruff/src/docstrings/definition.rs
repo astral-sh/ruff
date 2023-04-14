@@ -65,12 +65,16 @@ pub struct DocstringBody<'a> {
 impl<'a> DocstringBody<'a> {
     #[inline]
     pub fn start(self) -> TextSize {
-        self.docstring.body_range.start() + self.docstring.start()
+        self.range().start()
     }
 
     #[inline]
     pub fn end(self) -> TextSize {
-        self.docstring.body_range.end() + self.docstring.start()
+        self.range().end()
+    }
+
+    pub fn range(self) -> TextRange {
+        self.docstring.body_range + self.docstring.start()
     }
 
     pub fn as_str(self) -> &'a str {
@@ -90,7 +94,7 @@ impl Debug for DocstringBody<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("DocstringBody")
             .field("text", &self.as_str())
-            .field("range", &self.docstring.body_range)
+            .field("range", &self.range())
             .finish()
     }
 }

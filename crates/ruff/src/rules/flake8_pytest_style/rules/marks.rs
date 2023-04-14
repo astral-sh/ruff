@@ -113,8 +113,9 @@ fn check_useless_usefixtures(checker: &mut Checker, decorator: &Expr, call_path:
     if !has_parameters {
         let mut diagnostic = Diagnostic::new(PytestUseFixturesWithoutParameters, decorator.range());
         if checker.patch(diagnostic.kind.rule()) {
-            let at_start = decorator.start() - TextSize::from(1);
-            diagnostic.set_fix(Edit::deletion(at_start, decorator.end()));
+            diagnostic.set_fix(Edit::range_deletion(
+                decorator.range().sub_start(TextSize::from(1)),
+            ));
         }
         checker.diagnostics.push(diagnostic);
     }

@@ -128,9 +128,9 @@ impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
         let contents = f.context().locator().slice(expr.range());
         let elts = rustpython_parser::lexer::lex_located(contents, Mode::Module, expr.start())
             .flatten()
-            .filter_map(|(start, tok, end)| {
+            .filter_map(|(tok, range)| {
                 if matches!(tok, Tok::String { .. }) {
-                    Some(TextRange::new(start, end))
+                    Some(range)
                 } else {
                     None
                 }

@@ -18,7 +18,7 @@ pub const JUPYTER_NOTEBOOK_EXT: &str = "ipynb";
 /// Jupyter Notebook indexing table
 ///
 /// When we lint a jupyter notebook, we have to translate the row/column based on
-/// [`crate::message::Location`]
+/// [`ruff_text_size::TextSize`]
 /// to jupyter notebook cell/row/column.
 #[derive(Debug, Eq, PartialEq)]
 pub struct JupyterIndex {

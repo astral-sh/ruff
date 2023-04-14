@@ -30,13 +30,10 @@ path-absolutize = { version = "3.0.14" }
 proc-macro2 = { version = "1.0.51" }
 quote = { version = "1.0.23" }
 regex = { version = "1.7.1" }
+ruff_text_size = { git = "https://github.com/charliermarsh/RustPython.git", rev = "f336c43058ce37594635fab1fb85d2ad288bdcdb" }
 rustc-hash = { version = "1.1.0" }
-ruff_text_size = { path = "../RustPython/ruff_text_size" }
-rustpython-common = { path = "../RustPython/common"}
-rustpython-parser = { features = [
-  "lalrpop",
-  "serde",
-], path = "../RustPython/compiler/parser" }
+rustpython-common = { git = "https://github.com/charliermarsh/RustPython.git", rev = "f336c43058ce37594635fab1fb85d2ad288bdcdb" }
+rustpython-parser = { git = "https://github.com/charliermarsh/RustPython.git", rev = "f336c43058ce37594635fab1fb85d2ad288bdcdb" }
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93", features = ["preserve_order"] }

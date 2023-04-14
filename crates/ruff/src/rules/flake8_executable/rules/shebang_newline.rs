@@ -1,4 +1,4 @@
-use ruff_text_size::TextRange;
+use ruff_text_size::{TextLen, TextRange};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -21,13 +21,13 @@ pub fn shebang_newline(
     shebang: &ShebangDirective,
     first_line: bool,
 ) -> Option<Diagnostic> {
-    if let ShebangDirective::Match(_, start, end, _) = shebang {
+    if let ShebangDirective::Match(_, start, content) = shebang {
         if first_line {
             None
         } else {
             let diagnostic = Diagnostic::new(
                 ShebangNotFirstLine,
-                TextRange::new(range.start() + start, range.start() + end),
+                TextRange::at(range.start() + start, content.text_len()),
             );
             Some(diagnostic)
         }

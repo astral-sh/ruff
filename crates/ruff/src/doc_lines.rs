@@ -38,19 +38,19 @@ impl Iterator for DocLines<'_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
-            let (start, tok, end) = self.inner.next()?;
+            let (tok, range) = self.inner.next()?;
 
             if let Tok::Comment(..) = tok {
                 if self.prev == TextSize::default()
                     || self
                         .locator
-                        .contains_line_break(TextRange::new(self.prev, *start))
+                        .contains_line_break(TextRange::new(self.prev, range.start()))
                 {
-                    break Some(*start);
+                    break Some(range.start());
                 }
             }
 
-            self.prev = *end;
+            self.prev = range.end();
         }
     }
 }

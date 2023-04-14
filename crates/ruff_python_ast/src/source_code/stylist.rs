@@ -64,19 +64,19 @@ impl<'a> Stylist<'a> {
     }
 
     pub fn from_tokens(tokens: &[LexResult], locator: &'a Locator<'a>) -> Self {
-        let indent_end = tokens.iter().flatten().find_map(|(_, t, end)| {
+        let indent_end = tokens.iter().flatten().find_map(|(t, range)| {
             if matches!(t, Tok::Indent) {
-                Some(*end)
+                Some(range.end())
             } else {
                 None
             }
         });
 
-        let quote_range = tokens.iter().flatten().find_map(|(start, t, end)| match t {
+        let quote_range = tokens.iter().flatten().find_map(|(t, range)| match t {
             Tok::String {
                 triple_quoted: false,
                 ..
-            } => Some(TextRange::new(*start, *end)),
+            } => Some(*range),
             _ => None,
         });
 

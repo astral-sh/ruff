@@ -46,7 +46,7 @@ impl Edit {
         }
     }
 
-    /// Creates an edit that inserts `content` at the [`Location`] `at`.
+    /// Creates an edit that inserts `content` at the [`TextSize`] `at`.
     pub fn insertion(content: String, at: TextSize) -> Self {
         debug_assert!(!content.is_empty(), "Insert content is empty");
 

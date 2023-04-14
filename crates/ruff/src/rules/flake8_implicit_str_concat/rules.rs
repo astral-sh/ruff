@@ -121,25 +121,25 @@ impl Violation for ExplicitStringConcatenation {
 /// ISC001, ISC002
 pub fn implicit(tokens: &[LexResult], settings: &Settings, locator: &Locator) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
-    for ((a_start, a_tok, a_end), (b_start, b_tok, b_end)) in tokens
+    for ((a_tok, a_range), (b_tok, b_range)) in tokens
         .iter()
         .flatten()
-        .filter(|(_, tok, _)| {
+        .filter(|(tok, _)| {
             !matches!(tok, Tok::Comment(..))
                 && (settings.allow_multiline || !matches!(tok, Tok::NonLogicalNewline))
         })
         .tuple_windows()
     {
         if matches!(a_tok, Tok::String { .. }) && matches!(b_tok, Tok::String { .. }) {
-            if locator.contains_line_break(TextRange::new(*a_end, *b_start)) {
+            if locator.contains_line_break(TextRange::new(a_range.end(), b_range.start())) {
                 diagnostics.push(Diagnostic::new(
                     MultiLineImplicitStringConcatenation,
-                    TextRange::new(*a_start, *b_end),
+                    TextRange::new(a_range.start(), b_range.end()),
                 ));
             } else {
                 diagnostics.push(Diagnostic::new(
                     SingleLineImplicitStringConcatenation,
-                    TextRange::new(*a_start, *b_end),
+                    TextRange::new(a_range.start(), b_range.end()),
                 ));
             }
         }

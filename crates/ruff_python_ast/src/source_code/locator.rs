@@ -375,23 +375,22 @@ impl<'a> Locator<'a> {
         &self.contents[self.full_lines_range(range)]
     }
 
-    // TODO remove
-    /// Take the source code up to the given [`Location`].
+    /// Take the source code up to the given [`TextSize`].
     #[inline]
     pub fn up_to(&self, offset: TextSize) -> &'a str {
         &self.contents[TextRange::up_to(offset)]
     }
 
-    /// Take the source code after the given [`Location`].
+    /// Take the source code after the given [`TextSize`].
     #[inline]
     pub fn after(&self, offset: TextSize) -> &'a str {
         &self.contents[usize::from(offset)..]
     }
 
-    /// Take the source code between the given [`Range`].
+    /// Take the source code between the given [`TextRange`].
     #[inline]
-    pub fn slice<R: Into<TextRange>>(&self, range: R) -> &'a str {
-        &self.contents[range.into()]
+    pub fn slice(&self, range: TextRange) -> &'a str {
+        &self.contents[range]
     }
 
     /// Return the underlying source code.

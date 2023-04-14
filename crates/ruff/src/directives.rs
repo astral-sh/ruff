@@ -88,9 +88,8 @@ pub fn extract_noqa_line_for(
     indexer: &Indexer,
 ) -> NoqaMapping {
     let mut string_mappings = Vec::new();
-    let mut prev_non_newline_start: Option<TextSize> = None;
 
-    for (start, tok, end) in lxr.iter().flatten() {
+    for (tok, range) in lxr.iter().flatten() {
         match tok {
             Tok::EndOfFile => {
                 break;
@@ -102,16 +101,12 @@ pub fn extract_noqa_line_for(
                 triple_quoted: true,
                 ..
             } => {
-                if locator.contains_line_break(TextRange::new(*start, *end)) {
-                    string_mappings.push(TextRange::new(*start, *end));
+                if locator.contains_line_break(*range) {
+                    string_mappings.push(*range);
                 }
             }
 
             _ => {}
-        }
-
-        if prev_non_newline_start.is_none() {
-            prev_non_newline_start = Some(*start);
         }
     }
 
@@ -172,7 +167,7 @@ pub fn extract_isort_directives(lxr: &[LexResult], locator: &Locator) -> IsortDi
     let mut splits: Vec<TextSize> = Vec::default();
     let mut off: Option<TextSize> = None;
 
-    for &(start, ref tok, _) in lxr.iter().flatten() {
+    for &(ref tok, range) in lxr.iter().flatten() {
         let Tok::Comment(comment_text) = tok else {
             continue;
         };
@@ -182,7 +177,7 @@ pub fn extract_isort_directives(lxr: &[LexResult], locator: &Locator) -> IsortDi
         // required to include the space, and must appear on their own lines.
         let comment_text = comment_text.trim_end();
         if matches!(comment_text, "# isort: split" | "# ruff: isort: split") {
-            splits.push(start);
+            splits.push(range.start());
         } else if matches!(
             comment_text,
             "# isort: skip_file"
@@ -197,15 +192,15 @@ pub fn extract_isort_directives(lxr: &[LexResult], locator: &Locator) -> IsortDi
         } else if off.is_some() {
             if comment_text == "# isort: on" || comment_text == "# ruff: isort: on" {
                 if let Some(exclusion_start) = off {
-                    exclusions.push(TextRange::new(exclusion_start, start));
+                    exclusions.push(TextRange::new(exclusion_start, range.start()));
                 }
                 off = None;
             }
         } else {
             if comment_text.contains("isort: skip") || comment_text.contains("isort:skip") {
-                exclusions.push(locator.line_range(start));
+                exclusions.push(locator.line_range(range.start()));
             } else if comment_text == "# isort: off" || comment_text == "# ruff: isort: off" {
-                off = Some(start);
+                off = Some(range.start());
             }
         }
     }

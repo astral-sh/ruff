@@ -370,34 +370,34 @@ fn has_refs_before_next_assign(
 fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack, locator: &Locator) -> bool {
     if let Some(references) = stack.references.get(&id) {
         for location in references {
-            for (try_location, try_end_location) in &stack.tries {
-                if locator.contains_line_break(TextRange::new(*try_location, *location))
-                    && location <= try_end_location
+            for try_range in &stack.tries {
+                if try_range.contains(*location)
+                    && locator.contains_line_break(TextRange::new(try_range.start(), *location))
                 {
                     return true;
                 }
             }
-            for (loop_location, loop_end_location) in &stack.loops {
-                if locator.contains_line_break(TextRange::new(*loop_location, *location))
-                    && location <= loop_end_location
+            for loop_range in &stack.loops {
+                if loop_range.contains(*location)
+                    && locator.contains_line_break(TextRange::new(loop_range.start(), *location))
                 {
                     return true;
                 }
             }
         }
     }
-    if let Some(assignments) = stack.assignments.get(&id) {
-        for location in assignments {
-            for (try_location, try_end_location) in &stack.tries {
-                if locator.contains_line_break(TextRange::new(*try_location, *location))
-                    && location <= try_end_location
+    if let Some(references) = stack.assignments.get(&id) {
+        for location in references {
+            for try_range in &stack.tries {
+                if try_range.contains(*location)
+                    && locator.contains_line_break(TextRange::new(try_range.start(), *location))
                 {
                     return true;
                 }
             }
-            for (loop_location, loop_end_location) in &stack.loops {
-                if locator.contains_line_break(TextRange::new(*loop_location, *location))
-                    && location <= loop_end_location
+            for loop_range in &stack.loops {
+                if loop_range.contains(*location)
+                    && locator.contains_line_break(TextRange::new(loop_range.start(), *location))
                 {
                     return true;
                 }

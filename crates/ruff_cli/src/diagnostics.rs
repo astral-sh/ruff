@@ -87,7 +87,9 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Box<Diag
             return Err(Box::new(Diagnostics {
                 messages: vec![Message::from_diagnostic(
                     *diagnostic,
-                    SourceFileBuilder::new(&path.to_string_lossy()).finish(),
+                    SourceFileBuilder::new(&path.to_string_lossy())
+                        .source_text("")
+                        .finish(),
                     TextSize::default(),
                 )],
                 ..Diagnostics::default()
@@ -198,6 +200,7 @@ pub fn lint_path(
     let imports = imports.unwrap_or_default();
 
     if let Some(err) = parse_error {
+        // FIXME micha manually print parse errors to get line and column numbers
         // Notify the user of any parse errors.
         error!(
             "{}{}{} {err}",

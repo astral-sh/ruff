@@ -118,7 +118,9 @@ pub fn run(
                     );
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.rules.enabled(Rule::IOError) {
-                        let file = SourceFileBuilder::new(&path.to_string_lossy()).finish();
+                        let file = SourceFileBuilder::new(&path.to_string_lossy())
+                            .source_text("")
+                            .finish();
 
                         Diagnostics::new(
                             vec![Message::from_diagnostic(

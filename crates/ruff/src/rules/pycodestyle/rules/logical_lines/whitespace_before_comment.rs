@@ -147,19 +147,24 @@ pub(crate) fn whitespace_before_comment(
         let kind = token.kind();
 
         if let TokenKind::Comment = kind {
-            let (start, end) = token.range();
+            let range = token.range();
 
-            let line = locator.slice(TextRange::new(locator.line_start(start), start));
-            let text = locator.slice(TextRange::new(start, end));
+            let line = locator.slice(TextRange::new(
+                locator.line_start(range.start()),
+                range.start(),
+            ));
+            let text = locator.slice(range);
 
             let is_inline_comment = !line.trim().is_empty();
             if is_inline_comment {
-                if start < prev_end + TextSize::from(2)
-                    && !locator
-                        .contains_line_break(TextRange::new(start, prev_end + TextSize::from(2)))
+                if range.start() < prev_end + TextSize::from(2)
+                    && !locator.contains_line_break(TextRange::new(
+                        range.start(),
+                        prev_end + TextSize::from(2),
+                    ))
                 {
                     diagnostics.push((
-                        TextRange::new(prev_end, start),
+                        TextRange::new(prev_end, range.start()),
                         TooFewSpacesBeforeInlineComment.into(),
                     ));
                 }
@@ -179,19 +184,14 @@ pub(crate) fn whitespace_before_comment(
             if is_inline_comment {
                 if bad_prefix.is_some() || comment.chars().next().map_or(false, char::is_whitespace)
                 {
-                    diagnostics
-                        .push((TextRange::new(start, end), NoSpaceAfterInlineComment.into()));
+                    diagnostics.push((range, NoSpaceAfterInlineComment.into()));
                 }
             } else if let Some(bad_prefix) = bad_prefix {
                 if bad_prefix != '!' || !is_first_row {
                     if bad_prefix != '#' {
-                        diagnostics
-                            .push((TextRange::new(start, end), NoSpaceAfterBlockComment.into()));
+                        diagnostics.push((range, NoSpaceAfterBlockComment.into()));
                     } else if !comment.is_empty() {
-                        diagnostics.push((
-                            TextRange::new(start, end),
-                            MultipleLeadingHashesForBlockComment.into(),
-                        ));
+                        diagnostics.push((range, MultipleLeadingHashesForBlockComment.into()));
                     }
                 }
             }

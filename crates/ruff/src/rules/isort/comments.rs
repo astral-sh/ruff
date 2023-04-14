@@ -30,11 +30,11 @@ pub fn collect_comments<'a>(range: TextRange, locator: &'a Locator) -> Vec<Comme
     let contents = locator.slice(range);
     lexer::lex_located(contents, Mode::Module, range.start())
         .flatten()
-        .filter_map(|(start, tok, end)| {
+        .filter_map(|(tok, range)| {
             if let Tok::Comment(value) = tok {
                 Some(Comment {
                     value: value.into(),
-                    range: TextRange::new(start, end),
+                    range,
                 })
             } else {
                 None

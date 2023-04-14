@@ -392,6 +392,13 @@ impl<'a> NoqaDirectives<'a> {
             });
         }
 
+        // Extend a mapping at the end of the file to also include the EOF token.
+        if let Some(last) = directives.last_mut() {
+            if last.range.end() == locator.contents().text_len() {
+                last.range = last.range.add_end(TextSize::from(1));
+            }
+        }
+
         Self { inner: directives }
     }
 
@@ -415,7 +422,7 @@ impl<'a> NoqaDirectives<'a> {
             .binary_search_by(|directive| {
                 if directive.range.end() < offset {
                     std::cmp::Ordering::Less
-                } else if directive.range.contains_inclusive(offset) {
+                } else if directive.range.contains(offset) {
                     std::cmp::Ordering::Equal
                 } else {
                     std::cmp::Ordering::Greater

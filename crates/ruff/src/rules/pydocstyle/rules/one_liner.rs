@@ -36,7 +36,7 @@ pub fn one_liner(checker: &mut Checker, docstring: &Docstring) {
     }
 
     if non_empty_line_count == 1 && line_count > 1 {
-        let mut diagnostic = Diagnostic::new(FitsOnOneLine, docstring.expr.range());
+        let mut diagnostic = Diagnostic::new(FitsOnOneLine, docstring.range());
         if checker.patch(diagnostic.kind.rule()) {
             if let (Some(leading), Some(trailing)) = (
                 leading_quote(docstring.contents),
