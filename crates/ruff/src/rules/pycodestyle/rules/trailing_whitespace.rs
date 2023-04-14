@@ -84,7 +84,7 @@ pub(crate) fn trailing_whitespace(
         .chars()
         .rev()
         .take_while(|c| c.is_whitespace())
-        .map(|c| c.text_len())
+        .map(TextLen::text_len)
         .sum();
     if whitespace_len > TextSize::from(0) {
         let range = TextRange::new(line.end() - whitespace_len, line.end());

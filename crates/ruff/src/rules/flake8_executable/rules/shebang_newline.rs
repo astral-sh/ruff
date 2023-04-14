@@ -22,14 +22,14 @@ pub fn shebang_newline(
     first_line: bool,
 ) -> Option<Diagnostic> {
     if let ShebangDirective::Match(_, start, end, _) = shebang {
-        if !first_line {
+        if first_line {
+            None
+        } else {
             let diagnostic = Diagnostic::new(
                 ShebangNotFirstLine,
                 TextRange::new(range.start() + start, range.start() + end),
             );
             Some(diagnostic)
-        } else {
-            None
         }
     } else {
         None

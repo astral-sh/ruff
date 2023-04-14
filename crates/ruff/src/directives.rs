@@ -126,10 +126,9 @@ pub fn extract_noqa_line_for(
             if last_range.end() == *continuation_line {
                 last = Some(TextRange::new(last_range.start(), line_end));
                 continue;
-            } else {
-                // new continuation
-                continuation_mappings.push(last_range);
             }
+            // new continuation
+            continuation_mappings.push(last_range);
         }
 
         last = Some(TextRange::new(*continuation_line, line_end));

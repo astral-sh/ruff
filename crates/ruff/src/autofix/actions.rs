@@ -383,8 +383,8 @@ pub fn remove_argument(
         }
     } else if args
         .iter()
-        .map(|node| node.start())
-        .chain(keywords.iter().map(|node| node.start()))
+        .map(Expr::start)
+        .chain(keywords.iter().map(Keyword::start))
         .any(|location| location > expr_at)
     {
         // Case 2: argument or keyword is _not_ the last node.

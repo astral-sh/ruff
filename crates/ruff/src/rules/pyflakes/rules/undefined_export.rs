@@ -17,7 +17,7 @@ impl Violation for UndefinedExport {
 }
 
 /// F822
-pub fn undefined_export(names: &[&str], range: &TextRange, scope: &Scope) -> Vec<Diagnostic> {
+pub fn undefined_export(names: &[&str], range: TextRange, scope: &Scope) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     if !scope.uses_star_imports() {
         for name in names {
@@ -26,7 +26,7 @@ pub fn undefined_export(names: &[&str], range: &TextRange, scope: &Scope) -> Vec
                     UndefinedExport {
                         name: (*name).to_string(),
                     },
-                    *range,
+                    range,
                 ));
             }
         }

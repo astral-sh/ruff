@@ -577,7 +577,6 @@ fn blanks_and_section_underline(
                 docstring.range(),
             ));
         }
-        return;
     }
 }
 
@@ -675,7 +674,7 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
         .rules
         .enabled(Rule::NoBlankLineBeforeSection)
     {
-        if !context.previous_line().map_or(false, |l| l.is_empty()) {
+        if !context.previous_line().map_or(false, str::is_empty) {
             let mut diagnostic = Diagnostic::new(
                 NoBlankLineBeforeSection {
                     name: context.section_name().to_string(),

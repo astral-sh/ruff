@@ -760,7 +760,7 @@ fn sorted_child_nodes_inner<'a>(node: Node<'a>, result: &mut Vec<Node<'a>>) {
     }
 }
 
-pub fn sorted_child_nodes<'a>(node: Node<'a>) -> Vec<Node<'a>> {
+pub fn sorted_child_nodes(node: Node) -> Vec<Node> {
     let mut result = Vec::new();
     sorted_child_nodes_inner(node, &mut result);
 
@@ -802,11 +802,11 @@ pub fn decorate_token<'a>(
             let existing_start = existing.start();
             let existing_end = existing.end();
             if start == existing_start && end == existing_end {
-                enclosed_node = Some(child.clone());
+                enclosed_node = Some(child);
             }
         } else {
             if token.start() <= start && token.end() >= end {
-                enclosed_node = Some(child.clone());
+                enclosed_node = Some(child);
             }
         }
 
@@ -820,7 +820,7 @@ pub fn decorate_token<'a>(
             // Because we will never consider this node or any nodes
             // before it again, this node must be the closest preceding
             // node we have encountered so far.
-            preceding_node = Some(child.clone());
+            preceding_node = Some(child);
             left = middle + 1;
             continue;
         }
@@ -830,7 +830,7 @@ pub fn decorate_token<'a>(
             // Because we will never consider this node or any nodes after
             // it again, this node must be the closest following node we
             // have encountered so far.
-            following_node = Some(child.clone());
+            following_node = Some(child);
             right = middle;
             continue;
         }

@@ -85,8 +85,8 @@ fn unescape_f_string(content: &str) -> String {
 }
 
 fn fix_f_string_missing_placeholders(
-    prefix_range: &TextRange,
-    tok_range: &TextRange,
+    prefix_range: TextRange,
+    tok_range: TextRange,
     checker: &mut Checker,
 ) -> Edit {
     let content = &checker.locator.contents()[TextRange::new(prefix_range.end(), tok_range.end())];
@@ -107,8 +107,8 @@ pub fn f_string_missing_placeholders(expr: &Expr, values: &[Expr], checker: &mut
             let mut diagnostic = Diagnostic::new(FStringMissingPlaceholders, tok_range);
             if checker.patch(diagnostic.kind.rule()) {
                 diagnostic.set_fix(fix_f_string_missing_placeholders(
-                    &prefix_range,
-                    &tok_range,
+                    prefix_range,
+                    tok_range,
                     checker,
                 ));
             }

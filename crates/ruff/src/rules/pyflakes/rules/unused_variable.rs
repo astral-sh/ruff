@@ -193,12 +193,12 @@ enum DeletionKind {
 /// enclosing [`Stmt`] and the [`Range`] of the variable binding.
 fn remove_unused_variable(
     stmt: &Stmt,
-    range: &TextRange,
+    range: TextRange,
     checker: &Checker,
 ) -> Option<(DeletionKind, Edit)> {
     // First case: simple assignment (`x = 1`)
     if let StmtKind::Assign { targets, value, .. } = &stmt.node {
-        if let Some(target) = targets.iter().find(|target| *range == target.range()) {
+        if let Some(target) = targets.iter().find(|target| range == target.range()) {
             if matches!(target.node, ExprKind::Name { .. }) {
                 return if targets.len() > 1
                     || contains_effect(value, |id| checker.ctx.is_builtin(id))
@@ -290,7 +290,7 @@ fn remove_unused_variable(
         // TODO(charlie): Store the `Withitem` in the `Binding`.
         for item in items {
             if let Some(optional_vars) = &item.optional_vars {
-                if optional_vars.range() == *range {
+                if optional_vars.range() == range {
                     return Some((
                         DeletionKind::Partial,
                         Edit::deletion(
@@ -337,7 +337,7 @@ pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
             );
             if checker.patch(diagnostic.kind.rule()) {
                 if let Some(stmt) = binding.source.as_ref().map(Into::into) {
-                    if let Some((kind, fix)) = remove_unused_variable(stmt, &binding.range, checker)
+                    if let Some((kind, fix)) = remove_unused_variable(stmt, binding.range, checker)
                     {
                         if matches!(kind, DeletionKind::Whole) {
                             checker.deletions.insert(RefEquality(stmt));

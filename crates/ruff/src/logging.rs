@@ -42,13 +42,13 @@ macro_rules! warn_user_once {
 
 #[macro_export]
 macro_rules! warn_user {
-    ($($arg:tt)*) => {
+    ($($arg:tt)*) => {{
         use colored::Colorize;
         use log::warn;
 
         let message = format!("{}", format_args!($($arg)*));
         warn!("{}", message.bold());
-    };
+    }};
 }
 
 #[macro_export]

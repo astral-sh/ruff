@@ -49,7 +49,7 @@ pub fn newline_after_last_paragraph(checker: &mut Checker, docstring: &Docstring
                             .rev()
                             .skip(usize::from(num_trailing_quotes))
                             .take_while(|c| c.is_whitespace())
-                            .map(|c| c.text_len())
+                            .map(TextLen::text_len)
                             .sum();
                         let content = format!(
                             "{}{}",

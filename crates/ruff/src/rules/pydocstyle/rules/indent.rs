@@ -75,7 +75,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
             continue;
         }
 
-        let line_indent = whitespace::leading_space(&line);
+        let line_indent = whitespace::leading_space(line);
 
         // We only report tab indentation once, so only check if we haven't seen a tab
         // yet.
@@ -141,7 +141,7 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
 
         // If the last line is over-indented...
         if let Some(last) = lines.last() {
-            let line_indent = whitespace::leading_space(&last);
+            let line_indent = whitespace::leading_space(last);
             if line_indent.len() > docstring.indentation.len() {
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(last.start()));

@@ -244,7 +244,7 @@ fn add_noqa_inner(
                         continue;
                     }
                     Directive::Codes(.., codes, _) => {
-                        if includes(diagnostic.kind.rule(), &codes) {
+                        if includes(diagnostic.kind.rule(), codes) {
                             continue;
                         }
                     }
@@ -262,7 +262,7 @@ fn add_noqa_inner(
                     continue;
                 }
                 Directive::Codes(.., codes, _) => {
-                    if !includes(diagnostic.kind.rule(), &codes) {
+                    if !includes(diagnostic.kind.rule(), codes) {
                         matches_by_line
                             .entry(directive_line.range.start())
                             .or_insert_with(|| {
@@ -288,7 +288,7 @@ fn add_noqa_inner(
     let mut output = String::with_capacity(locator.len());
     let mut prev_end = TextSize::default();
 
-    for (offset, (rules, directive)) in matches_by_line.into_iter() {
+    for (offset, (rules, directive)) in matches_by_line {
         output.push_str(&locator.contents()[TextRange::up_to(prev_end)]);
 
         let line = locator.full_line(offset);
@@ -326,7 +326,7 @@ fn add_noqa_inner(
                     rules
                         .iter()
                         .map(|r| r.noqa_code().to_string())
-                        .chain(existing.into_iter().map(ToString::to_string))
+                        .chain(existing.iter().map(ToString::to_string))
                         .sorted_unstable(),
                 );
 
@@ -381,7 +381,7 @@ impl<'a> NoqaDirectives<'a> {
                 Directive::None => {
                     continue;
                 }
-                directive @ Directive::All(..) | directive @ Directive::Codes(..) => directive,
+                directive @ (Directive::All(..) | Directive::Codes(..)) => directive,
             };
 
             // noqa comments are guaranteed to be single line.
@@ -485,7 +485,7 @@ impl FromIterator<TextRange> for NoqaMapping {
     fn from_iter<T: IntoIterator<Item = TextRange>>(iter: T) -> Self {
         let mut mappings = NoqaMapping::default();
 
-        for range in iter.into_iter() {
+        for range in iter {
             mappings.push_mapping(range);
         }
 

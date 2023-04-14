@@ -134,7 +134,7 @@ if True:
 "#
         .trim();
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(&lxr.as_slice(), &Locator::new(contents));
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
             indexer.continuation_line_starts(),
             [
@@ -166,7 +166,7 @@ import os
 "#
         .trim();
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(&lxr.as_slice(), &Locator::new(contents));
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
             indexer.continuation_line_starts(),
             [
@@ -182,7 +182,7 @@ import os
     fn string_ranges() {
         let contents = r#""this is a single-quoted string""#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(&lxr.as_slice(), &Locator::new(contents));
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(indexer.string_ranges(), []);
 
         let contents = r#"
@@ -191,7 +191,7 @@ import os
             """
             "#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(&lxr.as_slice(), &Locator::new(contents));
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
             indexer.string_ranges(),
             [TextRange::new(TextSize::from(13), TextSize::from(71))]
@@ -203,7 +203,7 @@ import os
             """
             "#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(&lxr.as_slice(), &Locator::new(contents));
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
             indexer.string_ranges(),
             [TextRange::new(TextSize::from(13), TextSize::from(107))]
@@ -220,7 +220,7 @@ import os
             """
             "#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer = Indexer::from_tokens(&lxr.as_slice(), &Locator::new(contents));
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
             indexer.string_ranges(),
             &[

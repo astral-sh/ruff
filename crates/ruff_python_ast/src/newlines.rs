@@ -116,25 +116,22 @@ impl DoubleEndedIterator for UniversalNewlineIterator<'_> {
 
         // Find the end of the previous line. The previous line is the text up to, but not including
         // the newline character.
-        let line = match haystack.rfind(['\n', '\r']) {
+        let line = if let Some(line_end) = haystack.rfind(['\n', '\r']) {
             // '\n' or '\r' or '\r\n'
-            Some(line_end) => {
-                let (remainder, line) = self.text.split_at(line_end + 1);
-                self.text = remainder;
-                self.offset_back -= line.text_len();
+            let (remainder, line) = self.text.split_at(line_end + 1);
+            self.text = remainder;
+            self.offset_back -= line.text_len();
 
-                Line {
-                    text: line,
-                    offset: self.offset_back,
-                }
+            Line {
+                text: line,
+                offset: self.offset_back,
             }
+        } else {
             // Last line
-            None => {
-                let offset = self.offset_back - self.text.text_len();
-                Line {
-                    text: std::mem::take(&mut self.text),
-                    offset,
-                }
+            let offset = self.offset_back - self.text.text_len();
+            Line {
+                text: std::mem::take(&mut self.text),
+                offset,
             }
         };
 
@@ -242,7 +239,7 @@ impl<'a> Line<'a> {
     /// Returns the line's text, including the terminating new line character.
     #[inline]
     pub fn as_full_str(&self) -> &'a str {
-        &self.text
+        self.text
     }
 
     #[inline]
@@ -377,6 +374,6 @@ mod tests {
             lines.next_back(),
             Some(Line::new("\r\n", TextSize::from(8)))
         );
-        assert_eq!(lines.next(), None)
+        assert_eq!(lines.next(), None);
     }
 }

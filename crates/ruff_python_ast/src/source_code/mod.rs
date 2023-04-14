@@ -148,7 +148,7 @@ impl SourceFileBuilder {
     }
 
     pub fn set_source_text(&mut self, text: &str) {
-        self.set_source_code(&SourceCode::new(text, &LineIndex::from_source_text(text)))
+        self.set_source_code(&SourceCode::new(text, &LineIndex::from_source_text(text)));
     }
 
     /// Consumes `self` and returns a builder for a file with the source text `text`. Builds the [`LineIndex`] from `text`.

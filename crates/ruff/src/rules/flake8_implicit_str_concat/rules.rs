@@ -131,14 +131,14 @@ pub fn implicit(tokens: &[LexResult], settings: &Settings, locator: &Locator) ->
         .tuple_windows()
     {
         if matches!(a_tok, Tok::String { .. }) && matches!(b_tok, Tok::String { .. }) {
-            if !locator.contains_line_break(TextRange::new(*a_end, *b_start)) {
+            if locator.contains_line_break(TextRange::new(*a_end, *b_start)) {
                 diagnostics.push(Diagnostic::new(
-                    SingleLineImplicitStringConcatenation,
+                    MultiLineImplicitStringConcatenation,
                     TextRange::new(*a_start, *b_end),
                 ));
             } else {
                 diagnostics.push(Diagnostic::new(
-                    MultiLineImplicitStringConcatenation,
+                    SingleLineImplicitStringConcatenation,
                     TextRange::new(*a_start, *b_end),
                 ));
             }

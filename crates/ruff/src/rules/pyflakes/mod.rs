@@ -11,6 +11,7 @@ mod tests {
     use anyhow::Result;
 
     use regex::Regex;
+    use ruff_diagnostics::Diagnostic;
     use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
     use textwrap::dedent;
@@ -276,7 +277,7 @@ mod tests {
             flags::Noqa::Enabled,
             flags::Autofix::Enabled,
         );
-        diagnostics.sort_by_key(|diagnostic| diagnostic.start());
+        diagnostics.sort_by_key(Diagnostic::start);
         let actual = diagnostics
             .iter()
             .map(|diagnostic| diagnostic.kind.rule())

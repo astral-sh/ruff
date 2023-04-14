@@ -214,7 +214,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
                 code: message.kind.rule().noqa_code().to_string(),
                 message: message.kind.body,
                 location: start_location,
-                end_location: end_location,
+                end_location,
                 fix: if message.fix.is_empty() {
                     None
                 } else {

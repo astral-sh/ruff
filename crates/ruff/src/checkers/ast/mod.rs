@@ -3507,7 +3507,7 @@ where
                     .enabled(Rule::HardcodedBindAllInterfaces)
                 {
                     if let Some(diagnostic) =
-                        flake8_bandit::rules::hardcoded_bind_all_interfaces(value, &expr.range())
+                        flake8_bandit::rules::hardcoded_bind_all_interfaces(value, expr.range())
                     {
                         self.diagnostics.push(diagnostic);
                     }
@@ -5029,7 +5029,7 @@ impl<'a> Checker<'a> {
                 // F822
                 if self.settings.rules.enabled(Rule::UndefinedExport) {
                     if !self.path.ends_with("__init__.py") {
-                        if let Some((names, range)) = &all_names {
+                        if let Some((names, range)) = all_names {
                             diagnostics
                                 .extend(pyflakes::rules::undefined_export(names, range, scope));
                         }
@@ -5474,11 +5474,11 @@ impl<'a> Checker<'a> {
                         #[allow(deprecated)]
                         let location = self.locator.compute_source_location(expr.start());
                         warn_user!(
-                        "Docstring at {}:{}:{} contains implicit string concatenation; ignoring...",
-                        relativize_path(self.path),
-                        location.row,
-                        location.column
-                    );
+                            "Docstring at {}:{}:{} contains implicit string concatenation; ignoring...",
+                            relativize_path(self.path),
+                            location.row,
+                            location.column
+                        );
                         continue;
                     }
 

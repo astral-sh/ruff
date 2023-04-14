@@ -6,7 +6,7 @@ use std::ops::Deref;
 use itertools::Itertools;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::Constant;
-use rustpython_parser::Mode;
+use rustpython_parser::{ast, Mode};
 
 use ruff_python_ast::source_code::Locator;
 
@@ -53,7 +53,7 @@ impl<T> Located<T> {
     }
 
     pub fn id(&self) -> usize {
-        &self.node as *const _ as usize
+        std::ptr::addr_of!(self.node) as usize
     }
 }
 
@@ -946,7 +946,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                     range: TextRange::new(
                         decorator_list
                             .first()
-                            .map_or(stmt.range.start(), |d| d.start()),
+                            .map_or(stmt.range.start(), ast::Located::start),
                         body.end(),
                     ),
                     node: StmtKind::FunctionDef {
@@ -1383,7 +1383,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 // Find the start and end of the `orelse`.
                 let orelse = (!orelse.is_empty()).then(|| {
                     let orelse_range = expand_indented_block(
-                        handlers.last().map_or(body.end(), |handler| handler.end()),
+                        handlers.last().map_or(body.end(), Located::end),
                         orelse.last().unwrap().end(),
                         locator,
                     );
@@ -1402,8 +1402,8 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 let finalbody = (!finalbody.is_empty()).then(|| {
                     let finalbody_range = expand_indented_block(
                         orelse.as_ref().map_or(
-                            handlers.last().map_or(body.end(), |handler| handler.end()),
-                            |orelse| orelse.end(),
+                            handlers.last().map_or(body.end(), Located::end),
+                            Located::end,
                         ),
                         finalbody.last().unwrap().end(),
                         locator,
@@ -1421,10 +1421,10 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
 
                 let end_location = finalbody.as_ref().map_or(
                     orelse.as_ref().map_or(
-                        handlers.last().map_or(body.end(), |handler| handler.end()),
-                        |orelse| orelse.end(),
+                        handlers.last().map_or(body.end(), Located::end),
+                        Located::end,
                     ),
-                    |finalbody| finalbody.end(),
+                    Located::end,
                 );
 
                 Stmt {
@@ -1471,7 +1471,7 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 // Find the start and end of the `orelse`.
                 let orelse = (!orelse.is_empty()).then(|| {
                     let orelse_range = expand_indented_block(
-                        handlers.last().map_or(body.end(), |handler| handler.end()),
+                        handlers.last().map_or(body.end(), Located::end),
                         orelse.last().unwrap().end(),
                         locator,
                     );
@@ -1490,8 +1490,8 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
                 let finalbody = (!finalbody.is_empty()).then(|| {
                     let finalbody_range = expand_indented_block(
                         orelse.as_ref().map_or(
-                            handlers.last().map_or(body.end(), |handler| handler.end()),
-                            |orelse| orelse.end(),
+                            handlers.last().map_or(body.end(), Located::end),
+                            Located::end,
                         ),
                         finalbody.last().unwrap().end(),
                         locator,
@@ -1509,10 +1509,10 @@ impl From<(rustpython_parser::ast::Stmt, &Locator<'_>)> for Stmt {
 
                 let end_location = finalbody.as_ref().map_or(
                     orelse.as_ref().map_or(
-                        handlers.last().map_or(body.end(), |handler| handler.end()),
-                        |orelse| orelse.end(),
+                        handlers.last().map_or(body.end(), Located::end),
+                        Located::end,
                     ),
-                    |finalbody| finalbody.end(),
+                    Located::end,
                 );
 
                 Stmt {

@@ -37,7 +37,7 @@ pub struct Docstring<'a> {
 
 impl<'a> Docstring<'a> {
     pub fn body(&self) -> DocstringBody {
-        DocstringBody { docstring: &self }
+        DocstringBody { docstring: self }
     }
 
     pub const fn start(&self) -> TextSize {
@@ -64,16 +64,16 @@ pub struct DocstringBody<'a> {
 
 impl<'a> DocstringBody<'a> {
     #[inline]
-    pub fn start(&self) -> TextSize {
+    pub fn start(self) -> TextSize {
         self.docstring.body_range.start() + self.docstring.start()
     }
 
     #[inline]
-    pub fn end(&self) -> TextSize {
+    pub fn end(self) -> TextSize {
         self.docstring.body_range.end() + self.docstring.start()
     }
 
-    pub fn as_str(&self) -> &'a str {
+    pub fn as_str(self) -> &'a str {
         &self.docstring.contents[self.docstring.body_range]
     }
 }

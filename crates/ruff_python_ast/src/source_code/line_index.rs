@@ -105,7 +105,7 @@ impl LineIndex {
                 } else {
                     // Don't count the BOM character as a column.
                     if line_start == TextSize::from(0) && content.starts_with('\u{feff}') {
-                        line_start = line_start + '\u{feff}'.text_len()
+                        line_start += '\u{feff}'.text_len();
                     }
 
                     content[TextRange::new(line_start, offset)].chars().count()

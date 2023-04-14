@@ -132,8 +132,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine) -> Vec<(TextSize, Diagno
                 {
                     if !matches!(last_token, Some(TokenKind::Comma)) {
                         let start = token.start();
-                        diagnostics
-                            .push((start - TextSize::try_from(offset).unwrap(), diagnostic_kind));
+                        diagnostics.push((start - offset, diagnostic_kind));
                     }
                 }
             }

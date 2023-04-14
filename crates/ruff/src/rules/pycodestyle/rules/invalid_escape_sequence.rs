@@ -95,7 +95,7 @@ pub fn invalid_escape_sequence(
                 };
 
                 // If the next character is a valid escape sequence, skip.
-                if VALID_ESCAPE_SEQUENCES.contains(&next_char) {
+                if VALID_ESCAPE_SEQUENCES.contains(next_char) {
                     continue;
                 }
 
