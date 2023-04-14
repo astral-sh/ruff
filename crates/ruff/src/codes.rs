@@ -263,6 +263,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Comprehensions, "15") => Rule::UnnecessarySubscriptReversal,
         (Flake8Comprehensions, "16") => Rule::UnnecessaryComprehension,
         (Flake8Comprehensions, "17") => Rule::UnnecessaryMap,
+        (Flake8Comprehensions, "18") => Rule::UnnecessaryLiteralWithinDictCall,
 
         // flake8-debugger
         (Flake8Debugger, "0") => Rule::Debugger,

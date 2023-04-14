@@ -244,6 +244,7 @@ ruff_macros::register_rules!(
     rules::flake8_comprehensions::rules::UnnecessarySubscriptReversal,
     rules::flake8_comprehensions::rules::UnnecessaryComprehension,
     rules::flake8_comprehensions::rules::UnnecessaryMap,
+    rules::flake8_comprehensions::rules::UnnecessaryLiteralWithinDictCall,
     // flake8-debugger
     rules::flake8_debugger::rules::Debugger,
     // mccabe

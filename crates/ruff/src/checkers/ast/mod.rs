@@ -2732,7 +2732,7 @@ where
                     .enabled(Rule::UnnecessaryLiteralWithinTupleCall)
                 {
                     flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
-                        self, expr, func, args,
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self
@@ -2741,7 +2741,16 @@ where
                     .enabled(Rule::UnnecessaryLiteralWithinListCall)
                 {
                     flake8_comprehensions::rules::unnecessary_literal_within_list_call(
-                        self, expr, func, args,
+                        self, expr, func, args, keywords,
+                    );
+                }
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UnnecessaryLiteralWithinDictCall)
+                {
+                    flake8_comprehensions::rules::unnecessary_literal_within_dict_call(
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.settings.rules.enabled(Rule::UnnecessaryListCall) {

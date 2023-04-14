@@ -32,6 +32,7 @@ mod tests {
     #[test_case(Rule::UnnecessarySubscriptReversal, Path::new("C415.py"); "C415")]
     #[test_case(Rule::UnnecessaryComprehension, Path::new("C416.py"); "C416")]
     #[test_case(Rule::UnnecessaryMap, Path::new("C417.py"); "C417")]
+    #[test_case(Rule::UnnecessaryLiteralWithinDictCall, Path::new("C418.py"); "C418")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

@@ -1173,3 +1173,31 @@ pub fn fix_unnecessary_map(
         bail!("Should have two arguments");
     }
 }
+
+/// (C418) Convert `dict({"a": 1})` to `{"a": 1}`
+pub fn fix_unnecessary_literal_within_dict_call(
+    locator: &Locator,
+    stylist: &Stylist,
+    expr: &rustpython_parser::ast::Expr,
+) -> Result<Edit> {
+    let module_text = locator.slice(expr);
+    let mut tree = match_module(module_text)?;
+    let mut body = match_expr(&mut tree)?;
+    let call = match_call(body)?;
+    let arg = match_arg(call)?;
+
+    body.value = arg.value.clone();
+
+    let mut state = CodegenState {
+        default_newline: &stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
+    tree.codegen(&mut state);
+
+    Ok(Edit::replacement(
+        state.to_string(),
+        expr.location,
+        expr.end_location.unwrap(),
+    ))
+}
