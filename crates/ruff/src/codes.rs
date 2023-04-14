@@ -264,6 +264,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Comprehensions, "16") => Rule::UnnecessaryComprehension,
         (Flake8Comprehensions, "17") => Rule::UnnecessaryMap,
         (Flake8Comprehensions, "18") => Rule::UnnecessaryLiteralWithinDictCall,
+        (Flake8Comprehensions, "19") => Rule::UnnecessaryComprehensionAnyAll,
 
         // flake8-debugger
         (Flake8Debugger, "0") => Rule::Debugger,
@@ -617,7 +618,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pie, "794") => Rule::DuplicateClassFieldDefinition,
         (Flake8Pie, "796") => Rule::NonUniqueEnums,
         (Flake8Pie, "800") => Rule::UnnecessarySpread,
-        (Flake8Pie, "802") => Rule::UnnecessaryComprehensionAnyAll,
         (Flake8Pie, "804") => Rule::UnnecessaryDictKwargs,
         (Flake8Pie, "807") => Rule::ReimplementedListBuiltin,
         (Flake8Pie, "810") => Rule::MultipleStartsEndsWith,

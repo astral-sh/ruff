@@ -5,6 +5,9 @@ pub use unnecessary_collection_call::{unnecessary_collection_call, UnnecessaryCo
 pub use unnecessary_comprehension::{
     unnecessary_dict_comprehension, unnecessary_list_set_comprehension, UnnecessaryComprehension,
 };
+pub use unnecessary_comprehension_any_all::{
+    unnecessary_comprehension_any_all, UnnecessaryComprehensionAnyAll,
+};
 pub use unnecessary_double_cast_or_process::{
     unnecessary_double_cast_or_process, UnnecessaryDoubleCastOrProcess,
 };
@@ -38,6 +41,7 @@ mod helpers;
 mod unnecessary_call_around_sorted;
 mod unnecessary_collection_call;
 mod unnecessary_comprehension;
+mod unnecessary_comprehension_any_all;
 mod unnecessary_double_cast_or_process;
 mod unnecessary_generator_dict;
 mod unnecessary_generator_list;

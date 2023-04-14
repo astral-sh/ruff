@@ -1201,3 +1201,47 @@ pub fn fix_unnecessary_literal_within_dict_call(
         expr.end_location.unwrap(),
     ))
 }
+
+/// (C419) Convert `[i for i in a]` into `i for i in a`
+pub fn fix_unnecessary_comprehension_any_all(
+    locator: &Locator,
+    stylist: &Stylist,
+    expr: &rustpython_parser::ast::Expr,
+) -> Result<Edit> {
+    // Expr(ListComp) -> Expr(GeneratorExp)
+    let module_text = locator.slice(expr);
+    let mut tree = match_module(module_text)?;
+    let body = match_expr(&mut tree)?;
+    let call = match_call(body)?;
+
+    let Expression::ListComp(list_comp) = &call.args[0].value else {
+        bail!(
+            "Expected Expression::ListComp"
+        );
+    };
+
+    call.args[0].value = Expression::GeneratorExp(Box::new(GeneratorExp {
+        elt: list_comp.elt.clone(),
+        for_in: list_comp.for_in.clone(),
+        lpar: list_comp.lpar.clone(),
+        rpar: list_comp.rpar.clone(),
+    }));
+
+    if let Some(comma) = &call.args[0].comma {
+        call.args[0].whitespace_after_arg = comma.whitespace_after.clone();
+        call.args[0].comma = None;
+    }
+
+    let mut state = CodegenState {
+        default_newline: &stylist.line_ending(),
+        default_indent: stylist.indentation(),
+        ..CodegenState::default()
+    };
+    tree.codegen(&mut state);
+
+    Ok(Edit::replacement(
+        state.to_string(),
+        expr.location,
+        expr.end_location.unwrap(),
+    ))
+}

@@ -2585,13 +2585,6 @@ where
                 if self.settings.rules.enabled(Rule::UnnecessaryDictKwargs) {
                     flake8_pie::rules::unnecessary_dict_kwargs(self, expr, keywords);
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::UnnecessaryComprehensionAnyAll)
-                {
-                    flake8_pie::rules::unnecessary_comprehension_any_all(self, expr, func, args);
-                }
 
                 // flake8-bandit
                 if self.settings.rules.enabled(Rule::ExecBuiltin) {
@@ -2790,6 +2783,15 @@ where
                         self.ctx.current_expr_parent().map(Into::into),
                         func,
                         args,
+                    );
+                }
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UnnecessaryComprehensionAnyAll)
+                {
+                    flake8_comprehensions::rules::unnecessary_comprehension_any_all(
+                        self, expr, func, args, keywords,
                     );
                 }
 
