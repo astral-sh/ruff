@@ -21,7 +21,7 @@ use super::Settings;
 pub struct Options {
     #[option(
         default = r#""parents""#,
-        value_type = r#""parents" | "all""#,
+        value_type = r#""parents" | "all" | "force-siblings" "#,
         example = r#"
             # Disallow all relative imports.
             ban-relative-imports = "all"
@@ -29,6 +29,7 @@ pub struct Options {
     )]
     /// Whether to ban all relative imports (`"all"`), or only those imports
     /// that extend into the parent module or beyond (`"parents"`).
+    /// `"force-siblings"` force relative imports for siblings and ban parent imports like `"parents"`
     pub ban_relative_imports: Option<Strictness>,
     #[option(
         default = r#"{}"#,

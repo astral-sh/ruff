@@ -1325,6 +1325,21 @@ where
                         }
                     }
 
+                    if self.settings.rules.enabled(Rule::RelativeSiblings) {
+                        if let Some(diagnostic) =
+                            flake8_tidy_imports::relative_imports::force_siblings(
+                                self,
+                                stmt,
+                                *level,
+                                module.as_deref(),
+                                self.module_path.as_ref(),
+                                &self.settings.flake8_tidy_imports.ban_relative_imports,
+                            )
+                        {
+                            self.diagnostics.push(diagnostic);
+                        }
+                    }
+
                     // flake8-debugger
                     if self.settings.rules.enabled(Rule::Debugger) {
                         if let Some(diagnostic) = flake8_debugger::rules::debugger_import(

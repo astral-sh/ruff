@@ -275,6 +275,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         // flake8-tidy-imports
         (Flake8TidyImports, "251") => Rule::BannedApi,
         (Flake8TidyImports, "252") => Rule::RelativeImports,
+        (Flake8TidyImports, "253") => Rule::RelativeSiblings,
 
         // flake8-return
         (Flake8Return, "501") => Rule::UnnecessaryReturnNone,

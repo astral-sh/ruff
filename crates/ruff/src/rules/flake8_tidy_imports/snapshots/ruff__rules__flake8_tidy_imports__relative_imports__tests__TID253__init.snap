@@ -1,0 +1,78 @@
+---
+source: crates/ruff/src/rules/flake8_tidy_imports/relative_imports.rs
+---
+__init__.py:8:1: TID253 [*] Relative imports for sibling modules are required
+   |
+ 8 | # TID253
+ 9 | from TID253 import _
+   | ^^^^^^^^^^^^^^^^^^^^ TID253
+10 | from TID253.module import _
+11 | from TID253.nested import _
+   |
+   = help: Replace absolute sibling imports with relative imports
+
+ℹ Suggested fix
+5 5 | from .nested.module import _
+6 6 | 
+7 7 | # TID253
+8   |-from TID253 import _
+  8 |+from . import _
+9 9 | from TID253.module import _
+10 10 | from TID253.nested import _
+11 11 | from TID253.nested.module import _
+
+__init__.py:9:1: TID253 [*] Relative imports for sibling modules are required
+   |
+ 9 | # TID253
+10 | from TID253 import _
+11 | from TID253.module import _
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID253
+12 | from TID253.nested import _
+13 | from TID253.nested.module import _
+   |
+   = help: Replace absolute sibling imports with relative imports
+
+ℹ Suggested fix
+6  6  | 
+7  7  | # TID253
+8  8  | from TID253 import _
+9     |-from TID253.module import _
+   9  |+from .module import _
+10 10 | from TID253.nested import _
+11 11 | from TID253.nested.module import _
+
+__init__.py:10:1: TID253 [*] Relative imports for sibling modules are required
+   |
+10 | from TID253 import _
+11 | from TID253.module import _
+12 | from TID253.nested import _
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID253
+13 | from TID253.nested.module import _
+   |
+   = help: Replace absolute sibling imports with relative imports
+
+ℹ Suggested fix
+7  7  | # TID253
+8  8  | from TID253 import _
+9  9  | from TID253.module import _
+10    |-from TID253.nested import _
+   10 |+from .nested import _
+11 11 | from TID253.nested.module import _
+
+__init__.py:11:1: TID253 [*] Relative imports for sibling modules are required
+   |
+11 | from TID253.module import _
+12 | from TID253.nested import _
+13 | from TID253.nested.module import _
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID253
+   |
+   = help: Replace absolute sibling imports with relative imports
+
+ℹ Suggested fix
+8  8  | from TID253 import _
+9  9  | from TID253.module import _
+10 10 | from TID253.nested import _
+11    |-from TID253.nested.module import _
+   11 |+from .nested.module import _
+
+

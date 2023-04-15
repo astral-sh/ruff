@@ -940,7 +940,7 @@
       "type": "object",
       "properties": {
         "ban-relative-imports": {
-          "description": "Whether to ban all relative imports (`\"all\"`), or only those imports that extend into the parent module or beyond (`\"parents\"`).",
+          "description": "Whether to ban all relative imports (`\"all\"`), or only those imports that extend into the parent module or beyond (`\"parents\"`). `\"force-siblings\"` force relative imports for siblings and ban parent imports like `\"parents\"`",
           "anyOf": [
             {
               "$ref": "#/definitions/Strictness"
@@ -2275,6 +2275,7 @@
         "TID25",
         "TID251",
         "TID252",
+        "TID253",
         "TRY",
         "TRY0",
         "TRY00",
@@ -2396,6 +2397,13 @@
           "type": "string",
           "enum": [
             "all"
+          ]
+        },
+        {
+          "description": "Ban parent imports but force relative imports for siblings.",
+          "type": "string",
+          "enum": [
+            "force-siblings"
           ]
         }
       ]

@@ -66,6 +66,7 @@ static REDIRECTS: Lazy<HashMap<&'static str, &'static str>> = Lazy::new(|| {
         ("I2", "TID2"),
         ("I25", "TID25"),
         ("I252", "TID252"),
+        ("I253", "TID253"),
         ("M", "RUF100"),
         ("M0", "RUF100"),
         ("M001", "RUF100"),

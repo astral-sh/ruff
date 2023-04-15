@@ -253,6 +253,7 @@ ruff_macros::register_rules!(
     // flake8-tidy-imports
     rules::flake8_tidy_imports::banned_api::BannedApi,
     rules::flake8_tidy_imports::relative_imports::RelativeImports,
+    rules::flake8_tidy_imports::relative_imports::RelativeSiblings,
     // flake8-return
     rules::flake8_return::rules::UnnecessaryReturnNone,
     rules::flake8_return::rules::ImplicitReturnValue,

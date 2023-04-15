@@ -24,6 +24,8 @@ pub enum Strictness {
     Parents,
     /// Ban all relative imports.
     All,
+    /// Ban parent imports but force relative imports for siblings.
+    ForceSiblings,
 }
 
 /// ## What it does
@@ -71,14 +73,16 @@ impl Violation for RelativeImports {
     #[derive_message_formats]
     fn message(&self) -> String {
         match self.strictness {
-            Strictness::Parents => format!("Relative imports from parent modules are banned"),
+            Strictness::Parents | Strictness::ForceSiblings => {
+                format!("Relative imports from parent modules are banned")
+            }
             Strictness::All => format!("Relative imports are banned"),
         }
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
         Some(|RelativeImports { strictness }| match strictness {
-            Strictness::Parents => {
+            Strictness::Parents | Strictness::ForceSiblings => {
                 format!("Replace relative imports from parent modules with absolute imports")
             }
             Strictness::All => format!("Replace relative imports with absolute imports"),
@@ -163,7 +167,7 @@ pub fn banned_relative_import(
 ) -> Option<Diagnostic> {
     let strictness_level = match strictness {
         Strictness::All => 0,
-        Strictness::Parents => 1,
+        Strictness::Parents | Strictness::ForceSiblings => 1,
     };
     if level? > strictness_level {
         let mut diagnostic = Diagnostic::new(
@@ -185,12 +189,119 @@ pub fn banned_relative_import(
     }
 }
 
+/// ## What it does
+/// Requires relative imports for siblings
+///
+/// ## Why is this bad?
+/// Absolute imports, or relative imports from siblings, are recommended by [PEP 8]:
+///
+/// > Absolute imports are recommended, as they are usually more readable and tend to be better behaved...
+/// > ```python
+/// > import mypkg.sibling
+/// > from mypkg import sibling
+/// > from mypkg.sibling import example
+/// > ```
+/// > However, explicit relative imports are an acceptable alternative to absolute imports,
+/// > especially when dealing with complex package layouts where using absolute imports would be
+/// > unnecessarily verbose:
+/// > ```python
+/// > from . import sibling
+/// > from .sibling import example
+/// > ```
+///
+///
+/// ## Options
+/// - `flake8-tidy-imports.ban-relative-imports`
+///
+/// ## Example
+/// ```python
+/// from mypkg import foo
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from . import foo
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#imports
+#[violation]
+pub struct RelativeSiblings;
+
+impl Violation for RelativeSiblings {
+    const AUTOFIX: AutofixKind = AutofixKind::Always;
+
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Relative imports for sibling modules are required")
+    }
+
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|_| format!("Replace absolute sibling imports with relative imports"))
+    }
+}
+
+fn fix_relative_sibling_import(
+    stmt: &Stmt,
+    module: Option<&str>,
+    pkg: &str,
+    stylist: &Stylist,
+) -> Edit {
+    let StmtKind::ImportFrom { names, .. } = &stmt.node else {
+        panic!("Expected StmtKind::ImportFrom");
+    };
+    let prefix = format!("{pkg}.");
+    let new_module = module
+        .unwrap()
+        .strip_prefix(prefix.as_str())
+        .map(String::from);
+    let content = unparse_stmt(
+        &create_stmt(StmtKind::ImportFrom {
+            module: new_module,
+            names: names.clone(),
+            level: Some(1),
+        }),
+        stylist,
+    );
+
+    Edit::replacement(content, stmt.location, stmt.end_location.unwrap())
+}
+
+/// TID253
+pub fn force_siblings(
+    checker: &Checker,
+    stmt: &Stmt,
+    level: Option<usize>,
+    module: Option<&str>,
+    module_path: Option<&Vec<String>>,
+    strictness: &Strictness,
+) -> Option<Diagnostic> {
+    if let Strictness::ForceSiblings = strictness {
+        if let Some(mods) = &module_path {
+            let pkg = mods[..mods.len() - 1].join(".");
+            if level == Some(0) && module.unwrap().starts_with(pkg.as_str()) {
+                let mut diagnostic = Diagnostic::new(RelativeSiblings {}, Range::from(stmt));
+                if checker.patch(diagnostic.kind.rule()) {
+                    diagnostic.set_fix(fix_relative_sibling_import(
+                        stmt,
+                        module,
+                        pkg.as_str(),
+                        checker.stylist,
+                    ));
+                }
+                return Some(diagnostic);
+            }
+        }
+    }
+    None
+}
+
 #[cfg(test)]
 mod tests {
     use std::path::Path;
 
     use crate::assert_messages;
     use anyhow::Result;
+    use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::settings::Settings;
@@ -198,13 +309,14 @@ mod tests {
 
     use super::Strictness;
 
-    #[test]
-    fn ban_parent_imports() -> Result<()> {
+    #[test_case(Strictness::Parents; "parents")]
+    #[test_case(Strictness::ForceSiblings; "force-siblings")]
+    fn ban_parent_imports(strictness: Strictness) -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID252.py"),
             &Settings {
                 flake8_tidy_imports: super::super::Settings {
-                    ban_relative_imports: Strictness::Parents,
+                    ban_relative_imports: strictness,
                     ..Default::default()
                 },
                 ..Settings::for_rules(vec![Rule::RelativeImports])
@@ -230,13 +342,14 @@ mod tests {
         Ok(())
     }
 
-    #[test]
-    fn ban_parent_imports_package() -> Result<()> {
+    #[test_case(Strictness::Parents; "parents")]
+    #[test_case(Strictness::ForceSiblings; "force-siblings")]
+    fn ban_parent_imports_package(strictness: Strictness) -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID252/my_package/sublib/api/application.py"),
             &Settings {
                 flake8_tidy_imports: super::super::Settings {
-                    ban_relative_imports: Strictness::Parents,
+                    ban_relative_imports: strictness,
                     ..Default::default()
                 },
                 namespace_packages: vec![Path::new("my_package").to_path_buf()],
@@ -244,6 +357,29 @@ mod tests {
             },
         )?;
         assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("TID253.py"); "root module not in package")]
+    #[test_case(Path::new("TID253/__init__.py"); "root package init")]
+    #[test_case(Path::new("TID253/module.py"); "root package module")]
+    #[test_case(Path::new("TID253/nested/__init__.py"); "nested package init")]
+    #[test_case(Path::new("TID253/nested/module.py"); "nested package module")]
+    #[test_case(Path::new("TID253/not_a_pkg/module.py"); "nested module not in package")]
+    fn ban_parent_imports_force_siblings(path: &Path) -> Result<()> {
+        let file = path.to_string_lossy();
+        let diagnostics = test_path(
+            Path::new(&format!("flake8_tidy_imports/{file}")),
+            &Settings {
+                flake8_tidy_imports: super::super::Settings {
+                    ban_relative_imports: Strictness::ForceSiblings,
+                    ..Default::default()
+                },
+                ..Settings::for_rules(vec![Rule::RelativeSiblings])
+            },
+        )?;
+        let snapshot = file.replace("__", "").replace('/', "__").replace(".py", "");
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }
