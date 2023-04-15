@@ -6,7 +6,6 @@ use regex::{CaptureMatches, Regex};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
-use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -105,9 +104,9 @@ impl Violation for MissingSpaceAfterColonInTodo {
 //
 // Note: Tags taken from https://github.com/orsinium-labs/flake8-todos/blob/master/flake8_todos/_rules.py#L12.
 static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
-    // TODO BEFORE COMMITTING - <space> should be a nested group inside of <colon>
     Regex::new(r"^#\s*([tT][oO][dD][oO]|BUG|FIXME|XXX)(\(.*\))?(:)?( )?(.+)?$").unwrap()
 });
+
 static NUM_CAPTURE_GROUPS: usize = 5usize;
 
 pub fn check_rules(tokens: &[LexResult]) -> Vec<Diagnostic> {
@@ -118,8 +117,43 @@ pub fn check_rules(tokens: &[LexResult]) -> Vec<Diagnostic> {
             continue;
         };
 
-        if get_captured_matches(comment).peek().is_some() {
-            diagnostics.extend(get_tag_regex_errors(comment, *start, *end));
+        if let Some(captures_ref) = get_captured_matches(comment).peek() {
+            let diagnostics_ref = &mut diagnostics;
+            let range = Range::new(*start, *end);
+            let captures = captures_ref.to_owned();
+
+            // captures.get(1) is the tag, which is required for the regex to match. The unwrap()
+            // call is therefore safe
+            let tag = captures.get(1).unwrap().as_str();
+            if tag != "TODO" {
+                diagnostics_ref.push(Diagnostic::new(
+                    InvalidTodoTag {
+                        tag: String::from(tag),
+                    },
+                    range,
+                ));
+
+                if tag.to_uppercase() == "TODO" {
+                    diagnostics_ref.push(Diagnostic::new(
+                        InvalidCapitalizationInTodo {
+                            tag: String::from(tag),
+                        },
+                        range,
+                    ));
+                }
+            }
+
+            for capture_group_index in 2..=NUM_CAPTURE_GROUPS {
+                if captures.get(capture_group_index).is_some() {
+                    continue;
+                }
+
+                if let Some(diagnostic) =
+                    get_regex_error(capture_group_index, &range, diagnostics_ref)
+                {
+                    diagnostics_ref.push(diagnostic);
+                };
+            }
         }
     }
 
@@ -130,55 +164,23 @@ fn get_captured_matches(text: &str) -> Peekable<CaptureMatches> {
     TODO_REGEX.captures_iter(text).peekable()
 }
 
-fn get_tag_regex_errors(text: &str, start: Location, end: Location) -> Vec<Diagnostic> {
-    let mut diagnostics: Vec<Diagnostic> = vec![];
-
-    for capture in TODO_REGEX.captures_iter(text) {
-        // The tag is required for capturing the regex, so this is safe.
-        let tag = capture.get(1).unwrap().as_str();
-        if tag != "TODO" {
-            diagnostics.push(Diagnostic::new(
-                InvalidTodoTag {
-                    tag: String::from(tag),
-                },
-                Range::new(start, end),
-            ));
-
-            if tag.to_uppercase() == "TODO" {
-                diagnostics.push(Diagnostic::new(
-                    InvalidCapitalizationInTodo {
-                        tag: String::from(tag),
-                    },
-                    Range::new(start, end),
-                ));
+/// Mapper for static regex errors caused by a capture group at index i (i > 1 since the tag
+/// capture group could lead to multiple diagnostics being pushed)
+fn get_regex_error(i: usize, range: &Range, diagnostics: &mut [Diagnostic]) -> Option<Diagnostic> {
+    match i {
+        2usize => Some(Diagnostic::new(MissingAuthorInTodo, *range)),
+        3usize => Some(Diagnostic::new(MissingColonInTodo, *range)),
+        4usize => {
+            if diagnostics
+                .last()
+                .map_or(true, |last| last.kind != MissingColonInTodo.into())
+            {
+                Some(Diagnostic::new(MissingSpaceAfterColonInTodo, *range))
+            } else {
+                None
             }
         }
-
-        // Note: This initially looks bad from a speed perspective, but is O(1) given that we
-        // know that there will only ever be 1 `capture` (due to regex anchors) and constant
-        // capture groups.
-        for capture_group_index in 2..=NUM_CAPTURE_GROUPS {
-            if capture.get(capture_group_index).is_none() {
-                let range = Range::new(start, end);
-                diagnostics.push(match capture_group_index {
-                    2usize => Diagnostic::new(MissingAuthorInTodo, range),
-                    3usize => Diagnostic::new(MissingColonInTodo, range),
-                    4usize => {
-                        if diagnostics
-                            .last()
-                            .map_or(true, |last| last.kind != MissingColonInTodo.into())
-                        {
-                            Diagnostic::new(MissingSpaceAfterColonInTodo, range)
-                        } else {
-                            continue;
-                        }
-                    }
-                    5usize => Diagnostic::new(MissingTextInTodo, range),
-                    _ => break,
-                });
-            }
-        }
+        5usize => Some(Diagnostic::new(MissingTextInTodo, *range)),
+        _ => None,
     }
-
-    diagnostics
 }
