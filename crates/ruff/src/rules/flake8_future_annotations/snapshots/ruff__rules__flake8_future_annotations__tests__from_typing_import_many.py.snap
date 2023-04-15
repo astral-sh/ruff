@@ -1,11 +1,10 @@
 ---
 source: crates/ruff/src/rules/flake8_future_annotations/mod.rs
 ---
-from_typing_import_many.py:1:1: FA100 [*] Missing from __future__ import annotations but imports: `Dict`, `List`, `Optional`, `Set`, `Union`
+from_typing_import_many.py:1:1: FA100 Missing from __future__ import annotations but imports: `Dict`, `List`, `Optional`, `Set`, `Union`
   |
 1 | from typing import Dict, List, Optional, Set, Union, cast
   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ FA100
   |
-  = help: Add `from future import annotations` import
 
 

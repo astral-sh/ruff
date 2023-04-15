@@ -4129,10 +4129,6 @@ where
 
         self.ctx.body = prev_body;
         self.ctx.body_index = prev_body_index;
-
-        // if self.settings.rules.enabled(&Rule::MissingFutureAnnotationsWithImports) {
-        //     flake8_future_annotations::rules::check_missing_future_annotations_import(self, body);
-        // }
     }
 }
 

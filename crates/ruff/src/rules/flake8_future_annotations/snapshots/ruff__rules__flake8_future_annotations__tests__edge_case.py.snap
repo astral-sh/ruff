@@ -1,21 +1,19 @@
 ---
 source: crates/ruff/src/rules/flake8_future_annotations/mod.rs
 ---
-edge_case.py:1:1: FA100 [*] Missing from __future__ import annotations but imports: `List`
+edge_case.py:1:1: FA100 Missing from __future__ import annotations but imports: `List`
   |
 1 | from typing import List
   | ^^^^^^^^^^^^^^^^^^^^^^^ FA100
 2 | import typing as t
   |
-  = help: Add `from future import annotations` import
 
-edge_case.py:6:13: FA100 [*] Missing from __future__ import annotations but imports: `typing.List`
+edge_case.py:6:13: FA100 Missing from __future__ import annotations but imports: `typing.List`
   |
 6 | def main(_: List[int]) -> None:
 7 |     a_list: t.List[str] = []
   |             ^^^^^^ FA100
 8 |     a_list.append("hello")
   |
-  = help: Add `from future import annotations` import
 
 

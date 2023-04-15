@@ -1,6 +1,6 @@
 use crate::checkers::ast::Checker;
 use itertools::Itertools;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 use rustpython_parser::ast::{AliasData, Expr, Located, Stmt};
@@ -50,16 +50,12 @@ pub struct MissingFutureAnnotationsWithImports {
     pub names: Vec<String>,
 }
 
-impl AlwaysAutofixableViolation for MissingFutureAnnotationsWithImports {
+impl Violation for MissingFutureAnnotationsWithImports {
     #[derive_message_formats]
     fn message(&self) -> String {
         let MissingFutureAnnotationsWithImports { names } = self;
         let names = names.iter().map(|name| format!("`{name}`")).join(", ");
         format!("Missing from __future__ import annotations but imports: {names}")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Add `from __future__ import annotations` import".to_string()
     }
 }
 
@@ -114,14 +110,4 @@ pub fn check_missing_future_annotations_import(checker: &mut Checker, expr: &Exp
             ));
         }
     }
-
-    // let mut diagnostic = Diagnostic::new(TypingTextStrAlias, Range::from(expr));
-    // if checker.patch(diagnostic.kind.rule()) {
-    //     diagnostic.amend(Fix::replacement(
-    //         "str".to_string(),
-    //         expr.location,
-    //         expr.end_location.unwrap(),
-    //     ));
-    // }
-    // checker.diagnostics.push(diagnostic);
 }
