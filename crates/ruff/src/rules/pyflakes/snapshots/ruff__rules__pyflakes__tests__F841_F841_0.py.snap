@@ -1,236 +1,213 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedVariable
-    body: "Local variable `e` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `e`"
-    fixable: true
-  location:
-    row: 3
-    column: 21
-  end_location:
-    row: 3
-    column: 22
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 3
-          column: 17
-        end_location:
-          row: 3
-          column: 22
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `z` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `z`"
-    fixable: true
-  location:
-    row: 16
-    column: 4
-  end_location:
-    row: 16
-    column: 5
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 16
-          column: 4
-        end_location:
-          row: 16
-          column: 8
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `foo` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `foo`"
-    fixable: true
-  location:
-    row: 20
-    column: 4
-  end_location:
-    row: 20
-    column: 7
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 20
-          column: 0
-        end_location:
-          row: 21
-          column: 0
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `a` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `a`"
-    fixable: true
-  location:
-    row: 21
-    column: 5
-  end_location:
-    row: 21
-    column: 6
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `b` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `b`"
-    fixable: true
-  location:
-    row: 21
-    column: 8
-  end_location:
-    row: 21
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `baz` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `baz`"
-    fixable: true
-  location:
-    row: 26
-    column: 13
-  end_location:
-    row: 26
-    column: 16
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 26
-          column: 13
-        end_location:
-          row: 26
-          column: 19
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `b` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `b`"
-    fixable: true
-  location:
-    row: 51
-    column: 8
-  end_location:
-    row: 51
-    column: 9
-  fix:
-    edits:
-      - content: pass
-        location:
-          row: 51
-          column: 8
-        end_location:
-          row: 51
-          column: 13
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `my_file` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `my_file`"
-    fixable: true
-  location:
-    row: 79
-    column: 25
-  end_location:
-    row: 79
-    column: 32
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 79
-          column: 21
-        end_location:
-          row: 79
-          column: 32
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `my_file` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `my_file`"
-    fixable: true
-  location:
-    row: 85
-    column: 24
-  end_location:
-    row: 85
-    column: 31
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 85
-          column: 20
-        end_location:
-          row: 85
-          column: 31
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `msg3` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `msg3`"
-    fixable: true
-  location:
-    row: 102
-    column: 4
-  end_location:
-    row: 102
-    column: 8
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 102
-          column: 0
-        end_location:
-          row: 103
-          column: 0
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `Baz` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `Baz`"
-    fixable: true
-  location:
-    row: 115
-    column: 4
-  end_location:
-    row: 115
-    column: 7
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 115
-          column: 4
-        end_location:
-          row: 115
-          column: 10
-  parent: ~
-- kind:
-    name: UnusedVariable
-    body: "Local variable `y` is assigned to but never used"
-    suggestion: "Remove assignment to unused variable `y`"
-    fixable: true
-  location:
-    row: 122
-    column: 13
-  end_location:
-    row: 122
-    column: 14
-  fix:
-    edits: []
-  parent: ~
+F841_0.py:3:22: F841 [*] Local variable `e` is assigned to but never used
+  |
+3 | try:
+4 |     1 / 0
+5 | except ValueError as e:
+  |                      ^ F841
+6 |     pass
+  |
+  = help: Remove assignment to unused variable `e`
+
+ℹ Suggested fix
+1 1 | try:
+2 2 |     1 / 0
+3   |-except ValueError as e:
+  3 |+except ValueError:
+4 4 |     pass
+5 5 | 
+6 6 | 
+
+F841_0.py:16:5: F841 [*] Local variable `z` is assigned to but never used
+   |
+16 |     x = 1
+17 |     y = 2
+18 |     z = x + y
+   |     ^ F841
+   |
+   = help: Remove assignment to unused variable `z`
+
+ℹ Suggested fix
+13 13 | def f():
+14 14 |     x = 1
+15 15 |     y = 2
+16    |-    z = x + y
+   16 |+    x + y
+17 17 | 
+18 18 | 
+19 19 | def f():
+
+F841_0.py:20:5: F841 [*] Local variable `foo` is assigned to but never used
+   |
+20 | def f():
+21 |     foo = (1, 2)
+   |     ^^^ F841
+22 |     (a, b) = (1, 2)
+   |
+   = help: Remove assignment to unused variable `foo`
+
+ℹ Suggested fix
+17 17 | 
+18 18 | 
+19 19 | def f():
+20    |-    foo = (1, 2)
+21 20 |     (a, b) = (1, 2)
+22 21 | 
+23 22 |     bar = (1, 2)
+
+F841_0.py:21:6: F841 [*] Local variable `a` is assigned to but never used
+   |
+21 | def f():
+22 |     foo = (1, 2)
+23 |     (a, b) = (1, 2)
+   |      ^ F841
+24 | 
+25 |     bar = (1, 2)
+   |
+   = help: Remove assignment to unused variable `a`
+
+F841_0.py:21:9: F841 [*] Local variable `b` is assigned to but never used
+   |
+21 | def f():
+22 |     foo = (1, 2)
+23 |     (a, b) = (1, 2)
+   |         ^ F841
+24 | 
+25 |     bar = (1, 2)
+   |
+   = help: Remove assignment to unused variable `b`
+
+F841_0.py:26:14: F841 [*] Local variable `baz` is assigned to but never used
+   |
+26 |     (c, d) = bar
+27 | 
+28 |     (x, y) = baz = bar
+   |              ^^^ F841
+   |
+   = help: Remove assignment to unused variable `baz`
+
+ℹ Suggested fix
+23 23 |     bar = (1, 2)
+24 24 |     (c, d) = bar
+25 25 | 
+26    |-    (x, y) = baz = bar
+   26 |+    (x, y) = bar
+27 27 | 
+28 28 | 
+29 29 | def f():
+
+F841_0.py:51:9: F841 [*] Local variable `b` is assigned to but never used
+   |
+51 |     def c():
+52 |         # F841
+53 |         b = 1
+   |         ^ F841
+54 | 
+55 |     def d():
+   |
+   = help: Remove assignment to unused variable `b`
+
+ℹ Suggested fix
+48 48 | 
+49 49 |     def c():
+50 50 |         # F841
+51    |-        b = 1
+   51 |+        pass
+52 52 | 
+53 53 |     def d():
+54 54 |         nonlocal b
+
+F841_0.py:79:26: F841 [*] Local variable `my_file` is assigned to but never used
+   |
+79 | def f():
+80 |     with open("file") as my_file, open("") as ((this, that)):
+   |                          ^^^^^^^ F841
+81 |         print("hello")
+   |
+   = help: Remove assignment to unused variable `my_file`
+
+ℹ Suggested fix
+76 76 | 
+77 77 | 
+78 78 | def f():
+79    |-    with open("file") as my_file, open("") as ((this, that)):
+   79 |+    with open("file"), open("") as ((this, that)):
+80 80 |         print("hello")
+81 81 | 
+82 82 | 
+
+F841_0.py:85:25: F841 [*] Local variable `my_file` is assigned to but never used
+   |
+85 | def f():
+86 |     with (
+87 |         open("file") as my_file,
+   |                         ^^^^^^^ F841
+88 |         open("") as ((this, that)),
+89 |     ):
+   |
+   = help: Remove assignment to unused variable `my_file`
+
+ℹ Suggested fix
+82 82 | 
+83 83 | def f():
+84 84 |     with (
+85    |-        open("file") as my_file,
+   85 |+        open("file"),
+86 86 |         open("") as ((this, that)),
+87 87 |     ):
+88 88 |         print("hello")
+
+F841_0.py:102:5: F841 [*] Local variable `msg3` is assigned to but never used
+    |
+102 |     msg1 = "Hello, world!"
+103 |     msg2 = "Hello, world!"
+104 |     msg3 = "Hello, world!"
+    |     ^^^^ F841
+105 |     match x:
+106 |         case 1:
+    |
+    = help: Remove assignment to unused variable `msg3`
+
+ℹ Suggested fix
+99  99  | def f(x: int):
+100 100 |     msg1 = "Hello, world!"
+101 101 |     msg2 = "Hello, world!"
+102     |-    msg3 = "Hello, world!"
+103 102 |     match x:
+104 103 |         case 1:
+105 104 |             print(msg1)
+
+F841_0.py:115:5: F841 [*] Local variable `Baz` is assigned to but never used
+    |
+115 |     Foo = enum.Enum("Foo", "A B")
+116 |     Bar = enum.Enum("Bar", "A B")
+117 |     Baz = enum.Enum("Baz", "A B")
+    |     ^^^ F841
+118 | 
+119 |     match x:
+    |
+    = help: Remove assignment to unused variable `Baz`
+
+ℹ Suggested fix
+112 112 | 
+113 113 |     Foo = enum.Enum("Foo", "A B")
+114 114 |     Bar = enum.Enum("Bar", "A B")
+115     |-    Baz = enum.Enum("Baz", "A B")
+    115 |+    enum.Enum("Baz", "A B")
+116 116 | 
+117 117 |     match x:
+118 118 |         case (Foo.A):
+
+F841_0.py:122:14: F841 [*] Local variable `y` is assigned to but never used
+    |
+122 |         case [Bar.A, *_]:
+123 |             print("A")
+124 |         case y:
+    |              ^ F841
+125 |             pass
+    |
+    = help: Remove assignment to unused variable `y`
+
 

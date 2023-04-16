@@ -1,89 +1,64 @@
 ---
 source: crates/ruff/src/rules/tryceratops/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: RaiseWithinTry
-    body: "Abstract `raise` to an inner function"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 12
-  end_location:
-    row: 9
-    column: 32
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RaiseWithinTry
-    body: "Abstract `raise` to an inner function"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 8
-  end_location:
-    row: 11
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RaiseWithinTry
-    body: "Abstract `raise` to an inner function"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 16
-  end_location:
-    row: 16
-    column: 36
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RaiseWithinTry
-    body: "Abstract `raise` to an inner function"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 27
-    column: 12
-  end_location:
-    row: 27
-    column: 32
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RaiseWithinTry
-    body: "Abstract `raise` to an inner function"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 8
-  end_location:
-    row: 29
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RaiseWithinTry
-    body: "Abstract `raise` to an inner function"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 34
-    column: 16
-  end_location:
-    row: 34
-    column: 36
-  fix:
-    edits: []
-  parent: ~
+TRY301.py:9:13: TRY301 Abstract `raise` to an inner function
+   |
+ 9 |         a = process()
+10 |         if not a:
+11 |             raise MyException(a)
+   |             ^^^^^^^^^^^^^^^^^^^^ TRY301
+12 | 
+13 |         raise MyException(a)
+   |
+
+TRY301.py:11:9: TRY301 Abstract `raise` to an inner function
+   |
+11 |             raise MyException(a)
+12 | 
+13 |         raise MyException(a)
+   |         ^^^^^^^^^^^^^^^^^^^^ TRY301
+14 | 
+15 |         try:
+   |
+
+TRY301.py:16:17: TRY301 Abstract `raise` to an inner function
+   |
+16 |             b = process()
+17 |             if not b:
+18 |                 raise MyException(b)
+   |                 ^^^^^^^^^^^^^^^^^^^^ TRY301
+19 |         except Exception:
+20 |             logger.exception("something failed")
+   |
+
+TRY301.py:27:13: TRY301 Abstract `raise` to an inner function
+   |
+27 |         a = process()
+28 |         if not a:
+29 |             raise MyException(a)
+   |             ^^^^^^^^^^^^^^^^^^^^ TRY301
+30 | 
+31 |         raise MyException(a)
+   |
+
+TRY301.py:29:9: TRY301 Abstract `raise` to an inner function
+   |
+29 |             raise MyException(a)
+30 | 
+31 |         raise MyException(a)
+   |         ^^^^^^^^^^^^^^^^^^^^ TRY301
+32 | 
+33 |         try:
+   |
+
+TRY301.py:34:17: TRY301 Abstract `raise` to an inner function
+   |
+34 |             b = process()
+35 |             if not b:
+36 |                 raise MyException(b)
+   |                 ^^^^^^^^^^^^^^^^^^^^ TRY301
+37 |         except* Exception:
+38 |             logger.exception("something failed")
+   |
+
 

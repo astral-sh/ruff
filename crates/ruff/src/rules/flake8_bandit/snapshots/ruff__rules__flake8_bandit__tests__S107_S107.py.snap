@@ -1,75 +1,39 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: HardcodedPasswordDefault
-    body: "Possible hardcoded password: \"default\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 28
-  end_location:
-    row: 5
-    column: 37
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordDefault
-    body: "Possible hardcoded password: \"posonly\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 44
-  end_location:
-    row: 13
-    column: 53
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordDefault
-    body: "Possible hardcoded password: \"kwonly\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 38
-  end_location:
-    row: 21
-    column: 46
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordDefault
-    body: "Possible hardcoded password: \"posonly\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 38
-  end_location:
-    row: 29
-    column: 47
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: HardcodedPasswordDefault
-    body: "Possible hardcoded password: \"kwonly\""
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 61
-  end_location:
-    row: 29
-    column: 69
-  fix:
-    edits: []
-  parent: ~
+S107.py:5:29: S107 Possible hardcoded password: "default"
+  |
+5 | def default(first, password="default"):
+  |                             ^^^^^^^^^ S107
+6 |     pass
+  |
+
+S107.py:13:45: S107 Possible hardcoded password: "posonly"
+   |
+13 | def default_posonly(first, /, pos, password="posonly"):
+   |                                             ^^^^^^^^^ S107
+14 |     pass
+   |
+
+S107.py:21:39: S107 Possible hardcoded password: "kwonly"
+   |
+21 | def default_kwonly(first, *, password="kwonly"):
+   |                                       ^^^^^^^^ S107
+22 |     pass
+   |
+
+S107.py:29:39: S107 Possible hardcoded password: "posonly"
+   |
+29 | def default_all(first, /, pos, secret="posonly", *, password="kwonly"):
+   |                                       ^^^^^^^^^ S107
+30 |     pass
+   |
+
+S107.py:29:62: S107 Possible hardcoded password: "kwonly"
+   |
+29 | def default_all(first, /, pos, secret="posonly", *, password="kwonly"):
+   |                                                              ^^^^^^^^ S107
+30 |     pass
+   |
+
 

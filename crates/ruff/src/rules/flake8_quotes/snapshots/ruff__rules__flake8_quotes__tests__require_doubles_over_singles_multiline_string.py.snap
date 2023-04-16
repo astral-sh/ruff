@@ -1,26 +1,26 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 1
-    column: 4
-  end_location:
-    row: 3
-    column: 12
-  fix:
-    edits:
-      - content: "\"\"\" This 'should'\nbe\n'linted' \"\"\""
-        location:
-          row: 1
-          column: 4
-        end_location:
-          row: 3
-          column: 12
-  parent: ~
+singles_multiline_string.py:1:5: Q001 [*] Single quote multiline found but double quotes preferred
+  |
+1 |   s = ''' This 'should'
+  |  _____^
+2 | | be
+3 | | 'linted' '''
+  | |____________^ Q001
+4 |   
+5 |   s = """ This 'should'
+  |
+  = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+1   |-s = ''' This 'should'
+  1 |+s = """ This 'should'
+2 2 | be
+3   |-'linted' '''
+  3 |+'linted' """
+4 4 | 
+5 5 | s = """ This 'should'
+6 6 | 'not' be
+
 

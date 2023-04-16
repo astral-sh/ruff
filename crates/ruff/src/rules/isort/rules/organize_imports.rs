@@ -139,6 +139,7 @@ pub fn organize_imports(
         settings.isort.lines_between_types,
         &settings.isort.forced_separate,
         settings.target_version,
+        &settings.isort.section_order,
     );
 
     // Expand the span the entire range, including leading and trailing space.

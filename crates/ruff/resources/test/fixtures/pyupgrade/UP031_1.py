@@ -34,28 +34,6 @@ pytest.param('"%8s" % (None,)', id="unsafe width-string conversion"),
 "%(and)s" % {"and": 2}
 
 # OK (arguably false negatives)
-(
-    "foo %s "
-    "bar %s"
-) % (x, y)
-
-(
-    "foo %(foo)s "
-    "bar %(bar)s"
-) % {"foo": x, "bar": y}
-
-(
-    """foo %s"""
-    % (x,)
-)
-
-(
-    """
-    foo %s
-    """
-    % (x,)
-)
-
 'Hello %s' % bar
 
 'Hello %s' % bar.baz

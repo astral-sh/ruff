@@ -77,6 +77,32 @@ impl std::fmt::Display for ImportFrom<'_> {
     }
 }
 
+pub trait FutureImport {
+    /// Returns `true` if this import is from the `__future__` module.
+    fn is_future_import(&self) -> bool;
+}
+
+impl FutureImport for Import<'_> {
+    fn is_future_import(&self) -> bool {
+        self.name.name == "__future__"
+    }
+}
+
+impl FutureImport for ImportFrom<'_> {
+    fn is_future_import(&self) -> bool {
+        self.module == Some("__future__")
+    }
+}
+
+impl FutureImport for AnyImport<'_> {
+    fn is_future_import(&self) -> bool {
+        match self {
+            AnyImport::Import(import) => import.is_future_import(),
+            AnyImport::ImportFrom(import_from) => import_from.is_future_import(),
+        }
+    }
+}
+
 /// A representation of a module reference in an import statement.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModuleImport {

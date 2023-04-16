@@ -1,551 +1,607 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 3
-    column: 11
-  end_location:
-    row: 3
-    column: 15
-  fix:
-    edits:
-      - content: from unittest import mock
-        location:
-          row: 3
-          column: 4
-        end_location:
-          row: 3
-          column: 15
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 7
-    column: 11
-  end_location:
-    row: 7
-    column: 15
-  fix:
-    edits:
-      - content: "import sys\n    from unittest import mock"
-        location:
-          row: 7
-          column: 4
-        end_location:
-          row: 7
-          column: 20
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 11
-    column: 22
-  fix:
-    edits:
-      - content: from unittest.mock import *
-        location:
-          row: 11
-          column: 4
-        end_location:
-          row: 11
-          column: 22
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 14
-    column: 7
-  end_location:
-    row: 14
-    column: 16
-  fix:
-    edits:
-      - content: from unittest import mock
-        location:
-          row: 14
-          column: 0
-        end_location:
-          row: 14
-          column: 16
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 17
-    column: 19
-  end_location:
-    row: 17
-    column: 23
-  fix:
-    edits:
-      - content: "import contextlib, sys\nfrom unittest import mock"
-        location:
-          row: 17
-          column: 0
-        end_location:
-          row: 17
-          column: 28
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 20
-    column: 7
-  end_location:
-    row: 20
-    column: 11
-  fix:
-    edits:
-      - content: "import sys\nfrom unittest import mock"
-        location:
-          row: 20
-          column: 0
-        end_location:
-          row: 20
-          column: 16
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 24
-    column: 0
-  end_location:
-    row: 24
-    column: 21
-  fix:
-    edits:
-      - content: from unittest import mock
-        location:
-          row: 24
-          column: 0
-        end_location:
-          row: 24
-          column: 21
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 27
-    column: 0
-  end_location:
-    row: 32
-    column: 1
-  fix:
-    edits:
-      - content: "from unittest.mock import (\n    a,\n    b,\n    c,\n)\nfrom unittest import mock"
-        location:
-          row: 27
-          column: 0
-        end_location:
-          row: 32
-          column: 1
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 33
-    column: 0
-  end_location:
-    row: 38
-    column: 1
-  fix:
-    edits:
-      - content: "from unittest.mock import (\n    a,\n    b,\n    c,\n)\nfrom unittest import mock"
-        location:
-          row: 33
-          column: 0
-        end_location:
-          row: 38
-          column: 1
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 41
-    column: 0
-  end_location:
-    row: 46
-    column: 1
-  fix:
-    edits:
-      - content: "from unittest.mock import (\n    a,\n    b,\n    c\n)\nfrom unittest import mock"
-        location:
-          row: 41
-          column: 0
-        end_location:
-          row: 46
-          column: 1
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 47
-    column: 0
-  end_location:
-    row: 52
-    column: 1
-  fix:
-    edits:
-      - content: "from unittest.mock import (\n    a,\n    b,\n    c\n)\nfrom unittest import mock"
-        location:
-          row: 47
-          column: 0
-        end_location:
-          row: 52
-          column: 1
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 53
-    column: 0
-  end_location:
-    row: 53
-    column: 30
-  fix:
-    edits:
-      - content: "from unittest.mock import a, b, c\nfrom unittest import mock"
-        location:
-          row: 53
-          column: 0
-        end_location:
-          row: 53
-          column: 30
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 54
-    column: 0
-  end_location:
-    row: 54
-    column: 30
-  fix:
-    edits:
-      - content: "from unittest.mock import a, b, c\nfrom unittest import mock"
-        location:
-          row: 54
-          column: 0
-        end_location:
-          row: 54
-          column: 30
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 58
-    column: 8
-  end_location:
-    row: 63
-    column: 9
-  fix:
-    edits:
-      - content: "from unittest.mock import (\n            a,\n            b,\n            c\n        )\n        from unittest import mock"
-        location:
-          row: 58
-          column: 8
-        end_location:
-          row: 63
-          column: 9
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 69
-    column: 7
-  end_location:
-    row: 69
-    column: 11
-  fix:
-    edits:
-      - content: "from unittest import mock\nfrom unittest import mock"
-        location:
-          row: 69
-          column: 0
-        end_location:
-          row: 69
-          column: 17
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 69
-    column: 13
-  end_location:
-    row: 69
-    column: 17
-  fix:
-    edits:
-      - content: "from unittest import mock\nfrom unittest import mock"
-        location:
-          row: 69
-          column: 0
-        end_location:
-          row: 69
-          column: 17
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 72
-    column: 7
-  end_location:
-    row: 72
-    column: 18
-  fix:
-    edits:
-      - content: from unittest import mock as foo
-        location:
-          row: 72
-          column: 0
-        end_location:
-          row: 72
-          column: 18
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 75
-    column: 0
-  end_location:
-    row: 75
-    column: 28
-  fix:
-    edits:
-      - content: from unittest import mock as foo
-        location:
-          row: 75
-          column: 0
-        end_location:
-          row: 75
-          column: 28
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 79
-    column: 11
-  end_location:
-    row: 79
-    column: 22
-  fix:
-    edits:
-      - content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
-          row: 79
-          column: 4
-        end_location:
-          row: 79
-          column: 41
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 79
-    column: 24
-  end_location:
-    row: 79
-    column: 35
-  fix:
-    edits:
-      - content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
-          row: 79
-          column: 4
-        end_location:
-          row: 79
-          column: 41
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 79
-    column: 37
-  end_location:
-    row: 79
-    column: 41
-  fix:
-    edits:
-      - content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
-          row: 79
-          column: 4
-        end_location:
-          row: 79
-          column: 41
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 82
-    column: 11
-  end_location:
-    row: 82
-    column: 22
-  fix:
-    edits:
-      - content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
-          row: 82
-          column: 4
-        end_location:
-          row: 82
-          column: 45
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 82
-    column: 24
-  end_location:
-    row: 82
-    column: 35
-  fix:
-    edits:
-      - content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
-          row: 82
-          column: 4
-        end_location:
-          row: 82
-          column: 45
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 82
-    column: 37
-  end_location:
-    row: 82
-    column: 41
-  fix:
-    edits:
-      - content: "import os\n    from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
-          row: 82
-          column: 4
-        end_location:
-          row: 82
-          column: 45
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Import from `unittest.mock` instead"
-    fixable: true
-  location:
-    row: 86
-    column: 4
-  end_location:
-    row: 86
-    column: 51
-  fix:
-    edits:
-      - content: "from unittest import mock as foo\n    from unittest import mock as bar\n    from unittest import mock"
-        location:
-          row: 86
-          column: 4
-        end_location:
-          row: 86
-          column: 51
-  parent: ~
-- kind:
-    name: DeprecatedMockImport
-    body: "`mock` is deprecated, use `unittest.mock`"
-    suggestion: "Replace `mock.mock` with `mock`"
-    fixable: true
-  location:
-    row: 93
-    column: 4
-  end_location:
-    row: 93
-    column: 13
-  fix:
-    edits:
-      - content: mock
-        location:
-          row: 93
-          column: 4
-        end_location:
-          row: 93
-          column: 13
-  parent: ~
+UP026.py:3:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
+  |
+3 | # Error (`from unittest import mock`)
+4 | if True:
+5 |     import mock
+  |            ^^^^ UP026
+6 | 
+7 | # Error (`from unittest import mock`)
+  |
+  = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+1 1 | # Error (`from unittest import mock`)
+2 2 | if True:
+3   |-    import mock
+  3 |+    from unittest import mock
+4 4 | 
+5 5 | # Error (`from unittest import mock`)
+6 6 | if True:
+
+UP026.py:7:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+ 7 | # Error (`from unittest import mock`)
+ 8 | if True:
+ 9 |     import mock, sys
+   |            ^^^^ UP026
+10 | 
+11 | # Error (`from unittest.mock import *`)
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+4 4 | 
+5 5 | # Error (`from unittest import mock`)
+6 6 | if True:
+7   |-    import mock, sys
+  7 |+    import sys
+  8 |+    from unittest import mock
+8 9 | 
+9 10 | # Error (`from unittest.mock import *`)
+10 11 | if True:
+
+UP026.py:11:5: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+11 | # Error (`from unittest.mock import *`)
+12 | if True:
+13 |     from mock import *
+   |     ^^^^^^^^^^^^^^^^^^ UP026
+14 | 
+15 | # Error (`from unittest import mock`)
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+8  8  | 
+9  9  | # Error (`from unittest.mock import *`)
+10 10 | if True:
+11    |-    from mock import *
+   11 |+    from unittest.mock import *
+12 12 | 
+13 13 | # Error (`from unittest import mock`)
+14 14 | import mock.mock
+
+UP026.py:14:8: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+14 | # Error (`from unittest import mock`)
+15 | import mock.mock
+   |        ^^^^^^^^^ UP026
+16 | 
+17 | # Error (`from unittest import mock`)
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+11 11 |     from mock import *
+12 12 | 
+13 13 | # Error (`from unittest import mock`)
+14    |-import mock.mock
+   14 |+from unittest import mock
+15 15 | 
+16 16 | # Error (`from unittest import mock`)
+17 17 | import contextlib, mock, sys
+
+UP026.py:17:20: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+17 | # Error (`from unittest import mock`)
+18 | import contextlib, mock, sys
+   |                    ^^^^ UP026
+19 | 
+20 | # Error (`from unittest import mock`)
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+14 14 | import mock.mock
+15 15 | 
+16 16 | # Error (`from unittest import mock`)
+17    |-import contextlib, mock, sys
+   17 |+import contextlib, sys
+   18 |+from unittest import mock
+18 19 | 
+19 20 | # Error (`from unittest import mock`)
+20 21 | import mock, sys
+
+UP026.py:20:8: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+20 | # Error (`from unittest import mock`)
+21 | import mock, sys
+   |        ^^^^ UP026
+22 | x = "This code should be preserved one line below the mock"
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+17 17 | import contextlib, mock, sys
+18 18 | 
+19 19 | # Error (`from unittest import mock`)
+20    |-import mock, sys
+   20 |+import sys
+   21 |+from unittest import mock
+21 22 | x = "This code should be preserved one line below the mock"
+22 23 | 
+23 24 | # Error (`from unittest import mock`)
+
+UP026.py:24:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+24 | # Error (`from unittest import mock`)
+25 | from mock import mock
+   | ^^^^^^^^^^^^^^^^^^^^^ UP026
+26 | 
+27 | # Error (keep trailing comma)
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+21 21 | x = "This code should be preserved one line below the mock"
+22 22 | 
+23 23 | # Error (`from unittest import mock`)
+24    |-from mock import mock
+   24 |+from unittest import mock
+25 25 | 
+26 26 | # Error (keep trailing comma)
+27 27 | from mock import (
+
+UP026.py:27:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+27 |   # Error (keep trailing comma)
+28 | / from mock import (
+29 | |     mock,
+30 | |     a,
+31 | |     b,
+32 | |     c,
+33 | | )
+   | |_^ UP026
+34 |   from mock import (
+35 |       a,
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+24 24 | from mock import mock
+25 25 | 
+26 26 | # Error (keep trailing comma)
+27    |-from mock import (
+28    |-    mock,
+   27 |+from unittest.mock import (
+29 28 |     a,
+30 29 |     b,
+31 30 |     c,
+32 31 | )
+   32 |+from unittest import mock
+33 33 | from mock import (
+34 34 |     a,
+35 35 |     b,
+
+UP026.py:33:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+33 |       c,
+34 |   )
+35 | / from mock import (
+36 | |     a,
+37 | |     b,
+38 | |     c,
+39 | |     mock,
+40 | | )
+   | |_^ UP026
+41 |   
+42 |   # Error (avoid trailing comma)
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+30 30 |     b,
+31 31 |     c,
+32 32 | )
+33    |-from mock import (
+   33 |+from unittest.mock import (
+34 34 |     a,
+35 35 |     b,
+36 36 |     c,
+37    |-    mock,
+38 37 | )
+   38 |+from unittest import mock
+39 39 | 
+40 40 | # Error (avoid trailing comma)
+41 41 | from mock import (
+
+UP026.py:41:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+41 |   # Error (avoid trailing comma)
+42 | / from mock import (
+43 | |     mock,
+44 | |     a,
+45 | |     b,
+46 | |     c
+47 | | )
+   | |_^ UP026
+48 |   from mock import (
+49 |       a,
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+38 38 | )
+39 39 | 
+40 40 | # Error (avoid trailing comma)
+41    |-from mock import (
+42    |-    mock,
+   41 |+from unittest.mock import (
+43 42 |     a,
+44 43 |     b,
+45 44 |     c
+46 45 | )
+   46 |+from unittest import mock
+47 47 | from mock import (
+48 48 |     a,
+49 49 |     b,
+
+UP026.py:47:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+47 |       c
+48 |   )
+49 | / from mock import (
+50 | |     a,
+51 | |     b,
+52 | |     c,
+53 | |     mock
+54 | | )
+   | |_^ UP026
+55 |   from mock import mock, a, b, c
+56 |   from mock import a, b, c, mock
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+44 44 |     b,
+45 45 |     c
+46 46 | )
+47    |-from mock import (
+   47 |+from unittest.mock import (
+48 48 |     a,
+49 49 |     b,
+50    |-    c,
+51    |-    mock
+   50 |+    c
+52 51 | )
+   52 |+from unittest import mock
+53 53 | from mock import mock, a, b, c
+54 54 | from mock import a, b, c, mock
+55 55 | 
+
+UP026.py:53:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+53 |     mock
+54 | )
+55 | from mock import mock, a, b, c
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP026
+56 | from mock import a, b, c, mock
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+50 50 |     c,
+51 51 |     mock
+52 52 | )
+53    |-from mock import mock, a, b, c
+   53 |+from unittest.mock import a, b, c
+   54 |+from unittest import mock
+54 55 | from mock import a, b, c, mock
+55 56 | 
+56 57 | if True:
+
+UP026.py:54:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+54 | )
+55 | from mock import mock, a, b, c
+56 | from mock import a, b, c, mock
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP026
+57 | 
+58 | if True:
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+51 51 |     mock
+52 52 | )
+53 53 | from mock import mock, a, b, c
+54    |-from mock import a, b, c, mock
+   54 |+from unittest.mock import a, b, c
+   55 |+from unittest import mock
+55 56 | 
+56 57 | if True:
+57 58 |     if False:
+
+UP026.py:58:9: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+58 |   if True:
+59 |       if False:
+60 |           from mock import (
+   |  _________^
+61 | |             mock,
+62 | |             a,
+63 | |             b,
+64 | |             c
+65 | |         )
+   | |_________^ UP026
+66 |   
+67 |   # OK
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+55 55 | 
+56 56 | if True:
+57 57 |     if False:
+58    |-        from mock import (
+59    |-            mock,
+   58 |+        from unittest.mock import (
+60 59 |             a,
+61 60 |             b,
+62 61 |             c
+63 62 |         )
+   63 |+        from unittest import mock
+64 64 | 
+65 65 | # OK
+66 66 | import os, io
+
+UP026.py:69:8: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+69 | # Error (`from unittest import mock`)
+70 | import mock, mock
+   |        ^^^^ UP026
+71 | 
+72 | # Error (`from unittest import mock as foo`)
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+66 66 | import os, io
+67 67 | 
+68 68 | # Error (`from unittest import mock`)
+69    |-import mock, mock
+   69 |+from unittest import mock
+   70 |+from unittest import mock
+70 71 | 
+71 72 | # Error (`from unittest import mock as foo`)
+72 73 | import mock as foo
+
+UP026.py:69:14: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+69 | # Error (`from unittest import mock`)
+70 | import mock, mock
+   |              ^^^^ UP026
+71 | 
+72 | # Error (`from unittest import mock as foo`)
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+66 66 | import os, io
+67 67 | 
+68 68 | # Error (`from unittest import mock`)
+69    |-import mock, mock
+   69 |+from unittest import mock
+   70 |+from unittest import mock
+70 71 | 
+71 72 | # Error (`from unittest import mock as foo`)
+72 73 | import mock as foo
+
+UP026.py:72:8: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+72 | # Error (`from unittest import mock as foo`)
+73 | import mock as foo
+   |        ^^^^^^^^^^^ UP026
+74 | 
+75 | # Error (`from unittest import mock as foo`)
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+69 69 | import mock, mock
+70 70 | 
+71 71 | # Error (`from unittest import mock as foo`)
+72    |-import mock as foo
+   72 |+from unittest import mock as foo
+73 73 | 
+74 74 | # Error (`from unittest import mock as foo`)
+75 75 | from mock import mock as foo
+
+UP026.py:75:1: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+75 | # Error (`from unittest import mock as foo`)
+76 | from mock import mock as foo
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP026
+77 | 
+78 | if True:
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+72 72 | import mock as foo
+73 73 | 
+74 74 | # Error (`from unittest import mock as foo`)
+75    |-from mock import mock as foo
+   75 |+from unittest import mock as foo
+76 76 | 
+77 77 | if True:
+78 78 |     # This should yield multiple, aliased imports.
+
+UP026.py:79:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+79 | if True:
+80 |     # This should yield multiple, aliased imports.
+81 |     import mock as foo, mock as bar, mock
+   |            ^^^^^^^^^^^ UP026
+82 | 
+83 |     # This should yield multiple, aliased imports, and preserve `os`.
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+76 76 | 
+77 77 | if True:
+78 78 |     # This should yield multiple, aliased imports.
+79    |-    import mock as foo, mock as bar, mock
+   79 |+    from unittest import mock as foo
+   80 |+    from unittest import mock as bar
+   81 |+    from unittest import mock
+80 82 | 
+81 83 |     # This should yield multiple, aliased imports, and preserve `os`.
+82 84 |     import mock as foo, mock as bar, mock, os
+
+UP026.py:79:25: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+79 | if True:
+80 |     # This should yield multiple, aliased imports.
+81 |     import mock as foo, mock as bar, mock
+   |                         ^^^^^^^^^^^ UP026
+82 | 
+83 |     # This should yield multiple, aliased imports, and preserve `os`.
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+76 76 | 
+77 77 | if True:
+78 78 |     # This should yield multiple, aliased imports.
+79    |-    import mock as foo, mock as bar, mock
+   79 |+    from unittest import mock as foo
+   80 |+    from unittest import mock as bar
+   81 |+    from unittest import mock
+80 82 | 
+81 83 |     # This should yield multiple, aliased imports, and preserve `os`.
+82 84 |     import mock as foo, mock as bar, mock, os
+
+UP026.py:79:38: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+79 | if True:
+80 |     # This should yield multiple, aliased imports.
+81 |     import mock as foo, mock as bar, mock
+   |                                      ^^^^ UP026
+82 | 
+83 |     # This should yield multiple, aliased imports, and preserve `os`.
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+76 76 | 
+77 77 | if True:
+78 78 |     # This should yield multiple, aliased imports.
+79    |-    import mock as foo, mock as bar, mock
+   79 |+    from unittest import mock as foo
+   80 |+    from unittest import mock as bar
+   81 |+    from unittest import mock
+80 82 | 
+81 83 |     # This should yield multiple, aliased imports, and preserve `os`.
+82 84 |     import mock as foo, mock as bar, mock, os
+
+UP026.py:82:12: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+82 |     # This should yield multiple, aliased imports, and preserve `os`.
+83 |     import mock as foo, mock as bar, mock, os
+   |            ^^^^^^^^^^^ UP026
+84 | 
+85 | if True:
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+79 79 |     import mock as foo, mock as bar, mock
+80 80 | 
+81 81 |     # This should yield multiple, aliased imports, and preserve `os`.
+82    |-    import mock as foo, mock as bar, mock, os
+   82 |+    import os
+   83 |+    from unittest import mock as foo
+   84 |+    from unittest import mock as bar
+   85 |+    from unittest import mock
+83 86 | 
+84 87 | if True:
+85 88 |     # This should yield multiple, aliased imports.
+
+UP026.py:82:25: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+82 |     # This should yield multiple, aliased imports, and preserve `os`.
+83 |     import mock as foo, mock as bar, mock, os
+   |                         ^^^^^^^^^^^ UP026
+84 | 
+85 | if True:
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+79 79 |     import mock as foo, mock as bar, mock
+80 80 | 
+81 81 |     # This should yield multiple, aliased imports, and preserve `os`.
+82    |-    import mock as foo, mock as bar, mock, os
+   82 |+    import os
+   83 |+    from unittest import mock as foo
+   84 |+    from unittest import mock as bar
+   85 |+    from unittest import mock
+83 86 | 
+84 87 | if True:
+85 88 |     # This should yield multiple, aliased imports.
+
+UP026.py:82:38: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+82 |     # This should yield multiple, aliased imports, and preserve `os`.
+83 |     import mock as foo, mock as bar, mock, os
+   |                                      ^^^^ UP026
+84 | 
+85 | if True:
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+79 79 |     import mock as foo, mock as bar, mock
+80 80 | 
+81 81 |     # This should yield multiple, aliased imports, and preserve `os`.
+82    |-    import mock as foo, mock as bar, mock, os
+   82 |+    import os
+   83 |+    from unittest import mock as foo
+   84 |+    from unittest import mock as bar
+   85 |+    from unittest import mock
+83 86 | 
+84 87 | if True:
+85 88 |     # This should yield multiple, aliased imports.
+
+UP026.py:86:5: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+86 | if True:
+87 |     # This should yield multiple, aliased imports.
+88 |     from mock import mock as foo, mock as bar, mock
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP026
+   |
+   = help: Import from `unittest.mock` instead
+
+ℹ Suggested fix
+83 83 | 
+84 84 | if True:
+85 85 |     # This should yield multiple, aliased imports.
+86    |-    from mock import mock as foo, mock as bar, mock
+   86 |+    from unittest import mock as foo
+   87 |+    from unittest import mock as bar
+   88 |+    from unittest import mock
+87 89 | 
+88 90 | 
+89 91 | # OK.
+
+UP026.py:93:5: UP026 [*] `mock` is deprecated, use `unittest.mock`
+   |
+93 | # Error (`mock.Mock()`).
+94 | x = mock.mock.Mock()
+   |     ^^^^^^^^^ UP026
+   |
+   = help: Replace `mock.mock` with `mock`
+
+ℹ Suggested fix
+90 90 | x = mock.Mock()
+91 91 | 
+92 92 | # Error (`mock.Mock()`).
+93    |-x = mock.mock.Mock()
+   93 |+x = mock.Mock()
+
 

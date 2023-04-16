@@ -1,110 +1,108 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryLiteralWithinTupleCall
-    body: "Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)"
-    suggestion: "Rewrite as a `tuple` literal"
-    fixable: true
-  location:
-    row: 1
-    column: 5
-  end_location:
-    row: 1
-    column: 14
-  fix:
-    edits:
-      - content: ()
-        location:
-          row: 1
-          column: 5
-        end_location:
-          row: 1
-          column: 14
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralWithinTupleCall
-    body: "Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)"
-    suggestion: "Rewrite as a `tuple` literal"
-    fixable: true
-  location:
-    row: 2
-    column: 5
-  end_location:
-    row: 2
-    column: 18
-  fix:
-    edits:
-      - content: "(1, 2)"
-        location:
-          row: 2
-          column: 5
-        end_location:
-          row: 2
-          column: 18
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralWithinTupleCall
-    body: "Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)"
-    suggestion: "Remove outer `tuple` call"
-    fixable: true
-  location:
-    row: 3
-    column: 5
-  end_location:
-    row: 3
-    column: 18
-  fix:
-    edits:
-      - content: "(1, 2)"
-        location:
-          row: 3
-          column: 5
-        end_location:
-          row: 3
-          column: 18
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralWithinTupleCall
-    body: "Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)"
-    suggestion: "Rewrite as a `tuple` literal"
-    fixable: true
-  location:
-    row: 4
-    column: 5
-  end_location:
-    row: 7
-    column: 2
-  fix:
-    edits:
-      - content: "(\n    1,\n    2\n)"
-        location:
-          row: 4
-          column: 5
-        end_location:
-          row: 7
-          column: 2
-  parent: ~
-- kind:
-    name: UnnecessaryLiteralWithinTupleCall
-    body: "Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)"
-    suggestion: "Remove outer `tuple` call"
-    fixable: true
-  location:
-    row: 8
-    column: 5
-  end_location:
-    row: 10
-    column: 1
-  fix:
-    edits:
-      - content: "(1, 2)"
-        location:
-          row: 8
-          column: 5
-        end_location:
-          row: 10
-          column: 1
-  parent: ~
+C409.py:1:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
+  |
+1 | t1 = tuple([])
+  |      ^^^^^^^^^ C409
+2 | t2 = tuple([1, 2])
+3 | t3 = tuple((1, 2))
+  |
+  = help: Rewrite as a `tuple` literal
+
+ℹ Suggested fix
+1   |-t1 = tuple([])
+  1 |+t1 = ()
+2 2 | t2 = tuple([1, 2])
+3 3 | t3 = tuple((1, 2))
+4 4 | t4 = tuple([
+
+C409.py:2:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
+  |
+2 | t1 = tuple([])
+3 | t2 = tuple([1, 2])
+  |      ^^^^^^^^^^^^^ C409
+4 | t3 = tuple((1, 2))
+5 | t4 = tuple([
+  |
+  = help: Rewrite as a `tuple` literal
+
+ℹ Suggested fix
+1 1 | t1 = tuple([])
+2   |-t2 = tuple([1, 2])
+  2 |+t2 = (1, 2)
+3 3 | t3 = tuple((1, 2))
+4 4 | t4 = tuple([
+5 5 |     1,
+
+C409.py:3:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
+  |
+3 | t1 = tuple([])
+4 | t2 = tuple([1, 2])
+5 | t3 = tuple((1, 2))
+  |      ^^^^^^^^^^^^^ C409
+6 | t4 = tuple([
+7 |     1,
+  |
+  = help: Remove outer `tuple` call
+
+ℹ Suggested fix
+1 1 | t1 = tuple([])
+2 2 | t2 = tuple([1, 2])
+3   |-t3 = tuple((1, 2))
+  3 |+t3 = (1, 2)
+4 4 | t4 = tuple([
+5 5 |     1,
+6 6 |     2
+
+C409.py:4:6: C409 [*] Unnecessary `list` literal passed to `tuple()` (rewrite as a `tuple` literal)
+   |
+ 4 |   t2 = tuple([1, 2])
+ 5 |   t3 = tuple((1, 2))
+ 6 |   t4 = tuple([
+   |  ______^
+ 7 | |     1,
+ 8 | |     2
+ 9 | | ])
+   | |__^ C409
+10 |   t5 = tuple(
+11 |       (1, 2)
+   |
+   = help: Rewrite as a `tuple` literal
+
+ℹ Suggested fix
+1 1 | t1 = tuple([])
+2 2 | t2 = tuple([1, 2])
+3 3 | t3 = tuple((1, 2))
+4   |-t4 = tuple([
+  4 |+t4 = (
+5 5 |     1,
+6 6 |     2
+7   |-])
+  7 |+)
+8 8 | t5 = tuple(
+9 9 |     (1, 2)
+10 10 | )
+
+C409.py:8:6: C409 [*] Unnecessary `tuple` literal passed to `tuple()` (remove the outer call to `tuple()`)
+   |
+ 8 |       2
+ 9 |   ])
+10 |   t5 = tuple(
+   |  ______^
+11 | |     (1, 2)
+12 | | )
+   | |_^ C409
+   |
+   = help: Remove outer `tuple` call
+
+ℹ Suggested fix
+5 5 |     1,
+6 6 |     2
+7 7 | ])
+8   |-t5 = tuple(
+9   |-    (1, 2)
+10   |-)
+  8 |+t5 = (1, 2)
+
 

@@ -1,33 +1,23 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestFixtureFinalizerCallback
-    body: "Use `yield` instead of `request.addfinalizer`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 49
-    column: 4
-  end_location:
-    row: 49
-    column: 42
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestFixtureFinalizerCallback
-    body: "Use `yield` instead of `request.addfinalizer`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 56
-    column: 4
-  end_location:
-    row: 56
-    column: 42
-  fix:
-    edits: []
-  parent: ~
+PT021.py:49:5: PT021 Use `yield` instead of `request.addfinalizer`
+   |
+49 | def my_fixture(request):  # Error return
+50 |     resource = acquire_resource()
+51 |     request.addfinalizer(resource.release)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT021
+52 |     return resource
+   |
+
+PT021.py:56:5: PT021 Use `yield` instead of `request.addfinalizer`
+   |
+56 | def my_fixture(request):  # Error yield
+57 |     resource = acquire_resource()
+58 |     request.addfinalizer(resource.release)
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PT021
+59 |     yield resource
+60 |     resource  # prevent PT022
+   |
+
 

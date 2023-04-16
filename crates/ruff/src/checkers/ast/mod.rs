@@ -344,6 +344,7 @@ where
                             |expr| self.ctx.resolve_call_path(expr),
                         ));
                 }
+
                 if self.settings.rules.enabled(Rule::AmbiguousFunctionName) {
                     if let Some(diagnostic) =
                         pycodestyle::rules::ambiguous_function_name(name, || {
@@ -358,7 +359,9 @@ where
                     if let Some(diagnostic) = pep8_naming::rules::invalid_function_name(
                         stmt,
                         name,
+                        decorator_list,
                         &self.settings.pep8_naming.ignore_names,
+                        &self.ctx,
                         self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
@@ -816,6 +819,24 @@ where
                     flake8_pie::rules::non_unique_enums(self, stmt, body);
                 }
 
+                if self.settings.rules.any_enabled(&[
+                    Rule::MutableDataclassDefault,
+                    Rule::FunctionCallInDataclassDefaultArgument,
+                ]) && ruff::rules::is_dataclass(self, decorator_list)
+                {
+                    if self.settings.rules.enabled(Rule::MutableDataclassDefault) {
+                        ruff::rules::mutable_dataclass_default(self, body);
+                    }
+
+                    if self
+                        .settings
+                        .rules
+                        .enabled(Rule::FunctionCallInDataclassDefaultArgument)
+                    {
+                        ruff::rules::function_call_in_dataclass_defaults(self, body);
+                    }
+                }
+
                 self.check_builtin_shadowing(name, stmt, false);
 
                 for expr in bases {
@@ -1053,6 +1074,21 @@ where
                             )
                         {
                             self.diagnostics.push(diagnostic);
+                        }
+                    }
+
+                    if self.settings.rules.enabled(Rule::BannedImportAlias) {
+                        if let Some(asname) = &alias.node.asname {
+                            if let Some(diagnostic) =
+                                flake8_import_conventions::rules::check_banned_import(
+                                    stmt,
+                                    &alias.node.name,
+                                    asname,
+                                    &self.settings.flake8_import_conventions.banned_aliases,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
+                            }
                         }
                     }
 
@@ -1318,6 +1354,26 @@ where
                         }
                     }
 
+                    if self.settings.rules.enabled(Rule::BannedImportAlias) {
+                        if let Some(asname) = &alias.node.asname {
+                            let full_name = helpers::format_import_from_member(
+                                *level,
+                                module.as_deref(),
+                                &alias.node.name,
+                            );
+                            if let Some(diagnostic) =
+                                flake8_import_conventions::rules::check_banned_import(
+                                    stmt,
+                                    &full_name,
+                                    asname,
+                                    &self.settings.flake8_import_conventions.banned_aliases,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
+                            }
+                        }
+                    }
+
                     if let Some(asname) = &alias.node.asname {
                         if self
                             .settings
@@ -1547,15 +1603,17 @@ where
                 }
             }
             StmtKind::Assert { test, msg } => {
+                if !self.ctx.in_type_checking_block {
+                    if self.settings.rules.enabled(Rule::Assert) {
+                        self.diagnostics
+                            .push(flake8_bandit::rules::assert_used(stmt));
+                    }
+                }
                 if self.settings.rules.enabled(Rule::AssertTuple) {
                     pyflakes::rules::assert_tuple(self, stmt, test);
                 }
                 if self.settings.rules.enabled(Rule::AssertFalse) {
                     flake8_bugbear::rules::assert_false(self, stmt, test, msg.as_deref());
-                }
-                if self.settings.rules.enabled(Rule::Assert) {
-                    self.diagnostics
-                        .push(flake8_bandit::rules::assert_used(stmt));
                 }
                 if self.settings.rules.enabled(Rule::PytestAssertAlwaysFalse) {
                     if let Some(diagnostic) = flake8_pytest_style::rules::assert_falsy(stmt, test) {
@@ -1570,7 +1628,6 @@ where
                         msg.as_deref(),
                     );
                 }
-
                 if self.settings.rules.enabled(Rule::AssertOnStringLiteral) {
                     pylint::rules::assert_on_string_literal(self, test);
                 }
@@ -2532,13 +2589,6 @@ where
                 if self.settings.rules.enabled(Rule::UnnecessaryDictKwargs) {
                     flake8_pie::rules::unnecessary_dict_kwargs(self, expr, keywords);
                 }
-                if self
-                    .settings
-                    .rules
-                    .enabled(Rule::UnnecessaryComprehensionAnyAll)
-                {
-                    flake8_pie::rules::unnecessary_comprehension_any_all(self, expr, func, args);
-                }
 
                 // flake8-bandit
                 if self.settings.rules.enabled(Rule::ExecBuiltin) {
@@ -2597,6 +2647,16 @@ where
                     flake8_bandit::rules::logging_config_insecure_listen(
                         self, func, args, keywords,
                     );
+                }
+                if self.settings.rules.any_enabled(&[
+                    Rule::SubprocessWithoutShellEqualsTrue,
+                    Rule::SubprocessPopenWithShellEqualsTrue,
+                    Rule::CallWithShellEqualsTrue,
+                    Rule::StartProcessWithAShell,
+                    Rule::StartProcessWithNoShell,
+                    Rule::StartProcessWithPartialPath,
+                ]) {
+                    flake8_bandit::rules::shell_injection(self, func, args, keywords);
                 }
 
                 // flake8-comprehensions
@@ -2669,7 +2729,7 @@ where
                     .enabled(Rule::UnnecessaryLiteralWithinTupleCall)
                 {
                     flake8_comprehensions::rules::unnecessary_literal_within_tuple_call(
-                        self, expr, func, args,
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self
@@ -2678,7 +2738,16 @@ where
                     .enabled(Rule::UnnecessaryLiteralWithinListCall)
                 {
                     flake8_comprehensions::rules::unnecessary_literal_within_list_call(
-                        self, expr, func, args,
+                        self, expr, func, args, keywords,
+                    );
+                }
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UnnecessaryLiteralWithinDictCall)
+                {
+                    flake8_comprehensions::rules::unnecessary_literal_within_dict_call(
+                        self, expr, func, args, keywords,
                     );
                 }
                 if self.settings.rules.enabled(Rule::UnnecessaryListCall) {
@@ -2718,6 +2787,15 @@ where
                         self.ctx.current_expr_parent().map(Into::into),
                         func,
                         args,
+                    );
+                }
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UnnecessaryComprehensionAnyAll)
+                {
+                    flake8_comprehensions::rules::unnecessary_comprehension_any_all(
+                        self, expr, func, args, keywords,
                     );
                 }
 
@@ -3182,7 +3260,7 @@ where
                     }
 
                     if self.settings.rules.enabled(Rule::PrintfStringFormatting) {
-                        pyupgrade::rules::printf_string_formatting(self, expr, left, right);
+                        pyupgrade::rules::printf_string_formatting(self, expr, right);
                     }
                     if self.settings.rules.enabled(Rule::BadStringFormatType) {
                         pylint::rules::bad_string_format_type(self, expr, right);
@@ -3213,6 +3291,27 @@ where
                 }
                 if self.settings.rules.enabled(Rule::HardcodedSQLExpression) {
                     flake8_bandit::rules::hardcoded_sql_expression(self, expr);
+                }
+            }
+            ExprKind::BinOp {
+                op: Operator::BitOr,
+                ..
+            } => {
+                if self.is_stub {
+                    if self.settings.rules.enabled(Rule::DuplicateUnionMember)
+                        && self.ctx.in_type_definition
+                        && self.ctx.current_expr_parent().map_or(true, |parent| {
+                            !matches!(
+                                parent.node,
+                                ExprKind::BinOp {
+                                    op: Operator::BitOr,
+                                    ..
+                                }
+                            )
+                        })
+                    {
+                        flake8_pyi::rules::duplicate_union_member(self, expr);
+                    }
                 }
             }
             ExprKind::UnaryOp { op, operand } => {
@@ -5087,7 +5186,7 @@ impl<'a> Checker<'a> {
                             self.stylist,
                         ) {
                             Ok(fix) => {
-                                if fix.content.is_empty() || fix.content == "pass" {
+                                if fix.is_deletion() || fix.content() == Some("pass") {
                                     self.deletions.insert(*defined_by);
                                 }
                                 Some(fix)

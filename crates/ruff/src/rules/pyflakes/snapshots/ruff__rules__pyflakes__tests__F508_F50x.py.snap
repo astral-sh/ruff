@@ -1,19 +1,14 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PercentFormatStarRequiresSequence
-    body: "`%`-format string `*` specifier requires sequence"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 27
-  fix:
-    edits: []
-  parent: ~
+F50x.py:11:1: F508 `%`-format string `*` specifier requires sequence
+   |
+11 | '%(bar)s' % (1, 2, 3)  # F502
+12 | '%s %s' % {'k': 'v'}  # F503
+13 | '%(bar)*s' % {'bar': 'baz'}  # F506, F508
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ F508
+14 | 
+15 | # ok: single %s with mapping
+   |
+
 

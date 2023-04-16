@@ -1,6 +1,4 @@
 ---
-source: src/rules/flake8_logging_format/mod.rs
-expression: diagnostics
+source: crates/ruff/src/rules/flake8_logging_format/mod.rs
 ---
-[]
 

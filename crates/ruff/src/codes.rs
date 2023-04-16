@@ -264,6 +264,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Comprehensions, "15") => Rule::UnnecessarySubscriptReversal,
         (Flake8Comprehensions, "16") => Rule::UnnecessaryComprehension,
         (Flake8Comprehensions, "17") => Rule::UnnecessaryMap,
+        (Flake8Comprehensions, "18") => Rule::UnnecessaryLiteralWithinDictCall,
+        (Flake8Comprehensions, "19") => Rule::UnnecessaryComprehensionAnyAll,
 
         // flake8-debugger
         (Flake8Debugger, "0") => Rule::Debugger,
@@ -508,6 +510,12 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Bandit, "506") => Rule::UnsafeYAMLLoad,
         (Flake8Bandit, "508") => Rule::SnmpInsecureVersion,
         (Flake8Bandit, "509") => Rule::SnmpWeakCryptography,
+        (Flake8Bandit, "602") => Rule::SubprocessPopenWithShellEqualsTrue,
+        (Flake8Bandit, "603") => Rule::SubprocessWithoutShellEqualsTrue,
+        (Flake8Bandit, "604") => Rule::CallWithShellEqualsTrue,
+        (Flake8Bandit, "605") => Rule::StartProcessWithAShell,
+        (Flake8Bandit, "606") => Rule::StartProcessWithNoShell,
+        (Flake8Bandit, "607") => Rule::StartProcessWithPartialPath,
         (Flake8Bandit, "608") => Rule::HardcodedSQLExpression,
         (Flake8Bandit, "612") => Rule::LoggingConfigInsecureListen,
         (Flake8Bandit, "701") => Rule::Jinja2AutoescapeFalse,
@@ -526,6 +534,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
 
         // flake8-import-conventions
         (Flake8ImportConventions, "001") => Rule::UnconventionalImportAlias,
+        (Flake8ImportConventions, "002") => Rule::BannedImportAlias,
 
         // flake8-datetimez
         (Flake8Datetimez, "001") => Rule::CallDatetimeWithoutTzinfo,
@@ -574,6 +583,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "012") => Rule::PassInClassBody,
         (Flake8Pyi, "014") => Rule::ArgumentDefaultInStub,
         (Flake8Pyi, "015") => Rule::AssignmentDefaultInStub,
+        (Flake8Pyi, "016") => Rule::DuplicateUnionMember,
         (Flake8Pyi, "021") => Rule::DocstringInStub,
         (Flake8Pyi, "033") => Rule::TypeCommentInStub,
 
@@ -609,7 +619,6 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pie, "794") => Rule::DuplicateClassFieldDefinition,
         (Flake8Pie, "796") => Rule::NonUniqueEnums,
         (Flake8Pie, "800") => Rule::UnnecessarySpread,
-        (Flake8Pie, "802") => Rule::UnnecessaryComprehensionAnyAll,
         (Flake8Pie, "804") => Rule::UnnecessaryDictKwargs,
         (Flake8Pie, "807") => Rule::ReimplementedListBuiltin,
         (Flake8Pie, "810") => Rule::MultipleStartsEndsWith,
@@ -701,6 +710,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Ruff, "005") => Rule::CollectionLiteralConcatenation,
         (Ruff, "006") => Rule::AsyncioDanglingTask,
         (Ruff, "007") => Rule::PairwiseOverZipped,
+        (Ruff, "008") => Rule::MutableDataclassDefault,
+        (Ruff, "009") => Rule::FunctionCallInDataclassDefaultArgument,
         (Ruff, "100") => Rule::UnusedNOQA,
 
         // flake8-django

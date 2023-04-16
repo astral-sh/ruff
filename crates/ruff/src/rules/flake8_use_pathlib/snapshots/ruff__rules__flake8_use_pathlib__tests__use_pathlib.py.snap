@@ -1,6 +1,4 @@
 ---
-source: src/rules/flake8_use_pathlib/mod.rs
-expression: diagnostics
+source: crates/ruff/src/rules/flake8_use_pathlib/mod.rs
 ---
-[]
 

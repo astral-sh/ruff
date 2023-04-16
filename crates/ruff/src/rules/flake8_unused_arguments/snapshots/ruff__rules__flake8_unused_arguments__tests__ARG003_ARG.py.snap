@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/flake8_unused_arguments/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnusedClassMethodArgument
-    body: "Unused class method argument: `x`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 45
-    column: 15
-  end_location:
-    row: 45
-    column: 16
-  fix:
-    edits: []
-  parent: ~
+ARG.py:45:16: ARG003 Unused class method argument: `x`
+   |
+45 |     @classmethod
+46 |     def f(cls, x):
+   |                ^ ARG003
+47 |         print("Hello, world!")
+   |
+
 

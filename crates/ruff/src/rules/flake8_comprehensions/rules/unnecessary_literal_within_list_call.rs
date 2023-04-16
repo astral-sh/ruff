@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind};
+use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
@@ -72,7 +72,11 @@ pub fn unnecessary_literal_within_list_call(
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
+    keywords: &[Keyword],
 ) {
+    if !keywords.is_empty() {
+        return;
+    }
     let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
         return;
     };

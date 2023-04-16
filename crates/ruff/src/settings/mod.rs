@@ -90,6 +90,8 @@ pub struct Settings {
     pub exclude: FilePatternSet,
     pub extend_exclude: FilePatternSet,
     pub force_exclude: bool,
+    pub include: FilePatternSet,
+    pub extend_include: FilePatternSet,
     pub respect_gitignore: bool,
     pub project_root: PathBuf,
 
@@ -155,10 +157,12 @@ impl Settings {
                 config.exclude.unwrap_or_else(|| defaults::EXCLUDE.clone()),
             )?,
             extend_exclude: FilePatternSet::try_from_vec(config.extend_exclude)?,
+            extend_include: FilePatternSet::try_from_vec(config.extend_include)?,
             external: FxHashSet::from_iter(config.external.unwrap_or_default()),
-
             force_exclude: config.force_exclude.unwrap_or(false),
-
+            include: FilePatternSet::try_from_vec(
+                config.include.unwrap_or_else(|| defaults::INCLUDE.clone()),
+            )?,
             ignore_init_module_imports: config.ignore_init_module_imports.unwrap_or_default(),
             line_length: config.line_length.unwrap_or(defaults::LINE_LENGTH),
             namespace_packages: config.namespace_packages.unwrap_or_default(),

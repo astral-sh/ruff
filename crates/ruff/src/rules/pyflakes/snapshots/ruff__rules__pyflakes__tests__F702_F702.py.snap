@@ -1,61 +1,35 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ContinueOutsideLoop
-    body: "`continue` not properly in loop"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueOutsideLoop
-    body: "`continue` not properly in loop"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 4
-  end_location:
-    row: 16
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueOutsideLoop
-    body: "`continue` not properly in loop"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 20
-    column: 4
-  end_location:
-    row: 20
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ContinueOutsideLoop
-    body: "`continue` not properly in loop"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 23
-    column: 0
-  end_location:
-    row: 23
-    column: 8
-  fix:
-    edits: []
-  parent: ~
+F702.py:4:5: F702 `continue` not properly in loop
+  |
+4 |     continue
+5 | else:
+6 |     continue
+  |     ^^^^^^^^ F702
+7 | 
+8 | i = 0
+  |
+
+F702.py:16:5: F702 `continue` not properly in loop
+   |
+16 |         continue
+17 | 
+18 |     continue
+   |     ^^^^^^^^ F702
+   |
+
+F702.py:20:5: F702 `continue` not properly in loop
+   |
+20 | class Foo:
+21 |     continue
+   |     ^^^^^^^^ F702
+   |
+
+F702.py:23:1: F702 `continue` not properly in loop
+   |
+23 | continue
+   | ^^^^^^^^ F702
+   |
+
 

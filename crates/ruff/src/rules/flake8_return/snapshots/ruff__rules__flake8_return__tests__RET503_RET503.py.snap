@@ -1,404 +1,384 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 20
-    column: 4
-  end_location:
-    row: 21
-    column: 16
-  fix:
-    edits:
-      - content: "\n    return None"
-        location:
-          row: 21
-          column: 16
-        end_location:
-          row: 21
-          column: 16
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 27
-    column: 8
-  end_location:
-    row: 27
-    column: 15
-  fix:
-    edits:
-      - content: "\n        return None"
-        location:
-          row: 27
-          column: 24
-        end_location:
-          row: 27
-          column: 24
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 36
-    column: 4
-  end_location:
-    row: 36
-    column: 11
-  fix:
-    edits:
-      - content: "\n    return None"
-        location:
-          row: 36
-          column: 20
-        end_location:
-          row: 36
-          column: 20
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 41
-    column: 4
-  end_location:
-    row: 43
-    column: 20
-  fix:
-    edits:
-      - content: "\n    return None"
-        location:
-          row: 43
-          column: 20
-        end_location:
-          row: 43
-          column: 20
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 52
-    column: 8
-  end_location:
-    row: 52
-    column: 15
-  fix:
-    edits:
-      - content: "\n        return None"
-        location:
-          row: 52
-          column: 24
-        end_location:
-          row: 52
-          column: 24
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 59
-    column: 4
-  end_location:
-    row: 59
-    column: 22
-  fix:
-    edits:
-      - content: "\n    return None"
-        location:
-          row: 59
-          column: 31
-        end_location:
-          row: 59
-          column: 31
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 66
-    column: 4
-  end_location:
-    row: 66
-    column: 21
-  fix:
-    edits:
-      - content: "\n    return None"
-        location:
-          row: 66
-          column: 30
-        end_location:
-          row: 66
-          column: 30
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 82
-    column: 4
-  end_location:
-    row: 85
-    column: 14
-  fix:
-    edits:
-      - content: "\n    return None"
-        location:
-          row: 85
-          column: 14
-        end_location:
-          row: 85
-          column: 14
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 113
-    column: 4
-  end_location:
-    row: 116
-    column: 16
-  fix:
-    edits:
-      - content: "\n    return None"
-        location:
-          row: 116
-          column: 16
-        end_location:
-          row: 116
-          column: 16
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 120
-    column: 4
-  end_location:
-    row: 126
-    column: 19
-  fix:
-    edits:
-      - content: "\n    return None"
-        location:
-          row: 126
-          column: 19
-        end_location:
-          row: 126
-          column: 19
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 130
-    column: 4
-  end_location:
-    row: 133
-    column: 16
-  fix:
-    edits:
-      - content: "\n    return None"
-        location:
-          row: 133
-          column: 16
-        end_location:
-          row: 133
-          column: 16
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 137
-    column: 4
-  end_location:
-    row: 143
-    column: 19
-  fix:
-    edits:
-      - content: "\n    return None"
-        location:
-          row: 143
-          column: 19
-        end_location:
-          row: 143
-          column: 19
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 274
-    column: 4
-  end_location:
-    row: 275
-    column: 20
-  fix:
-    edits:
-      - content: "\n    return None"
-        location:
-          row: 275
-          column: 20
-        end_location:
-          row: 275
-          column: 20
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 291
-    column: 12
-  end_location:
-    row: 291
-    column: 19
-  fix:
-    edits:
-      - content: "\n            return None"
-        location:
-          row: 291
-          column: 28
-        end_location:
-          row: 291
-          column: 28
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 300
-    column: 8
-  end_location:
-    row: 301
-    column: 21
-  fix:
-    edits:
-      - content: "\n        return None"
-        location:
-          row: 301
-          column: 21
-        end_location:
-          row: 301
-          column: 21
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 305
-    column: 8
-  end_location:
-    row: 306
-    column: 21
-  fix:
-    edits:
-      - content: "\n        return None"
-        location:
-          row: 306
-          column: 21
-        end_location:
-          row: 306
-          column: 21
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 310
-    column: 8
-  end_location:
-    row: 311
-    column: 21
-  fix:
-    edits:
-      - content: "\n        return None"
-        location:
-          row: 311
-          column: 37
-        end_location:
-          row: 311
-          column: 37
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 315
-    column: 8
-  end_location:
-    row: 316
-    column: 21
-  fix:
-    edits:
-      - content: "\n        return None"
-        location:
-          row: 316
-          column: 24
-        end_location:
-          row: 316
-          column: 24
-  parent: ~
-- kind:
-    name: ImplicitReturn
-    body: "Missing explicit `return` at the end of function able to return non-`None` value"
-    suggestion: "Add explicit `return` statement"
-    fixable: true
-  location:
-    row: 320
-    column: 8
-  end_location:
-    row: 321
-    column: 21
-  fix:
-    edits:
-      - content: "\n        return None"
-        location:
-          row: 322
-          column: 33
-        end_location:
-          row: 322
-          column: 33
-  parent: ~
+RET503.py:20:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+   |
+20 |   # if/elif/else
+21 |   def x(y):
+22 |       if not y:
+   |  _____^
+23 | |         return 1
+   | |________________^ RET503
+24 |       # error
+   |
+   = help: Add explicit `return` statement
+
+ℹ Suggested fix
+19 19 | def x(y):
+20 20 |     if not y:
+21 21 |         return 1
+   22 |+    return None
+22 23 |     # error
+23 24 | 
+24 25 | 
+
+RET503.py:27:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+   |
+27 | def x(y):
+28 |     if not y:
+29 |         print()  # error
+   |         ^^^^^^^ RET503
+30 |     else:
+31 |         return 2
+   |
+   = help: Add explicit `return` statement
+
+ℹ Suggested fix
+25 25 | def x(y):
+26 26 |     if not y:
+27 27 |         print()  # error
+   28 |+        return None
+28 29 |     else:
+29 30 |         return 2
+30 31 | 
+
+RET503.py:36:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+   |
+36 |         return 1
+37 | 
+38 |     print()  # error
+   |     ^^^^^^^ RET503
+   |
+   = help: Add explicit `return` statement
+
+ℹ Suggested fix
+34 34 |         return 1
+35 35 | 
+36 36 |     print()  # error
+   37 |+    return None
+37 38 | 
+38 39 | 
+39 40 | # for
+
+RET503.py:41:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+   |
+41 |   # for
+42 |   def x(y):
+43 |       for i in range(10):
+   |  _____^
+44 | |         if i > 10:
+45 | |             return i
+   | |____________________^ RET503
+46 |       # error
+   |
+   = help: Add explicit `return` statement
+
+ℹ Suggested fix
+41 41 |     for i in range(10):
+42 42 |         if i > 10:
+43 43 |             return i
+   44 |+    return None
+44 45 |     # error
+45 46 | 
+46 47 | 
+
+RET503.py:52:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+   |
+52 |             return i
+53 |     else:
+54 |         print()  # error
+   |         ^^^^^^^ RET503
+   |
+   = help: Add explicit `return` statement
+
+ℹ Suggested fix
+50 50 |             return i
+51 51 |     else:
+52 52 |         print()  # error
+   53 |+        return None
+53 54 | 
+54 55 | 
+55 56 | # A nonexistent function
+
+RET503.py:59:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+   |
+59 |     if x > 0:
+60 |         return False
+61 |     no_such_function()  # error
+   |     ^^^^^^^^^^^^^^^^^^ RET503
+   |
+   = help: Add explicit `return` statement
+
+ℹ Suggested fix
+57 57 |     if x > 0:
+58 58 |         return False
+59 59 |     no_such_function()  # error
+   60 |+    return None
+60 61 | 
+61 62 | 
+62 63 | # A function that does return the control
+
+RET503.py:66:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+   |
+66 |     if x > 0:
+67 |         return False
+68 |     print("", end="")  # error
+   |     ^^^^^^^^^^^^^^^^^ RET503
+   |
+   = help: Add explicit `return` statement
+
+ℹ Suggested fix
+64 64 |     if x > 0:
+65 65 |         return False
+66 66 |     print("", end="")  # error
+   67 |+    return None
+67 68 | 
+68 69 | 
+69 70 | ###
+
+RET503.py:82:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+   |
+82 |   # last line in while loop
+83 |   def x(y):
+84 |       while i > 0:
+   |  _____^
+85 | |         if y > 0:
+86 | |             return 1
+87 | |         y += 1
+   | |______________^ RET503
+   |
+   = help: Add explicit `return` statement
+
+ℹ Suggested fix
+83 83 |         if y > 0:
+84 84 |             return 1
+85 85 |         y += 1
+   86 |+    return None
+86 87 | 
+87 88 | 
+88 89 | # exclude empty functions
+
+RET503.py:113:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+113 |   # return value within loop
+114 |   def bar1(x, y, z):
+115 |       for i in x:
+    |  _____^
+116 | |         if i > y:
+117 | |             break
+118 | |         return z
+    | |________________^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Suggested fix
+114 114 |         if i > y:
+115 115 |             break
+116 116 |         return z
+    117 |+    return None
+117 118 | 
+118 119 | 
+119 120 | def bar3(x, y, z):
+
+RET503.py:120:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+120 |   def bar3(x, y, z):
+121 |       for i in x:
+    |  _____^
+122 | |         if i > y:
+123 | |             if z:
+124 | |                 break
+125 | |         else:
+126 | |             return z
+127 | |         return None
+    | |___________________^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Suggested fix
+124 124 |         else:
+125 125 |             return z
+126 126 |         return None
+    127 |+    return None
+127 128 | 
+128 129 | 
+129 130 | def bar1(x, y, z):
+
+RET503.py:130:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+130 |   def bar1(x, y, z):
+131 |       for i in x:
+    |  _____^
+132 | |         if i < y:
+133 | |             continue
+134 | |         return z
+    | |________________^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Suggested fix
+131 131 |         if i < y:
+132 132 |             continue
+133 133 |         return z
+    134 |+    return None
+134 135 | 
+135 136 | 
+136 137 | def bar3(x, y, z):
+
+RET503.py:137:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+137 |   def bar3(x, y, z):
+138 |       for i in x:
+    |  _____^
+139 | |         if i < y:
+140 | |             if z:
+141 | |                 continue
+142 | |         else:
+143 | |             return z
+144 | |         return None
+    | |___________________^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Suggested fix
+141 141 |         else:
+142 142 |             return z
+143 143 |         return None
+    144 |+    return None
+144 145 | 
+145 146 | 
+146 147 | def prompts(self, foo):
+
+RET503.py:274:5: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+274 |           return False
+275 |   
+276 |       for value in values:
+    |  _____^
+277 | |         print(value)
+    | |____________________^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Suggested fix
+273 273 | 
+274 274 |     for value in values:
+275 275 |         print(value)
+    276 |+    return None
+276 277 | 
+277 278 | 
+278 279 | def while_true():
+
+RET503.py:291:13: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+291 |             return 1
+292 |         case 1:
+293 |             print()  # error
+    |             ^^^^^^^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Suggested fix
+289 289 |             return 1
+290 290 |         case 1:
+291 291 |             print()  # error
+    292 |+            return None
+292 293 | 
+293 294 | 
+294 295 | def foo(baz: str) -> str:
+
+RET503.py:300:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+300 |   def end_of_statement():
+301 |       def example():
+302 |           if True:
+    |  _________^
+303 | |             return ""
+    | |_____________________^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Suggested fix
+299 299 |     def example():
+300 300 |         if True:
+301 301 |             return ""
+    302 |+        return None
+302 303 | 
+303 304 | 
+304 305 |     def example():
+
+RET503.py:305:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+305 |       def example():
+306 |           if True:
+    |  _________^
+307 | |             return ""
+    | |_____________________^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Suggested fix
+304 304 |     def example():
+305 305 |         if True:
+306 306 |             return ""
+    307 |+        return None
+307 308 | 
+308 309 | 
+309 310 |     def example():
+
+RET503.py:310:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+310 |       def example():
+311 |           if True:
+    |  _________^
+312 | |             return ""  # type: ignore
+    | |_____________________^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Suggested fix
+309 309 |     def example():
+310 310 |         if True:
+311 311 |             return ""  # type: ignore
+    312 |+        return None
+312 313 | 
+313 314 | 
+314 315 |     def example():
+
+RET503.py:315:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+315 |       def example():
+316 |           if True:
+    |  _________^
+317 | |             return ""  ;
+    | |_____________________^ RET503
+    |
+    = help: Add explicit `return` statement
+
+ℹ Suggested fix
+314 314 |     def example():
+315 315 |         if True:
+316 316 |             return ""  ;
+    317 |+        return None
+317 318 | 
+318 319 | 
+319 320 |     def example():
+
+RET503.py:320:9: RET503 [*] Missing explicit `return` at the end of function able to return non-`None` value
+    |
+320 |       def example():
+321 |           if True:
+    |  _________^
+322 | |             return "" \
+    | |_____________________^ RET503
+323 |                   ;  # type: ignore
+    |
+    = help: Add explicit `return` statement
+
+ℹ Suggested fix
+320 320 |         if True:
+321 321 |             return "" \
+322 322 |                 ;  # type: ignore
+    323 |+        return None
+
 

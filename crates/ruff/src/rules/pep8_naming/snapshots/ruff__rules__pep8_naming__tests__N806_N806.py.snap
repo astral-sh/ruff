@@ -1,33 +1,23 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NonLowercaseVariableInFunction
-    body: "Variable `Camel` in function should be lowercase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 4
-  end_location:
-    row: 14
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NonLowercaseVariableInFunction
-    body: "Variable `CONSTANT` in function should be lowercase"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 4
-  end_location:
-    row: 15
-    column: 12
-  fix:
-    edits: []
-  parent: ~
+N806.py:14:5: N806 Variable `Camel` in function should be lowercase
+   |
+14 |     GLOBAL = "bar"
+15 |     lower = 0
+16 |     Camel = 0
+   |     ^^^^^ N806
+17 |     CONSTANT = 0
+18 |     _ = 0
+   |
+
+N806.py:15:5: N806 Variable `CONSTANT` in function should be lowercase
+   |
+15 |     lower = 0
+16 |     Camel = 0
+17 |     CONSTANT = 0
+   |     ^^^^^^^^ N806
+18 |     _ = 0
+   |
+
 

@@ -1,68 +1,79 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BadQuotesDocstring
-    body: Single quote docstring found but double quotes preferred
-    suggestion: Replace single quotes docstring with double quotes
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 3
-    column: 3
-  fix:
-    edits:
-      - content: "\"\"\"\nSingle quotes multiline module docstring\n\"\"\""
-        location:
-          row: 1
-          column: 0
-        end_location:
-          row: 3
-          column: 3
-  parent: ~
-- kind:
-    name: BadQuotesDocstring
-    body: Single quote docstring found but double quotes preferred
-    suggestion: Replace single quotes docstring with double quotes
-    fixable: true
-  location:
-    row: 14
-    column: 4
-  end_location:
-    row: 16
-    column: 7
-  fix:
-    edits:
-      - content: "\"\"\"\n    Single quotes multiline class docstring\n    \"\"\""
-        location:
-          row: 14
-          column: 4
-        end_location:
-          row: 16
-          column: 7
-  parent: ~
-- kind:
-    name: BadQuotesDocstring
-    body: Single quote docstring found but double quotes preferred
-    suggestion: Replace single quotes docstring with double quotes
-    fixable: true
-  location:
-    row: 26
-    column: 8
-  end_location:
-    row: 28
-    column: 11
-  fix:
-    edits:
-      - content: "\"\"\"\n        Single quotes multiline function docstring\n        \"\"\""
-        location:
-          row: 26
-          column: 8
-        end_location:
-          row: 28
-          column: 11
-  parent: ~
+docstring_singles.py:1:1: Q002 [*] Single quote docstring found but double quotes preferred
+  |
+1 | / '''
+2 | | Single quotes multiline module docstring
+3 | | '''
+  | |___^ Q002
+4 |   
+5 |   '''
+  |
+  = help: Replace single quotes docstring with double quotes
+
+ℹ Suggested fix
+1   |-'''
+  1 |+"""
+2 2 | Single quotes multiline module docstring
+3   |-'''
+  3 |+"""
+4 4 | 
+5 5 | '''
+6 6 | this is not a docstring
+
+docstring_singles.py:14:5: Q002 [*] Single quote docstring found but double quotes preferred
+   |
+14 |       class params \t not a docstring
+15 |   ''')):
+16 |       '''
+   |  _____^
+17 | |     Single quotes multiline class docstring
+18 | |     '''
+   | |_______^ Q002
+19 |   
+20 |       '''
+   |
+   = help: Replace single quotes docstring with double quotes
+
+ℹ Suggested fix
+11 11 | class Cls(MakeKlass('''
+12 12 |     class params \t not a docstring
+13 13 | ''')):
+14    |-    '''
+   14 |+    """
+15 15 |     Single quotes multiline class docstring
+16    |-    '''
+   16 |+    """
+17 17 | 
+18 18 |     '''
+19 19 |     this is not a docstring
+
+docstring_singles.py:26:9: Q002 [*] Single quote docstring found but double quotes preferred
+   |
+26 |           definitely not a docstring''',
+27 |           val=l[Cls():3]):
+28 |           '''
+   |  _________^
+29 | |         Single quotes multiline function docstring
+30 | |         '''
+   | |___________^ Q002
+31 |   
+32 |           some_expression = 'hello world'
+   |
+   = help: Replace single quotes docstring with double quotes
+
+ℹ Suggested fix
+23 23 |     def f(self, bar='''
+24 24 |         definitely not a docstring''',
+25 25 |         val=l[Cls():3]):
+26    |-        '''
+   26 |+        """
+27 27 |         Single quotes multiline function docstring
+28    |-        '''
+   28 |+        """
+29 29 | 
+30 30 |         some_expression = 'hello world'
+31 31 | 
+
 

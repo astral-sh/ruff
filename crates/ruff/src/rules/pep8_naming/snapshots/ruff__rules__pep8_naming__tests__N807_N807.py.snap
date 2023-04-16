@@ -1,33 +1,19 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DunderFunctionName
-    body: "Function name should not start and end with `__`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 4
-  end_location:
-    row: 1
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DunderFunctionName
-    body: "Function name should not start and end with `__`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 8
-  end_location:
-    row: 14
-    column: 15
-  fix:
-    edits: []
-  parent: ~
+N807.py:1:5: N807 Function name should not start and end with `__`
+  |
+1 | def __bad__():
+  |     ^^^^^^^ N807
+2 |     pass
+  |
+
+N807.py:14:9: N807 Function name should not start and end with `__`
+   |
+14 | def nested():
+15 |     def __bad__():
+   |         ^^^^^^^ N807
+16 |         pass
+   |
+
 

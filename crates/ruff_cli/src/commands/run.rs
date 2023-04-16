@@ -19,6 +19,7 @@ use ruff::settings::{flags, AllSettings};
 use ruff::{fs, packaging, resolver, warn_user_once, IOError, Range};
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
+use ruff_python_ast::source_code::SourceFileBuilder;
 
 use crate::args::Overrides;
 use crate::cache;
@@ -119,14 +120,15 @@ pub fn run(
                     );
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.rules.enabled(Rule::IOError) {
+                        let file = SourceFileBuilder::new(&path.to_string_lossy()).finish();
+
                         Diagnostics::new(
                             vec![Message::from_diagnostic(
                                 Diagnostic::new(
                                     IOError { message },
                                     Range::new(Location::default(), Location::default()),
                                 ),
-                                format!("{}", path.display()),
-                                None,
+                                file,
                                 1,
                             )],
                             ImportMap::default(),

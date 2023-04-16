@@ -1,19 +1,13 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: AssignmentToOsEnviron
-    body: "Assigning to `os.environ` doesn't clear the environment"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 10
-  fix:
-    edits: []
-  parent: ~
+B003.py:9:1: B003 Assigning to `os.environ` doesn't clear the environment
+   |
+ 9 | from os import environ
+10 | 
+11 | os.environ = {}
+   | ^^^^^^^^^^ B003
+12 | environ = {}  # that's fine, assigning a new meaning to the module-level name
+   |
+
 

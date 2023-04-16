@@ -5,8 +5,9 @@ pub(crate) mod rules;
 mod tests {
     use std::path::{Path, PathBuf};
 
+    use crate::assert_messages;
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use test_case::test_case;
 
     use crate::registry::Rule;
@@ -37,7 +38,7 @@ mod tests {
                 ..Settings::for_rule(Rule::ImplicitNamespacePackage)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

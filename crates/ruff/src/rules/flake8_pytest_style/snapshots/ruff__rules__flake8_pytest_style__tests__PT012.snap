@@ -1,117 +1,101 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestRaisesWithMultipleStatements
-    body: "`pytest.raises()` block should contain a single simple statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 28
-    column: 4
-  end_location:
-    row: 30
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestRaisesWithMultipleStatements
-    body: "`pytest.raises()` block should contain a single simple statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 34
-    column: 4
-  end_location:
-    row: 36
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestRaisesWithMultipleStatements
-    body: "`pytest.raises()` block should contain a single simple statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 4
-  end_location:
-    row: 40
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestRaisesWithMultipleStatements
-    body: "`pytest.raises()` block should contain a single simple statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 42
-    column: 4
-  end_location:
-    row: 44
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestRaisesWithMultipleStatements
-    body: "`pytest.raises()` block should contain a single simple statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 4
-  end_location:
-    row: 48
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestRaisesWithMultipleStatements
-    body: "`pytest.raises()` block should contain a single simple statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 4
-  end_location:
-    row: 52
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestRaisesWithMultipleStatements
-    body: "`pytest.raises()` block should contain a single simple statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 4
-  end_location:
-    row: 56
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PytestRaisesWithMultipleStatements
-    body: "`pytest.raises()` block should contain a single simple statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 60
-    column: 4
-  end_location:
-    row: 64
-    column: 17
-  fix:
-    edits: []
-  parent: ~
+PT012.py:28:5: PT012 `pytest.raises()` block should contain a single simple statement
+   |
+28 |   def test_error_multiple_statements():
+29 |       with pytest.raises(AttributeError):
+   |  _____^
+30 | |         len([])
+31 | |         [].size
+   | |_______________^ PT012
+   |
+
+PT012.py:34:5: PT012 `pytest.raises()` block should contain a single simple statement
+   |
+34 |   async def test_error_complex_statement():
+35 |       with pytest.raises(AttributeError):
+   |  _____^
+36 | |         if True:
+37 | |             [].size
+   | |___________________^ PT012
+38 |   
+39 |       with pytest.raises(AttributeError):
+   |
+
+PT012.py:38:5: PT012 `pytest.raises()` block should contain a single simple statement
+   |
+38 |               [].size
+39 |   
+40 |       with pytest.raises(AttributeError):
+   |  _____^
+41 | |         for i in []:
+42 | |             [].size
+   | |___________________^ PT012
+43 |   
+44 |       with pytest.raises(AttributeError):
+   |
+
+PT012.py:42:5: PT012 `pytest.raises()` block should contain a single simple statement
+   |
+42 |               [].size
+43 |   
+44 |       with pytest.raises(AttributeError):
+   |  _____^
+45 | |         async for i in []:
+46 | |             [].size
+   | |___________________^ PT012
+47 |   
+48 |       with pytest.raises(AttributeError):
+   |
+
+PT012.py:46:5: PT012 `pytest.raises()` block should contain a single simple statement
+   |
+46 |               [].size
+47 |   
+48 |       with pytest.raises(AttributeError):
+   |  _____^
+49 | |         while True:
+50 | |             [].size
+   | |___________________^ PT012
+51 |   
+52 |       with pytest.raises(AttributeError):
+   |
+
+PT012.py:50:5: PT012 `pytest.raises()` block should contain a single simple statement
+   |
+50 |               [].size
+51 |   
+52 |       with pytest.raises(AttributeError):
+   |  _____^
+53 | |         with context_manager_under_test():
+54 | |             [].size
+   | |___________________^ PT012
+55 |   
+56 |       with pytest.raises(AttributeError):
+   |
+
+PT012.py:54:5: PT012 `pytest.raises()` block should contain a single simple statement
+   |
+54 |               [].size
+55 |   
+56 |       with pytest.raises(AttributeError):
+   |  _____^
+57 | |         async with context_manager_under_test():
+58 | |             [].size
+   | |___________________^ PT012
+   |
+
+PT012.py:60:5: PT012 `pytest.raises()` block should contain a single simple statement
+   |
+60 |   def test_error_try():
+61 |       with pytest.raises(AttributeError):
+   |  _____^
+62 | |         try:
+63 | |             [].size
+64 | |         except:
+65 | |             raise
+   | |_________________^ PT012
+   |
+
 

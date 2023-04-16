@@ -11,3 +11,9 @@
 "{}".format(1, 2, 3)  # F523
 "{:{}}".format(1, 2)  # No issues
 "{:{}}".format(1, 2, 3)  # F523
+
+# With *args
+"{0}{1}".format(*args)  # No issues
+"{0}{1}".format(1, *args)  # No issues
+"{0}{1}".format(1, 2, *args)  # No issues
+"{0}{1}".format(1, 2, 3, *args)  # F523

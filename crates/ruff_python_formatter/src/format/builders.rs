@@ -80,10 +80,7 @@ impl Format<ASTFormatContext<'_>> for Literal {
 
         f.write_element(FormatElement::StaticTextSlice {
             text,
-            range: TextRange::new(
-                start_index.try_into().unwrap(),
-                end_index.try_into().unwrap(),
-            ),
+            range: TextRange::new(start_index, end_index),
         })
     }
 }

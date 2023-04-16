@@ -1,47 +1,31 @@
 ---
 source: crates/ruff/src/rules/flake8_boolean_trap/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BooleanPositionalValueInFunctionCall
-    body: Boolean positional value in function call
-    suggestion: ~
-    fixable: false
-  location:
-    row: 42
-    column: 10
-  end_location:
-    row: 42
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BooleanPositionalValueInFunctionCall
-    body: Boolean positional value in function call
-    suggestion: ~
-    fixable: false
-  location:
-    row: 57
-    column: 10
-  end_location:
-    row: 57
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BooleanPositionalValueInFunctionCall
-    body: Boolean positional value in function call
-    suggestion: ~
-    fixable: false
-  location:
-    row: 57
-    column: 16
-  end_location:
-    row: 57
-    column: 21
-  fix:
-    edits: []
-  parent: ~
+FBT.py:42:11: FBT003 Boolean positional value in function call
+   |
+42 | used("a", True)
+   |           ^^^^ FBT003
+43 | used(do=True)
+   |
+
+FBT.py:57:11: FBT003 Boolean positional value in function call
+   |
+57 | {}.pop(True, False)
+58 | dict.fromkeys(("world",), True)
+59 | {}.deploy(True, False)
+   |           ^^^^ FBT003
+60 | getattr(someobj, attrname, False)
+61 | mylist.index(True)
+   |
+
+FBT.py:57:17: FBT003 Boolean positional value in function call
+   |
+57 | {}.pop(True, False)
+58 | dict.fromkeys(("world",), True)
+59 | {}.deploy(True, False)
+   |                 ^^^^^ FBT003
+60 | getattr(someobj, attrname, False)
+61 | mylist.index(True)
+   |
+
 

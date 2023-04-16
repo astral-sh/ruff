@@ -1,33 +1,23 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NoExplicitStacklevel
-    body: "No explicit `stacklevel` keyword argument found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NoExplicitStacklevel
-    body: "No explicit `stacklevel` keyword argument found"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 13
-  fix:
-    edits: []
-  parent: ~
+B028.py:8:1: B028 No explicit `stacklevel` keyword argument found
+   |
+ 8 | """
+ 9 | 
+10 | warnings.warn(DeprecationWarning("test"))
+   | ^^^^^^^^^^^^^ B028
+11 | warnings.warn(DeprecationWarning("test"), source=None)
+12 | warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
+   |
+
+B028.py:9:1: B028 No explicit `stacklevel` keyword argument found
+   |
+ 9 | warnings.warn(DeprecationWarning("test"))
+10 | warnings.warn(DeprecationWarning("test"), source=None)
+   | ^^^^^^^^^^^^^ B028
+11 | warnings.warn(DeprecationWarning("test"), source=None, stacklevel=2)
+12 | warnings.warn(DeprecationWarning("test"), stacklevel=1)
+   |
+
 

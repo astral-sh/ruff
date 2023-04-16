@@ -4,12 +4,10 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use itertools::Either::{Left, Right};
-use strum::IntoEnumIterator;
 
-use crate::rules::isort::categorize::KnownModules;
 use annotate::annotate_imports;
 use categorize::categorize_imports;
-pub use categorize::{categorize, ImportType};
+pub use categorize::{categorize, ImportSection, ImportType};
 use comments::Comment;
 use normalize::normalize_imports;
 use order::order_imports;
@@ -20,6 +18,7 @@ use track::{Block, Trailer};
 use types::EitherImport::{Import, ImportFrom};
 use types::{AliasData, CommentSet, EitherImport, OrderedImportBlock, TrailingComma};
 
+use crate::rules::isort::categorize::KnownModules;
 use crate::rules::isort::types::ImportBlock;
 use crate::settings::types::PythonVersion;
 
@@ -131,11 +130,12 @@ pub fn format_imports(
     classes: &BTreeSet<String>,
     constants: &BTreeSet<String>,
     variables: &BTreeSet<String>,
-    no_lines_before: &BTreeSet<ImportType>,
+    no_lines_before: &BTreeSet<ImportSection>,
     lines_after_imports: isize,
     lines_between_types: usize,
     forced_separate: &[String],
     target_version: PythonVersion,
+    section_order: &[ImportSection],
 ) -> String {
     let trailer = &block.trailer;
     let block = annotate_imports(&block.imports, comments, locator, split_on_trailing_comma);
@@ -143,6 +143,7 @@ pub fn format_imports(
     // Normalize imports (i.e., deduplicate, aggregate `from` imports).
     let block = normalize_imports(block, combine_as_imports, force_single_line);
 
+    // Categorize imports.
     let mut output = String::new();
 
     for block in split::split_by_forced_separate(block, forced_separate) {
@@ -167,6 +168,7 @@ pub fn format_imports(
             no_lines_before,
             lines_between_types,
             target_version,
+            section_order,
         );
 
         if !block_output.is_empty() && !output.is_empty() {
@@ -221,9 +223,10 @@ fn format_import_block(
     classes: &BTreeSet<String>,
     constants: &BTreeSet<String>,
     variables: &BTreeSet<String>,
-    no_lines_before: &BTreeSet<ImportType>,
+    no_lines_before: &BTreeSet<ImportSection>,
     lines_between_types: usize,
     target_version: PythonVersion,
+    section_order: &[ImportSection],
 ) -> String {
     // Categorize by type (e.g., first-party vs. third-party).
     let mut block_by_type = categorize_imports(block, src, package, known_modules, target_version);
@@ -233,10 +236,10 @@ fn format_import_block(
     // Generate replacement source code.
     let mut is_first_block = true;
     let mut pending_lines_before = false;
-    for import_type in ImportType::iter() {
-        let import_block = block_by_type.remove(&import_type);
+    for import_section in section_order {
+        let import_block = block_by_type.remove(import_section);
 
-        if !no_lines_before.contains(&import_type) {
+        if !no_lines_before.contains(import_section) {
             pending_lines_before = true;
         }
         let Some(import_block) = import_block else {
@@ -331,11 +334,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+    use rustc_hash::FxHashMap;
     use test_case::test_case;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
-    use crate::rules::isort::categorize::KnownModules;
+    use crate::rules::isort::categorize::{ImportSection, KnownModules};
     use crate::settings::Settings;
     use crate::test::{test_path, test_resource_path};
 
@@ -396,7 +400,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -412,6 +416,7 @@ mod tests {
                         vec!["foo".to_string(), "__future__".to_string()],
                         vec![],
                         vec![],
+                        FxHashMap::default(),
                     ),
                     ..super::settings::Settings::default()
                 },
@@ -419,7 +424,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -435,6 +440,7 @@ mod tests {
                         vec!["foo.bar".to_string()],
                         vec![],
                         vec![],
+                        FxHashMap::default(),
                     ),
                     ..super::settings::Settings::default()
                 },
@@ -442,7 +448,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -460,7 +466,7 @@ mod tests {
     //             ..Settings::for_rule(Rule::UnsortedImports)
     //         },
     //     )?;
-    //     insta::assert_yaml_snapshot!(snapshot, diagnostics);
+    //     crate::assert_messages!(snapshot, diagnostics);
     //     Ok(())
     // }
 
@@ -476,6 +482,7 @@ mod tests {
                         vec![],
                         vec!["ruff".to_string()],
                         vec![],
+                        FxHashMap::default(),
                     ),
                     ..super::settings::Settings::default()
                 },
@@ -483,7 +490,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -507,7 +514,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -525,7 +532,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -544,7 +551,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -562,7 +569,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -583,7 +590,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -602,7 +609,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -630,7 +637,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -660,7 +667,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -688,7 +695,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -708,11 +715,12 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
     #[test_case(Path::new("multiline_docstring.py"))]
     #[test_case(Path::new("empty.py"))]
@@ -731,11 +739,12 @@ mod tests {
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
     #[test_case(Path::new("empty.py"))]
     fn required_imports(path: &Path) -> Result<()> {
@@ -754,11 +763,12 @@ mod tests {
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
     #[test_case(Path::new("empty.py"))]
     fn combined_required_imports(path: &Path) -> Result<()> {
@@ -776,11 +786,12 @@ mod tests {
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
     #[test_case(Path::new("docstring.py"))]
+    #[test_case(Path::new("docstring.pyi"))]
     #[test_case(Path::new("docstring_only.py"))]
     #[test_case(Path::new("empty.py"))]
     fn straight_required_import(path: &Path) -> Result<()> {
@@ -796,7 +807,7 @@ mod tests {
                 ..Settings::for_rule(Rule::MissingRequiredImport)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -814,7 +825,7 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -826,11 +837,11 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     no_lines_before: BTreeSet::from([
-                        ImportType::Future,
-                        ImportType::StandardLibrary,
-                        ImportType::ThirdParty,
-                        ImportType::FirstParty,
-                        ImportType::LocalFolder,
+                        ImportSection::Known(ImportType::Future),
+                        ImportSection::Known(ImportType::StandardLibrary),
+                        ImportSection::Known(ImportType::ThirdParty),
+                        ImportSection::Known(ImportType::FirstParty),
+                        ImportSection::Known(ImportType::LocalFolder),
                     ]),
                     ..super::settings::Settings::default()
                 },
@@ -839,7 +850,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -854,8 +865,8 @@ mod tests {
             &Settings {
                 isort: super::settings::Settings {
                     no_lines_before: BTreeSet::from([
-                        ImportType::StandardLibrary,
-                        ImportType::LocalFolder,
+                        ImportSection::Known(ImportType::StandardLibrary),
+                        ImportSection::Known(ImportType::LocalFolder),
                     ]),
                     ..super::settings::Settings::default()
                 },
@@ -864,7 +875,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -885,7 +896,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -904,7 +915,7 @@ mod tests {
             },
         )?;
         diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -927,7 +938,72 @@ mod tests {
                 ..Settings::for_rule(Rule::UnsortedImports)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("sections.py"))]
+    fn sections(path: &Path) -> Result<()> {
+        let snapshot = format!("sections_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec![],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::from_iter([("django".to_string(), vec!["django".to_string()])]),
+                    ),
+                    section_order: vec![
+                        ImportSection::Known(ImportType::Future),
+                        ImportSection::Known(ImportType::StandardLibrary),
+                        ImportSection::Known(ImportType::ThirdParty),
+                        ImportSection::Known(ImportType::FirstParty),
+                        ImportSection::Known(ImportType::LocalFolder),
+                        ImportSection::UserDefined("django".to_string()),
+                    ],
+
+                    ..super::settings::Settings::default()
+                },
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
+
+    #[test_case(Path::new("sections.py"))]
+    fn section_order(path: &Path) -> Result<()> {
+        let snapshot = format!("section_order_{}", path.to_string_lossy());
+        let diagnostics = test_path(
+            Path::new("isort").join(path).as_path(),
+            &Settings {
+                src: vec![test_resource_path("fixtures/isort")],
+                isort: super::settings::Settings {
+                    known_modules: KnownModules::new(
+                        vec!["library".to_string()],
+                        vec![],
+                        vec![],
+                        vec![],
+                        FxHashMap::from_iter([("django".to_string(), vec!["django".to_string()])]),
+                    ),
+                    section_order: vec![
+                        ImportSection::Known(ImportType::Future),
+                        ImportSection::Known(ImportType::StandardLibrary),
+                        ImportSection::Known(ImportType::ThirdParty),
+                        ImportSection::UserDefined("django".to_string()),
+                        ImportSection::Known(ImportType::FirstParty),
+                        ImportSection::Known(ImportType::LocalFolder),
+                    ],
+                    ..super::settings::Settings::default()
+                },
+                ..Settings::for_rule(Rule::UnsortedImports)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

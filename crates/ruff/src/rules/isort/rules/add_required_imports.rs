@@ -5,7 +5,7 @@ use rustpython_parser::ast::{Location, StmtKind, Suite};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::is_docstring_stmt;
-use ruff_python_ast::imports::{Alias, AnyImport, Import, ImportFrom};
+use ruff_python_ast::imports::{Alias, AnyImport, FutureImport, Import, ImportFrom};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 
@@ -84,6 +84,7 @@ fn contains(block: &Block, required_import: &AnyImport) -> bool {
     })
 }
 
+#[allow(clippy::too_many_arguments)]
 fn add_required_import(
     required_import: &AnyImport,
     blocks: &[&Block],
@@ -92,6 +93,7 @@ fn add_required_import(
     stylist: &Stylist,
     settings: &Settings,
     autofix: flags::Autofix,
+    is_stub: bool,
 ) -> Option<Diagnostic> {
     // If the import is already present in a top-level block, don't add it.
     if blocks
@@ -104,6 +106,11 @@ fn add_required_import(
 
     // Don't add imports to semantically-empty files.
     if python_ast.iter().all(is_docstring_stmt) {
+        return None;
+    }
+
+    // We don't need to add `__future__` imports to stubs.
+    if is_stub && required_import.is_future_import() {
         return None;
     }
 
@@ -126,6 +133,7 @@ pub fn add_required_imports(
     stylist: &Stylist,
     settings: &Settings,
     autofix: flags::Autofix,
+    is_stub: bool,
 ) -> Vec<Diagnostic> {
     settings
         .isort
@@ -167,6 +175,7 @@ pub fn add_required_imports(
                             stylist,
                             settings,
                             autofix,
+                            is_stub,
                         )
                     })
                     .collect(),
@@ -186,6 +195,7 @@ pub fn add_required_imports(
                             stylist,
                             settings,
                             autofix,
+                            is_stub,
                         )
                     })
                     .collect(),

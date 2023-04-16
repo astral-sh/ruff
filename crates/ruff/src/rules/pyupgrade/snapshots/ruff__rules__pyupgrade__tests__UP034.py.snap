@@ -1,215 +1,209 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ExtraneousParentheses
-    body: Avoid extraneous parentheses
-    suggestion: Remove extraneous parentheses
-    fixable: true
-  location:
-    row: 2
-    column: 6
-  end_location:
-    row: 2
-    column: 13
-  fix:
-    edits:
-      - content: "\"foo\""
-        location:
-          row: 2
-          column: 6
-        end_location:
-          row: 2
-          column: 13
-  parent: ~
-- kind:
-    name: ExtraneousParentheses
-    body: Avoid extraneous parentheses
-    suggestion: Remove extraneous parentheses
-    fixable: true
-  location:
-    row: 5
-    column: 6
-  end_location:
-    row: 5
-    column: 26
-  fix:
-    edits:
-      - content: "\"hell((goodybe))o\""
-        location:
-          row: 5
-          column: 6
-        end_location:
-          row: 5
-          column: 26
-  parent: ~
-- kind:
-    name: ExtraneousParentheses
-    body: Avoid extraneous parentheses
-    suggestion: Remove extraneous parentheses
-    fixable: true
-  location:
-    row: 8
-    column: 6
-  end_location:
-    row: 8
-    column: 15
-  fix:
-    edits:
-      - content: "(\"foo\")"
-        location:
-          row: 8
-          column: 6
-        end_location:
-          row: 8
-          column: 15
-  parent: ~
-- kind:
-    name: ExtraneousParentheses
-    body: Avoid extraneous parentheses
-    suggestion: Remove extraneous parentheses
-    fixable: true
-  location:
-    row: 11
-    column: 6
-  end_location:
-    row: 11
-    column: 13
-  fix:
-    edits:
-      - content: ((1))
-        location:
-          row: 11
-          column: 6
-        end_location:
-          row: 11
-          column: 13
-  parent: ~
-- kind:
-    name: ExtraneousParentheses
-    body: Avoid extraneous parentheses
-    suggestion: Remove extraneous parentheses
-    fixable: true
-  location:
-    row: 14
-    column: 6
-  end_location:
-    row: 14
-    column: 25
-  fix:
-    edits:
-      - content: "\"foo{}\".format(1)"
-        location:
-          row: 14
-          column: 6
-        end_location:
-          row: 14
-          column: 25
-  parent: ~
-- kind:
-    name: ExtraneousParentheses
-    body: Avoid extraneous parentheses
-    suggestion: Remove extraneous parentheses
-    fixable: true
-  location:
-    row: 18
-    column: 4
-  end_location:
-    row: 18
-    column: 23
-  fix:
-    edits:
-      - content: "\"foo{}\".format(1)"
-        location:
-          row: 18
-          column: 4
-        end_location:
-          row: 18
-          column: 23
-  parent: ~
-- kind:
-    name: ExtraneousParentheses
-    body: Avoid extraneous parentheses
-    suggestion: Remove extraneous parentheses
-    fixable: true
-  location:
-    row: 23
-    column: 4
-  end_location:
-    row: 25
-    column: 5
-  fix:
-    edits:
-      - content: "\n        \"foo\"\n    "
-        location:
-          row: 23
-          column: 4
-        end_location:
-          row: 25
-          column: 5
-  parent: ~
-- kind:
-    name: ExtraneousParentheses
-    body: Avoid extraneous parentheses
-    suggestion: Remove extraneous parentheses
-    fixable: true
-  location:
-    row: 30
-    column: 12
-  end_location:
-    row: 30
-    column: 23
-  fix:
-    edits:
-      - content: (yield 1)
-        location:
-          row: 30
-          column: 12
-        end_location:
-          row: 30
-          column: 23
-  parent: ~
-- kind:
-    name: ExtraneousParentheses
-    body: Avoid extraneous parentheses
-    suggestion: Remove extraneous parentheses
-    fixable: true
-  location:
-    row: 35
-    column: 8
-  end_location:
-    row: 35
-    column: 27
-  fix:
-    edits:
-      - content: "\"foo{}\".format(1)"
-        location:
-          row: 35
-          column: 8
-        end_location:
-          row: 35
-          column: 27
-  parent: ~
-- kind:
-    name: ExtraneousParentheses
-    body: Avoid extraneous parentheses
-    suggestion: Remove extraneous parentheses
-    fixable: true
-  location:
-    row: 39
-    column: 6
-  end_location:
-    row: 39
-    column: 27
-  fix:
-    edits:
-      - content: x for x in range(3)
-        location:
-          row: 39
-          column: 6
-        end_location:
-          row: 39
-          column: 27
-  parent: ~
+UP034.py:2:7: UP034 [*] Avoid extraneous parentheses
+  |
+2 | # UP034
+3 | print(("foo"))
+  |       ^^^^^^^ UP034
+4 | 
+5 | # UP034
+  |
+  = help: Remove extraneous parentheses
+
+ℹ Suggested fix
+1 1 | # UP034
+2   |-print(("foo"))
+  2 |+print("foo")
+3 3 | 
+4 4 | # UP034
+5 5 | print(("hell((goodybe))o"))
+
+UP034.py:5:7: UP034 [*] Avoid extraneous parentheses
+  |
+5 | # UP034
+6 | print(("hell((goodybe))o"))
+  |       ^^^^^^^^^^^^^^^^^^^^ UP034
+7 | 
+8 | # UP034
+  |
+  = help: Remove extraneous parentheses
+
+ℹ Suggested fix
+2 2 | print(("foo"))
+3 3 | 
+4 4 | # UP034
+5   |-print(("hell((goodybe))o"))
+  5 |+print("hell((goodybe))o")
+6 6 | 
+7 7 | # UP034
+8 8 | print((("foo")))
+
+UP034.py:8:7: UP034 [*] Avoid extraneous parentheses
+   |
+ 8 | # UP034
+ 9 | print((("foo")))
+   |       ^^^^^^^^^ UP034
+10 | 
+11 | # UP034
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Suggested fix
+5 5 | print(("hell((goodybe))o"))
+6 6 | 
+7 7 | # UP034
+8   |-print((("foo")))
+  8 |+print(("foo"))
+9 9 | 
+10 10 | # UP034
+11 11 | print((((1))))
+
+UP034.py:11:7: UP034 [*] Avoid extraneous parentheses
+   |
+11 | # UP034
+12 | print((((1))))
+   |       ^^^^^^^ UP034
+13 | 
+14 | # UP034
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Suggested fix
+8  8  | print((("foo")))
+9  9  | 
+10 10 | # UP034
+11    |-print((((1))))
+   11 |+print(((1)))
+12 12 | 
+13 13 | # UP034
+14 14 | print(("foo{}".format(1)))
+
+UP034.py:14:7: UP034 [*] Avoid extraneous parentheses
+   |
+14 | # UP034
+15 | print(("foo{}".format(1)))
+   |       ^^^^^^^^^^^^^^^^^^^ UP034
+16 | 
+17 | # UP034
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Suggested fix
+11 11 | print((((1))))
+12 12 | 
+13 13 | # UP034
+14    |-print(("foo{}".format(1)))
+   14 |+print("foo{}".format(1))
+15 15 | 
+16 16 | # UP034
+17 17 | print(
+
+UP034.py:18:5: UP034 [*] Avoid extraneous parentheses
+   |
+18 | # UP034
+19 | print(
+20 |     ("foo{}".format(1))
+   |     ^^^^^^^^^^^^^^^^^^^ UP034
+21 | )
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Suggested fix
+15 15 | 
+16 16 | # UP034
+17 17 | print(
+18    |-    ("foo{}".format(1))
+   18 |+    "foo{}".format(1)
+19 19 | )
+20 20 | 
+21 21 | # UP034
+
+UP034.py:23:5: UP034 [*] Avoid extraneous parentheses
+   |
+23 |   # UP034
+24 |   print(
+25 |       (
+   |  _____^
+26 | |         "foo"
+27 | |     )
+   | |_____^ UP034
+28 |   )
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Suggested fix
+20 20 | 
+21 21 | # UP034
+22 22 | print(
+23    |-    (
+   23 |+    
+24 24 |         "foo"
+25    |-    )
+   25 |+    
+26 26 | )
+27 27 | 
+28 28 | # UP034
+
+UP034.py:30:13: UP034 [*] Avoid extraneous parentheses
+   |
+30 | # UP034
+31 | def f():
+32 |     x = int(((yield 1)))
+   |             ^^^^^^^^^^^ UP034
+33 | 
+34 | # UP034
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Suggested fix
+27 27 | 
+28 28 | # UP034
+29 29 | def f():
+30    |-    x = int(((yield 1)))
+   30 |+    x = int((yield 1))
+31 31 | 
+32 32 | # UP034
+33 33 | if True:
+
+UP034.py:35:9: UP034 [*] Avoid extraneous parentheses
+   |
+35 | if True:
+36 |     print(
+37 |         ("foo{}".format(1))
+   |         ^^^^^^^^^^^^^^^^^^^ UP034
+38 |     )
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Suggested fix
+32 32 | # UP034
+33 33 | if True:
+34 34 |     print(
+35    |-        ("foo{}".format(1))
+   35 |+        "foo{}".format(1)
+36 36 |     )
+37 37 | 
+38 38 | # UP034
+
+UP034.py:39:7: UP034 [*] Avoid extraneous parentheses
+   |
+39 | # UP034
+40 | print((x for x in range(3)))
+   |       ^^^^^^^^^^^^^^^^^^^^^ UP034
+41 | 
+42 | # OK
+   |
+   = help: Remove extraneous parentheses
+
+ℹ Suggested fix
+36 36 |     )
+37 37 | 
+38 38 | # UP034
+39    |-print((x for x in range(3)))
+   39 |+print(x for x in range(3))
+40 40 | 
+41 41 | # OK
+42 42 | print("foo")
+
 

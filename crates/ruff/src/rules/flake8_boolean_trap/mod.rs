@@ -6,12 +6,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::BooleanPositionalArgInFunctionDefinition, Path::new("FBT.py"); "FBT001")]
     #[test_case(Rule::BooleanDefaultValueInFunctionDefinition, Path::new("FBT.py"); "FBT002")]
@@ -22,7 +22,7 @@ mod tests {
             Path::new("flake8_boolean_trap").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

@@ -1,117 +1,82 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: GlobalStatement
-    body: "Using the global statement to update `CONSTANT` is discouraged"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 17
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: GlobalStatement
-    body: "Using the global statement to update `sys` is discouraged"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 4
-  end_location:
-    row: 24
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: GlobalStatement
-    body: "Using the global statement to update `namedtuple` is discouraged"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 30
-    column: 4
-  end_location:
-    row: 30
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: GlobalStatement
-    body: "Using the global statement to update `CONSTANT` is discouraged"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 36
-    column: 4
-  end_location:
-    row: 36
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: GlobalStatement
-    body: "Using the global statement to update `CONSTANT` is discouraged"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 4
-  end_location:
-    row: 43
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: GlobalStatement
-    body: "Using the global statement to update `CONSTANT` is discouraged"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 50
-    column: 4
-  end_location:
-    row: 50
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: GlobalStatement
-    body: "Using the global statement to update `FUNC` is discouraged"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 60
-    column: 4
-  end_location:
-    row: 60
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: GlobalStatement
-    body: "Using the global statement to update `CLASS` is discouraged"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 70
-    column: 4
-  end_location:
-    row: 70
-    column: 16
-  fix:
-    edits: []
-  parent: ~
+global_statement.py:17:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
+   |
+17 | def fix_constant(value):
+18 |     """All this is ok, but try not to use `global` ;)"""
+19 |     global CONSTANT  # [global-statement]
+   |     ^^^^^^^^^^^^^^^ PLW0603
+20 |     print(CONSTANT)
+21 |     CONSTANT = value
+   |
+
+global_statement.py:24:5: PLW0603 Using the global statement to update `sys` is discouraged
+   |
+24 | def global_with_import():
+25 |     """Should only warn for global-statement when using `Import` node"""
+26 |     global sys  # [global-statement]
+   |     ^^^^^^^^^^ PLW0603
+27 |     import sys
+   |
+
+global_statement.py:30:5: PLW0603 Using the global statement to update `namedtuple` is discouraged
+   |
+30 | def global_with_import_from():
+31 |     """Should only warn for global-statement when using `ImportFrom` node"""
+32 |     global namedtuple  # [global-statement]
+   |     ^^^^^^^^^^^^^^^^^ PLW0603
+33 |     from collections import namedtuple
+   |
+
+global_statement.py:36:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
+   |
+36 | def global_del():
+37 |     """Deleting the global name prevents `global-variable-not-assigned`"""
+38 |     global CONSTANT  # [global-statement]
+   |     ^^^^^^^^^^^^^^^ PLW0603
+39 |     print(CONSTANT)
+40 |     del CONSTANT
+   |
+
+global_statement.py:43:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
+   |
+43 | def global_operator_assign():
+44 |     """Operator assigns should only throw a global statement error"""
+45 |     global CONSTANT  # [global-statement]
+   |     ^^^^^^^^^^^^^^^ PLW0603
+46 |     print(CONSTANT)
+47 |     CONSTANT += 1
+   |
+
+global_statement.py:50:5: PLW0603 Using the global statement to update `CONSTANT` is discouraged
+   |
+50 | def global_function_assign():
+51 |     """Function assigns should only throw a global statement error"""
+52 |     global CONSTANT  # [global-statement]
+   |     ^^^^^^^^^^^^^^^ PLW0603
+53 | 
+54 |     def CONSTANT():
+   |
+
+global_statement.py:60:5: PLW0603 Using the global statement to update `FUNC` is discouraged
+   |
+60 | def override_func():
+61 |     """Overriding a function should only throw a global statement error"""
+62 |     global FUNC  # [global-statement]
+   |     ^^^^^^^^^^^ PLW0603
+63 | 
+64 |     def FUNC():
+   |
+
+global_statement.py:70:5: PLW0603 Using the global statement to update `CLASS` is discouraged
+   |
+70 | def override_class():
+71 |     """Overriding a class should only throw a global statement error"""
+72 |     global CLASS  # [global-statement]
+   |     ^^^^^^^^^^^^ PLW0603
+73 | 
+74 |     class CLASS:
+   |
+
 

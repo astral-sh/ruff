@@ -1,47 +1,33 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MultipleLeadingHashesForBlockComment
-    body: "Too many leading `#` before block comment"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 4
-  end_location:
-    row: 19
-    column: 30
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleLeadingHashesForBlockComment
-    body: "Too many leading `#` before block comment"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 4
-  end_location:
-    row: 22
-    column: 30
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleLeadingHashesForBlockComment
-    body: "Too many leading `#` before block comment"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 0
-  end_location:
-    row: 26
-    column: 21
-  fix:
-    edits: []
-  parent: ~
+E26.py:19:5: E266 Too many leading `#` before block comment
+   |
+19 | def how_it_feel(r):
+20 | 
+21 |     ### This is a variable ###
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ E266
+22 |     a = 42
+   |
+
+E26.py:22:5: E266 Too many leading `#` before block comment
+   |
+22 |     a = 42
+23 | 
+24 |     ### Of course it is unused
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ E266
+25 |     return
+26 | #: E265:1:1 E266:2:1
+   |
+
+E26.py:26:1: E266 Too many leading `#` before block comment
+   |
+26 | #: E265:1:1 E266:2:1
+27 | ##if DEBUG:
+28 | ##    logging.error()
+   | ^^^^^^^^^^^^^^^^^^^^^ E266
+29 | #: W291:1:42
+30 | #########################################
+   |
+
 

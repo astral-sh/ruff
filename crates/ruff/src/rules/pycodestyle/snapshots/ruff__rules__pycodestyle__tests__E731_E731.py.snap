@@ -1,124 +1,121 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: LambdaAssignment
-    body: "Do not assign a `lambda` expression, use a `def`"
-    suggestion: "Rewrite `f` as a `def`"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 19
-  fix:
-    edits:
-      - content: "def f(x):\n    return 2 * x"
-        location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 19
-  parent: ~
-- kind:
-    name: LambdaAssignment
-    body: "Do not assign a `lambda` expression, use a `def`"
-    suggestion: "Rewrite `f` as a `def`"
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 19
-  fix:
-    edits:
-      - content: "def f(x):\n    return 2 * x"
-        location:
-          row: 4
-          column: 0
-        end_location:
-          row: 4
-          column: 19
-  parent: ~
-- kind:
-    name: LambdaAssignment
-    body: "Do not assign a `lambda` expression, use a `def`"
-    suggestion: "Rewrite `this` as a `def`"
-    fixable: true
-  location:
-    row: 7
-    column: 4
-  end_location:
-    row: 7
-    column: 29
-  fix:
-    edits:
-      - content: "def this(y, z):\n        return 2 * x"
-        location:
-          row: 7
-          column: 4
-        end_location:
-          row: 7
-          column: 29
-  parent: ~
-- kind:
-    name: LambdaAssignment
-    body: "Do not assign a `lambda` expression, use a `def`"
-    suggestion: "Rewrite `f` as a `def`"
-    fixable: true
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 21
-  fix:
-    edits:
-      - content: "def f():\n    return (yield 1)"
-        location:
-          row: 9
-          column: 0
-        end_location:
-          row: 9
-          column: 21
-  parent: ~
-- kind:
-    name: LambdaAssignment
-    body: "Do not assign a `lambda` expression, use a `def`"
-    suggestion: "Rewrite `f` as a `def`"
-    fixable: true
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 28
-  fix:
-    edits:
-      - content: "def f():\n    return (yield from g())"
-        location:
-          row: 11
-          column: 0
-        end_location:
-          row: 11
-          column: 28
-  parent: ~
-- kind:
-    name: LambdaAssignment
-    body: "Do not assign a `lambda` expression, use a `def`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 4
-  end_location:
-    row: 14
-    column: 23
-  fix:
-    edits: []
-  parent: ~
+E731.py:2:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+  |
+2 | #: E731
+3 | f = lambda x: 2 * x
+  | ^^^^^^^^^^^^^^^^^^^ E731
+4 | #: E731
+5 | f = lambda x: 2 * x
+  |
+  = help: Rewrite `f` as a `def`
+
+ℹ Suggested fix
+1 1 | #: E731
+2   |-f = lambda x: 2 * x
+  2 |+def f(x):
+  3 |+    return 2 * x
+3 4 | #: E731
+4 5 | f = lambda x: 2 * x
+5 6 | #: E731
+
+E731.py:4:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+  |
+4 | f = lambda x: 2 * x
+5 | #: E731
+6 | f = lambda x: 2 * x
+  | ^^^^^^^^^^^^^^^^^^^ E731
+7 | #: E731
+8 | while False:
+  |
+  = help: Rewrite `f` as a `def`
+
+ℹ Suggested fix
+1 1 | #: E731
+2 2 | f = lambda x: 2 * x
+3 3 | #: E731
+4   |-f = lambda x: 2 * x
+  4 |+def f(x):
+  5 |+    return 2 * x
+5 6 | #: E731
+6 7 | while False:
+7 8 |     this = lambda y, z: 2 * x
+
+E731.py:7:5: E731 [*] Do not assign a `lambda` expression, use a `def`
+   |
+ 7 | #: E731
+ 8 | while False:
+ 9 |     this = lambda y, z: 2 * x
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+10 | #: E731
+11 | f = lambda: (yield 1)
+   |
+   = help: Rewrite `this` as a `def`
+
+ℹ Suggested fix
+4 4 | f = lambda x: 2 * x
+5 5 | #: E731
+6 6 | while False:
+7   |-    this = lambda y, z: 2 * x
+  7 |+    def this(y, z):
+  8 |+        return 2 * x
+8 9 | #: E731
+9 10 | f = lambda: (yield 1)
+10 11 | #: E731
+
+E731.py:9:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+   |
+ 9 |     this = lambda y, z: 2 * x
+10 | #: E731
+11 | f = lambda: (yield 1)
+   | ^^^^^^^^^^^^^^^^^^^^^ E731
+12 | #: E731
+13 | f = lambda: (yield from g())
+   |
+   = help: Rewrite `f` as a `def`
+
+ℹ Suggested fix
+6  6  | while False:
+7  7  |     this = lambda y, z: 2 * x
+8  8  | #: E731
+9     |-f = lambda: (yield 1)
+   9  |+def f():
+   10 |+    return (yield 1)
+10 11 | #: E731
+11 12 | f = lambda: (yield from g())
+12 13 | #: E731
+
+E731.py:11:1: E731 [*] Do not assign a `lambda` expression, use a `def`
+   |
+11 | f = lambda: (yield 1)
+12 | #: E731
+13 | f = lambda: (yield from g())
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E731
+14 | #: E731
+15 | class F:
+   |
+   = help: Rewrite `f` as a `def`
+
+ℹ Suggested fix
+8  8  | #: E731
+9  9  | f = lambda: (yield 1)
+10 10 | #: E731
+11    |-f = lambda: (yield from g())
+   11 |+def f():
+   12 |+    return (yield from g())
+12 13 | #: E731
+13 14 | class F:
+14 15 |     f = lambda x: 2 * x
+
+E731.py:14:5: E731 Do not assign a `lambda` expression, use a `def`
+   |
+14 | #: E731
+15 | class F:
+16 |     f = lambda x: 2 * x
+   |     ^^^^^^^^^^^^^^^^^^^ E731
+17 | 
+18 | f = object()
+   |
+
 

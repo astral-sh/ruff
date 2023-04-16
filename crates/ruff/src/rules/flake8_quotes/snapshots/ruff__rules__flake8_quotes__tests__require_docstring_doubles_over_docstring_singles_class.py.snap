@@ -1,68 +1,56 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BadQuotesDocstring
-    body: Single quote docstring found but double quotes preferred
-    suggestion: Replace single quotes docstring with double quotes
-    fixable: true
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 53
-  fix:
-    edits:
-      - content: "\"\"\" Double quotes single line class docstring \"\"\""
-        location:
-          row: 2
-          column: 4
-        end_location:
-          row: 2
-          column: 53
-  parent: ~
-- kind:
-    name: BadQuotesDocstring
-    body: Single quote docstring found but double quotes preferred
-    suggestion: Replace single quotes docstring with double quotes
-    fixable: true
-  location:
-    row: 6
-    column: 8
-  end_location:
-    row: 6
-    column: 57
-  fix:
-    edits:
-      - content: "\"\"\" Double quotes single line method docstring\"\"\""
-        location:
-          row: 6
-          column: 8
-        end_location:
-          row: 6
-          column: 57
-  parent: ~
-- kind:
-    name: BadQuotesDocstring
-    body: Single quote docstring found but double quotes preferred
-    suggestion: Replace single quotes docstring with double quotes
-    fixable: true
-  location:
-    row: 9
-    column: 28
-  end_location:
-    row: 9
-    column: 52
-  fix:
-    edits:
-      - content: "\"\"\" inline docstring \"\"\""
-        location:
-          row: 9
-          column: 28
-        end_location:
-          row: 9
-          column: 52
-  parent: ~
+docstring_singles_class.py:2:5: Q002 [*] Single quote docstring found but double quotes preferred
+  |
+2 | class SingleLineDocstrings():
+3 |     ''' Double quotes single line class docstring '''
+  |     ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002
+4 |     ''' Not a docstring '''
+  |
+  = help: Replace single quotes docstring with double quotes
+
+ℹ Suggested fix
+1 1 | class SingleLineDocstrings():
+2   |-    ''' Double quotes single line class docstring '''
+  2 |+    """ Double quotes single line class docstring """
+3 3 |     ''' Not a docstring '''
+4 4 | 
+5 5 |     def foo(self, bar='''not a docstring'''):
+
+docstring_singles_class.py:6:9: Q002 [*] Single quote docstring found but double quotes preferred
+  |
+6 |     def foo(self, bar='''not a docstring'''):
+7 |         ''' Double quotes single line method docstring'''
+  |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ Q002
+8 |         pass
+  |
+  = help: Replace single quotes docstring with double quotes
+
+ℹ Suggested fix
+3 3 |     ''' Not a docstring '''
+4 4 | 
+5 5 |     def foo(self, bar='''not a docstring'''):
+6   |-        ''' Double quotes single line method docstring'''
+  6 |+        """ Double quotes single line method docstring"""
+7 7 |         pass
+8 8 | 
+9 9 |     class Nested(foo()[:]): ''' inline docstring '''; pass
+
+docstring_singles_class.py:9:29: Q002 [*] Single quote docstring found but double quotes preferred
+   |
+ 9 |         pass
+10 | 
+11 |     class Nested(foo()[:]): ''' inline docstring '''; pass
+   |                             ^^^^^^^^^^^^^^^^^^^^^^^^ Q002
+   |
+   = help: Replace single quotes docstring with double quotes
+
+ℹ Suggested fix
+6 6 |         ''' Double quotes single line method docstring'''
+7 7 |         pass
+8 8 | 
+9   |-    class Nested(foo()[:]): ''' inline docstring '''; pass
+  9 |+    class Nested(foo()[:]): """ inline docstring """; pass
+
 

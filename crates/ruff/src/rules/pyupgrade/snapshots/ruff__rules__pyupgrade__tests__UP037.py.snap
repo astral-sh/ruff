@@ -1,593 +1,559 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 18
-    column: 13
-  end_location:
-    row: 18
-    column: 22
-  fix:
-    edits:
-      - content: MyClass
-        location:
-          row: 18
-          column: 13
-        end_location:
-          row: 18
-          column: 22
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 18
-    column: 27
-  end_location:
-    row: 18
-    column: 36
-  fix:
-    edits:
-      - content: MyClass
-        location:
-          row: 18
-          column: 27
-        end_location:
-          row: 18
-          column: 36
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 19
-    column: 7
-  end_location:
-    row: 19
-    column: 16
-  fix:
-    edits:
-      - content: MyClass
-        location:
-          row: 19
-          column: 7
-        end_location:
-          row: 19
-          column: 16
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 22
-    column: 20
-  end_location:
-    row: 22
-    column: 26
-  fix:
-    edits:
-      - content: bool
-        location:
-          row: 22
-          column: 20
-        end_location:
-          row: 22
-          column: 26
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 26
-    column: 15
-  end_location:
-    row: 26
-    column: 20
-  fix:
-    edits:
-      - content: str
-        location:
-          row: 26
-          column: 15
-        end_location:
-          row: 26
-          column: 20
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 26
-    column: 32
-  end_location:
-    row: 26
-    column: 37
-  fix:
-    edits:
-      - content: int
-        location:
-          row: 26
-          column: 32
-        end_location:
-          row: 26
-          column: 37
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 30
-    column: 9
-  end_location:
-    row: 30
-    column: 18
-  fix:
-    edits:
-      - content: MyClass
-        location:
-          row: 30
-          column: 9
-        end_location:
-          row: 30
-          column: 18
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 32
-    column: 13
-  end_location:
-    row: 32
-    column: 22
-  fix:
-    edits:
-      - content: MyClass
-        location:
-          row: 32
-          column: 13
-        end_location:
-          row: 32
-          column: 22
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 36
-    column: 7
-  end_location:
-    row: 36
-    column: 16
-  fix:
-    edits:
-      - content: MyClass
-        location:
-          row: 36
-          column: 7
-        end_location:
-          row: 36
-          column: 16
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 40
-    column: 26
-  end_location:
-    row: 40
-    column: 31
-  fix:
-    edits:
-      - content: int
-        location:
-          row: 40
-          column: 26
-        end_location:
-          row: 40
-          column: 31
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 44
-    column: 30
-  end_location:
-    row: 44
-    column: 35
-  fix:
-    edits:
-      - content: int
-        location:
-          row: 44
-          column: 30
-        end_location:
-          row: 44
-          column: 35
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 47
-    column: 13
-  end_location:
-    row: 47
-    column: 18
-  fix:
-    edits:
-      - content: str
-        location:
-          row: 47
-          column: 13
-        end_location:
-          row: 47
-          column: 18
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 49
-    column: 7
-  end_location:
-    row: 49
-    column: 12
-  fix:
-    edits:
-      - content: str
-        location:
-          row: 49
-          column: 7
-        end_location:
-          row: 49
-          column: 12
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 51
-    column: 14
-  end_location:
-    row: 51
-    column: 19
-  fix:
-    edits:
-      - content: str
-        location:
-          row: 51
-          column: 14
-        end_location:
-          row: 51
-          column: 19
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 53
-    column: 12
-  end_location:
-    row: 53
-    column: 17
-  fix:
-    edits:
-      - content: str
-        location:
-          row: 53
-          column: 12
-        end_location:
-          row: 53
-          column: 17
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 55
-    column: 19
-  end_location:
-    row: 55
-    column: 24
-  fix:
-    edits:
-      - content: str
-        location:
-          row: 55
-          column: 19
-        end_location:
-          row: 55
-          column: 24
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 57
-    column: 19
-  end_location:
-    row: 57
-    column: 24
-  fix:
-    edits:
-      - content: str
-        location:
-          row: 57
-          column: 19
-        end_location:
-          row: 57
-          column: 24
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 59
-    column: 10
-  end_location:
-    row: 59
-    column: 15
-  fix:
-    edits:
-      - content: str
-        location:
-          row: 59
-          column: 10
-        end_location:
-          row: 59
-          column: 15
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 61
-    column: 18
-  end_location:
-    row: 61
-    column: 27
-  fix:
-    edits:
-      - content: MyClass
-        location:
-          row: 61
-          column: 18
-        end_location:
-          row: 61
-          column: 27
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 63
-    column: 28
-  end_location:
-    row: 63
-    column: 33
-  fix:
-    edits:
-      - content: int
-        location:
-          row: 63
-          column: 28
-        end_location:
-          row: 63
-          column: 33
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 63
-    column: 44
-  end_location:
-    row: 63
-    column: 49
-  fix:
-    edits:
-      - content: str
-        location:
-          row: 63
-          column: 44
-        end_location:
-          row: 63
-          column: 49
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 65
-    column: 28
-  end_location:
-    row: 65
-    column: 33
-  fix:
-    edits:
-      - content: foo
-        location:
-          row: 65
-          column: 28
-        end_location:
-          row: 65
-          column: 33
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 65
-    column: 35
-  end_location:
-    row: 65
-    column: 40
-  fix:
-    edits:
-      - content: int
-        location:
-          row: 65
-          column: 35
-        end_location:
-          row: 65
-          column: 40
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 65
-    column: 44
-  end_location:
-    row: 65
-    column: 49
-  fix:
-    edits:
-      - content: bar
-        location:
-          row: 65
-          column: 44
-        end_location:
-          row: 65
-          column: 49
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 65
-    column: 51
-  end_location:
-    row: 65
-    column: 56
-  fix:
-    edits:
-      - content: str
-        location:
-          row: 65
-          column: 51
-        end_location:
-          row: 65
-          column: 56
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 67
-    column: 23
-  end_location:
-    row: 67
-    column: 26
-  fix:
-    edits:
-      - content: X
-        location:
-          row: 67
-          column: 23
-        end_location:
-          row: 67
-          column: 26
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 67
-    column: 37
-  end_location:
-    row: 67
-    column: 42
-  fix:
-    edits:
-      - content: foo
-        location:
-          row: 67
-          column: 37
-        end_location:
-          row: 67
-          column: 42
-  parent: ~
-- kind:
-    name: QuotedAnnotation
-    body: Remove quotes from type annotation
-    suggestion: Remove quotes
-    fixable: true
-  location:
-    row: 67
-    column: 44
-  end_location:
-    row: 67
-    column: 49
-  fix:
-    edits:
-      - content: int
-        location:
-          row: 67
-          column: 44
-        end_location:
-          row: 67
-          column: 49
-  parent: ~
+UP037.py:18:14: UP037 [*] Remove quotes from type annotation
+   |
+18 | def foo(var: "MyClass") -> "MyClass":
+   |              ^^^^^^^^^ UP037
+19 |     x: "MyClass"
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+15 15 | from mypy_extensions import Arg, DefaultArg, DefaultNamedArg, NamedArg, VarArg
+16 16 | 
+17 17 | 
+18    |-def foo(var: "MyClass") -> "MyClass":
+   18 |+def foo(var: MyClass) -> "MyClass":
+19 19 |     x: "MyClass"
+20 20 | 
+21 21 | 
+
+UP037.py:18:28: UP037 [*] Remove quotes from type annotation
+   |
+18 | def foo(var: "MyClass") -> "MyClass":
+   |                            ^^^^^^^^^ UP037
+19 |     x: "MyClass"
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+15 15 | from mypy_extensions import Arg, DefaultArg, DefaultNamedArg, NamedArg, VarArg
+16 16 | 
+17 17 | 
+18    |-def foo(var: "MyClass") -> "MyClass":
+   18 |+def foo(var: "MyClass") -> MyClass:
+19 19 |     x: "MyClass"
+20 20 | 
+21 21 | 
+
+UP037.py:19:8: UP037 [*] Remove quotes from type annotation
+   |
+19 | def foo(var: "MyClass") -> "MyClass":
+20 |     x: "MyClass"
+   |        ^^^^^^^^^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+16 16 | 
+17 17 | 
+18 18 | def foo(var: "MyClass") -> "MyClass":
+19    |-    x: "MyClass"
+   19 |+    x: MyClass
+20 20 | 
+21 21 | 
+22 22 | def foo(*, inplace: "bool"):
+
+UP037.py:22:21: UP037 [*] Remove quotes from type annotation
+   |
+22 | def foo(*, inplace: "bool"):
+   |                     ^^^^^^ UP037
+23 |     pass
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+19 19 |     x: "MyClass"
+20 20 | 
+21 21 | 
+22    |-def foo(*, inplace: "bool"):
+   22 |+def foo(*, inplace: bool):
+23 23 |     pass
+24 24 | 
+25 25 | 
+
+UP037.py:26:16: UP037 [*] Remove quotes from type annotation
+   |
+26 | def foo(*args: "str", **kwargs: "int"):
+   |                ^^^^^ UP037
+27 |     pass
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+23 23 |     pass
+24 24 | 
+25 25 | 
+26    |-def foo(*args: "str", **kwargs: "int"):
+   26 |+def foo(*args: str, **kwargs: "int"):
+27 27 |     pass
+28 28 | 
+29 29 | 
+
+UP037.py:26:33: UP037 [*] Remove quotes from type annotation
+   |
+26 | def foo(*args: "str", **kwargs: "int"):
+   |                                 ^^^^^ UP037
+27 |     pass
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+23 23 |     pass
+24 24 | 
+25 25 | 
+26    |-def foo(*args: "str", **kwargs: "int"):
+   26 |+def foo(*args: "str", **kwargs: int):
+27 27 |     pass
+28 28 | 
+29 29 | 
+
+UP037.py:30:10: UP037 [*] Remove quotes from type annotation
+   |
+30 | x: Tuple["MyClass"]
+   |          ^^^^^^^^^ UP037
+31 | 
+32 | x: Callable[["MyClass"], None]
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+27 27 |     pass
+28 28 | 
+29 29 | 
+30    |-x: Tuple["MyClass"]
+   30 |+x: Tuple[MyClass]
+31 31 | 
+32 32 | x: Callable[["MyClass"], None]
+33 33 | 
+
+UP037.py:32:14: UP037 [*] Remove quotes from type annotation
+   |
+32 | x: Tuple["MyClass"]
+33 | 
+34 | x: Callable[["MyClass"], None]
+   |              ^^^^^^^^^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+29 29 | 
+30 30 | x: Tuple["MyClass"]
+31 31 | 
+32    |-x: Callable[["MyClass"], None]
+   32 |+x: Callable[[MyClass], None]
+33 33 | 
+34 34 | 
+35 35 | class Foo(NamedTuple):
+
+UP037.py:36:8: UP037 [*] Remove quotes from type annotation
+   |
+36 | class Foo(NamedTuple):
+37 |     x: "MyClass"
+   |        ^^^^^^^^^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+33 33 | 
+34 34 | 
+35 35 | class Foo(NamedTuple):
+36    |-    x: "MyClass"
+   36 |+    x: MyClass
+37 37 | 
+38 38 | 
+39 39 | class D(TypedDict):
+
+UP037.py:40:27: UP037 [*] Remove quotes from type annotation
+   |
+40 | class D(TypedDict):
+41 |     E: TypedDict("E", foo="int", total=False)
+   |                           ^^^^^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+37 37 | 
+38 38 | 
+39 39 | class D(TypedDict):
+40    |-    E: TypedDict("E", foo="int", total=False)
+   40 |+    E: TypedDict("E", foo=int, total=False)
+41 41 | 
+42 42 | 
+43 43 | class D(TypedDict):
+
+UP037.py:44:31: UP037 [*] Remove quotes from type annotation
+   |
+44 | class D(TypedDict):
+45 |     E: TypedDict("E", {"foo": "int"})
+   |                               ^^^^^ UP037
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+41 41 | 
+42 42 | 
+43 43 | class D(TypedDict):
+44    |-    E: TypedDict("E", {"foo": "int"})
+   44 |+    E: TypedDict("E", {"foo": int})
+45 45 | 
+46 46 | 
+47 47 | x: Annotated["str", "metadata"]
+
+UP037.py:47:14: UP037 [*] Remove quotes from type annotation
+   |
+47 | x: Annotated["str", "metadata"]
+   |              ^^^^^ UP037
+48 | 
+49 | x: Arg("str", "name")
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+44 44 |     E: TypedDict("E", {"foo": "int"})
+45 45 | 
+46 46 | 
+47    |-x: Annotated["str", "metadata"]
+   47 |+x: Annotated[str, "metadata"]
+48 48 | 
+49 49 | x: Arg("str", "name")
+50 50 | 
+
+UP037.py:49:8: UP037 [*] Remove quotes from type annotation
+   |
+49 | x: Annotated["str", "metadata"]
+50 | 
+51 | x: Arg("str", "name")
+   |        ^^^^^ UP037
+52 | 
+53 | x: DefaultArg("str", "name")
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+46 46 | 
+47 47 | x: Annotated["str", "metadata"]
+48 48 | 
+49    |-x: Arg("str", "name")
+   49 |+x: Arg(str, "name")
+50 50 | 
+51 51 | x: DefaultArg("str", "name")
+52 52 | 
+
+UP037.py:51:15: UP037 [*] Remove quotes from type annotation
+   |
+51 | x: Arg("str", "name")
+52 | 
+53 | x: DefaultArg("str", "name")
+   |               ^^^^^ UP037
+54 | 
+55 | x: NamedArg("str", "name")
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+48 48 | 
+49 49 | x: Arg("str", "name")
+50 50 | 
+51    |-x: DefaultArg("str", "name")
+   51 |+x: DefaultArg(str, "name")
+52 52 | 
+53 53 | x: NamedArg("str", "name")
+54 54 | 
+
+UP037.py:53:13: UP037 [*] Remove quotes from type annotation
+   |
+53 | x: DefaultArg("str", "name")
+54 | 
+55 | x: NamedArg("str", "name")
+   |             ^^^^^ UP037
+56 | 
+57 | x: DefaultNamedArg("str", "name")
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+50 50 | 
+51 51 | x: DefaultArg("str", "name")
+52 52 | 
+53    |-x: NamedArg("str", "name")
+   53 |+x: NamedArg(str, "name")
+54 54 | 
+55 55 | x: DefaultNamedArg("str", "name")
+56 56 | 
+
+UP037.py:55:20: UP037 [*] Remove quotes from type annotation
+   |
+55 | x: NamedArg("str", "name")
+56 | 
+57 | x: DefaultNamedArg("str", "name")
+   |                    ^^^^^ UP037
+58 | 
+59 | x: DefaultNamedArg("str", name="name")
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+52 52 | 
+53 53 | x: NamedArg("str", "name")
+54 54 | 
+55    |-x: DefaultNamedArg("str", "name")
+   55 |+x: DefaultNamedArg(str, "name")
+56 56 | 
+57 57 | x: DefaultNamedArg("str", name="name")
+58 58 | 
+
+UP037.py:57:20: UP037 [*] Remove quotes from type annotation
+   |
+57 | x: DefaultNamedArg("str", "name")
+58 | 
+59 | x: DefaultNamedArg("str", name="name")
+   |                    ^^^^^ UP037
+60 | 
+61 | x: VarArg("str")
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+54 54 | 
+55 55 | x: DefaultNamedArg("str", "name")
+56 56 | 
+57    |-x: DefaultNamedArg("str", name="name")
+   57 |+x: DefaultNamedArg(str, name="name")
+58 58 | 
+59 59 | x: VarArg("str")
+60 60 | 
+
+UP037.py:59:11: UP037 [*] Remove quotes from type annotation
+   |
+59 | x: DefaultNamedArg("str", name="name")
+60 | 
+61 | x: VarArg("str")
+   |           ^^^^^ UP037
+62 | 
+63 | x: List[List[List["MyClass"]]]
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+56 56 | 
+57 57 | x: DefaultNamedArg("str", name="name")
+58 58 | 
+59    |-x: VarArg("str")
+   59 |+x: VarArg(str)
+60 60 | 
+61 61 | x: List[List[List["MyClass"]]]
+62 62 | 
+
+UP037.py:61:19: UP037 [*] Remove quotes from type annotation
+   |
+61 | x: VarArg("str")
+62 | 
+63 | x: List[List[List["MyClass"]]]
+   |                   ^^^^^^^^^ UP037
+64 | 
+65 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+58 58 | 
+59 59 | x: VarArg("str")
+60 60 | 
+61    |-x: List[List[List["MyClass"]]]
+   61 |+x: List[List[List[MyClass]]]
+62 62 | 
+63 63 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+64 64 | 
+
+UP037.py:63:29: UP037 [*] Remove quotes from type annotation
+   |
+63 | x: List[List[List["MyClass"]]]
+64 | 
+65 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+   |                             ^^^^^ UP037
+66 | 
+67 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+60 60 | 
+61 61 | x: List[List[List["MyClass"]]]
+62 62 | 
+63    |-x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+   63 |+x: NamedTuple("X", [("foo", int), ("bar", "str")])
+64 64 | 
+65 65 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+66 66 | 
+
+UP037.py:63:45: UP037 [*] Remove quotes from type annotation
+   |
+63 | x: List[List[List["MyClass"]]]
+64 | 
+65 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+   |                                             ^^^^^ UP037
+66 | 
+67 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+60 60 | 
+61 61 | x: List[List[List["MyClass"]]]
+62 62 | 
+63    |-x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+   63 |+x: NamedTuple("X", [("foo", "int"), ("bar", str)])
+64 64 | 
+65 65 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+66 66 | 
+
+UP037.py:65:29: UP037 [*] Remove quotes from type annotation
+   |
+65 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+66 | 
+67 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+   |                             ^^^^^ UP037
+68 | 
+69 | x: NamedTuple(typename="X", fields=[("foo", "int")])
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+62 62 | 
+63 63 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+64 64 | 
+65    |-x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+   65 |+x: NamedTuple("X", fields=[(foo, "int"), ("bar", "str")])
+66 66 | 
+67 67 | x: NamedTuple(typename="X", fields=[("foo", "int")])
+68 68 | 
+
+UP037.py:65:36: UP037 [*] Remove quotes from type annotation
+   |
+65 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+66 | 
+67 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+   |                                    ^^^^^ UP037
+68 | 
+69 | x: NamedTuple(typename="X", fields=[("foo", "int")])
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+62 62 | 
+63 63 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+64 64 | 
+65    |-x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+   65 |+x: NamedTuple("X", fields=[("foo", int), ("bar", "str")])
+66 66 | 
+67 67 | x: NamedTuple(typename="X", fields=[("foo", "int")])
+68 68 | 
+
+UP037.py:65:45: UP037 [*] Remove quotes from type annotation
+   |
+65 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+66 | 
+67 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+   |                                             ^^^^^ UP037
+68 | 
+69 | x: NamedTuple(typename="X", fields=[("foo", "int")])
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+62 62 | 
+63 63 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+64 64 | 
+65    |-x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+   65 |+x: NamedTuple("X", fields=[("foo", "int"), (bar, "str")])
+66 66 | 
+67 67 | x: NamedTuple(typename="X", fields=[("foo", "int")])
+68 68 | 
+
+UP037.py:65:52: UP037 [*] Remove quotes from type annotation
+   |
+65 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+66 | 
+67 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+   |                                                    ^^^^^ UP037
+68 | 
+69 | x: NamedTuple(typename="X", fields=[("foo", "int")])
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+62 62 | 
+63 63 | x: NamedTuple("X", [("foo", "int"), ("bar", "str")])
+64 64 | 
+65    |-x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+   65 |+x: NamedTuple("X", fields=[("foo", "int"), ("bar", str)])
+66 66 | 
+67 67 | x: NamedTuple(typename="X", fields=[("foo", "int")])
+68 68 | 
+
+UP037.py:67:24: UP037 [*] Remove quotes from type annotation
+   |
+67 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+68 | 
+69 | x: NamedTuple(typename="X", fields=[("foo", "int")])
+   |                        ^^^ UP037
+70 | 
+71 | X: MyCallable("X")
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+64 64 | 
+65 65 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+66 66 | 
+67    |-x: NamedTuple(typename="X", fields=[("foo", "int")])
+   67 |+x: NamedTuple(typename=X, fields=[("foo", "int")])
+68 68 | 
+69 69 | X: MyCallable("X")
+70 70 | 
+
+UP037.py:67:38: UP037 [*] Remove quotes from type annotation
+   |
+67 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+68 | 
+69 | x: NamedTuple(typename="X", fields=[("foo", "int")])
+   |                                      ^^^^^ UP037
+70 | 
+71 | X: MyCallable("X")
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+64 64 | 
+65 65 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+66 66 | 
+67    |-x: NamedTuple(typename="X", fields=[("foo", "int")])
+   67 |+x: NamedTuple(typename="X", fields=[(foo, "int")])
+68 68 | 
+69 69 | X: MyCallable("X")
+70 70 | 
+
+UP037.py:67:45: UP037 [*] Remove quotes from type annotation
+   |
+67 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+68 | 
+69 | x: NamedTuple(typename="X", fields=[("foo", "int")])
+   |                                             ^^^^^ UP037
+70 | 
+71 | X: MyCallable("X")
+   |
+   = help: Remove quotes
+
+ℹ Suggested fix
+64 64 | 
+65 65 | x: NamedTuple("X", fields=[("foo", "int"), ("bar", "str")])
+66 66 | 
+67    |-x: NamedTuple(typename="X", fields=[("foo", "int")])
+   67 |+x: NamedTuple(typename="X", fields=[("foo", int)])
+68 68 | 
+69 69 | X: MyCallable("X")
+70 70 | 
+
 
