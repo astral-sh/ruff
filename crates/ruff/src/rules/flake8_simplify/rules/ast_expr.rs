@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 use ruff_python_ast::types::Range;
@@ -33,35 +33,30 @@ pub struct DictGetWithNoneDefault {
     pub original: String,
 }
 
-impl AlwaysAutofixableViolation for DictGetWithNoneDefault {
+impl Violation for DictGetWithNoneDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DictGetWithNoneDefault { expected, original } = self;
         format!("Use `{expected}` instead of `{original}`")
     }
-
-    fn autofix_title(&self) -> String {
-        let DictGetWithNoneDefault { expected, original } = self;
-        format!("Replace `{original}` with `{expected}`")
-    }
 }
 
 /// SIM112
 pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
-    // check `os.environ['foo']`
+    // Ex) `os.environ['foo']`
     if let ExprKind::Subscript { .. } = &expr.node {
         check_os_environ_subscript(checker, expr);
         return;
     }
 
-    // check `os.environ.get('foo')` and `os.getenv('foo')`.
+    // Ex) `os.environ.get('foo')`, `os.getenv('foo')`
     let ExprKind::Call { func, args, .. } = &expr.node else {
         return;
     };
     let Some(arg) = args.get(0) else {
         return;
     };
-    let ExprKind::Constant { value: Constant::Str(env_var), kind } = &arg.node else {
+    let ExprKind::Constant { value: Constant::Str(env_var), .. } = &arg.node else {
         return;
     };
     if !checker
@@ -80,25 +75,13 @@ pub fn use_capital_environment_variables(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(
+    checker.diagnostics.push(Diagnostic::new(
         UncapitalizedEnvironmentVariables {
-            expected: capital_env_var.clone(),
+            expected: capital_env_var,
             original: env_var.clone(),
         },
         Range::from(arg),
-    );
-    if checker.patch(diagnostic.kind.rule()) {
-        let new_env_var = create_expr(ExprKind::Constant {
-            value: capital_env_var.into(),
-            kind: kind.clone(),
-        });
-        diagnostic.set_fix(Edit::replacement(
-            unparse_expr(&new_env_var, checker.stylist),
-            arg.location,
-            arg.end_location.unwrap(),
-        ));
-    }
-    checker.diagnostics.push(diagnostic);
+    ));
 }
 
 fn check_os_environ_subscript(checker: &mut Checker, expr: &Expr) {
