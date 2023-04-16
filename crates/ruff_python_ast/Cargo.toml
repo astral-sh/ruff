@@ -13,6 +13,7 @@ ruff_text_size = { workspace = true, features = ["serde"] }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }
+memchr = "2.5.0"
 is-macro = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }

@@ -234,11 +234,12 @@ fn top_of_file_insertion(body: &[Stmt], locator: &Locator, stylist: &Stylist) ->
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use ruff_python_ast::newlines::LineEnding;
     use ruff_text_size::TextSize;
     use rustpython_parser as parser;
     use rustpython_parser::lexer::LexResult;
 
-    use ruff_python_ast::source_code::{LineEnding, Locator, Stylist};
+    use ruff_python_ast::source_code::{Locator, Stylist};
 
     use crate::importer::{top_of_file_insertion, Insertion};
 
