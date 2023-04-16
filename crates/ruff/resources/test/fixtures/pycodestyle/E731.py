@@ -13,6 +13,7 @@ f = lambda: (yield from g())
 class F:
     f = lambda x: 2 * x
 
+
 f = object()
 f.method = lambda: "Method"
 f = {}

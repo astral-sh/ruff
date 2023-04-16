@@ -135,6 +135,14 @@ fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> 
     if elts.len() != 2 {
         return None;
     }
+
+    if !ctx.resolve_call_path(value).map_or(false, |call_path| {
+        call_path.as_slice() == ["collections", "abc", "Callable"]
+            || ctx.match_typing_call_path(&call_path, "Callable")
+    }) {
+        return None;
+    }
+
     // The first argument to `Callable` must be a list of types, parameter
     // specification, or ellipsis.
     let args = match &elts[0].node {
@@ -145,13 +153,11 @@ fn extract_types(ctx: &Context, annotation: &Expr) -> Option<(Vec<Expr>, Expr)> 
         } => vec![],
         _ => return None,
     };
-    if !ctx.resolve_call_path(value).map_or(false, |call_path| {
-        call_path.as_slice() == ["collections", "abc", "Callable"]
-            || ctx.match_typing_call_path(&call_path, "Callable")
-    }) {
-        return None;
-    }
-    Some((args, elts[1].clone()))
+
+    // The second argument to `Callable` must be a type.
+    let return_type = elts[1].clone();
+
+    Some((args, return_type))
 }
 
 fn function(
