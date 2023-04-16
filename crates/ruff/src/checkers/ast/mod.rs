@@ -1786,7 +1786,7 @@ where
             StmtKind::Assign { targets, value, .. } => {
                 if self.settings.rules.enabled(Rule::LambdaAssignment) {
                     if let [target] = &targets[..] {
-                        pycodestyle::rules::lambda_assignment(self, target, value, stmt);
+                        pycodestyle::rules::lambda_assignment(self, target, value, None, stmt);
                     }
                 }
 
@@ -1861,7 +1861,13 @@ where
             } => {
                 if self.settings.rules.enabled(Rule::LambdaAssignment) {
                     if let Some(value) = value {
-                        pycodestyle::rules::lambda_assignment(self, target, value, stmt);
+                        pycodestyle::rules::lambda_assignment(
+                            self,
+                            target,
+                            value,
+                            Some(annotation),
+                            stmt,
+                        );
                     }
                 }
                 if self
