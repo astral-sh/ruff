@@ -51,7 +51,7 @@ impl<T> LinterResult<T> {
     }
 }
 
-pub type MessagesAndImports = (Vec<Message>, Imports);
+pub type MessagesAndImports = (Vec<Message>, ImportMap);
 pub type FixTable = FxHashMap<Rule, usize>;
 
 pub struct FixerResult<'a> {
