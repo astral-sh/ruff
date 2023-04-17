@@ -3,6 +3,7 @@ use rustpython_parser::lexer::LexResult;
 
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::token_kind::TokenKind;
 
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{
@@ -161,12 +162,21 @@ pub fn check_logical_lines(
         }
 
         // Extract the indentation level.
-        let Some(start_loc) = line.first_token_location() else { continue; };
-        let start_line = locator.slice(TextRange::new(locator.line_start(start_loc), start_loc));
-        let indent_level = expand_indent(start_line);
+        let Some(first_token) = line.first_token() else {
+            continue;
+        };
+
+        let range = if first_token.kind() == TokenKind::Indent {
+            first_token.range()
+        } else {
+            TextRange::new(locator.line_start(first_token.start()), first_token.start())
+        };
+
+        let indent_level = expand_indent(locator.slice(range));
+
         let indent_size = 4;
 
-        for (location, kind) in indentation(
+        for kind in indentation(
             &line,
             prev_line.as_ref(),
             indent_char,
@@ -177,7 +187,7 @@ pub fn check_logical_lines(
             if settings.rules.enabled(kind.rule()) {
                 diagnostics.push(Diagnostic {
                     kind,
-                    range: TextRange::empty(location),
+                    range,
                     fix: Fix::empty(),
                     parent: None,
                 });

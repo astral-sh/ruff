@@ -30,10 +30,10 @@ path-absolutize = { version = "3.0.14" }
 proc-macro2 = { version = "1.0.51" }
 quote = { version = "1.0.23" }
 regex = { version = "1.7.1" }
-ruff_text_size = { git = "https://github.com/charliermarsh/RustPython.git", rev = "f336c43058ce37594635fab1fb85d2ad288bdcdb" }
+ruff_text_size = { git = "https://github.com/charliermarsh/RustPython.git", rev = "974a19cc535bb6eeefec11a8d9c1cf4e212010e0" }
 rustc-hash = { version = "1.1.0" }
-rustpython-common = { git = "https://github.com/charliermarsh/RustPython.git", rev = "f336c43058ce37594635fab1fb85d2ad288bdcdb" }
-rustpython-parser = { git = "https://github.com/charliermarsh/RustPython.git", rev = "f336c43058ce37594635fab1fb85d2ad288bdcdb" }
+rustpython-common = { git = "https://github.com/charliermarsh/RustPython.git", rev = "974a19cc535bb6eeefec11a8d9c1cf4e212010e0" }
+rustpython-parser = { git = "https://github.com/charliermarsh/RustPython.git", rev = "974a19cc535bb6eeefec11a8d9c1cf4e212010e0" }
 schemars = { version = "0.8.12" }
 serde = { version = "1.0.152", features = ["derive"] }
 serde_json = { version = "1.0.93", features = ["preserve_order"] }

@@ -261,9 +261,8 @@ impl<'a> LogicalLine<'a> {
         }
     }
 
-    /// Returns the [`TextSize`] of the first token on the line or [`None`].
-    pub fn first_token_location(&self) -> Option<TextSize> {
-        self.tokens().first().map(|t| t.start())
+    pub fn first_token(&self) -> Option<LogicalLineToken> {
+        self.tokens().first()
     }
 
     /// Returns the line's flags
@@ -535,7 +534,14 @@ impl Whitespace {
         match count {
             0 => (Self::None, TextSize::default()),
             1 => (Self::Single, len),
-            _ => (Self::Many, len),
+            _ => {
+                if len == content.text_len() {
+                    // All whitespace up to the start of the line -> Indent
+                    (Self::None, TextSize::default())
+                } else {
+                    (Self::Many, len)
+                }
+            }
         }
     }
 }

@@ -4,7 +4,6 @@ use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
-use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -73,17 +72,16 @@ fn detect_quote(tokens: &[LexResult], locator: &Locator) -> Quote {
 }
 
 fn detect_indention(tokens: &[LexResult], locator: &Locator) -> Indentation {
-    let indent_end = tokens.iter().flatten().find_map(|(t, range)| {
+    let indent_range = tokens.iter().flatten().find_map(|(t, range)| {
         if matches!(t, Tok::Indent) {
-            Some(range.end())
+            Some(range)
         } else {
             None
         }
     });
 
-    if let Some(indent_end) = indent_end {
-        let start = locator.line_start(indent_end);
-        let whitespace = locator.slice(TextRange::new(start, indent_end));
+    if let Some(indent_range) = indent_range {
+        let whitespace = locator.slice(*indent_range);
 
         Indentation(whitespace.to_string())
     } else {

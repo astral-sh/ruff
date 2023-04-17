@@ -2285,7 +2285,7 @@ dependencies = [
 [[package]]
 name = "ruff_text_size"
 version = "0.0.0"
-source = "git+https://github.com/charliermarsh/RustPython.git?rev=f336c43058ce37594635fab1fb85d2ad288bdcdb#f336c43058ce37594635fab1fb85d2ad288bdcdb"
+source = "git+https://github.com/charliermarsh/RustPython.git?rev=974a19cc535bb6eeefec11a8d9c1cf4e212010e0#974a19cc535bb6eeefec11a8d9c1cf4e212010e0"
 dependencies = [
  "schemars",
  "serde",
@@ -2356,7 +2356,7 @@ dependencies = [
 [[package]]
 name = "rustpython-ast"
 version = "0.2.0"
-source = "git+https://github.com/charliermarsh/RustPython.git?rev=f336c43058ce37594635fab1fb85d2ad288bdcdb#f336c43058ce37594635fab1fb85d2ad288bdcdb"
+source = "git+https://github.com/charliermarsh/RustPython.git?rev=974a19cc535bb6eeefec11a8d9c1cf4e212010e0#974a19cc535bb6eeefec11a8d9c1cf4e212010e0"
 dependencies = [
  "num-bigint",
  "ruff_text_size",
@@ -2365,7 +2365,7 @@ dependencies = [
 [[package]]
 name = "rustpython-common"
 version = "0.2.0"
-source = "git+https://github.com/charliermarsh/RustPython.git?rev=f336c43058ce37594635fab1fb85d2ad288bdcdb#f336c43058ce37594635fab1fb85d2ad288bdcdb"
+source = "git+https://github.com/charliermarsh/RustPython.git?rev=974a19cc535bb6eeefec11a8d9c1cf4e212010e0#974a19cc535bb6eeefec11a8d9c1cf4e212010e0"
 dependencies = [
  "ascii",
  "bitflags 1.3.2",
@@ -2391,7 +2391,7 @@ dependencies = [
 [[package]]
 name = "rustpython-compiler-core"
 version = "0.2.0"
-source = "git+https://github.com/charliermarsh/RustPython.git?rev=f336c43058ce37594635fab1fb85d2ad288bdcdb#f336c43058ce37594635fab1fb85d2ad288bdcdb"
+source = "git+https://github.com/charliermarsh/RustPython.git?rev=974a19cc535bb6eeefec11a8d9c1cf4e212010e0#974a19cc535bb6eeefec11a8d9c1cf4e212010e0"
 dependencies = [
  "bitflags 1.3.2",
  "bstr 0.2.17",
@@ -2405,7 +2405,7 @@ dependencies = [
 [[package]]
 name = "rustpython-parser"
 version = "0.2.0"
-source = "git+https://github.com/charliermarsh/RustPython.git?rev=f336c43058ce37594635fab1fb85d2ad288bdcdb#f336c43058ce37594635fab1fb85d2ad288bdcdb"
+source = "git+https://github.com/charliermarsh/RustPython.git?rev=974a19cc535bb6eeefec11a8d9c1cf4e212010e0#974a19cc535bb6eeefec11a8d9c1cf4e212010e0"
 dependencies = [
  "ahash",
  "anyhow",
