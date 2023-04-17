@@ -9,6 +9,30 @@ use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for an empty type-checking block.
+///
+/// ## Why is this bad?
+/// The type-checking block does not do anything and should be removed to avoid
+/// confusion.
+///
+/// ## Example
+/// ```python
+/// from typing import TYPE_CHECKING
+///
+/// if TYPE_CHECKING:
+///    pass
+///
+/// print("Hello, world!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Hello, world!")
+/// ```
+///
+/// ## References
+/// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct EmptyTypeCheckingBlock;
 
