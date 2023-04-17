@@ -87,7 +87,6 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
         new_contents += "\n"
 
         rules_mod.write_text(new_contents)
-        rustfmt(rules_mod)
     else:
         with rules_mod.open("a") as fp:
             fp.write(f"{new_pub_use};")
@@ -196,8 +195,12 @@ pub fn {rule_name_snake}(checker: &mut Checker) {{}}
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("w") as fp:
         fp.write(text)
 
-def rustfmt(path):
+    _rustfmt(rules_mod)
+
+
+def _rustfmt(path: str) -> None:
     subprocess.run(["rustfmt", path])
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
