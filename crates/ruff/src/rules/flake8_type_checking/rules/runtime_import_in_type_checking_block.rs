@@ -4,6 +4,34 @@ use ruff_python_semantic::binding::{
     Binding, BindingKind, ExecutionContext, FromImportation, Importation, SubmoduleImportation,
 };
 
+/// ## What it does
+/// Checks for runtime imports defined in a type-checking block.
+///
+/// ## Why is this bad?
+/// The type-checking block is not executed at runtime, so the import will not
+/// be available at runtime.
+///
+/// ## Example
+/// ```python
+/// from typing import TYPE_CHECKING
+///
+/// if TYPE_CHECKING:
+///    import foo
+///
+/// def bar() -> None:
+///     foo.bar()  # raises NameError: name 'foo' is not defined
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import foo
+///
+/// def bar() -> None:
+///    foo.bar()
+/// ```
+///
+/// ## References
+/// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct RuntimeImportInTypeCheckingBlock {
     pub full_name: String,
