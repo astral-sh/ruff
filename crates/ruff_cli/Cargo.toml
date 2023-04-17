@@ -65,6 +65,9 @@ ureq = { version = "2.6.2", features = [] }
 [features]
 jupyter_notebook = ["ruff/jupyter_notebook"]
 
+[package.metadata.maturin]
+name = "ruff"
+
 [target.'cfg(target_os = "windows")'.dependencies]
 mimalloc = "0.1.34"
 
