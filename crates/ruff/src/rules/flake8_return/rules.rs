@@ -9,6 +9,7 @@ use ruff_python_ast::helpers::is_const_none;
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -181,8 +182,6 @@ const NORETURN_FUNCS: &[&[&str]] = &[
     &["posix", "_exit"],
     &["posix", "abort"],
     &["sys", "exit"],
-    &["typing", "assert_never"],
-    &["typing_extensions", "assert_never"],
     &["_thread", "exit"],
     &["_winapi", "ExitProcess"],
     // third-party modules
@@ -193,15 +192,13 @@ const NORETURN_FUNCS: &[&[&str]] = &[
 ];
 
 /// Return `true` if the `func` is a known function that never returns.
-fn is_noreturn_func(checker: &Checker, func: &Expr) -> bool {
-    checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            NORETURN_FUNCS
-                .iter()
-                .any(|target| call_path.as_slice() == *target)
-        })
+fn is_noreturn_func(context: &Context, func: &Expr) -> bool {
+    context.resolve_call_path(func).map_or(false, |call_path| {
+        NORETURN_FUNCS
+            .iter()
+            .any(|target| call_path.as_slice() == *target)
+            || context.match_typing_call_path(&call_path, "assert_never")
+    })
 }
 
 /// RET503
@@ -288,7 +285,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if matches!(
                 &value.node,
                 ExprKind::Call { func, ..  }
-                    if is_noreturn_func(checker, func)
+                    if is_noreturn_func(&checker.ctx, func)
             ) => {}
         _ => {
             let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
