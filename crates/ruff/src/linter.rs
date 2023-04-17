@@ -23,6 +23,7 @@ use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
+use crate::logging::DisplayParseError;
 use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
@@ -296,12 +297,7 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
 
     // Log any parse errors.
     if let Some(err) = error {
-        error!(
-            "{}{}{} {err:?}",
-            "Failed to parse ".bold(),
-            fs::relativize_path(path).bold(),
-            ":".bold()
-        );
+        error!("{}", DisplayParseError::new(err, locator.to_source_code()));
     }
 
     // Add any missing `# noqa` pragmas.

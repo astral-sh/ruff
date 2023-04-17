@@ -1,10 +1,15 @@
+use std::fmt::{Display, Formatter};
+use std::path::Path;
 use std::sync::Mutex;
 
+use crate::fs;
 use anyhow::Result;
 use colored::Colorize;
 use fern;
 use log::Level;
 use once_cell::sync::Lazy;
+use ruff_python_ast::source_code::SourceCode;
+use rustpython_parser::ParseError;
 
 pub(crate) static WARNINGS: Lazy<Mutex<Vec<&'static str>>> = Lazy::new(Mutex::default);
 
@@ -125,6 +130,34 @@ pub fn set_up_logging(level: &LogLevel) -> Result<()> {
         .chain(std::io::stderr())
         .apply()?;
     Ok(())
+}
+
+pub struct DisplayParseError<'a> {
+    error: ParseError,
+    source_code: SourceCode<'a, 'a>,
+}
+
+impl<'a> DisplayParseError<'a> {
+    pub fn new(error: ParseError, source_code: SourceCode<'a, 'a>) -> Self {
+        Self { error, source_code }
+    }
+}
+
+impl Display for DisplayParseError<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        let source_location = self.source_code.source_location(self.error.location);
+
+        write!(
+            f,
+            "{header} {path}{colon}{row}{colon}{column}{colon} {inner}",
+            header = "Failed to parse ".bold(),
+            path = fs::relativize_path(Path::new(&self.error.source_path)).bold(),
+            row = source_location.row,
+            column = source_location.column,
+            colon = ":".cyan(),
+            inner = &self.error.error
+        )
+    }
 }
 
 #[cfg(test)]

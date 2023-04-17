@@ -16,10 +16,11 @@ use similar::TextDiff;
 use ruff::fs;
 use ruff::jupyter::{is_jupyter_notebook, JupyterIndex, JupyterNotebook};
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
+use ruff::logging::DisplayParseError;
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::source_code::SourceFileBuilder;
+use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
 
 use crate::cache;
 
@@ -200,13 +201,12 @@ pub fn lint_path(
     let imports = imports.unwrap_or_default();
 
     if let Some(err) = parse_error {
-        // FIXME micha manually print parse errors to get line and column numbers
-        // Notify the user of any parse errors.
         error!(
-            "{}{}{} {err}",
-            "Failed to parse ".bold(),
-            fs::relativize_path(path).bold(),
-            ":".bold()
+            "{}",
+            DisplayParseError::new(
+                err,
+                SourceCode::new(&contents, &LineIndex::from_source_text(&contents))
+            )
         );
 
         // Purge the cache.
