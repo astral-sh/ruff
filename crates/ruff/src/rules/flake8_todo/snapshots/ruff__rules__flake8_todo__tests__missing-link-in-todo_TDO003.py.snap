@@ -1,0 +1,12 @@
+---
+source: crates/ruff/src/rules/flake8_todo/mod.rs
+---
+TDO003.py:10:1: TDO003 Missing issue link in TODO
+   |
+10 | # TDO003 - errors
+11 | # TODO: this comment has no
+12 | # link after it
+   | ^^^^^^^^^^^^^^^ TDO003
+   |
+
+

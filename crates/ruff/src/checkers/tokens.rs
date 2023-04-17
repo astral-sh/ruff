@@ -62,11 +62,11 @@ pub(crate) fn check_tokens(
     let enforce_todos = settings.rules.any_enabled(&[
         Rule::InvalidTodoTag,
         Rule::MissingAuthorInTodo,
+        Rule::MissingLinkInTodo,
         Rule::MissingColonInTodo,
         Rule::MissingTextInTodo,
-        Rule::MissingSpaceAfterColonInTodo,
         Rule::InvalidCapitalizationInTodo,
-        //     Rule::TodoMissingLink,
+        Rule::MissingSpaceAfterColonInTodo,
     ]);
 
     // RUF001, RUF002, RUF003

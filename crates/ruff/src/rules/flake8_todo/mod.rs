@@ -14,6 +14,7 @@ mod tests {
 
     #[test_case(Rule::InvalidTodoTag, Path::new("TDO001.py"); "TDO001")]
     #[test_case(Rule::MissingAuthorInTodo, Path::new("TDO002.py"); "TDO002")]
+    #[test_case(Rule::MissingLinkInTodo, Path::new("TDO003.py"); "TDO003")]
     #[test_case(Rule::MissingColonInTodo, Path::new("TDO004.py"); "TDO004")]
     #[test_case(Rule::MissingTextInTodo, Path::new("TDO005.py"); "TDO005")]
     #[test_case(Rule::InvalidCapitalizationInTodo, Path::new("TDO006.py"); "TDO006")]

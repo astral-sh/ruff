@@ -745,6 +745,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         // flake8-todo
         (Flake8Todo, "001") => Rule::InvalidTodoTag,
         (Flake8Todo, "002") => Rule::MissingAuthorInTodo,
+        (Flake8Todo, "003") => Rule::MissingLinkInTodo,
         (Flake8Todo, "004") => Rule::MissingColonInTodo,
         (Flake8Todo, "005") => Rule::MissingTextInTodo,
         (Flake8Todo, "006") => Rule::InvalidCapitalizationInTodo,

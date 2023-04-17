@@ -33,11 +33,11 @@ impl Violation for MissingAuthorInTodo {
 }
 
 #[violation]
-pub struct MissingLink;
-impl Violation for MissingLink {
+pub struct MissingLinkInTodo;
+impl Violation for MissingLinkInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("To be implemented")
+        format!("Missing issue link in TODO")
     }
 }
 
@@ -102,24 +102,47 @@ impl Violation for MissingSpaceAfterColonInTodo {
 // will yield [Some("ToDo"), None, None, Some(" "), Some("this is completely wrong")]. Note the
 // `Nones` for the colon and space checks
 //
-// Note: Tags taken from https://github.com/orsinium-labs/flake8-todos/blob/master/flake8_todos/_rules.py#L12.
+// Note: Regexes taken from https://github.com/orsinium-labs/flake8-todos/blob/master/flake8_todos/_rules.py#L12.
 static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
     Regex::new(r"^#\s*([tT][oO][dD][oO]|BUG|FIXME|XXX)(\(.*\))?(:)?( )?(.+)?$").unwrap()
 });
 
+// Issue code: TDO-003
+static ISSUE_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"^#\s*[A-Z]{1,6}\-?\d+$"#).unwrap());
+// Issue code: 003
+static TICKET_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"^#\s*\d+$"#).unwrap());
+// Link to issue
+static LINK_REGEX: Lazy<Regex> = Lazy::new(|| Regex::new(r#"^#\s*(http|https)://.*"#).unwrap());
 static NUM_CAPTURE_GROUPS: usize = 5usize;
 
 pub fn check_rules(tokens: &[LexResult]) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
+    let mut prev_token_is_todo = false;
 
     for (start, token, end) in tokens.iter().flatten() {
         let Tok::Comment(comment) = token else {
             continue;
         };
 
+        let diagnostics_ref = &mut diagnostics;
+        let range = Range::new(*start, *end);
+
+        // The previous token is a TODO, so let's check if this token is a link
+        if prev_token_is_todo {
+            if ISSUE_REGEX.is_match(comment)
+                || TICKET_REGEX.is_match(comment)
+                || LINK_REGEX.is_match(comment)
+            {
+                prev_token_is_todo = false;
+                // continuing here avoids an expensive call to captures_iter() - we know that this
+                // line, if it's a link, can't be another TODO
+                continue;
+            }
+
+            diagnostics_ref.push(Diagnostic::new(MissingLinkInTodo, range));
+        }
+
         if let Some(captures_ref) = get_captured_matches(comment).peek() {
-            let diagnostics_ref = &mut diagnostics;
-            let range = Range::new(*start, *end);
             let captures = captures_ref.to_owned();
 
             // captures.get(1) is the tag, which is required for the regex to match. The unwrap()
@@ -154,6 +177,10 @@ pub fn check_rules(tokens: &[LexResult]) -> Vec<Diagnostic> {
                     diagnostics_ref.push(diagnostic);
                 };
             }
+
+            prev_token_is_todo = true;
+        } else {
+            prev_token_is_todo = false;
         }
     }
 

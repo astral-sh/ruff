@@ -676,10 +676,11 @@ ruff_macros::register_rules!(
     // flake8-todo
     rules::flake8_todo::rules::InvalidTodoTag,
     rules::flake8_todo::rules::MissingAuthorInTodo,
+    rules::flake8_todo::rules::MissingLinkInTodo,
     rules::flake8_todo::rules::MissingColonInTodo,
-    rules::flake8_todo::rules::MissingSpaceAfterColonInTodo,
     rules::flake8_todo::rules::MissingTextInTodo,
     rules::flake8_todo::rules::InvalidCapitalizationInTodo,
+    rules::flake8_todo::rules::MissingSpaceAfterColonInTodo,
 );
 
 pub trait AsRule {
@@ -950,10 +951,11 @@ impl Rule {
             | Rule::TypeCommentInStub
             | Rule::InvalidTodoTag
             | Rule::MissingAuthorInTodo
-            | Rule::MissingSpaceAfterColonInTodo
+            | Rule::MissingLinkInTodo
+            | Rule::MissingColonInTodo
             | Rule::MissingTextInTodo
             | Rule::InvalidCapitalizationInTodo
-            | Rule::MissingColonInTodo => LintSource::Tokens,
+            | Rule::MissingSpaceAfterColonInTodo => LintSource::Tokens,
             Rule::IOError => LintSource::Io,
             Rule::UnsortedImports | Rule::MissingRequiredImport => LintSource::Imports,
             Rule::ImplicitNamespacePackage | Rule::InvalidModuleName => LintSource::Filesystem,
