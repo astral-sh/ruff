@@ -40,8 +40,7 @@ impl Display for Diff<'_> {
 
         for edit in self.fix.edits() {
             output.push_str(
-                self
-                    .source_code
+                self.source_code
                     .slice(TextRange::new(last_end, edit.start())),
             );
             output.push_str(edit.content().unwrap_or_default());
