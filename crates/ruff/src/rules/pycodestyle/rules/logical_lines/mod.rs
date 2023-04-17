@@ -451,25 +451,22 @@ impl<'a> LogicalLineToken<'a> {
     /// Returns the token's start location
     #[inline]
     pub fn start(&self) -> TextSize {
-        #[allow(unsafe_code)]
-        unsafe {
-            *self.tokens.starts.get_unchecked(self.position)
-        }
+        self.range().start()
     }
 
     /// Returns the token's end location
     #[inline]
     pub fn end(&self) -> TextSize {
-        #[allow(unsafe_code)]
-        unsafe {
-            *self.tokens.ends.get_unchecked(self.position)
-        }
+        self.range().end()
     }
 
     /// Returns a tuple with the token's `(start, end)` locations
     #[inline]
     pub fn range(&self) -> TextRange {
-        TextRange::new(self.start(), self.end())
+        #[allow(unsafe_code)]
+        unsafe {
+            *self.tokens.ranges.get_unchecked(self.position)
+        }
     }
 }
 
@@ -653,11 +650,8 @@ struct Tokens {
     /// The token kinds
     kinds: Vec<TokenKind>,
 
-    /// The start locations
-    starts: Vec<TextSize>,
-
-    /// The end locations
-    ends: Vec<TextSize>,
+    /// The ranges
+    ranges: Vec<TextRange>,
 }
 
 impl Tokens {
@@ -665,8 +659,7 @@ impl Tokens {
     fn with_capacity(capacity: usize) -> Self {
         Self {
             kinds: Vec::with_capacity(capacity),
-            starts: Vec::with_capacity(capacity),
-            ends: Vec::with_capacity(capacity),
+            ranges: Vec::with_capacity(capacity),
         }
     }
 
@@ -678,7 +671,6 @@ impl Tokens {
     /// Adds a new token with the given `kind` and `range`
     fn push(&mut self, kind: TokenKind, range: TextRange) {
         self.kinds.push(kind);
-        self.starts.push(range.start());
-        self.ends.push(range.end());
+        self.ranges.push(range);
     }
 }

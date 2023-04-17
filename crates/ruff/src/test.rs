@@ -94,10 +94,11 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
                     iterations += 1;
                     contents = fixed_contents.to_string();
                 } else {
-                    let source_code =
-                        SourceFileBuilder::new(&path.file_name().unwrap().to_string_lossy())
-                            .source_text_string(contents)
-                            .finish();
+                    let source_code = SourceFileBuilder::new(
+                        path.file_name().unwrap().to_string_lossy().as_ref(),
+                        contents,
+                    )
+                    .finish();
 
                     let messages: Vec<_> = diagnostics
                         .into_iter()
@@ -132,9 +133,11 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
         }
     }
 
-    let source_code = SourceFileBuilder::new(&path.file_name().unwrap().to_string_lossy())
-        .source_text_string(contents)
-        .finish();
+    let source_code = SourceFileBuilder::new(
+        path.file_name().unwrap().to_string_lossy().as_ref(),
+        contents,
+    )
+    .finish();
 
     Ok(diagnostics
         .into_iter()

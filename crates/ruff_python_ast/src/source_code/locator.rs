@@ -37,6 +37,10 @@ impl<'a> Locator<'a> {
             .get_or_init(|| LineIndex::from_source_text(self.contents))
     }
 
+    pub fn line_index(&self) -> Option<&LineIndex> {
+        self.index.get()
+    }
+
     pub fn to_source_code(&self) -> SourceCode {
         SourceCode {
             index: self.to_index(),

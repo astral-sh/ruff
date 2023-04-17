@@ -57,11 +57,11 @@ impl Message {
     }
 
     pub fn compute_start_location(&self) -> SourceLocation {
-        self.file.source_code().source_location(self.start())
+        self.file.to_source_code().source_location(self.start())
     }
 
     pub fn compute_end_location(&self) -> SourceLocation {
-        self.file.source_code().source_location(self.end())
+        self.file.to_source_code().source_location(self.end())
     }
 
     pub const fn start(&self) -> TextSize {
@@ -178,7 +178,7 @@ def fibonacci(n):
             TextRange::new(TextSize::from(7), TextSize::from(9)),
         );
 
-        let fib_source = SourceFileBuilder::new("fib.py").source_text(fib).finish();
+        let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 
         let unused_variable = Diagnostic::new(
             UnusedVariable {
@@ -200,9 +200,7 @@ def fibonacci(n):
             TextRange::new(TextSize::from(3), TextSize::from(4)),
         );
 
-        let file_2_source = SourceFileBuilder::new("undef.py")
-            .source_text(file_2)
-            .finish();
+        let file_2_source = SourceFileBuilder::new("undef.py", file_2).finish();
 
         let unused_import_start = unused_import.start();
         let unused_variable_start = unused_variable.start();

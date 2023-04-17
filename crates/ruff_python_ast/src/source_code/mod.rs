@@ -14,8 +14,8 @@ use rustpython_parser::{lexer, Mode, ParseError};
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
-
 use std::sync::Arc;
+
 pub use stylist::{LineEnding, Stylist};
 
 /// Run round-trip source code generation on a given Python code.
@@ -114,74 +114,43 @@ impl Eq for SourceCode<'_, '_> {}
 /// A Builder for constructing a [`SourceFile`]
 pub struct SourceFileBuilder {
     name: Box<str>,
-    code: Option<FileSourceCode>,
+    code: Box<str>,
+    index: Option<LineIndex>,
 }
 
 impl SourceFileBuilder {
     /// Creates a new builder for a file named `name`.
-    pub fn new(name: &str) -> Self {
+    pub fn new<Name: Into<Box<str>>, Code: Into<Box<str>>>(name: Name, code: Code) -> Self {
         Self {
-            name: Box::from(name),
-            code: None,
+            name: name.into(),
+            code: code.into(),
+            index: None,
         }
     }
 
-    /// Creates a enw builder for a file named `name`
-    pub fn from_string(name: String) -> Self {
-        Self {
-            name: Box::from(name),
-            code: None,
-        }
-    }
-
-    /// Consumes `self` and returns a builder for a file with the source text and the [`LineIndex`] copied
-    /// from `source`.
     #[must_use]
-    pub fn source_code(mut self, source: &SourceCode) -> Self {
-        self.set_source_code(source);
+    pub fn line_index(mut self, index: LineIndex) -> Self {
+        self.index = Some(index);
         self
     }
 
-    /// Copies the source text and [`LineIndex`] from `source`.
-    pub fn set_source_code(&mut self, source: &SourceCode) {
-        self.code = Some(FileSourceCode {
-            text: Box::from(source.text()),
-            index: source.index.clone(),
-        });
-    }
-
-    pub fn set_source_text(&mut self, text: &str) {
-        self.set_source_code(&SourceCode::new(text, &LineIndex::from_source_text(text)));
-    }
-
-    /// Consumes `self` and returns a builder for a file with the source text `text`. Builds the [`LineIndex`] from `text`.
-    #[must_use]
-    pub fn source_text(self, text: &str) -> Self {
-        self.source_code(&SourceCode::new(text, &LineIndex::from_source_text(text)))
-    }
-
-    /// Consumes `self` and returns a builder for a file with the source text `text`. Builds the [`LineIndex`] from `text`.
-    #[must_use]
-    pub fn source_text_string(mut self, text: String) -> Self {
-        self.set_source_text_string(text);
-        self
-    }
-
-    /// Copies the source text `text` and builds the [`LineIndex`] from `text`.
-    pub fn set_source_text_string(&mut self, text: String) {
-        self.code = Some(FileSourceCode {
-            index: LineIndex::from_source_text(&text),
-            text: Box::from(text),
-        });
+    pub fn set_line_index(&mut self, index: LineIndex) {
+        self.index = Some(index);
     }
 
     /// Consumes `self` and returns the [`SourceFile`].
     pub fn finish(self) -> SourceFile {
-        // FIXME micha avoid unwrap or simply remove builder?
+        let index = if let Some(index) = self.index {
+            once_cell::sync::OnceCell::with_value(index)
+        } else {
+            once_cell::sync::OnceCell::new()
+        };
+
         SourceFile {
             inner: Arc::new(SourceFileInner {
                 name: self.name,
-                code: self.code.unwrap(),
+                code: self.code,
+                line_index: index,
             }),
         }
     }
@@ -199,7 +168,7 @@ impl Debug for SourceFile {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SourceFile")
             .field("name", &self.name())
-            .field("code", &self.source_code())
+            .field("code", &self.source_text())
             .finish()
     }
 }
@@ -211,42 +180,44 @@ impl SourceFile {
         &self.inner.name
     }
 
-    /// Returns `Some` with the source code if set, or `None`.
     #[inline]
-    pub fn source_code(&self) -> SourceCode {
-        let code = &self.inner.code;
+    pub fn slice(&self, range: TextRange) -> &str {
+        &self.source_text()[range]
+    }
+
+    pub fn to_source_code(&self) -> SourceCode {
         SourceCode {
-            text: &code.text,
-            index: &code.index,
+            text: self.source_text(),
+            index: self.index(),
         }
+    }
+
+    fn index(&self) -> &LineIndex {
+        self.inner
+            .line_index
+            .get_or_init(|| LineIndex::from_source_text(self.source_text()))
     }
 
     /// Returns `Some` with the source text if set, or `None`.
     #[inline]
     pub fn source_text(&self) -> &str {
-        self.source_code().text()
+        &self.inner.code
     }
 }
 
-#[derive(Eq, PartialEq)]
 struct SourceFileInner {
     name: Box<str>,
-    code: FileSourceCode,
+    code: Box<str>,
+    line_index: once_cell::sync::OnceCell<LineIndex>,
 }
 
-struct FileSourceCode {
-    text: Box<str>,
-    index: LineIndex,
-}
-
-impl PartialEq for FileSourceCode {
+impl PartialEq for SourceFileInner {
     fn eq(&self, other: &Self) -> bool {
-        // It should be safe to assume that the index for two source files are identical
-        self.text == other.text
+        self.name == other.name && self.code == other.code
     }
 }
 
-impl Eq for FileSourceCode {}
+impl Eq for SourceFileInner {}
 
 #[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]

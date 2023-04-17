@@ -1,7 +1,7 @@
 use crate::message::Message;
 use colored::{Color, ColoredString, Colorize, Styles};
 use ruff_diagnostics::Fix;
-use ruff_python_ast::source_code::{OneIndexed, SourceCode};
+use ruff_python_ast::source_code::{OneIndexed, SourceFile};
 use ruff_text_size::{TextRange, TextSize};
 use similar::{ChangeTag, TextDiff};
 use std::fmt::{Display, Formatter};
@@ -17,7 +17,7 @@ use std::num::NonZeroUsize;
 /// * Compute the diff from the [`Edit`] because diff calculation is expensive.
 pub(super) struct Diff<'a> {
     fix: &'a Fix,
-    source_code: SourceCode<'a, 'a>,
+    source_code: &'a SourceFile,
 }
 
 impl<'a> Diff<'a> {
@@ -26,7 +26,7 @@ impl<'a> Diff<'a> {
             None
         } else {
             Some(Diff {
-                source_code: message.file.source_code(),
+                source_code: &message.file,
                 fix: &message.fix,
             })
         }
@@ -35,18 +35,22 @@ impl<'a> Diff<'a> {
 
 impl Display for Diff<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let mut output = String::with_capacity(self.source_code.text().len());
+        let mut output = String::with_capacity(self.source_code.source_text().len());
         let mut last_end = TextSize::default();
 
         for edit in self.fix.edits() {
-            output.push_str(&self.source_code.text()[TextRange::new(last_end, edit.start())]);
+            output.push_str(
+                self
+                    .source_code
+                    .slice(TextRange::new(last_end, edit.start())),
+            );
             output.push_str(edit.content().unwrap_or_default());
             last_end = edit.end();
         }
 
-        output.push_str(&self.source_code.text()[usize::from(last_end)..]);
+        output.push_str(&self.source_code.source_text()[usize::from(last_end)..]);
 
-        let diff = TextDiff::from_lines(self.source_code.text(), &output);
+        let diff = TextDiff::from_lines(self.source_code.source_text(), &output);
 
         writeln!(f, "{}", "ℹ Suggested fix".blue())?;
 

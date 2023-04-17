@@ -1,5 +1,7 @@
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
+use ruff_diagnostics::Edit;
+use ruff_python_ast::source_code::SourceCode;
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
 use serde_json::json;
@@ -33,22 +35,20 @@ impl Serialize for ExpandedMessages<'_> {
         let mut s = serializer.serialize_seq(Some(self.messages.len()))?;
 
         for message in self.messages {
+            let source_code = message.file.to_source_code();
+
             let fix = if message.fix.is_empty() {
                 None
             } else {
                 Some(json!({
                     "message": message.kind.suggestion.as_deref(),
-                    "edits": &ExpandedEdits { message },
+                    "edits": &ExpandedEdits { edits: message.fix.edits(), source_code: &source_code },
                 }))
             };
 
-            let start_location = message.compute_start_location();
-            let end_location = message.compute_end_location();
-
-            let noqa_location = message
-                .file
-                .source_code()
-                .source_location(message.noqa_offset);
+            let start_location = source_code.source_location(message.start());
+            let end_location = source_code.source_location(message.end());
+            let noqa_location = source_code.source_location(message.noqa_offset);
 
             let value = json!({
                 "code": message.kind.rule().noqa_code().to_string(),
@@ -68,7 +68,8 @@ impl Serialize for ExpandedMessages<'_> {
 }
 
 struct ExpandedEdits<'a> {
-    message: &'a Message,
+    edits: &'a [Edit],
+    source_code: &'a SourceCode<'a, 'a>,
 }
 
 impl Serialize for ExpandedEdits<'_> {
@@ -76,16 +77,11 @@ impl Serialize for ExpandedEdits<'_> {
     where
         S: Serializer,
     {
-        let edits = self.message.fix.edits();
-        let mut s = serializer.serialize_seq(Some(edits.len()))?;
+        let mut s = serializer.serialize_seq(Some(self.edits.len()))?;
 
-        for edit in edits {
-            let start_location = self
-                .message
-                .file
-                .source_code()
-                .source_location(edit.start());
-            let end_location = self.message.file.source_code().source_location(edit.end());
+        for edit in self.edits {
+            let start_location = self.source_code.source_location(edit.start());
+            let end_location = self.source_code.source_location(edit.end());
             let value = json!({
                 "content": edit.content().unwrap_or_default(),
                 "location": start_location,

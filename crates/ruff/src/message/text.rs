@@ -160,8 +160,6 @@ impl Display for MessageCodeFrame<'_> {
             kind, file, range, ..
         } = self.message;
 
-        let source_code = file.source_code();
-
         let suggestion = kind.suggestion.as_deref();
         let footer = if suggestion.is_some() {
             vec![Annotation {
@@ -173,6 +171,7 @@ impl Display for MessageCodeFrame<'_> {
             Vec::new()
         };
 
+        let source_code = file.to_source_code();
         let content_start_index = source_code.line_index(range.start());
         let mut start_index = content_start_index.saturating_sub(2);
 
@@ -184,12 +183,10 @@ impl Display for MessageCodeFrame<'_> {
             start_index = start_index.saturating_add(1);
         }
 
-        let content_end_index = file.source_code().line_index(range.end());
+        let content_end_index = source_code.line_index(range.end());
         let mut end_index = content_end_index
             .saturating_add(2)
-            .min(OneIndexed::from_zero_indexed(
-                file.source_code().line_count(),
-            ));
+            .min(OneIndexed::from_zero_indexed(source_code.line_count()));
 
         // Trim trailing empty lines
         while end_index > content_end_index {
@@ -203,7 +200,7 @@ impl Display for MessageCodeFrame<'_> {
         let start_offset = source_code.line_start(start_index);
         let end_offset = source_code.line_end(end_index);
 
-        let source_text = &source_code.text()[TextRange::new(start_offset, end_offset)];
+        let source_text = source_code.slice(TextRange::new(start_offset, end_offset));
 
         let annotation_start_offset = range.start() - start_offset;
         let annotation_end_offset = range.end() - start_offset;

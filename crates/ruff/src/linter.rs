@@ -371,8 +371,12 @@ fn diagnostics_to_messages(
     directives: &Directives,
 ) -> Vec<Message> {
     let file = once_cell::unsync::Lazy::new(|| {
-        let mut builder = SourceFileBuilder::new(&path.to_string_lossy());
-        builder.set_source_code(&locator.to_source_code());
+        let mut builder =
+            SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents());
+
+        if let Some(line_index) = locator.line_index() {
+            builder.set_line_index(line_index.clone());
+        }
 
         builder.finish()
     });

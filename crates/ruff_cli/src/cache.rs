@@ -221,11 +221,7 @@ pub fn get(
 
             let source_files: Vec<_> = sources
                 .into_iter()
-                .map(|(filename, text)| {
-                    SourceFileBuilder::from_string(filename)
-                        .source_text_string(text)
-                        .finish()
-                })
+                .map(|(filename, text)| SourceFileBuilder::new(filename, text).finish())
                 .collect();
 
             for header in headers {

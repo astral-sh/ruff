@@ -88,9 +88,7 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Box<Diag
             return Err(Box::new(Diagnostics {
                 messages: vec![Message::from_diagnostic(
                     *diagnostic,
-                    SourceFileBuilder::new(&path.to_string_lossy())
-                        .source_text("")
-                        .finish(),
+                    SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish(),
                     TextSize::default(),
                 )],
                 ..Diagnostics::default()

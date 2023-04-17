@@ -4,7 +4,7 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 /// ## What it does
 /// Checks if inline comments are separated by at least two spaces.
@@ -157,12 +157,7 @@ pub(crate) fn whitespace_before_comment(
 
             let is_inline_comment = !line.trim().is_empty();
             if is_inline_comment {
-                if range.start() < prev_end + TextSize::from(2)
-                    && !locator.contains_line_break(TextRange::new(
-                        range.start(),
-                        prev_end + TextSize::from(2),
-                    ))
-                {
+                if range.start() - prev_end < "  ".text_len() {
                     diagnostics.push((
                         TextRange::new(prev_end, range.start()),
                         TooFewSpacesBeforeInlineComment.into(),
