@@ -11,6 +11,7 @@ Example usage:
 """
 
 import argparse
+import subprocess
 
 from _utils import ROOT_DIR, dir_name, get_indent, pascal_case, snake_case
 
@@ -79,20 +80,14 @@ def main(*, name: str, prefix: str, code: str, linter: str) -> None:
     new_mod = f"mod {rule_name_snake};"
 
     if len(parts) == 2:
-        pub_use_contents = parts[0].split(";\n")
-        pub_use_contents.append(new_pub_use)
-        pub_use_contents.sort()
-
-        mod_contents = parts[1].splitlines()
-        mod_contents.append(new_mod)
-        mod_contents.sort()
-
-        new_contents = ";\n".join(pub_use_contents)
+        new_contents = parts[0]
+        new_contents += "\n" + new_pub_use + ";"
         new_contents += "\n\n"
-        new_contents += "\n".join(mod_contents)
+        new_contents += parts[1] + new_mod
         new_contents += "\n"
 
         rules_mod.write_text(new_contents)
+        rustfmt(rules_mod)
     else:
         with rules_mod.open("a") as fp:
             fp.write(f"{new_pub_use};")
@@ -201,6 +196,8 @@ pub fn {rule_name_snake}(checker: &mut Checker) {{}}
     with (ROOT_DIR / "crates/ruff/src/codes.rs").open("w") as fp:
         fp.write(text)
 
+def rustfmt(path):
+    subprocess.run(["rustfmt", path])
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
