@@ -466,34 +466,26 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
 }
 
 /// RET505, RET506, RET507, RET508
-fn superfluous_elif(checker: &mut Checker, stack: &Stack) -> bool {
+fn superfluous_elif(checker: &mut Checker, stack: &Stack) {
     for stmt in &stack.elifs {
-        if superfluous_else_node(checker, stmt, Branch::Elif) {
-            return true;
-        }
+        superfluous_else_node(checker, stmt, Branch::Elif);
     }
-    false
 }
 
 /// RET505, RET506, RET507, RET508
-fn superfluous_else(checker: &mut Checker, stack: &Stack) -> bool {
+fn superfluous_else(checker: &mut Checker, stack: &Stack) {
     for stmt in &stack.elses {
-        if superfluous_else_node(checker, stmt, Branch::Else) {
-            return true;
-        }
+        superfluous_else_node(checker, stmt, Branch::Else);
     }
-    false
 }
 
 /// Run all checks from the `flake8-return` plugin.
 pub fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
-    // Skip empty functions.
-    if body.is_empty() {
-        return;
-    }
-
     // Find the last statement in the function.
-    let last_stmt = body.last().unwrap();
+    let Some(last_stmt) = body.last() else {
+        // Skip empty functions.
+        return;
+    };
 
     // Skip functions that consist of a single return statement.
     if body.len() == 1 && matches!(last_stmt.node, StmtKind::Return { .. }) {
@@ -514,20 +506,14 @@ pub fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
         return;
     }
 
-    if checker.settings.rules.enabled(Rule::SuperfluousElseReturn)
-        || checker.settings.rules.enabled(Rule::SuperfluousElseRaise)
-        || checker
-            .settings
-            .rules
-            .enabled(Rule::SuperfluousElseContinue)
-        || checker.settings.rules.enabled(Rule::SuperfluousElseBreak)
-    {
-        if superfluous_elif(checker, &stack) {
-            return;
-        }
-        if superfluous_else(checker, &stack) {
-            return;
-        }
+    if checker.settings.rules.any_enabled(&[
+        Rule::SuperfluousElseReturn,
+        Rule::SuperfluousElseRaise,
+        Rule::SuperfluousElseContinue,
+        Rule::SuperfluousElseBreak,
+    ]) {
+        superfluous_elif(checker, &stack);
+        superfluous_else(checker, &stack);
     }
 
     // Skip any functions without return statements.
@@ -535,27 +521,27 @@ pub fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
         return;
     }
 
-    if !result_exists(&stack.returns) {
+    // If we have at least one non-`None` return...
+    if result_exists(&stack.returns) {
+        if checker.settings.rules.enabled(Rule::ImplicitReturnValue) {
+            implicit_return_value(checker, &stack);
+        }
+        if checker.settings.rules.enabled(Rule::ImplicitReturn) {
+            implicit_return(checker, last_stmt);
+        }
+
+        if checker.settings.rules.enabled(Rule::UnnecessaryAssign) {
+            for (_, expr) in &stack.returns {
+                if let Some(expr) = expr {
+                    unnecessary_assign(checker, &stack, expr);
+                }
+            }
+        }
+    } else {
         if checker.settings.rules.enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
             if returns.map_or(true, is_const_none) {
                 unnecessary_return_none(checker, &stack);
-            }
-        }
-        return;
-    }
-
-    if checker.settings.rules.enabled(Rule::ImplicitReturnValue) {
-        implicit_return_value(checker, &stack);
-    }
-    if checker.settings.rules.enabled(Rule::ImplicitReturn) {
-        implicit_return(checker, last_stmt);
-    }
-
-    if checker.settings.rules.enabled(Rule::UnnecessaryAssign) {
-        for (_, expr) in &stack.returns {
-            if let Some(expr) = expr {
-                unnecessary_assign(checker, &stack, expr);
             }
         }
     }
