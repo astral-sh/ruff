@@ -100,11 +100,11 @@ fn test_stdin_json() -> Result<()> {
           "content": "",
           "location": {{
             "row": 1,
-            "column": 0
+            "column": 1
           }},
           "end_location": {{
             "row": 2,
-            "column": 0
+            "column": 1
           }}
         }}
       ]
