@@ -183,7 +183,7 @@ pub fn check_logical_lines(
             if settings.rules.enabled(kind.rule()) {
                 diagnostics.push(Diagnostic {
                     kind,
-                    location,
+                    location: Location::new(start_loc.row(), 0),
                     end_location: location,
                     fix: Fix::empty(),
                     parent: None,
