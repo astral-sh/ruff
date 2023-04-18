@@ -306,8 +306,9 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
     }
 }
 
+/// Return `true` if the `id` has multiple assignments within the function.
 fn has_multiple_assigns(id: &str, stack: &Stack) -> bool {
-    if let Some(assigns) = stack.assigns.get(&id) {
+    if let Some(assigns) = stack.assignments.get(&id) {
         if assigns.len() > 1 {
             return true;
         }
@@ -315,41 +316,53 @@ fn has_multiple_assigns(id: &str, stack: &Stack) -> bool {
     false
 }
 
+/// Return `true` if the `id` has a (read) reference between the `return_location` and its
+/// preceding assignment.
 fn has_refs_before_next_assign(id: &str, return_location: Location, stack: &Stack) -> bool {
-    let mut before_assign: &Location = &Location::default();
-    let mut after_assign: Option<&Location> = None;
-    if let Some(assigns) = stack.assigns.get(&id) {
-        for location in assigns.iter().sorted() {
+    let mut assignment_before_return: Option<&Location> = None;
+    let mut assignment_after_return: Option<&Location> = None;
+    if let Some(assignments) = stack.assignments.get(&id) {
+        for location in assignments.iter().sorted() {
             if location.row() > return_location.row() {
-                after_assign = Some(location);
+                assignment_after_return = Some(location);
                 break;
             }
             if location.row() <= return_location.row() {
-                before_assign = location;
+                assignment_before_return = Some(location);
             }
         }
     }
 
-    if let Some(refs) = stack.refs.get(&id) {
-        for location in refs {
+    // If there is no assignment before the return, then the variable must be defined in
+    // some other way (e.g., a function argument). No need to check for references.
+    let Some(assignment_before_return) = assignment_before_return else {
+        return true;
+    };
+
+    if let Some(references) = stack.references.get(&id) {
+        for location in references {
             if location.row() == return_location.row() {
                 continue;
             }
-            if let Some(after_assign) = after_assign {
-                if before_assign.row() < location.row() && location.row() <= after_assign.row() {
+            if let Some(assignment_after_return) = assignment_after_return {
+                if assignment_before_return.row() < location.row()
+                    && location.row() <= assignment_after_return.row()
+                {
                     return true;
                 }
-            } else if before_assign.row() < location.row() {
+            } else if assignment_before_return.row() < location.row() {
                 return true;
             }
         }
     }
+
     false
 }
 
+/// Return `true` if the `id` has a read or write reference within a `try` or loop body.
 fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
-    if let Some(refs) = stack.refs.get(&id) {
-        for location in refs {
+    if let Some(references) = stack.references.get(&id) {
+        for location in references {
             for (try_location, try_end_location) in &stack.tries {
                 if try_location.row() < location.row() && location.row() <= try_end_location.row() {
                     return true;
@@ -363,8 +376,8 @@ fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
             }
         }
     }
-    if let Some(refs) = stack.assigns.get(&id) {
-        for location in refs {
+    if let Some(assignments) = stack.assignments.get(&id) {
+        for location in assignments {
             for (try_location, try_end_location) in &stack.tries {
                 if try_location.row() < location.row() && location.row() <= try_end_location.row() {
                     return true;
@@ -384,11 +397,11 @@ fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
 /// RET504
 fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
     if let ExprKind::Name { id, .. } = &expr.node {
-        if !stack.assigns.contains_key(id.as_str()) {
+        if !stack.assignments.contains_key(id.as_str()) {
             return;
         }
 
-        if !stack.refs.contains_key(id.as_str()) {
+        if !stack.references.contains_key(id.as_str()) {
             checker
                 .diagnostics
                 .push(Diagnostic::new(UnnecessaryAssign, Range::from(expr)));
