@@ -178,7 +178,7 @@ pub fn check_path(
                 // if it's disabled via any of the usual mechanisms (e.g., `noqa`,
                 // `per-file-ignores`), and the easiest way to detect that suppression is
                 // to see if the diagnostic persists to the end of the function.
-                pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error);
+                pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error, locator);
                 error = Some(parse_error);
             }
         }

@@ -7,7 +7,6 @@ use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::elif_else_range;
 use ruff_python_ast::helpers::is_const_none;
-use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::context::Context;
@@ -314,17 +313,12 @@ fn has_multiple_assigns(id: &str, stack: &Stack) -> bool {
 
 /// Return `true` if the `id` has a (read) reference between the `return_location` and its
 /// preceding assignment.
-fn has_refs_before_next_assign(
-    id: &str,
-    return_location: TextSize,
-    stack: &Stack,
-    locator: &Locator,
-) -> bool {
+fn has_refs_before_next_assign(id: &str, return_range: TextRange, stack: &Stack) -> bool {
     let mut assignment_before_return: Option<TextSize> = None;
     let mut assignment_after_return: Option<TextSize> = None;
     if let Some(assignments) = stack.assignments.get(&id) {
         for location in assignments.iter().sorted() {
-            if *location > return_location {
+            if *location > return_range.start() {
                 assignment_after_return = Some(*location);
                 break;
             }
@@ -340,24 +334,17 @@ fn has_refs_before_next_assign(
 
     if let Some(references) = stack.references.get(&id) {
         for location in references {
-            if *location >= return_location
-                || !locator.contains_line_break(TextRange::new(*location, return_location))
-            {
+            if return_range.contains(*location) {
                 continue;
             }
 
             if assignment_before_return < *location {
-                let location_on_new_row = locator
-                    .contains_line_break(TextRange::new(assignment_before_return, *location));
-
-                if location_on_new_row {
-                    if let Some(assignment_after_return) = assignment_after_return {
-                        if *location <= assignment_after_return {
-                            return true;
-                        }
-                    } else {
+                if let Some(assignment_after_return) = assignment_after_return {
+                    if *location <= assignment_after_return {
                         return true;
                     }
+                } else {
+                    return true;
                 }
             }
         }
@@ -367,20 +354,16 @@ fn has_refs_before_next_assign(
 }
 
 /// Return `true` if the `id` has a read or write reference within a `try` or loop body.
-fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack, locator: &Locator) -> bool {
+fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
     if let Some(references) = stack.references.get(&id) {
         for location in references {
             for try_range in &stack.tries {
-                if try_range.contains(*location)
-                    && locator.contains_line_break(TextRange::new(try_range.start(), *location))
-                {
+                if try_range.contains(*location) {
                     return true;
                 }
             }
             for loop_range in &stack.loops {
-                if loop_range.contains(*location)
-                    && locator.contains_line_break(TextRange::new(loop_range.start(), *location))
-                {
+                if loop_range.contains(*location) {
                     return true;
                 }
             }
@@ -389,16 +372,12 @@ fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack, locator: &Loc
     if let Some(references) = stack.assignments.get(&id) {
         for location in references {
             for try_range in &stack.tries {
-                if try_range.contains(*location)
-                    && locator.contains_line_break(TextRange::new(try_range.start(), *location))
-                {
+                if try_range.contains(*location) {
                     return true;
                 }
             }
             for loop_range in &stack.loops {
-                if loop_range.contains(*location)
-                    && locator.contains_line_break(TextRange::new(loop_range.start(), *location))
-                {
+                if loop_range.contains(*location) {
                     return true;
                 }
             }
@@ -422,8 +401,8 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
         }
 
         if has_multiple_assigns(id, stack)
-            || has_refs_before_next_assign(id, expr.start(), stack, checker.locator)
-            || has_refs_or_assigns_within_try_or_loop(id, stack, checker.locator)
+            || has_refs_before_next_assign(id, expr.range(), stack)
+            || has_refs_or_assigns_within_try_or_loop(id, stack)
         {
             return;
         }
