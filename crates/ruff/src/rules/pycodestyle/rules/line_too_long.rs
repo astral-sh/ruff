@@ -1,5 +1,5 @@
 use rustpython_parser::ast::Location;
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -48,11 +48,24 @@ pub fn line_too_long(lineno: usize, line: &str, settings: &Settings) -> Option<D
         settings.pycodestyle.ignore_overlong_task_comments,
         &settings.task_tags,
     ) {
+        let mut start_column = 0;
+        let mut width = 0;
+        let mut length = 0;
+
+        for c in line.chars() {
+            if width < limit {
+                width += c.width().unwrap_or(0);
+                start_column += 1;
+            } else {
+                length += 1;
+            }
+        }
+
         Some(Diagnostic::new(
             LineTooLong(line_width, limit),
             Range::new(
-                Location::new(lineno + 1, limit),
-                Location::new(lineno + 1, line.chars().count()),
+                Location::new(lineno + 1, start_column),
+                Location::new(lineno + 1, start_column + length),
             ),
         ))
     } else {
