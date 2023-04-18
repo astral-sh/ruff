@@ -89,10 +89,15 @@ pub fn invalid_escape_sequence(
                 continue;
             }
 
-            // If we're at the end of the line, skip.
+            // If we're at the end of the file, skip.
             let Some((_, next_char)) = chars_iter.peek() else {
-                    continue;
-                };
+                continue;
+            };
+
+            // If we're at the end of the line, skip
+            if matches!(next_char, '\n' | '\r') {
+                continue;
+            }
 
             // If the next character is a valid escape sequence, skip.
             if VALID_ESCAPE_SEQUENCES.contains(next_char) {

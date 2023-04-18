@@ -25,6 +25,7 @@ pub use pylint::PylintEmitter;
 pub use text::TextEmitter;
 
 use crate::jupyter::JupyterIndex;
+use crate::registry::AsRule;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_python_ast::source_code::{SourceFile, SourceLocation};
 
@@ -75,7 +76,11 @@ impl Message {
 
 impl Ord for Message {
     fn cmp(&self, other: &Self) -> Ordering {
-        (self.filename(), self.start()).cmp(&(other.filename(), other.start()))
+        (self.filename(), self.start(), self.kind.rule()).cmp(&(
+            other.filename(),
+            other.start(),
+            other.kind.rule(),
+        ))
     }
 }
 
