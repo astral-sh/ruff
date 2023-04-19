@@ -28,11 +28,11 @@ expression: content
           "content": "",
           "location": {
             "row": 6,
-            "column": 5
+            "column": 4
           },
           "end_location": {
             "row": 6,
-            "column": 10
+            "column": 9
           }
         }
       ]

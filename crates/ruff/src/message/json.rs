@@ -1,10 +1,10 @@
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
 use ruff_diagnostics::Edit;
-use ruff_python_ast::source_code::SourceCode;
+use ruff_python_ast::source_code::{SourceCode, SourceLocation};
 use serde::ser::SerializeSeq;
 use serde::{Serialize, Serializer};
-use serde_json::json;
+use serde_json::{json, Value};
 use std::io::Write;
 
 #[derive(Default)]
@@ -84,8 +84,8 @@ impl Serialize for ExpandedEdits<'_> {
             let end_location = self.source_code.source_location(edit.end());
             let value = json!({
                 "content": edit.content().unwrap_or_default(),
-                "location": start_location,
-                "end_location": end_location
+                "location": to_zero_indexed_column(&start_location),
+                "end_location": to_zero_indexed_column(&end_location)
             });
 
             s.serialize_element(&value)?;
@@ -93,6 +93,13 @@ impl Serialize for ExpandedEdits<'_> {
 
         s.end()
     }
+}
+
+fn to_zero_indexed_column(location: &SourceLocation) -> Value {
+    json!({
+        "row": location.row,
+        "column": location.column.to_zero_indexed()
+    })
 }
 
 #[cfg(test)]
