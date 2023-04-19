@@ -4488,7 +4488,6 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        // TODO(charlie): Include comprehensions here.
         if matches!(
             parent.node,
             StmtKind::For { .. } | StmtKind::AsyncFor { .. }
