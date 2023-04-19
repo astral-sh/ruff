@@ -55,8 +55,8 @@ Ruff is extremely actively developed and used in major open-source projects like
 
 ...and many more.
 
-Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster) or
-the most recent [project update](https://notes.crmarsh.com/ruff-the-first-200-releases).
+Ruff is backed by [Astral](https://astral.sh). Read the [launch post](https://astral.sh/blog/announcing-astral-the-company-behind-ruff),
+or the original [project announcement](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
 ## Testimonials
 
