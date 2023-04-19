@@ -1,11 +1,5 @@
 <!-- Begin section: Overview -->
 
-# Announcement
-
-<p align="center">
-  ⚡️ Introducing <a href="https://astral.sh/blog/announcing-astral-the-company-behind-ruff">Astral</a>: The company behind Ruff with a mission to build blazingly fast Python tools engineered to elevate your code's performance and optimize your workflow.
-</p>
-
 # Ruff
 
 [![Ruff](https://img.shields.io/endpoint?url=https://raw.githubusercontent.com/charliermarsh/ruff/main/assets/badge/v1.json)](https://github.com/charliermarsh/ruff)
@@ -61,8 +55,8 @@ Ruff is extremely actively developed and used in major open-source projects like
 
 ...and many more.
 
-Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster) or
-the most recent [project update](https://notes.crmarsh.com/ruff-the-first-200-releases).
+Ruff is backed by [Astral](https://astral.sh). Read the [launch post](https://astral.sh/blog/announcing-astral-the-company-behind-ruff),
+or the original [project announcement](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
 ## Testimonials
 
