@@ -1796,12 +1796,6 @@ where
                     }
                 }
 
-                if self.is_stub {
-                    if self.settings.rules.enabled(Rule::UnprefixedTypeParam) {
-                        flake8_pyi::rules::prefix_type_params(self, value, targets);
-                    }
-                }
-
                 if self.settings.rules.enabled(Rule::GlobalStatement) {
                     for target in targets.iter() {
                         if let ExprKind::Name { id, .. } = &target.node {
@@ -1842,8 +1836,20 @@ where
                 }
 
                 if self.is_stub {
-                    if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
-                        flake8_pyi::rules::assignment_default_in_stub(self, value, None);
+                    if self
+                        .settings
+                        .rules
+                        .any_enabled(&[Rule::UnprefixedTypeParam, Rule::AssignmentDefaultInStub])
+                    {
+                        // Ignore assignments in function bodies; those are covered by other rules.
+                        if !self.ctx.scopes().any(|scope| scope.kind.is_function()) {
+                            if self.settings.rules.enabled(Rule::UnprefixedTypeParam) {
+                                flake8_pyi::rules::prefix_type_params(self, value, targets);
+                            }
+                            if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
+                                flake8_pyi::rules::assignment_default_in_stub(self, value, None);
+                            }
+                        }
                     }
                 }
             }
@@ -1879,11 +1885,14 @@ where
                 if self.is_stub {
                     if let Some(value) = value {
                         if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
-                            flake8_pyi::rules::assignment_default_in_stub(
-                                self,
-                                value,
-                                Some(annotation),
-                            );
+                            // Ignore assignments in function bodies; those are covered by other rules.
+                            if !self.ctx.scopes().any(|scope| scope.kind.is_function()) {
+                                flake8_pyi::rules::assignment_default_in_stub(
+                                    self,
+                                    value,
+                                    Some(annotation),
+                                );
+                            }
                         }
                     }
                 }
