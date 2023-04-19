@@ -113,6 +113,8 @@ TID251.py:33:1: TID251 `typing.TypedDict` is banned: Use typing_extensions.Typed
 34 | import typing as totally_not_typing
 35 | totally_not_typing.TypedDict
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID251
+36 | 
+37 | # relative imports are respected
    |
 
 

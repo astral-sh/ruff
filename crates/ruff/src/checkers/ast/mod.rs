@@ -1155,13 +1155,15 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::BannedApi) {
-                    if let Some(module) = module {
-                        for name in names {
-                            flake8_tidy_imports::banned_api::name_is_banned(self, module, name);
+                    if level.map_or(true, |level| level == 0) {
+                        if let Some(module) = module {
+                            for name in names {
+                                flake8_tidy_imports::banned_api::name_is_banned(self, module, name);
+                            }
+                            flake8_tidy_imports::banned_api::name_or_parent_is_banned(
+                                self, module, stmt,
+                            );
                         }
-                        flake8_tidy_imports::banned_api::name_or_parent_is_banned(
-                            self, module, stmt,
-                        );
                     }
                 }
 
