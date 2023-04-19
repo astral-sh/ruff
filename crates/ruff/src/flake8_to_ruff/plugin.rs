@@ -42,6 +42,7 @@ pub enum Plugin {
     PandasVet,
     Pyupgrade,
     Tryceratops,
+    WemakePythonStyleguide,
 }
 
 impl FromStr for Plugin {
@@ -82,6 +83,7 @@ impl FromStr for Plugin {
             "pandas-vet" => Ok(Plugin::PandasVet),
             "pyupgrade" => Ok(Plugin::Pyupgrade),
             "tryceratops" => Ok(Plugin::Tryceratops),
+            "wemake-python-styleguide" => Ok(Plugin::WemakePythonStyleguide),
             _ => Err(anyhow!("Unknown plugin: {string}")),
         }
     }
@@ -126,6 +128,7 @@ impl fmt::Debug for Plugin {
                 Plugin::PandasVet => "pandas-vet",
                 Plugin::Pyupgrade => "pyupgrade",
                 Plugin::Tryceratops => "tryceratops",
+                Plugin::WemakePythonStyleguide => "wemake-python-styleguide",
             }
         )
     }
@@ -167,6 +170,7 @@ impl From<&Plugin> for Linter {
             Plugin::PandasVet => Linter::PandasVet,
             Plugin::Pyupgrade => Linter::Pyupgrade,
             Plugin::Tryceratops => Linter::Tryceratops,
+            Plugin::WemakePythonStyleguide => Linter::WemakePythonStyleguide,
         }
     }
 }
@@ -327,6 +331,7 @@ pub fn infer_plugins_from_codes(selectors: &HashSet<RuleSelector>) -> Vec<Plugin
         Plugin::PEP8Naming,
         Plugin::PandasVet,
         Plugin::Tryceratops,
+        Plugin::WemakePythonStyleguide,
     ]
     .into_iter()
     .filter(|plugin| {

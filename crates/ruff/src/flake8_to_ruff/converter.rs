@@ -16,7 +16,7 @@ use crate::rules::flake8_tidy_imports::relative_imports::Strictness;
 use crate::rules::pydocstyle::settings::Convention;
 use crate::rules::{
     flake8_annotations, flake8_bugbear, flake8_builtins, flake8_errmsg, flake8_pytest_style,
-    flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming, pydocstyle,
+    flake8_quotes, flake8_tidy_imports, mccabe, pep8_naming, pydocstyle, wemake_python_styleguide,
 };
 use crate::settings::options::Options;
 use crate::settings::pyproject::Pyproject;
@@ -111,6 +111,7 @@ pub fn convert(
     let mut mccabe = mccabe::settings::Options::default();
     let mut pep8_naming = pep8_naming::settings::Options::default();
     let mut pydocstyle = pydocstyle::settings::Options::default();
+    let mut wemake_python_styleguide = wemake_python_styleguide::settings::Options::default();
     for (key, value) in flake8 {
         if let Some(value) = value {
             match key.as_str() {
@@ -347,6 +348,15 @@ pub fn convert(
                         }
                     }
                 }
+                // wemake-python-styleguide
+                "min-name-length" | "min_name_length" => match value.parse::<usize>() {
+                    Ok(min_name_length) => {
+                        wemake_python_styleguide.min_name_length = Some(min_name_length);
+                    }
+                    Err(e) => {
+                        warn_user!("Unable to parse '{key}' property: {e}");
+                    }
+                },
                 // Unknown
                 _ => {
                     warn_user!("Skipping unsupported property: {}", key);
@@ -397,6 +407,9 @@ pub fn convert(
     }
     if pydocstyle != pydocstyle::settings::Options::default() {
         options.pydocstyle = Some(pydocstyle);
+    }
+    if wemake_python_styleguide != wemake_python_styleguide::settings::Options::default() {
+        options.wemake_python_styleguide = Some(wemake_python_styleguide);
     }
 
     // Extract any settings from the existing `pyproject.toml`.
