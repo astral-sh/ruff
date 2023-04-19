@@ -51,14 +51,11 @@ impl Violation for BannedApi {
 }
 
 /// TID251
-pub fn name_is_banned(
-    module: &str,
-    name: &Alias,
-    api_bans: &FxHashMap<String, ApiBan>,
-) -> Option<Diagnostic> {
+pub fn name_is_banned(checker: &mut Checker, module: &str, name: &Alias) {
+    let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
     let full_name = format!("{module}.{}", &name.node.name);
-    if let Some(ban) = api_bans.get(&full_name) {
-        return Some(Diagnostic::new(
+    if let Some(ban) = banned_api.get(&full_name) {
+        checker.diagnostics.push(Diagnostic::new(
             BannedApi {
                 name: full_name,
                 message: ban.msg.to_string(),
@@ -66,42 +63,37 @@ pub fn name_is_banned(
             Range::from(name),
         ));
     }
-    None
 }
 
 /// TID251
-pub fn name_or_parent_is_banned<T>(
-    located: &Located<T>,
-    name: &str,
-    api_bans: &FxHashMap<String, ApiBan>,
-) -> Option<Diagnostic> {
+pub fn name_or_parent_is_banned<T>(checker: &mut Checker, name: &str, located: &Located<T>) {
+    let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
     let mut name = name;
     loop {
-        if let Some(ban) = api_bans.get(name) {
-            return Some(Diagnostic::new(
+        if let Some(ban) = banned_api.get(name) {
+            checker.diagnostics.push(Diagnostic::new(
                 BannedApi {
                     name: name.to_string(),
                     message: ban.msg.to_string(),
                 },
                 Range::from(located),
             ));
+            return;
         }
         match name.rfind('.') {
             Some(idx) => {
                 name = &name[..idx];
             }
-            None => return None,
+            None => return,
         }
     }
 }
 
 /// TID251
 pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
+    let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
     if let Some((banned_path, ban)) = checker.ctx.resolve_call_path(expr).and_then(|call_path| {
-        checker
-            .settings
-            .flake8_tidy_imports
-            .banned_api
+        banned_api
             .iter()
             .find(|(banned_path, ..)| call_path == from_qualified_name(banned_path))
     }) {
@@ -119,11 +111,10 @@ pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
 mod tests {
     use std::path::Path;
 
-    use crate::assert_messages;
     use anyhow::Result;
-
     use rustc_hash::FxHashMap;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;

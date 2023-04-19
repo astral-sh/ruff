@@ -970,15 +970,11 @@ where
 
                     // flake8_tidy_imports
                     if self.settings.rules.enabled(Rule::BannedApi) {
-                        if let Some(diagnostic) =
-                            flake8_tidy_imports::banned_api::name_or_parent_is_banned(
-                                alias,
-                                &alias.node.name,
-                                &self.settings.flake8_tidy_imports.banned_api,
-                            )
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
+                        flake8_tidy_imports::banned_api::name_or_parent_is_banned(
+                            self,
+                            &alias.node.name,
+                            alias,
+                        );
                     }
 
                     // pylint
@@ -1161,25 +1157,11 @@ where
                 if self.settings.rules.enabled(Rule::BannedApi) {
                     if let Some(module) = module {
                         for name in names {
-                            if let Some(diagnostic) =
-                                flake8_tidy_imports::banned_api::name_is_banned(
-                                    module,
-                                    name,
-                                    &self.settings.flake8_tidy_imports.banned_api,
-                                )
-                            {
-                                self.diagnostics.push(diagnostic);
-                            }
+                            flake8_tidy_imports::banned_api::name_is_banned(self, module, name);
                         }
-                        if let Some(diagnostic) =
-                            flake8_tidy_imports::banned_api::name_or_parent_is_banned(
-                                stmt,
-                                module,
-                                &self.settings.flake8_tidy_imports.banned_api,
-                            )
-                        {
-                            self.diagnostics.push(diagnostic);
-                        }
+                        flake8_tidy_imports::banned_api::name_or_parent_is_banned(
+                            self, module, stmt,
+                        );
                     }
                 }
 
