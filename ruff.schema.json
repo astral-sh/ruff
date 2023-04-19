@@ -538,6 +538,17 @@
         "boolean",
         "null"
       ]
+    },
+    "wemake-python-styleguide": {
+      "description": "Options for the `wemake-python-styleguide` plugin.",
+      "anyOf": [
+        {
+          "$ref": "#/definitions/WemakePythonStyleguideOptions"
+        },
+        {
+          "type": "null"
+        }
+      ]
     }
   },
   "additionalProperties": false,
@@ -2350,6 +2361,10 @@
         "W6",
         "W60",
         "W605",
+        "WPS",
+        "WPS1",
+        "WPS11",
+        "WPS111",
         "YTT",
         "YTT1",
         "YTT10",
@@ -2402,6 +2417,21 @@
     },
     "Version": {
       "type": "string"
+    },
+    "WemakePythonStyleguideOptions": {
+      "type": "object",
+      "properties": {
+        "min-name-length": {
+          "description": "Minimum name length for variables and methods.",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
+        }
+      },
+      "additionalProperties": false
     }
   }
 }

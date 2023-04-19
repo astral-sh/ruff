@@ -1,0 +1,22 @@
+---
+source: crates/ruff/src/rules/wemake_python_styleguide/mod.rs
+---
+WPS111.py:2:1: WPS111 Found too short name: `x`
+  |
+2 | # Errors
+3 | x = 1
+  | ^^^^^ WPS111
+4 | y = 2
+  |
+
+WPS111.py:3:1: WPS111 Found too short name: `y`
+  |
+3 | # Errors
+4 | x = 1
+5 | y = 2
+  | ^^^^^ WPS111
+6 | 
+7 | # OK
+  |
+
+

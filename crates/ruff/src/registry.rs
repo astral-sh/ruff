@@ -663,6 +663,8 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::DjangoModelWithoutDunderStr,
     rules::flake8_django::rules::DjangoUnorderedBodyContentInModel,
     rules::flake8_django::rules::DjangoNonLeadingReceiverDecorator,
+    // wemake-python-styleguide
+    rules::wemake_python_styleguide::rules::TooShortName,
 );
 
 pub trait AsRule {
@@ -824,6 +826,9 @@ pub enum Linter {
     /// Ruff-specific rules
     #[prefix = "RUF"]
     Ruff,
+    /// [wemake-python-styleguide](https://wemake-python-styleguide.readthedocs.io/)
+    #[prefix = "WPS"]
+    WemakePythonStyleguide,
 }
 
 pub trait RuleNamespace: Sized {

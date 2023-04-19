@@ -722,6 +722,9 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Django, "012") => Rule::DjangoUnorderedBodyContentInModel,
         (Flake8Django, "013") => Rule::DjangoNonLeadingReceiverDecorator,
 
+        // wemake-python-styleguide
+        (WemakePythonStyleguide, "111") => Rule::TooShortName,
+
         _ => return None,
     })
 }

@@ -48,7 +48,7 @@ use crate::rules::{
     flake8_pytest_style, flake8_raise, flake8_return, flake8_self, flake8_simplify,
     flake8_tidy_imports, flake8_type_checking, flake8_unused_arguments, flake8_use_pathlib, mccabe,
     numpy, pandas_vet, pep8_naming, pycodestyle, pydocstyle, pyflakes, pygrep_hooks, pylint,
-    pyupgrade, ruff, tryceratops,
+    pyupgrade, ruff, tryceratops, wemake_python_styleguide,
 };
 use crate::settings::types::PythonVersion;
 use crate::settings::{flags, Settings};
@@ -1850,6 +1850,23 @@ where
                 if self.is_stub {
                     if self.settings.rules.enabled(Rule::AssignmentDefaultInStub) {
                         flake8_pyi::rules::assignment_default_in_stub(self, value, None);
+                    }
+                }
+
+                if self.settings.rules.enabled(Rule::TooShortName) {
+                    for target in targets.iter() {
+                        if let ExprKind::Name { id, .. } = &target.node {
+                            if let Some(diagnostic) =
+                                wemake_python_styleguide::rules::too_short_name(
+                                    stmt,
+                                    id,
+                                    self.settings.wemake_python_styleguide.min_name_length,
+                                    self.locator,
+                                )
+                            {
+                                self.diagnostics.push(diagnostic);
+                            };
+                        }
                     }
                 }
             }

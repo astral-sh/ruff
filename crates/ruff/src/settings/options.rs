@@ -11,7 +11,7 @@ use crate::rules::{
     flake8_errmsg, flake8_gettext, flake8_implicit_str_concat, flake8_import_conventions,
     flake8_pytest_style, flake8_quotes, flake8_self, flake8_tidy_imports, flake8_type_checking,
     flake8_unused_arguments, isort, mccabe, pep8_naming, pycodestyle, pydocstyle, pylint,
-    pyupgrade,
+    pyupgrade, wemake_python_styleguide,
 };
 use crate::settings::types::{PythonVersion, SerializationFormat, Version};
 
@@ -522,6 +522,9 @@ pub struct Options {
     #[option_group]
     /// Options for the `pyupgrade` plugin.
     pub pyupgrade: Option<pyupgrade::settings::Options>,
+    #[option_group]
+    /// Options for the `wemake-python-styleguide` plugin.
+    pub wemake_python_styleguide: Option<wemake_python_styleguide::settings::Options>,
     // Tables are required to go last.
     #[option(
         default = "{}",
