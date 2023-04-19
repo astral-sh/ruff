@@ -30,7 +30,7 @@ use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 /// try:
 ///     ...
 /// except ValueError as e:
-///     logger.exception(f"Found an error")
+///     logger.exception("Found an error")
 /// ```
 #[violation]
 pub struct VerboseLogMessage;
