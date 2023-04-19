@@ -598,14 +598,9 @@ where
                     self.visit_expr(expr);
                 }
 
-                // If we're in a class or module scope, then the annotation needs to be
-                // available at runtime.
-                // See: https://docs.python.org/3/reference/simple_stmts.html#annotated-assignment-statements
-                let runtime_annotation = !self.ctx.annotations_future_enabled
-                    && matches!(
-                        self.ctx.scope().kind,
-                        ScopeKind::Class(..) | ScopeKind::Module
-                    );
+                // Function annotations are always evaluated at runtime, unless future annotations
+                // are enabled.
+                let runtime_annotation = !self.ctx.annotations_future_enabled;
 
                 for arg in &args.posonlyargs {
                     if let Some(expr) = &arg.node.annotation {
