@@ -121,7 +121,7 @@ mod tests {
     use super::ApiBan;
 
     #[test]
-    fn banned_api_true_positives() -> Result<()> {
+    fn banned_api() -> Result<()> {
         let diagnostics = test_path(
             Path::new("flake8_tidy_imports/TID251.py"),
             &Settings {
@@ -142,6 +142,36 @@ mod tests {
                     ]),
                     ..Default::default()
                 },
+                ..Settings::for_rules(vec![Rule::BannedApi])
+            },
+        )?;
+        assert_messages!(diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn banned_api_package() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_tidy_imports/TID/my_package/sublib/api/application.py"),
+            &Settings {
+                flake8_tidy_imports: super::super::Settings {
+                    banned_api: FxHashMap::from_iter([
+                        (
+                            "attrs".to_string(),
+                            ApiBan {
+                                msg: "The attrs module is deprecated.".to_string(),
+                            },
+                        ),
+                        (
+                            "my_package.sublib.protocol".to_string(),
+                            ApiBan {
+                                msg: "The protocol module is deprecated.".to_string(),
+                            },
+                        ),
+                    ]),
+                    ..Default::default()
+                },
+                namespace_packages: vec![Path::new("my_package").to_path_buf()],
                 ..Settings::for_rules(vec![Rule::BannedApi])
             },
         )?;

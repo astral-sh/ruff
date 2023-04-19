@@ -204,7 +204,7 @@ mod tests {
     #[test]
     fn ban_parent_imports_package() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("flake8_tidy_imports/TID252/my_package/sublib/api/application.py"),
+            Path::new("flake8_tidy_imports/TID/my_package/sublib/api/application.py"),
             &Settings {
                 flake8_tidy_imports: super::super::Settings {
                     ban_relative_imports: Strictness::Parents,
