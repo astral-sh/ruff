@@ -1,7 +1,7 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 
-use ruff_diagnostics::{Diagnostic, Fix};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::token_kind::TokenKind;
 
@@ -37,7 +37,7 @@ pub fn check_logical_lines(
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
+    let mut context = LogicalLinesContext::new(settings);
 
     #[cfg(feature = "logical_lines")]
     let should_fix_missing_whitespace =
@@ -59,106 +59,33 @@ pub fn check_logical_lines(
 
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
-            for (location, kind) in space_around_operator(&line) {
-                if settings.rules.enabled(kind.rule()) {
-                    diagnostics.push(Diagnostic {
-                        kind,
-                        range: TextRange::empty(location),
-                        fix: Fix::empty(),
-                        parent: None,
-                    });
-                }
-            }
-
-            for (location, kind) in whitespace_around_named_parameter_equals(&line.tokens()) {
-                if settings.rules.enabled(kind.rule()) {
-                    diagnostics.push(Diagnostic {
-                        kind,
-                        range: TextRange::empty(location),
-                        fix: Fix::empty(),
-                        parent: None,
-                    });
-                }
-            }
-            for (location, kind) in missing_whitespace_around_operator(&line.tokens()) {
-                if settings.rules.enabled(kind.rule()) {
-                    diagnostics.push(Diagnostic {
-                        kind,
-                        range: TextRange::empty(location),
-                        fix: Fix::empty(),
-                        parent: None,
-                    });
-                }
-            }
-
-            for diagnostic in missing_whitespace(&line, should_fix_missing_whitespace) {
-                if settings.rules.enabled(diagnostic.kind.rule()) {
-                    diagnostics.push(diagnostic);
-                }
-            }
+            space_around_operator(&line, &mut context);
+            whitespace_around_named_parameter_equals(&line.tokens(), &mut context);
+            missing_whitespace_around_operator(&line.tokens(), &mut context);
+            missing_whitespace(&line, should_fix_missing_whitespace, &mut context);
         }
+
         if line
             .flags()
             .contains(TokenFlags::OPERATOR | TokenFlags::PUNCTUATION)
         {
-            for (location, kind) in extraneous_whitespace(&line) {
-                if settings.rules.enabled(kind.rule()) {
-                    diagnostics.push(Diagnostic {
-                        kind,
-                        range: TextRange::empty(location),
-                        fix: Fix::empty(),
-                        parent: None,
-                    });
-                }
-            }
+            extraneous_whitespace(&line, &mut context);
         }
         if line.flags().contains(TokenFlags::KEYWORD) {
-            for (location, kind) in whitespace_around_keywords(&line) {
-                if settings.rules.enabled(kind.rule()) {
-                    diagnostics.push(Diagnostic {
-                        kind,
-                        range: TextRange::empty(location),
-                        fix: Fix::empty(),
-                        parent: None,
-                    });
-                }
-            }
-
-            for (location, kind) in missing_whitespace_after_keyword(&line.tokens()) {
-                if settings.rules.enabled(kind.rule()) {
-                    diagnostics.push(Diagnostic {
-                        kind,
-                        range: TextRange::empty(location),
-                        fix: Fix::empty(),
-                        parent: None,
-                    });
-                }
-            }
+            whitespace_around_keywords(&line, &mut context);
+            missing_whitespace_after_keyword(&line.tokens(), &mut context);
         }
+
         if line.flags().contains(TokenFlags::COMMENT) {
-            for (range, kind) in
-                whitespace_before_comment(&line.tokens(), locator, prev_line.is_none())
-            {
-                if settings.rules.enabled(kind.rule()) {
-                    diagnostics.push(Diagnostic {
-                        kind,
-                        range,
-                        fix: Fix::empty(),
-                        parent: None,
-                    });
-                }
-            }
+            whitespace_before_comment(&line.tokens(), locator, prev_line.is_none(), &mut context);
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
-            for diagnostic in whitespace_before_parameters(
+            whitespace_before_parameters(
                 &line.tokens(),
                 should_fix_whitespace_before_parameters,
-            ) {
-                if settings.rules.enabled(diagnostic.kind.rule()) {
-                    diagnostics.push(diagnostic);
-                }
-            }
+                &mut context,
+            );
         }
 
         // Extract the indentation level.
@@ -185,12 +112,7 @@ pub fn check_logical_lines(
             indent_size,
         ) {
             if settings.rules.enabled(kind.rule()) {
-                diagnostics.push(Diagnostic {
-                    kind,
-                    range,
-                    fix: Fix::empty(),
-                    parent: None,
-                });
+                context.push(kind, range);
             }
         }
 
@@ -199,7 +121,40 @@ pub fn check_logical_lines(
             prev_indent_level = Some(indent_level);
         }
     }
-    diagnostics
+    context.diagnostics
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct LogicalLinesContext<'a> {
+    settings: &'a Settings,
+    diagnostics: Vec<Diagnostic>,
+}
+
+impl<'a> LogicalLinesContext<'a> {
+    fn new(settings: &'a Settings) -> Self {
+        Self {
+            settings,
+            diagnostics: Vec::new(),
+        }
+    }
+
+    pub fn push<K: Into<DiagnosticKind>>(&mut self, kind: K, range: TextRange) {
+        let kind = kind.into();
+        if self.settings.rules.enabled(kind.rule()) {
+            self.diagnostics.push(Diagnostic {
+                kind,
+                range,
+                fix: Fix::empty(),
+                parent: None,
+            });
+        }
+    }
+
+    pub fn push_diagnostic(&mut self, diagnostic: Diagnostic) {
+        if self.settings.rules.enabled(diagnostic.kind.rule()) {
+            self.diagnostics.push(diagnostic);
+        }
+    }
 }
 
 #[cfg(test)]

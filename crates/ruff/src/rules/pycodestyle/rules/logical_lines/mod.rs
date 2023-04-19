@@ -554,7 +554,7 @@ struct CurrentLine {
 struct LogicalLinesBuilder {
     tokens: Tokens,
     lines: Vec<Line>,
-    current_line: Option<CurrentLine>,
+    current_line: CurrentLine,
 }
 
 impl LogicalLinesBuilder {
@@ -568,12 +568,7 @@ impl LogicalLinesBuilder {
     // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
     #[allow(clippy::cast_possible_truncation)]
     fn push_token(&mut self, kind: TokenKind, range: TextRange) {
-        let tokens_start = self.tokens.len();
-
-        let line = self.current_line.get_or_insert_with(|| CurrentLine {
-            flags: TokenFlags::empty(),
-            tokens_start: tokens_start as u32,
-        });
+        let line = &mut self.current_line;
 
         if matches!(kind, TokenKind::Comment) {
             line.flags.insert(TokenFlags::COMMENT);
@@ -618,12 +613,18 @@ impl LogicalLinesBuilder {
     // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
     #[allow(clippy::cast_possible_truncation)]
     fn finish_line(&mut self) {
-        if let Some(current) = self.current_line.take() {
+        let end = self.tokens.len() as u32;
+        if self.current_line.tokens_start < end {
             self.lines.push(Line {
-                flags: current.flags,
-                tokens_start: current.tokens_start,
-                tokens_end: self.tokens.len() as u32,
+                flags: self.current_line.flags,
+                tokens_start: self.current_line.tokens_start,
+                tokens_end: end,
             });
+
+            self.current_line = CurrentLine {
+                flags: Default::default(),
+                tokens_start: end,
+            }
         }
     }
 
