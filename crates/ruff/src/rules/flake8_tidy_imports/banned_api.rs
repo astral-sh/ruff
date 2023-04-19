@@ -1,5 +1,5 @@
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Alias, Expr, Located};
+use rustpython_parser::ast::{Expr, Located};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -51,16 +51,15 @@ impl Violation for BannedApi {
 }
 
 /// TID251
-pub fn name_is_banned(checker: &mut Checker, module: &str, name: &Alias) {
+pub fn name_is_banned<T>(checker: &mut Checker, name: String, located: &Located<T>) {
     let banned_api = &checker.settings.flake8_tidy_imports.banned_api;
-    let full_name = format!("{module}.{}", &name.node.name);
-    if let Some(ban) = banned_api.get(&full_name) {
+    if let Some(ban) = banned_api.get(&name) {
         checker.diagnostics.push(Diagnostic::new(
             BannedApi {
-                name: full_name,
+                name,
                 message: ban.msg.to_string(),
             },
-            Range::from(name),
+            Range::from(located),
         ));
     }
 }

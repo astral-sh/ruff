@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::path::Path;
 
 use itertools::Itertools;
@@ -662,7 +663,17 @@ where
     })
 }
 
-/// Format the module name for a relative import.
+/// Format the module reference name for a relative import.
+///
+/// # Examples
+///
+/// ```rust
+/// # use ruff_python_ast::helpers::format_import_from;
+///
+/// assert_eq!(format_import_from(None, None), "".to_string());
+/// assert_eq!(format_import_from(Some(1), None), ".".to_string());
+/// assert_eq!(format_import_from(Some(1), Some("foo")), ".foo".to_string());
+/// ```
 pub fn format_import_from(level: Option<usize>, module: Option<&str>) -> String {
     let mut module_name = String::with_capacity(16);
     if let Some(level) = level {
@@ -677,6 +688,16 @@ pub fn format_import_from(level: Option<usize>, module: Option<&str>) -> String 
 }
 
 /// Format the member reference name for a relative import.
+///
+/// # Examples
+///
+/// ```rust
+/// # use ruff_python_ast::helpers::format_import_from_member;
+///
+/// assert_eq!(format_import_from_member(None, None, "bar"), "bar".to_string());
+/// assert_eq!(format_import_from_member(Some(1), None, "bar"), ".bar".to_string());
+/// assert_eq!(format_import_from_member(Some(1), Some("foo"), "bar"), ".foo.bar".to_string());
+/// ```
 pub fn format_import_from_member(
     level: Option<usize>,
     module: Option<&str>,
@@ -715,7 +736,24 @@ pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
         .collect::<Option<Vec<String>>>()
 }
 
-/// Create a call path from a relative import.
+/// Create a [`CallPath`] from a relative import reference name (like `".foo.bar"`).
+///
+/// Returns an empty [`CallPath`] if the import is invalid (e.g., a relative import that
+/// extends beyond the top-level module).
+///
+/// # Examples
+///
+/// ```rust
+/// # use smallvec::{smallvec, SmallVec};
+/// # use ruff_python_ast::helpers::from_relative_import;
+///
+/// assert_eq!(from_relative_import(&[], "bar"), SmallVec::from_buf(["bar"]));
+/// assert_eq!(from_relative_import(&["foo".to_string()], "bar"), SmallVec::from_buf(["foo", "bar"]));
+/// assert_eq!(from_relative_import(&["foo".to_string()], "bar.baz"), SmallVec::from_buf(["foo", "bar", "baz"]));
+/// assert_eq!(from_relative_import(&["foo".to_string()], ".bar"), SmallVec::from_buf(["bar"]));
+/// assert!(from_relative_import(&["foo".to_string()], "..bar").is_empty());
+/// assert!(from_relative_import(&["foo".to_string()], "...bar").is_empty());
+/// ```
 pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath<'a> {
     let mut call_path: CallPath = SmallVec::with_capacity(module.len() + 1);
 
@@ -724,6 +762,9 @@ pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath
 
     // Remove segments based on the number of dots.
     for _ in 0..name.chars().take_while(|c| *c == '.').count() {
+        if call_path.is_empty() {
+            return SmallVec::new();
+        }
         call_path.pop();
     }
 
@@ -731,6 +772,39 @@ pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath
     call_path.extend(name.trim_start_matches('.').split('.'));
 
     call_path
+}
+
+/// Given an imported module (based on its relative import level and module name), return the
+/// fully-qualified module path.
+pub fn resolve_imported_module_path<'a>(
+    level: Option<usize>,
+    module: Option<&'a str>,
+    module_path: Option<&[String]>,
+) -> Option<Cow<'a, str>> {
+    let Some(level) = level else {
+        return Some(Cow::Borrowed(module.unwrap_or("")));
+    };
+
+    if level == 0 {
+        return Some(Cow::Borrowed(module.unwrap_or("")));
+    }
+
+    let Some(module_path) = module_path else {
+        return None;
+    };
+
+    if level >= module_path.len() {
+        return None;
+    }
+
+    let mut qualified_path = module_path[..module_path.len() - level].join(".");
+    if let Some(module) = module {
+        if !qualified_path.is_empty() {
+            qualified_path.push('.');
+        }
+        qualified_path.push_str(module);
+    }
+    Some(Cow::Owned(qualified_path))
 }
 
 /// A [`Visitor`] that collects all `return` statements in a function or method.
@@ -1350,13 +1424,15 @@ pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use anyhow::Result;
     use rustpython_parser as parser;
     use rustpython_parser::ast::{Cmpop, Location};
 
     use crate::helpers::{
         elif_else_range, else_range, first_colon_range, identifier_range, locate_cmpops,
-        match_trailing_content, LocatedCmpop,
+        match_trailing_content, resolve_imported_module_path, LocatedCmpop,
     };
     use crate::source_code::Locator;
     use crate::types::Range;
@@ -1467,6 +1543,43 @@ class Class():
         );
 
         Ok(())
+    }
+
+    #[test]
+    fn resolve_import() {
+        // Return the module directly.
+        assert_eq!(
+            resolve_imported_module_path(None, Some("foo"), None),
+            Some(Cow::Borrowed("foo"))
+        );
+
+        // Construct the module path from the calling module's path.
+        assert_eq!(
+            resolve_imported_module_path(
+                Some(1),
+                Some("foo"),
+                Some(&["bar".to_string(), "baz".to_string()])
+            ),
+            Some(Cow::Owned("bar.foo".to_string()))
+        );
+
+        // We can't return the module if it's a relative import, and we don't know the calling
+        // module's path.
+        assert_eq!(
+            resolve_imported_module_path(Some(1), Some("foo"), None),
+            None
+        );
+
+        // We can't return the module if it's a relative import, and the path goes beyond the
+        // calling module's path.
+        assert_eq!(
+            resolve_imported_module_path(Some(1), Some("foo"), Some(&["bar".to_string()])),
+            None,
+        );
+        assert_eq!(
+            resolve_imported_module_path(Some(2), Some("foo"), Some(&["bar".to_string()])),
+            None
+        );
     }
 
     #[test]
