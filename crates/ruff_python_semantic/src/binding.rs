@@ -253,6 +253,7 @@ pub enum BindingKind<'a> {
     Annotation,
     Argument,
     Assignment,
+    NamedExprAssignment,
     Binding,
     LoopVar,
     Global,

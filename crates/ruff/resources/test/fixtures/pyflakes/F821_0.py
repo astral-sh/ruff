@@ -132,3 +132,8 @@ def in_ipython_notebook() -> bool:
     except NameError:
         return False  # not in notebook
     return True
+
+
+def named_expr():
+    if any((key := (value := x)) for x in ["ok"]):
+        print(key)
