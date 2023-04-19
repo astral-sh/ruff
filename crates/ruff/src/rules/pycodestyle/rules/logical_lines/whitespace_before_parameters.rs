@@ -1,3 +1,4 @@
+use crate::checkers::logical_lines::LogicalLinesContext;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
@@ -37,8 +38,8 @@ impl AlwaysAutofixableViolation for WhitespaceBeforeParameters {
 pub(crate) fn whitespace_before_parameters(
     tokens: &LogicalLineTokens,
     autofix: bool,
-) -> Vec<Diagnostic> {
-    let mut diagnostics = vec![];
+    context: &mut LogicalLinesContext,
+) {
     let previous = tokens.first().unwrap();
 
     let mut pre_pre_kind: Option<TokenKind> = None;
@@ -65,11 +66,10 @@ pub(crate) fn whitespace_before_parameters(
             if autofix {
                 diagnostic.set_fix(Edit::deletion(start, end));
             }
-            diagnostics.push(diagnostic);
+            context.push_diagnostic(diagnostic);
         }
         pre_pre_kind = Some(prev_token);
         prev_token = kind;
         prev_end = token.end();
     }
-    diagnostics
 }

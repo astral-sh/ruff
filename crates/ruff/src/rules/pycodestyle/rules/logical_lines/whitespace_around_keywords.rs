@@ -1,8 +1,8 @@
 use super::{LogicalLine, Whitespace};
-use ruff_diagnostics::DiagnosticKind;
+use crate::checkers::logical_lines::LogicalLinesContext;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_text_size::TextSize;
+use ruff_text_size::TextRange;
 
 /// ## What it does
 /// Checks for extraneous whitespace after keywords.
@@ -108,8 +108,7 @@ impl Violation for TabBeforeKeyword {
 }
 
 /// E271, E272, E273, E274
-pub(crate) fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(TextSize, DiagnosticKind)> {
-    let mut diagnostics = vec![];
+pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut LogicalLinesContext) {
     let mut after_keyword = false;
 
     for token in line.tokens() {
@@ -119,11 +118,14 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(TextSize, D
                 match line.leading_whitespace(&token) {
                     (Whitespace::Tab, offset) => {
                         let start = token.start();
-                        diagnostics.push((start - offset, TabBeforeKeyword.into()));
+                        context.push(TabBeforeKeyword, TextRange::empty(start - offset));
                     }
                     (Whitespace::Many, offset) => {
                         let start = token.start();
-                        diagnostics.push((start - offset, MultipleSpacesBeforeKeyword.into()));
+                        context.push(
+                            MultipleSpacesBeforeKeyword,
+                            TextRange::empty(start - offset),
+                        );
                     }
                     _ => {}
                 }
@@ -132,11 +134,11 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(TextSize, D
             match line.trailing_whitespace(&token) {
                 Whitespace::Tab => {
                     let end = token.end();
-                    diagnostics.push((end, TabAfterKeyword.into()));
+                    context.push(TabAfterKeyword, TextRange::empty(end));
                 }
                 Whitespace::Many => {
                     let end = token.end();
-                    diagnostics.push((end, MultipleSpacesAfterKeyword.into()));
+                    context.push(MultipleSpacesAfterKeyword, TextRange::empty(end));
                 }
                 _ => {}
             }
@@ -144,6 +146,4 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine) -> Vec<(TextSize, D
 
         after_keyword = is_keyword;
     }
-
-    diagnostics
 }

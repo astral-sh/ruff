@@ -1,7 +1,7 @@
 use itertools::Itertools;
-use ruff_text_size::TextSize;
+use ruff_text_size::TextRange;
 
-use ruff_diagnostics::DiagnosticKind;
+use crate::checkers::logical_lines::LogicalLinesContext;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
@@ -21,9 +21,8 @@ impl Violation for MissingWhitespaceAfterKeyword {
 /// E275
 pub(crate) fn missing_whitespace_after_keyword(
     tokens: &LogicalLineTokens,
-) -> Vec<(TextSize, DiagnosticKind)> {
-    let mut diagnostics = vec![];
-
+    context: &mut LogicalLinesContext,
+) {
     for (tok0, tok1) in tokens.iter().tuple_windows() {
         let tok0_kind = tok0.kind();
         let tok1_kind = tok1.kind();
@@ -36,8 +35,7 @@ pub(crate) fn missing_whitespace_after_keyword(
                 || matches!(tok1_kind, TokenKind::Colon | TokenKind::Newline))
             && tok0.end() == tok1.start()
         {
-            diagnostics.push((tok0.end(), MissingWhitespaceAfterKeyword.into()));
+            context.push(MissingWhitespaceAfterKeyword, TextRange::empty(tok0.end()));
         }
     }
-    diagnostics
 }

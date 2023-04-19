@@ -167,6 +167,7 @@ pub enum TokenKind {
 }
 
 impl TokenKind {
+    #[inline]
     pub const fn is_whitespace_needed(&self) -> bool {
         matches!(
             self,
@@ -197,6 +198,7 @@ impl TokenKind {
         )
     }
 
+    #[inline]
     pub const fn is_whitespace_optional(&self) -> bool {
         self.is_arithmetic()
             || matches!(
@@ -210,6 +212,7 @@ impl TokenKind {
             )
     }
 
+    #[inline]
     pub const fn is_unary(&self) -> bool {
         matches!(
             self,
@@ -221,6 +224,7 @@ impl TokenKind {
         )
     }
 
+    #[inline]
     pub const fn is_keyword(&self) -> bool {
         matches!(
             self,
@@ -261,6 +265,7 @@ impl TokenKind {
         )
     }
 
+    #[inline]
     pub const fn is_operator(&self) -> bool {
         matches!(
             self,
@@ -313,10 +318,12 @@ impl TokenKind {
         )
     }
 
+    #[inline]
     pub const fn is_singleton(&self) -> bool {
         matches!(self, TokenKind::False | TokenKind::True | TokenKind::None)
     }
 
+    #[inline]
     pub const fn is_skip_comment(&self) -> bool {
         matches!(
             self,
@@ -328,6 +335,7 @@ impl TokenKind {
         )
     }
 
+    #[inline]
     pub const fn is_arithmetic(&self) -> bool {
         matches!(
             self,
@@ -340,6 +348,7 @@ impl TokenKind {
         )
     }
 
+    #[inline]
     pub const fn is_soft_keyword(&self) -> bool {
         matches!(self, TokenKind::Match | TokenKind::Case)
     }
