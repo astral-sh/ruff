@@ -1311,7 +1311,7 @@ where
                                 stmt,
                                 *level,
                                 module.as_deref(),
-                                self.module_path.as_ref(),
+                                self.module_path.as_deref(),
                                 &self.settings.flake8_tidy_imports.ban_relative_imports,
                             )
                         {
