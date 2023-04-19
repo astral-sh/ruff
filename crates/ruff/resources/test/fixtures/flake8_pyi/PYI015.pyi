@@ -57,3 +57,37 @@ field25 = 5 * 5  # Y015 Only simple default values are allowed for assignments
 # We shouldn't emit Y015 within functions
 def f():
   field26: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+
+
+# We shouldn't emit Y015 for __slots__ or __match_args__
+class Class1:
+  __slots__ = (
+    '_one',
+    '_two',
+    '_three',
+    '_four',
+    '_five',
+    '_six',
+    '_seven',
+    '_eight',
+    '_nine',
+    '_ten',
+    '_eleven',
+  )
+
+  __match_args__ = (
+    'one',
+    'two',
+    'three',
+    'four',
+    'five',
+    'six',
+    'seven',
+    'eight',
+    'nine',
+    'ten',
+    'eleven',
+  )
+
+# We shouldn't emit Y015 for __all__
+__all__ = ["Class1"]
