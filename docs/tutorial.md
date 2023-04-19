@@ -242,7 +242,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.261'
+  rev: 'v0.0.262'
   hooks:
     - id: ruff
 ```
