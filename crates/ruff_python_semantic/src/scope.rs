@@ -131,7 +131,7 @@ impl From<ScopeId> for usize {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, is_macro::Is)]
 pub enum ScopeKind<'a> {
     Class(ClassDef<'a>),
     Function(FunctionDef<'a>),

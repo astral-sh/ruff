@@ -46,3 +46,7 @@ field229: dict[int, int] = {1: 2, **{3: 4}}  # Y015 Only simple default values a
 field23 = "foo" + "bar"  # Y015 Only simple default values are allowed for assignments
 field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
 field25 = 5 * 5  # Y015 Only simple default values are allowed for assignments
+
+# We shouldn't emit Y015 within functions
+def f():
+  field26: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
