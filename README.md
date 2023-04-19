@@ -1,6 +1,7 @@
 <!-- Begin section: Overview -->
 
 # Announcement
+
 <p align="center">
   ⚡️ Introducing <a href="https://astral.sh/blog/announcing-astral-the-company-behind-ruff">Astral</a>: The company behind Ruff with a mission to build blazingly fast Python tools engineered to elevate your code's performance and optimize your workflow.
 </p>
