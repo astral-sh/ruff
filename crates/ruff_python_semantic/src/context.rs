@@ -174,8 +174,12 @@ impl<'a> Context<'a> {
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
-                        source_path.extend(call_path.into_iter().skip(1));
-                        Some(source_path)
+                        if source_path.is_empty() {
+                            None
+                        } else {
+                            source_path.extend(call_path.into_iter().skip(1));
+                            Some(source_path)
+                        }
                     } else {
                         None
                     }
@@ -191,8 +195,12 @@ impl<'a> Context<'a> {
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
-                        source_path.extend(call_path.into_iter().skip(1));
-                        Some(source_path)
+                        if source_path.is_empty() {
+                            None
+                        } else {
+                            source_path.extend(call_path.into_iter().skip(1));
+                            Some(source_path)
+                        }
                     } else {
                         None
                     }

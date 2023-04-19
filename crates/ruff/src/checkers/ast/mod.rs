@@ -1155,13 +1155,23 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::BannedApi) {
-                    if level.map_or(true, |level| level == 0) {
-                        if let Some(module) = module {
-                            for name in names {
-                                flake8_tidy_imports::banned_api::name_is_banned(self, module, name);
+                    if let Some(module) = helpers::resolve_imported_module_path(
+                        *level,
+                        module.as_deref(),
+                        self.module_path.as_deref(),
+                    ) {
+                        flake8_tidy_imports::banned_api::name_or_parent_is_banned(
+                            self, &module, stmt,
+                        );
+
+                        for alias in names {
+                            if alias.node.name == "*" {
+                                continue;
                             }
-                            flake8_tidy_imports::banned_api::name_or_parent_is_banned(
-                                self, module, stmt,
+                            flake8_tidy_imports::banned_api::name_is_banned(
+                                self,
+                                format!("{module}.{}", alias.node.name),
+                                alias,
                             );
                         }
                     }
