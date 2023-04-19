@@ -1,7 +1,8 @@
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 use ruff_python_ast::source_code::Stylist;
-use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
-use unicode_width::UnicodeWidthStr;
+use ruff_python_ast::types::Range;
+use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Location};
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 pub fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
@@ -18,28 +19,40 @@ pub fn compare(left: &Expr, ops: &[Cmpop], comparators: &[Expr], stylist: &Styli
     )
 }
 
-pub fn is_overlong(
+pub(super) fn is_overlong(
     line: &str,
-    line_width: usize,
     limit: usize,
     ignore_overlong_task_comments: bool,
     task_tags: &[String],
-) -> bool {
-    if line_width <= limit {
-        return false;
+) -> Option<Overlong> {
+    let mut start_column = 0;
+    let mut width = 0;
+    let mut end = 0;
+
+    for c in line.chars() {
+        if width < limit {
+            start_column += 1;
+        }
+
+        width += c.width().unwrap_or(0);
+        end += 1;
+    }
+
+    if width <= limit {
+        return None;
     }
 
     let mut chunks = line.split_whitespace();
     let (Some(first_chunk), Some(second_chunk)) = (chunks.next(), chunks.next()) else {
         // Single word / no printable chars - no way to make the line shorter
-        return false;
+        return None;
     };
 
     if first_chunk == "#" {
         if ignore_overlong_task_comments {
             let second = second_chunk.trim_end_matches(':');
             if task_tags.iter().any(|task_tag| task_tag == second) {
-                return false;
+                return None;
             }
         }
     }
@@ -48,10 +61,33 @@ pub fn is_overlong(
     // begins before the limit.
     let last_chunk = chunks.last().unwrap_or(second_chunk);
     if last_chunk.contains("://") {
-        if line_width - last_chunk.width() <= limit {
-            return false;
+        if width - last_chunk.width() <= limit {
+            return None;
         }
     }
 
-    true
+    Some(Overlong {
+        column: start_column,
+        end_column: end,
+        width,
+    })
+}
+
+pub(super) struct Overlong {
+    column: usize,
+    end_column: usize,
+    width: usize,
+}
+
+impl Overlong {
+    pub(super) fn range(&self, line_no: usize) -> Range {
+        Range::new(
+            Location::new(line_no + 1, self.column),
+            Location::new(line_no + 1, self.end_column),
+        )
+    }
+
+    pub(super) const fn width(&self) -> usize {
+        self.width
+    }
 }
