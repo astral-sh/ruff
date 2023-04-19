@@ -1,34 +1,34 @@
 ---
 source: crates/ruff/src/rules/flake8_type_checking/mod.rs
 ---
-strict.py:24:21: TCH002 Move third-party import `pkg.A` into a type-checking block
+strict.py:27:21: TCH002 Move third-party import `pkg.A` into a type-checking block
    |
-24 |     # In un-strict mode, this shouldn't rase an error, since `pkg` is used at runtime.
-25 |     import pkg
-26 |     from pkg import A
+27 |     # In un-strict mode, this shouldn't rase an error, since `pkg` is used at runtime.
+28 |     import pkg
+29 |     from pkg import A
    |                     ^ TCH002
-27 | 
-28 |     def test(value: A):
+30 | 
+31 |     def test(value: A):
    |
 
-strict.py:32:21: TCH002 Move third-party import `pkg.A` into a type-checking block
+strict.py:35:21: TCH002 Move third-party import `pkg.A` into a type-checking block
    |
-32 | def f():
-33 |     # In un-strict mode, this shouldn't rase an error, since `pkg` is used at runtime.
-34 |     from pkg import A, B
+35 | def f():
+36 |     # In un-strict mode, this shouldn't rase an error, since `pkg` is used at runtime.
+37 |     from pkg import A, B
    |                     ^ TCH002
-35 | 
-36 |     def test(value: A):
+38 | 
+39 |     def test(value: A):
    |
 
-strict.py:51:25: TCH002 Move third-party import `pkg.bar.A` into a type-checking block
+strict.py:54:25: TCH002 Move third-party import `pkg.bar.A` into a type-checking block
    |
-51 |     # In un-strict mode, this _should_ rase an error, since `pkg` is used at runtime.
-52 |     import pkg
-53 |     from pkg.bar import A
+54 |     # In un-strict mode, this _should_ rase an error, since `pkg` is used at runtime.
+55 |     import pkg
+56 |     from pkg.bar import A
    |                         ^ TCH002
-54 | 
-55 |     def test(value: A):
+57 | 
+58 |     def test(value: A):
    |
 
 
