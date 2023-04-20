@@ -91,3 +91,10 @@ class Class1:
 
 # We shouldn't emit Y015 for __all__
 __all__ = ["Class1"]
+
+# Ignore the following for PYI015
+field26 = typing.Sequence[int]
+field27 = list[str]
+field28 = builtins.str
+field29 = str
+field30 = str | bytes | None

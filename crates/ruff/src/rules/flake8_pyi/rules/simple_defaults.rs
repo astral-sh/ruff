@@ -219,6 +219,40 @@ fn is_valid_default_value_with_annotation(
     false
 }
 
+/// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union. (e.g. `int | None`)
+fn is_valid_pep_604_union(annotation: &Expr) -> bool {
+    match &annotation.node {
+        ExprKind::BinOp {
+            left,
+            op: Operator::BitOr,
+            right,
+        } => is_valid_pep_604_union(left) && is_valid_pep_604_union(right),
+        ExprKind::Name { .. }
+        | ExprKind::Subscript { .. }
+        | ExprKind::Attribute { .. }
+        | ExprKind::Constant {
+            value: Constant::None,
+            ..
+        } => true,
+        _ => false,
+    }
+}
+
+/// Returns `true` if an [`Expr`] appears to be a valid default value without an annotation.
+fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
+    matches!(
+        &default.node,
+        ExprKind::Call { .. }
+            | ExprKind::Name { .. }
+            | ExprKind::Attribute { .. }
+            | ExprKind::Subscript { .. }
+            | ExprKind::Constant {
+                value: Constant::Ellipsis | Constant::None,
+                ..
+            }
+    ) || is_valid_pep_604_union(default)
+}
+
 /// Returns `true` if an [`Expr`] appears to be `TypeVar`, `TypeVarTuple`, `NewType`, or `ParamSpec`
 /// call.
 fn is_type_var_like_call(context: &Context, expr: &Expr) -> bool {
@@ -370,6 +404,9 @@ pub fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value
         return;
     }
     if is_type_var_like_call(&checker.ctx, value) {
+        return;
+    }
+    if is_valid_default_value_without_annotation(value) {
         return;
     }
     if is_valid_default_value_with_annotation(value, checker, true) {
