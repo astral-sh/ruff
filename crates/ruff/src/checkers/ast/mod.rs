@@ -1457,6 +1457,18 @@ where
                         }
                     }
                 }
+
+                if self.settings.rules.enabled(Rule::BannedImportFrom) {
+                    if let Some(diagnostic) =
+                        flake8_import_conventions::rules::check_banned_import_from(
+                            stmt,
+                            &helpers::format_import_from(*level, module.as_deref()),
+                            &self.settings.flake8_import_conventions.banned_from,
+                        )
+                    {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
             }
             StmtKind::Raise { exc, .. } => {
                 if self.settings.rules.enabled(Rule::RaiseNotImplemented) {
