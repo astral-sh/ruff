@@ -13,8 +13,8 @@ use crate::checkers::ast::Checker;
 /// These forms catch every Exception, which can lead to passing tests even
 /// the code being tested is never executed due to a typo.
 ///
-/// Either assert for a more specific exception (builtin or custom), use
-/// `assertRaisesRegex` or the context manager form of `assertRaises`.
+/// Either assert for a more specific exception (builtin or custom),
+/// `assertRaisesRegex`, or `pytest.raises(..., match=<REGEX>)`.
 ///
 /// ## Example
 /// ```python
