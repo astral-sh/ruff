@@ -1,10 +1,9 @@
 use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
 use ruff_text_size::{TextRange, TextSize};
-
-use super::LogicalLineTokens;
 
 #[violation]
 pub struct WhitespaceBeforeParameters {
@@ -36,17 +35,17 @@ impl AlwaysAutofixableViolation for WhitespaceBeforeParameters {
 
 /// E211
 pub(crate) fn whitespace_before_parameters(
-    tokens: &LogicalLineTokens,
+    line: &LogicalLine,
     autofix: bool,
     context: &mut LogicalLinesContext,
 ) {
-    let previous = tokens.first().unwrap();
+    let previous = line.tokens().first().unwrap();
 
     let mut pre_pre_kind: Option<TokenKind> = None;
     let mut prev_token = previous.kind();
     let mut prev_end = previous.end();
 
-    for token in tokens {
+    for token in line.tokens() {
         let kind = token.kind();
 
         if matches!(kind, TokenKind::Lpar | TokenKind::Lsqb)

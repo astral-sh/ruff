@@ -60,8 +60,8 @@ pub fn check_logical_lines(
     for line in &LogicalLines::from_tokens(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
             space_around_operator(&line, &mut context);
-            whitespace_around_named_parameter_equals(&line.tokens(), &mut context);
-            missing_whitespace_around_operator(&line.tokens(), &mut context);
+            whitespace_around_named_parameter_equals(&line, &mut context);
+            missing_whitespace_around_operator(&line, &mut context);
             missing_whitespace(&line, should_fix_missing_whitespace, &mut context);
         }
 
@@ -73,16 +73,16 @@ pub fn check_logical_lines(
         }
         if line.flags().contains(TokenFlags::KEYWORD) {
             whitespace_around_keywords(&line, &mut context);
-            missing_whitespace_after_keyword(&line.tokens(), &mut context);
+            missing_whitespace_after_keyword(&line, &mut context);
         }
 
         if line.flags().contains(TokenFlags::COMMENT) {
-            whitespace_before_comment(&line.tokens(), locator, prev_line.is_none(), &mut context);
+            whitespace_before_comment(&line, locator, prev_line.is_none(), &mut context);
         }
 
         if line.flags().contains(TokenFlags::BRACKET) {
             whitespace_before_parameters(
-                &line.tokens(),
+                &line,
                 should_fix_whitespace_before_parameters,
                 &mut context,
             );

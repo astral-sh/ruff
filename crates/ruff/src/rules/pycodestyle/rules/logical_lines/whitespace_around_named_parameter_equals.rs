@@ -1,10 +1,9 @@
 use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineToken};
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
 use ruff_text_size::{TextRange, TextSize};
-
-use super::LogicalLineTokens;
 
 #[violation]
 pub struct UnexpectedSpacesAroundKeywordParameterEquals;
@@ -26,7 +25,7 @@ impl Violation for MissingWhitespaceAroundParameterEquals {
     }
 }
 
-fn is_in_def(tokens: &LogicalLineTokens) -> bool {
+fn is_in_def(tokens: &[LogicalLineToken]) -> bool {
     for token in tokens {
         match token.kind() {
             TokenKind::Async | TokenKind::Indent | TokenKind::Dedent => continue,
@@ -40,15 +39,15 @@ fn is_in_def(tokens: &LogicalLineTokens) -> bool {
 
 /// E251, E252
 pub(crate) fn whitespace_around_named_parameter_equals(
-    tokens: &LogicalLineTokens,
+    line: &LogicalLine,
     context: &mut LogicalLinesContext,
 ) {
     let mut parens = 0u32;
     let mut annotated_func_arg = false;
     let mut prev_end = TextSize::default();
 
-    let in_def = is_in_def(tokens);
-    let mut iter = tokens.iter().peekable();
+    let in_def = is_in_def(line.tokens());
+    let mut iter = line.tokens().iter().peekable();
 
     while let Some(token) = iter.next() {
         let kind = token.kind();

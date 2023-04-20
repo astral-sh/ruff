@@ -4,7 +4,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::rules::pycodestyle::rules::logical_lines::LogicalLineTokens;
+use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
 // E225
 #[violation]
@@ -53,7 +53,7 @@ impl Violation for MissingWhitespaceAroundModuloOperator {
 /// E225, E226, E227, E228
 #[allow(clippy::if_same_then_else)]
 pub(crate) fn missing_whitespace_around_operator(
-    tokens: &LogicalLineTokens,
+    line: &LogicalLine,
     context: &mut LogicalLinesContext,
 ) {
     #[derive(Copy, Clone, Eq, PartialEq)]
@@ -70,7 +70,7 @@ pub(crate) fn missing_whitespace_around_operator(
     let mut prev_type: TokenKind = TokenKind::EndOfFile;
     let mut prev_end = TextSize::default();
 
-    for token in tokens {
+    for token in line.tokens() {
         let kind = token.kind();
 
         if kind.is_skip_comment() {
