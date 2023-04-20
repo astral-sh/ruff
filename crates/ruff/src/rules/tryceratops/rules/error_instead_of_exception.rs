@@ -8,6 +8,40 @@ use ruff_python_ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 
+/// ## What it does
+/// Checks for `logging.error` instead of `logging.exception` when logging an
+/// exception.
+///
+/// ## Why is this bad?
+/// `logging.exception` logs the exception and the traceback, while `logging.error`
+/// only logs the exception.
+///
+/// ## Example
+/// ```python
+/// import logging
+///
+///
+/// def foo():
+///     try:
+///         raise NotImplementedError
+///     except NotImplementedError:
+///         logging.error("Exception occurred")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import logging
+///
+///
+/// def foo():
+///     try:
+///         raise NotImplementedError
+///     except NotImplementedError as exc:
+///         logging.exception("Exception occurred")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/logging.html#logging.exception)
 #[violation]
 pub struct ErrorInsteadOfException;
 

@@ -7,6 +7,45 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `return` statements in `try` blocks.
+///
+/// ## Why is this bad?
+/// The `try` ... `except` statement has an `else` clause for code that should
+/// run only if no exceptions were raised. Using this clause is more explicit
+/// and avoids confusion.
+///
+/// ## Example
+/// ```python
+/// import logging
+///
+///
+/// def reciprocal(n):
+///     try:
+///         rec = 1 / n
+///         print(f"reciprocal of {n} is {rec}")
+///         return rec
+///     except ZeroDivisionError as exc:
+///         logging.exception("Exception occurred")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import logging
+///
+///
+/// def reciprocal(n):
+///     try:
+///         rec = 1 / n
+///     except ZeroDivisionError as exc:
+///         logging.exception("Exception occurred")
+///     else:
+///         print(f"reciprocal of {n} is {rec}")
+///         return rec
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/tutorial/errors.html)
 #[violation]
 pub struct TryConsiderElse;
 

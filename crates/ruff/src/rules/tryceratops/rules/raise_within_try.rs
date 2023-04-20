@@ -7,6 +7,39 @@ use ruff_python_ast::visitor::{self, Visitor};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `raise` statements within `try` blocks.
+///
+/// ## Why is this bad?
+/// It is confusing to read.
+///
+/// ## Example
+/// ```python
+/// def bar():
+///     pass
+///
+///
+/// def foo():
+///     try:
+///         a = bar()
+///         if not a:
+///             raise ValueError
+///     except ValueError:
+///         raise
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def bar():
+///     raise ValueError
+///
+///
+/// def foo():
+///     try:
+///         a = bar()  # refactored bar to raise ValueError
+///     except ValueError:
+///         raise
+/// ```
 #[violation]
 pub struct RaiseWithinTry;
 
