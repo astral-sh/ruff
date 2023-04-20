@@ -7,11 +7,11 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for `self.assertRaises(Exception)`.
+/// Checks for `self.assertRaises(Exception)` or `pytest.raises(Exception)`.
 ///
 /// ## Why is this bad?
-/// `assertRaises(Exception)` can lead to your test passing even if the
-/// code being tested is never executed due to a typo.
+/// These forms catch every Exception, which can lead to passing tests even
+/// the code being tested is never executed due to a typo.
 ///
 /// Either assert for a more specific exception (builtin or custom), use
 /// `assertRaisesRegex` or the context manager form of `assertRaises`.
@@ -31,7 +31,9 @@ pub struct AssertRaisesException;
 impl Violation for AssertRaisesException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("`assertRaises(Exception)` should be considered evil")
+        format!(
+            "`assertRaises(Exception)` and `pytest.raises(Exception)` should be considered evil"
+        )
     }
 }
 
@@ -50,9 +52,18 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
     if item.optional_vars.is_some() {
         return;
     }
-    if !matches!(&func.node, ExprKind::Attribute { attr, .. } if attr == "assertRaises") {
+
+    if !matches!(&func.node, ExprKind::Attribute { attr, .. } if attr == "assertRaises")
+        && !checker
+            .ctx
+            .resolve_call_path(func)
+            .map_or(false, |call_path| {
+                call_path.as_slice() == ["pytest", "raises"]
+            })
+    {
         return;
     }
+
     if !checker
         .ctx
         .resolve_call_path(args.first().unwrap())
