@@ -104,7 +104,7 @@ impl Violation for MissingSpaceAfterColonInTodo {
 //
 // Note: Regexes taken from https://github.com/orsinium-labs/flake8-todos/blob/master/flake8_todos/_rules.py#L12.
 static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^#\s*([tT][oO][dD][oO]|BUG|FIXME|XXX)(\(.*\))?(:)?( )?(.+)?$").unwrap()
+    Regex::new(r"^#\s*(?P<tag>[tT][oO][dD][oO]|BUG|FIXME|XXX)(\(.*\))?(:)?( )?(.+)?$").unwrap()
 });
 
 // Issue code: TDO-003
@@ -147,7 +147,7 @@ pub fn check_rules(tokens: &[LexResult]) -> Vec<Diagnostic> {
 
             // captures.get(1) is the tag, which is required for the regex to match. The unwrap()
             // call is therefore safe
-            let tag = captures.get(1).unwrap().as_str();
+            let tag = captures.name("tag").unwrap().as_str();
             if tag != "TODO" {
                 diagnostics_ref.push(Diagnostic::new(
                     InvalidTodoTag {
