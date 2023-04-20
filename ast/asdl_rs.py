@@ -474,7 +474,7 @@ class ExtendModuleVisitor(EmitVisitor):
     def visitModule(self, mod):
         depth = 0
         self.emit(
-            "pub fn extend_module_nodes(vm: &VirtualMachine, module: &PyObject) {",
+            "pub fn extend_module_nodes(vm: &VirtualMachine, module: &Py<PyModule>) {",
             depth,
         )
         self.emit("extend_module!(vm, module, {", depth + 1)
