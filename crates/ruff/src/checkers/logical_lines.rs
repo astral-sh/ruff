@@ -1,16 +1,16 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::token_kind::TokenKind;
 
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{
     extraneous_whitespace, indentation, missing_whitespace, missing_whitespace_after_keyword,
     missing_whitespace_around_operator, space_around_operator, whitespace_around_keywords,
     whitespace_around_named_parameter_equals, whitespace_before_comment,
-    whitespace_before_parameters, LogicalLines, TokenFlags,
+    whitespace_before_parameters, LogicalLinesIter, TokenFlags,
 };
 use crate::settings::{flags, Settings};
 
@@ -57,7 +57,7 @@ pub fn check_logical_lines(
     let mut prev_indent_level = None;
     let indent_char = stylist.indentation().as_char();
 
-    for line in &LogicalLines::from_tokens(tokens, locator) {
+    for line in LogicalLinesIter::new(tokens, locator) {
         if line.flags().contains(TokenFlags::OPERATOR) {
             space_around_operator(&line, &mut context);
             whitespace_around_named_parameter_equals(&line, &mut context);
@@ -93,7 +93,7 @@ pub fn check_logical_lines(
             continue;
         };
 
-        let range = if first_token.kind() == TokenKind::Indent {
+        let range = if first_token.token() == &Tok::Indent {
             first_token.range()
         } else {
             TextRange::new(locator.line_start(first_token.start()), first_token.start())
@@ -159,11 +159,10 @@ impl<'a> LogicalLinesContext<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::rules::pycodestyle::rules::logical_lines::LogicalLinesIter;
+    use ruff_python_ast::source_code::Locator;
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
-
-    use crate::rules::pycodestyle::rules::logical_lines::LogicalLines;
-    use ruff_python_ast::source_code::Locator;
 
     #[test]
     fn split_logical_lines() {
@@ -173,7 +172,7 @@ y = 2
 z = x + 1"#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
-        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
+        let actual: Vec<String> = LogicalLinesIter::new(&lxr, &locator)
             .into_iter()
             .map(|line| line.text_trimmed().to_string())
             .collect();
@@ -194,7 +193,7 @@ y = 2
 z = x + 1"#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
-        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
+        let actual: Vec<String> = LogicalLinesIter::new(&lxr, &locator)
             .into_iter()
             .map(|line| line.text_trimmed().to_string())
             .collect();
@@ -208,7 +207,7 @@ z = x + 1"#;
         let contents = "x = 'abc'";
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
-        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
+        let actual: Vec<String> = LogicalLinesIter::new(&lxr, &locator)
             .into_iter()
             .map(|line| line.text_trimmed().to_string())
             .collect();
@@ -221,7 +220,7 @@ def f():
 f()"#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
-        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
+        let actual: Vec<String> = LogicalLinesIter::new(&lxr, &locator)
             .into_iter()
             .map(|line| line.text_trimmed().to_string())
             .collect();
@@ -236,7 +235,7 @@ def f():
 f()"#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
-        let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
+        let actual: Vec<String> = LogicalLinesIter::new(&lxr, &locator)
             .into_iter()
             .map(|line| line.text_trimmed().to_string())
             .collect();

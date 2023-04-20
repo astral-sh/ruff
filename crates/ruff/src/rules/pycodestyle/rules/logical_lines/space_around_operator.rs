@@ -1,10 +1,10 @@
 use ruff_text_size::TextRange;
+use rustpython_parser::Tok;
 
 use super::{LogicalLine, Whitespace};
 use crate::checkers::logical_lines::LogicalLinesContext;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::token_kind::TokenKind;
 
 /// ## What it does
 /// Checks for extraneous tabs before an operator.
@@ -127,11 +127,11 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
     let mut after_operator = false;
 
     for token in line.tokens() {
-        let is_operator = is_operator_token(token.kind());
+        let is_operator = is_operator_token(&token);
 
         if is_operator {
             if !after_operator {
-                match line.leading_whitespace(token) {
+                match line.leading_whitespace(&token) {
                     (Whitespace::Tab, offset) => {
                         let start = token.start();
                         context.push(TabBeforeOperator, TextRange::empty(start - offset));
@@ -147,7 +147,7 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
                 }
             }
 
-            match line.trailing_whitespace(token) {
+            match line.trailing_whitespace(&token) {
                 Whitespace::Tab => {
                     let end = token.end();
                     context.push(TabAfterOperator, TextRange::empty(end));
@@ -164,39 +164,39 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
     }
 }
 
-const fn is_operator_token(token: TokenKind) -> bool {
+const fn is_operator_token(token: &Tok) -> bool {
     matches!(
         token,
-        TokenKind::Plus
-            | TokenKind::Minus
-            | TokenKind::Star
-            | TokenKind::Slash
-            | TokenKind::Vbar
-            | TokenKind::Amper
-            | TokenKind::Less
-            | TokenKind::Greater
-            | TokenKind::Equal
-            | TokenKind::Percent
-            | TokenKind::NotEqual
-            | TokenKind::LessEqual
-            | TokenKind::GreaterEqual
-            | TokenKind::CircumFlex
-            | TokenKind::LeftShift
-            | TokenKind::RightShift
-            | TokenKind::DoubleStar
-            | TokenKind::PlusEqual
-            | TokenKind::MinusEqual
-            | TokenKind::StarEqual
-            | TokenKind::SlashEqual
-            | TokenKind::PercentEqual
-            | TokenKind::AmperEqual
-            | TokenKind::VbarEqual
-            | TokenKind::CircumflexEqual
-            | TokenKind::LeftShiftEqual
-            | TokenKind::RightShiftEqual
-            | TokenKind::DoubleStarEqual
-            | TokenKind::DoubleSlash
-            | TokenKind::DoubleSlashEqual
-            | TokenKind::ColonEqual
+        Tok::Plus
+            | Tok::Minus
+            | Tok::Star
+            | Tok::Slash
+            | Tok::Vbar
+            | Tok::Amper
+            | Tok::Less
+            | Tok::Greater
+            | Tok::Equal
+            | Tok::Percent
+            | Tok::NotEqual
+            | Tok::LessEqual
+            | Tok::GreaterEqual
+            | Tok::CircumFlex
+            | Tok::LeftShift
+            | Tok::RightShift
+            | Tok::DoubleStar
+            | Tok::PlusEqual
+            | Tok::MinusEqual
+            | Tok::StarEqual
+            | Tok::SlashEqual
+            | Tok::PercentEqual
+            | Tok::AmperEqual
+            | Tok::VbarEqual
+            | Tok::CircumflexEqual
+            | Tok::LeftShiftEqual
+            | Tok::RightShiftEqual
+            | Tok::DoubleStarEqual
+            | Tok::DoubleSlash
+            | Tok::DoubleSlashEqual
+            | Tok::ColonEqual
     )
 }

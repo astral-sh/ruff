@@ -1,7 +1,6 @@
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::token_kind::TokenKind;
 
 use super::LogicalLine;
 
@@ -248,7 +247,7 @@ pub(crate) fn indentation(
     }
     let indent_expect = prev_logical_line
         .and_then(|prev_logical_line| prev_logical_line.tokens_trimmed().last())
-        .map_or(false, |t| t.kind() == TokenKind::Colon);
+        .map_or(false, |t| t.is_colon());
 
     if indent_expect && indent_level <= prev_indent_level.unwrap_or(0) {
         diagnostics.push(if logical_line.is_comment_only() {

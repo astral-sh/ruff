@@ -112,10 +112,10 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
     let mut after_keyword = false;
 
     for token in line.tokens() {
-        let is_keyword = token.kind().is_keyword();
+        let is_keyword = token.is_keyword();
         if is_keyword {
             if !after_keyword {
-                match line.leading_whitespace(token) {
+                match line.leading_whitespace(&token) {
                     (Whitespace::Tab, offset) => {
                         let start = token.start();
                         context.push(TabBeforeKeyword, TextRange::empty(start - offset));
@@ -131,7 +131,7 @@ pub(crate) fn whitespace_around_keywords(line: &LogicalLine, context: &mut Logic
                 }
             }
 
-            match line.trailing_whitespace(token) {
+            match line.trailing_whitespace(&token) {
                 Whitespace::Tab => {
                     let end = token.end();
                     context.push(TabAfterKeyword, TextRange::empty(end));

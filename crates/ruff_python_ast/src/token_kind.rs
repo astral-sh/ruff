@@ -166,193 +166,127 @@ pub enum TokenKind {
     StartExpression,
 }
 
+#[inline]
+pub const fn is_unary_token(token: &Tok) -> bool {
+    matches!(
+        token,
+        Tok::Plus | Tok::Minus | Tok::Star | Tok::DoubleStar | Tok::RightShift
+    )
+}
+
+#[inline]
+pub const fn is_keyword_token(token: &Tok) -> bool {
+    matches!(
+        token,
+        Tok::False
+            | Tok::True
+            | Tok::None
+            | Tok::And
+            | Tok::As
+            | Tok::Assert
+            | Tok::Await
+            | Tok::Break
+            | Tok::Class
+            | Tok::Continue
+            | Tok::Def
+            | Tok::Del
+            | Tok::Elif
+            | Tok::Else
+            | Tok::Except
+            | Tok::Finally
+            | Tok::For
+            | Tok::From
+            | Tok::Global
+            | Tok::If
+            | Tok::Import
+            | Tok::In
+            | Tok::Is
+            | Tok::Lambda
+            | Tok::Nonlocal
+            | Tok::Not
+            | Tok::Or
+            | Tok::Pass
+            | Tok::Raise
+            | Tok::Return
+            | Tok::Try
+            | Tok::While
+            | Tok::With
+            | Tok::Yield
+    )
+}
+
+#[inline]
+pub const fn is_operator_token(token: &Tok) -> bool {
+    matches!(
+        token,
+        Tok::Lpar
+            | Tok::Rpar
+            | Tok::Lsqb
+            | Tok::Rsqb
+            | Tok::Comma
+            | Tok::Semi
+            | Tok::Plus
+            | Tok::Minus
+            | Tok::Star
+            | Tok::Slash
+            | Tok::Vbar
+            | Tok::Amper
+            | Tok::Less
+            | Tok::Greater
+            | Tok::Equal
+            | Tok::Dot
+            | Tok::Percent
+            | Tok::Lbrace
+            | Tok::Rbrace
+            | Tok::NotEqual
+            | Tok::LessEqual
+            | Tok::GreaterEqual
+            | Tok::Tilde
+            | Tok::CircumFlex
+            | Tok::LeftShift
+            | Tok::RightShift
+            | Tok::DoubleStar
+            | Tok::PlusEqual
+            | Tok::MinusEqual
+            | Tok::StarEqual
+            | Tok::SlashEqual
+            | Tok::PercentEqual
+            | Tok::AmperEqual
+            | Tok::VbarEqual
+            | Tok::CircumflexEqual
+            | Tok::LeftShiftEqual
+            | Tok::RightShiftEqual
+            | Tok::DoubleStarEqual
+            | Tok::DoubleSlash
+            | Tok::DoubleSlashEqual
+            | Tok::At
+            | Tok::AtEqual
+            | Tok::Rarrow
+            | Tok::Ellipsis
+            | Tok::ColonEqual
+            | Tok::Colon
+    )
+}
+
+#[inline]
+pub const fn is_singleton_token(token: &Tok) -> bool {
+    matches!(token, Tok::False | Tok::True | Tok::None)
+}
+
+#[inline]
+pub const fn is_arithmetic_token(token: &Tok) -> bool {
+    matches!(
+        token,
+        Tok::DoubleStar | Tok::Star | Tok::Plus | Tok::Minus | Tok::Slash | Tok::At
+    )
+}
+
+#[inline]
+pub const fn is_soft_keyword_token(token: &Tok) -> bool {
+    matches!(token, Tok::Match | Tok::Case)
+}
+
 impl TokenKind {
-    #[inline]
-    pub const fn is_whitespace_needed(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::DoubleStarEqual
-                | TokenKind::StarEqual
-                | TokenKind::SlashEqual
-                | TokenKind::DoubleSlashEqual
-                | TokenKind::PlusEqual
-                | TokenKind::MinusEqual
-                | TokenKind::NotEqual
-                | TokenKind::Less
-                | TokenKind::Greater
-                | TokenKind::PercentEqual
-                | TokenKind::CircumflexEqual
-                | TokenKind::AmperEqual
-                | TokenKind::VbarEqual
-                | TokenKind::EqEqual
-                | TokenKind::LessEqual
-                | TokenKind::GreaterEqual
-                | TokenKind::LeftShiftEqual
-                | TokenKind::RightShiftEqual
-                | TokenKind::Equal
-                | TokenKind::And
-                | TokenKind::Or
-                | TokenKind::In
-                | TokenKind::Is
-                | TokenKind::Rarrow
-        )
-    }
-
-    #[inline]
-    pub const fn is_whitespace_optional(&self) -> bool {
-        self.is_arithmetic()
-            || matches!(
-                self,
-                TokenKind::CircumFlex
-                    | TokenKind::Amper
-                    | TokenKind::Vbar
-                    | TokenKind::LeftShift
-                    | TokenKind::RightShift
-                    | TokenKind::Percent
-            )
-    }
-
-    #[inline]
-    pub const fn is_unary(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::Plus
-                | TokenKind::Minus
-                | TokenKind::Star
-                | TokenKind::DoubleStar
-                | TokenKind::RightShift
-        )
-    }
-
-    #[inline]
-    pub const fn is_keyword(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::False
-                | TokenKind::True
-                | TokenKind::None
-                | TokenKind::And
-                | TokenKind::As
-                | TokenKind::Assert
-                | TokenKind::Await
-                | TokenKind::Break
-                | TokenKind::Class
-                | TokenKind::Continue
-                | TokenKind::Def
-                | TokenKind::Del
-                | TokenKind::Elif
-                | TokenKind::Else
-                | TokenKind::Except
-                | TokenKind::Finally
-                | TokenKind::For
-                | TokenKind::From
-                | TokenKind::Global
-                | TokenKind::If
-                | TokenKind::Import
-                | TokenKind::In
-                | TokenKind::Is
-                | TokenKind::Lambda
-                | TokenKind::Nonlocal
-                | TokenKind::Not
-                | TokenKind::Or
-                | TokenKind::Pass
-                | TokenKind::Raise
-                | TokenKind::Return
-                | TokenKind::Try
-                | TokenKind::While
-                | TokenKind::With
-                | TokenKind::Yield
-        )
-    }
-
-    #[inline]
-    pub const fn is_operator(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::Lpar
-                | TokenKind::Rpar
-                | TokenKind::Lsqb
-                | TokenKind::Rsqb
-                | TokenKind::Comma
-                | TokenKind::Semi
-                | TokenKind::Plus
-                | TokenKind::Minus
-                | TokenKind::Star
-                | TokenKind::Slash
-                | TokenKind::Vbar
-                | TokenKind::Amper
-                | TokenKind::Less
-                | TokenKind::Greater
-                | TokenKind::Equal
-                | TokenKind::Dot
-                | TokenKind::Percent
-                | TokenKind::Lbrace
-                | TokenKind::Rbrace
-                | TokenKind::NotEqual
-                | TokenKind::LessEqual
-                | TokenKind::GreaterEqual
-                | TokenKind::Tilde
-                | TokenKind::CircumFlex
-                | TokenKind::LeftShift
-                | TokenKind::RightShift
-                | TokenKind::DoubleStar
-                | TokenKind::PlusEqual
-                | TokenKind::MinusEqual
-                | TokenKind::StarEqual
-                | TokenKind::SlashEqual
-                | TokenKind::PercentEqual
-                | TokenKind::AmperEqual
-                | TokenKind::VbarEqual
-                | TokenKind::CircumflexEqual
-                | TokenKind::LeftShiftEqual
-                | TokenKind::RightShiftEqual
-                | TokenKind::DoubleStarEqual
-                | TokenKind::DoubleSlash
-                | TokenKind::DoubleSlashEqual
-                | TokenKind::At
-                | TokenKind::AtEqual
-                | TokenKind::Rarrow
-                | TokenKind::Ellipsis
-                | TokenKind::ColonEqual
-                | TokenKind::Colon
-        )
-    }
-
-    #[inline]
-    pub const fn is_singleton(&self) -> bool {
-        matches!(self, TokenKind::False | TokenKind::True | TokenKind::None)
-    }
-
-    #[inline]
-    pub const fn is_skip_comment(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::Newline
-                | TokenKind::Indent
-                | TokenKind::Dedent
-                | TokenKind::NonLogicalNewline
-                | TokenKind::Comment
-        )
-    }
-
-    #[inline]
-    pub const fn is_arithmetic(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::DoubleStar
-                | TokenKind::Star
-                | TokenKind::Plus
-                | TokenKind::Minus
-                | TokenKind::Slash
-                | TokenKind::At
-        )
-    }
-
-    #[inline]
-    pub const fn is_soft_keyword(&self) -> bool {
-        matches!(self, TokenKind::Match | TokenKind::Case)
-    }
-
     pub const fn from_token(token: &Tok) -> Self {
         match token {
             Tok::Name { .. } => TokenKind::Name,

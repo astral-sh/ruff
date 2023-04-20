@@ -1,11 +1,12 @@
 use bitflags::bitflags;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
+use rustpython_parser::Tok;
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
+use std::ops::Deref;
 
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::token_kind::TokenKind;
 
 pub(crate) use extraneous_whitespace::{
     extraneous_whitespace, WhitespaceAfterOpenBracket, WhitespaceBeforeCloseBracket,
@@ -24,6 +25,9 @@ pub(crate) use missing_whitespace_around_operator::{
     missing_whitespace_around_operator, MissingWhitespaceAroundArithmeticOperator,
     MissingWhitespaceAroundBitwiseOrShiftOperator, MissingWhitespaceAroundModuloOperator,
     MissingWhitespaceAroundOperator,
+};
+use ruff_python_ast::token_kind::{
+    is_arithmetic_token, is_keyword_token, is_operator_token, is_unary_token,
 };
 pub(crate) use space_around_operator::{
     space_around_operator, MultipleSpacesAfterOperator, MultipleSpacesBeforeOperator,
@@ -75,60 +79,107 @@ bitflags! {
     }
 }
 
-#[derive(Clone)]
-pub(crate) struct LogicalLines<'a> {
-    tokens: Vec<LogicalLineToken>,
-    lines: Vec<Line>,
-    locator: &'a Locator<'a>,
+impl TokenFlags {
+    fn add_token(&mut self, token: &Tok) {
+        if matches!(token, Tok::Comment { .. }) {
+            self.insert(TokenFlags::COMMENT);
+        } else if is_operator_token(token) {
+            self.insert(TokenFlags::OPERATOR);
+
+            self.set(
+                TokenFlags::BRACKET,
+                matches!(
+                    token,
+                    Tok::Lpar | Tok::Lsqb | Tok::Lbrace | Tok::Rpar | Tok::Rsqb | Tok::Rbrace
+                ),
+            );
+        }
+
+        if matches!(token, Tok::Comma | Tok::Semi | Tok::Colon) {
+            self.insert(TokenFlags::PUNCTUATION);
+        } else if is_keyword_token(token) {
+            self.insert(TokenFlags::KEYWORD);
+        }
+
+        self.set(
+            TokenFlags::NON_TRIVIA,
+            !matches!(
+                token,
+                Tok::Comment { .. }
+                    | Tok::Newline
+                    | Tok::NonLogicalNewline
+                    | Tok::Dedent
+                    | Tok::Indent
+            ),
+        );
+    }
 }
 
-impl<'a> LogicalLines<'a> {
-    pub fn from_tokens(tokens: &'a [LexResult], locator: &'a Locator<'a>) -> Self {
-        assert!(u32::try_from(tokens.len()).is_ok());
+#[derive(Clone)]
+pub(crate) struct LogicalLinesIter<'a> {
+    tokens: &'a [LexResult],
+    locator: &'a Locator<'a>,
+    parens: u32,
+}
 
-        let mut builder = LogicalLinesBuilder::with_capacity(tokens.len());
-        let mut parens: u32 = 0;
+impl<'a> LogicalLinesIter<'a> {
+    pub fn new(tokens: &'a [LexResult], locator: &'a Locator<'a>) -> Self {
+        Self {
+            tokens,
+            locator,
+            parens: 0,
+        }
+    }
+}
 
-        for (token, range) in tokens.iter().flatten() {
-            let token_kind = TokenKind::from_token(token);
-            builder.push_token(token_kind, *range);
+impl<'a> Iterator for LogicalLinesIter<'a> {
+    type Item = LogicalLine<'a>;
 
-            match token_kind {
-                TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
-                    parens += 1;
+    fn next(&mut self) -> Option<Self::Item> {
+        let mut flags = TokenFlags::empty();
+
+        for (offset, token) in self.tokens.iter().enumerate() {
+            let Ok((token, _)) = token else {
+                // Skip the entire line
+                return if let Some(newline_pos) = self.tokens.iter().position(|res| matches!(res, Ok((Tok::Newline | Tok::NonLogicalNewline | Tok::Comment( ..), _)))) {
+                    self.tokens = &self.tokens[newline_pos + 1..];
+                    self.next()
+                } else {
+                    self.tokens = &[];
+                    None
                 }
-                TokenKind::Rbrace | TokenKind::Rpar | TokenKind::Rsqb => {
-                    parens -= 1;
+            };
+
+            flags.add_token(token);
+
+            match token {
+                Tok::Lbrace | Tok::Lpar | Tok::Lsqb => {
+                    self.parens += 1;
                 }
-                TokenKind::Newline | TokenKind::NonLogicalNewline | TokenKind::Comment
-                    if parens == 0 =>
-                {
-                    builder.finish_line();
+                Tok::Rbrace | Tok::Rpar | Tok::Rsqb => {
+                    self.parens -= 1;
+                }
+                Tok::Newline | Tok::NonLogicalNewline | Tok::Comment { .. } if self.parens == 0 => {
+                    let (line_tokens, rest_tokens) = self.tokens.split_at(offset + 1);
+                    self.tokens = rest_tokens;
+                    return Some(LogicalLine {
+                        flags,
+                        tokens: line_tokens,
+                        locator: self.locator,
+                    });
                 }
                 _ => {}
             }
         }
 
-        builder.finish(locator)
-    }
-}
-
-impl Debug for LogicalLines<'_> {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        f.debug_list()
-            .entries(self.into_iter().map(DebugLogicalLine))
-            .finish()
-    }
-}
-
-impl<'a> IntoIterator for &'a LogicalLines<'a> {
-    type Item = LogicalLine<'a>;
-    type IntoIter = LogicalLinesIter<'a>;
-
-    fn into_iter(self) -> Self::IntoIter {
-        LogicalLinesIter {
-            lines: self,
-            inner: self.lines.iter(),
+        if self.tokens.is_empty() {
+            None
+        } else {
+            Some(LogicalLine {
+                flags,
+                tokens: std::mem::take(&mut self.tokens),
+                locator: self.locator,
+            })
         }
     }
 }
@@ -146,24 +197,24 @@ impl<'a> IntoIterator for &'a LogicalLines<'a> {
 ///     2
 /// ]
 /// ```
-#[derive(Debug)]
+#[derive(Clone)]
 pub(crate) struct LogicalLine<'a> {
-    lines: &'a LogicalLines<'a>,
-    line: &'a Line,
+    flags: TokenFlags,
+    tokens: &'a [LexResult],
+    locator: &'a Locator<'a>,
 }
 
 impl<'a> LogicalLine<'a> {
     /// Returns `true` if this is a comment only line
     pub fn is_comment_only(&self) -> bool {
-        self.flags() == TokenFlags::COMMENT
+        self.flags == TokenFlags::COMMENT
     }
 
     /// Returns logical line's text including comments, indents, dedent and trailing new lines.
     pub fn text(&self) -> &'a str {
         let tokens = self.tokens();
-        match (tokens.first(), tokens.last()) {
+        match (self.first_token(), tokens.last()) {
             (Some(first), Some(last)) => self
-                .lines
                 .locator
                 .slice(TextRange::new(first.start(), last.end())),
             _ => "",
@@ -173,127 +224,132 @@ impl<'a> LogicalLine<'a> {
     /// Returns the text without any leading or trailing newline, comment, indent, or dedent of this line
     #[cfg(test)]
     pub fn text_trimmed(&self) -> &'a str {
-        let tokens = self.tokens_trimmed();
-
-        match (tokens.first(), tokens.last()) {
+        let mut trimmed = self.tokens_trimmed();
+        let first = trimmed.next();
+        let last = trimmed.next_back().or_else(|| first.clone());
+        match (first, last) {
             (Some(first), Some(last)) => self
-                .lines
                 .locator
                 .slice(TextRange::new(first.start(), last.end())),
             _ => "",
         }
     }
 
-    pub fn tokens_trimmed(&self) -> &'a [LogicalLineToken] {
-        let tokens = self.tokens();
-
-        let start = tokens
-            .iter()
+    pub fn tokens_trimmed(&self) -> LogicalLineTokensIter<'a> {
+        let start = self
+            .tokens()
             .position(|t| {
                 !matches!(
-                    t.kind(),
-                    TokenKind::Newline
-                        | TokenKind::NonLogicalNewline
-                        | TokenKind::Indent
-                        | TokenKind::Dedent
-                        | TokenKind::Comment,
+                    t.token(),
+                    Tok::Newline
+                        | Tok::NonLogicalNewline
+                        | Tok::Indent
+                        | Tok::Dedent
+                        | Tok::Comment { .. },
                 )
             })
-            .unwrap_or(tokens.len());
+            .unwrap_or(self.tokens.len());
 
-        let tokens = &tokens[start..];
-
-        let end = tokens
-            .iter()
+        let end = self
+            .tokens()
             .rposition(|t| {
                 !matches!(
-                    t.kind(),
-                    TokenKind::Newline
-                        | TokenKind::NonLogicalNewline
-                        | TokenKind::Indent
-                        | TokenKind::Dedent
-                        | TokenKind::Comment,
+                    t.token(),
+                    Tok::Newline
+                        | Tok::NonLogicalNewline
+                        | Tok::Indent
+                        | Tok::Dedent
+                        | Tok::Comment { .. },
                 )
             })
-            .map_or(0, |pos| pos + 1);
+            .map_or(start, |pos| pos + 1);
 
-        &tokens[..end]
+        LogicalLineTokensIter {
+            inner: self.tokens[start..end].into_iter(),
+        }
     }
 
     /// Returns the text after `token`
     #[inline]
-    pub fn text_after(&self, token: &'a LogicalLineToken) -> &str {
+    pub fn text_after(&self, token: &LogicalLineToken<'a>) -> &str {
         // SAFETY: The line must have at least one token or `token` would not belong to this line.
         let last_token = self.tokens().last().unwrap();
-        self.lines
-            .locator
+        self.locator
             .slice(TextRange::new(token.end(), last_token.end()))
     }
 
     /// Returns the text before `token`
     #[inline]
-    pub fn text_before(&self, token: &'a LogicalLineToken) -> &str {
+    pub fn text_before(&self, token: &LogicalLineToken<'a>) -> &str {
         // SAFETY: The line must have at least one token or `token` would not belong to this line.
-        let first_token = self.tokens().first().unwrap();
-        self.lines
-            .locator
+        let first_token = self.tokens().next().unwrap();
+        self.locator
             .slice(TextRange::new(first_token.start(), token.start()))
     }
 
     /// Returns the whitespace *after* the `token`
-    pub fn trailing_whitespace(&self, token: &'a LogicalLineToken) -> Whitespace {
+    pub fn trailing_whitespace(&self, token: &LogicalLineToken<'a>) -> Whitespace {
         Whitespace::leading(self.text_after(token))
     }
 
     /// Returns the whitespace and whitespace byte-length *before* the `token`
-    pub fn leading_whitespace(&self, token: &'a LogicalLineToken) -> (Whitespace, TextSize) {
+    pub fn leading_whitespace(&self, token: &LogicalLineToken<'a>) -> (Whitespace, TextSize) {
         Whitespace::trailing(self.text_before(token))
     }
 
     /// Returns all tokens of the line, including comments and trailing new lines.
-    pub fn tokens(&self) -> &'a [LogicalLineToken] {
-        &self.lines.tokens[self.line.tokens_start as usize..self.line.tokens_end as usize]
+    pub fn tokens(&self) -> LogicalLineTokensIter<'a> {
+        LogicalLineTokensIter {
+            inner: self.tokens.iter(),
+        }
     }
 
-    pub fn first_token(&self) -> Option<&'a LogicalLineToken> {
-        self.tokens().first()
+    pub fn first_token(&self) -> Option<LogicalLineToken<'a>> {
+        self.tokens().next()
+    }
+
+    pub fn last_token(&self) -> Option<LogicalLineToken<'a>> {
+        self.tokens().next_back()
     }
 
     /// Returns the line's flags
     pub const fn flags(&self) -> TokenFlags {
-        self.line.flags
+        self.flags
     }
 }
 
-/// Helper struct to pretty print [`LogicalLine`] with `dbg`
-struct DebugLogicalLine<'a>(LogicalLine<'a>);
-
-impl Debug for DebugLogicalLine<'_> {
+impl Debug for LogicalLine<'_> {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("LogicalLine")
-            .field("text", &self.0.text())
-            .field("flags", &self.0.flags())
-            .field("tokens", &self.0.tokens())
+            .field("text", &self.text())
+            .field("flags", &self.flags())
+            .field("tokens", &DebugLogicalLines(self))
             .finish()
     }
 }
 
-/// Iterator over the logical lines of a document.
-pub(crate) struct LogicalLinesIter<'a> {
-    lines: &'a LogicalLines<'a>,
-    inner: std::slice::Iter<'a, Line>,
+struct DebugLogicalLines<'a>(&'a LogicalLine<'a>);
+
+impl Debug for DebugLogicalLines<'_> {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_list().entries(self.0.tokens()).finish()
+    }
 }
 
-impl<'a> Iterator for LogicalLinesIter<'a> {
-    type Item = LogicalLine<'a>;
+pub(crate) struct LogicalLineTokensIter<'a> {
+    inner: std::slice::Iter<'a, LexResult>,
+}
+
+impl<'a> Iterator for LogicalLineTokensIter<'a> {
+    type Item = LogicalLineToken<'a>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let line = self.inner.next()?;
+        let result = self.inner.next()?;
 
-        Some(LogicalLine {
-            lines: self.lines,
-            line,
-        })
+        // SAFETY: Guaranteed to be `OK` because the `LogicalLinesIter` aborts on the first `Err` token.
+        #[allow(unsafe_code)]
+        let spanned = unsafe { result.as_ref().unwrap_unchecked() };
+        Some(LogicalLineToken { spanned })
     }
 
     fn size_hint(&self) -> (usize, Option<usize>) {
@@ -301,51 +357,163 @@ impl<'a> Iterator for LogicalLinesIter<'a> {
     }
 }
 
-impl DoubleEndedIterator for LogicalLinesIter<'_> {
+impl DoubleEndedIterator for LogicalLineTokensIter<'_> {
     fn next_back(&mut self) -> Option<Self::Item> {
-        let line = self.inner.next_back()?;
-
-        Some(LogicalLine {
-            lines: self.lines,
-            line,
-        })
+        let result = self.inner.next_back()?;
+        // SAFETY: Guaranteed to be `OK` because the `LogicalLinesIter` aborts on the first `Err` token.
+        #[allow(unsafe_code)]
+        let spanned = unsafe { result.as_ref().unwrap_unchecked() };
+        Some(LogicalLineToken { spanned })
     }
 }
 
-impl ExactSizeIterator for LogicalLinesIter<'_> {}
-
-impl FusedIterator for LogicalLinesIter<'_> {}
+impl ExactSizeIterator for LogicalLineTokensIter<'_> {}
+impl FusedIterator for LogicalLineTokensIter<'_> {}
 
 /// A token of a [`LogicalLine`]
 #[derive(Clone, Debug)]
-pub(crate) struct LogicalLineToken {
-    kind: TokenKind,
-    range: TextRange,
+pub(crate) struct LogicalLineToken<'a> {
+    spanned: &'a (Tok, TextRange),
 }
 
-impl LogicalLineToken {
-    /// Returns the token's kind
-    #[inline]
-    pub const fn kind(&self) -> TokenKind {
-        self.kind
+impl<'a> LogicalLineToken<'a> {
+    pub const fn token(&self) -> &'a Tok {
+        &self.spanned.0
     }
 
     /// Returns the token's start location
     #[inline]
     pub const fn start(&self) -> TextSize {
-        self.range.start()
+        self.range().start()
     }
 
     /// Returns the token's end location
     #[inline]
     pub const fn end(&self) -> TextSize {
-        self.range.end()
+        self.range().end()
     }
 
     /// Returns a tuple with the token's `(start, end)` locations
     #[inline]
     pub const fn range(&self) -> TextRange {
-        self.range
+        self.spanned.1
+    }
+
+    pub const fn is_whitespace_needed(&self) -> bool {
+        matches!(
+            self.token(),
+            Tok::DoubleStarEqual
+                | Tok::StarEqual
+                | Tok::SlashEqual
+                | Tok::DoubleSlashEqual
+                | Tok::PlusEqual
+                | Tok::MinusEqual
+                | Tok::NotEqual
+                | Tok::Less
+                | Tok::Greater
+                | Tok::PercentEqual
+                | Tok::CircumflexEqual
+                | Tok::AmperEqual
+                | Tok::VbarEqual
+                | Tok::EqEqual
+                | Tok::LessEqual
+                | Tok::GreaterEqual
+                | Tok::LeftShiftEqual
+                | Tok::RightShiftEqual
+                | Tok::Equal
+                | Tok::And
+                | Tok::Or
+                | Tok::In
+                | Tok::Is
+                | Tok::Rarrow
+        )
+    }
+
+    #[inline]
+    pub const fn is_whitespace_optional(&self) -> bool {
+        let token = self.token();
+        is_arithmetic_token(token)
+            || matches!(
+                token,
+                Tok::CircumFlex
+                    | Tok::Amper
+                    | Tok::Vbar
+                    | Tok::LeftShift
+                    | Tok::RightShift
+                    | Tok::Percent
+            )
+    }
+
+    pub const fn is_indent(&self) -> bool {
+        matches!(self.token(), Tok::Indent)
+    }
+
+    pub const fn is_colon(&self) -> bool {
+        matches!(self.token(), Tok::Colon)
+    }
+
+    pub const fn is_except(&self) -> bool {
+        matches!(self.token(), Tok::Except)
+    }
+
+    pub const fn is_star(&self) -> bool {
+        matches!(self.token(), Tok::Star)
+    }
+
+    pub const fn is_yield(&self) -> bool {
+        matches!(self.token(), Tok::Yield)
+    }
+
+    pub const fn is_rpar(&self) -> bool {
+        matches!(self.token(), Tok::Rpar)
+    }
+
+    pub const fn is_greater(&self) -> bool {
+        matches!(self.token(), Tok::Greater)
+    }
+
+    pub const fn is_operator(&self) -> bool {
+        is_operator_token(self.token())
+    }
+
+    pub const fn is_name(&self) -> bool {
+        matches!(self.token(), Tok::Name { .. })
+    }
+
+    pub const fn is_equal(&self) -> bool {
+        matches!(self.token(), Tok::Equal)
+    }
+
+    pub const fn is_comment(&self) -> bool {
+        matches!(self.token(), Tok::Comment(..))
+    }
+
+    pub const fn is_unary(&self) -> bool {
+        is_unary_token(self.token())
+    }
+
+    pub const fn is_keyword(&self) -> bool {
+        is_keyword_token(self.token())
+    }
+
+    #[inline]
+    pub const fn is_skip_comment(&self) -> bool {
+        matches!(
+            self.token(),
+            Tok::Newline | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline | Tok::Comment { .. }
+        )
+    }
+
+    pub const fn is_non_logical_newline(&self) -> bool {
+        matches!(self.token(), Tok::NonLogicalNewline)
+    }
+}
+
+impl Deref for LogicalLineToken<'_> {
+    type Target = Tok;
+
+    fn deref(&self) -> &Self::Target {
+        self.token()
     }
 }
 
@@ -358,6 +526,10 @@ pub(crate) enum Whitespace {
 }
 
 impl Whitespace {
+    const fn is_none(self) -> bool {
+        matches!(self, Whitespace::None)
+    }
+
     fn leading(content: &str) -> Self {
         let mut count = 0u32;
 
@@ -411,107 +583,4 @@ impl Whitespace {
             }
         }
     }
-}
-
-#[derive(Debug, Default)]
-struct CurrentLine {
-    flags: TokenFlags,
-    tokens_start: u32,
-}
-
-/// Builder for [`LogicalLines`]
-#[derive(Debug, Default)]
-struct LogicalLinesBuilder {
-    tokens: Vec<LogicalLineToken>,
-    lines: Vec<Line>,
-    current_line: CurrentLine,
-}
-
-impl LogicalLinesBuilder {
-    fn with_capacity(tokens: usize) -> Self {
-        Self {
-            tokens: Vec::with_capacity(tokens),
-            ..Self::default()
-        }
-    }
-
-    // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
-    #[allow(clippy::cast_possible_truncation)]
-    fn push_token(&mut self, kind: TokenKind, range: TextRange) {
-        let line = &mut self.current_line;
-
-        if matches!(kind, TokenKind::Comment) {
-            line.flags.insert(TokenFlags::COMMENT);
-        } else if kind.is_operator() {
-            line.flags.insert(TokenFlags::OPERATOR);
-
-            line.flags.set(
-                TokenFlags::BRACKET,
-                matches!(
-                    kind,
-                    TokenKind::Lpar
-                        | TokenKind::Lsqb
-                        | TokenKind::Lbrace
-                        | TokenKind::Rpar
-                        | TokenKind::Rsqb
-                        | TokenKind::Rbrace
-                ),
-            );
-        }
-
-        if matches!(kind, TokenKind::Comma | TokenKind::Semi | TokenKind::Colon) {
-            line.flags.insert(TokenFlags::PUNCTUATION);
-        } else if kind.is_keyword() {
-            line.flags.insert(TokenFlags::KEYWORD);
-        }
-
-        line.flags.set(
-            TokenFlags::NON_TRIVIA,
-            !matches!(
-                kind,
-                TokenKind::Comment
-                    | TokenKind::Newline
-                    | TokenKind::NonLogicalNewline
-                    | TokenKind::Dedent
-                    | TokenKind::Indent
-            ),
-        );
-
-        self.tokens.push(LogicalLineToken { kind, range });
-    }
-
-    // SAFETY: `LogicalLines::from_tokens` asserts that the file has less than `u32::MAX` tokens and each tokens is at least one character long
-    #[allow(clippy::cast_possible_truncation)]
-    fn finish_line(&mut self) {
-        let end = self.tokens.len() as u32;
-        if self.current_line.tokens_start < end {
-            self.lines.push(Line {
-                flags: self.current_line.flags,
-                tokens_start: self.current_line.tokens_start,
-                tokens_end: end,
-            });
-
-            self.current_line = CurrentLine {
-                flags: TokenFlags::default(),
-                tokens_start: end,
-            }
-        }
-    }
-
-    fn finish<'a>(mut self, locator: &'a Locator<'a>) -> LogicalLines<'a> {
-        self.finish_line();
-
-        LogicalLines {
-            tokens: self.tokens,
-            lines: self.lines,
-            locator,
-        }
-    }
-}
-
-#[derive(Debug, Clone)]
-struct Line {
-    flags: TokenFlags,
-    tokens_start: u32,
-    tokens_end: u32,
 }

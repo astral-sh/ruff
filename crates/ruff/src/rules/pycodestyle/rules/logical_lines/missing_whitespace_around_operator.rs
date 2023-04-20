@@ -1,8 +1,11 @@
 use crate::checkers::logical_lines::LogicalLinesContext;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::token_kind::TokenKind;
+use ruff_python_ast::token_kind::{
+    is_arithmetic_token, is_keyword_token, is_operator_token, is_soft_keyword_token,
+};
 use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::Tok;
 
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 
@@ -67,19 +70,19 @@ pub(crate) fn missing_whitespace_around_operator(
     let mut needs_space_aux = NeedsSpace::Unset;
     let mut prev_end_aux = TextSize::default();
     let mut parens = 0u32;
-    let mut prev_type: TokenKind = TokenKind::EndOfFile;
+    let mut prev_type = &Tok::EndOfFile;
     let mut prev_end = TextSize::default();
 
     for token in line.tokens() {
-        let kind = token.kind();
+        let kind = token.token();
 
-        if kind.is_skip_comment() {
+        if token.is_skip_comment() {
             continue;
         }
 
         match kind {
-            TokenKind::Lpar | TokenKind::Lambda => parens += 1,
-            TokenKind::Rpar => parens -= 1,
+            Tok::Lpar | Tok::Lambda => parens += 1,
+            Tok::Rpar => parens -= 1,
             _ => {}
         };
 
@@ -97,27 +100,25 @@ pub(crate) fn missing_whitespace_around_operator(
                 needs_space_main = NeedsSpace::No;
                 needs_space_aux = NeedsSpace::Unset;
                 prev_end_aux = TextSize::new(0);
-            } else if kind == TokenKind::Greater
-                && matches!(prev_type, TokenKind::Less | TokenKind::Minus)
-            {
+            } else if token.is_greater() && matches!(prev_type, Tok::Less | Tok::Minus) {
                 // Tolerate the "<>" operator, even if running Python 3
                 // Deal with Python 3's annotated return value "->"
-            } else if prev_type == TokenKind::Slash
-                && matches!(kind, TokenKind::Comma | TokenKind::Rpar | TokenKind::Colon)
-                || (prev_type == TokenKind::Rpar && kind == TokenKind::Colon)
+            } else if matches!(prev_type, Tok::Slash)
+                && matches!(kind, Tok::Comma | Tok::Rpar | Tok::Colon)
+                || (matches!(prev_type, Tok::Rpar) && token.is_colon())
             {
                 // Tolerate the "/" operator in function definition
                 // For more info see PEP570
             } else {
                 if needs_space_main == NeedsSpace::Yes || needs_space_aux == NeedsSpace::Yes {
                     context.push(MissingWhitespaceAroundOperator, TextRange::empty(prev_end));
-                } else if prev_type != TokenKind::DoubleStar {
-                    if prev_type == TokenKind::Percent {
+                } else if !matches!(prev_type, Tok::DoubleStar) {
+                    if matches!(prev_type, Tok::Percent) {
                         context.push(
                             MissingWhitespaceAroundModuloOperator,
                             TextRange::empty(prev_end_aux),
                         );
-                    } else if !prev_type.is_arithmetic() {
+                    } else if !is_arithmetic_token(prev_type) {
                         context.push(
                             MissingWhitespaceAroundBitwiseOrShiftOperator,
                             TextRange::empty(prev_end_aux),
@@ -133,31 +134,27 @@ pub(crate) fn missing_whitespace_around_operator(
                 needs_space_aux = NeedsSpace::Unset;
                 prev_end_aux = TextSize::new(0);
             }
-        } else if (kind.is_operator() || matches!(kind, TokenKind::Name))
-            && prev_end != TextSize::default()
-        {
-            if kind == TokenKind::Equal && parens > 0 {
+        } else if (token.is_operator() || token.is_name()) && prev_end != TextSize::default() {
+            if token.is_equal() && parens > 0 {
                 // Allow keyword args or defaults: foo(bar=None).
-            } else if kind.is_whitespace_needed() {
+            } else if token.is_whitespace_needed() {
                 needs_space_main = NeedsSpace::Yes;
                 needs_space_aux = NeedsSpace::Unset;
                 prev_end_aux = TextSize::new(0);
-            } else if kind.is_unary() {
+            } else if token.is_unary() {
                 // Check if the operator is used as a binary operator
                 // Allow unary operators: -123, -x, +1.
                 // Allow argument unpacking: foo(*args, **kwargs)
-                if (matches!(
-                    prev_type,
-                    TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
-                )) || (!prev_type.is_operator()
-                    && !prev_type.is_keyword()
-                    && !prev_type.is_soft_keyword())
+                if (matches!(prev_type, Tok::Rpar | Tok::Rsqb | Tok::Rbrace))
+                    || (!is_operator_token(prev_type)
+                        && !is_keyword_token(prev_type)
+                        && !is_soft_keyword_token(prev_type))
                 {
                     needs_space_main = NeedsSpace::Unset;
                     needs_space_aux = NeedsSpace::Unset;
                     prev_end_aux = TextSize::new(0);
                 }
-            } else if kind.is_whitespace_optional() {
+            } else if token.is_whitespace_optional() {
                 needs_space_main = NeedsSpace::Unset;
                 needs_space_aux = NeedsSpace::Unset;
                 prev_end_aux = TextSize::new(0);

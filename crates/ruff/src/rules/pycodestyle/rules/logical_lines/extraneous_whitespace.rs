@@ -1,11 +1,11 @@
 use ruff_text_size::TextRange;
+use rustpython_parser::Tok;
 
 use super::{LogicalLine, Whitespace};
 use crate::checkers::logical_lines::LogicalLinesContext;
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::token_kind::TokenKind;
 
 /// ## What it does
 /// Checks for the use of extraneous whitespace after "(".
@@ -103,34 +103,26 @@ impl Violation for WhitespaceBeforePunctuation {
 
 /// E201, E202, E203
 pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLinesContext) {
-    let mut last_token = TokenKind::EndOfFile;
+    let mut last_token = &Tok::EndOfFile;
 
     for token in line.tokens() {
-        let kind = token.kind();
-        match kind {
-            TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
-                if !matches!(line.trailing_whitespace(token), Whitespace::None) {
+        match token.token() {
+            Tok::Lbrace | Tok::Lpar | Tok::Lsqb => {
+                if !line.trailing_whitespace(&token).is_none() {
                     context.push(WhitespaceAfterOpenBracket, TextRange::empty(token.end()));
                 }
             }
-            TokenKind::Rbrace
-            | TokenKind::Rpar
-            | TokenKind::Rsqb
-            | TokenKind::Comma
-            | TokenKind::Semi
-            | TokenKind::Colon => {
+            Tok::Rbrace | Tok::Rpar | Tok::Rsqb | Tok::Comma | Tok::Semi | Tok::Colon => {
                 if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
-                    line.leading_whitespace(token)
+                    line.leading_whitespace(&token)
                 {
-                    if !matches!(last_token, TokenKind::Comma | TokenKind::EndOfFile) {
-                        let diagnostic_kind = if matches!(
-                            kind,
-                            TokenKind::Comma | TokenKind::Semi | TokenKind::Colon
-                        ) {
-                            DiagnosticKind::from(WhitespaceBeforePunctuation)
-                        } else {
-                            DiagnosticKind::from(WhitespaceBeforeCloseBracket)
-                        };
+                    if !matches!(last_token, Tok::Comma | Tok::EndOfFile) {
+                        let diagnostic_kind =
+                            if matches!(token.token(), Tok::Comma | Tok::Semi | Tok::Colon) {
+                                DiagnosticKind::from(WhitespaceBeforePunctuation)
+                            } else {
+                                DiagnosticKind::from(WhitespaceBeforeCloseBracket)
+                            };
 
                         context.push(diagnostic_kind, TextRange::empty(token.start() - offset));
                     }
@@ -140,6 +132,6 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
             _ => {}
         }
 
-        last_token = kind;
+        last_token = token.token();
     }
 }
