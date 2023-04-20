@@ -6,7 +6,7 @@ use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::error;
 use rustc_hash::FxHashMap;
-use rustpython_parser::lexer::LexResult;
+use rustpython_parser::lexer::Spanned;
 use rustpython_parser::ParseError;
 
 use ruff_diagnostics::Diagnostic;
@@ -69,7 +69,7 @@ pub struct FixerResult<'a> {
 pub fn check_path(
     path: &Path,
     package: Option<&Path>,
-    tokens: Vec<LexResult>,
+    tokens: Vec<Spanned>,
     locator: &Locator,
     stylist: &Stylist,
     indexer: &Indexer,
@@ -259,7 +259,7 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
     let contents = std::fs::read_to_string(path)?;
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
+    let tokens: Vec<_> = ruff_rustpython::tokenize(&contents);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(&contents);
@@ -322,7 +322,7 @@ pub fn lint_only(
     autofix: flags::Autofix,
 ) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
+    let tokens: Vec<_> = ruff_rustpython::tokenize(contents);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(contents);
@@ -413,7 +413,7 @@ pub fn lint_fix<'a>(
     // Continuously autofix until the source code stabilizes.
     loop {
         // Tokenize once.
-        let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&transformed);
+        let tokens: Vec<_> = ruff_rustpython::tokenize(&transformed);
 
         // Map row and column locations to byte slices (lazily).
         let locator = Locator::new(&transformed);

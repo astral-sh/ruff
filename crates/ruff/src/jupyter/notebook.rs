@@ -1,4 +1,5 @@
 use ruff_text_size::TextRange;
+use rustpython_parser::Tok;
 use std::fs::File;
 use std::io::{BufReader, BufWriter};
 use std::iter;
@@ -75,7 +76,7 @@ impl JupyterNotebook {
                             // Check if tokenizing was successful and the file is non-empty
                             if (ruff_rustpython::tokenize(&contents))
                                 .last()
-                                .map_or(true, Result::is_err)
+                                .map_or(true, |(t, _)| matches!(t, Tok::Error(..)))
                             {
                                 Diagnostic::new(
                                     SyntaxError {

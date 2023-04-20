@@ -1,7 +1,7 @@
 use itertools::Itertools;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
-use rustpython_parser::lexer::LexResult;
+use rustpython_parser::lexer::Spanned;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -119,11 +119,10 @@ impl Violation for ExplicitStringConcatenation {
 }
 
 /// ISC001, ISC002
-pub fn implicit(tokens: &[LexResult], settings: &Settings, locator: &Locator) -> Vec<Diagnostic> {
+pub fn implicit(tokens: &[Spanned], settings: &Settings, locator: &Locator) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
     for ((a_tok, a_range), (b_tok, b_range)) in tokens
         .iter()
-        .flatten()
         .filter(|(tok, _)| {
             !matches!(tok, Tok::Comment(..))
                 && (settings.allow_multiline || !matches!(tok, Tok::NonLogicalNewline))

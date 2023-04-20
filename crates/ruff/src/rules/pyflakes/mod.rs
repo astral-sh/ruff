@@ -12,7 +12,6 @@ mod tests {
 
     use regex::Regex;
     use ruff_diagnostics::Diagnostic;
-    use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
     use textwrap::dedent;
 
@@ -252,7 +251,7 @@ mod tests {
     fn flakes(contents: &str, expected: &[Rule]) {
         let contents = dedent(contents);
         let settings = settings::Settings::for_rules(&Linter::Pyflakes);
-        let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
+        let tokens: Vec<_> = ruff_rustpython::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
         let indexer = Indexer::from_tokens(&tokens, &locator);

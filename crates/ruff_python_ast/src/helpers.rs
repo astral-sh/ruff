@@ -638,14 +638,10 @@ pub fn has_comments_in(range: TextRange, locator: &Locator) -> bool {
 
     for tok in lexer::lex_located(source, Mode::Module, range.start()) {
         match tok {
-            Ok((tok, _)) => {
-                if matches!(tok, Tok::Comment(..)) {
-                    return true;
-                }
+            (Tok::Comment(..), _) => {
+                return true;
             }
-            Err(_) => {
-                return false;
-            }
+            _ => {}
         }
     }
     false
@@ -974,7 +970,7 @@ pub fn match_parens(start: TextSize, locator: &Locator) -> Option<TextRange> {
     let mut fix_end = None;
     let mut count: usize = 0;
 
-    for (tok, range) in lexer::lex_located(contents, Mode::Module, start).flatten() {
+    for (tok, range) in lexer::lex_located(contents, Mode::Module, start) {
         match tok {
             Tok::Lpar => {
                 if count == 0 {
@@ -1011,7 +1007,7 @@ pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> TextRange {
     ) {
         let contents = &locator.contents()[stmt.range()];
 
-        for (tok, range) in lexer::lex_located(contents, Mode::Module, stmt.start()).flatten() {
+        for (tok, range) in lexer::lex_located(contents, Mode::Module, stmt.start()) {
             if matches!(tok, Tok::Name { .. }) {
                 return range;
             }
@@ -1030,7 +1026,6 @@ pub fn find_names<'a, T>(
     let contents = locator.slice(located.range());
 
     lexer::lex_located(contents, Mode::Module, located.start())
-        .flatten()
         .filter(|(tok, _)| matches!(tok, Tok::Name { .. }))
         .map(|(_, range)| range)
 }
@@ -1046,7 +1041,6 @@ pub fn excepthandler_name_range(handler: &Excepthandler, locator: &Locator) -> O
             let contents = &locator.contents()[TextRange::new(type_.end(), body[0].start())];
 
             lexer::lex_located(contents, Mode::Module, type_.end())
-                .flatten()
                 .tuple_windows()
                 .find(|(tok, next_tok)| {
                     matches!(tok.0, Tok::As) && matches!(next_tok.0, Tok::Name { .. })
@@ -1068,7 +1062,6 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> TextRange {
     let contents = &locator.contents()[TextRange::new(handler.start(), end)];
 
     lexer::lex_located(contents, Mode::Module, handler.start())
-        .flatten()
         .find(|(kind, _)| matches!(kind, Tok::Except { .. }))
         .map(|(_, range)| range)
         .expect("Failed to find `except` range")
@@ -1090,7 +1083,6 @@ pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
             let contents = &locator.contents()[TextRange::new(body_end, or_else_start)];
 
             lexer::lex_located(contents, Mode::Module, body_end)
-                .flatten()
                 .find(|(kind, _)| matches!(kind, Tok::Else))
                 .map(|(_, range)| range)
         }
@@ -1102,7 +1094,6 @@ pub fn else_range(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
 pub fn first_colon_range(range: TextRange, locator: &Locator) -> Option<TextRange> {
     let contents = &locator.contents()[range];
     let range = lexer::lex_located(contents, Mode::Module, range.start())
-        .flatten()
         .find(|(kind, _)| matches!(kind, Tok::Colon))
         .map(|(_, range)| range);
     range
@@ -1127,7 +1118,6 @@ pub fn elif_else_range(stmt: &Stmt, locator: &Locator) -> Option<TextRange> {
 
     let contents = &locator.contents()[TextRange::new(start, end)];
     lexer::lex_located(contents, Mode::Module, start)
-        .flatten()
         .find(|(kind, _)| matches!(kind, Tok::Elif | Tok::Else))
         .map(|(_, range)| range)
 }
@@ -1348,7 +1338,7 @@ pub type LocatedCmpop<U = ()> = Located<Cmpop, U>;
 /// `CPython` doesn't either. This method iterates over the token stream and
 /// re-identifies [`Cmpop`] nodes, annotating them with valid ranges.
 pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
-    let mut tok_iter = lexer::lex(contents, Mode::Module).flatten().peekable();
+    let mut tok_iter = lexer::lex(contents, Mode::Module).peekable();
     let mut ops: Vec<LocatedCmpop> = vec![];
     let mut count: usize = 0;
     loop {

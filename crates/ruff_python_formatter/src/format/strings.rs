@@ -127,7 +127,6 @@ impl Format<ASTFormatContext<'_>> for StringLiteral<'_> {
         // comments to individual string literals.
         let contents = f.context().locator().slice(expr.range());
         let elts = rustpython_parser::lexer::lex_located(contents, Mode::Module, expr.start())
-            .flatten()
             .filter_map(|(tok, range)| {
                 if matches!(tok, Tok::String { .. }) {
                     Some(range)

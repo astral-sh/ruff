@@ -135,7 +135,7 @@ fn create_remove_param_fix(locator: &Locator, expr: &Expr, mode_param: &Expr) ->
     let mut fix_end: Option<TextSize> = None;
     let mut is_first_arg: bool = false;
     let mut delete_first_arg: bool = false;
-    for (tok, range) in lexer::lex_located(content, Mode::Module, expr.start()).flatten() {
+    for (tok, range) in lexer::lex_located(content, Mode::Module, expr.start()) {
         if range.start() == mode_param.start() {
             if is_first_arg {
                 delete_first_arg = true;

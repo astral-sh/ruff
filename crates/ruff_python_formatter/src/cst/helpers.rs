@@ -21,9 +21,7 @@ pub fn find_tok(
         &locator.contents()[range],
         rustpython_parser::Mode::Module,
         range.start(),
-    )
-    .flatten()
-    {
+    ) {
         if f(tok) {
             return tok_range;
         }
@@ -49,9 +47,7 @@ pub fn expand_indented_block(
         &contents[TextRange::new(location, end_location)],
         rustpython_parser::Mode::Module,
         location,
-    )
-    .flatten()
-    {
+    ) {
         match tok {
             rustpython_parser::Tok::Colon if nesting == 0 => {
                 colon = Some(tok_range.start());
@@ -74,7 +70,6 @@ pub fn expand_indented_block(
         rustpython_parser::Mode::Module,
         colon_location,
     )
-    .flatten()
     .find_map(|(tok, range)| match tok {
         rustpython_parser::Tok::Indent => Some(range.end()),
         _ => None,

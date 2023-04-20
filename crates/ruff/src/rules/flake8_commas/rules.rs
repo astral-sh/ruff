@@ -1,6 +1,6 @@
 use itertools::Itertools;
 use ruff_text_size::TextRange;
-use rustpython_parser::lexer::{LexResult, Spanned};
+use rustpython_parser::lexer::Spanned;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -150,7 +150,7 @@ impl AlwaysAutofixableViolation for ProhibitedTrailingComma {
 
 /// COM812, COM818, COM819
 pub fn trailing_commas(
-    tokens: &[LexResult],
+    tokens: &[Spanned],
     locator: &Locator,
     settings: &Settings,
     autofix: flags::Autofix,
@@ -159,7 +159,6 @@ pub fn trailing_commas(
 
     let tokens = tokens
         .iter()
-        .flatten()
         // Completely ignore comments -- they just interfere with the logic.
         .filter(|&r| !matches!(r, (Tok::Comment(_), _)))
         .map(Token::from_spanned);

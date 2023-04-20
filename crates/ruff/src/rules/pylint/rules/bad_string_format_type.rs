@@ -245,7 +245,7 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) 
     // Grab each string segment (in case there's an implicit concatenation).
     let content = checker.locator.slice(expr.range());
     let mut strings: Vec<TextRange> = vec![];
-    for (tok, range) in lexer::lex_located(content, Mode::Module, expr.start()).flatten() {
+    for (tok, range) in lexer::lex_located(content, Mode::Module, expr.start()) {
         if matches!(tok, Tok::String { .. }) {
             strings.push(range);
         } else if matches!(tok, Tok::Percent) {

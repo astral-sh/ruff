@@ -29,7 +29,6 @@ impl Comment<'_> {
 pub fn collect_comments<'a>(range: TextRange, locator: &'a Locator) -> Vec<Comment<'a>> {
     let contents = locator.slice(range);
     lexer::lex_located(contents, Mode::Module, range.start())
-        .flatten()
         .filter_map(|(tok, range)| {
             if let Tok::Comment(value) = tok {
                 Some(Comment {

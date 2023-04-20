@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::lexer::LexResult;
+use rustpython_parser::lexer::Spanned;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
@@ -24,16 +24,17 @@ impl AlwaysAutofixableViolation for ExtraneousParentheses {
 }
 
 // See: https://github.com/asottile/pyupgrade/blob/97ed6fb3cf2e650d4f762ba231c3f04c41797710/pyupgrade/_main.py#L148
-fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(usize, usize)> {
+fn match_extraneous_parentheses(tokens: &[Spanned], mut i: usize) -> Option<(usize, usize)> {
     i += 1;
 
     loop {
         if i >= tokens.len() {
             return None;
         }
-        let Ok((tok, _)) = &tokens[i] else {
+        let (tok, _) = &tokens[i];
+        if matches!(tok, Tok::Error(..)) {
             return None;
-        };
+        }
         match tok {
             Tok::Comment(..) | Tok::NonLogicalNewline => {
                 i += 1;
@@ -57,9 +58,12 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
         if i >= tokens.len() {
             return None;
         }
-        let Ok((tok, _)) = &tokens[i] else {
+
+        let (tok, _) = &tokens[i];
+
+        if matches!(tok, Tok::Error(..)) {
             return None;
-        };
+        }
 
         // If we find a comma or a yield at depth 1 or 2, it's a tuple or coroutine.
         if depth == 1 && matches!(tok, Tok::Comma | Tok::Yield) {
@@ -75,12 +79,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
     let end = i;
 
     // Verify that we're not in an empty tuple.
-    if (start + 1..i).all(|i| {
-        matches!(
-            tokens[i],
-            Ok((Tok::Comment(..) | Tok::NonLogicalNewline, _))
-        )
-    }) {
+    if (start + 1..i).all(|i| matches!(tokens[i], (Tok::Comment(..) | Tok::NonLogicalNewline, _))) {
         return None;
     }
 
@@ -90,9 +89,10 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
         if i >= tokens.len() {
             return None;
         }
-        let Ok(( tok, _)) = &tokens[i] else {
+        let (tok, _) = &tokens[i];
+        if matches!(tok, Tok::Error(..)) {
             return None;
-        };
+        }
         match tok {
             Tok::Comment(..) | Tok::NonLogicalNewline => {
                 i += 1;
@@ -106,9 +106,12 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
     if i >= tokens.len() {
         return None;
     }
-    let Ok(( tok, _)) = &tokens[i] else {
+
+    let (tok, _) = &tokens[i];
+    if matches!(tok, Tok::Error(..)) {
         return None;
-    };
+    }
+
     if matches!(tok, Tok::Rpar) {
         Some((start, end))
     } else {
@@ -118,7 +121,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
 
 /// UP034
 pub fn extraneous_parentheses(
-    tokens: &[LexResult],
+    tokens: &[Spanned],
     locator: &Locator,
     settings: &Settings,
     autofix: flags::Autofix,
@@ -126,15 +129,16 @@ pub fn extraneous_parentheses(
     let mut diagnostics = vec![];
     let mut i = 0;
     while i < tokens.len() {
-        if matches!(tokens[i], Ok((Tok::Lpar, _))) {
+        if matches!(tokens[i], (Tok::Lpar, _)) {
             if let Some((start, end)) = match_extraneous_parentheses(tokens, i) {
                 i = end + 1;
-                let Ok((_, start_range)) = &tokens[start] else {
+                let (start_tok, start_range) = &tokens[start];
+                let (end_tok, end_range) = &tokens[end];
+
+                if matches!(start_tok, Tok::Error(..)) || matches!(end_tok, Tok::Error(..)) {
                     return diagnostics;
-                };
-                let Ok((.., end_range)) = &tokens[end] else {
-                    return diagnostics;
-                };
+                }
+
                 let mut diagnostic = Diagnostic::new(
                     ExtraneousParentheses,
                     TextRange::new(start_range.start(), end_range.end()),

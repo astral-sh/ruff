@@ -6,7 +6,6 @@ use std::path::Path;
 use anyhow::Result;
 use itertools::Itertools;
 use rustc_hash::FxHashMap;
-use rustpython_parser::lexer::LexResult;
 
 use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist};
 
@@ -26,7 +25,7 @@ pub fn test_resource_path(path: impl AsRef<Path>) -> std::path::PathBuf {
 pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Message>> {
     let path = test_resource_path("fixtures").join(path);
     let contents = std::fs::read_to_string(&path)?;
-    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
+    let tokens: Vec<_> = ruff_rustpython::tokenize(&contents);
     let locator = Locator::new(&contents);
     let stylist = Stylist::from_tokens(&tokens, &locator);
     let indexer = Indexer::from_tokens(&tokens, &locator);
@@ -64,7 +63,7 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
         let mut iterations = 0;
 
         loop {
-            let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
+            let tokens: Vec<_> = ruff_rustpython::tokenize(&contents);
             let locator = Locator::new(&contents);
             let stylist = Stylist::from_tokens(&tokens, &locator);
             let indexer = Indexer::from_tokens(&tokens, &locator);

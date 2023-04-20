@@ -314,9 +314,7 @@ pub(crate) fn printf_string_formatting(
         checker.locator.slice(expr.range()),
         Mode::Module,
         expr.start(),
-    )
-    .flatten()
-    {
+    ) {
         if matches!(tok, Tok::String { .. }) {
             strings.push(range);
         } else if matches!(tok, Tok::Rpar) {

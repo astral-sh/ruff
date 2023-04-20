@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::lexer::LexResult;
+use rustpython_parser::lexer::Spanned;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
@@ -100,7 +100,7 @@ impl AlwaysAutofixableViolation for UselessSemicolon {
 
 /// E701, E702, E703
 pub fn compound_statements(
-    lxr: &[LexResult],
+    lxr: &[Spanned],
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
@@ -131,7 +131,7 @@ pub fn compound_statements(
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for &(ref tok, range) in lxr.iter().flatten() {
+    for &(ref tok, range) in lxr.iter() {
         match tok {
             Tok::Lpar => {
                 par_count += 1;

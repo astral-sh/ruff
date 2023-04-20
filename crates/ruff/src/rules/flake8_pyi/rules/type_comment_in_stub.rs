@@ -1,6 +1,6 @@
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::lexer::LexResult;
+use rustpython_parser::lexer::Spanned;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{Diagnostic, Violation};
@@ -35,10 +35,10 @@ impl Violation for TypeCommentInStub {
 }
 
 /// PYI033
-pub fn type_comment_in_stub(tokens: &[LexResult]) -> Vec<Diagnostic> {
+pub fn type_comment_in_stub(tokens: &[Spanned]) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    for token in tokens.iter().flatten() {
+    for token in tokens.iter() {
         if let (Tok::Comment(comment), range) = token {
             if TYPE_COMMENT_REGEX.is_match(comment) && !TYPE_IGNORE_REGEX.is_match(comment) {
                 diagnostics.push(Diagnostic::new(TypeCommentInStub, *range));

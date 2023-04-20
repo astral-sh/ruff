@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use rustpython_parser::lexer::LexResult;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
@@ -170,7 +169,7 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         Settings::from_configuration(configuration, Path::new(".")).map_err(|e| e.to_string())?;
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
+    let tokens: Vec<_> = ruff_rustpython::tokenize(contents);
 
     // Map row and column locations to byte slices (lazily).
     let locator = Locator::new(contents);

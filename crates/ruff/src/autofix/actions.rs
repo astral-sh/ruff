@@ -350,7 +350,7 @@ pub fn remove_argument(
     if n_arguments == 1 {
         // Case 1: there is only one argument.
         let mut count: usize = 0;
-        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at) {
             if matches!(tok, Tok::Lpar) {
                 if count == 0 {
                     fix_start = Some(if remove_parentheses {
@@ -382,7 +382,7 @@ pub fn remove_argument(
     {
         // Case 2: argument or keyword is _not_ the last node.
         let mut seen_comma = false;
-        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at) {
             if seen_comma {
                 if matches!(tok, Tok::NonLogicalNewline) {
                     // Also delete any non-logical newlines after the comma.
@@ -405,7 +405,7 @@ pub fn remove_argument(
     } else {
         // Case 3: argument or keyword is the last node, so we have to find the last
         // comma in the stmt.
-        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at).flatten() {
+        for (tok, range) in lexer::lex_located(contents, Mode::Module, call_at) {
             if range.start() == expr_range.start() {
                 fix_end = Some(expr_range.end());
                 break;

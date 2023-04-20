@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::lexer::LexResult;
+use rustpython_parser::lexer::Spanned;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
@@ -462,7 +462,7 @@ fn strings(
 
 /// Generate `flake8-quote` diagnostics from a token stream.
 pub fn from_tokens(
-    lxr: &[LexResult],
+    lxr: &[Spanned],
     locator: &Locator,
     settings: &Settings,
     autofix: flags::Autofix,
@@ -473,7 +473,7 @@ pub fn from_tokens(
     // concatenation, and should thus be handled as a single unit.
     let mut sequence = vec![];
     let mut state_machine = StateMachine::default();
-    for &(ref tok, range) in lxr.iter().flatten() {
+    for &(ref tok, range) in lxr.iter() {
         let is_docstring = state_machine.consume(tok);
 
         // If this is a docstring, consume the existing sequence, then consume the

@@ -54,29 +54,26 @@ fn find_useless_f_strings<'a>(
     locator: &'a Locator,
 ) -> impl Iterator<Item = (TextRange, TextRange)> + 'a {
     let contents = locator.slice(expr.range());
-    lexer::lex_located(contents, Mode::Module, expr.start())
-        .flatten()
-        .filter_map(|(tok, range)| match tok {
-            Tok::String {
-                kind: StringKind::FString | StringKind::RawFString,
-                ..
-            } => {
-                let first_char =
-                    &locator.contents()[TextRange::at(range.start(), TextSize::from(1))];
-                // f"..."  => f_position = 0
-                // fr"..." => f_position = 0
-                // rf"..." => f_position = 1
-                let f_position = u32::from(!(first_char == "f" || first_char == "F"));
-                Some((
-                    TextRange::at(
-                        range.start() + TextSize::from(f_position),
-                        TextSize::from(1),
-                    ),
-                    range,
-                ))
-            }
-            _ => None,
-        })
+    lexer::lex_located(contents, Mode::Module, expr.start()).filter_map(|(tok, range)| match tok {
+        Tok::String {
+            kind: StringKind::FString | StringKind::RawFString,
+            ..
+        } => {
+            let first_char = &locator.contents()[TextRange::at(range.start(), TextSize::from(1))];
+            // f"..."  => f_position = 0
+            // fr"..." => f_position = 0
+            // rf"..." => f_position = 1
+            let f_position = u32::from(!(first_char == "f" || first_char == "F"));
+            Some((
+                TextRange::at(
+                    range.start() + TextSize::from(f_position),
+                    TextSize::from(1),
+                ),
+                range,
+            ))
+        }
+        _ => None,
+    })
 }
 
 fn unescape_f_string(content: &str) -> String {

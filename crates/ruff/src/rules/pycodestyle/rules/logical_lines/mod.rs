@@ -1,6 +1,6 @@
 use bitflags::bitflags;
 use ruff_text_size::{TextLen, TextRange, TextSize};
-use rustpython_parser::lexer::LexResult;
+use rustpython_parser::lexer::Spanned;
 use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 
@@ -83,13 +83,13 @@ pub(crate) struct LogicalLines<'a> {
 }
 
 impl<'a> LogicalLines<'a> {
-    pub fn from_tokens(tokens: &'a [LexResult], locator: &'a Locator<'a>) -> Self {
+    pub fn from_tokens(tokens: &'a [Spanned], locator: &'a Locator<'a>) -> Self {
         assert!(u32::try_from(tokens.len()).is_ok());
 
         let mut builder = LogicalLinesBuilder::with_capacity(tokens.len());
         let mut parens: u32 = 0;
 
-        for (token, range) in tokens.iter().flatten() {
+        for (token, range) in tokens.iter() {
             let token_kind = TokenKind::from_token(token);
             builder.push_token(token_kind, *range);
 

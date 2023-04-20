@@ -64,19 +64,12 @@ fn metadata<T>(locator: &Locator, located: &Located<T>) -> Option<BlockMetadata>
     let mut elif = None;
     let mut else_ = None;
 
-    for (tok, range) in lexer::lex_located(text, Mode::Module, line_start)
-        .flatten()
-        .filter(|(tok, _)| {
-            !matches!(
-                tok,
-                Tok::Indent
-                    | Tok::Dedent
-                    | Tok::NonLogicalNewline
-                    | Tok::Newline
-                    | Tok::Comment(..)
-            )
-        })
-    {
+    for (tok, range) in lexer::lex_located(text, Mode::Module, line_start).filter(|(tok, _)| {
+        !matches!(
+            tok,
+            Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline | Tok::Newline | Tok::Comment(..)
+        )
+    }) {
         if starter.is_none() {
             starter = Some(tok.clone());
         } else {

@@ -1,6 +1,6 @@
 //! Lint rules based on token traversal.
 
-use rustpython_parser::lexer::LexResult;
+use rustpython_parser::lexer::Spanned;
 use rustpython_parser::Tok;
 
 use crate::lex::docstring_detection::StateMachine;
@@ -16,7 +16,7 @@ use ruff_python_ast::source_code::Locator;
 
 pub fn check_tokens(
     locator: &Locator,
-    tokens: &[LexResult],
+    tokens: &[Spanned],
     settings: &Settings,
     autofix: flags::Autofix,
     is_stub: bool,
@@ -64,7 +64,7 @@ pub fn check_tokens(
     // RUF001, RUF002, RUF003
     if enforce_ambiguous_unicode_character {
         let mut state_machine = StateMachine::default();
-        for &(ref tok, range) in tokens.iter().flatten() {
+        for &(ref tok, range) in tokens.iter() {
             let is_docstring = if enforce_ambiguous_unicode_character {
                 state_machine.consume(tok)
             } else {
@@ -93,7 +93,7 @@ pub fn check_tokens(
 
     // ERA001
     if enforce_commented_out_code {
-        for (tok, range) in tokens.iter().flatten() {
+        for (tok, range) in tokens.iter() {
             if matches!(tok, Tok::Comment(_)) {
                 if let Some(diagnostic) =
                     eradicate::rules::commented_out_code(locator, *range, settings, autofix)
@@ -106,7 +106,7 @@ pub fn check_tokens(
 
     // W605
     if enforce_invalid_escape_sequence {
-        for (tok, range) in tokens.iter().flatten() {
+        for (tok, range) in tokens.iter() {
             if matches!(tok, Tok::String { .. }) {
                 diagnostics.extend(pycodestyle::rules::invalid_escape_sequence(
                     locator,
@@ -118,7 +118,7 @@ pub fn check_tokens(
     }
     // PLE2510, PLE2512, PLE2513
     if enforce_invalid_string_character {
-        for (tok, range) in tokens.iter().flatten() {
+        for (tok, range) in tokens.iter() {
             if matches!(tok, Tok::String { .. }) {
                 diagnostics.extend(
                     pylint::rules::invalid_string_characters(locator, *range, autofix.into())

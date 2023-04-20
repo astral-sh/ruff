@@ -104,9 +104,7 @@ fn get_parametrize_name_range(checker: &Checker, decorator: &Expr, expr: &Expr) 
         checker.locator.slice(decorator.range()),
         Mode::Module,
         decorator.start(),
-    )
-    .flatten()
-    {
+    ) {
         match tok {
             Tok::Lpar => locations.push(range.start()),
             Tok::Rpar => {

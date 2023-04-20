@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::lexer::LexResult;
+use rustpython_parser::lexer::Spanned;
 
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
@@ -31,7 +31,7 @@ fn expand_indent(line: &str) -> usize {
 }
 
 pub fn check_logical_lines(
-    tokens: &[LexResult],
+    tokens: &[Spanned],
     locator: &Locator,
     stylist: &Stylist,
     settings: &Settings,
@@ -204,7 +204,6 @@ pub fn check_logical_lines(
 
 #[cfg(test)]
 mod tests {
-    use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
     use crate::rules::pycodestyle::rules::logical_lines::LogicalLines;
@@ -216,7 +215,7 @@ mod tests {
 x = 1
 y = 2
 z = x + 1"#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let lxr: Vec<_> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
@@ -237,7 +236,7 @@ x = [
 ]
 y = 2
 z = x + 1"#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let lxr: Vec<_> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
@@ -251,7 +250,7 @@ z = x + 1"#;
         assert_eq!(actual, expected);
 
         let contents = "x = 'abc'";
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let lxr: Vec<_> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
@@ -264,7 +263,7 @@ z = x + 1"#;
 def f():
   x = 1
 f()"#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let lxr: Vec<_> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()
@@ -279,7 +278,7 @@ def f():
   # Comment goes here.
   x = 1
 f()"#;
-        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let lxr: Vec<_> = lexer::lex(contents, Mode::Module).collect();
         let locator = Locator::new(contents);
         let actual: Vec<String> = LogicalLines::from_tokens(&lxr, &locator)
             .into_iter()

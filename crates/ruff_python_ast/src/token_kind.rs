@@ -164,6 +164,7 @@ pub enum TokenKind {
     StartModule,
     StartInteractive,
     StartExpression,
+    Error,
 }
 
 impl TokenKind {
@@ -444,6 +445,7 @@ impl TokenKind {
             Tok::StartModule => TokenKind::StartModule,
             Tok::StartInteractive => TokenKind::StartInteractive,
             Tok::StartExpression => TokenKind::StartExpression,
+            Tok::Error(..) => TokenKind::Error,
         }
     }
 }

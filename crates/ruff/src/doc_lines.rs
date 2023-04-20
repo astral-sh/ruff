@@ -6,27 +6,27 @@ use std::iter::FusedIterator;
 
 use ruff_python_ast::source_code::Locator;
 use rustpython_parser::ast::{Constant, ExprKind, Stmt, StmtKind, Suite};
-use rustpython_parser::lexer::LexResult;
+use rustpython_parser::lexer::Spanned;
 use rustpython_parser::Tok;
 
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
 /// Extract doc lines (standalone comments) from a token sequence.
-pub fn doc_lines_from_tokens<'a>(lxr: &'a [LexResult], locator: &'a Locator<'a>) -> DocLines<'a> {
+pub fn doc_lines_from_tokens<'a>(lxr: &'a [Spanned], locator: &'a Locator<'a>) -> DocLines<'a> {
     DocLines::new(lxr, locator)
 }
 
 pub struct DocLines<'a> {
-    inner: std::iter::Flatten<core::slice::Iter<'a, LexResult>>,
+    inner: core::slice::Iter<'a, Spanned>,
     locator: &'a Locator<'a>,
     prev: TextSize,
 }
 
 impl<'a> DocLines<'a> {
-    fn new(lxr: &'a [LexResult], locator: &'a Locator) -> Self {
+    fn new(lxr: &'a [Spanned], locator: &'a Locator) -> Self {
         Self {
-            inner: lxr.iter().flatten(),
+            inner: lxr.iter(),
             locator,
             prev: TextSize::default(),
         }

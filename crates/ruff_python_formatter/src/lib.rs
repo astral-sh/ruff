@@ -1,5 +1,4 @@
 use anyhow::Result;
-use rustpython_parser::lexer::LexResult;
 
 use ruff_formatter::{format, Formatted, IndentStyle, SimpleFormatOptions};
 use ruff_python_ast::source_code::Locator;
@@ -25,7 +24,7 @@ pub fn fmt(contents: &str) -> Result<Formatted<ASTFormatContext>> {
     let locator = Locator::new(contents);
 
     // Tokenize once.
-    let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
+    let tokens: Vec<_> = ruff_rustpython::tokenize(contents);
 
     // Extract trivia.
     let trivia = trivia::extract_trivia_tokens(&tokens, contents);

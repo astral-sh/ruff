@@ -89,9 +89,8 @@ pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
     // Find all Tok::Name tokens that are not preceded by Tok::As, and all
     // Tok::Comma tokens.
     let mut prev_tok = None;
-    for (tok, range) in lexer::lex(contents, Mode::Module)
-        .flatten()
-        .skip_while(|(tok, _)| !matches!(tok, Tok::Import))
+    for (tok, range) in
+        lexer::lex(contents, Mode::Module).skip_while(|(tok, _)| !matches!(tok, Tok::Import))
     {
         if let Tok::Name { name } = &tok {
             if matches!(prev_tok, Some(Tok::As)) {

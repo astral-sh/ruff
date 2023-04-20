@@ -171,7 +171,7 @@ fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
 /// along with a trailing newline suffix.
 fn end_of_statement_insertion(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Insertion {
     let location = stmt.end();
-    let mut tokens = lexer::lex_located(locator.after(location), Mode::Module, location).flatten();
+    let mut tokens = lexer::lex_located(locator.after(location), Mode::Module, location);
     if let Some((Tok::Semi, range)) = tokens.next() {
         // If the first token after the docstring is a semicolon, insert after the semicolon as an
         // inline statement;
@@ -204,9 +204,8 @@ fn top_of_file_insertion(body: &[Stmt], locator: &Locator, stylist: &Stylist) ->
     let mut location = if let Some(location) = match_docstring_end(body) {
         // If the first token after the docstring is a semicolon, insert after the semicolon as an
         // inline statement;
-        let first_token = lexer::lex_located(locator.after(location), Mode::Module, location)
-            .flatten()
-            .next();
+        let first_token =
+            lexer::lex_located(locator.after(location), Mode::Module, location).next();
         if let Some((Tok::Semi, range)) = first_token {
             return Insertion::new(" ", range.end(), ";");
         }
@@ -218,9 +217,7 @@ fn top_of_file_insertion(body: &[Stmt], locator: &Locator, stylist: &Stylist) ->
     };
 
     // Skip over any comments and empty lines.
-    for (tok, range) in
-        lexer::lex_located(locator.after(location), Mode::Module, location).flatten()
-    {
+    for (tok, range) in lexer::lex_located(locator.after(location), Mode::Module, location) {
         if matches!(tok, Tok::Comment(..) | Tok::Newline) {
             location = locator.full_line_end(range.end());
         } else {
@@ -236,7 +233,6 @@ mod tests {
     use anyhow::Result;
     use ruff_text_size::TextSize;
     use rustpython_parser as parser;
-    use rustpython_parser::lexer::LexResult;
 
     use ruff_python_ast::source_code::{LineEnding, Locator, Stylist};
 
@@ -244,7 +240,7 @@ mod tests {
 
     fn insert(contents: &str) -> Result<Insertion> {
         let program = parser::parse_program(contents, "<filename>")?;
-        let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
+        let tokens: Vec<_> = ruff_rustpython::tokenize(contents);
         let locator = Locator::new(contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
         Ok(top_of_file_insertion(&program, &locator, &stylist))

@@ -74,9 +74,8 @@ where
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for ((tok, _), (_, range)) in lexer::lex_located(contents, Mode::Module, located.start())
-        .flatten()
-        .tuple_windows()
+    for ((tok, _), (_, range)) in
+        lexer::lex_located(contents, Mode::Module, located.start()).tuple_windows()
     {
         match tok {
             Tok::Lpar => {
@@ -136,7 +135,7 @@ where
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for (tok, range) in lexer::lex_located(contents, Mode::Module, located.start()).flatten() {
+    for (tok, range) in lexer::lex_located(contents, Mode::Module, located.start()) {
         match tok {
             Tok::Lpar => {
                 par_count += 1;

@@ -112,7 +112,7 @@ fn replace_with_bytes_literal(locator: &Locator, expr: &Expr, constant: &Expr) -
     let contents = locator.slice(constant.range());
     let mut replacement = String::with_capacity(contents.len() + 1);
     let mut prev = None;
-    for (tok, range) in lexer::lex_located(contents, Mode::Module, constant.start()).flatten() {
+    for (tok, range) in lexer::lex_located(contents, Mode::Module, constant.start()) {
         if matches!(tok, Tok::String { .. }) {
             if let Some(prev) = prev {
                 replacement.push_str(locator.slice(TextRange::new(prev, range.start())));
