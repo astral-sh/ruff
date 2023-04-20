@@ -225,3 +225,44 @@ pub static SIMPLE_MAGIC_RETURN_TYPES: Lazy<FxHashMap<&'static str, &'static str>
             ("__subclasscheck__", "bool"),
         ])
     });
+
+pub const IMMUTABLE_TYPES: &[&[&str]] = &[
+    &["", "bool"],
+    &["", "bytes"],
+    &["", "complex"],
+    &["", "float"],
+    &["", "frozenset"],
+    &["", "int"],
+    &["", "object"],
+    &["", "range"],
+    &["", "str"],
+    &["collections", "abc", "Sized"],
+    &["typing", "LiteralString"],
+    &["typing", "Sized"],
+];
+
+pub const IMMUTABLE_GENERIC_TYPES: &[&[&str]] = &[
+    &["", "tuple"],
+    &["collections", "abc", "ByteString"],
+    &["collections", "abc", "Collection"],
+    &["collections", "abc", "Container"],
+    &["collections", "abc", "Iterable"],
+    &["collections", "abc", "Mapping"],
+    &["collections", "abc", "Reversible"],
+    &["collections", "abc", "Sequence"],
+    &["collections", "abc", "Set"],
+    &["typing", "AbstractSet"],
+    &["typing", "ByteString"],
+    &["typing", "Callable"],
+    &["typing", "Collection"],
+    &["typing", "Container"],
+    &["typing", "FrozenSet"],
+    &["typing", "Iterable"],
+    &["typing", "Literal"],
+    &["typing", "Mapping"],
+    &["typing", "Never"],
+    &["typing", "NoReturn"],
+    &["typing", "Reversible"],
+    &["typing", "Sequence"],
+    &["typing", "Tuple"],
+];
