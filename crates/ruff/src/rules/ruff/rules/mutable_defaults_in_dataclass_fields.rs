@@ -3,6 +3,7 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{call_path::compose_call_path, helpers::map_callable, types::Range};
+use ruff_python_semantic::analyze::typing::is_immutable_annotation;
 use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
@@ -174,16 +175,26 @@ pub fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &[Stmt])
 /// RUF008
 pub fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
     for statement in body {
-        if let StmtKind::AnnAssign {
-            value: Some(value), ..
-        }
-        | StmtKind::Assign { value, .. } = &statement.node
-        {
-            if is_mutable_expr(value) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(MutableDataclassDefault, Range::from(value)));
+        match &statement.node {
+            StmtKind::AnnAssign {
+                annotation,
+                value: Some(value),
+                ..
+            } => {
+                if !is_immutable_annotation(&checker.ctx, annotation) && is_mutable_expr(value) {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(MutableDataclassDefault, Range::from(value)));
+                }
             }
+            StmtKind::Assign { value, .. } => {
+                if is_mutable_expr(value) {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(MutableDataclassDefault, Range::from(value)));
+                }
+            }
+            _ => (),
         }
     }
 }

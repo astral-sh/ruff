@@ -1,8 +1,9 @@
-use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator};
+use rustpython_parser::ast::{Arguments, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::analyze::typing::is_immutable_annotation;
 
 use crate::checkers::ast::Checker;
 
@@ -23,47 +24,6 @@ const MUTABLE_FUNCS: &[&[&str]] = &[
     &["collections", "OrderedDict"],
     &["collections", "defaultdict"],
     &["collections", "deque"],
-];
-
-const IMMUTABLE_TYPES: &[&[&str]] = &[
-    &["", "bool"],
-    &["", "bytes"],
-    &["", "complex"],
-    &["", "float"],
-    &["", "frozenset"],
-    &["", "int"],
-    &["", "object"],
-    &["", "range"],
-    &["", "str"],
-    &["collections", "abc", "Sized"],
-    &["typing", "LiteralString"],
-    &["typing", "Sized"],
-];
-
-const IMMUTABLE_GENERIC_TYPES: &[&[&str]] = &[
-    &["", "tuple"],
-    &["collections", "abc", "ByteString"],
-    &["collections", "abc", "Collection"],
-    &["collections", "abc", "Container"],
-    &["collections", "abc", "Iterable"],
-    &["collections", "abc", "Mapping"],
-    &["collections", "abc", "Reversible"],
-    &["collections", "abc", "Sequence"],
-    &["collections", "abc", "Set"],
-    &["typing", "AbstractSet"],
-    &["typing", "ByteString"],
-    &["typing", "Callable"],
-    &["typing", "Collection"],
-    &["typing", "Container"],
-    &["typing", "FrozenSet"],
-    &["typing", "Iterable"],
-    &["typing", "Literal"],
-    &["typing", "Mapping"],
-    &["typing", "Never"],
-    &["typing", "NoReturn"],
-    &["typing", "Reversible"],
-    &["typing", "Sequence"],
-    &["typing", "Tuple"],
 ];
 
 pub fn is_mutable_func(checker: &Checker, func: &Expr) -> bool {
@@ -90,60 +50,6 @@ fn is_mutable_expr(checker: &Checker, expr: &Expr) -> bool {
     }
 }
 
-fn is_immutable_annotation(checker: &Checker, expr: &Expr) -> bool {
-    match &expr.node {
-        ExprKind::Name { .. } | ExprKind::Attribute { .. } => checker
-            .ctx
-            .resolve_call_path(expr)
-            .map_or(false, |call_path| {
-                IMMUTABLE_TYPES
-                    .iter()
-                    .chain(IMMUTABLE_GENERIC_TYPES)
-                    .any(|target| call_path.as_slice() == *target)
-            }),
-        ExprKind::Subscript { value, slice, .. } => {
-            checker
-                .ctx
-                .resolve_call_path(value)
-                .map_or(false, |call_path| {
-                    if IMMUTABLE_GENERIC_TYPES
-                        .iter()
-                        .any(|target| call_path.as_slice() == *target)
-                    {
-                        true
-                    } else if call_path.as_slice() == ["typing", "Union"] {
-                        if let ExprKind::Tuple { elts, .. } = &slice.node {
-                            elts.iter().all(|elt| is_immutable_annotation(checker, elt))
-                        } else {
-                            false
-                        }
-                    } else if call_path.as_slice() == ["typing", "Optional"] {
-                        is_immutable_annotation(checker, slice)
-                    } else if call_path.as_slice() == ["typing", "Annotated"] {
-                        if let ExprKind::Tuple { elts, .. } = &slice.node {
-                            elts.first()
-                                .map_or(false, |elt| is_immutable_annotation(checker, elt))
-                        } else {
-                            false
-                        }
-                    } else {
-                        false
-                    }
-                })
-        }
-        ExprKind::BinOp {
-            left,
-            op: Operator::BitOr,
-            right,
-        } => is_immutable_annotation(checker, left) && is_immutable_annotation(checker, right),
-        ExprKind::Constant {
-            value: Constant::None,
-            ..
-        } => true,
-        _ => false,
-    }
-}
-
 /// B006
 pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
     // Scan in reverse order to right-align zip().
@@ -166,7 +72,7 @@ pub fn mutable_argument_default(checker: &mut Checker, arguments: &Arguments) {
                 .node
                 .annotation
                 .as_ref()
-                .map_or(false, |expr| is_immutable_annotation(checker, expr))
+                .map_or(false, |expr| is_immutable_annotation(&checker.ctx, expr))
         {
             checker.diagnostics.push(Diagnostic::new(
                 MutableArgumentDefault,
