@@ -1,5 +1,5 @@
-use super::LogicalLineTokens;
 use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
@@ -137,13 +137,13 @@ impl Violation for MultipleLeadingHashesForBlockComment {
 
 /// E261, E262, E265, E266
 pub(crate) fn whitespace_before_comment(
-    tokens: &LogicalLineTokens,
+    line: &LogicalLine,
     locator: &Locator,
     is_first_row: bool,
     context: &mut LogicalLinesContext,
 ) {
     let mut prev_end = TextSize::default();
-    for token in tokens {
+    for token in line.tokens() {
         let kind = token.kind();
 
         if let TokenKind::Comment = kind {

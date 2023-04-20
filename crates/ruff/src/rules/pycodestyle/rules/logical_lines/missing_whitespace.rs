@@ -61,7 +61,7 @@ pub(crate) fn missing_whitespace(
             }
 
             TokenKind::Comma | TokenKind::Semi | TokenKind::Colon => {
-                let after = line.text_after(&token);
+                let after = line.text_after(token);
 
                 if !after.chars().next().map_or(false, char::is_whitespace) {
                     if let Some(next_token) = iter.peek() {

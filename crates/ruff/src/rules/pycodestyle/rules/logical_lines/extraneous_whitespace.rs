@@ -109,7 +109,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
         let kind = token.kind();
         match kind {
             TokenKind::Lbrace | TokenKind::Lpar | TokenKind::Lsqb => {
-                if !matches!(line.trailing_whitespace(&token), Whitespace::None) {
+                if !matches!(line.trailing_whitespace(token), Whitespace::None) {
                     context.push(WhitespaceAfterOpenBracket, TextRange::empty(token.end()));
                 }
             }
@@ -120,7 +120,7 @@ pub(crate) fn extraneous_whitespace(line: &LogicalLine, context: &mut LogicalLin
             | TokenKind::Semi
             | TokenKind::Colon => {
                 if let (Whitespace::Single | Whitespace::Many | Whitespace::Tab, offset) =
-                    line.leading_whitespace(&token)
+                    line.leading_whitespace(token)
                 {
                     if !matches!(last_token, TokenKind::Comma | TokenKind::EndOfFile) {
                         let diagnostic_kind = if matches!(

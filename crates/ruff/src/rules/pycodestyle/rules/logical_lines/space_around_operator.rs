@@ -131,7 +131,7 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
 
         if is_operator {
             if !after_operator {
-                match line.leading_whitespace(&token) {
+                match line.leading_whitespace(token) {
                     (Whitespace::Tab, offset) => {
                         let start = token.start();
                         context.push(TabBeforeOperator, TextRange::empty(start - offset));
@@ -147,7 +147,7 @@ pub(crate) fn space_around_operator(line: &LogicalLine, context: &mut LogicalLin
                 }
             }
 
-            match line.trailing_whitespace(&token) {
+            match line.trailing_whitespace(token) {
                 Whitespace::Tab => {
                     let end = token.end();
                     context.push(TabAfterOperator, TextRange::empty(end));
