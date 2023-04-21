@@ -83,18 +83,15 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
             .map_or(false, |call_path| {
                 call_path.as_slice() == ["pytest", "raises"]
             })
-        {
-            if keywords.iter().any(|keyword| {
+            && !keywords.iter().any(|keyword| {
                 keyword
                     .node
                     .arg
                     .as_ref()
                     .map_or(false, |arg| arg == "match")
-            }) {
-                return;
-            } else {
-                AssertionKind::PytestRaises
-            }
+            })
+        {
+            AssertionKind::PytestRaises
         } else {
             return;
         }
