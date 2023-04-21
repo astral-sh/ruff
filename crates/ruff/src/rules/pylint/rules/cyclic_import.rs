@@ -196,7 +196,7 @@ mod tests {
         let location2 = Location::new(2, 2);
 
         let a_a = ModuleImport::new("a_a".to_string(), location1, location1);
-        let b_a = ModuleImport::new("b_a".to_string(), location2, location2); 
+        let b_a = ModuleImport::new("b_a".to_string(), location2, location2);
         map.insert(a_a.module.clone(), vec![]);
         map.insert(b_a.module, vec![a_a.clone()]);
         let imports = ImportMap::new(map);
@@ -206,10 +206,10 @@ mod tests {
 
         let VisitedAndCycles {
             fully_visited: visited,
-            cycles
+            cycles,
         } = cyclic_checker.has_cycles(&a_a.module);
         let mut check_visited = FxHashSet::default();
-        check_visited.insert(a_a.module.clone());
+        check_visited.insert(a_a.module);
         assert_eq!(visited, check_visited);
         assert!(cycles.is_none());
     }
@@ -265,22 +265,10 @@ mod tests {
         let c_a = ModuleImport::new("c_a".to_string(), location1, location2);
         let d_a = ModuleImport::new("d_a".to_string(), location2, location2);
 
-        map.insert(
-            a_a.module.clone(),
-            vec![b_a.clone(), c_a.clone()],
-        );
-        map.insert(
-            b_a.module.clone(),
-            vec![c_a.clone(), d_a.clone()],
-        );
-        map.insert(
-            c_a.module.clone(),
-            vec![b_a.clone(), d_a.clone()],
-        );
-        map.insert(
-            d_a.module.clone(),
-            vec![a_a.clone()],
-        );
+        map.insert(a_a.module.clone(), vec![b_a.clone(), c_a.clone()]);
+        map.insert(b_a.module.clone(), vec![c_a.clone(), d_a.clone()]);
+        map.insert(c_a.module.clone(), vec![b_a.clone(), d_a.clone()]);
+        map.insert(d_a.module.clone(), vec![a_a.clone()]);
         let imports = ImportMap::new(map);
         let cyclic_checker = CyclicImportChecker {
             imports: &imports.module_to_imports,
@@ -298,12 +286,30 @@ mod tests {
         assert_eq!(visited, check_visited);
 
         let mut check_cycles = FxHashSet::default();
-        check_cycles.insert(vec![a_a.module.clone(), b_a.module.clone(), c_a.module.clone(), d_a.module.clone()]);
-        check_cycles.insert(vec![a_a.module.clone(), c_a.module.clone(), b_a.module.clone(), d_a.module.clone()]);
-        check_cycles.insert(vec![a_a.module.clone(), c_a.module.clone(), d_a.module.clone()]);
-        check_cycles.insert(vec![a_a.module.clone(), b_a.module.clone(), d_a.module.clone()]);
+        check_cycles.insert(vec![
+            a_a.module.clone(),
+            b_a.module.clone(),
+            c_a.module.clone(),
+            d_a.module.clone(),
+        ]);
+        check_cycles.insert(vec![
+            a_a.module.clone(),
+            c_a.module.clone(),
+            b_a.module.clone(),
+            d_a.module.clone(),
+        ]);
+        check_cycles.insert(vec![
+            a_a.module.clone(),
+            c_a.module.clone(),
+            d_a.module.clone(),
+        ]);
+        check_cycles.insert(vec![
+            a_a.module,
+            b_a.module.clone(),
+            d_a.module,
+        ]);
         check_cycles.insert(vec![c_a.module.clone(), b_a.module.clone()]);
-        check_cycles.insert(vec![b_a.module.clone(), c_a.module.clone()]);
+        check_cycles.insert(vec![b_a.module, c_a.module]);
         assert_eq!(cycles, Some(check_cycles));
     }
 
