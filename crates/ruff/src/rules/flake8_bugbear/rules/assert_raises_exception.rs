@@ -6,15 +6,21 @@ use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum AssertionKind {
+    AssertRaises,
+    PytestRaises,
+}
+
 /// ## What it does
 /// Checks for `self.assertRaises(Exception)` or `pytest.raises(Exception)`.
 ///
 /// ## Why is this bad?
-/// These forms catch every Exception, which can lead to passing tests even
-/// the code being tested is never executed due to a typo.
+/// These forms catch every `Exception`, which can lead to tests passing even
+/// if, e.g., the code being tested is never executed due to a typo.
 ///
-/// Either assert for a more specific exception (builtin or custom),
-/// `assertRaisesRegex`, or `pytest.raises(..., match=<REGEX>)`.
+/// Either assert for a more specific exception (builtin or custom), or use
+/// `assertRaisesRegex` or `pytest.raises(..., match=<REGEX>)` respectively.
 ///
 /// ## Example
 /// ```python
@@ -26,14 +32,21 @@ use crate::checkers::ast::Checker;
 /// self.assertRaises(SomeSpecificException, foo)
 /// ```
 #[violation]
-pub struct AssertRaisesException;
+pub struct AssertRaisesException {
+    kind: AssertionKind,
+}
 
 impl Violation for AssertRaisesException {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!(
-            "`assertRaises(Exception)` and `pytest.raises(Exception)` should be considered evil"
-        )
+        match self.kind {
+            AssertionKind::AssertRaises => {
+                format!("`assertRaises(Exception)` should be considered evil")
+            }
+            AssertionKind::PytestRaises => {
+                format!("`pytest.raises(Exception)` should be considered evil")
+            }
+        }
     }
 }
 
@@ -43,24 +56,13 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
         return;
     };
     let item_context = &item.context_expr;
-    let ExprKind::Call { func, args, .. } = &item_context.node else {
+    let ExprKind::Call { func, args, keywords } = &item_context.node else {
         return;
     };
     if args.len() != 1 {
         return;
     }
     if item.optional_vars.is_some() {
-        return;
-    }
-
-    if !matches!(&func.node, ExprKind::Attribute { attr, .. } if attr == "assertRaises")
-        && !checker
-            .ctx
-            .resolve_call_path(func)
-            .map_or(false, |call_path| {
-                call_path.as_slice() == ["pytest", "raises"]
-            })
-    {
         return;
     }
 
@@ -72,7 +74,34 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
         return;
     }
 
-    checker
-        .diagnostics
-        .push(Diagnostic::new(AssertRaisesException, Range::from(stmt)));
+    let kind = {
+        if matches!(&func.node, ExprKind::Attribute { attr, .. } if attr == "assertRaises") {
+            AssertionKind::AssertRaises
+        } else if checker
+            .ctx
+            .resolve_call_path(func)
+            .map_or(false, |call_path| {
+                call_path.as_slice() == ["pytest", "raises"]
+            })
+        {
+            if keywords.iter().any(|keyword| {
+                keyword
+                    .node
+                    .arg
+                    .as_ref()
+                    .map_or(false, |arg| arg == "match")
+            }) {
+                return;
+            } else {
+                AssertionKind::PytestRaises
+            }
+        } else {
+            return;
+        }
+    };
+
+    checker.diagnostics.push(Diagnostic::new(
+        AssertRaisesException { kind },
+        Range::from(stmt),
+    ));
 }

@@ -36,9 +36,13 @@ class Foobar(unittest.TestCase):
         with self.assertRaises(asyncio.CancelledError):
             Foo()
 
+
 def test_pytest_raises():
     with pytest.raises(Exception):
         raise ValueError("Hello")
 
+    with pytest.raises(Exception, "hello"):
+        raise ValueError("This is fine")
+
     with pytest.raises(Exception, match="hello"):
-        raise ValueError("Hello")
+        raise ValueError("This is also fine")
