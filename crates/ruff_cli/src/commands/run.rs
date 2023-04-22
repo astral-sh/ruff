@@ -168,7 +168,6 @@ pub fn run(
             if let Some(cycle_diagnostics) =
                 pylint_cyclic_import(path, package, &diagnostics.imports, &mut cycles)
             {
-                // let file = SourceFileBuilder::new(&path.to_string_lossy()).finish();
                 diagnostics += Diagnostics::new(
                     cycle_diagnostics
                         .into_iter()
