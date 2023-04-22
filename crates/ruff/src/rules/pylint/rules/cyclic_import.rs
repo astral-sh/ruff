@@ -221,7 +221,7 @@ mod tests {
     }
 
     #[test]
-    fn cyclic_import_multiple() {
+    fn cyclic_import_multiple_cycles() {
         let mut map = FxHashMap::default();
         let location1 = Location::new(1, 1);
         let location2 = Location::new(2, 2);
@@ -272,7 +272,7 @@ mod tests {
     }
 
     #[test]
-    fn cyclic_import_run_test() {
+    fn cyclic_import_check_diagnostics() {
         let location1 = Location::new(1, 1);
         let location2 = Location::new(2, 2);
         let location3 = Location::new(3, 3);
