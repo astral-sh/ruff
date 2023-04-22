@@ -115,6 +115,20 @@ def f(x, *args, **kwargs):
     return x
 
 
+def f(x, *, y, z):
+    """Do something.
+
+    Args:
+        x: some first value
+
+    Keyword Args:
+        y (int): the other value
+        z (int): the last value
+
+    """
+    return x, y, z
+
+
 class Test:
     def f(self, /, arg1: int) -> None:
         """
