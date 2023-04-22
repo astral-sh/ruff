@@ -1,4 +1,4 @@
-use rustpython_parser::ast::{Expr, ExprKind, Stmt};
+use rustpython_parser::ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -37,15 +37,10 @@ pub fn mixed_case_variable_in_class_scope(
     {
         return;
     }
-    if bases.iter().any(|base| {
-        if let ExprKind::Name { id, .. } = &base.node {
-            return id == "TypedDict";
-        }
-        false
-    }) {
-        return;
-    }
-    if helpers::is_mixed_case(name) && !helpers::is_namedtuple_assignment(checker, stmt) {
+    if helpers::is_mixed_case(name)
+        && !helpers::is_namedtuple_assignment(checker, stmt)
+        && !helpers::is_typeddict(checker, bases)
+    {
         checker.diagnostics.push(Diagnostic::new(
             MixedCaseVariableInClassScope {
                 name: name.to_string(),
