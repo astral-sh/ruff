@@ -298,7 +298,9 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
             if numpy_sections.iter().any(|context| {
                 matches!(
                     context.kind,
-                    SectionKind::Parameters | SectionKind::OtherParameters
+                    SectionKind::Parameters
+                        | SectionKind::OtherParams
+                        | SectionKind::OtherParameters
                 )
             }) {
                 for context in &numpy_sections {
@@ -318,9 +320,6 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
                         | SectionKind::KeywordArguments
                         | SectionKind::OtherArgs
                         | SectionKind::OtherArguments
-                        | SectionKind::OtherParams
-                        | SectionKind::OtherParameters
-                        | SectionKind::Parameters
                 )
             }) {
                 parse_google_sections(checker, &lines, docstring);
@@ -1068,9 +1067,6 @@ fn parse_google_sections(checker: &mut Checker, lines: &[&str], docstring: &Docs
                 | SectionKind::KeywordArguments
                 | SectionKind::OtherArgs
                 | SectionKind::OtherArguments
-                | SectionKind::OtherParams
-                | SectionKind::OtherParameters
-                | SectionKind::Parameters
         ) {
             documented_args.extend(args_section(section_context));
         }

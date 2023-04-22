@@ -28,8 +28,6 @@ pub(crate) static GOOGLE_SECTIONS: &[SectionKind] = &[
     SectionKind::Notes,
     SectionKind::OtherArgs,
     SectionKind::OtherArguments,
-    SectionKind::OtherParams,
-    SectionKind::OtherParameters,
     SectionKind::Return,
     SectionKind::Tip,
     SectionKind::Todo,
