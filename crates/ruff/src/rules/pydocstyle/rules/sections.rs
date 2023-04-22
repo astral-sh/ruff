@@ -307,16 +307,20 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
                 return;
             }
 
-            // If the docstring contains `Args:`, `Arguments:`, `Keyword Args:`, or `Keyword
-            // Arguments`, use the Google convention.
+            // If the docstring contains any argument specifier, use the Google convention.
             let google_sections = section_contexts(&lines, SectionStyle::Google);
             if google_sections.iter().any(|context| {
                 matches!(
                     context.kind,
-                    SectionKind::Arguments
-                        | SectionKind::Args
+                    SectionKind::Args
+                        | SectionKind::Arguments
                         | SectionKind::KeywordArgs
                         | SectionKind::KeywordArguments
+                        | SectionKind::OtherArgs
+                        | SectionKind::OtherArguments
+                        | SectionKind::OtherParams
+                        | SectionKind::OtherParameters
+                        | SectionKind::Parameters
                 )
             }) {
                 parse_google_sections(checker, &lines, docstring);
@@ -1062,6 +1066,11 @@ fn parse_google_sections(checker: &mut Checker, lines: &[&str], docstring: &Docs
                 | SectionKind::Arguments
                 | SectionKind::KeywordArgs
                 | SectionKind::KeywordArguments
+                | SectionKind::OtherArgs
+                | SectionKind::OtherArguments
+                | SectionKind::OtherParams
+                | SectionKind::OtherParameters
+                | SectionKind::Parameters
         ) {
             documented_args.extend(args_section(section_context));
         }
