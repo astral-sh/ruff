@@ -9,7 +9,8 @@ use rustpython_parser::Tok;
 use crate::settings::Settings;
 
 bitflags! {
-    pub struct Flags: u32 {
+    #[derive(Debug, Copy, Clone)]
+    pub struct Flags: u8 {
         const NOQA = 0b0000_0001;
         const ISORT = 0b0000_0010;
     }
