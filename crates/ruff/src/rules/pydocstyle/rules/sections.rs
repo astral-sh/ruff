@@ -280,9 +280,7 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
 
     match convention {
         Some(Convention::Google) => {
-            for context in &section_contexts(&lines, SectionStyle::Google) {
-                google_section(checker, docstring, context);
-            }
+            parse_google_sections(checker, &lines, docstring);
         }
         Some(Convention::Numpy) => {
             for context in &section_contexts(&lines, SectionStyle::Numpy) {
@@ -309,23 +307,27 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
                 return;
             }
 
-            // If the docstring contains `Args:` or `Arguments:`, use the Google convention.
+            // If the docstring contains `Args:`, `Arguments:`, `Keyword Args:`, or `Keyword
+            // Arguments`, use the Google convention.
+            //
+            // Need to unify argument list between Args and Keyword Args sections
             let google_sections = section_contexts(&lines, SectionStyle::Google);
-            if google_sections
-                .iter()
-                .any(|context| matches!(context.kind, SectionKind::Arguments | SectionKind::Args))
-            {
-                for context in &google_sections {
-                    google_section(checker, docstring, context);
-                }
+            if google_sections.iter().any(|context| {
+                matches!(
+                    context.kind,
+                    SectionKind::Arguments
+                        | SectionKind::Args
+                        | SectionKind::KeywordArgs
+                        | SectionKind::KeywordArguments
+                )
+            }) {
+                parse_google_sections(checker, &lines, docstring);
                 return;
             }
 
             // Otherwise, use whichever convention matched more sections.
             if google_sections.len() > numpy_sections.len() {
-                for context in &google_sections {
-                    google_section(checker, docstring, context);
-                }
+                parse_google_sections(checker, &lines, docstring);
             } else {
                 for context in &numpy_sections {
                     numpy_section(checker, docstring, context);
@@ -790,6 +792,7 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
     blanks_and_section_underline(checker, docstring, context);
 }
 
+// have to change this function to look at the kwargs
 fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<&str>) {
     let (
         DefinitionKind::Function(parent)
@@ -810,6 +813,8 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     };
 
     // Look for arguments that weren't included in the docstring.
+    println!("arguments: {:?}", arguments);
+    println!("docstring args: {:?}", docstrings_args);
     let mut missing_arg_names: FxHashSet<String> = FxHashSet::default();
     for arg in arguments
         .posonlyargs
@@ -863,13 +868,13 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 }
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
-static GOOGLE_ARGS_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap());
+static GOOGLE_ARGS_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"^\s*(?P<arg_name>\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap()
+});
 
-fn args_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
+fn args_section(context: &SectionContext) -> FxHashSet<&str> {
     if context.following_lines.is_empty() {
-        missing_args(checker, docstring, &FxHashSet::default());
-        return;
+        return FxHashSet::default();
     }
 
     // Normalize leading whitespace, by removing any lines with less indentation
@@ -901,6 +906,8 @@ fn args_section(checker: &mut Checker, docstring: &Docstring, context: &SectionC
         }
     }
 
+    println!("context: {:?}", context);
+
     // Extract the argument name from each section.
     let mut matches = Vec::new();
     for section in &args_sections {
@@ -908,12 +915,11 @@ fn args_section(checker: &mut Checker, docstring: &Docstring, context: &SectionC
             matches.push(captures);
         }
     }
-    let docstrings_args = matches
-        .iter()
-        .filter_map(|captures| captures.get(1).map(|arg_name| arg_name.as_str()))
-        .collect();
 
-    missing_args(checker, docstring, &docstrings_args);
+    matches
+        .iter()
+        .filter_map(|captures| captures.name("arg_name").map(|arg_name| arg_name.as_str()))
+        .collect::<FxHashSet<&str>>()
 }
 
 fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
@@ -1045,9 +1051,46 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
         }
     }
 
-    if checker.settings.rules.enabled(Rule::UndocumentedParam) {
-        if matches!(context.kind, SectionKind::Args | SectionKind::Arguments) {
-            args_section(checker, docstring, context);
+    //     if checker.settings.rules.enabled(Rule::UndocumentedParam) {
+    //         // TODO: will need to unify args_section to parse all arguments, not just the list of
+    //         // arguments in the context. currently checking the Args block misses y and z, but checking
+    //         // the KeywordArgs block misses x. We have to unify the two parameter lists into one list
+    //         // and pass that to args_section
+    //         if matches!(
+    //             context.kind,
+    //             SectionKind::Args
+    //                 | SectionKind::Arguments
+    //                 | SectionKind::KeywordArgs
+    //                 | SectionKind::KeywordArguments
+    //         ) {
+    //             args_section(checker, docstring, context);
+    //         }
+    //     }
+}
+
+fn parse_google_sections(checker: &mut Checker, lines: &Vec<&str>, docstring: &Docstring) {
+    let mut documented_args: FxHashSet<&str> = FxHashSet::default();
+    let section_contexts = &section_contexts(&lines, SectionStyle::Google);
+    for section_context in section_contexts {
+        if matches!(
+            section_context.kind,
+            SectionKind::Args
+                | SectionKind::Arguments
+                | SectionKind::KeywordArgs
+                | SectionKind::KeywordArguments
+        ) {
+            documented_args.extend(args_section(section_context));
+            continue;
         }
+
+        google_section(checker, docstring, section_context);
+    }
+
+    if checker.settings.rules.enabled(Rule::UndocumentedParam) {
+        // TODO: will need to unify args_section to parse all arguments, not just the list of
+        // arguments in the context. currently checking the Args block misses y and z, but checking
+        // the KeywordArgs block misses x. We have to unify the two parameter lists into one list
+        // and pass that to args_section
+        missing_args(checker, docstring, &documented_args);
     }
 }
