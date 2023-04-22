@@ -1,4 +1,4 @@
-use std::{convert::AsRef, ops::Deref};
+use std::ops::Deref;
 
 use rustpython_parser::ast::{Expr, Located, Location, Stmt};
 
