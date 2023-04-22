@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_python_stdlib::str::{is_lower, is_upper};
 
@@ -68,6 +68,12 @@ pub fn is_type_var_assignment(checker: &Checker, stmt: &Stmt) -> bool {
             call_path.as_slice() == ["typing", "TypeVar"]
                 || call_path.as_slice() == ["typing", "NewType"]
         })
+}
+
+pub fn is_typeddict(checker: &Checker, bases: &[Expr]) -> bool {
+    bases
+        .iter()
+        .any(|base| checker.ctx.match_typing_expr(base, "TypedDict"))
 }
 
 #[cfg(test)]

@@ -4456,8 +4456,14 @@ impl<'a> Checker<'a> {
             .rules
             .enabled(Rule::MixedCaseVariableInClassScope)
         {
-            if matches!(self.ctx.scope().kind, ScopeKind::Class(..)) {
-                pep8_naming::rules::mixed_case_variable_in_class_scope(self, expr, parent, id);
+            if let ScopeKind::Class(class) = &self.ctx.scope().kind {
+                pep8_naming::rules::mixed_case_variable_in_class_scope(
+                    self,
+                    expr,
+                    parent,
+                    id,
+                    class.bases,
+                );
             }
         }
 
