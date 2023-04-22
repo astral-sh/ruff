@@ -12,13 +12,13 @@ impl BadRope<'_> {
 #[test]
 fn main() {
     let x: char = 'c';
-    let _ = TextSize::of(x);
+    _ = TextSize::of(x);
 
     let x: &str = "hello";
-    let _ = TextSize::of(x);
+    _ = TextSize::of(x);
 
     let x: &String = &"hello".into();
-    let _ = TextSize::of(x);
+    _ = TextSize::of(x);
 
-    let _ = BadRope(&[""]).text_len();
+    _ = BadRope(&[""]).text_len();
 }
