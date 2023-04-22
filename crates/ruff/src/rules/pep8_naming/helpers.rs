@@ -1,15 +1,14 @@
 use itertools::Itertools;
+use ruff_python_semantic::context::Context;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_python_stdlib::str::{is_lower, is_upper};
 
-use crate::checkers::ast::Checker;
-
-pub fn is_camelcase(name: &str) -> bool {
+pub(crate) fn is_camelcase(name: &str) -> bool {
     !is_lower(name) && !is_upper(name) && !name.contains('_')
 }
 
-pub fn is_mixed_case(name: &str) -> bool {
+pub(crate) fn is_mixed_case(name: &str) -> bool {
     !is_lower(name)
         && name
             .strip_prefix('_')
@@ -19,61 +18,54 @@ pub fn is_mixed_case(name: &str) -> bool {
             .map_or_else(|| false, char::is_lowercase)
 }
 
-pub fn is_acronym(name: &str, asname: &str) -> bool {
+pub(crate) fn is_acronym(name: &str, asname: &str) -> bool {
     name.chars().filter(|c| c.is_uppercase()).join("") == asname
 }
 
-pub fn is_namedtuple_assignment(checker: &Checker, stmt: &Stmt) -> bool {
+pub(crate) fn is_named_tuple_assignment(context: &Context, stmt: &Stmt) -> bool {
     let StmtKind::Assign { value, .. } = &stmt.node else {
         return false;
     };
     let ExprKind::Call {func, ..} = &value.node else {
         return false;
     };
-    checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["collections", "namedtuple"]
-                || call_path.as_slice() == ["typing", "NamedTuple"]
-        })
+    context.resolve_call_path(func).map_or(false, |call_path| {
+        matches!(
+            call_path.as_slice(),
+            ["collections", "namedtuple"] | ["typing", "NamedTuple"]
+        )
+    })
 }
 
-pub fn is_typeddict_assignment(checker: &Checker, stmt: &Stmt) -> bool {
+pub(crate) fn is_typed_dict_assignment(context: &Context, stmt: &Stmt) -> bool {
     let StmtKind::Assign { value, .. } = &stmt.node else {
         return false;
     };
     let ExprKind::Call {func, ..} = &value.node else {
         return false;
     };
-    checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["typing", "TypedDict"]
-        })
+    context.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["typing", "TypedDict"]
+    })
 }
 
-pub fn is_type_var_assignment(checker: &Checker, stmt: &Stmt) -> bool {
+pub(crate) fn is_type_var_assignment(context: &Context, stmt: &Stmt) -> bool {
     let StmtKind::Assign { value, .. } = &stmt.node else {
         return false;
     };
     let ExprKind::Call {func, ..} = &value.node else {
         return false;
     };
-    checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            call_path.as_slice() == ["typing", "TypeVar"]
-                || call_path.as_slice() == ["typing", "NewType"]
-        })
+    context.resolve_call_path(func).map_or(false, |call_path| {
+        call_path.as_slice() == ["typing", "TypeVar"]
+            || call_path.as_slice() == ["typing", "NewType"]
+    })
 }
 
-pub fn is_typeddict(checker: &Checker, bases: &[Expr]) -> bool {
+pub(crate) fn is_typed_dict_class(context: &Context, bases: &[Expr]) -> bool {
     bases
         .iter()
-        .any(|base| checker.ctx.match_typing_expr(base, "TypedDict"))
+        .any(|base| context.match_typing_expr(base, "TypedDict"))
 }
 
 #[cfg(test)]
