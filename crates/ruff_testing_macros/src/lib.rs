@@ -42,7 +42,7 @@ impl Parse for ArgValue {
     fn parse(input: ParseStream) -> syn::Result<Self> {
         let value = if input.peek(syn::token::Bracket) {
             let inner;
-            let _ = bracketed!(inner in input);
+            _ = bracketed!(inner in input);
 
             let values = inner.parse_terminated(
                 |parser| {
