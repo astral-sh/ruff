@@ -2,8 +2,8 @@ use bitflags::bitflags;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 bitflags! {
-    #[derive(Default)]
-    pub struct AllNamesFlags: u32 {
+    #[derive(Default, Debug, Copy, Clone, PartialEq, Eq)]
+    pub struct AllNamesFlags: u8 {
         const INVALID_FORMAT = 0b0000_0001;
         const INVALID_OBJECT = 0b0000_0010;
     }

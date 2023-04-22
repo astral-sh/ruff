@@ -58,7 +58,7 @@ mod whitespace_before_comment;
 mod whitespace_before_parameters;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, Eq, PartialEq, Clone, Copy, Debug)]
     pub(crate) struct TokenFlags: u8 {
         /// Whether the logical line contains an operator.
         const OPERATOR = 0b0000_0001;

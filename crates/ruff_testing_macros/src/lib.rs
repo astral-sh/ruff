@@ -44,10 +44,13 @@ impl Parse for ArgValue {
             let inner;
             let _ = bracketed!(inner in input);
 
-            let values = inner.parse_terminated(|parser| {
-                let value: LitStr = parser.parse()?;
-                Ok(value)
-            })?;
+            let values = inner.parse_terminated(
+                |parser| {
+                    let value: LitStr = parser.parse()?;
+                    Ok(value)
+                },
+                Token![,],
+            )?;
             ArgValue::List(values)
         } else {
             ArgValue::LitStr(input.parse()?)
@@ -59,7 +62,7 @@ impl Parse for ArgValue {
 
 impl Parse for FixtureConfiguration {
     fn parse(input: ParseStream) -> syn::Result<Self> {
-        let args: Punctuated<_, Token![,]> = input.parse_terminated(Arg::parse)?;
+        let args: Punctuated<_, Token![,]> = input.parse_terminated(Arg::parse, Token![,])?;
 
         let mut pattern = None;
         let mut exclude = None;
@@ -186,7 +189,9 @@ fn generate_fixtures(
     configuration: &FixtureConfiguration,
 ) -> syn::Result<proc_macro2::TokenStream> {
     // Remove the fixtures attribute
-    test_fn.attrs.retain(|attr| !attr.path.is_ident("fixtures"));
+    test_fn
+        .attrs
+        .retain(|attr| !attr.path().is_ident("fixtures"));
 
     // Extract the name of the only argument of the test function.
     let last_arg = test_fn.sig.inputs.last();

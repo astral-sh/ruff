@@ -26,7 +26,7 @@ use ruff::settings::types::SerializationFormat;
 use crate::diagnostics::Diagnostics;
 
 bitflags! {
-    #[derive(Default)]
+    #[derive(Default, Debug, Copy, Clone)]
     pub(crate) struct Flags: u8 {
         const SHOW_VIOLATIONS = 0b0000_0001;
         const SHOW_FIXES = 0b0000_0010;
