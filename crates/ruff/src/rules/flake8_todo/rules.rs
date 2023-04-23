@@ -63,7 +63,7 @@ pub struct MissingAuthorInTodo;
 impl Violation for MissingAuthorInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing author into TODO")
+        format!("Missing author in TODO")
     }
 }
 
@@ -217,7 +217,7 @@ impl Violation for MissingSpaceAfterColonInTodo {
 //
 // Note: Regexes taken from https://github.com/orsinium-labs/flake8-todos/blob/master/flake8_todos/_rules.py#L12.
 static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^#\s*(?P<tag>[tT][oO][dD][oO]|BUG|FIXME|XXX)(\(.*\))?(:)?( )?(.+)?$").unwrap()
+    Regex::new(r"^#\s*(?P<tag>[tT][oO][dD][oO]|BUG|FIXME|XXX)( {0,1}\(.*\))?(:)?( )?(.+)?$").unwrap()
 });
 
 // Issue code: TDO-003
