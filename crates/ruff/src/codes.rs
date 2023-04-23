@@ -534,6 +534,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         // flake8-import-conventions
         (Flake8ImportConventions, "001") => Rule::UnconventionalImportAlias,
         (Flake8ImportConventions, "002") => Rule::BannedImportAlias,
+        (Flake8ImportConventions, "003") => Rule::BannedImportFrom,
 
         // flake8-datetimez
         (Flake8Datetimez, "001") => Rule::CallDatetimeWithoutTzinfo,
