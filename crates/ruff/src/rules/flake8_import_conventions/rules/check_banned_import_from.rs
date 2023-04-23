@@ -7,6 +7,7 @@ use ruff_python_ast::types::Range;
 
 #[violation]
 pub struct BannedImportFrom(pub String);
+
 impl Violation for BannedImportFrom {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -21,8 +22,6 @@ pub fn check_banned_import_from(
     name: &str,
     banned_conventions: &FxHashSet<String>,
 ) -> Option<Diagnostic> {
-    log::debug!("Enabling conventions: {:?}", banned_conventions);
-    log::debug!("Checking banned import from: {}", name);
     if banned_conventions.contains(name) {
         return Some(Diagnostic::new(
             BannedImportFrom(name.to_string()),
