@@ -131,10 +131,14 @@ pub fn indent(checker: &mut Checker, docstring: &Docstring) {
                 let mut diagnostic =
                     Diagnostic::new(OverIndentation, TextRange::empty(over_indented.start()));
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement(
-                        whitespace::clean(docstring.indentation),
-                        over_indented,
-                    ));
+                    let new_indent = whitespace::clean(docstring.indentation);
+
+                    let edit = if new_indent.is_empty() {
+                        Edit::range_deletion(over_indented)
+                    } else {
+                        Edit::range_replacement(new_indent, over_indented)
+                    };
+                    diagnostic.set_fix(edit);
                 }
                 checker.diagnostics.push(diagnostic);
             }
