@@ -193,7 +193,6 @@ impl ModuleMapping {
     }
 }
 
-
 #[derive(Default)]
 pub struct CyclicImportHelper {
     pub cycles: FxHashMap<u32, FxHashSet<Vec<u32>>>,

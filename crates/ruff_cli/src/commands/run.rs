@@ -163,9 +163,12 @@ pub fn run(
             })
     {
         if settings.lib.rules.enabled(Rule::CyclicImport) {
-            if let Some(cycle_diagnostics) =
-                pylint_cyclic_import(path, package, &diagnostics.imports.module_to_imports, &mut cycle_helper)
-            {
+            if let Some(cycle_diagnostics) = pylint_cyclic_import(
+                path,
+                package,
+                &diagnostics.imports.module_to_imports,
+                &mut cycle_helper,
+            ) {
                 // should we take into account Jupyter notebokks here?
                 let contents = std::fs::read_to_string(path)?;
                 let locator = ruff_python_ast::source_code::Locator::new(&contents);
