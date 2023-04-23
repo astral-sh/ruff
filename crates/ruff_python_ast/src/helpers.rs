@@ -3,6 +3,7 @@ use std::path::Path;
 
 use itertools::Itertools;
 use log::error;
+use num_traits::Zero;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -50,6 +51,13 @@ pub fn unparse_constant(constant: &Constant, stylist: &Stylist) -> String {
     generator.generate()
 }
 
+pub fn is_iterable_initializer<F>(id: &str, is_builtin: F) -> bool
+where
+    F: Fn(&str) -> bool,
+{
+    matches!(id, "list" | "tuple" | "set" | "dict" | "frozenset") && is_builtin(id)
+}
+
 /// Return `true` if the `Expr` contains an expression that appears to include a
 /// side-effect (like a function call).
 ///
@@ -68,10 +76,7 @@ where
         {
             if args.is_empty() && keywords.is_empty() {
                 if let ExprKind::Name { id, .. } = &func.node {
-                    if !matches!(id.as_str(), "set" | "list" | "tuple" | "dict" | "frozenset") {
-                        return true;
-                    }
-                    if !is_builtin(id) {
+                    if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
                         return true;
                     }
                     return false;
@@ -1420,6 +1425,85 @@ pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
         }
     }
     ops
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
+pub enum Truthiness {
+    // The `shell` keyword argument is set and evaluates to `False`.
+    Falsey,
+    // The `shell` keyword argument is set and evaluates to `True`.
+    Truthy,
+    // The `shell` keyword argument is set, but its value is unknown.
+    Unknown,
+}
+
+impl From<Option<bool>> for Truthiness {
+    fn from(value: Option<bool>) -> Self {
+        match value {
+            Some(true) => Truthiness::Truthy,
+            Some(false) => Truthiness::Falsey,
+            None => Truthiness::Unknown,
+        }
+    }
+}
+
+impl From<Truthiness> for Option<bool> {
+    fn from(truthiness: Truthiness) -> Self {
+        match truthiness {
+            Truthiness::Truthy => Some(true),
+            Truthiness::Falsey => Some(false),
+            Truthiness::Unknown => None,
+        }
+    }
+}
+
+impl Truthiness {
+    pub fn from_expr<F>(expr: &Expr, is_builtin: F) -> Self
+    where
+        F: Fn(&str) -> bool,
+    {
+        match &expr.node {
+            ExprKind::Constant { value, .. } => match value {
+                Constant::Bool(value) => Some(*value),
+                Constant::None => Some(false),
+                Constant::Str(string) => Some(!string.is_empty()),
+                Constant::Bytes(bytes) => Some(!bytes.is_empty()),
+                Constant::Int(int) => Some(!int.is_zero()),
+                Constant::Float(float) => Some(*float != 0.0),
+                Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
+                Constant::Ellipsis => Some(true),
+                Constant::Tuple(elts) => Some(!elts.is_empty()),
+            },
+            ExprKind::JoinedStr { values, .. } => Some(!values.is_empty()),
+            ExprKind::List { elts, .. }
+            | ExprKind::Set { elts, .. }
+            | ExprKind::Tuple { elts, .. } => Some(!elts.is_empty()),
+            ExprKind::Dict { keys, .. } => Some(!keys.is_empty()),
+            ExprKind::Call {
+                func,
+                args,
+                keywords,
+            } => {
+                if let ExprKind::Name { id, .. } = &func.node {
+                    if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
+                        if args.is_empty() && keywords.is_empty() {
+                            Some(false)
+                        } else if args.len() == 1 && keywords.is_empty() {
+                            Self::from_expr(&args[0], is_builtin).into()
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+        .into()
+    }
 }
 
 #[cfg(test)]

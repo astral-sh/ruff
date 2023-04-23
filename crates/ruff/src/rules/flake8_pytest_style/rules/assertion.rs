@@ -5,6 +5,7 @@ use libcst_native::{
     ParenthesizableWhitespace, ParenthesizedNode, SimpleStatementLine, SimpleWhitespace,
     SmallStatement, Statement, Suite, TrailingWhitespace, UnaryOp, UnaryOperation,
 };
+use ruff_python_semantic::context::Context;
 use rustpython_parser::ast::{
     Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Location, Stmt, StmtKind,
     Unaryop,
@@ -12,7 +13,7 @@ use rustpython_parser::ast::{
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{has_comments_in, unparse_stmt};
+use ruff_python_ast::helpers::{has_comments_in, unparse_stmt, Truthiness};
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::Visitor;
@@ -22,7 +23,6 @@ use crate::checkers::ast::Checker;
 use crate::cst::matchers::match_module;
 use crate::registry::AsRule;
 
-use super::helpers::is_falsy_constant;
 use super::unittest_assert::UnittestAssert;
 
 /// ## What it does
@@ -223,8 +223,8 @@ pub fn unittest_assertion(
 }
 
 /// PT015
-pub fn assert_falsy(stmt: &Stmt, test: &Expr) -> Option<Diagnostic> {
-    if is_falsy_constant(test) {
+pub fn assert_falsy(ctx: &Context, stmt: &Stmt, test: &Expr) -> Option<Diagnostic> {
+    if Truthiness::from_expr(test, |id| ctx.is_builtin(id)).is_falsey() {
         Some(Diagnostic::new(PytestAssertAlwaysFalse, Range::from(stmt)))
     } else {
         None
