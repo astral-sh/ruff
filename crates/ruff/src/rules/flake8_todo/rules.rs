@@ -9,6 +9,25 @@ use ruff_python_ast::types::Range;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
+/// ## What it does
+/// Checks that a TODO comment is actually labelled with "TODO".
+///
+/// ## Why is this bad?
+/// Ambiguous tags reduce code visibility and can lead to dangling TODOs.
+/// If someone greps for a TODO to fix, but the comment is tagged with a "FIXME"
+/// tag instead of a "TODO", that comment may never be found!
+///
+/// Note that this rule will only flag "FIXME", "BUG", and "XXX" tags as incorrect.
+///
+/// ## Example
+/// ```python
+/// # FIXME(ruff): this should get fixed!
+/// ```
+///
+/// Use instead:
+/// ```python
+/// # TODO(ruff): this is now fixed!
+/// ```
 #[violation]
 pub struct InvalidTodoTag {
     pub tag: String,
@@ -23,6 +42,22 @@ impl Violation for InvalidTodoTag {
     }
 }
 
+/// ## What it does
+/// Checks that a TODO comment has an author assigned to it.
+///
+/// ## Why is this bad?
+/// Assigning an author to a task helps keep it on the radar and keeps code
+/// formatting consistent.
+///
+/// ## Example
+/// ```python
+/// # TODO: should assign an author here
+/// ```
+///
+/// Use instead
+/// ```python
+/// # TODO(ruff): now an author is assigned
+/// ```
 #[violation]
 pub struct MissingAuthorInTodo;
 impl Violation for MissingAuthorInTodo {
@@ -32,6 +67,23 @@ impl Violation for MissingAuthorInTodo {
     }
 }
 
+/// ## What it does
+/// Checks that an issue link or ticket is associated with a TODO.
+///
+/// ## Why is this bad?
+/// Including an issue link near a TODO makes it easier for resolvers
+/// to get context around the issue and keeps code formatting consistent.
+///
+/// ## Example
+/// ```python
+/// # TODO: this link has no issue
+/// ```
+///
+/// Use instead:
+/// ```python
+/// # TODO(ruff): solve this issue!
+/// # https://github.com/charliermarsh/ruff/issues/3870
+/// ```
 #[violation]
 pub struct MissingLinkInTodo;
 impl Violation for MissingLinkInTodo {
@@ -41,6 +93,21 @@ impl Violation for MissingLinkInTodo {
     }
 }
 
+/// ## What it does
+/// Checks that a "TODO" tag is followed by a colon.
+///
+/// ## Why is this bad?
+/// Skipping colons after a "TODO" tag can create inconsistent code formatting.
+///
+/// ## Example
+/// ```python
+/// # TODO(ruff) fix this colon
+/// ```
+///
+/// Used instead:
+/// ```python
+/// # TODO(ruff): colon fixed
+/// ```
 #[violation]
 pub struct MissingColonInTodo;
 impl Violation for MissingColonInTodo {
@@ -50,6 +117,22 @@ impl Violation for MissingColonInTodo {
     }
 }
 
+/// ## What it does
+/// Checks that a "TODO" tag has some text after it.
+///
+/// ## Why is this bad?
+/// Just putting a "TODO" tag in the code, without any context, makes it harder
+/// for the reader/future resolver to understand the issue that has to be fixed.
+///
+/// ## Example
+/// ```python
+/// # TODO(ruff)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// # TODO(ruff): fix some issue
+/// ```
 #[violation]
 pub struct MissingTextInTodo;
 impl Violation for MissingTextInTodo {
@@ -59,6 +142,21 @@ impl Violation for MissingTextInTodo {
     }
 }
 
+/// ## What it does
+/// Checks that a "TODO" tag is properly capitalized, i.e. that the tag is uppercase.
+///
+/// ## Why is this bad?
+/// Inconsistent capitalization leads to less readable code.
+///
+/// ## Example
+/// ```python
+/// # todo(ruff): capitalize this
+/// ```
+///
+/// Use instead:
+/// ```python
+/// # TODO(ruff): this is capitalized
+/// ```
 #[violation]
 pub struct InvalidCapitalizationInTodo {
     pub tag: String,
@@ -71,6 +169,21 @@ impl Violation for InvalidCapitalizationInTodo {
     }
 }
 
+/// ## What it does
+/// Checks that the colon after a "TODO" tag is followed by a space.
+///
+/// ## Why is this bad?
+/// Skipping the space after a colon leads to less readable code.
+///
+/// ## Example
+/// ```python
+/// # TODO(ruff):fix this
+/// ```
+///
+/// Use instead:
+/// ```python
+/// # TODO(ruff): fix this
+/// ```
 #[violation]
 pub struct MissingSpaceAfterColonInTodo;
 impl Violation for MissingSpaceAfterColonInTodo {
@@ -100,7 +213,7 @@ impl Violation for MissingSpaceAfterColonInTodo {
 // # ToDo this is completely wrong
 // ```
 // will yield [Some("ToDo"), None, None, Some(" "), Some("this is completely wrong")]. Note the
-// `Nones` for the colon and space checks
+// `Nones` for the colon and space checks.
 //
 // Note: Regexes taken from https://github.com/orsinium-labs/flake8-todos/blob/master/flake8_todos/_rules.py#L12.
 static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
