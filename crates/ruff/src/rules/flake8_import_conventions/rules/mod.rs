@@ -1,7 +1,7 @@
-pub use check_banned_import::{check_banned_import, BannedImportAlias};
-pub use check_banned_import_from::{check_banned_import_from, BannedImportFrom};
-pub use check_conventional_import::{check_conventional_import, UnconventionalImportAlias};
+pub use banned_import_alias::{banned_import_alias, BannedImportAlias};
+pub use banned_import_from::{banned_import_from, BannedImportFrom};
+pub use conventional_import_alias::{conventional_import_alias, UnconventionalImportAlias};
 
-mod check_banned_import;
-mod check_banned_import_from;
-mod check_conventional_import;
+mod banned_import_alias;
+mod banned_import_from;
+mod conventional_import_alias;

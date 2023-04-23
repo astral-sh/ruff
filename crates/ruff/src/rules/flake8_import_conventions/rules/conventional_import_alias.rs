@@ -27,38 +27,34 @@ use ruff_python_ast::types::Range;
 /// import pandas as pd
 /// ```
 #[violation]
-pub struct UnconventionalImportAlias(pub String, pub String);
+pub struct UnconventionalImportAlias {
+    pub name: String,
+    pub asname: String,
+}
 
 impl Violation for UnconventionalImportAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let UnconventionalImportAlias(name, asname) = self;
+        let UnconventionalImportAlias { name, asname } = self;
         format!("`{name}` should be imported as `{asname}`")
     }
 }
 
 /// ICN001
-pub fn check_conventional_import(
-    import_from: &Stmt,
+pub fn conventional_import_alias(
+    stmt: &Stmt,
     name: &str,
     asname: Option<&str>,
     conventions: &FxHashMap<String, String>,
 ) -> Option<Diagnostic> {
-    let mut is_valid_import = true;
     if let Some(expected_alias) = conventions.get(name) {
-        if !expected_alias.is_empty() {
-            if let Some(alias) = asname {
-                if expected_alias != alias {
-                    is_valid_import = false;
-                }
-            } else {
-                is_valid_import = false;
-            }
-        }
-        if !is_valid_import {
+        if asname != Some(expected_alias) {
             return Some(Diagnostic::new(
-                UnconventionalImportAlias(name.to_string(), expected_alias.to_string()),
-                Range::from(import_from),
+                UnconventionalImportAlias {
+                    name: name.to_string(),
+                    asname: expected_alias.to_string(),
+                },
+                Range::from(stmt),
             ));
         }
     }
