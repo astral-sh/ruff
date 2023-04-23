@@ -11,7 +11,11 @@ use crate::checkers::ast::Checker;
 /// Checks for `raise` statements within `try` blocks.
 ///
 /// ## Why is this bad?
-/// It is confusing to read.
+/// Raising and catching exceptions within the same `try` block is redundant,
+/// as the code can be refactored to avoid the `try` block entirely.
+///
+/// Alternatively, the `raise` can be moved within an inner function, making
+/// the exception reusable across multiple call sites.
 ///
 /// ## Example
 /// ```python
@@ -36,7 +40,7 @@ use crate::checkers::ast::Checker;
 ///
 /// def foo():
 ///     try:
-///         a = bar()  # refactored bar to raise ValueError
+///         a = bar()  # refactored `bar` to raise `ValueError`
 ///     except ValueError:
 ///         raise
 /// ```

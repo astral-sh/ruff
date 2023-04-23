@@ -9,12 +9,13 @@ use crate::checkers::ast::Checker;
 use crate::rules::tryceratops::helpers::LoggerCandidateVisitor;
 
 /// ## What it does
-/// Checks for `logging.error` instead of `logging.exception` when logging an
-/// exception.
+/// Checks for uses of `logging.error` instead of `logging.exception` when
+/// logging an exception.
 ///
 /// ## Why is this bad?
-/// `logging.exception` logs the exception and the traceback, while `logging.error`
-/// only logs the exception.
+/// `logging.exception` logs the exception and the traceback, while
+/// `logging.error` only logs the exception. The former is more appropriate
+/// when logging an exception, as the traceback is often useful for debugging.
 ///
 /// ## Example
 /// ```python

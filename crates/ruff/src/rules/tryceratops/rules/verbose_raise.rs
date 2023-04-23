@@ -9,10 +9,11 @@ use ruff_python_ast::visitor::Visitor;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for needless exception name in `raise` statements.
+/// Checks for needless exception names in `raise` statements.
 ///
 /// ## Why is this bad?
-/// It is redundant and verbose.
+/// It's redundant to specify the exception name in a `raise` statement if the
+/// exception is being re-raised.
 ///
 /// ## Example
 /// ```python

@@ -7,10 +7,16 @@ use ruff_python_ast::types::Range;
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for long exception messages that are not defined in the exception.
+/// Checks for long exception messages that are not defined in the exception
+/// class itself.
 ///
 /// ## Why is this bad?
-/// Increases code duplication and invites inconsistencies.
+/// By formatting an exception message at the `raise` site, the exception class
+/// becomes less reusable, and may now raise inconsistent messages depending on
+/// where it is raised.
+///
+/// If the exception message is instead defined within the exception class, it
+/// will be consistent across all `raise` invocations.
 ///
 /// ## Example
 /// ```python

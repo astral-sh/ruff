@@ -12,9 +12,8 @@ use crate::checkers::ast::Checker;
 /// Checks for type checks that do not raise `TypeError`.
 ///
 /// ## Why is this bad?
-/// The Python documentation states that `TypeError` should be raised when an
-/// encountering an inappropriate type. Not following this convention can lead
-/// to confusion.
+/// The Python documentation states that `TypeError` should be raised upon
+/// encountering an inappropriate type.
 ///
 /// ## Example
 /// ```python

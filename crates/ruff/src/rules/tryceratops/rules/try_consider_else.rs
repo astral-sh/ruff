@@ -11,9 +11,9 @@ use crate::checkers::ast::Checker;
 /// Checks for `return` statements in `try` blocks.
 ///
 /// ## Why is this bad?
-/// The `try` ... `except` statement has an `else` clause for code that should
-/// run only if no exceptions were raised. Using this clause is more explicit
-/// and avoids confusion.
+/// The `try`-`except` statement has an `else` clause for code that should
+/// run _only_ if no exceptions were raised. Using the `else` clause is more
+/// explicit than using a `return` statement inside of a `try` block.
 ///
 /// ## Example
 /// ```python
