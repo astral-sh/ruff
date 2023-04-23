@@ -534,7 +534,7 @@ fn blanks_and_section_underline(
                     );
                     if checker.patch(diagnostic.kind.rule()) {
                         let range =
-                            TextRange::at(context.following_range().start(), blank_lines_end);
+                            TextRange::new(context.following_range().start(), blank_lines_end);
                         // Delete any blank lines between the header and content.
                         diagnostic.set_fix(Edit::range_deletion(range));
                     }
