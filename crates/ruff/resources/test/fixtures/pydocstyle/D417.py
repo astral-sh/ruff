@@ -129,6 +129,18 @@ def f(x, *, y, z):
     return x, y, z
 
 
+# OK since we only throw if an Args section is present
+def f(x, y, z):
+    """Do something.
+
+    Keyword Args:
+        x: something
+        y: something else
+    """
+
+    return x, y, z
+
+
 class Test:
     def f(self, /, arg1: int) -> None:
         """

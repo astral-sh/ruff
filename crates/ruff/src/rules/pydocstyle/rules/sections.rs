@@ -866,9 +866,8 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 }
 
 // See: `GOOGLE_ARGS_REGEX` in `pydocstyle/checker.py`.
-static GOOGLE_ARGS_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^\s*(?P<arg_name>\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap()
-});
+static GOOGLE_ARGS_REGEX: Lazy<Regex> =
+    Lazy::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap());
 
 fn args_section(context: &SectionContext) -> FxHashSet<String> {
     if context.following_lines.is_empty() {
@@ -914,11 +913,7 @@ fn args_section(context: &SectionContext) -> FxHashSet<String> {
 
     matches
         .iter()
-        .filter_map(|captures| {
-            captures
-                .name("arg_name")
-                .map(|arg_name| arg_name.as_str().to_owned())
-        })
+        .filter_map(|captures| captures.get(1).map(|arg_name| arg_name.as_str().to_owned()))
         .collect::<FxHashSet<String>>()
 }
 
@@ -1053,6 +1048,7 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
 }
 
 fn parse_google_sections(checker: &mut Checker, lines: &[&str], docstring: &Docstring) {
+    let mut arg_section_present = false;
     let mut documented_args: FxHashSet<String> = FxHashSet::default();
     let section_contexts = &section_contexts(lines, SectionStyle::Google);
     for section_context in section_contexts {
@@ -1068,13 +1064,20 @@ fn parse_google_sections(checker: &mut Checker, lines: &[&str], docstring: &Docs
                 | SectionKind::OtherArgs
                 | SectionKind::OtherArguments
         ) {
+            if matches!(
+                section_context.kind,
+                SectionKind::Args | SectionKind::Arguments
+            ) {
+                arg_section_present = true;
+            }
+
             documented_args.extend(args_section(section_context));
         }
 
         google_section(checker, docstring, section_context);
     }
 
-    if checker.settings.rules.enabled(Rule::UndocumentedParam) {
+    if checker.settings.rules.enabled(Rule::UndocumentedParam) && arg_section_present {
         missing_args(checker, docstring, &documented_args);
     }
 }
