@@ -8,9 +8,9 @@ detailed overview, see [_Configuration_](configuration.md).
 Let's assume that our project structure looks like:
 
 ```text
-numbers/
-    __init__.py
-    numbers.py
+numbers                   
+  ├── __init__.py
+  └── numbers.py  
 ```
 
 Where `numbers.py` contains the following code:

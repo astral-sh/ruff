@@ -267,7 +267,8 @@ pub enum BindingKind<'a> {
 }
 
 bitflags! {
-    pub struct Exceptions: u32 {
+    #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash)]
+    pub struct Exceptions: u8 {
         const NAME_ERROR = 0b0000_0001;
         const MODULE_NOT_FOUND_ERROR = 0b0000_0010;
         const IMPORT_ERROR = 0b0000_0100;

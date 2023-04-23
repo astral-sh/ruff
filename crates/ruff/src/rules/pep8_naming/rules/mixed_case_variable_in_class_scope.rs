@@ -26,6 +26,7 @@ pub fn mixed_case_variable_in_class_scope(
     expr: &Expr,
     stmt: &Stmt,
     name: &str,
+    bases: &[Expr],
 ) {
     if checker
         .settings
@@ -36,7 +37,10 @@ pub fn mixed_case_variable_in_class_scope(
     {
         return;
     }
-    if helpers::is_mixed_case(name) && !helpers::is_namedtuple_assignment(checker, stmt) {
+    if helpers::is_mixed_case(name)
+        && !helpers::is_named_tuple_assignment(&checker.ctx, stmt)
+        && !helpers::is_typed_dict_class(&checker.ctx, bases)
+    {
         checker.diagnostics.push(Diagnostic::new(
             MixedCaseVariableInClassScope {
                 name: name.to_string(),
