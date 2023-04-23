@@ -28,9 +28,10 @@ pub struct Definition<'a> {
 pub struct Docstring<'a> {
     pub kind: DefinitionKind<'a>,
     pub expr: &'a Expr,
-    /// The
+    /// The content of the docstring, including the leading and trailing quotes.
     pub contents: &'a str,
-    /// Relative range to [`Self::contents`]
+
+    /// The range of the docstring body (without the quotes). The range is relative to [`Self::contents`].
     pub body_range: TextRange,
     pub indentation: &'a str,
 }

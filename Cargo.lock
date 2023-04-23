@@ -2371,13 +2371,13 @@ dependencies = [
  "bitflags 1.3.2",
  "bstr 0.2.17",
  "cfg-if",
+ "getrandom",
  "hexf-parse",
  "itertools",
  "lexical-parse-float",
  "libc",
  "lock_api",
  "num-bigint",
- "num-complex",
  "num-traits",
  "once_cell",
  "radium",
@@ -2394,7 +2394,6 @@ version = "0.2.0"
 source = "git+https://github.com/charliermarsh/RustPython.git?rev=e53251a2f7a4dda09afd3d43e22375d345e31a95#e53251a2f7a4dda09afd3d43e22375d345e31a95"
 dependencies = [
  "bitflags 1.3.2",
- "bstr 0.2.17",
  "itertools",
  "lz4_flex",
  "num-bigint",
@@ -2407,7 +2406,6 @@ name = "rustpython-parser"
 version = "0.2.0"
 source = "git+https://github.com/charliermarsh/RustPython.git?rev=e53251a2f7a4dda09afd3d43e22375d345e31a95#e53251a2f7a4dda09afd3d43e22375d345e31a95"
 dependencies = [
- "ahash",
  "anyhow",
  "itertools",
  "lalrpop",

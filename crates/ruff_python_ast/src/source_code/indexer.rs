@@ -7,15 +7,21 @@ use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 pub struct Indexer {
-    /// Stores the ranges of comments sorted by their range in increasing order.
-    comments: Vec<TextRange>,
+    /// Stores the ranges of comments sorted by [`TextRange::start`] in increasing order. No two ranges are overlapping.
+    comment_ranges: Vec<TextRange>,
+
     /// Stores the start offset of continuation lines.
     continuation_lines: Vec<TextSize>,
-    string_ranges: Vec<TextRange>,
+
+    /// The range of all triple quoted strings in the source document. The ranges are sorted by their
+    /// [`TextRange::start`] position in increasing order. No two ranges are overlapping.
+    triple_quoted_string_ranges: Vec<TextRange>,
 }
 
 impl Indexer {
     pub fn from_tokens(tokens: &[LexResult], locator: &Locator) -> Self {
+        assert!(TextSize::try_from(locator.contents().len()).is_ok());
+
         let mut commented_lines = Vec::new();
         let mut continuation_lines = Vec::new();
         let mut string_ranges = Vec::new();
@@ -27,21 +33,28 @@ impl Indexer {
         for (tok, range) in tokens.iter().flatten() {
             let trivia = &locator.contents()[TextRange::new(prev_end, range.start())];
 
+            // Get the trivia between the previous and the current token and detect any newlines.
+            // This is necessary because `RustPython` doesn't emit `[Tok::Newline]` tokens
+            // between any two tokens that form a continuation nor multiple newlines in a row.
+            // That's why we have to extract the newlines "manually".
             for (index, text) in trivia.match_indices(['\n', '\r']) {
                 if text == "\r" && trivia.as_bytes().get(index + 1) == Some(&b'\n') {
                     continue;
                 }
 
-                if let Some(prev_token) = prev_token {
-                    if !matches!(
-                        prev_token,
-                        Tok::Newline | Tok::NonLogicalNewline | Tok::Comment(..),
-                    ) {
-                        continuation_lines.push(line_start);
-                    }
+                // Newlines after a comment or new-line never form a continuation.
+                if !matches!(
+                    prev_token,
+                    Some(Tok::Newline | Tok::NonLogicalNewline | Tok::Comment(..)) | None
+                ) {
+                    continuation_lines.push(line_start);
                 }
 
-                line_start = prev_end + TextSize::try_from(index + 1).unwrap();
+                // SAFETY: Safe because of the len assertion at the top of the function.
+                #[allow(clippy::cast_possible_truncation)]
+                {
+                    line_start = prev_end + TextSize::new((index + 1) as u32);
+                }
             }
 
             match tok {
@@ -62,15 +75,15 @@ impl Indexer {
             prev_end = range.end();
         }
         Self {
-            comments: commented_lines,
+            comment_ranges: commented_lines,
             continuation_lines,
-            string_ranges,
+            triple_quoted_string_ranges: string_ranges,
         }
     }
 
     /// Returns the byte offset ranges of comments
     pub fn comment_ranges(&self) -> &[TextRange] {
-        &self.comments
+        &self.comment_ranges
     }
 
     /// Returns the line start positions of continuations (backslash).
@@ -78,9 +91,10 @@ impl Indexer {
         &self.continuation_lines
     }
 
-    /// Return a slice of all ranges that include a triple-quoted string.
-    pub fn string_ranges(&self) -> &[TextRange] {
-        &self.string_ranges
+    /// Return a slice of all ranges that include a triple-quoted string. The ranges are sorted by
+    /// [`TextRange::start`] in increasing order. No two ranges are overlapping.
+    pub fn triple_quoted_string_ranges(&self) -> &[TextRange] {
+        &self.triple_quoted_string_ranges
     }
 
     pub fn is_continuation(&self, offset: TextSize, locator: &Locator) -> bool {
@@ -107,9 +121,9 @@ mod tests {
         let contents = r#"
         # Hello, world!
 
-        x = 1
+x = 1
 
-        y = 2
+y = 2
         "#
         .trim();
 
@@ -183,7 +197,7 @@ import os
         let contents = r#""this is a single-quoted string""#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
-        assert_eq!(indexer.string_ranges(), []);
+        assert_eq!(indexer.triple_quoted_string_ranges(), []);
 
         let contents = r#"
             """
@@ -193,7 +207,7 @@ import os
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
-            indexer.string_ranges(),
+            indexer.triple_quoted_string_ranges(),
             [TextRange::new(TextSize::from(13), TextSize::from(71))]
         );
 
@@ -205,7 +219,7 @@ import os
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
-            indexer.string_ranges(),
+            indexer.triple_quoted_string_ranges(),
             [TextRange::new(TextSize::from(13), TextSize::from(107))]
         );
 
@@ -222,7 +236,7 @@ import os
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
         let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
         assert_eq!(
-            indexer.string_ranges(),
+            indexer.triple_quoted_string_ranges(),
             &[
                 TextRange::new(TextSize::from(13), TextSize::from(85)),
                 TextRange::new(TextSize::from(98), TextSize::from(161))

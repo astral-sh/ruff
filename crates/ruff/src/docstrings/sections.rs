@@ -155,9 +155,13 @@ impl<'a> SectionContexts<'a> {
                 let indent = whitespace::leading_space(&line);
                 let section_name = whitespace::leading_words(&line);
 
-                let section_range = TextRange::at(indent.text_len(), section_name.text_len());
+                let section_name_range = TextRange::at(indent.text_len(), section_name.text_len());
 
-                if is_docstring_section(&line, section_range, previous_line.unwrap_or_default()) {
+                if is_docstring_section(
+                    &line,
+                    section_name_range,
+                    previous_line.unwrap_or_default(),
+                ) {
                     if let Some(mut last) = last.take() {
                         last.range = TextRange::new(last.range.start(), line.start());
                         contexts.push(last);
@@ -165,7 +169,7 @@ impl<'a> SectionContexts<'a> {
 
                     last = Some(SectionContextData {
                         kind: section_kind,
-                        name_range: section_range + line.start(),
+                        name_range: section_name_range + line.start(),
                         range: TextRange::empty(line.start()),
                         summary_full_end: line.full_end(),
                     });
@@ -277,7 +281,7 @@ impl<'a> SectionContext<'a> {
         self.data.kind
     }
 
-    /// The name  of the section as it appears in the docstring, e.g. "Args" or "Returns".
+    /// The name of the section as it appears in the docstring, e.g. "Args" or "Returns".
     pub fn section_name(&self) -> &'a str {
         &self.docstring_body.as_str()[self.data.name_range]
     }
@@ -301,12 +305,12 @@ impl<'a> SectionContext<'a> {
         self.summary_full_range_relative() + self.offset()
     }
 
-    /// The absolute range of the summary line, excluding any trailing new line character.
+    /// The absolute range of the summary line, excluding any trailing newline character.
     pub fn summary_range(&self) -> TextRange {
         TextRange::at(self.range().start(), self.summary_line().text_len())
     }
 
-    /// Range of the summary line relative to [`Docstring::body`], including the trailing new line character.
+    /// Range of the summary line relative to [`Docstring::body`], including the trailing newline character.
     fn summary_full_range_relative(&self) -> TextRange {
         TextRange::new(self.range_relative().start(), self.data.summary_full_end)
     }
@@ -391,8 +395,8 @@ fn suspected_as_section(line: &str, style: SectionStyle) -> Option<SectionKind> 
 }
 
 /// Check if the suspected context is really a section header.
-fn is_docstring_section(line: &str, section_range: TextRange, previous_lines: &str) -> bool {
-    let section_name_suffix = line[usize::from(section_range.end())..].trim();
+fn is_docstring_section(line: &str, section_name_range: TextRange, previous_lines: &str) -> bool {
+    let section_name_suffix = line[usize::from(section_name_range.end())..].trim();
     let this_looks_like_a_section_name =
         section_name_suffix == ":" || section_name_suffix.is_empty();
     if !this_looks_like_a_section_name {

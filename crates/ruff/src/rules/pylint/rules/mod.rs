@@ -2,7 +2,7 @@ pub use assert_on_string_literal::{assert_on_string_literal, AssertOnStringLiter
 pub use await_outside_async::{await_outside_async, AwaitOutsideAsync};
 pub use bad_str_strip_call::{bad_str_strip_call, BadStrStripCall};
 pub use bad_string_format_type::{bad_string_format_type, BadStringFormatType};
-pubgi use bidirectional_unicode::{bidirectional_unicode, BidirectionalUnicode};
+pub use bidirectional_unicode::{bidirectional_unicode, BidirectionalUnicode};
 pub use binary_op_exception::{binary_op_exception, BinaryOpException};
 pub use collapsible_else_if::{collapsible_else_if, CollapsibleElseIf};
 pub use compare_to_empty_string::{compare_to_empty_string, CompareToEmptyString};

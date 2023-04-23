@@ -321,8 +321,7 @@ impl<'a> Locator<'a> {
     /// If the `range` is out of bounds.
     pub fn contains_line_break(&self, range: TextRange) -> bool {
         let text = &self.contents[range];
-
-        text.bytes().any(|b| matches!(b, b'\n' | b'\r'))
+        text.contains(['\n', '\r'])
     }
 
     /// Returns the text of all lines that include `range`.
