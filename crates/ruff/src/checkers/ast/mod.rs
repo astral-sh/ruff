@@ -151,6 +151,16 @@ macro_rules! visit_type_definition {
     }};
 }
 
+/// Visit an [`Expr`], and treat it as a test.
+macro_rules! visit_test {
+    ($self:ident, $expr:expr) => {{
+        let prev_in_test = $self.ctx.in_test;
+        $self.ctx.in_test = true;
+        $self.visit_expr($expr);
+        $self.ctx.in_test = prev_in_test;
+    }};
+}
+
 /// Visit an [`Expr`], and treat it as _not_ a type definition.
 macro_rules! visit_non_type_definition {
     ($self:ident, $expr:expr) => {{
@@ -2156,8 +2166,16 @@ where
                 }
                 self.visit_expr(target);
             }
+            StmtKind::Assert { test, .. } => {
+                visit_test!(self, test);
+            }
+            StmtKind::While { test, body, orelse } => {
+                visit_test!(self, test);
+                self.visit_body(body);
+                self.visit_body(orelse);
+            }
             StmtKind::If { test, body, orelse } => {
-                self.visit_expr(test);
+                visit_test!(self, test);
 
                 if flake8_type_checking::helpers::is_type_checking_block(&self.ctx, test) {
                     if self.settings.rules.enabled(Rule::EmptyTypeCheckingBlock) {
@@ -2244,6 +2262,11 @@ where
 
         let prev_in_literal = self.ctx.in_literal;
         let prev_in_type_definition = self.ctx.in_type_definition;
+        let prev_in_test = self.ctx.in_test;
+
+        if !matches!(expr.node, ExprKind::BoolOp { .. }) {
+            self.ctx.in_test = false;
+        }
 
         // Pre-visit.
         match &expr.node {
@@ -3584,6 +3607,11 @@ where
                     (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                 ));
             }
+            ExprKind::IfExp { test, body, orelse } => {
+                visit_test!(self, test);
+                self.visit_expr(body);
+                self.visit_expr(orelse);
+            }
             ExprKind::Call {
                 func,
                 args,
@@ -3612,11 +3640,19 @@ where
                     .any(|target| call_path.as_slice() == ["mypy_extensions", target])
                     {
                         Some(Callable::MypyExtension)
+                    } else if call_path.as_slice() == ["", "bool"] && self.ctx.is_builtin("bool") {
+                        Some(Callable::Bool)
                     } else {
                         None
                     }
                 });
                 match callable {
+                    Some(Callable::Bool) => {
+                        self.visit_expr(func);
+                        if args.len() == 1 {
+                            visit_test!(self, &args[0]);
+                        }
+                    }
                     Some(Callable::Cast) => {
                         self.visit_expr(func);
                         if !args.is_empty() {
@@ -3815,6 +3851,7 @@ where
 
         self.ctx.in_type_definition = prev_in_type_definition;
         self.ctx.in_literal = prev_in_literal;
+        self.ctx.in_test = prev_in_test;
 
         self.ctx.pop_expr();
     }
@@ -3827,7 +3864,11 @@ where
                 &comprehension.iter,
             );
         }
-        visitor::walk_comprehension(self, comprehension);
+        self.visit_expr(&comprehension.iter);
+        self.visit_expr(&comprehension.target);
+        for expr in &comprehension.ifs {
+            visit_test!(self, expr);
+        }
     }
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
