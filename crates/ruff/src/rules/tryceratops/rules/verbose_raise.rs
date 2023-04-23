@@ -8,6 +8,30 @@ use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for needless exception names in `raise` statements.
+///
+/// ## Why is this bad?
+/// It's redundant to specify the exception name in a `raise` statement if the
+/// exception is being re-raised.
+///
+/// ## Example
+/// ```python
+/// def foo():
+///     try:
+///         ...
+///     except ValueError as exc:
+///         raise exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo():
+///     try:
+///         ...
+///     except ValueError:
+///         raise
+/// ```
 #[violation]
 pub struct VerboseRaise;
 

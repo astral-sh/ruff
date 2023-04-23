@@ -7,6 +7,35 @@ use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for exceptions that are re-raised without specifying the cause via
+/// the `from` keyword.
+///
+/// ## Why is this bad?
+/// The `from` keyword sets the `__cause__` attribute of the exception, which
+/// stores the "cause" of the exception. The availability of an exception
+/// "cause" is useful for debugging.
+///
+/// ## Example
+/// ```python
+/// def reciprocal(n):
+///     try:
+///         return 1 / n
+///     except ZeroDivisionError:
+///         raise ValueError
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def reciprocal(n):
+///     try:
+///         return 1 / n
+///     except ZeroDivisionError as exc:
+///         raise ValueError from exc
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/exceptions.html#exception-context)
 #[violation]
 pub struct ReraiseNoCause;
 
