@@ -28,19 +28,22 @@ use ruff_python_ast::types::Range;
 /// tf.keras.backend
 /// ```
 #[violation]
-pub struct BannedImportAlias(pub String, pub String);
+pub struct BannedImportAlias {
+    pub name: String,
+    pub asname: String,
+}
 
 impl Violation for BannedImportAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let BannedImportAlias(name, asname) = self;
+        let BannedImportAlias { name, asname } = self;
         format!("`{name}` should not be imported as `{asname}`")
     }
 }
 
 /// ICN002
-pub fn check_banned_import(
-    import_from: &Stmt,
+pub fn banned_import_alias(
+    stmt: &Stmt,
     name: &str,
     asname: &str,
     banned_conventions: &FxHashMap<String, Vec<String>>,
@@ -51,8 +54,11 @@ pub fn check_banned_import(
             .any(|banned_alias| banned_alias == asname)
         {
             return Some(Diagnostic::new(
-                BannedImportAlias(name.to_string(), asname.to_string()),
-                Range::from(import_from),
+                BannedImportAlias {
+                    name: name.to_string(),
+                    asname: asname.to_string(),
+                },
+                Range::from(stmt),
             ));
         }
     }
