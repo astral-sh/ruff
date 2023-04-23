@@ -253,24 +253,24 @@ fn add_noqa_inner(
             }
         }
 
+        let noqa_offset = noqa_line_for.resolve(diagnostic.start());
+
         // Or ignored by the directive itself
-        if let Some(directive_line) =
-            directives.find_line_with_directive(noqa_line_for.resolve(diagnostic.start()))
-        {
+        if let Some(directive_line) = directives.find_line_with_directive(noqa_offset) {
             match &directive_line.directive {
                 Directive::All(..) => {
                     continue;
                 }
                 Directive::Codes(.., codes, _) => {
-                    if !includes(diagnostic.kind.rule(), codes) {
+                    let rule = diagnostic.kind.rule();
+                    if !includes(rule, codes) {
                         matches_by_line
                             .entry(directive_line.range.start())
                             .or_insert_with(|| {
-                                (
-                                    RuleSet::from_rule(diagnostic.kind.rule()),
-                                    Some(&directive_line.directive),
-                                )
-                            });
+                                (RuleSet::default(), Some(&directive_line.directive))
+                            })
+                            .0
+                            .insert(rule);
                     }
                     continue;
                 }
@@ -280,8 +280,10 @@ fn add_noqa_inner(
 
         // There's no existing noqa directive that suppresses the diagnostic.
         matches_by_line
-            .entry(locator.line_start(diagnostic.start()))
-            .or_insert_with(|| (RuleSet::from_rule(diagnostic.kind.rule()), None));
+            .entry(locator.line_start(noqa_offset))
+            .or_insert_with(|| (RuleSet::default(), None))
+            .0
+            .insert(diagnostic.kind.rule());
     }
 
     let mut count = 0;
@@ -289,7 +291,7 @@ fn add_noqa_inner(
     let mut prev_end = TextSize::default();
 
     for (offset, (rules, directive)) in matches_by_line {
-        output.push_str(&locator.contents()[TextRange::up_to(prev_end)]);
+        output.push_str(&locator.contents()[TextRange::new(prev_end, offset)]);
 
         let line = locator.full_line(offset);
 
@@ -315,7 +317,11 @@ fn add_noqa_inner(
                 let output_start = output.len();
 
                 // Add existing content.
-                output.push_str(line[TextRange::new(offset, noqa_range.start())].trim_end());
+                output.push_str(
+                    locator
+                        .slice(TextRange::new(offset, noqa_range.start()))
+                        .trim_end(),
+                );
 
                 // Add `noqa` directive.
                 output.push_str("  # noqa: ");
