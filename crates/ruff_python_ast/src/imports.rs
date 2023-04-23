@@ -121,12 +121,6 @@ impl ModuleImport {
     }
 }
 
-impl AsRef<ModuleImport> for ModuleImport {
-    fn as_ref(&self) -> &ModuleImport {
-        self
-    }
-}
-
 impl From<&ModuleImport> for Range {
     fn from(import: &ModuleImport) -> Range {
         Range::new(import.location, import.end_location)

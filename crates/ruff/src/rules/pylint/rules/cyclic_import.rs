@@ -99,7 +99,10 @@ pub fn cyclic_import(
     let Some(package) = package else {
         return None;
     };
-    let module_name = to_module_path(package, path).unwrap().join(".");
+    let Some(module_name) = to_module_path(package, path) else {
+        return None;
+    };
+    let module_name = module_name.join(".");
     // if the module name isn't in the import map, it can't possibly have cycles
     debug!("Checking module {module_name}");
     let Some((module_name, _)) = imports.module_to_imports.get_key_value(&module_name as &str) else {
@@ -122,7 +125,7 @@ pub fn cyclic_import(
                                 .collect::<Vec<_>>()
                                 .join(" -> "),
                         },
-                        imports.module_to_imports[module_name][0].as_ref().into(),
+                        (&imports.module_to_imports[module_name][0]).into(),
                     )
                 })
                 .collect::<Vec<Diagnostic>>(),
@@ -152,7 +155,7 @@ pub fn cyclic_import(
                             },
                             imports.module_to_imports[module_name]
                                 .iter()
-                                .find(|m| &(m.module) == the_rest.first().unwrap())
+                                .find(|m| m.module == the_rest[0])
                                 .unwrap()
                                 .into(),
                         ));
@@ -308,7 +311,7 @@ mod tests {
                 CyclicImport {
                     cycle: "a.a -> a.b".to_string(),
                 },
-                b_in_a.as_ref().into(),
+                (&b_in_a).into(),
             )])
         );
         let mut check_map: FxHashMap<Arc<str>, FxHashSet<Vec<Arc<str>>>> = FxHashMap::default();
@@ -322,7 +325,7 @@ mod tests {
                 CyclicImport {
                     cycle: "a.b -> a.a".to_string(),
                 },
-                a_in_b.as_ref().into(),
+                (&a_in_b).into(),
             )])
         );
 

@@ -168,16 +168,21 @@ pub fn run(
             if let Some(cycle_diagnostics) =
                 pylint_cyclic_import(path, package, &diagnostics.imports, &mut cycles)
             {
+                // should we take into account Jupyter notebokks here?
+                let contents = std::fs::read_to_string(path)?;
+                let locator = ruff_python_ast::source_code::Locator::new(&contents);
+                let file = {
+                    let mut builder = SourceFileBuilder::new(&path.to_string_lossy());
+                    if settings.lib.show_source {
+                        builder.set_source_code(&locator.to_source_code());
+                    }
+
+                    builder.finish()
+                };
                 diagnostics += Diagnostics::new(
                     cycle_diagnostics
                         .into_iter()
-                        .map(|diagnostic| {
-                            Message::from_diagnostic(
-                                diagnostic,
-                                SourceFileBuilder::new(&path.to_string_lossy()).finish(),
-                                0,
-                            )
-                        })
+                        .map(|diagnostic| Message::from_diagnostic(diagnostic, file.clone(), 0))
                         .collect::<Vec<_>>(),
                     ImportMap::default(),
                 );
