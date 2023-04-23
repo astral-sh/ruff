@@ -1,6 +1,5 @@
 use std::io;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use std::time::Instant;
 
 use anyhow::Result;
@@ -9,7 +8,6 @@ use ignore::Error;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
-use rustc_hash::{FxHashMap, FxHashSet};
 
 use ruff::message::{Location, Message};
 use ruff::registry::Rule;
@@ -18,7 +16,7 @@ use ruff::rules::pylint::pylint_cyclic_import;
 use ruff::settings::{flags, AllSettings};
 use ruff::{fs, packaging, resolver, warn_user_once, IOError, Range};
 use ruff_diagnostics::Diagnostic;
-use ruff_python_ast::imports::ImportMap;
+use ruff_python_ast::imports::{CyclicImportHelper, ImportMap};
 use ruff_python_ast::source_code::SourceFileBuilder;
 
 use crate::args::Overrides;
@@ -148,7 +146,7 @@ pub fn run(
         });
 
     debug!("{:#?}", diagnostics.imports);
-    let mut cycles: FxHashMap<Arc<str>, FxHashSet<Vec<Arc<str>>>> = FxHashMap::default();
+    let mut cycle_helper: CyclicImportHelper = CyclicImportHelper::new(&diagnostics.imports);
 
     for (path, package, settings) in
         paths
@@ -166,7 +164,7 @@ pub fn run(
     {
         if settings.lib.rules.enabled(Rule::CyclicImport) {
             if let Some(cycle_diagnostics) =
-                pylint_cyclic_import(path, package, &diagnostics.imports, &mut cycles)
+                pylint_cyclic_import(path, package, &diagnostics.imports.module_to_imports, &mut cycle_helper)
             {
                 // should we take into account Jupyter notebokks here?
                 let contents = std::fs::read_to_string(path)?;

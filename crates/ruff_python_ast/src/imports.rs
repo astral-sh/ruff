@@ -1,6 +1,6 @@
 use std::sync::Arc;
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
 
@@ -155,5 +155,61 @@ impl<'a> IntoIterator for &'a ImportMap {
 
     fn into_iter(self) -> Self::IntoIter {
         self.module_to_imports.iter()
+    }
+}
+
+#[derive(Default)]
+pub struct ModuleMapping {
+    pub(super) module_to_id: FxHashMap<Arc<str>, u32>,
+    pub(super) id_to_module: FxHashMap<u32, Arc<str>>,
+    id: u32,
+}
+
+impl ModuleMapping {
+    pub fn new() -> Self {
+        Self {
+            module_to_id: FxHashMap::default(),
+            id_to_module: FxHashMap::default(),
+            id: 0,
+        }
+    }
+
+    pub(super) fn insert(&mut self, module: &Arc<str>) {
+        self.module_to_id.insert(module.clone(), self.id);
+        self.id_to_module.insert(self.id, module.clone());
+        self.id += 1;
+    }
+
+    pub fn to_id(&self, module: &Arc<str>) -> Option<&u32> {
+        self.module_to_id.get(module)
+    }
+
+    pub fn to_module(&self, id: &u32) -> Option<&Arc<str>> {
+        self.id_to_module.get(id)
+    }
+
+    pub fn contains_module(&self, module: &Arc<str>) -> bool {
+        self.module_to_id.contains_key(module)
+    }
+}
+
+
+#[derive(Default)]
+pub struct CyclicImportHelper {
+    pub cycles: FxHashMap<u32, FxHashSet<Vec<u32>>>,
+    pub module_mapping: ModuleMapping,
+}
+
+impl CyclicImportHelper {
+    pub fn new(import_map: &ImportMap) -> Self {
+        let mut module_mapping = ModuleMapping::new();
+        import_map.module_to_imports.keys().for_each(|module| {
+            module_mapping.insert(module);
+        });
+
+        Self {
+            cycles: FxHashMap::default(),
+            module_mapping,
+        }
     }
 }
