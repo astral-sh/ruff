@@ -151,16 +151,6 @@ macro_rules! visit_type_definition {
     }};
 }
 
-/// Visit an [`Expr`], and treat it as a test.
-macro_rules! visit_test {
-    ($self:ident, $expr:expr) => {{
-        let prev_in_test = $self.ctx.in_test;
-        $self.ctx.in_test = true;
-        $self.visit_expr($expr);
-        $self.ctx.in_test = prev_in_test;
-    }};
-}
-
 /// Visit an [`Expr`], and treat it as _not_ a type definition.
 macro_rules! visit_non_type_definition {
     ($self:ident, $expr:expr) => {{
@@ -168,6 +158,18 @@ macro_rules! visit_non_type_definition {
         $self.ctx.in_type_definition = false;
         $self.visit_expr($expr);
         $self.ctx.in_type_definition = prev_in_type_definition;
+    }};
+}
+
+/// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
+/// expressions return value is significant, or whether the calling context only relies on
+/// its truthiness.
+macro_rules! visit_boolean_test {
+    ($self:ident, $expr:expr) => {{
+        let prev_in_boolean_test = $self.ctx.in_boolean_test;
+        $self.ctx.in_boolean_test = true;
+        $self.visit_expr($expr);
+        $self.ctx.in_boolean_test = prev_in_boolean_test;
     }};
 }
 
@@ -2166,16 +2168,19 @@ where
                 }
                 self.visit_expr(target);
             }
-            StmtKind::Assert { test, .. } => {
-                visit_test!(self, test);
+            StmtKind::Assert { test, msg } => {
+                visit_boolean_test!(self, test);
+                if let Some(expr) = msg {
+                    self.visit_expr(expr);
+                }
             }
             StmtKind::While { test, body, orelse } => {
-                visit_test!(self, test);
+                visit_boolean_test!(self, test);
                 self.visit_body(body);
                 self.visit_body(orelse);
             }
             StmtKind::If { test, body, orelse } => {
-                visit_test!(self, test);
+                visit_boolean_test!(self, test);
 
                 if flake8_type_checking::helpers::is_type_checking_block(&self.ctx, test) {
                     if self.settings.rules.enabled(Rule::EmptyTypeCheckingBlock) {
@@ -2262,10 +2267,10 @@ where
 
         let prev_in_literal = self.ctx.in_literal;
         let prev_in_type_definition = self.ctx.in_type_definition;
-        let prev_in_test = self.ctx.in_test;
+        let prev_in_boolean_test = self.ctx.in_boolean_test;
 
         if !matches!(expr.node, ExprKind::BoolOp { .. }) {
-            self.ctx.in_test = false;
+            self.ctx.in_boolean_test = false;
         }
 
         // Pre-visit.
@@ -3608,7 +3613,7 @@ where
                 ));
             }
             ExprKind::IfExp { test, body, orelse } => {
-                visit_test!(self, test);
+                visit_boolean_test!(self, test);
                 self.visit_expr(body);
                 self.visit_expr(orelse);
             }
@@ -3640,7 +3645,7 @@ where
                     .any(|target| call_path.as_slice() == ["mypy_extensions", target])
                     {
                         Some(Callable::MypyExtension)
-                    } else if call_path.as_slice() == ["", "bool"] && self.ctx.is_builtin("bool") {
+                    } else if call_path.as_slice() == ["", "bool"] {
                         Some(Callable::Bool)
                     } else {
                         None
@@ -3649,8 +3654,11 @@ where
                 match callable {
                     Some(Callable::Bool) => {
                         self.visit_expr(func);
-                        if args.len() == 1 {
-                            visit_test!(self, &args[0]);
+                        if !args.is_empty() {
+                            visit_boolean_test!(self, &args[0]);
+                        }
+                        for expr in args.iter().skip(1) {
+                            self.visit_expr(expr);
                         }
                     }
                     Some(Callable::Cast) => {
@@ -3851,7 +3859,7 @@ where
 
         self.ctx.in_type_definition = prev_in_type_definition;
         self.ctx.in_literal = prev_in_literal;
-        self.ctx.in_test = prev_in_test;
+        self.ctx.in_boolean_test = prev_in_boolean_test;
 
         self.ctx.pop_expr();
     }
@@ -3867,7 +3875,7 @@ where
         self.visit_expr(&comprehension.iter);
         self.visit_expr(&comprehension.target);
         for expr in &comprehension.ifs {
-            visit_test!(self, expr);
+            visit_boolean_test!(self, expr);
         }
     }
 
