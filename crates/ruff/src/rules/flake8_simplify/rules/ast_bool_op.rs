@@ -128,6 +128,25 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
     }
 }
 
+/// ## What it does
+/// Checks if `or` expressions with truthy value can be simplified.
+///
+/// ## Why is this bad?
+/// The code is less readable and more difficult to understand.
+/// The code is also less efficient, as multiple expressions are evaluated
+/// instead of just one.
+///
+/// ## Example
+/// ```python
+/// if x or True:
+///     pass
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if True:
+///     pass
+/// ```
 #[violation]
 pub struct ExprOrTrue {
     pub expr: String,
@@ -137,15 +156,42 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ExprOrTrue { expr } = self;
-        format!("Use `{expr}` instead of `... or {expr}`")
+        if expr.as_str() == "True" {
+            format!("Use `True` instead of `... or True`")
+        } else {
+            format!("Use truthy `{expr}` instead of `... or {expr}`")
+        }
     }
 
     fn autofix_title(&self) -> String {
         let ExprOrTrue { expr } = self;
-        format!("Replace with `{expr}`")
+        if expr.as_str() == "True" {
+            format!("Replace with `True`")
+        } else {
+            format!("Replace with truthy `{expr}`")
+        }
     }
 }
 
+/// ## What it does
+/// Checks if `and` expressions with falsey value can be simplified.
+/// 
+/// ## Why is this bad?
+/// The code is less readable and more difficult to understand.
+/// The code is also less efficient, as multiple expressions are evaluated
+/// instead of just one.
+/// 
+/// ## Example
+/// ```python
+/// if x and False:
+///     pass
+/// ```
+/// 
+/// Use instead:
+/// ```python
+/// if False:
+///     pass
+/// ```
 #[violation]
 pub struct ExprAndFalse {
     pub expr: String,
@@ -155,12 +201,20 @@ impl AlwaysAutofixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
         let ExprAndFalse { expr } = self;
-        format!("Use `{expr}` instead of `... and {expr}`")
+        if expr.as_str() == "False" {
+            format!("Use `False` instead of `... and False`")
+        } else {
+            format!("Use falsey `{expr}` instead of `... and {expr}`")
+        }
     }
 
     fn autofix_title(&self) -> String {
         let ExprAndFalse { expr } = self;
-        format!("Replace with `{expr}`")
+        if expr.as_str() == "False" {
+            format!("Replace with `False`")
+        } else {
+            format!("Replace with falsey `{expr}`")
+        }
     }
 }
 
