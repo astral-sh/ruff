@@ -91,6 +91,18 @@ impl<'a> GroupNameFinder<'a> {
             false
         }
     }
+
+    /// Increment the usage count for the group name by the given value.
+    /// If we're in one of the branches of a mutually exclusive statement,
+    /// then increment the count for that branch. Otherwise, increment the
+    /// global count.
+    fn increment_usage_count(&mut self, value: u32) {
+        if let Some(last) = self.counter_stack.last_mut() {
+            *last.last_mut().unwrap() += value;
+        } else {
+            self.usage_count += value;
+        }
+    }
 }
 
 impl<'a, 'b> Visitor<'b> for GroupNameFinder<'a>
@@ -109,7 +121,7 @@ where
                     self.overridden = true;
                 } else {
                     if self.name_matches(iter) {
-                        self.usage_count += 1;
+                        self.increment_usage_count(1);
                         // This could happen when the group is being looped
                         // over multiple times:
                         //      for item in group:
@@ -178,11 +190,7 @@ where
                         // This is the max number of group usage from all the
                         // branches of this `if` statement.
                         let max_count = last.into_iter().max().unwrap_or(0);
-                        if let Some(current_last) = self.counter_stack.last_mut() {
-                            *current_last.last_mut().unwrap() += max_count;
-                        } else {
-                            self.usage_count += max_count;
-                        }
+                        self.increment_usage_count(max_count);
                     }
                 }
             }
@@ -197,11 +205,7 @@ where
                     // This is the max number of group usage from all the
                     // branches of this `match` statement.
                     let max_count = last.into_iter().max().unwrap_or(0);
-                    if let Some(current_last) = self.counter_stack.last_mut() {
-                        *current_last.last_mut().unwrap() += max_count;
-                    } else {
-                        self.usage_count += max_count;
-                    }
+                    self.increment_usage_count(max_count);
                 }
             }
             StmtKind::Assign { targets, value, .. } => {
@@ -230,7 +234,7 @@ where
             return;
         }
         if self.name_matches(&comprehension.iter) {
-            self.usage_count += 1;
+            self.increment_usage_count(1);
             if self.usage_count > 1 {
                 self.exprs.push(&comprehension.iter);
             }
@@ -275,14 +279,7 @@ where
             }
             _ => {
                 if self.name_matches(expr) {
-                    // If the stack isn't empty, then we're in one of the branches of
-                    // a mutually exclusive statement. Otherwise, we'll add it to the
-                    // global count.
-                    if let Some(last) = self.counter_stack.last_mut() {
-                        *last.last_mut().unwrap() += 1;
-                    } else {
-                        self.usage_count += 1;
-                    }
+                    self.increment_usage_count(1);
 
                     let current_usage_count = self.usage_count
                         + self

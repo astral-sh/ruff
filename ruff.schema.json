@@ -788,6 +788,17 @@
             }
           }
         },
+        "banned-from": {
+          "description": "A list of modules that are allowed to be imported from",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
+        },
         "extend-aliases": {
           "description": "A mapping from module to conventional import alias. These aliases will be added to the `aliases` mapping.",
           "type": [
@@ -1844,6 +1855,7 @@
         "ICN00",
         "ICN001",
         "ICN002",
+        "ICN003",
         "INP",
         "INP0",
         "INP00",

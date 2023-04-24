@@ -1057,7 +1057,7 @@ where
 
                     if self.settings.rules.enabled(Rule::UnconventionalImportAlias) {
                         if let Some(diagnostic) =
-                            flake8_import_conventions::rules::check_conventional_import(
+                            flake8_import_conventions::rules::conventional_import_alias(
                                 stmt,
                                 &alias.node.name,
                                 alias.node.asname.as_deref(),
@@ -1071,7 +1071,7 @@ where
                     if self.settings.rules.enabled(Rule::BannedImportAlias) {
                         if let Some(asname) = &alias.node.asname {
                             if let Some(diagnostic) =
-                                flake8_import_conventions::rules::check_banned_import(
+                                flake8_import_conventions::rules::banned_import_alias(
                                     stmt,
                                     &alias.node.name,
                                     asname,
@@ -1332,7 +1332,7 @@ where
                             &alias.node.name,
                         );
                         if let Some(diagnostic) =
-                            flake8_import_conventions::rules::check_conventional_import(
+                            flake8_import_conventions::rules::conventional_import_alias(
                                 stmt,
                                 &full_name,
                                 alias.node.asname.as_deref(),
@@ -1351,7 +1351,7 @@ where
                                 &alias.node.name,
                             );
                             if let Some(diagnostic) =
-                                flake8_import_conventions::rules::check_banned_import(
+                                flake8_import_conventions::rules::banned_import_alias(
                                     stmt,
                                     &full_name,
                                     asname,
@@ -1455,6 +1455,16 @@ where
                                 pylint::rules::useless_import_alias(self, alias);
                             }
                         }
+                    }
+                }
+
+                if self.settings.rules.enabled(Rule::BannedImportFrom) {
+                    if let Some(diagnostic) = flake8_import_conventions::rules::banned_import_from(
+                        stmt,
+                        &helpers::format_import_from(*level, module.as_deref()),
+                        &self.settings.flake8_import_conventions.banned_from,
+                    ) {
+                        self.diagnostics.push(diagnostic);
                     }
                 }
             }
@@ -4456,8 +4466,14 @@ impl<'a> Checker<'a> {
             .rules
             .enabled(Rule::MixedCaseVariableInClassScope)
         {
-            if matches!(self.ctx.scope().kind, ScopeKind::Class(..)) {
-                pep8_naming::rules::mixed_case_variable_in_class_scope(self, expr, parent, id);
+            if let ScopeKind::Class(class) = &self.ctx.scope().kind {
+                pep8_naming::rules::mixed_case_variable_in_class_scope(
+                    self,
+                    expr,
+                    parent,
+                    id,
+                    class.bases,
+                );
             }
         }
 
