@@ -91,13 +91,15 @@ pub fn not_tests(
             ..
         } = &operand.node
         {
-            let should_fix = ops.len() == 1;
+            if !matches!(&ops[..], [Cmpop::In | Cmpop::Is]) {
+                return;
+            }
             for op in ops.iter() {
                 match op {
                     Cmpop::In => {
                         if check_not_in {
                             let mut diagnostic = Diagnostic::new(NotInTest, Range::from(operand));
-                            if checker.patch(diagnostic.kind.rule()) && should_fix {
+                            if checker.patch(diagnostic.kind.rule()) {
                                 diagnostic.set_fix(Edit::replacement(
                                     compare(left, &[Cmpop::NotIn], comparators, checker.stylist),
                                     expr.location,
@@ -110,7 +112,7 @@ pub fn not_tests(
                     Cmpop::Is => {
                         if check_not_is {
                             let mut diagnostic = Diagnostic::new(NotIsTest, Range::from(operand));
-                            if checker.patch(diagnostic.kind.rule()) && should_fix {
+                            if checker.patch(diagnostic.kind.rule()) {
                                 diagnostic.set_fix(Edit::replacement(
                                     compare(left, &[Cmpop::IsNot], comparators, checker.stylist),
                                     expr.location,
