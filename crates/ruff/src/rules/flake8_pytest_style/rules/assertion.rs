@@ -5,7 +5,6 @@ use libcst_native::{
     ParenthesizableWhitespace, ParenthesizedNode, SimpleStatementLine, SimpleWhitespace,
     SmallStatement, Statement, Suite, TrailingWhitespace, UnaryOp, UnaryOperation,
 };
-use ruff_python_semantic::context::Context;
 use rustpython_parser::ast::{
     Boolop, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, Location, Stmt, StmtKind,
     Unaryop,
@@ -223,11 +222,11 @@ pub fn unittest_assertion(
 }
 
 /// PT015
-pub fn assert_falsy(ctx: &Context, stmt: &Stmt, test: &Expr) -> Option<Diagnostic> {
-    if Truthiness::from_expr(test, |id| ctx.is_builtin(id)).is_falsey() {
-        Some(Diagnostic::new(PytestAssertAlwaysFalse, Range::from(stmt)))
-    } else {
-        None
+pub fn assert_falsy(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
+    if Truthiness::from_expr(test, |id| checker.ctx.is_builtin(id)).is_falsey() {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(PytestAssertAlwaysFalse, Range::from(stmt)));
     }
 }
 

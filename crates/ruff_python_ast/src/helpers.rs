@@ -51,7 +51,7 @@ pub fn unparse_constant(constant: &Constant, stylist: &Stylist) -> String {
     generator.generate()
 }
 
-pub fn is_iterable_initializer<F>(id: &str, is_builtin: F) -> bool
+fn is_iterable_initializer<F>(id: &str, is_builtin: F) -> bool
 where
     F: Fn(&str) -> bool,
 {
@@ -1429,11 +1429,11 @@ pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
 
 #[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
 pub enum Truthiness {
-    // The `shell` keyword argument is set and evaluates to `False`.
+    // An expression evaluates to `False`.
     Falsey,
-    // The `shell` keyword argument is set and evaluates to `True`.
+    // An expression evaluates to `True`.
     Truthy,
-    // The `shell` keyword argument is set, but its value is unknown.
+    // An expression evaluates to an unknown value (e.g., a variable `x` of unknown type).
     Unknown,
 }
 
@@ -1474,7 +1474,20 @@ impl Truthiness {
                 Constant::Ellipsis => Some(true),
                 Constant::Tuple(elts) => Some(!elts.is_empty()),
             },
-            ExprKind::JoinedStr { values, .. } => Some(!values.is_empty()),
+            ExprKind::JoinedStr { values, .. } => {
+                if values.is_empty() {
+                    Some(false)
+                } else if values.iter().any(|value| {
+                    let ExprKind::Constant { value: Constant::Str(string), .. } = &value.node else {
+                        return false;
+                    };
+                    !string.is_empty()
+                }) {
+                    Some(true)
+                } else {
+                    None
+                }
+            }
             ExprKind::List { elts, .. }
             | ExprKind::Set { elts, .. }
             | ExprKind::Tuple { elts, .. } => Some(!elts.is_empty()),
