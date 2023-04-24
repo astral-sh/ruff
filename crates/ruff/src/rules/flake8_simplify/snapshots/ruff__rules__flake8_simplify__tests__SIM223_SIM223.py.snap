@@ -56,7 +56,7 @@ SIM223.py:7:10: SIM223 [*] Use `False` instead of `... and False`
 9 9 | 
 10 10 | if a or False:
 
-SIM223.py:19:18: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:19:18: SIM223 [*] Use `False` instead of `False and ...`
    |
 19 |     pass
 20 | 
@@ -76,7 +76,7 @@ SIM223.py:19:18: SIM223 [*] Use `False` instead of `... and False`
 21 21 | 
 22 22 | if False and f() and a and g() and b:  # SIM223
 
-SIM223.py:22:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:22:4: SIM223 [*] Use `False` instead of `False and ...`
    |
 22 |     pass
 23 | 
@@ -96,7 +96,7 @@ SIM223.py:22:4: SIM223 [*] Use `False` instead of `... and False`
 24 24 | 
 25 25 | if a and False and f() and b and g():  # SIM223
 
-SIM223.py:25:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:25:4: SIM223 [*] Use `False` instead of `... and False and ...`
    |
 25 |     pass
 26 | 
@@ -116,7 +116,7 @@ SIM223.py:25:4: SIM223 [*] Use `False` instead of `... and False`
 27 27 | 
 28 28 | 
 
-SIM223.py:42:4: SIM223 [*] Use falsey `""` instead of `... and ""`
+SIM223.py:42:4: SIM223 [*] Use falsey `""` instead of `... and "" and ...`
    |
 42 | if a and "" and False:  # SIM223
    |    ^^^^^^^^^^^^^^^^^^ SIM223
@@ -134,7 +134,7 @@ SIM223.py:42:4: SIM223 [*] Use falsey `""` instead of `... and ""`
 44 44 | 
 45 45 | if a and "foo" and False and "bar":  # SIM223
 
-SIM223.py:45:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:45:4: SIM223 [*] Use `False` instead of `... and False and ...`
    |
 45 |     pass
 46 | 
@@ -154,7 +154,7 @@ SIM223.py:45:4: SIM223 [*] Use `False` instead of `... and False`
 47 47 | 
 48 48 | if a and 0 and False:  # SIM223
 
-SIM223.py:48:4: SIM223 [*] Use falsey `0` instead of `... and 0`
+SIM223.py:48:4: SIM223 [*] Use falsey `0` instead of `... and 0 and ...`
    |
 48 |     pass
 49 | 
@@ -174,7 +174,7 @@ SIM223.py:48:4: SIM223 [*] Use falsey `0` instead of `... and 0`
 50 50 | 
 51 51 | if a and 1 and False and 2:  # SIM223
 
-SIM223.py:51:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:51:4: SIM223 [*] Use `False` instead of `... and False and ...`
    |
 51 |     pass
 52 | 
@@ -194,7 +194,7 @@ SIM223.py:51:4: SIM223 [*] Use `False` instead of `... and False`
 53 53 | 
 54 54 | if a and 0.0 and False:  # SIM223
 
-SIM223.py:54:4: SIM223 [*] Use falsey `0.0` instead of `... and 0.0`
+SIM223.py:54:4: SIM223 [*] Use falsey `0.0` instead of `... and 0.0 and ...`
    |
 54 |     pass
 55 | 
@@ -214,7 +214,7 @@ SIM223.py:54:4: SIM223 [*] Use falsey `0.0` instead of `... and 0.0`
 56 56 | 
 57 57 | if a and 0.1 and False and 0.2:  # SIM223
 
-SIM223.py:57:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:57:4: SIM223 [*] Use `False` instead of `... and False and ...`
    |
 57 |     pass
 58 | 
@@ -234,7 +234,7 @@ SIM223.py:57:4: SIM223 [*] Use `False` instead of `... and False`
 59 59 | 
 60 60 | if a and [] and False:  # SIM223
 
-SIM223.py:60:4: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:60:4: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
    |
 60 |     pass
 61 | 
@@ -254,7 +254,7 @@ SIM223.py:60:4: SIM223 [*] Use falsey `[]` instead of `... and []`
 62 62 | 
 63 63 | if a and list([]) and False:  # SIM223
 
-SIM223.py:63:4: SIM223 [*] Use falsey `list([])` instead of `... and list([])`
+SIM223.py:63:4: SIM223 [*] Use falsey `list([])` instead of `... and list([]) and ...`
    |
 63 |     pass
 64 | 
@@ -274,7 +274,7 @@ SIM223.py:63:4: SIM223 [*] Use falsey `list([])` instead of `... and list([])`
 65 65 | 
 66 66 | if a and [1] and False and [2]:  # SIM223
 
-SIM223.py:66:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:66:4: SIM223 [*] Use `False` instead of `... and False and ...`
    |
 66 |     pass
 67 | 
@@ -294,7 +294,7 @@ SIM223.py:66:4: SIM223 [*] Use `False` instead of `... and False`
 68 68 | 
 69 69 | if a and list([1]) and False and list([2]):  # SIM223
 
-SIM223.py:69:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:69:4: SIM223 [*] Use `False` instead of `... and False and ...`
    |
 69 |     pass
 70 | 
@@ -314,7 +314,7 @@ SIM223.py:69:4: SIM223 [*] Use `False` instead of `... and False`
 71 71 | 
 72 72 | if a and {} and False:  # SIM223
 
-SIM223.py:72:4: SIM223 [*] Use falsey `{}` instead of `... and {}`
+SIM223.py:72:4: SIM223 [*] Use falsey `{}` instead of `... and {} and ...`
    |
 72 |     pass
 73 | 
@@ -334,7 +334,7 @@ SIM223.py:72:4: SIM223 [*] Use falsey `{}` instead of `... and {}`
 74 74 | 
 75 75 | if a and dict() and False:  # SIM223
 
-SIM223.py:75:4: SIM223 [*] Use falsey `dict()` instead of `... and dict()`
+SIM223.py:75:4: SIM223 [*] Use falsey `dict()` instead of `... and dict() and ...`
    |
 75 |     pass
 76 | 
@@ -354,7 +354,7 @@ SIM223.py:75:4: SIM223 [*] Use falsey `dict()` instead of `... and dict()`
 77 77 | 
 78 78 | if a and {1: 1} and False and {2: 2}:  # SIM223
 
-SIM223.py:78:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:78:4: SIM223 [*] Use `False` instead of `... and False and ...`
    |
 78 |     pass
 79 | 
@@ -374,7 +374,7 @@ SIM223.py:78:4: SIM223 [*] Use `False` instead of `... and False`
 80 80 | 
 81 81 | if a and dict({1: 1}) and False and dict({2: 2}):  # SIM223
 
-SIM223.py:81:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:81:4: SIM223 [*] Use `False` instead of `... and False and ...`
    |
 81 |     pass
 82 | 
@@ -394,7 +394,7 @@ SIM223.py:81:4: SIM223 [*] Use `False` instead of `... and False`
 83 83 | 
 84 84 | if a and set() and False:  # SIM223
 
-SIM223.py:84:4: SIM223 [*] Use falsey `set()` instead of `... and set()`
+SIM223.py:84:4: SIM223 [*] Use falsey `set()` instead of `... and set() and ...`
    |
 84 |     pass
 85 | 
@@ -414,7 +414,7 @@ SIM223.py:84:4: SIM223 [*] Use falsey `set()` instead of `... and set()`
 86 86 | 
 87 87 | if a and set(set()) and False:  # SIM223
 
-SIM223.py:87:4: SIM223 [*] Use falsey `set(set())` instead of `... and set(set())`
+SIM223.py:87:4: SIM223 [*] Use falsey `set(set())` instead of `... and set(set()) and ...`
    |
 87 |     pass
 88 | 
@@ -434,7 +434,7 @@ SIM223.py:87:4: SIM223 [*] Use falsey `set(set())` instead of `... and set(set()
 89 89 | 
 90 90 | if a and {1} and False and {2}:  # SIM223
 
-SIM223.py:90:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:90:4: SIM223 [*] Use `False` instead of `... and False and ...`
    |
 90 |     pass
 91 | 
@@ -454,7 +454,7 @@ SIM223.py:90:4: SIM223 [*] Use `False` instead of `... and False`
 92 92 | 
 93 93 | if a and set({1}) and False and set({2}):  # SIM223
 
-SIM223.py:93:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:93:4: SIM223 [*] Use `False` instead of `... and False and ...`
    |
 93 |     pass
 94 | 
@@ -474,7 +474,7 @@ SIM223.py:93:4: SIM223 [*] Use `False` instead of `... and False`
 95 95 | 
 96 96 | if a and () and False:  # SIM222
 
-SIM223.py:96:4: SIM223 [*] Use falsey `()` instead of `... and ()`
+SIM223.py:96:4: SIM223 [*] Use falsey `()` instead of `... and () and ...`
    |
 96 |     pass
 97 | 
@@ -494,7 +494,7 @@ SIM223.py:96:4: SIM223 [*] Use falsey `()` instead of `... and ()`
 98 98 | 
 99 99 | if a and tuple(()) and False:  # SIM222
 
-SIM223.py:99:4: SIM223 [*] Use falsey `tuple(())` instead of `... and tuple(())`
+SIM223.py:99:4: SIM223 [*] Use falsey `tuple(())` instead of `... and tuple(()) and ...`
     |
  99 |     pass
 100 | 
@@ -514,7 +514,7 @@ SIM223.py:99:4: SIM223 [*] Use falsey `tuple(())` instead of `... and tuple(())`
 101 101 | 
 102 102 | if a and (1,) and False and (2,):  # SIM222
 
-SIM223.py:102:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:102:4: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 102 |     pass
 103 | 
@@ -534,7 +534,7 @@ SIM223.py:102:4: SIM223 [*] Use `False` instead of `... and False`
 104 104 | 
 105 105 | if a and tuple((1,)) and False and tuple((2,)):  # SIM222
 
-SIM223.py:105:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:105:4: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 105 |     pass
 106 | 
@@ -554,7 +554,7 @@ SIM223.py:105:4: SIM223 [*] Use `False` instead of `... and False`
 107 107 | 
 108 108 | if a and frozenset() and False:  # SIM222
 
-SIM223.py:108:4: SIM223 [*] Use falsey `frozenset()` instead of `... and frozenset()`
+SIM223.py:108:4: SIM223 [*] Use falsey `frozenset()` instead of `... and frozenset() and ...`
     |
 108 |     pass
 109 | 
@@ -574,7 +574,7 @@ SIM223.py:108:4: SIM223 [*] Use falsey `frozenset()` instead of `... and frozens
 110 110 | 
 111 111 | if a and frozenset(frozenset()) and False:  # SIM222
 
-SIM223.py:111:4: SIM223 [*] Use falsey `frozenset(frozenset())` instead of `... and frozenset(frozenset())`
+SIM223.py:111:4: SIM223 [*] Use falsey `frozenset(frozenset())` instead of `... and frozenset(frozenset()) and ...`
     |
 111 |     pass
 112 | 
@@ -594,7 +594,7 @@ SIM223.py:111:4: SIM223 [*] Use falsey `frozenset(frozenset())` instead of `... 
 113 113 | 
 114 114 | if a and frozenset({1}) and False and frozenset({2}):  # SIM222
 
-SIM223.py:114:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:114:4: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 114 |     pass
 115 | 
@@ -614,7 +614,7 @@ SIM223.py:114:4: SIM223 [*] Use `False` instead of `... and False`
 116 116 | 
 117 117 | if a and frozenset(frozenset({1})) and False and frozenset(frozenset({2})):  # SIM222
 
-SIM223.py:117:4: SIM223 [*] Use `False` instead of `... and False`
+SIM223.py:117:4: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 117 |     pass
 118 | 
@@ -634,7 +634,7 @@ SIM223.py:117:4: SIM223 [*] Use `False` instead of `... and False`
 119 119 | 
 120 120 | 
 
-SIM223.py:123:6: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:123:6: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 123 | # Inside test `a` is simplified
 124 | 
@@ -655,7 +655,7 @@ SIM223.py:123:6: SIM223 [*] Use falsey `[]` instead of `... and []`
 125 125 | assert a and [] and False and []  # SIM223
 126 126 | 
 
-SIM223.py:125:8: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:125:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 125 | bool(a and [] and False and [])  # SIM223
 126 | 
@@ -676,7 +676,7 @@ SIM223.py:125:8: SIM223 [*] Use falsey `[]` instead of `... and []`
 127 127 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
 128 128 |     pass
 
-SIM223.py:127:5: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:127:5: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 127 | assert a and [] and False and []  # SIM223
 128 | 
@@ -696,7 +696,7 @@ SIM223.py:127:5: SIM223 [*] Use falsey `[]` instead of `... and []`
 129 129 | 
 130 130 | 0 if a and [] and False and [] else 1  # SIM222
 
-SIM223.py:127:36: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:127:36: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 127 | assert a and [] and False and []  # SIM223
 128 | 
@@ -716,7 +716,7 @@ SIM223.py:127:36: SIM223 [*] Use falsey `[]` instead of `... and []`
 129 129 | 
 130 130 | 0 if a and [] and False and [] else 1  # SIM222
 
-SIM223.py:130:6: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:130:6: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 130 |     pass
 131 | 
@@ -737,7 +737,7 @@ SIM223.py:130:6: SIM223 [*] Use falsey `[]` instead of `... and []`
 132 132 | while a and [] and False and []:  # SIM223
 133 133 |     pass
 
-SIM223.py:132:7: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:132:7: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 132 | 0 if a and [] and False and [] else 1  # SIM222
 133 | 
@@ -757,7 +757,7 @@ SIM223.py:132:7: SIM223 [*] Use falsey `[]` instead of `... and []`
 134 134 | 
 135 135 | [
 
-SIM223.py:139:8: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:139:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 139 |     for a in range(10)
 140 |     for b in range(10)
@@ -778,7 +778,7 @@ SIM223.py:139:8: SIM223 [*] Use falsey `[]` instead of `... and []`
 141 141 | ]
 142 142 | 
 
-SIM223.py:140:8: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:140:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 140 |     for b in range(10)
 141 |     if a and [] and False and []  # SIM223
@@ -798,7 +798,7 @@ SIM223.py:140:8: SIM223 [*] Use falsey `[]` instead of `... and []`
 142 142 | 
 143 143 | {
 
-SIM223.py:147:8: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:147:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 147 |     for a in range(10)
 148 |     for b in range(10)
@@ -819,7 +819,7 @@ SIM223.py:147:8: SIM223 [*] Use falsey `[]` instead of `... and []`
 149 149 | }
 150 150 | 
 
-SIM223.py:148:8: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:148:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 148 |     for b in range(10)
 149 |     if a and [] and False and []  # SIM223
@@ -839,7 +839,7 @@ SIM223.py:148:8: SIM223 [*] Use falsey `[]` instead of `... and []`
 150 150 | 
 151 151 | {
 
-SIM223.py:155:8: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:155:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 155 |     for a in range(10)
 156 |     for b in range(10)
@@ -860,7 +860,7 @@ SIM223.py:155:8: SIM223 [*] Use falsey `[]` instead of `... and []`
 157 157 | }
 158 158 | 
 
-SIM223.py:156:8: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:156:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 156 |     for b in range(10)
 157 |     if a and [] and False and []  # SIM223
@@ -880,7 +880,7 @@ SIM223.py:156:8: SIM223 [*] Use falsey `[]` instead of `... and []`
 158 158 | 
 159 159 | (
 
-SIM223.py:163:8: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:163:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 163 |     for a in range(10)
 164 |     for b in range(10)
@@ -901,7 +901,7 @@ SIM223.py:163:8: SIM223 [*] Use falsey `[]` instead of `... and []`
 165 165 | )
 166 166 | 
 
-SIM223.py:164:8: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:164:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |
 164 |     for b in range(10)
 165 |     if a and [] and False and []  # SIM223
@@ -921,7 +921,7 @@ SIM223.py:164:8: SIM223 [*] Use falsey `[]` instead of `... and []`
 166 166 | 
 167 167 | # Outside test `a` is not simplified
 
-SIM223.py:169:7: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:169:7: SIM223 [*] Use falsey `[]` instead of `[] and ...`
     |
 169 | # Outside test `a` is not simplified
 170 | 
@@ -942,7 +942,7 @@ SIM223.py:169:7: SIM223 [*] Use falsey `[]` instead of `... and []`
 171 171 | if (a and [] and False and []) == (a and []):  # SIM223
 172 172 |     pass
 
-SIM223.py:171:11: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:171:11: SIM223 [*] Use falsey `[]` instead of `[] and ...`
     |
 171 | a and [] and False and []  # SIM223
 172 | 
@@ -962,7 +962,7 @@ SIM223.py:171:11: SIM223 [*] Use falsey `[]` instead of `... and []`
 173 173 | 
 174 174 | if f(a and [] and False and []):  # SIM223
 
-SIM223.py:174:12: SIM223 [*] Use falsey `[]` instead of `... and []`
+SIM223.py:174:12: SIM223 [*] Use falsey `[]` instead of `[] and ...`
     |
 174 |     pass
 175 | 

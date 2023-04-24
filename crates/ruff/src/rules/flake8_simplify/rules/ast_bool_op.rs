@@ -128,6 +128,75 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
     }
 }
 
+struct Replacement {
+    pub boolop: Boolop,
+    pub expr: String,
+    pub remove_before: bool,
+    pub remove_after: bool,
+}
+
+impl From<&ExprOrTrue> for Replacement {
+    fn from(violation: &ExprOrTrue) -> Self {
+        let ExprOrTrue {
+            expr,
+            remove_before,
+            remove_after,
+        } = violation;
+        Self {
+            boolop: Boolop::Or,
+            expr: expr.clone(),
+            remove_before: *remove_before,
+            remove_after: *remove_after,
+        }
+    }
+}
+
+impl From<&ExprAndFalse> for Replacement {
+    fn from(violation: &ExprAndFalse) -> Self {
+        let ExprAndFalse {
+            expr,
+            remove_before,
+            remove_after,
+        } = violation;
+        Self {
+            boolop: Boolop::And,
+            expr: expr.clone(),
+            remove_before: *remove_before,
+            remove_after: *remove_after,
+        }
+    }
+}
+
+impl Replacement {
+    fn message(&self) -> String {
+        let op = match self.boolop {
+            Boolop::Or => "or",
+            Boolop::And => "and",
+        };
+        let replaced = match (self.remove_before, self.remove_after) {
+            (false, false) => panic!("`remove_before` and `remove_after` cannot both be false"),
+            (false, true) => format!("{} {op} ...", self.expr),
+            (true, false) => format!("... {op} {}", self.expr),
+            (true, true) => format!("... {op} {0} {op} ...", self.expr),
+        };
+        match (&self.boolop, self.expr.as_str()) {
+            (Boolop::Or, "True") => format!("Use `True` instead of `{replaced}`"),
+            (Boolop::Or, _) => format!("Use truthy `{}` instead of `{replaced}`", self.expr),
+            (Boolop::And, "False") => format!("Use `False` instead of `{replaced}`"),
+            (Boolop::And, _) => format!("Use falsey `{}` instead of `{replaced}`", self.expr),
+        }
+    }
+
+    fn autofix_title(&self) -> String {
+        match (&self.boolop, self.expr.as_str()) {
+            (Boolop::Or, "True") => format!("Replace with `True`"),
+            (Boolop::Or, _) => format!("Replace with truthy `{}`", self.expr),
+            (Boolop::And, "False") => format!("Replace with `False`"),
+            (Boolop::And, _) => format!("Replace with falsey `{}`", self.expr),
+        }
+    }
+}
+
 /// ## What it does
 /// Checks if `or` expressions with truthy value can be simplified.
 ///
@@ -150,43 +219,36 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
 #[violation]
 pub struct ExprOrTrue {
     pub expr: String,
+    pub remove_before: bool,
+    pub remove_after: bool,
 }
 
 impl AlwaysAutofixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ExprOrTrue { expr } = self;
-        if expr.as_str() == "True" {
-            format!("Use `True` instead of `... or True`")
-        } else {
-            format!("Use truthy `{expr}` instead of `... or {expr}`")
-        }
+        let message = Replacement::from(self).message();
+        format!("{message}")
     }
 
     fn autofix_title(&self) -> String {
-        let ExprOrTrue { expr } = self;
-        if expr.as_str() == "True" {
-            format!("Replace with `True`")
-        } else {
-            format!("Replace with truthy `{expr}`")
-        }
+        Replacement::from(self).autofix_title()
     }
 }
 
 /// ## What it does
 /// Checks if `and` expressions with falsey value can be simplified.
-/// 
+///
 /// ## Why is this bad?
 /// The code is less readable and more difficult to understand.
 /// The code is also less efficient, as multiple expressions are evaluated
 /// instead of just one.
-/// 
+///
 /// ## Example
 /// ```python
 /// if x and False:
 ///     pass
 /// ```
-/// 
+///
 /// Use instead:
 /// ```python
 /// if False:
@@ -195,26 +257,19 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
 #[violation]
 pub struct ExprAndFalse {
     pub expr: String,
+    pub remove_before: bool,
+    pub remove_after: bool,
 }
 
 impl AlwaysAutofixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ExprAndFalse { expr } = self;
-        if expr.as_str() == "False" {
-            format!("Use `False` instead of `... and False`")
-        } else {
-            format!("Use falsey `{expr}` instead of `... and {expr}`")
-        }
+        let message = Replacement::from(self).message();
+        format!("{message}")
     }
 
     fn autofix_title(&self) -> String {
-        let ExprAndFalse { expr } = self;
-        if expr.as_str() == "False" {
-            format!("Replace with `False`")
-        } else {
-            format!("Replace with falsey `{expr}`")
-        }
+        Replacement::from(self).autofix_title()
     }
 }
 
@@ -584,7 +639,9 @@ pub fn is_short_circuit(
 
     let mut location = expr.location;
     let mut edit = None;
-    for (value, next_value) in values.iter().tuple_windows() {
+    let mut remove_before = false;
+    let mut remove_after = false;
+    for (index, (value, next_value)) in values.iter().tuple_windows().enumerate() {
         // Keep track of the location of the furthest-right, truthy or falsey expression
         let value_truthiness = Truthiness::from_expr(value, |id| checker.ctx.is_builtin(id));
         let next_value_truthiness =
@@ -604,6 +661,8 @@ pub fn is_short_circuit(
         // short-circuit expression is the first expression in the list; otherwise, we'll see it
         // as `next_value` before we see it as `value`.
         if value_truthiness == short_circuit_truthiness {
+            remove_before = location != value.location;
+            remove_after = true;
             edit = Some(Edit::replacement(
                 unparse_expr(value, checker.stylist),
                 location,
@@ -615,6 +674,8 @@ pub fn is_short_circuit(
         // If the next expression is a constant, and it matches the short-circuit value, then
         // we can return the location of the expression.
         if next_value_truthiness == short_circuit_truthiness {
+            remove_before = true;
+            remove_after = index != values.len() - 2;
             edit = Some(Edit::replacement(
                 unparse_expr(next_value, checker.stylist),
                 location,
@@ -627,10 +688,14 @@ pub fn is_short_circuit(
         let diagnostic_kind: DiagnosticKind = match op {
             Boolop::And => ExprAndFalse {
                 expr: edit.content().unwrap().to_string(),
+                remove_before,
+                remove_after,
             }
             .into(),
             Boolop::Or => ExprOrTrue {
                 expr: edit.content().unwrap().to_string(),
+                remove_before,
+                remove_after,
             }
             .into(),
         };
