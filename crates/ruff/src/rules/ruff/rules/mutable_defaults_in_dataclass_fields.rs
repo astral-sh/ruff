@@ -152,11 +152,11 @@ fn is_allowed_func(context: &Context, func: &Expr) -> bool {
 }
 
 /// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
-fn is_classvar_annotation(context: &Context, annotation: &Expr) -> bool {
-    if let ExprKind::Subscript { value, .. } = &annotation.node {
-        return context.match_typing_expr(value, "ClassVar");
-    }
-    false
+fn is_class_var_annotation(context: &Context, annotation: &Expr) -> bool {
+    let ExprKind::Subscript { value, .. } = &annotation.node else {
+        return false;
+    };
+    context.match_typing_expr(value, "ClassVar")
 }
 
 /// RUF009
@@ -168,7 +168,7 @@ pub fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &[Stmt])
             ..
         } = &statement.node
         {
-            if is_classvar_annotation(&checker.ctx, annotation) {
+            if is_class_var_annotation(&checker.ctx, annotation) {
                 continue;
             }
             if let ExprKind::Call { func, .. } = &expr.node {
@@ -194,7 +194,7 @@ pub fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
                 value: Some(value),
                 ..
             } => {
-                if !is_classvar_annotation(&checker.ctx, annotation)
+                if !is_class_var_annotation(&checker.ctx, annotation)
                     && !is_immutable_annotation(&checker.ctx, annotation)
                     && is_mutable_expr(value)
                 {
