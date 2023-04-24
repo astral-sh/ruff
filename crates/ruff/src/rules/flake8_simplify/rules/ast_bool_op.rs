@@ -128,75 +128,6 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
     }
 }
 
-struct Replacement {
-    pub boolop: Boolop,
-    pub expr: String,
-    pub remove_before: bool,
-    pub remove_after: bool,
-}
-
-impl From<&ExprOrTrue> for Replacement {
-    fn from(violation: &ExprOrTrue) -> Self {
-        let ExprOrTrue {
-            expr,
-            remove_before,
-            remove_after,
-        } = violation;
-        Self {
-            boolop: Boolop::Or,
-            expr: expr.clone(),
-            remove_before: *remove_before,
-            remove_after: *remove_after,
-        }
-    }
-}
-
-impl From<&ExprAndFalse> for Replacement {
-    fn from(violation: &ExprAndFalse) -> Self {
-        let ExprAndFalse {
-            expr,
-            remove_before,
-            remove_after,
-        } = violation;
-        Self {
-            boolop: Boolop::And,
-            expr: expr.clone(),
-            remove_before: *remove_before,
-            remove_after: *remove_after,
-        }
-    }
-}
-
-impl Replacement {
-    fn message(&self) -> String {
-        let op = match self.boolop {
-            Boolop::Or => "or",
-            Boolop::And => "and",
-        };
-        let replaced = match (self.remove_before, self.remove_after) {
-            (false, false) => panic!("`remove_before` and `remove_after` cannot both be false"),
-            (false, true) => format!("{} {op} ...", self.expr),
-            (true, false) => format!("... {op} {}", self.expr),
-            (true, true) => format!("... {op} {0} {op} ...", self.expr),
-        };
-        match (&self.boolop, self.expr.as_str()) {
-            (Boolop::Or, "True") => format!("Use `True` instead of `{replaced}`"),
-            (Boolop::Or, _) => format!("Use truthy `{}` instead of `{replaced}`", self.expr),
-            (Boolop::And, "False") => format!("Use `False` instead of `{replaced}`"),
-            (Boolop::And, _) => format!("Use falsey `{}` instead of `{replaced}`", self.expr),
-        }
-    }
-
-    fn autofix_title(&self) -> String {
-        match (&self.boolop, self.expr.as_str()) {
-            (Boolop::Or, "True") => format!("Replace with `True`"),
-            (Boolop::Or, _) => format!("Replace with truthy `{}`", self.expr),
-            (Boolop::And, "False") => format!("Replace with `False`"),
-            (Boolop::And, _) => format!("Replace with falsey `{}`", self.expr),
-        }
-    }
-}
-
 /// ## What it does
 /// Checks if `or` expressions with truthy value can be simplified.
 ///
@@ -226,12 +157,31 @@ pub struct ExprOrTrue {
 impl AlwaysAutofixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let message = Replacement::from(self).message();
-        format!("{message}")
+        let ExprOrTrue {
+            expr,
+            remove_before,
+            remove_after,
+        } = self;
+        let replaced = match (remove_before, remove_after) {
+            (false, true) => format!("{expr} or ..."),
+            (true, false) => format!("... or {expr}"),
+            (true, true) => format!("... or {expr} or ..."),
+            (false, false) => panic!("`remove_before` and `remove_after` cannot both be false"),
+        };
+        if matches!(expr.as_str(), "True") {
+            format!("Use `True` instead of `{replaced}`")
+        } else {
+            format!("Use truthy `{expr}` instead of `{replaced}`")
+        }
     }
 
     fn autofix_title(&self) -> String {
-        Replacement::from(self).autofix_title()
+        let ExprOrTrue { expr, .. } = self;
+        if matches!(self.expr.as_str(), "True") {
+            format!("Replace with `True`")
+        } else {
+            format!("Replace with truthy `{expr}`")
+        }
     }
 }
 
@@ -264,12 +214,31 @@ pub struct ExprAndFalse {
 impl AlwaysAutofixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let message = Replacement::from(self).message();
-        format!("{message}")
+        let ExprAndFalse {
+            expr,
+            remove_before,
+            remove_after,
+        } = self;
+        let replaced = match (remove_before, remove_after) {
+            (false, true) => format!(r#"{expr} and ..."#),
+            (true, false) => format!("... and {expr}"),
+            (true, true) => format!("... and {expr} and ..."),
+            (false, false) => panic!("`remove_before` and `remove_after` cannot both be false"),
+        };
+        if matches!(expr.as_str(), "False") {
+            format!("Use `False` instead of `{replaced}`")
+        } else {
+            format!("Use falsey `{expr}` instead of `{replaced}`")
+        }
     }
 
     fn autofix_title(&self) -> String {
-        Replacement::from(self).autofix_title()
+        let ExprAndFalse { expr, .. } = self;
+        if matches!(self.expr.as_str(), "False") {
+            format!("Replace with `False`")
+        } else {
+            format!("Replace with falsey `{expr}`")
+        }
     }
 }
 
