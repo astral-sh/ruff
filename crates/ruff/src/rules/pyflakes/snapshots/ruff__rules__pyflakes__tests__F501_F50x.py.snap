@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PercentFormatInvalidFormat
-    body: "`%`-format string has invalid format string: incomplete format"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 25
-  fix:
-    edits: []
-  parent: ~
+F50x.py:1:1: F501 `%`-format string has invalid format string: incomplete format
+  |
+1 | '%(foo)' % {'foo': 'bar'}  # F501
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ F501
+2 | '%s %(foo)s' % {'foo': 'bar'}  # F506
+3 | '%(foo)s %s' % {'foo': 'bar'}  # F506
+  |
+
 

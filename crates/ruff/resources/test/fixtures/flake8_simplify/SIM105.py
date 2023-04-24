@@ -59,3 +59,15 @@ def bar():
         return foo()
     except ValueError:
         pass
+
+def with_ellipsis():
+    try:
+        foo()
+    except ValueError:
+        ...
+
+def with_ellipsis_and_return():
+    try:
+        return foo()
+    except ValueError:
+        ...

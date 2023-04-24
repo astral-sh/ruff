@@ -1,21 +1,22 @@
+use std::borrow::Cow;
 use std::path::Path;
 
 use itertools::Itertools;
 use log::error;
+use num_traits::Zero;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::{
-    Arguments, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword, KeywordData,
-    Located, Location, MatchCase, Pattern, PatternKind, Stmt, StmtKind,
+    Arguments, Cmpop, Constant, Excepthandler, ExcepthandlerKind, Expr, ExprKind, Keyword,
+    KeywordData, Located, Location, MatchCase, Pattern, PatternKind, Stmt, StmtKind,
 };
-use rustpython_parser::{lexer, Mode, StringKind, Tok};
-use smallvec::{smallvec, SmallVec};
+use rustpython_parser::{lexer, Mode, Tok};
+use smallvec::SmallVec;
 
-use crate::context::Context;
-use crate::scope::{Binding, BindingKind};
+use crate::call_path::CallPath;
 use crate::source_code::{Generator, Indexer, Locator, Stylist};
-use crate::types::{CallPath, Range};
+use crate::types::Range;
 use crate::visitor;
 use crate::visitor::Visitor;
 
@@ -50,65 +51,21 @@ pub fn unparse_constant(constant: &Constant, stylist: &Stylist) -> String {
     generator.generate()
 }
 
-fn collect_call_path_inner<'a>(expr: &'a Expr, parts: &mut CallPath<'a>) -> bool {
-    match &expr.node {
-        ExprKind::Attribute { value, attr, .. } => {
-            if collect_call_path_inner(value, parts) {
-                parts.push(attr);
-                true
-            } else {
-                false
-            }
-        }
-        ExprKind::Name { id, .. } => {
-            parts.push(id);
-            true
-        }
-        _ => false,
-    }
-}
-
-/// Convert an `Expr` to its [`CallPath`] segments (like `["typing", "List"]`).
-pub fn collect_call_path(expr: &Expr) -> CallPath {
-    let mut segments = smallvec![];
-    collect_call_path_inner(expr, &mut segments);
-    segments
-}
-
-/// Convert an `Expr` to its call path (like `List`, or `typing.List`).
-pub fn compose_call_path(expr: &Expr) -> Option<String> {
-    let call_path = collect_call_path(expr);
-    if call_path.is_empty() {
-        None
-    } else {
-        Some(format_call_path(&call_path))
-    }
-}
-
-/// Format a call path for display.
-pub fn format_call_path(call_path: &[&str]) -> String {
-    if call_path
-        .first()
-        .expect("Unable to format empty call path")
-        .is_empty()
-    {
-        call_path[1..].join(".")
-    } else {
-        call_path.join(".")
-    }
-}
-
-/// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
-pub fn contains_call_path(ctx: &Context, expr: &Expr, target: &[&str]) -> bool {
-    any_over_expr(expr, &|expr| {
-        ctx.resolve_call_path(expr)
-            .map_or(false, |call_path| call_path.as_slice() == target)
-    })
+fn is_iterable_initializer<F>(id: &str, is_builtin: F) -> bool
+where
+    F: Fn(&str) -> bool,
+{
+    matches!(id, "list" | "tuple" | "set" | "dict" | "frozenset") && is_builtin(id)
 }
 
 /// Return `true` if the `Expr` contains an expression that appears to include a
 /// side-effect (like a function call).
-pub fn contains_effect(ctx: &Context, expr: &Expr) -> bool {
+///
+/// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
+pub fn contains_effect<F>(expr: &Expr, is_builtin: F) -> bool
+where
+    F: Fn(&str) -> bool,
+{
     any_over_expr(expr, &|expr| {
         // Accept empty initializers.
         if let ExprKind::Call {
@@ -119,13 +76,10 @@ pub fn contains_effect(ctx: &Context, expr: &Expr) -> bool {
         {
             if args.is_empty() && keywords.is_empty() {
                 if let ExprKind::Name { id, .. } = &func.node {
-                    let is_empty_initializer = (id == "set"
-                        || id == "list"
-                        || id == "tuple"
-                        || id == "dict"
-                        || id == "frozenset")
-                        && ctx.is_builtin(id);
-                    return !is_empty_initializer;
+                    if !is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
+                        return true;
+                    }
+                    return false;
                 }
             }
         }
@@ -694,27 +648,41 @@ pub fn has_comments_in(range: Range, locator: &Locator) -> bool {
 }
 
 /// Return `true` if the body uses `locals()`, `globals()`, `vars()`, `eval()`.
-pub fn uses_magic_variable_access(ctx: &Context, body: &[Stmt]) -> bool {
+///
+/// Accepts a closure that determines whether a given name (e.g., `"list"`) is a Python builtin.
+pub fn uses_magic_variable_access<F>(body: &[Stmt], is_builtin: F) -> bool
+where
+    F: Fn(&str) -> bool,
+{
     any_over_body(body, &|expr| {
         if let ExprKind::Call { func, .. } = &expr.node {
-            ctx.resolve_call_path(func).map_or(false, |call_path| {
-                call_path.as_slice() == ["", "locals"]
-                    || call_path.as_slice() == ["", "globals"]
-                    || call_path.as_slice() == ["", "vars"]
-                    || call_path.as_slice() == ["", "eval"]
-                    || call_path.as_slice() == ["", "exec"]
-            })
-        } else {
-            false
+            if let ExprKind::Name { id, .. } = &func.node {
+                if matches!(id.as_str(), "locals" | "globals" | "vars" | "exec" | "eval") {
+                    if is_builtin(id.as_str()) {
+                        return true;
+                    }
+                }
+            }
         }
+        false
     })
 }
 
-/// Format the module name for a relative import.
-pub fn format_import_from(level: Option<&usize>, module: Option<&str>) -> String {
+/// Format the module reference name for a relative import.
+///
+/// # Examples
+///
+/// ```rust
+/// # use ruff_python_ast::helpers::format_import_from;
+///
+/// assert_eq!(format_import_from(None, None), "".to_string());
+/// assert_eq!(format_import_from(Some(1), None), ".".to_string());
+/// assert_eq!(format_import_from(Some(1), Some("foo")), ".foo".to_string());
+/// ```
+pub fn format_import_from(level: Option<usize>, module: Option<&str>) -> String {
     let mut module_name = String::with_capacity(16);
     if let Some(level) = level {
-        for _ in 0..*level {
+        for _ in 0..level {
             module_name.push('.');
         }
     }
@@ -725,19 +693,29 @@ pub fn format_import_from(level: Option<&usize>, module: Option<&str>) -> String
 }
 
 /// Format the member reference name for a relative import.
+///
+/// # Examples
+///
+/// ```rust
+/// # use ruff_python_ast::helpers::format_import_from_member;
+///
+/// assert_eq!(format_import_from_member(None, None, "bar"), "bar".to_string());
+/// assert_eq!(format_import_from_member(Some(1), None, "bar"), ".bar".to_string());
+/// assert_eq!(format_import_from_member(Some(1), Some("foo"), "bar"), ".foo.bar".to_string());
+/// ```
 pub fn format_import_from_member(
-    level: Option<&usize>,
+    level: Option<usize>,
     module: Option<&str>,
     member: &str,
 ) -> String {
     let mut full_name = String::with_capacity(
-        level.map_or(0, |level| *level)
+        level.map_or(0, |level| level)
             + module.as_ref().map_or(0, |module| module.len())
             + 1
             + member.len(),
     );
     if let Some(level) = level {
-        for _ in 0..*level {
+        for _ in 0..level {
             full_name.push('.');
         }
     }
@@ -747,15 +725,6 @@ pub fn format_import_from_member(
     }
     full_name.push_str(member);
     full_name
-}
-
-/// Split a target string (like `typing.List`) into (`typing`, `List`).
-pub fn to_call_path(target: &str) -> CallPath {
-    if target.contains('.') {
-        target.split('.').collect()
-    } else {
-        smallvec!["", target]
-    }
 }
 
 /// Create a module path from a (package, path) pair.
@@ -772,7 +741,24 @@ pub fn to_module_path(package: &Path, path: &Path) -> Option<Vec<String>> {
         .collect::<Option<Vec<String>>>()
 }
 
-/// Create a call path from a relative import.
+/// Create a [`CallPath`] from a relative import reference name (like `".foo.bar"`).
+///
+/// Returns an empty [`CallPath`] if the import is invalid (e.g., a relative import that
+/// extends beyond the top-level module).
+///
+/// # Examples
+///
+/// ```rust
+/// # use smallvec::{smallvec, SmallVec};
+/// # use ruff_python_ast::helpers::from_relative_import;
+///
+/// assert_eq!(from_relative_import(&[], "bar"), SmallVec::from_buf(["bar"]));
+/// assert_eq!(from_relative_import(&["foo".to_string()], "bar"), SmallVec::from_buf(["foo", "bar"]));
+/// assert_eq!(from_relative_import(&["foo".to_string()], "bar.baz"), SmallVec::from_buf(["foo", "bar", "baz"]));
+/// assert_eq!(from_relative_import(&["foo".to_string()], ".bar"), SmallVec::from_buf(["bar"]));
+/// assert!(from_relative_import(&["foo".to_string()], "..bar").is_empty());
+/// assert!(from_relative_import(&["foo".to_string()], "...bar").is_empty());
+/// ```
 pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath<'a> {
     let mut call_path: CallPath = SmallVec::with_capacity(module.len() + 1);
 
@@ -781,6 +767,9 @@ pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath
 
     // Remove segments based on the number of dots.
     for _ in 0..name.chars().take_while(|c| *c == '.').count() {
+        if call_path.is_empty() {
+            return SmallVec::new();
+        }
         call_path.pop();
     }
 
@@ -788,6 +777,39 @@ pub fn from_relative_import<'a>(module: &'a [String], name: &'a str) -> CallPath
     call_path.extend(name.trim_start_matches('.').split('.'));
 
     call_path
+}
+
+/// Given an imported module (based on its relative import level and module name), return the
+/// fully-qualified module path.
+pub fn resolve_imported_module_path<'a>(
+    level: Option<usize>,
+    module: Option<&'a str>,
+    module_path: Option<&[String]>,
+) -> Option<Cow<'a, str>> {
+    let Some(level) = level else {
+        return Some(Cow::Borrowed(module.unwrap_or("")));
+    };
+
+    if level == 0 {
+        return Some(Cow::Borrowed(module.unwrap_or("")));
+    }
+
+    let Some(module_path) = module_path else {
+        return None;
+    };
+
+    if level >= module_path.len() {
+        return None;
+    }
+
+    let mut qualified_path = module_path[..module_path.len() - level].join(".");
+    if let Some(module) = module {
+        if !qualified_path.is_empty() {
+            qualified_path.push('.');
+        }
+        qualified_path.push_str(module);
+    }
+    Some(Cow::Owned(qualified_path))
 }
 
 /// A [`Visitor`] that collects all `return` statements in a function or method.
@@ -851,6 +873,38 @@ where
             _ => {}
         }
     }
+}
+
+#[derive(Default)]
+struct GlobalStatementVisitor<'a> {
+    globals: FxHashMap<&'a str, &'a Stmt>,
+}
+
+impl<'a> Visitor<'a> for GlobalStatementVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
+        match &stmt.node {
+            StmtKind::Global { names } => {
+                for name in names {
+                    self.globals.insert(name, stmt);
+                }
+            }
+            StmtKind::FunctionDef { .. }
+            | StmtKind::AsyncFunctionDef { .. }
+            | StmtKind::ClassDef { .. } => {
+                // Don't recurse.
+            }
+            _ => visitor::walk_stmt(self, stmt),
+        }
+    }
+}
+
+/// Extract a map from global name to its last-defining [`Stmt`].
+pub fn extract_globals(body: &[Stmt]) -> FxHashMap<&str, &Stmt> {
+    let mut visitor = GlobalStatementVisitor::default();
+    for stmt in body {
+        visitor.visit_stmt(stmt);
+    }
+    visitor.globals
 }
 
 /// Convert a location within a file (relative to `base`) to an absolute
@@ -922,7 +976,7 @@ pub fn match_trailing_comment<T>(located: &Located<T>, locator: &Locator) -> Opt
 
 /// Return the number of trailing empty lines following a statement.
 pub fn count_trailing_lines(stmt: &Stmt, locator: &Locator) -> usize {
-    let suffix = locator.skip(Location::new(stmt.end_location.unwrap().row() + 1, 0));
+    let suffix = locator.after(Location::new(stmt.end_location.unwrap().row() + 1, 0));
     suffix
         .lines()
         .take_while(|line| line.trim().is_empty())
@@ -931,7 +985,7 @@ pub fn count_trailing_lines(stmt: &Stmt, locator: &Locator) -> usize {
 
 /// Return the range of the first parenthesis pair after a given [`Location`].
 pub fn match_parens(start: Location, locator: &Locator) -> Option<Range> {
-    let contents = locator.skip(start);
+    let contents = locator.after(start);
     let mut fix_start = None;
     let mut fix_end = None;
     let mut count: usize = 0;
@@ -976,21 +1030,6 @@ pub fn identifier_range(stmt: &Stmt, locator: &Locator) -> Range {
         error!("Failed to find identifier for {:?}", stmt);
     }
     Range::from(stmt)
-}
-
-/// Like `identifier_range`, but accepts a `Binding`.
-pub fn binding_range(binding: &Binding, locator: &Locator) -> Range {
-    if matches!(
-        binding.kind,
-        BindingKind::ClassDefinition | BindingKind::FunctionDefinition
-    ) {
-        binding
-            .source
-            .as_ref()
-            .map_or(binding.range, |source| identifier_range(source, locator))
-    } else {
-        binding.range
-    }
 }
 
 /// Return the ranges of [`Tok::Name`] tokens within a specified node.
@@ -1053,43 +1092,6 @@ pub fn except_range(handler: &Excepthandler, locator: &Locator) -> Range {
         })
         .expect("Failed to find `except` range");
     range
-}
-
-/// Find f-strings that don't contain any formatted values in a `JoinedStr`.
-pub fn find_useless_f_strings(expr: &Expr, locator: &Locator) -> Vec<(Range, Range)> {
-    let contents = locator.slice(expr);
-    lexer::lex_located(contents, Mode::Module, expr.location)
-        .flatten()
-        .filter_map(|(location, tok, end_location)| match tok {
-            Tok::String {
-                kind: StringKind::FString | StringKind::RawFString,
-                ..
-            } => {
-                let first_char = locator.slice(Range {
-                    location,
-                    end_location: Location::new(location.row(), location.column() + 1),
-                });
-                // f"..."  => f_position = 0
-                // fr"..." => f_position = 0
-                // rf"..." => f_position = 1
-                let f_position = usize::from(!(first_char == "f" || first_char == "F"));
-                Some((
-                    Range {
-                        location: Location::new(location.row(), location.column() + f_position),
-                        end_location: Location::new(
-                            location.row(),
-                            location.column() + f_position + 1,
-                        ),
-                    },
-                    Range {
-                        location,
-                        end_location,
-                    },
-                ))
-            }
-            _ => None,
-        })
-        .collect()
 }
 
 /// Return the `Range` of `else` in `For`, `AsyncFor`, and `While` statements.
@@ -1258,40 +1260,276 @@ impl<'a> SimpleCallArgs<'a> {
     }
 }
 
-/// Return `true` if the given `Expr` is a potential logging call. Matches
-/// `logging.error`, `logger.error`, `self.logger.error`, etc., but not
-/// arbitrary `foo.error` calls.
-///
-/// It even matches direct `logging.error` calls even if the `logging` module
-/// is aliased. Example:
-/// ```python
-/// import logging as bar
-///
-/// # This is detected to be a logger candidate
-/// bar.error()
-/// ```
-pub fn is_logger_candidate(context: &Context, func: &Expr) -> bool {
-    if let ExprKind::Attribute { value, .. } = &func.node {
-        let call_path = context
-            .resolve_call_path(value)
-            .unwrap_or_else(|| collect_call_path(value));
-        if let Some(tail) = call_path.last() {
-            if tail.starts_with("log") || tail.ends_with("logger") || tail.ends_with("logging") {
+/// Check if a node is parent of a conditional branch.
+pub fn on_conditional_branch<'a>(parents: &mut impl Iterator<Item = &'a Stmt>) -> bool {
+    parents.any(|parent| {
+        if matches!(
+            parent.node,
+            StmtKind::If { .. } | StmtKind::While { .. } | StmtKind::Match { .. }
+        ) {
+            return true;
+        }
+        if let StmtKind::Expr { value } = &parent.node {
+            if matches!(value.node, ExprKind::IfExp { .. }) {
                 return true;
             }
         }
+        false
+    })
+}
+
+/// Check if a node is in a nested block.
+pub fn in_nested_block<'a>(mut parents: impl Iterator<Item = &'a Stmt>) -> bool {
+    parents.any(|parent| {
+        matches!(
+            parent.node,
+            StmtKind::Try { .. }
+                | StmtKind::TryStar { .. }
+                | StmtKind::If { .. }
+                | StmtKind::With { .. }
+                | StmtKind::Match { .. }
+        )
+    })
+}
+
+/// Check if a node represents an unpacking assignment.
+pub fn is_unpacking_assignment(parent: &Stmt, child: &Expr) -> bool {
+    match &parent.node {
+        StmtKind::With { items, .. } => items.iter().any(|item| {
+            if let Some(optional_vars) = &item.optional_vars {
+                if matches!(optional_vars.node, ExprKind::Tuple { .. }) {
+                    if any_over_expr(optional_vars, &|expr| expr == child) {
+                        return true;
+                    }
+                }
+            }
+            false
+        }),
+        StmtKind::Assign { targets, value, .. } => {
+            // In `(a, b) = (1, 2)`, `(1, 2)` is the target, and it is a tuple.
+            let value_is_tuple = matches!(
+                &value.node,
+                ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+            );
+            // In `(a, b) = coords = (1, 2)`, `(a, b)` and `coords` are the targets, and
+            // `(a, b)` is a tuple. (We use "tuple" as a placeholder for any
+            // unpackable expression.)
+            let targets_are_tuples = targets.iter().all(|item| {
+                matches!(
+                    item.node,
+                    ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+                )
+            });
+            // If we're looking at `a` in `(a, b) = coords = (1, 2)`, then we should
+            // identify that the current expression is in a tuple.
+            let child_in_tuple = targets_are_tuples
+                || targets.iter().any(|item| {
+                    matches!(
+                        item.node,
+                        ExprKind::Set { .. } | ExprKind::List { .. } | ExprKind::Tuple { .. }
+                    ) && any_over_expr(item, &|expr| expr == child)
+                });
+
+            // If our child is a tuple, and value is not, it's always an unpacking
+            // expression. Ex) `x, y = tup`
+            if child_in_tuple && !value_is_tuple {
+                return true;
+            }
+
+            // If our child isn't a tuple, but value is, it's never an unpacking expression.
+            // Ex) `coords = (1, 2)`
+            if !child_in_tuple && value_is_tuple {
+                return false;
+            }
+
+            // If our target and the value are both tuples, then it's an unpacking
+            // expression assuming there's at least one non-tuple child.
+            // Ex) Given `(x, y) = coords = 1, 2`, `(x, y)` is considered an unpacking
+            // expression. Ex) Given `(x, y) = (a, b) = 1, 2`, `(x, y)` isn't
+            // considered an unpacking expression.
+            if child_in_tuple && value_is_tuple {
+                return !targets_are_tuples;
+            }
+
+            false
+        }
+        _ => false,
     }
-    false
+}
+
+pub type LocatedCmpop<U = ()> = Located<Cmpop, U>;
+
+/// Extract all [`Cmpop`] operators from a source code snippet, with appropriate
+/// ranges.
+///
+/// `RustPython` doesn't include line and column information on [`Cmpop`] nodes.
+/// `CPython` doesn't either. This method iterates over the token stream and
+/// re-identifies [`Cmpop`] nodes, annotating them with valid ranges.
+pub fn locate_cmpops(contents: &str) -> Vec<LocatedCmpop> {
+    let mut tok_iter = lexer::lex(contents, Mode::Module).flatten().peekable();
+    let mut ops: Vec<LocatedCmpop> = vec![];
+    let mut count: usize = 0;
+    loop {
+        let Some((start, tok, end)) = tok_iter.next() else {
+            break;
+        };
+        if matches!(tok, Tok::Lpar) {
+            count += 1;
+            continue;
+        } else if matches!(tok, Tok::Rpar) {
+            count -= 1;
+            continue;
+        }
+        if count == 0 {
+            match tok {
+                Tok::Not => {
+                    if let Some((_, _, end)) =
+                        tok_iter.next_if(|(_, tok, _)| matches!(tok, Tok::In))
+                    {
+                        ops.push(LocatedCmpop::new(start, end, Cmpop::NotIn));
+                    }
+                }
+                Tok::In => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::In));
+                }
+                Tok::Is => {
+                    let op = if let Some((_, _, end)) =
+                        tok_iter.next_if(|(_, tok, _)| matches!(tok, Tok::Not))
+                    {
+                        LocatedCmpop::new(start, end, Cmpop::IsNot)
+                    } else {
+                        LocatedCmpop::new(start, end, Cmpop::Is)
+                    };
+                    ops.push(op);
+                }
+                Tok::NotEqual => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::NotEq));
+                }
+                Tok::EqEqual => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::Eq));
+                }
+                Tok::GreaterEqual => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::GtE));
+                }
+                Tok::Greater => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::Gt));
+                }
+                Tok::LessEqual => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::LtE));
+                }
+                Tok::Less => {
+                    ops.push(LocatedCmpop::new(start, end, Cmpop::Lt));
+                }
+                _ => {}
+            }
+        }
+    }
+    ops
+}
+
+#[derive(Copy, Clone, Debug, PartialEq, is_macro::Is)]
+pub enum Truthiness {
+    // An expression evaluates to `False`.
+    Falsey,
+    // An expression evaluates to `True`.
+    Truthy,
+    // An expression evaluates to an unknown value (e.g., a variable `x` of unknown type).
+    Unknown,
+}
+
+impl From<Option<bool>> for Truthiness {
+    fn from(value: Option<bool>) -> Self {
+        match value {
+            Some(true) => Truthiness::Truthy,
+            Some(false) => Truthiness::Falsey,
+            None => Truthiness::Unknown,
+        }
+    }
+}
+
+impl From<Truthiness> for Option<bool> {
+    fn from(truthiness: Truthiness) -> Self {
+        match truthiness {
+            Truthiness::Truthy => Some(true),
+            Truthiness::Falsey => Some(false),
+            Truthiness::Unknown => None,
+        }
+    }
+}
+
+impl Truthiness {
+    pub fn from_expr<F>(expr: &Expr, is_builtin: F) -> Self
+    where
+        F: Fn(&str) -> bool,
+    {
+        match &expr.node {
+            ExprKind::Constant { value, .. } => match value {
+                Constant::Bool(value) => Some(*value),
+                Constant::None => Some(false),
+                Constant::Str(string) => Some(!string.is_empty()),
+                Constant::Bytes(bytes) => Some(!bytes.is_empty()),
+                Constant::Int(int) => Some(!int.is_zero()),
+                Constant::Float(float) => Some(*float != 0.0),
+                Constant::Complex { real, imag } => Some(*real != 0.0 || *imag != 0.0),
+                Constant::Ellipsis => Some(true),
+                Constant::Tuple(elts) => Some(!elts.is_empty()),
+            },
+            ExprKind::JoinedStr { values, .. } => {
+                if values.is_empty() {
+                    Some(false)
+                } else if values.iter().any(|value| {
+                    let ExprKind::Constant { value: Constant::Str(string), .. } = &value.node else {
+                        return false;
+                    };
+                    !string.is_empty()
+                }) {
+                    Some(true)
+                } else {
+                    None
+                }
+            }
+            ExprKind::List { elts, .. }
+            | ExprKind::Set { elts, .. }
+            | ExprKind::Tuple { elts, .. } => Some(!elts.is_empty()),
+            ExprKind::Dict { keys, .. } => Some(!keys.is_empty()),
+            ExprKind::Call {
+                func,
+                args,
+                keywords,
+            } => {
+                if let ExprKind::Name { id, .. } = &func.node {
+                    if is_iterable_initializer(id.as_str(), |id| is_builtin(id)) {
+                        if args.is_empty() && keywords.is_empty() {
+                            Some(false)
+                        } else if args.len() == 1 && keywords.is_empty() {
+                            Self::from_expr(&args[0], is_builtin).into()
+                        } else {
+                            None
+                        }
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+        .into()
+    }
 }
 
 #[cfg(test)]
 mod tests {
+    use std::borrow::Cow;
+
     use anyhow::Result;
     use rustpython_parser as parser;
-    use rustpython_parser::ast::Location;
+    use rustpython_parser::ast::{Cmpop, Location};
 
     use crate::helpers::{
-        elif_else_range, else_range, first_colon_range, identifier_range, match_trailing_content,
+        elif_else_range, else_range, first_colon_range, identifier_range, locate_cmpops,
+        match_trailing_content, resolve_imported_module_path, LocatedCmpop,
     };
     use crate::source_code::Locator;
     use crate::types::Range;
@@ -1405,7 +1643,44 @@ class Class():
     }
 
     #[test]
-    fn test_else_range() -> Result<()> {
+    fn resolve_import() {
+        // Return the module directly.
+        assert_eq!(
+            resolve_imported_module_path(None, Some("foo"), None),
+            Some(Cow::Borrowed("foo"))
+        );
+
+        // Construct the module path from the calling module's path.
+        assert_eq!(
+            resolve_imported_module_path(
+                Some(1),
+                Some("foo"),
+                Some(&["bar".to_string(), "baz".to_string()])
+            ),
+            Some(Cow::Owned("bar.foo".to_string()))
+        );
+
+        // We can't return the module if it's a relative import, and we don't know the calling
+        // module's path.
+        assert_eq!(
+            resolve_imported_module_path(Some(1), Some("foo"), None),
+            None
+        );
+
+        // We can't return the module if it's a relative import, and the path goes beyond the
+        // calling module's path.
+        assert_eq!(
+            resolve_imported_module_path(Some(1), Some("foo"), Some(&["bar".to_string()])),
+            None,
+        );
+        assert_eq!(
+            resolve_imported_module_path(Some(2), Some("foo"), Some(&["bar".to_string()])),
+            None
+        );
+    }
+
+    #[test]
+    fn extract_else_range() -> Result<()> {
         let contents = r#"
 for x in y:
     pass
@@ -1425,7 +1700,7 @@ else:
     }
 
     #[test]
-    fn test_first_colon_range() {
+    fn extract_first_colon_range() {
         let contents = "with a: pass";
         let locator = Locator::new(contents);
         let range = first_colon_range(
@@ -1440,7 +1715,7 @@ else:
     }
 
     #[test]
-    fn test_elif_else_range() -> Result<()> {
+    fn extract_elif_else_range() -> Result<()> {
         let contents = "
 if a:
     ...
@@ -1472,5 +1747,71 @@ else:
         assert_eq!(range.end_location.row(), 3);
         assert_eq!(range.end_location.column(), 4);
         Ok(())
+    }
+
+    #[test]
+    fn extract_cmpop_location() {
+        assert_eq!(
+            locate_cmpops("x == 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::Eq
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x != 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::NotEq
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x is 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::Is
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x is not 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 8),
+                Cmpop::IsNot
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x in 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::In
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x not in 1"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 8),
+                Cmpop::NotIn
+            )]
+        );
+
+        assert_eq!(
+            locate_cmpops("x != (1 is not 2)"),
+            vec![LocatedCmpop::new(
+                Location::new(1, 2),
+                Location::new(1, 4),
+                Cmpop::NotEq
+            )]
+        );
     }
 }

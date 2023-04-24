@@ -1,47 +1,34 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BareExcept
-    body: "Do not use bare `except`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 6
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BareExcept
-    body: "Do not use bare `except`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 6
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BareExcept
-    body: "Do not use bare `except`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 0
-  end_location:
-    row: 16
-    column: 6
-  fix:
-    edits: []
-  parent: ~
+E722.py:4:1: E722 Do not use bare `except`
+  |
+4 | try:
+5 |     pass
+6 | except:
+  | ^^^^^^ E722
+7 |     pass
+8 | #: E722
+  |
+
+E722.py:11:1: E722 Do not use bare `except`
+   |
+11 | except Exception:
+12 |     pass
+13 | except:
+   | ^^^^^^ E722
+14 |     pass
+15 | #: E722
+   |
+
+E722.py:16:1: E722 Do not use bare `except`
+   |
+16 | try:
+17 |     pass
+18 | except:
+   | ^^^^^^ E722
+19 |     pass
+20 | #: Okay
+   |
+
 

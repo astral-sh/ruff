@@ -1,26 +1,20 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestUselessYieldFixture
-    body: "No teardown in fixture `error`, use `return` instead of `yield`"
-    suggestion: "Replace `yield` with `return`"
-    fixable: true
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 17
-    column: 18
-  fix:
-    edits:
-      - content: return
-        location:
-          row: 17
-          column: 4
-        end_location:
-          row: 17
-          column: 9
-  parent: ~
+PT022.py:17:5: PT022 [*] No teardown in fixture `error`, use `return` instead of `yield`
+   |
+17 | def error():
+18 |     resource = acquire_resource()
+19 |     yield resource
+   |     ^^^^^^^^^^^^^^ PT022
+   |
+   = help: Replace `yield` with `return`
+
+ℹ Suggested fix
+14 14 | @pytest.fixture()
+15 15 | def error():
+16 16 |     resource = acquire_resource()
+17    |-    yield resource
+   17 |+    return resource
+
 

@@ -1,0 +1,223 @@
+---
+source: crates/ruff/src/rules/flake8_bandit/mod.rs
+---
+S607.py:9:11: S607 Starting a process with a partial executable path
+   |
+ 9 | subprocess.check_output("true")
+10 | subprocess.run("true")
+11 | os.system("true")
+   |           ^^^^^^ S607
+12 | os.popen("true")
+13 | os.popen2("true")
+   |
+
+S607.py:10:10: S607 Starting a process with a partial executable path
+   |
+10 | subprocess.run("true")
+11 | os.system("true")
+12 | os.popen("true")
+   |          ^^^^^^ S607
+13 | os.popen2("true")
+14 | os.popen3("true")
+   |
+
+S607.py:11:11: S607 Starting a process with a partial executable path
+   |
+11 | os.system("true")
+12 | os.popen("true")
+13 | os.popen2("true")
+   |           ^^^^^^ S607
+14 | os.popen3("true")
+15 | os.popen4("true")
+   |
+
+S607.py:12:11: S607 Starting a process with a partial executable path
+   |
+12 | os.popen("true")
+13 | os.popen2("true")
+14 | os.popen3("true")
+   |           ^^^^^^ S607
+15 | os.popen4("true")
+16 | popen2.popen2("true")
+   |
+
+S607.py:13:11: S607 Starting a process with a partial executable path
+   |
+13 | os.popen2("true")
+14 | os.popen3("true")
+15 | os.popen4("true")
+   |           ^^^^^^ S607
+16 | popen2.popen2("true")
+17 | popen2.popen3("true")
+   |
+
+S607.py:21:10: S607 Starting a process with a partial executable path
+   |
+21 | commands.getoutput("true")
+22 | commands.getstatusoutput("true")
+23 | os.execl("true")
+   |          ^^^^^^ S607
+24 | os.execle("true")
+25 | os.execlp("true")
+   |
+
+S607.py:22:11: S607 Starting a process with a partial executable path
+   |
+22 | commands.getstatusoutput("true")
+23 | os.execl("true")
+24 | os.execle("true")
+   |           ^^^^^^ S607
+25 | os.execlp("true")
+26 | os.execlpe("true")
+   |
+
+S607.py:23:11: S607 Starting a process with a partial executable path
+   |
+23 | os.execl("true")
+24 | os.execle("true")
+25 | os.execlp("true")
+   |           ^^^^^^ S607
+26 | os.execlpe("true")
+27 | os.execv("true")
+   |
+
+S607.py:24:12: S607 Starting a process with a partial executable path
+   |
+24 | os.execle("true")
+25 | os.execlp("true")
+26 | os.execlpe("true")
+   |            ^^^^^^ S607
+27 | os.execv("true")
+28 | os.execve("true")
+   |
+
+S607.py:25:10: S607 Starting a process with a partial executable path
+   |
+25 | os.execlp("true")
+26 | os.execlpe("true")
+27 | os.execv("true")
+   |          ^^^^^^ S607
+28 | os.execve("true")
+29 | os.execvp("true")
+   |
+
+S607.py:26:11: S607 Starting a process with a partial executable path
+   |
+26 | os.execlpe("true")
+27 | os.execv("true")
+28 | os.execve("true")
+   |           ^^^^^^ S607
+29 | os.execvp("true")
+30 | os.execvpe("true")
+   |
+
+S607.py:27:11: S607 Starting a process with a partial executable path
+   |
+27 | os.execv("true")
+28 | os.execve("true")
+29 | os.execvp("true")
+   |           ^^^^^^ S607
+30 | os.execvpe("true")
+31 | os.spawnl("true")
+   |
+
+S607.py:28:12: S607 Starting a process with a partial executable path
+   |
+28 | os.execve("true")
+29 | os.execvp("true")
+30 | os.execvpe("true")
+   |            ^^^^^^ S607
+31 | os.spawnl("true")
+32 | os.spawnle("true")
+   |
+
+S607.py:29:11: S607 Starting a process with a partial executable path
+   |
+29 | os.execvp("true")
+30 | os.execvpe("true")
+31 | os.spawnl("true")
+   |           ^^^^^^ S607
+32 | os.spawnle("true")
+33 | os.spawnlp("true")
+   |
+
+S607.py:30:12: S607 Starting a process with a partial executable path
+   |
+30 | os.execvpe("true")
+31 | os.spawnl("true")
+32 | os.spawnle("true")
+   |            ^^^^^^ S607
+33 | os.spawnlp("true")
+34 | os.spawnlpe("true")
+   |
+
+S607.py:31:12: S607 Starting a process with a partial executable path
+   |
+31 | os.spawnl("true")
+32 | os.spawnle("true")
+33 | os.spawnlp("true")
+   |            ^^^^^^ S607
+34 | os.spawnlpe("true")
+35 | os.spawnv("true")
+   |
+
+S607.py:32:13: S607 Starting a process with a partial executable path
+   |
+32 | os.spawnle("true")
+33 | os.spawnlp("true")
+34 | os.spawnlpe("true")
+   |             ^^^^^^ S607
+35 | os.spawnv("true")
+36 | os.spawnve("true")
+   |
+
+S607.py:33:11: S607 Starting a process with a partial executable path
+   |
+33 | os.spawnlp("true")
+34 | os.spawnlpe("true")
+35 | os.spawnv("true")
+   |           ^^^^^^ S607
+36 | os.spawnve("true")
+37 | os.spawnvp("true")
+   |
+
+S607.py:34:12: S607 Starting a process with a partial executable path
+   |
+34 | os.spawnlpe("true")
+35 | os.spawnv("true")
+36 | os.spawnve("true")
+   |            ^^^^^^ S607
+37 | os.spawnvp("true")
+38 | os.spawnvpe("true")
+   |
+
+S607.py:35:12: S607 Starting a process with a partial executable path
+   |
+35 | os.spawnv("true")
+36 | os.spawnve("true")
+37 | os.spawnvp("true")
+   |            ^^^^^^ S607
+38 | os.spawnvpe("true")
+39 | os.startfile("true")
+   |
+
+S607.py:36:13: S607 Starting a process with a partial executable path
+   |
+36 | os.spawnve("true")
+37 | os.spawnvp("true")
+38 | os.spawnvpe("true")
+   |             ^^^^^^ S607
+39 | os.startfile("true")
+   |
+
+S607.py:37:14: S607 Starting a process with a partial executable path
+   |
+37 | os.spawnvp("true")
+38 | os.spawnvpe("true")
+39 | os.startfile("true")
+   |              ^^^^^^ S607
+40 | 
+41 | # Check it does not fail for full paths.
+   |
+
+

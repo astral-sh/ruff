@@ -16,7 +16,7 @@ impl Violation for DeprecatedLogWarn {
     }
 }
 
-/// PGH002 - deprecated use of logging.warn
+/// PGH002
 pub fn deprecated_log_warn(checker: &mut Checker, func: &Expr) {
     if checker
         .ctx

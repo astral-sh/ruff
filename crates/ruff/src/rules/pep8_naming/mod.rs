@@ -8,13 +8,13 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use test_case::test_case;
 
     use crate::registry::Rule;
     use crate::rules::pep8_naming;
-    use crate::settings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::InvalidClassName, Path::new("N801.py"); "N801")]
     #[test_case(Rule::InvalidFunctionName, Path::new("N802.py"); "N802")]
@@ -41,9 +41,10 @@ mod tests {
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/no_module/test.txt"); "N999_8")]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/file-with-dashes.py"); "N999_9")]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__main__.py"); "N999_10")]
-    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/0001_initial.py"); "N999_11")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/invalid_name/0001_initial.py"); "N999_11")]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/__setup__.py"); "N999_12")]
     #[test_case(Rule::InvalidModuleName, Path::new("N999/module/valid_name/file-with-dashes"); "N999_13")]
+    #[test_case(Rule::InvalidModuleName, Path::new("N999/module/invalid_name/import.py"); "N999_14")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
@@ -52,7 +53,7 @@ mod tests {
                 ..settings::Settings::for_rule(rule_code)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -71,7 +72,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::InvalidFirstArgumentNameForMethod)
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

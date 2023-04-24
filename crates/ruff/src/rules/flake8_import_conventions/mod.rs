@@ -6,9 +6,10 @@ pub mod settings;
 mod tests {
     use std::path::Path;
 
+    use crate::assert_messages;
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
-    use rustc_hash::FxHashMap;
+
+    use rustc_hash::{FxHashMap, FxHashSet};
 
     use crate::registry::Rule;
     use crate::settings::Settings;
@@ -20,7 +21,7 @@ mod tests {
             Path::new("flake8_import_conventions/defaults.py"),
             &Settings::for_rule(Rule::UnconventionalImportAlias),
         )?;
-        assert_yaml_snapshot!("defaults", diagnostics);
+        assert_messages!("defaults", diagnostics);
         Ok(())
     }
 
@@ -35,12 +36,70 @@ mod tests {
                         ("dask.array".to_string(), "da".to_string()),
                         ("dask.dataframe".to_string(), "dd".to_string()),
                     ])),
+                    banned_aliases: None,
+                    banned_from: None,
                 }
                 .into(),
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_yaml_snapshot!("custom", diagnostics);
+        assert_messages!("custom", diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn custom_banned() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_import_conventions/custom_banned.py"),
+            &Settings {
+                flake8_import_conventions: super::settings::Options {
+                    aliases: None,
+                    extend_aliases: None,
+                    banned_aliases: Some(FxHashMap::from_iter([
+                        (
+                            "typing".to_string(),
+                            vec!["t".to_string(), "ty".to_string()],
+                        ),
+                        (
+                            "numpy".to_string(),
+                            vec!["nmp".to_string(), "npy".to_string()],
+                        ),
+                        (
+                            "tensorflow.keras.backend".to_string(),
+                            vec!["K".to_string()],
+                        ),
+                        ("torch.nn.functional".to_string(), vec!["F".to_string()]),
+                    ])),
+                    banned_from: None,
+                }
+                .into(),
+                ..Settings::for_rule(Rule::BannedImportAlias)
+            },
+        )?;
+        assert_messages!("custom_banned", diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn custom_banned_from() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_import_conventions/custom_banned_from.py"),
+            &Settings {
+                flake8_import_conventions: super::settings::Options {
+                    aliases: None,
+                    extend_aliases: None,
+                    banned_aliases: None,
+                    banned_from: Some(FxHashSet::from_iter([
+                        "logging.config".to_string(),
+                        "typing".to_string(),
+                        "pandas".to_string(),
+                    ])),
+                }
+                .into(),
+                ..Settings::for_rule(Rule::BannedImportFrom)
+            },
+        )?;
+        assert_messages!("custom_banned_from", diagnostics);
         Ok(())
     }
 
@@ -57,12 +116,14 @@ mod tests {
                         ("seaborn".to_string(), "sns".to_string()),
                     ])),
                     extend_aliases: None,
+                    banned_aliases: None,
+                    banned_from: None,
                 }
                 .into(),
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_yaml_snapshot!("remove_default", diagnostics);
+        assert_messages!("remove_default", diagnostics);
         Ok(())
     }
 
@@ -77,12 +138,14 @@ mod tests {
                         "numpy".to_string(),
                         "nmp".to_string(),
                     )])),
+                    banned_aliases: None,
+                    banned_from: None,
                 }
                 .into(),
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_yaml_snapshot!("override_default", diagnostics);
+        assert_messages!("override_default", diagnostics);
         Ok(())
     }
 
@@ -100,12 +163,14 @@ mod tests {
                             "pstr".to_string(),
                         ),
                     ])),
+                    banned_aliases: None,
+                    banned_from: None,
                 }
                 .into(),
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
             },
         )?;
-        assert_yaml_snapshot!("from_imports", diagnostics);
+        assert_messages!("from_imports", diagnostics);
         Ok(())
     }
 }

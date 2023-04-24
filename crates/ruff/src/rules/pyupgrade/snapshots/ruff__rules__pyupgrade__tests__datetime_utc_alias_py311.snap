@@ -1,68 +1,47 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DatetimeTimezoneUTC
-    body: "Use `datetime.UTC` alias"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 6
-  end_location:
-    row: 7
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DatetimeTimezoneUTC
-    body: "Use `datetime.UTC` alias"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 6
-  end_location:
-    row: 8
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DatetimeTimezoneUTC
-    body: "Use `datetime.UTC` alias"
-    suggestion: "Convert to `datetime.UTC` alias"
-    fixable: true
-  location:
-    row: 10
-    column: 6
-  end_location:
-    row: 10
-    column: 27
-  fix:
-    edits:
-      - content: datetime.UTC
-        location:
-          row: 10
-          column: 6
-        end_location:
-          row: 10
-          column: 27
-  parent: ~
-- kind:
-    name: DatetimeTimezoneUTC
-    body: "Use `datetime.UTC` alias"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 6
-  end_location:
-    row: 11
-    column: 21
-  fix:
-    edits: []
-  parent: ~
+UP017.py:7:7: UP017 Use `datetime.UTC` alias
+  |
+7 | print(datetime.timezone(-1))
+8 | print(timezone.utc)
+  |       ^^^^^^^^^^^^ UP017
+9 | print(tz.utc)
+  |
+
+UP017.py:8:7: UP017 Use `datetime.UTC` alias
+   |
+ 8 | print(datetime.timezone(-1))
+ 9 | print(timezone.utc)
+10 | print(tz.utc)
+   |       ^^^^^^ UP017
+11 | 
+12 | print(datetime.timezone.utc)
+   |
+
+UP017.py:10:7: UP017 [*] Use `datetime.UTC` alias
+   |
+10 | print(tz.utc)
+11 | 
+12 | print(datetime.timezone.utc)
+   |       ^^^^^^^^^^^^^^^^^^^^^ UP017
+13 | print(dt.timezone.utc)
+   |
+   = help: Convert to `datetime.UTC` alias
+
+ℹ Suggested fix
+7  7  | print(timezone.utc)
+8  8  | print(tz.utc)
+9  9  | 
+10    |-print(datetime.timezone.utc)
+   10 |+print(datetime.UTC)
+11 11 | print(dt.timezone.utc)
+
+UP017.py:11:7: UP017 Use `datetime.UTC` alias
+   |
+11 | print(datetime.timezone.utc)
+12 | print(dt.timezone.utc)
+   |       ^^^^^^^^^^^^^^^ UP017
+   |
+
 

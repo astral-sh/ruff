@@ -22,7 +22,7 @@ impl From<&Cmpop> for EqCmpop {
         match cmpop {
             Cmpop::Eq => EqCmpop::Eq,
             Cmpop::NotEq => EqCmpop::NotEq,
-            _ => unreachable!("Expected Cmpop::Eq | Cmpop::NotEq"),
+            _ => panic!("Expected Cmpop::Eq | Cmpop::NotEq"),
         }
     }
 }
@@ -98,13 +98,17 @@ impl AlwaysAutofixableViolation for TrueFalseComparison {
     fn message(&self) -> String {
         let TrueFalseComparison(value, op) = self;
         match (value, op) {
-            (true, EqCmpop::Eq) => format!("Comparison to `True` should be `cond is True`"),
-            (true, EqCmpop::NotEq) => {
-                format!("Comparison to `True` should be `cond is not True`")
+            (true, EqCmpop::Eq) => {
+                format!("Comparison to `True` should be `cond is True` or `if cond:`")
             }
-            (false, EqCmpop::Eq) => format!("Comparison to `False` should be `cond is False`"),
+            (true, EqCmpop::NotEq) => {
+                format!("Comparison to `True` should be `cond is not True` or `if not cond:`")
+            }
+            (false, EqCmpop::Eq) => {
+                format!("Comparison to `False` should be `cond is False` or `if not cond:`")
+            }
             (false, EqCmpop::NotEq) => {
-                format!("Comparison to `False` should be `cond is not False`")
+                format!("Comparison to `False` should be `cond is not False` or `if cond:`")
             }
         }
     }

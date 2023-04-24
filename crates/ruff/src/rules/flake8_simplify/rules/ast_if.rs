@@ -7,11 +7,12 @@ use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{
-    contains_call_path, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
+    any_over_expr, contains_effect, create_expr, create_stmt, first_colon_range, has_comments,
     has_comments_in, unparse_expr, unparse_stmt,
 };
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -253,7 +254,19 @@ pub fn nested_if_statements(
         return;
     }
 
+    // Allow `if __name__ == "__main__":` statements.
     if is_main_check(test) {
+        return;
+    }
+
+    // Allow `if True:` and `if False:` statements.
+    if matches!(
+        test.node,
+        ExprKind::Constant {
+            value: Constant::Bool(..),
+            ..
+        }
+    ) {
         return;
     }
 
@@ -286,7 +299,8 @@ pub fn nested_if_statements(
         match fix_if::fix_nested_if_statements(checker.locator, checker.stylist, stmt) {
             Ok(fix) => {
                 if fix
-                    .content
+                    .content()
+                    .unwrap_or_default()
                     .universal_newlines()
                     .all(|line| line.width() <= checker.settings.line_length)
                 {
@@ -400,6 +414,14 @@ fn ternary(target_var: &Expr, body_value: &Expr, test: &Expr, orelse_value: &Exp
             orelse: Box::new(orelse_value.clone()),
         })),
         type_comment: None,
+    })
+}
+
+/// Return `true` if the `Expr` contains a reference to `${module}.${target}`.
+fn contains_call_path(ctx: &Context, expr: &Expr, target: &[&str]) -> bool {
+    any_over_expr(expr, &|expr| {
+        ctx.resolve_call_path(expr)
+            .map_or(false, |call_path| call_path.as_slice() == target)
     })
 }
 
@@ -627,10 +649,9 @@ pub fn manual_dict_lookup(
     let StmtKind::Return { value, .. } = &body[0].node else {
         return;
     };
-    if value
-        .as_ref()
-        .map_or(false, |value| contains_effect(&checker.ctx, value))
-    {
+    if value.as_ref().map_or(false, |value| {
+        contains_effect(value, |id| checker.ctx.is_builtin(id))
+    }) {
         return;
     }
 
@@ -700,10 +721,9 @@ pub fn manual_dict_lookup(
         let StmtKind::Return { value, .. } = &body[0].node else {
             return;
         };
-        if value
-            .as_ref()
-            .map_or(false, |value| contains_effect(&checker.ctx, value))
-        {
+        if value.as_ref().map_or(false, |value| {
+            contains_effect(value, |id| checker.ctx.is_builtin(id))
+        }) {
             return;
         };
 
@@ -745,13 +765,13 @@ pub fn use_dict_get_with_default(
     if body.len() != 1 || orelse.len() != 1 {
         return;
     }
-    let StmtKind::Assign { targets: body_var, value: body_val, ..} = &body[0].node else {
+    let StmtKind::Assign { targets: body_var, value: body_value, ..} = &body[0].node else {
         return;
     };
     if body_var.len() != 1 {
         return;
     };
-    let StmtKind::Assign { targets: orelse_var, value: orelse_val, .. } = &orelse[0].node else {
+    let StmtKind::Assign { targets: orelse_var, value: orelse_value, .. } = &orelse[0].node else {
         return;
     };
     if orelse_var.len() != 1 {
@@ -763,15 +783,15 @@ pub fn use_dict_get_with_default(
     if test_dict.len() != 1 {
         return;
     }
-    let (expected_var, expected_val, default_var, default_val) = match ops[..] {
-        [Cmpop::In] => (&body_var[0], body_val, &orelse_var[0], orelse_val),
-        [Cmpop::NotIn] => (&orelse_var[0], orelse_val, &body_var[0], body_val),
+    let (expected_var, expected_value, default_var, default_value) = match ops[..] {
+        [Cmpop::In] => (&body_var[0], body_value, &orelse_var[0], orelse_value),
+        [Cmpop::NotIn] => (&orelse_var[0], orelse_value, &body_var[0], body_value),
         _ => {
             return;
         }
     };
     let test_dict = &test_dict[0];
-    let ExprKind::Subscript { value: expected_subscript, slice: expected_slice, .. }  =  &expected_val.node else {
+    let ExprKind::Subscript { value: expected_subscript, slice: expected_slice, .. }  =  &expected_value.node else {
         return;
     };
 
@@ -785,7 +805,7 @@ pub fn use_dict_get_with_default(
     }
 
     // Check that the default value is not "complex".
-    if contains_effect(&checker.ctx, default_val) {
+    if contains_effect(default_value, |id| checker.ctx.is_builtin(id)) {
         return;
     }
 
@@ -830,7 +850,7 @@ pub fn use_dict_get_with_default(
                 })),
                 args: vec![
                     create_expr(test_key.node.clone()),
-                    create_expr(default_val.node.clone()),
+                    create_expr(default_value.node.clone()),
                 ],
                 keywords: vec![],
             })),

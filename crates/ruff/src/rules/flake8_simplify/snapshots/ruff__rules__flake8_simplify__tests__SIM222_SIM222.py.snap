@@ -1,131 +1,119 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ExprOrTrue
-    body: "Use `True` instead of `... or True`"
-    suggestion: "Replace with `True`"
-    fixable: true
-  location:
-    row: 1
-    column: 3
-  end_location:
-    row: 1
-    column: 12
-  fix:
-    edits:
-      - content: "True"
-        location:
-          row: 1
-          column: 3
-        end_location:
-          row: 1
-          column: 12
-  parent: ~
-- kind:
-    name: ExprOrTrue
-    body: "Use `True` instead of `... or True`"
-    suggestion: "Replace with `True`"
-    fixable: true
-  location:
-    row: 4
-    column: 3
-  end_location:
-    row: 4
-    column: 19
-  fix:
-    edits:
-      - content: "True"
-        location:
-          row: 4
-          column: 3
-        end_location:
-          row: 4
-          column: 19
-  parent: ~
-- kind:
-    name: ExprOrTrue
-    body: "Use `True` instead of `... or True`"
-    suggestion: "Replace with `True`"
-    fixable: true
-  location:
-    row: 7
-    column: 9
-  end_location:
-    row: 7
-    column: 18
-  fix:
-    edits:
-      - content: "True"
-        location:
-          row: 7
-          column: 9
-        end_location:
-          row: 7
-          column: 18
-  parent: ~
-- kind:
-    name: ExprOrTrue
-    body: "Use `True` instead of `... or True`"
-    suggestion: "Replace with `True`"
-    fixable: true
-  location:
-    row: 24
-    column: 15
-  end_location:
-    row: 24
-    column: 31
-  fix:
-    edits:
-      - content: "True"
-        location:
-          row: 24
-          column: 15
-        end_location:
-          row: 24
-          column: 31
-  parent: ~
-- kind:
-    name: ExprOrTrue
-    body: "Use `True` instead of `... or True`"
-    suggestion: "Replace with `True`"
-    fixable: true
-  location:
-    row: 27
-    column: 3
-  end_location:
-    row: 27
-    column: 31
-  fix:
-    edits:
-      - content: "True"
-        location:
-          row: 27
-          column: 3
-        end_location:
-          row: 27
-          column: 31
-  parent: ~
-- kind:
-    name: ExprOrTrue
-    body: "Use `True` instead of `... or True`"
-    suggestion: "Replace with `True`"
-    fixable: true
-  location:
-    row: 30
-    column: 3
-  end_location:
-    row: 30
-    column: 31
-  fix:
-    edits:
-      - content: "True"
-        location:
-          row: 30
-          column: 3
-        end_location:
-          row: 30
-          column: 31
-  parent: ~
+SIM222.py:1:4: SIM222 [*] Use `True` instead of `... or True`
+  |
+1 | if a or True:  # SIM222
+  |    ^^^^^^^^^ SIM222
+2 |     pass
+  |
+  = help: Replace with `True`
+
+ℹ Suggested fix
+1   |-if a or True:  # SIM222
+  1 |+if True:  # SIM222
+2 2 |     pass
+3 3 | 
+4 4 | if (a or b) or True:  # SIM222
+
+SIM222.py:4:4: SIM222 [*] Use `True` instead of `... or True`
+  |
+4 |     pass
+5 | 
+6 | if (a or b) or True:  # SIM222
+  |    ^^^^^^^^^^^^^^^^ SIM222
+7 |     pass
+  |
+  = help: Replace with `True`
+
+ℹ Suggested fix
+1 1 | if a or True:  # SIM222
+2 2 |     pass
+3 3 | 
+4   |-if (a or b) or True:  # SIM222
+  4 |+if True:  # SIM222
+5 5 |     pass
+6 6 | 
+7 7 | if a or (b or True):  # SIM222
+
+SIM222.py:7:10: SIM222 [*] Use `True` instead of `... or True`
+   |
+ 7 |     pass
+ 8 | 
+ 9 | if a or (b or True):  # SIM222
+   |          ^^^^^^^^^ SIM222
+10 |     pass
+   |
+   = help: Replace with `True`
+
+ℹ Suggested fix
+4 4 | if (a or b) or True:  # SIM222
+5 5 |     pass
+6 6 | 
+7   |-if a or (b or True):  # SIM222
+  7 |+if a or (True):  # SIM222
+8 8 |     pass
+9 9 | 
+10 10 | if a and True:  # OK
+
+SIM222.py:24:16: SIM222 [*] Use `True` instead of `... or True`
+   |
+24 |     pass
+25 | 
+26 | if a or f() or True or g() or b:  # SIM222
+   |                ^^^^^^^^^^^^^^^^ SIM222
+27 |     pass
+   |
+   = help: Replace with `True`
+
+ℹ Suggested fix
+21 21 | if a or f() or b or g() or True:  # OK
+22 22 |     pass
+23 23 | 
+24    |-if a or f() or True or g() or b:  # SIM222
+   24 |+if a or f() or True:  # SIM222
+25 25 |     pass
+26 26 | 
+27 27 | if True or f() or a or g() or b:  # SIM222
+
+SIM222.py:27:4: SIM222 [*] Use `True` instead of `... or True`
+   |
+27 |     pass
+28 | 
+29 | if True or f() or a or g() or b:  # SIM222
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM222
+30 |     pass
+   |
+   = help: Replace with `True`
+
+ℹ Suggested fix
+24 24 | if a or f() or True or g() or b:  # SIM222
+25 25 |     pass
+26 26 | 
+27    |-if True or f() or a or g() or b:  # SIM222
+   27 |+if True:  # SIM222
+28 28 |     pass
+29 29 | 
+30 30 | if a or True or f() or b or g():  # SIM222
+
+SIM222.py:30:4: SIM222 [*] Use `True` instead of `... or True`
+   |
+30 |     pass
+31 | 
+32 | if a or True or f() or b or g():  # SIM222
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ SIM222
+33 |     pass
+   |
+   = help: Replace with `True`
+
+ℹ Suggested fix
+27 27 | if True or f() or a or g() or b:  # SIM222
+28 28 |     pass
+29 29 | 
+30    |-if a or True or f() or b or g():  # SIM222
+   30 |+if True:  # SIM222
+31 31 |     pass
+32 32 | 
+33 33 | 
+
 

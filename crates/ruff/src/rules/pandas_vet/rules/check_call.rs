@@ -3,8 +3,8 @@ use rustpython_parser::ast::{Expr, ExprKind};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::scope::{BindingKind, Importation};
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::binding::{BindingKind, Importation};
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -99,7 +99,6 @@ pub fn check_call(checker: &mut Checker, func: &Expr) {
                         | BindingKind::FunctionDefinition
                         | BindingKind::Export(..)
                         | BindingKind::FutureImportation
-                        | BindingKind::StarImportation(..)
                         | BindingKind::Importation(..)
                         | BindingKind::FromImportation(..)
                         | BindingKind::SubmoduleImportation(..)

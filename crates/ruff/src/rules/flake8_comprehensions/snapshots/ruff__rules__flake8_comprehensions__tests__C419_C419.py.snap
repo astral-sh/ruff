@@ -1,0 +1,91 @@
+---
+source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
+---
+C419.py:1:5: C419 [*] Unnecessary list comprehension.
+  |
+1 | any([x.id for x in bar])
+  |     ^^^^^^^^^^^^^^^^^^^ C419
+2 | all([x.id for x in bar])
+3 | any(  # first comment
+  |
+  = help: Remove unnecessary list comprehension
+
+ℹ Suggested fix
+1   |-any([x.id for x in bar])
+  1 |+any(x.id for x in bar)
+2 2 | all([x.id for x in bar])
+3 3 | any(  # first comment
+4 4 |     [x.id for x in bar],  # second comment
+
+C419.py:2:5: C419 [*] Unnecessary list comprehension.
+  |
+2 | any([x.id for x in bar])
+3 | all([x.id for x in bar])
+  |     ^^^^^^^^^^^^^^^^^^^ C419
+4 | any(  # first comment
+5 |     [x.id for x in bar],  # second comment
+  |
+  = help: Remove unnecessary list comprehension
+
+ℹ Suggested fix
+1 1 | any([x.id for x in bar])
+2   |-all([x.id for x in bar])
+  2 |+all(x.id for x in bar)
+3 3 | any(  # first comment
+4 4 |     [x.id for x in bar],  # second comment
+5 5 | )  # third comment
+
+C419.py:4:5: C419 [*] Unnecessary list comprehension.
+  |
+4 | all([x.id for x in bar])
+5 | any(  # first comment
+6 |     [x.id for x in bar],  # second comment
+  |     ^^^^^^^^^^^^^^^^^^^ C419
+7 | )  # third comment
+8 | all(  # first comment
+  |
+  = help: Remove unnecessary list comprehension
+
+ℹ Suggested fix
+1 1 | any([x.id for x in bar])
+2 2 | all([x.id for x in bar])
+3 3 | any(  # first comment
+4   |-    [x.id for x in bar],  # second comment
+  4 |+    x.id for x in bar  # second comment
+5 5 | )  # third comment
+6 6 | all(  # first comment
+7 7 |     [x.id for x in bar],  # second comment
+
+C419.py:7:5: C419 [*] Unnecessary list comprehension.
+   |
+ 7 | )  # third comment
+ 8 | all(  # first comment
+ 9 |     [x.id for x in bar],  # second comment
+   |     ^^^^^^^^^^^^^^^^^^^ C419
+10 | )  # third comment
+11 | any({x.id for x in bar})
+   |
+   = help: Remove unnecessary list comprehension
+
+ℹ Suggested fix
+4 4 |     [x.id for x in bar],  # second comment
+5 5 | )  # third comment
+6 6 | all(  # first comment
+7   |-    [x.id for x in bar],  # second comment
+  7 |+    x.id for x in bar  # second comment
+8 8 | )  # third comment
+9 9 | any({x.id for x in bar})
+10 10 | 
+
+C419.py:9:5: C419 [*] Unnecessary list comprehension.
+   |
+ 9 |     [x.id for x in bar],  # second comment
+10 | )  # third comment
+11 | any({x.id for x in bar})
+   |     ^^^^^^^^^^^^^^^^^^^ C419
+12 | 
+13 | # OK
+   |
+   = help: Remove unnecessary list comprehension
+
+

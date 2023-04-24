@@ -1,26 +1,89 @@
 ---
 source: crates/ruff/src/rules/isort/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnsortedImports
-    body: Import block is un-sorted or un-formatted
-    suggestion: Organize imports
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 34
-    column: 0
-  fix:
-    edits:
-      - content: "import B  # Comment 4\n\n# Comment 3a\n# Comment 3b\nimport C\nimport D\n\n# Comment 5\n# Comment 6\nfrom A import (\n    a,  # Comment 7  # Comment 9\n    b,  # Comment 10\n    c,  # Comment 8  # Comment 11\n)\nfrom D import (\n    a_long_name_to_force_multiple_lines,  # Comment 12\n    another_long_name_to_force_multiple_lines,  # Comment 13\n)\nfrom E import a  # Comment 1\nfrom F import (\n    a,  # Comment 1\n    b,\n)\n"
-        location:
-          row: 3
-          column: 0
-        end_location:
-          row: 34
-          column: 0
-  parent: ~
+comments.py:3:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+ 3 |   # Comment 1
+ 4 |   # Comment 2
+ 5 | / import D
+ 6 | | 
+ 7 | | # Comment 3a
+ 8 | | import C
+ 9 | | 
+10 | | # Comment 3b
+11 | | import C
+12 | | 
+13 | | import B  # Comment 4
+14 | | 
+15 | | # Comment 5
+16 | | 
+17 | | # Comment 6
+18 | | from A import (
+19 | |     a,  # Comment 7
+20 | |     b,
+21 | |     c,  # Comment 8
+22 | | )
+23 | | from A import (
+24 | |     a,  # Comment 9
+25 | |     b,  # Comment 10
+26 | |     c,  # Comment 11
+27 | | )
+28 | | 
+29 | | from D import a_long_name_to_force_multiple_lines # Comment 12
+30 | | from D import another_long_name_to_force_multiple_lines # Comment 13
+31 | | 
+32 | | from E import a  # Comment 1
+33 | | 
+34 | | from F import a  # Comment 1
+35 | | from F import b
+   |
+   = help: Organize imports
+
+ℹ Suggested fix
+1  1  | # Comment 1
+2  2  | # Comment 2
+3     |-import D
+   3  |+import B  # Comment 4
+4  4  | 
+5  5  | # Comment 3a
+6     |-import C
+7     |-
+8  6  | # Comment 3b
+9  7  | import C
+10    |-
+11    |-import B  # Comment 4
+   8  |+import D
+12 9  | 
+13 10 | # Comment 5
+14    |-
+15 11 | # Comment 6
+16 12 | from A import (
+17    |-    a,  # Comment 7
+18    |-    b,
+19    |-    c,  # Comment 8
+   13 |+    a,  # Comment 7  # Comment 9
+   14 |+    b,  # Comment 10
+   15 |+    c,  # Comment 8  # Comment 11
+20 16 | )
+21    |-from A import (
+22    |-    a,  # Comment 9
+23    |-    b,  # Comment 10
+24    |-    c,  # Comment 11
+   17 |+from D import (
+   18 |+    a_long_name_to_force_multiple_lines,  # Comment 12
+   19 |+    another_long_name_to_force_multiple_lines,  # Comment 13
+25 20 | )
+26    |-
+27    |-from D import a_long_name_to_force_multiple_lines # Comment 12
+28    |-from D import another_long_name_to_force_multiple_lines # Comment 13
+29    |-
+30 21 | from E import a  # Comment 1
+31    |-
+32    |-from F import a  # Comment 1
+33    |-from F import b
+   22 |+from F import (
+   23 |+    a,  # Comment 1
+   24 |+    b,
+   25 |+)
+
 

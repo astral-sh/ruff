@@ -5,6 +5,9 @@ pub use unnecessary_collection_call::{unnecessary_collection_call, UnnecessaryCo
 pub use unnecessary_comprehension::{
     unnecessary_dict_comprehension, unnecessary_list_set_comprehension, UnnecessaryComprehension,
 };
+pub use unnecessary_comprehension_any_all::{
+    unnecessary_comprehension_any_all, UnnecessaryComprehensionAnyAll,
+};
 pub use unnecessary_double_cast_or_process::{
     unnecessary_double_cast_or_process, UnnecessaryDoubleCastOrProcess,
 };
@@ -20,6 +23,9 @@ pub use unnecessary_list_comprehension_set::{
 };
 pub use unnecessary_literal_dict::{unnecessary_literal_dict, UnnecessaryLiteralDict};
 pub use unnecessary_literal_set::{unnecessary_literal_set, UnnecessaryLiteralSet};
+pub use unnecessary_literal_within_dict_call::{
+    unnecessary_literal_within_dict_call, UnnecessaryLiteralWithinDictCall,
+};
 pub use unnecessary_literal_within_list_call::{
     unnecessary_literal_within_list_call, UnnecessaryLiteralWithinListCall,
 };
@@ -35,6 +41,7 @@ mod helpers;
 mod unnecessary_call_around_sorted;
 mod unnecessary_collection_call;
 mod unnecessary_comprehension;
+mod unnecessary_comprehension_any_all;
 mod unnecessary_double_cast_or_process;
 mod unnecessary_generator_dict;
 mod unnecessary_generator_list;
@@ -44,6 +51,7 @@ mod unnecessary_list_comprehension_dict;
 mod unnecessary_list_comprehension_set;
 mod unnecessary_literal_dict;
 mod unnecessary_literal_set;
+mod unnecessary_literal_within_dict_call;
 mod unnecessary_literal_within_list_call;
 mod unnecessary_literal_within_tuple_call;
 mod unnecessary_map;

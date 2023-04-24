@@ -1,68 +1,59 @@
 ---
 source: crates/ruff/src/rules/ruff/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: AmbiguousUnicodeCharacterString
-    body: "String contains ambiguous unicode character `𝐁` (did you mean `B`?)"
-    suggestion: "Replace `𝐁` with `B`"
-    fixable: true
-  location:
-    row: 1
-    column: 5
-  end_location:
-    row: 1
-    column: 6
-  fix:
-    edits:
-      - content: B
-        location:
-          row: 1
-          column: 5
-        end_location:
-          row: 1
-          column: 6
-  parent: ~
-- kind:
-    name: AmbiguousUnicodeCharacterDocstring
-    body: "Docstring contains ambiguous unicode character `）` (did you mean `)`?)"
-    suggestion: "Replace `）` with `)`"
-    fixable: true
-  location:
-    row: 6
-    column: 55
-  end_location:
-    row: 6
-    column: 56
-  fix:
-    edits:
-      - content: )
-        location:
-          row: 6
-          column: 55
-        end_location:
-          row: 6
-          column: 56
-  parent: ~
-- kind:
-    name: AmbiguousUnicodeCharacterComment
-    body: "Comment contains ambiguous unicode character `᜵` (did you mean `/`?)"
-    suggestion: "Replace `᜵` with `/`"
-    fixable: true
-  location:
-    row: 7
-    column: 61
-  end_location:
-    row: 7
-    column: 62
-  fix:
-    edits:
-      - content: /
-        location:
-          row: 7
-          column: 61
-        end_location:
-          row: 7
-          column: 62
-  parent: ~
+confusables.py:1:6: RUF001 [*] String contains ambiguous unicode character `𝐁` (did you mean `B`?)
+  |
+1 | x = "𝐁ad string"
+  |      ^ RUF001
+2 | y = "−"
+  |
+  = help: Replace `𝐁` with `B`
+
+ℹ Suggested fix
+1   |-x = "𝐁ad string"
+  1 |+x = "Bad string"
+2 2 | y = "−"
+3 3 | 
+4 4 | 
+
+confusables.py:6:56: RUF002 [*] Docstring contains ambiguous unicode character `）` (did you mean `)`?)
+  |
+6 | def f():
+7 |     """Here's a docstring with an unusual parenthesis: ）"""
+  |                                                        ^^ RUF002
+8 |     # And here's a comment with an unusual punctuation mark: ᜵
+9 |     ...
+  |
+  = help: Replace `）` with `)`
+
+ℹ Suggested fix
+3 3 | 
+4 4 | 
+5 5 | def f():
+6   |-    """Here's a docstring with an unusual parenthesis: ）"""
+  6 |+    """Here's a docstring with an unusual parenthesis: )"""
+7 7 |     # And here's a comment with an unusual punctuation mark: ᜵
+8 8 |     ...
+9 9 | 
+
+confusables.py:7:62: RUF003 [*] Comment contains ambiguous unicode character `᜵` (did you mean `/`?)
+   |
+ 7 | def f():
+ 8 |     """Here's a docstring with an unusual parenthesis: ）"""
+ 9 |     # And here's a comment with an unusual punctuation mark: ᜵
+   |                                                              ^ RUF003
+10 |     ...
+   |
+   = help: Replace `᜵` with `/`
+
+ℹ Suggested fix
+4 4 | 
+5 5 | def f():
+6 6 |     """Here's a docstring with an unusual parenthesis: ）"""
+7   |-    # And here's a comment with an unusual punctuation mark: ᜵
+  7 |+    # And here's a comment with an unusual punctuation mark: /
+8 8 |     ...
+9 9 | 
+10 10 | 
+
 

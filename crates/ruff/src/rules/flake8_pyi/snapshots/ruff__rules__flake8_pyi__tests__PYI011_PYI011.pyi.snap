@@ -1,383 +1,457 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 10
-    column: 13
-  end_location:
-    row: 10
-    column: 23
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 10
-          column: 13
-        end_location:
-          row: 10
-          column: 23
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 38
-    column: 8
-  end_location:
-    row: 41
-    column: 5
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 38
-          column: 8
-        end_location:
-          row: 41
-          column: 5
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 46
-    column: 8
-  end_location:
-    row: 58
-    column: 5
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 46
-          column: 8
-        end_location:
-          row: 58
-          column: 5
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 63
-    column: 8
-  end_location:
-    row: 66
-    column: 5
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 63
-          column: 8
-        end_location:
-          row: 66
-          column: 5
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 71
-    column: 8
-  end_location:
-    row: 73
-    column: 5
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 71
-          column: 8
-        end_location:
-          row: 73
-          column: 5
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 78
-    column: 8
-  end_location:
-    row: 80
-    column: 5
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 78
-          column: 8
-        end_location:
-          row: 80
-          column: 5
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 85
-    column: 8
-  end_location:
-    row: 87
-    column: 5
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 85
-          column: 8
-        end_location:
-          row: 87
-          column: 5
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 90
-    column: 13
-  end_location:
-    row: 91
-    column: 11
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 90
-          column: 13
-        end_location:
-          row: 91
-          column: 11
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 94
-    column: 13
-  end_location:
-    row: 95
-    column: 12
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 94
-          column: 13
-        end_location:
-          row: 95
-          column: 12
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 98
-    column: 16
-  end_location:
-    row: 99
-    column: 7
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 98
-          column: 16
-        end_location:
-          row: 99
-          column: 7
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 102
-    column: 13
-  end_location:
-    row: 103
-    column: 7
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 102
-          column: 13
-        end_location:
-          row: 103
-          column: 7
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 106
-    column: 17
-  end_location:
-    row: 107
-    column: 8
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 106
-          column: 17
-        end_location:
-          row: 107
-          column: 8
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 110
-    column: 17
-  end_location:
-    row: 111
-    column: 10
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 110
-          column: 17
-        end_location:
-          row: 111
-          column: 10
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 138
-    column: 15
-  end_location:
-    row: 138
-    column: 18
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 138
-          column: 15
-        end_location:
-          row: 138
-          column: 18
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 141
-    column: 15
-  end_location:
-    row: 141
-    column: 21
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 141
-          column: 15
-        end_location:
-          row: 141
-          column: 21
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 147
-    column: 15
-  end_location:
-    row: 147
-    column: 24
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 147
-          column: 15
-        end_location:
-          row: 147
-          column: 24
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 150
-    column: 17
-  end_location:
-    row: 151
-    column: 8
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 150
-          column: 17
-        end_location:
-          row: 151
-          column: 8
-  parent: ~
-- kind:
-    name: TypedArgumentDefaultInStub
-    body: Only simple default values allowed for typed arguments
-    suggestion: "Replace default value with `...`"
-    fixable: true
-  location:
-    row: 159
-    column: 13
-  end_location:
-    row: 160
-    column: 8
-  fix:
-    edits:
-      - content: "..."
-        location:
-          row: 159
-          column: 13
-        end_location:
-          row: 160
-          column: 8
-  parent: ~
+PYI011.pyi:10:14: PYI011 [*] Only simple default values allowed for typed arguments
+   |
+10 | def f12(
+11 |     x,
+12 |     y: str = os.pathsep,  # Error PYI011 Only simple default values allowed for typed arguments
+   |              ^^^^^^^^^^ PYI011
+13 | ) -> None: ...
+14 | def f11(*, x: str = "x") -> None: ...  # OK
+   |
+   = help: Replace default value with `...`
+
+ℹ Suggested fix
+7  7  | 
+8  8  | def f12(
+9  9  |     x,
+10    |-    y: str = os.pathsep,  # Error PYI011 Only simple default values allowed for typed arguments
+   10 |+    y: str = ...,  # Error PYI011 Only simple default values allowed for typed arguments
+11 11 | ) -> None: ...
+12 12 | def f11(*, x: str = "x") -> None: ...  # OK
+13 13 | def f13(
+
+PYI011.pyi:38:9: PYI011 [*] Only simple default values allowed for typed arguments
+   |
+38 |       x: dict[
+39 |           int, int
+40 |       ] = {  # Error PYI011 Only simple default values allowed for typed arguments
+   |  _________^
+41 | |         1: 2,
+42 | |         **{3: 4},
+43 | |     }
+   | |_____^ PYI011
+44 |   ) -> None: ...
+45 |   def f153(
+   |
+   = help: Replace default value with `...`
+
+ℹ Suggested fix
+35 35 | def f152(
+36 36 |     x: dict[
+37 37 |         int, int
+38    |-    ] = {  # Error PYI011 Only simple default values allowed for typed arguments
+39    |-        1: 2,
+40    |-        **{3: 4},
+41    |-    }
+   38 |+    ] = ...
+42 39 | ) -> None: ...
+43 40 | def f153(
+44 41 |     x: list[
+
+PYI011.pyi:46:9: PYI011 [*] Only simple default values allowed for typed arguments
+   |
+46 |       x: list[
+47 |           int
+48 |       ] = [  # Error PYI011 Only simple default values allowed for typed arguments
+   |  _________^
+49 | |         1,
+50 | |         2,
+51 | |         3,
+52 | |         4,
+53 | |         5,
+54 | |         6,
+55 | |         7,
+56 | |         8,
+57 | |         9,
+58 | |         10,
+59 | |         11,
+60 | |     ]
+   | |_____^ PYI011
+61 |   ) -> None: ...
+62 |   def f154(
+   |
+   = help: Replace default value with `...`
+
+ℹ Suggested fix
+43 43 | def f153(
+44 44 |     x: list[
+45 45 |         int
+46    |-    ] = [  # Error PYI011 Only simple default values allowed for typed arguments
+47    |-        1,
+48    |-        2,
+49    |-        3,
+50    |-        4,
+51    |-        5,
+52    |-        6,
+53    |-        7,
+54    |-        8,
+55    |-        9,
+56    |-        10,
+57    |-        11,
+58    |-    ]
+   46 |+    ] = ...
+59 47 | ) -> None: ...
+60 48 | def f154(
+61 49 |     x: tuple[
+
+PYI011.pyi:63:9: PYI011 [*] Only simple default values allowed for typed arguments
+   |
+63 |       x: tuple[
+64 |           str, tuple[str, ...]
+65 |       ] = (  # Error PYI011 Only simple default values allowed for typed arguments
+   |  _________^
+66 | |         "foo",
+67 | |         ("bar", "baz"),
+68 | |     )
+   | |_____^ PYI011
+69 |   ) -> None: ...
+70 |   def f141(
+   |
+   = help: Replace default value with `...`
+
+ℹ Suggested fix
+60 60 | def f154(
+61 61 |     x: tuple[
+62 62 |         str, tuple[str, ...]
+63    |-    ] = (  # Error PYI011 Only simple default values allowed for typed arguments
+64    |-        "foo",
+65    |-        ("bar", "baz"),
+66    |-    )
+   63 |+    ] = ...
+67 64 | ) -> None: ...
+68 65 | def f141(
+69 66 |     x: list[
+
+PYI011.pyi:71:9: PYI011 [*] Only simple default values allowed for typed arguments
+   |
+71 |       x: list[
+72 |           int
+73 |       ] = [  # Error PYI011 Only simple default values allowed for typed arguments
+   |  _________^
+74 | |         *range(10)
+75 | |     ],
+   | |_____^ PYI011
+76 |   ) -> None: ...
+77 |   def f142(
+   |
+   = help: Replace default value with `...`
+
+ℹ Suggested fix
+68 68 | def f141(
+69 69 |     x: list[
+70 70 |         int
+71    |-    ] = [  # Error PYI011 Only simple default values allowed for typed arguments
+72    |-        *range(10)
+73    |-    ],
+   71 |+    ] = ...,
+74 72 | ) -> None: ...
+75 73 | def f142(
+76 74 |     x: list[
+
+PYI011.pyi:78:9: PYI011 [*] Only simple default values allowed for typed arguments
+   |
+78 |       x: list[
+79 |           int
+80 |       ] = list(  # Error PYI011 Only simple default values allowed for typed arguments
+   |  _________^
+81 | |         range(10)
+82 | |     ),
+   | |_____^ PYI011
+83 |   ) -> None: ...
+84 |   def f16(
+   |
+   = help: Replace default value with `...`
+
+ℹ Suggested fix
+75 75 | def f142(
+76 76 |     x: list[
+77 77 |         int
+78    |-    ] = list(  # Error PYI011 Only simple default values allowed for typed arguments
+79    |-        range(10)
+80    |-    ),
+   78 |+    ] = ...,
+81 79 | ) -> None: ...
+82 80 | def f16(
+83 81 |     x: frozenset[
+
+PYI011.pyi:85:9: PYI011 [*] Only simple default values allowed for typed arguments
+   |
+85 |       x: frozenset[
+86 |           bytes
+87 |       ] = frozenset(  # Error PYI011 Only simple default values allowed for typed arguments
+   |  _________^
+88 | |         {b"foo", b"bar", b"baz"}
+89 | |     )
+   | |_____^ PYI011
+90 |   ) -> None: ...
+91 |   def f17(
+   |
+   = help: Replace default value with `...`
+
+ℹ Suggested fix
+82 82 | def f16(
+83 83 |     x: frozenset[
+84 84 |         bytes
+85    |-    ] = frozenset(  # Error PYI011 Only simple default values allowed for typed arguments
+86    |-        {b"foo", b"bar", b"baz"}
+87    |-    )
+   85 |+    ] = ...
+88 86 | ) -> None: ...
+89 87 | def f17(
+90 88 |     x: str = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
+
+PYI011.pyi:90:14: PYI011 [*] Only simple default values allowed for typed arguments
+   |
+90 |   ) -> None: ...
+91 |   def f17(
+92 |       x: str = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
+   |  ______________^
+93 | |     + "bar",
+   | |___________^ PYI011
+94 |   ) -> None: ...
+95 |   def f18(
+   |
+   = help: Replace default value with `...`
+
+ℹ Suggested fix
+87 87 |     )
+88 88 | ) -> None: ...
+89 89 | def f17(
+90    |-    x: str = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
+91    |-    + "bar",
+   90 |+    x: str = ...,
+92 91 | ) -> None: ...
+93 92 | def f18(
+94 93 |     x: str = b"foo"  # Error PYI011 Only simple default values allowed for typed arguments
+
+PYI011.pyi:94:14: PYI011 [*] Only simple default values allowed for typed arguments
+   |
+94 |   ) -> None: ...
+95 |   def f18(
+96 |       x: str = b"foo"  # Error PYI011 Only simple default values allowed for typed arguments
+   |  ______________^
+97 | |     + b"bar",
+   | |____________^ PYI011
+98 |   ) -> None: ...
+99 |   def f19(
+   |
+   = help: Replace default value with `...`
+
+ℹ Suggested fix
+91 91 |     + "bar",
+92 92 | ) -> None: ...
+93 93 | def f18(
+94    |-    x: str = b"foo"  # Error PYI011 Only simple default values allowed for typed arguments
+95    |-    + b"bar",
+   94 |+    x: str = ...,
+96 95 | ) -> None: ...
+97 96 | def f19(
+98 97 |     x: object = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
+
+PYI011.pyi:98:17: PYI011 [*] Only simple default values allowed for typed arguments
+    |
+ 98 |   ) -> None: ...
+ 99 |   def f19(
+100 |       x: object = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
+    |  _________________^
+101 | |     + 4,
+    | |_______^ PYI011
+102 |   ) -> None: ...
+103 |   def f20(
+    |
+    = help: Replace default value with `...`
+
+ℹ Suggested fix
+95  95  |     + b"bar",
+96  96  | ) -> None: ...
+97  97  | def f19(
+98      |-    x: object = "foo"  # Error PYI011 Only simple default values allowed for typed arguments
+99      |-    + 4,
+    98  |+    x: object = ...,
+100 99  | ) -> None: ...
+101 100 | def f20(
+102 101 |     x: int = 5
+
+PYI011.pyi:102:14: PYI011 [*] Only simple default values allowed for typed arguments
+    |
+102 |   ) -> None: ...
+103 |   def f20(
+104 |       x: int = 5
+    |  ______________^
+105 | |     + 5,  # Error PYI011 Only simple default values allowed for typed arguments
+    | |_______^ PYI011
+106 |   ) -> None: ...
+107 |   def f21(
+    |
+    = help: Replace default value with `...`
+
+ℹ Suggested fix
+99  99  |     + 4,
+100 100 | ) -> None: ...
+101 101 | def f20(
+102     |-    x: int = 5
+103     |-    + 5,  # Error PYI011 Only simple default values allowed for typed arguments
+    102 |+    x: int = ...,  # Error PYI011 Only simple default values allowed for typed arguments
+104 103 | ) -> None: ...
+105 104 | def f21(
+106 105 |     x: complex = 3j
+
+PYI011.pyi:106:18: PYI011 [*] Only simple default values allowed for typed arguments
+    |
+106 |   ) -> None: ...
+107 |   def f21(
+108 |       x: complex = 3j
+    |  __________________^
+109 | |     - 3j,  # Error PYI011 Only simple default values allowed for typed arguments
+    | |________^ PYI011
+110 |   ) -> None: ...
+111 |   def f22(
+    |
+    = help: Replace default value with `...`
+
+ℹ Suggested fix
+103 103 |     + 5,  # Error PYI011 Only simple default values allowed for typed arguments
+104 104 | ) -> None: ...
+105 105 | def f21(
+106     |-    x: complex = 3j
+107     |-    - 3j,  # Error PYI011 Only simple default values allowed for typed arguments
+    106 |+    x: complex = ...,  # Error PYI011 Only simple default values allowed for typed arguments
+108 107 | ) -> None: ...
+109 108 | def f22(
+110 109 |     x: complex = -42.5j  # Error PYI011 Only simple default values allowed for typed arguments
+
+PYI011.pyi:110:18: PYI011 [*] Only simple default values allowed for typed arguments
+    |
+110 |   ) -> None: ...
+111 |   def f22(
+112 |       x: complex = -42.5j  # Error PYI011 Only simple default values allowed for typed arguments
+    |  __________________^
+113 | |     + 4.3j,
+    | |__________^ PYI011
+114 |   ) -> None: ...
+115 |   def f23(
+    |
+    = help: Replace default value with `...`
+
+ℹ Suggested fix
+107 107 |     - 3j,  # Error PYI011 Only simple default values allowed for typed arguments
+108 108 | ) -> None: ...
+109 109 | def f22(
+110     |-    x: complex = -42.5j  # Error PYI011 Only simple default values allowed for typed arguments
+111     |-    + 4.3j,
+    110 |+    x: complex = ...,
+112 111 | ) -> None: ...
+113 112 | def f23(
+114 113 |     x: bool = True,  # OK
+
+PYI011.pyi:138:16: PYI011 [*] Only simple default values allowed for typed arguments
+    |
+138 | ) -> None: ...
+139 | def f31(
+140 |     x: float = inf,  # Error PYI011 Only simple default values allowed for typed arguments
+    |                ^^^ PYI011
+141 | ) -> None: ...
+142 | def f32(
+    |
+    = help: Replace default value with `...`
+
+ℹ Suggested fix
+135 135 |     x: float = -math.inf,  # OK
+136 136 | ) -> None: ...
+137 137 | def f31(
+138     |-    x: float = inf,  # Error PYI011 Only simple default values allowed for typed arguments
+    138 |+    x: float = ...,  # Error PYI011 Only simple default values allowed for typed arguments
+139 139 | ) -> None: ...
+140 140 | def f32(
+141 141 |     x: float = np.inf,  # Error PYI011 Only simple default values allowed for typed arguments
+
+PYI011.pyi:141:16: PYI011 [*] Only simple default values allowed for typed arguments
+    |
+141 | ) -> None: ...
+142 | def f32(
+143 |     x: float = np.inf,  # Error PYI011 Only simple default values allowed for typed arguments
+    |                ^^^^^^ PYI011
+144 | ) -> None: ...
+145 | def f33(
+    |
+    = help: Replace default value with `...`
+
+ℹ Suggested fix
+138 138 |     x: float = inf,  # Error PYI011 Only simple default values allowed for typed arguments
+139 139 | ) -> None: ...
+140 140 | def f32(
+141     |-    x: float = np.inf,  # Error PYI011 Only simple default values allowed for typed arguments
+    141 |+    x: float = ...,  # Error PYI011 Only simple default values allowed for typed arguments
+142 142 | ) -> None: ...
+143 143 | def f33(
+144 144 |     x: float = math.nan,  # OK
+
+PYI011.pyi:147:16: PYI011 [*] Only simple default values allowed for typed arguments
+    |
+147 | ) -> None: ...
+148 | def f34(
+149 |     x: float = -math.nan,  # Error PYI011 Only simple default values allowed for typed arguments
+    |                ^^^^^^^^^ PYI011
+150 | ) -> None: ...
+151 | def f35(
+    |
+    = help: Replace default value with `...`
+
+ℹ Suggested fix
+144 144 |     x: float = math.nan,  # OK
+145 145 | ) -> None: ...
+146 146 | def f34(
+147     |-    x: float = -math.nan,  # Error PYI011 Only simple default values allowed for typed arguments
+    147 |+    x: float = ...,  # Error PYI011 Only simple default values allowed for typed arguments
+148 148 | ) -> None: ...
+149 149 | def f35(
+150 150 |     x: complex = math.inf  # Error PYI011 Only simple default values allowed for typed arguments
+
+PYI011.pyi:150:18: PYI011 [*] Only simple default values allowed for typed arguments
+    |
+150 |   ) -> None: ...
+151 |   def f35(
+152 |       x: complex = math.inf  # Error PYI011 Only simple default values allowed for typed arguments
+    |  __________________^
+153 | |     + 1j,
+    | |________^ PYI011
+154 |   ) -> None: ...
+155 |   def f36(
+    |
+    = help: Replace default value with `...`
+
+ℹ Suggested fix
+147 147 |     x: float = -math.nan,  # Error PYI011 Only simple default values allowed for typed arguments
+148 148 | ) -> None: ...
+149 149 | def f35(
+150     |-    x: complex = math.inf  # Error PYI011 Only simple default values allowed for typed arguments
+151     |-    + 1j,
+    150 |+    x: complex = ...,
+152 151 | ) -> None: ...
+153 152 | def f36(
+154 153 |     *,
+
+PYI011.pyi:159:14: PYI011 [*] Only simple default values allowed for typed arguments
+    |
+159 |   def f37(
+160 |       *,
+161 |       x: str = ""  # Error PYI011 Only simple default values allowed for typed arguments
+    |  ______________^
+162 | |     + "",
+    | |________^ PYI011
+163 |   ) -> None: ...
+    |
+    = help: Replace default value with `...`
+
+ℹ Suggested fix
+156 156 | ) -> None: ...
+157 157 | def f37(
+158 158 |     *,
+159     |-    x: str = ""  # Error PYI011 Only simple default values allowed for typed arguments
+160     |-    + "",
+    159 |+    x: str = ...,
+161 160 | ) -> None: ...
+
 

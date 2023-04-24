@@ -7,11 +7,10 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
 
     use crate::registry::Rule;
-    use crate::settings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test]
     fn defaults() -> Result<()> {
@@ -23,7 +22,7 @@ mod tests {
                 Rule::DotFormatInException,
             ]),
         )?;
-        assert_yaml_snapshot!("defaults", diagnostics);
+        assert_messages!("defaults", diagnostics);
         Ok(())
     }
 
@@ -42,7 +41,7 @@ mod tests {
                 ])
             },
         )?;
-        assert_yaml_snapshot!("custom", diagnostics);
+        assert_messages!("custom", diagnostics);
         Ok(())
     }
 }

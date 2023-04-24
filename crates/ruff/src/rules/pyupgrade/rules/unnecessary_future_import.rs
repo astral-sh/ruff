@@ -92,7 +92,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
             .iter()
             .map(|alias| format!("__future__.{}", alias.node.name))
             .collect();
-        match autofix::helpers::remove_unused_imports(
+        match autofix::actions::remove_unused_imports(
             unused_imports.iter().map(String::as_str),
             defined_by.into(),
             defined_in.map(Into::into),
@@ -102,7 +102,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
             checker.stylist,
         ) {
             Ok(fix) => {
-                if fix.content.is_empty() || fix.content == "pass" {
+                if fix.is_deletion() || fix.content() == Some("pass") {
                     checker.deletions.insert(*defined_by);
                 }
                 diagnostic.set_fix(fix);

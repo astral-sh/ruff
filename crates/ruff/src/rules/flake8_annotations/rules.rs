@@ -4,10 +4,10 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::ReturnStatementVisitor;
 use ruff_python_ast::types::Range;
-use ruff_python_ast::visibility::Visibility;
-use ruff_python_ast::visibility::{self};
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{cast, helpers};
+use ruff_python_semantic::analyze::visibility;
+use ruff_python_semantic::analyze::visibility::Visibility;
 use ruff_python_stdlib::typing::SIMPLE_MAGIC_RETURN_TYPES;
 
 use crate::checkers::ast::Checker;

@@ -1,33 +1,21 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PassStatementStubBody
-    body: "Empty body should contain `...`, not `pass`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: PassStatementStubBody
-    body: "Empty body should contain `...`, not `pass`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 4
-  end_location:
-    row: 8
-    column: 8
-  fix:
-    edits: []
-  parent: ~
+PYI009.pyi:3:5: PYI009 Empty body should contain `...`, not `pass`
+  |
+3 | def bar(): ...  # OK
+4 | def foo():
+5 |     pass  # ERROR PYI009, since we're in a stub file
+  |     ^^^^ PYI009
+6 | 
+7 | class Bar: ...  # OK
+  |
+
+PYI009.pyi:8:5: PYI009 Empty body should contain `...`, not `pass`
+  |
+8 | class Foo:
+9 |     pass  # ERROR PYI009, since we're in a stub file
+  |     ^^^^ PYI009
+  |
+
 

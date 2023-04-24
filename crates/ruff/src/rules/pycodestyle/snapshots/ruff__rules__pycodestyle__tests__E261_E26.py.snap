@@ -1,19 +1,13 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: TooFewSpacesBeforeInlineComment
-    body: Insert at least two spaces before an inline comment
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 5
-  fix:
-    edits: []
-  parent: ~
+E26.py:2:5: E261 Insert at least two spaces before an inline comment
+  |
+2 | #: E261:1:5
+3 | pass # an inline comment
+  |     ^ E261
+4 | #: E262:1:12
+5 | x = x + 1  #Increment x
+  |
+
 

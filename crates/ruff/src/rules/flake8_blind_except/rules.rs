@@ -2,9 +2,9 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers;
 use ruff_python_ast::helpers::{find_keyword, is_const_true};
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::analyze::logging;
 
 use crate::checkers::ast::Checker;
 
@@ -59,7 +59,7 @@ pub fn blind_except(
             if body.iter().any(|stmt| {
                 if let StmtKind::Expr { value } = &stmt.node {
                     if let ExprKind::Call { func, keywords, .. } = &value.node {
-                        if helpers::is_logger_candidate(&checker.ctx, func) {
+                        if logging::is_logger_candidate(&checker.ctx, func) {
                             if let ExprKind::Attribute { attr, .. } = &func.node {
                                 if attr == "exception" {
                                     return true;

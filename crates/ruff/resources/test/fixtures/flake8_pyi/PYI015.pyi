@@ -1,6 +1,6 @@
 import builtins
 import typing
-from typing import TypeAlias, Final
+from typing import TypeAlias, Final, NewType, TypeVar, TypeVarTuple, ParamSpec
 
 # We shouldn't emit Y015 for simple default values
 field1: int
@@ -26,6 +26,10 @@ field9 = None  # Y026 Use typing_extensions.TypeAlias for type aliases, e.g. "fi
 Field95: TypeAlias = None
 Field96: TypeAlias = int | None
 Field97: TypeAlias = None | typing.SupportsInt | builtins.str | float | bool
+Field98 = NewType('MyInt', int)
+Field99 = TypeVar('Field99')
+Field100 = TypeVarTuple('Field100')
+Field101 = ParamSpec('Field101')
 field19 = [1, 2, 3]  # Y052 Need type annotation for "field19"
 field191: list[int] = [1, 2, 3]
 field20 = (1, 2, 3)  # Y052 Need type annotation for "field20"
@@ -49,3 +53,48 @@ field229: dict[int, int] = {1: 2, **{3: 4}}  # Y015 Only simple default values a
 field23 = "foo" + "bar"  # Y015 Only simple default values are allowed for assignments
 field24 = b"foo" + b"bar"  # Y015 Only simple default values are allowed for assignments
 field25 = 5 * 5  # Y015 Only simple default values are allowed for assignments
+
+# We shouldn't emit Y015 within functions
+def f():
+  field26: list[int] = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]
+
+
+# We shouldn't emit Y015 for __slots__ or __match_args__
+class Class1:
+  __slots__ = (
+    '_one',
+    '_two',
+    '_three',
+    '_four',
+    '_five',
+    '_six',
+    '_seven',
+    '_eight',
+    '_nine',
+    '_ten',
+    '_eleven',
+  )
+
+  __match_args__ = (
+    'one',
+    'two',
+    'three',
+    'four',
+    'five',
+    'six',
+    'seven',
+    'eight',
+    'nine',
+    'ten',
+    'eleven',
+  )
+
+# We shouldn't emit Y015 for __all__
+__all__ = ["Class1"]
+
+# Ignore the following for PYI015
+field26 = typing.Sequence[int]
+field27 = list[str]
+field28 = builtins.str
+field29 = str
+field30 = str | bytes | None

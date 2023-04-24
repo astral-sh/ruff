@@ -3,6 +3,7 @@ use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator, Unar
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -10,7 +11,6 @@ use crate::registry::AsRule;
 #[violation]
 pub struct TypedArgumentDefaultInStub;
 
-/// PYI011
 impl AlwaysAutofixableViolation for TypedArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -25,7 +25,6 @@ impl AlwaysAutofixableViolation for TypedArgumentDefaultInStub {
 #[violation]
 pub struct ArgumentDefaultInStub;
 
-/// PYI014
 impl AlwaysAutofixableViolation for ArgumentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -40,7 +39,6 @@ impl AlwaysAutofixableViolation for ArgumentDefaultInStub {
 #[violation]
 pub struct AssignmentDefaultInStub;
 
-/// PYI015
 impl AlwaysAutofixableViolation for AssignmentDefaultInStub {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -221,6 +219,71 @@ fn is_valid_default_value_with_annotation(
     false
 }
 
+/// Returns `true` if an [`Expr`] appears to be a valid PEP 604 union. (e.g. `int | None`)
+fn is_valid_pep_604_union(annotation: &Expr) -> bool {
+    match &annotation.node {
+        ExprKind::BinOp {
+            left,
+            op: Operator::BitOr,
+            right,
+        } => is_valid_pep_604_union(left) && is_valid_pep_604_union(right),
+        ExprKind::Name { .. }
+        | ExprKind::Subscript { .. }
+        | ExprKind::Attribute { .. }
+        | ExprKind::Constant {
+            value: Constant::None,
+            ..
+        } => true,
+        _ => false,
+    }
+}
+
+/// Returns `true` if an [`Expr`] appears to be a valid default value without an annotation.
+fn is_valid_default_value_without_annotation(default: &Expr) -> bool {
+    matches!(
+        &default.node,
+        ExprKind::Call { .. }
+            | ExprKind::Name { .. }
+            | ExprKind::Attribute { .. }
+            | ExprKind::Subscript { .. }
+            | ExprKind::Constant {
+                value: Constant::Ellipsis | Constant::None,
+                ..
+            }
+    ) || is_valid_pep_604_union(default)
+}
+
+/// Returns `true` if an [`Expr`] appears to be `TypeVar`, `TypeVarTuple`, `NewType`, or `ParamSpec`
+/// call.
+fn is_type_var_like_call(context: &Context, expr: &Expr) -> bool {
+    let ExprKind::Call { func, .. } = &expr.node else {
+        return false;
+    };
+    context.resolve_call_path(func).map_or(false, |call_path| {
+        matches!(
+            call_path.as_slice(),
+            [
+                "typing" | "typing_extensions",
+                "TypeVar" | "TypeVarTuple" | "NewType" | "ParamSpec"
+            ]
+        )
+    })
+}
+
+/// Returns `true` if this is a "special" assignment which must have a value (e.g., an assignment to
+/// `__all__`).
+fn is_special_assignment(context: &Context, target: &Expr) -> bool {
+    if let ExprKind::Name { id, .. } = &target.node {
+        match id.as_str() {
+            "__all__" => context.scope().kind.is_module(),
+            "__match_args__" | "__slots__" => context.scope().kind.is_class(),
+            _ => false,
+        }
+    } else {
+        false
+    }
+}
+
 /// PYI011
 pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
     if !args.defaults.is_empty() {
@@ -336,23 +399,58 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
 }
 
 /// PYI015
-pub fn assignment_default_in_stub(checker: &mut Checker, value: &Expr, annotation: Option<&Expr>) {
-    if annotation.map_or(false, |annotation| {
-        checker.ctx.match_typing_expr(annotation, "TypeAlias")
-    }) {
+pub fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value: &Expr) {
+    if targets.len() == 1 && is_special_assignment(&checker.ctx, &targets[0]) {
         return;
     }
-    if !is_valid_default_value_with_annotation(value, checker, true) {
-        let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, Range::from(value));
-
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
-                "...".to_string(),
-                value.location,
-                value.end_location.unwrap(),
-            ));
-        }
-
-        checker.diagnostics.push(diagnostic);
+    if is_type_var_like_call(&checker.ctx, value) {
+        return;
     }
+    if is_valid_default_value_without_annotation(value) {
+        return;
+    }
+    if is_valid_default_value_with_annotation(value, checker, true) {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, Range::from(value));
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.set_fix(Edit::replacement(
+            "...".to_string(),
+            value.location,
+            value.end_location.unwrap(),
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
+}
+
+/// PYI015
+pub fn annotated_assignment_default_in_stub(
+    checker: &mut Checker,
+    target: &Expr,
+    value: &Expr,
+    annotation: &Expr,
+) {
+    if checker.ctx.match_typing_expr(annotation, "TypeAlias") {
+        return;
+    }
+    if is_special_assignment(&checker.ctx, target) {
+        return;
+    }
+    if is_type_var_like_call(&checker.ctx, value) {
+        return;
+    }
+    if is_valid_default_value_with_annotation(value, checker, true) {
+        return;
+    }
+
+    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, Range::from(value));
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.set_fix(Edit::replacement(
+            "...".to_string(),
+            value.location,
+            value.end_location.unwrap(),
+        ));
+    }
+    checker.diagnostics.push(diagnostic);
 }

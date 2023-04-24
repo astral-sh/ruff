@@ -1,89 +1,59 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: LineTooLong
-    body: Line too long (123 > 88 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 88
-  end_location:
-    row: 5
-    column: 123
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: LineTooLong
-    body: Line too long (95 > 88 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 88
-  end_location:
-    row: 16
-    column: 88
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: LineTooLong
-    body: Line too long (127 > 88 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 25
-    column: 88
-  end_location:
-    row: 25
-    column: 127
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: LineTooLong
-    body: Line too long (132 > 88 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 88
-  end_location:
-    row: 40
-    column: 132
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: LineTooLong
-    body: Line too long (105 > 88 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 88
-  end_location:
-    row: 43
-    column: 105
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: LineTooLong
-    body: Line too long (147 > 88 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 83
-    column: 88
-  end_location:
-    row: 83
-    column: 147
-  fix:
-    edits: []
-  parent: ~
+E501.py:5:89: E501 Line too long (123 > 88 characters)
+  |
+5 |     https://github.com/PyCQA/pycodestyle/pull/258/files#diff-841c622497a8033d10152bfdfb15b20b92437ecdea21a260944ea86b77b51533
+6 | 
+7 | Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+  |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+8 | """
+  |
+
+E501.py:16:85: E501 Line too long (95 > 88 characters)
+   |
+16 | _ = "---------------------------------------------------------------------------AAAAAAA"
+17 | _ = "---------------------------------------------------------------------------亜亜亜亜亜亜亜"
+   |                                                                                         ^^^^^^^ E501
+   |
+
+E501.py:25:89: E501 Line too long (127 > 88 characters)
+   |
+25 | caller(
+26 |     """
+27 |     Lorem ipsum dolor sit amet, consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+28 |     """,
+29 | )
+   |
+
+E501.py:40:89: E501 Line too long (132 > 88 characters)
+   |
+40 |     "Lorem ipsum dolor": "sit amet",
+41 |     # E501 Line too long
+42 |     "Lorem ipsum dolor": "sit amet consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.",
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+43 |     # E501 Line too long
+44 |     "Lorem ipsum dolor": """
+   |
+
+E501.py:43:89: E501 Line too long (105 > 88 characters)
+   |
+43 |     # E501 Line too long
+44 |     "Lorem ipsum dolor": """
+45 | sit amet  consectetur adipiscing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.
+   |                                                                                         ^^^^^^^^^^^^^^^^^ E501
+46 | """,
+47 |     # OK
+   |
+
+E501.py:83:89: E501 Line too long (147 > 88 characters)
+   |
+83 | class Bar:
+84 |     """
+85 |     This is a long sentence that ends with a shortened URL and, therefore, could easily be broken across multiple lines ([source](https://ruff.rs))
+   |                                                                                         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ E501
+86 |     """
+   |
+
 

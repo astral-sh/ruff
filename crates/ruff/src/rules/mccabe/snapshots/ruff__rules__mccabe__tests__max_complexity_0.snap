@@ -1,313 +1,200 @@
 ---
 source: crates/ruff/src/rules/mccabe/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ComplexStructure
-    body: "`trivial` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`expr_as_statement` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 4
-  end_location:
-    row: 7
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`sequential` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 4
-  end_location:
-    row: 12
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`if_elif_else_dead_path` is too complex (3 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 4
-  end_location:
-    row: 19
-    column: 26
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`nested_ifs` is too complex (3 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 4
-  end_location:
-    row: 29
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`for_loop` is too complex (2 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 40
-    column: 4
-  end_location:
-    row: 40
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`for_else` is too complex (2 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 46
-    column: 4
-  end_location:
-    row: 46
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`recursive` is too complex (2 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 4
-  end_location:
-    row: 54
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`nested_functions` is too complex (3 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 62
-    column: 4
-  end_location:
-    row: 62
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`a` is too complex (2 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 63
-    column: 8
-  end_location:
-    row: 63
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`b` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 64
-    column: 12
-  end_location:
-    row: 64
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`try_else` is too complex (4 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 73
-    column: 4
-  end_location:
-    row: 73
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`nested_try_finally` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 85
-    column: 4
-  end_location:
-    row: 85
-    column: 22
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`foobar` is too complex (3 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 96
-    column: 10
-  end_location:
-    row: 96
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`annotated_assign` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 107
-    column: 4
-  end_location:
-    row: 107
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`handle` is too complex (9 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 113
-    column: 8
-  end_location:
-    row: 113
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`a` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 118
-    column: 16
-  end_location:
-    row: 118
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`b` is too complex (2 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 121
-    column: 16
-  end_location:
-    row: 121
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`c` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 126
-    column: 16
-  end_location:
-    row: 126
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`error` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 129
-    column: 16
-  end_location:
-    row: 129
-    column: 21
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`info` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 132
-    column: 16
-  end_location:
-    row: 132
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: ComplexStructure
-    body: "`exception` is too complex (1 > 0)"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 135
-    column: 16
-  end_location:
-    row: 135
-    column: 25
-  fix:
-    edits: []
-  parent: ~
+C901.py:2:5: C901 `trivial` is too complex (1 > 0)
+  |
+2 | # Complexity = 1
+3 | def trivial():
+  |     ^^^^^^^ C901
+4 |     pass
+  |
+
+C901.py:7:5: C901 `expr_as_statement` is too complex (1 > 0)
+  |
+7 | # Complexity = 1
+8 | def expr_as_statement():
+  |     ^^^^^^^^^^^^^^^^^ C901
+9 |     0xF00D
+  |
+
+C901.py:12:5: C901 `sequential` is too complex (1 > 0)
+   |
+12 | # Complexity = 1
+13 | def sequential(n):
+   |     ^^^^^^^^^^ C901
+14 |     k = n + 4
+15 |     s = k + n
+   |
+
+C901.py:19:5: C901 `if_elif_else_dead_path` is too complex (3 > 0)
+   |
+19 | # Complexity = 3
+20 | def if_elif_else_dead_path(n):
+   |     ^^^^^^^^^^^^^^^^^^^^^^ C901
+21 |     if n > 3:
+22 |         return "bigger than three"
+   |
+
+C901.py:29:5: C901 `nested_ifs` is too complex (3 > 0)
+   |
+29 | # Complexity = 3
+30 | def nested_ifs():
+   |     ^^^^^^^^^^ C901
+31 |     if n > 3:
+32 |         if n > 4:
+   |
+
+C901.py:40:5: C901 `for_loop` is too complex (2 > 0)
+   |
+40 | # Complexity = 2
+41 | def for_loop():
+   |     ^^^^^^^^ C901
+42 |     for i in range(10):
+43 |         print(i)
+   |
+
+C901.py:46:5: C901 `for_else` is too complex (2 > 0)
+   |
+46 | # Complexity = 2
+47 | def for_else(mylist):
+   |     ^^^^^^^^ C901
+48 |     for i in mylist:
+49 |         print(i)
+   |
+
+C901.py:54:5: C901 `recursive` is too complex (2 > 0)
+   |
+54 | # Complexity = 2
+55 | def recursive(n):
+   |     ^^^^^^^^^ C901
+56 |     if n > 4:
+57 |         return f(n - 1)
+   |
+
+C901.py:62:5: C901 `nested_functions` is too complex (3 > 0)
+   |
+62 | # Complexity = 3
+63 | def nested_functions():
+   |     ^^^^^^^^^^^^^^^^ C901
+64 |     def a():
+65 |         def b():
+   |
+
+C901.py:63:9: C901 `a` is too complex (2 > 0)
+   |
+63 | # Complexity = 3
+64 | def nested_functions():
+65 |     def a():
+   |         ^ C901
+66 |         def b():
+67 |             pass
+   |
+
+C901.py:64:13: C901 `b` is too complex (1 > 0)
+   |
+64 | def nested_functions():
+65 |     def a():
+66 |         def b():
+   |             ^ C901
+67 |             pass
+   |
+
+C901.py:73:5: C901 `try_else` is too complex (4 > 0)
+   |
+73 | # Complexity = 4
+74 | def try_else():
+   |     ^^^^^^^^ C901
+75 |     try:
+76 |         print(1)
+   |
+
+C901.py:85:5: C901 `nested_try_finally` is too complex (1 > 0)
+   |
+85 | # Complexity = 3
+86 | def nested_try_finally():
+   |     ^^^^^^^^^^^^^^^^^^ C901
+87 |     try:
+88 |         try:
+   |
+
+C901.py:96:11: C901 `foobar` is too complex (3 > 0)
+   |
+96 | # Complexity = 3
+97 | async def foobar(a, b, c):
+   |           ^^^^^^ C901
+98 |     await whatever(a, b, c)
+99 |     if await b:
+   |
+
+C901.py:107:5: C901 `annotated_assign` is too complex (1 > 0)
+    |
+107 | # Complexity = 1
+108 | def annotated_assign():
+    |     ^^^^^^^^^^^^^^^^ C901
+109 |     x: Any = None
+    |
+
+C901.py:113:9: C901 `handle` is too complex (9 > 0)
+    |
+113 | # Complexity = 9
+114 | class Class:
+115 |     def handle(self, *args, **options):
+    |         ^^^^^^ C901
+116 |         if args:
+117 |             return
+    |
+
+C901.py:118:17: C901 `a` is too complex (1 > 0)
+    |
+118 |         class ServiceProvider:
+119 |             def a(self):
+    |                 ^ C901
+120 |                 pass
+    |
+
+C901.py:121:17: C901 `b` is too complex (2 > 0)
+    |
+121 |                 pass
+122 | 
+123 |             def b(self, data):
+    |                 ^ C901
+124 |                 if not args:
+125 |                     pass
+    |
+
+C901.py:126:17: C901 `c` is too complex (1 > 0)
+    |
+126 |         class Logger:
+127 |             def c(*args, **kwargs):
+    |                 ^ C901
+128 |                 pass
+    |
+
+C901.py:129:17: C901 `error` is too complex (1 > 0)
+    |
+129 |                 pass
+130 | 
+131 |             def error(self, message):
+    |                 ^^^^^ C901
+132 |                 pass
+    |
+
+C901.py:132:17: C901 `info` is too complex (1 > 0)
+    |
+132 |                 pass
+133 | 
+134 |             def info(self, message):
+    |                 ^^^^ C901
+135 |                 pass
+    |
+
+C901.py:135:17: C901 `exception` is too complex (1 > 0)
+    |
+135 |                 pass
+136 | 
+137 |             def exception(self):
+    |                 ^^^^^^^^^ C901
+138 |                 pass
+    |
+
 

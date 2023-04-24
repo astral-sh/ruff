@@ -1,7 +1,7 @@
-use itertools::Either::{Left, Right};
 use std::collections::BTreeMap;
 use std::iter;
 
+use itertools::Either::{Left, Right};
 use log::error;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{
@@ -15,14 +15,11 @@ use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{create_expr, match_trailing_comment, unparse_expr};
 use ruff_python_ast::types::{Range, RefEquality};
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_python_stdlib::keyword::KWLIST;
 
-use crate::autofix::helpers::delete_stmt;
+use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::message::Location;
 use crate::registry::AsRule;
-
-use super::fixes;
 
 #[violation]
 pub struct UnnecessaryPass;
@@ -64,50 +61,6 @@ impl Violation for NonUniqueEnums {
     fn message(&self) -> String {
         let NonUniqueEnums { value } = self;
         format!("Enum contains duplicate value: `{value}`")
-    }
-}
-
-/// ## What it does
-/// Checks for unnecessary list comprehensions passed to `any` and `all`.
-///
-/// ## Why is this bad?
-/// `any` and `all` take any iterators, including generators. Converting a generator to a list
-/// by way of a list comprehension is unnecessary and reduces performance due to the
-/// overhead of creating the list.
-///
-/// For example, compare the performance of `all` with a list comprehension against that
-/// of a generator (~40x faster here):
-///
-/// ```console
-/// In [1]: %timeit all([i for i in range(1000)])
-/// 8.14 µs ± 25.4 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
-///
-/// In [2]: %timeit all(i for i in range(1000))
-/// 212 ns ± 0.892 ns per loop (mean ± std. dev. of 7 runs, 1,000,000 loops each)
-/// ```
-///
-/// ## Examples
-/// ```python
-/// any([x.id for x in bar])
-/// all([x.id for x in bar])
-/// ```
-///
-/// Use instead:
-/// ```python
-/// any(x.id for x in bar)
-/// all(x.id for x in bar)
-/// ```
-#[violation]
-pub struct UnnecessaryComprehensionAnyAll;
-
-impl AlwaysAutofixableViolation for UnnecessaryComprehensionAnyAll {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary list comprehension.")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove unnecessary list comprehension".to_string()
     }
 }
 
@@ -332,36 +285,6 @@ pub fn unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: 
     }
 }
 
-/// PIE802
-pub fn unnecessary_comprehension_any_all(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-) {
-    if let ExprKind::Name { id, .. } = &func.node {
-        if (id == "all" || id == "any") && args.len() == 1 {
-            if !checker.ctx.is_builtin(id) {
-                return;
-            }
-            if let ExprKind::ListComp { .. } = args[0].node {
-                let mut diagnostic =
-                    Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from(&args[0]));
-                if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.try_set_fix(|| {
-                        fixes::fix_unnecessary_comprehension_any_all(
-                            checker.locator,
-                            checker.stylist,
-                            expr,
-                        )
-                    });
-                }
-                checker.diagnostics.push(diagnostic);
-            }
-        }
-    }
-}
-
 /// Return `true` if a key is a valid keyword argument name.
 fn is_valid_kwarg_name(key: &Expr) -> bool {
     if let ExprKind::Constant {
@@ -369,7 +292,7 @@ fn is_valid_kwarg_name(key: &Expr) -> bool {
         ..
     } = &key.node
     {
-        is_identifier(value) && !KWLIST.contains(&value.as_str())
+        is_identifier(value)
     } else {
         false
     }
@@ -512,7 +435,7 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
 /// PIE807
 pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
     let ExprKind::Lambda { args, body } = &expr.node else {
-        unreachable!("Expected ExprKind::Lambda");
+        panic!("Expected ExprKind::Lambda");
     };
     if args.args.is_empty()
         && args.kwonlyargs.is_empty()

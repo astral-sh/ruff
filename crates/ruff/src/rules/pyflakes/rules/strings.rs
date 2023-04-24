@@ -493,12 +493,15 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     args: &[Expr],
     location: Range,
 ) {
-    if has_star_args(args) {
-        return;
-    }
-
-    let missing: Vec<usize> = (0..args.len())
-        .filter(|i| !(summary.autos.contains(i) || summary.indexes.contains(i)))
+    let missing: Vec<usize> = args
+        .iter()
+        .enumerate()
+        .filter(|(i, arg)| {
+            !(matches!(arg.node, ExprKind::Starred { .. })
+                || summary.autos.contains(i)
+                || summary.indices.contains(i))
+        })
+        .map(|(i, _)| i)
         .collect();
 
     if missing.is_empty() {
@@ -551,7 +554,7 @@ pub(crate) fn string_dot_format_missing_argument(
     let missing: Vec<String> = summary
         .autos
         .iter()
-        .chain(summary.indexes.iter())
+        .chain(summary.indices.iter())
         .filter(|&&i| i >= args.len())
         .map(ToString::to_string)
         .chain(
@@ -577,7 +580,7 @@ pub(crate) fn string_dot_format_mixing_automatic(
     summary: &FormatSummary,
     location: Range,
 ) {
-    if !(summary.autos.is_empty() || summary.indexes.is_empty()) {
+    if !(summary.autos.is_empty() || summary.indices.is_empty()) {
         checker
             .diagnostics
             .push(Diagnostic::new(StringDotFormatMixingAutomatic, location));

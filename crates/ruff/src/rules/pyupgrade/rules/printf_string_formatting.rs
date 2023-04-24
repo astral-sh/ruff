@@ -12,7 +12,6 @@ use ruff_python_ast::str::{leading_quote, trailing_quote};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_stdlib::identifiers::is_identifier;
-use ruff_python_stdlib::keyword::KWLIST;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -177,10 +176,6 @@ fn clean_params_dictionary(checker: &mut Checker, right: &Expr) -> Option<String
                         if !is_identifier(key_string) {
                             return None;
                         }
-                        // If the key is a Python keyword, abort.
-                        if KWLIST.contains(&key_string.as_str()) {
-                            return None;
-                        }
                         // If there are multiple entries of the same key, abort.
                         if seen.contains(&key_string.as_str()) {
                             return None;
@@ -301,17 +296,7 @@ fn convertible(format_string: &CFormatString, params: &Expr) -> bool {
 }
 
 /// UP031
-pub(crate) fn printf_string_formatting(
-    checker: &mut Checker,
-    expr: &Expr,
-    left: &Expr,
-    right: &Expr,
-) {
-    // If the modulo symbol is on a separate line, abort.
-    if right.location.row() != left.end_location.unwrap().row() {
-        return;
-    }
-
+pub(crate) fn printf_string_formatting(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
     let mut strings: Vec<(Location, Location)> = vec![];
     let mut extension = None;

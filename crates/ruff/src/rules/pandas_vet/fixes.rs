@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Expr, ExprKind, Keyword, Location};
 use ruff_diagnostics::{Edit, Fix};
 use ruff_python_ast::source_code::Locator;
 
-use crate::autofix::helpers::remove_argument;
+use crate::autofix::actions::remove_argument;
 
 fn match_name(expr: &Expr) -> Option<&str> {
     if let ExprKind::Call { func, .. } = &expr.node {

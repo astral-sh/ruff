@@ -4,7 +4,8 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{CallPath, Range};
+use ruff_python_ast::call_path::CallPath;
+use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks for `asyncio.create_task` and `asyncio.ensure_future` calls

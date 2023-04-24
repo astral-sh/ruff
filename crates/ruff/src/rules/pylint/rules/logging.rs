@@ -2,9 +2,10 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{is_logger_candidate, SimpleCallArgs};
-use ruff_python_ast::logging::LoggingLevel;
+use ruff_python_ast::helpers::SimpleCallArgs;
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::analyze::logging;
+use ruff_python_stdlib::logging::LoggingLevel;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -100,7 +101,7 @@ pub fn logging_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords:
         return;
     }
 
-    if !is_logger_candidate(&checker.ctx, func) {
+    if !logging::is_logger_candidate(&checker.ctx, func) {
         return;
     }
 

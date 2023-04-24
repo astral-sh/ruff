@@ -3,15 +3,17 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
-use ruff_python_ast::context::Context;
+use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{
     Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Location, Unaryop,
 };
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{contains_effect, create_expr, has_comments, unparse_expr};
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -44,19 +46,32 @@ use crate::registry::AsRule;
 /// - [Python: "isinstance"](https://docs.python.org/3/library/functions.html#isinstance)
 #[violation]
 pub struct DuplicateIsinstanceCall {
-    pub name: String,
+    pub name: Option<String>,
+    pub fixable: bool,
 }
 
-impl AlwaysAutofixableViolation for DuplicateIsinstanceCall {
+impl Violation for DuplicateIsinstanceCall {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateIsinstanceCall { name } = self;
-        format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
+        let DuplicateIsinstanceCall { name, .. } = self;
+        if let Some(name) = name {
+            format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
+        } else {
+            format!("Multiple `isinstance` calls for expression, merge into a single call")
+        }
     }
 
-    fn autofix_title(&self) -> String {
-        let DuplicateIsinstanceCall { name } = self;
-        format!("Merge `isinstance` calls for `{name}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        self.fixable
+            .then_some(|DuplicateIsinstanceCall { name, .. }| {
+                if let Some(name) = name {
+                    format!("Merge `isinstance` calls for `{name}`")
+                } else {
+                    format!("Merge `isinstance` calls")
+                }
+            })
     }
 }
 
@@ -156,9 +171,9 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
         return;
     };
 
-    // Locate duplicate `isinstance` calls, represented as a map from argument name
+    // Locate duplicate `isinstance` calls, represented as a map from `ComparableExpr`
     // to indices of the relevant `Expr` instances in `values`.
-    let mut duplicates = BTreeMap::new();
+    let mut duplicates: FxHashMap<ComparableExpr, Vec<usize>> = FxHashMap::default();
     for (index, call) in values.iter().enumerate() {
         // Verify that this is an `isinstance` call.
         let ExprKind::Call { func, args, keywords } = &call.node else {
@@ -180,27 +195,39 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
             continue;
         }
 
-        // Collect the name of the argument.
-        let ExprKind::Name { id: arg_name, .. } = &args[0].node else {
-            continue;
-        };
+        // Collect the target (e.g., `obj` in `isinstance(obj, int)`).
+        let target = &args[0];
         duplicates
-            .entry(arg_name.as_str())
+            .entry(target.into())
             .or_insert_with(Vec::new)
             .push(index);
     }
 
     // Generate a `Diagnostic` for each duplicate.
-    for (arg_name, indices) in duplicates {
+    for indices in duplicates.values() {
         if indices.len() > 1 {
+            // Grab the target used in each duplicate `isinstance` call (e.g., `obj` in
+            // `isinstance(obj, int)`).
+            let target = if let ExprKind::Call { args, .. } = &values[indices[0]].node {
+                args.get(0).expect("`isinstance` should have two arguments")
+            } else {
+                unreachable!("Indices should only contain `isinstance` calls")
+            };
+            let fixable = !contains_effect(target, |id| checker.ctx.is_builtin(id));
             let mut diagnostic = Diagnostic::new(
                 DuplicateIsinstanceCall {
-                    name: arg_name.to_string(),
+                    name: if let ExprKind::Name { id, .. } = &target.node {
+                        Some(id.to_string())
+                    } else {
+                        None
+                    },
+                    fixable,
                 },
                 Range::from(expr),
             );
-            if checker.patch(diagnostic.kind.rule()) {
-                // Grab the types used in each duplicate `isinstance` call.
+            if fixable && checker.patch(diagnostic.kind.rule()) {
+                // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
+                // in `isinstance(obj, int) or isinstance(obj, str)`).
                 let types: Vec<&Expr> = indices
                     .iter()
                     .map(|index| &values[*index])
@@ -219,10 +246,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                         ctx: ExprContext::Load,
                     })),
                     args: vec![
-                        create_expr(ExprKind::Name {
-                            id: arg_name.to_string(),
-                            ctx: ExprContext::Load,
-                        }),
+                        target.clone(),
                         create_expr(ExprKind::Tuple {
                             // Flatten all the types used across the `isinstance` calls.
                             elts: types
@@ -317,7 +341,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
         // Avoid rewriting (e.g.) `a == "foo" or a == f()`.
         if comparators
             .iter()
-            .any(|expr| contains_effect(&checker.ctx, expr))
+            .any(|expr| contains_effect(expr, |id| checker.ctx.is_builtin(id)))
         {
             continue;
         }
@@ -399,7 +423,7 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(&checker.ctx, expr) {
+    if contains_effect(expr, |id| checker.ctx.is_builtin(id)) {
         return;
     }
 
@@ -453,7 +477,7 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
         return;
     }
 
-    if contains_effect(&checker.ctx, expr) {
+    if contains_effect(expr, |id| checker.ctx.is_builtin(id)) {
         return;
     }
 
@@ -479,10 +503,17 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-pub fn is_short_circuit(ctx: &Context, expr: &Expr) -> Option<(Location, Location)> {
+pub fn is_short_circuit(
+    ctx: &Context,
+    expr: &Expr,
+    expected_op: &Boolop,
+) -> Option<(Location, Location)> {
     let ExprKind::BoolOp { op, values, } = &expr.node else {
         return None;
     };
+    if op != expected_op {
+        return None;
+    }
     let short_circuit_value = match op {
         Boolop::And => false,
         Boolop::Or => true,
@@ -491,7 +522,7 @@ pub fn is_short_circuit(ctx: &Context, expr: &Expr) -> Option<(Location, Locatio
     let mut location = expr.location;
     for (value, next_value) in values.iter().tuple_windows() {
         // Keep track of the location of the furthest-right, non-effectful expression.
-        if contains_effect(ctx, value) {
+        if contains_effect(value, |id| ctx.is_builtin(id)) {
             location = next_value.location;
             continue;
         }
@@ -527,7 +558,7 @@ pub fn is_short_circuit(ctx: &Context, expr: &Expr) -> Option<(Location, Locatio
 
 /// SIM222
 pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
-    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr) else {
+    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr, &Boolop::Or) else {
         return;
     };
     let mut diagnostic = Diagnostic::new(
@@ -549,7 +580,7 @@ pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
 
 /// SIM223
 pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
-    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr) else {
+    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr, &Boolop::And) else {
         return;
     };
     let mut diagnostic = Diagnostic::new(

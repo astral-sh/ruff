@@ -1,61 +1,42 @@
 ---
 source: crates/ruff/src/rules/flake8_builtins/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BuiltinAttributeShadowing
-    body: "Class attribute `ImportError` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 4
-  end_location:
-    row: 2
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BuiltinAttributeShadowing
-    body: "Class attribute `id` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 6
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BuiltinAttributeShadowing
-    body: "Class attribute `dir` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 4
-  end_location:
-    row: 4
-    column: 7
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: BuiltinAttributeShadowing
-    body: "Class attribute `str` is shadowing a python builtin"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 4
-  end_location:
-    row: 12
-    column: 12
-  fix:
-    edits: []
-  parent: ~
+A003.py:2:5: A003 Class attribute `ImportError` is shadowing a python builtin
+  |
+2 | class MyClass:
+3 |     ImportError = 4
+  |     ^^^^^^^^^^^ A003
+4 |     id = 5
+5 |     dir = "/"
+  |
+
+A003.py:3:5: A003 Class attribute `id` is shadowing a python builtin
+  |
+3 | class MyClass:
+4 |     ImportError = 4
+5 |     id = 5
+  |     ^^ A003
+6 |     dir = "/"
+  |
+
+A003.py:4:5: A003 Class attribute `dir` is shadowing a python builtin
+  |
+4 |     ImportError = 4
+5 |     id = 5
+6 |     dir = "/"
+  |     ^^^ A003
+7 | 
+8 |     def __init__(self):
+  |
+
+A003.py:11:5: A003 Class attribute `str` is shadowing a python builtin
+   |
+11 |           self.dir = "."
+12 |   
+13 |       def str(self):
+   |  _____^
+14 | |         pass
+   | |____________^ A003
+   |
+
 

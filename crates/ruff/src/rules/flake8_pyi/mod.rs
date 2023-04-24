@@ -6,12 +6,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::UnprefixedTypeParam, Path::new("PYI001.py"))]
     #[test_case(Rule::UnprefixedTypeParam, Path::new("PYI001.pyi"))]
@@ -33,6 +33,8 @@ mod tests {
     #[test_case(Rule::ArgumentDefaultInStub, Path::new("PYI014.pyi"))]
     #[test_case(Rule::AssignmentDefaultInStub, Path::new("PYI015.py"))]
     #[test_case(Rule::AssignmentDefaultInStub, Path::new("PYI015.pyi"))]
+    #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.py"))]
+    #[test_case(Rule::DuplicateUnionMember, Path::new("PYI016.pyi"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.py"))]
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.pyi"))]
     #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.py"))]
@@ -43,7 +45,7 @@ mod tests {
             Path::new("flake8_pyi").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

@@ -1,4 +1,5 @@
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
+use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
@@ -80,8 +81,54 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
     ))
 }
 
+/// Returns the range of the `name` argument of `@pytest.mark.parametrize`.
+///
+/// This accounts for implicit string concatenation with parenthesis.
+/// For example, the following code will return the range marked with `^`:
+/// ```python
+/// @pytest.mark.parametrize(("a, " "b"), [(1, 2)])
+/// #                        ^^^^^^^^^^^
+/// #                        implicit string concatenation with parenthesis
+/// def test(a, b):
+///     ...
+/// ```
+///
+/// This method assumes that the first argument is a string.
+fn get_parametrize_name_range(checker: &Checker, decorator: &Expr, expr: &Expr) -> Range {
+    let mut locations = Vec::new();
+    let mut implicit_concat = None;
+
+    // The parenthesis are not part of the AST, so we need to tokenize the
+    // decorator to find them.
+    for (start, tok, end) in lexer::lex_located(
+        checker.locator.slice(decorator),
+        Mode::Module,
+        decorator.location,
+    )
+    .flatten()
+    {
+        match tok {
+            Tok::Lpar => locations.push(start),
+            Tok::Rpar => {
+                if let Some(start) = locations.pop() {
+                    implicit_concat = Some(Range::new(start, end));
+                }
+            }
+            // Stop after the first argument.
+            Tok::Comma => break,
+            _ => (),
+        }
+    }
+
+    if let Some(range) = implicit_concat {
+        range
+    } else {
+        Range::from(expr)
+    }
+}
+
 /// PT006
-fn check_names(checker: &mut Checker, expr: &Expr) {
+fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
     let names_type = checker.settings.flake8_pytest_style.parametrize_names_type;
 
     match &expr.node {
@@ -93,11 +140,12 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
             if names.len() > 1 {
                 match names_type {
                     types::ParametrizeNameType::Tuple => {
+                        let name_range = get_parametrize_name_range(checker, decorator, expr);
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
                             },
-                            Range::from(expr),
+                            name_range,
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.set_fix(Edit::replacement(
@@ -119,18 +167,19 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                         checker.stylist,
                                     )
                                 ),
-                                expr.location,
-                                expr.end_location.unwrap(),
+                                name_range.location,
+                                name_range.end_location,
                             ));
                         }
                         checker.diagnostics.push(diagnostic);
                     }
                     types::ParametrizeNameType::List => {
+                        let name_range = get_parametrize_name_range(checker, decorator, expr);
                         let mut diagnostic = Diagnostic::new(
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
                             },
-                            Range::from(expr),
+                            name_range,
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             diagnostic.set_fix(Edit::replacement(
@@ -149,8 +198,8 @@ fn check_names(checker: &mut Checker, expr: &Expr) {
                                     }),
                                     checker.stylist,
                                 ),
-                                expr.location,
-                                expr.end_location.unwrap(),
+                                name_range.location,
+                                name_range.end_location,
                             ));
                         }
                         checker.diagnostics.push(diagnostic);
@@ -383,7 +432,7 @@ pub fn parametrize(checker: &mut Checker, decorators: &[Expr]) {
                     .enabled(Rule::PytestParametrizeNamesWrongType)
                 {
                     if let Some(names) = args.get(0) {
-                        check_names(checker, names);
+                        check_names(checker, decorator, names);
                     }
                 }
                 if checker

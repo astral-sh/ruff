@@ -10,11 +10,9 @@ use ignore::{DirEntry, WalkBuilder, WalkState};
 use itertools::Itertools;
 use log::debug;
 use path_absolutize::path_dedot;
-use ruff_python_stdlib::path::is_python_file;
 use rustc_hash::FxHashSet;
 
 use crate::fs;
-use crate::jupyter::is_jupyter_notebook;
 use crate::settings::configuration::Configuration;
 use crate::settings::pyproject::settings_toml;
 use crate::settings::{pyproject, AllSettings, Settings};
@@ -191,16 +189,12 @@ pub fn resolve_settings_with_processor(
 
 /// Return `true` if the given file should be ignored based on the exclusion
 /// criteria.
-fn match_exclusion(file_path: &str, file_basename: &str, exclusion: &globset::GlobSet) -> bool {
+fn match_exclusion<P: AsRef<Path>, R: AsRef<Path>>(
+    file_path: P,
+    file_basename: R,
+    exclusion: &globset::GlobSet,
+) -> bool {
     exclusion.is_match(file_path) || exclusion.is_match(file_basename)
-}
-
-/// Return `true` if the [`DirEntry`] appears to be that of a Python file or jupyter notebook.
-pub fn is_python_entry(entry: &DirEntry) -> bool {
-    (is_python_file(entry.path()) || is_jupyter_notebook(entry.path()))
-        && !entry
-            .file_type()
-            .map_or(false, |file_type| file_type.is_dir())
 }
 
 /// Find all Python (`.py`, `.pyi` and `.ipynb` files) in a set of paths.
@@ -268,28 +262,21 @@ pub fn python_files_in_path(
                     let path = entry.path();
                     let resolver = resolver.read().unwrap();
                     let settings = resolver.resolve(path, pyproject_strategy);
-                    match fs::extract_path_names(path) {
-                        Ok((file_path, file_basename)) => {
-                            if !settings.exclude.is_empty()
-                                && match_exclusion(file_path, file_basename, &settings.exclude)
-                            {
-                                debug!("Ignored path via `exclude`: {:?}", path);
-                                return WalkState::Skip;
-                            } else if !settings.extend_exclude.is_empty()
-                                && match_exclusion(
-                                    file_path,
-                                    file_basename,
-                                    &settings.extend_exclude,
-                                )
-                            {
-                                debug!("Ignored path via `extend-exclude`: {:?}", path);
-                                return WalkState::Skip;
-                            }
-                        }
-                        Err(err) => {
-                            debug!("Ignored path due to error in parsing: {:?}: {}", path, err);
+                    if let Some(file_name) = path.file_name() {
+                        if !settings.exclude.is_empty()
+                            && match_exclusion(path, file_name, &settings.exclude)
+                        {
+                            debug!("Ignored path via `exclude`: {:?}", path);
+                            return WalkState::Skip;
+                        } else if !settings.extend_exclude.is_empty()
+                            && match_exclusion(path, file_name, &settings.extend_exclude)
+                        {
+                            debug!("Ignored path via `extend-exclude`: {:?}", path);
                             return WalkState::Skip;
                         }
+                    } else {
+                        debug!("Ignored path due to error in parsing: {:?}", path);
+                        return WalkState::Skip;
                     }
                 }
             }
@@ -327,10 +314,24 @@ pub fn python_files_in_path(
             }
 
             if result.as_ref().map_or(true, |entry| {
-                // Accept all files that are passed-in directly.
-                (entry.depth() == 0 && entry.file_type().map_or(false, |ft| ft.is_file()))
-                    // Accept all Python files.
-                    || is_python_entry(entry)
+                if entry.depth() == 0 {
+                    // Accept all files that are passed-in directly.
+                    entry.file_type().map_or(false, |ft| ft.is_file())
+                } else {
+                    // Otherwise, check if the file is included.
+                    let path = entry.path();
+                    let resolver = resolver.read().unwrap();
+                    let settings = resolver.resolve(path, pyproject_strategy);
+                    if settings.include.is_match(path) {
+                        debug!("Included path via `include`: {:?}", path);
+                        true
+                    } else if settings.extend_include.is_match(path) {
+                        debug!("Included path via `extend-include`: {:?}", path);
+                        true
+                    } else {
+                        false
+                    }
+                }
             }) {
                 files.lock().unwrap().push(result);
             }
@@ -385,24 +386,19 @@ fn is_file_excluded(
             break;
         }
         let settings = resolver.resolve(path, pyproject_strategy);
-        match fs::extract_path_names(path) {
-            Ok((file_path, file_basename)) => {
-                if !settings.exclude.is_empty()
-                    && match_exclusion(file_path, file_basename, &settings.exclude)
-                {
-                    debug!("Ignored path via `exclude`: {:?}", path);
-                    return true;
-                } else if !settings.extend_exclude.is_empty()
-                    && match_exclusion(file_path, file_basename, &settings.extend_exclude)
-                {
-                    debug!("Ignored path via `extend-exclude`: {:?}", path);
-                    return true;
-                }
-            }
-            Err(err) => {
-                debug!("Ignored path due to error in parsing: {:?}: {}", path, err);
+        if let Some(file_name) = path.file_name() {
+            if !settings.exclude.is_empty() && match_exclusion(path, file_name, &settings.exclude) {
+                debug!("Ignored path via `exclude`: {:?}", path);
+                return true;
+            } else if !settings.extend_exclude.is_empty()
+                && match_exclusion(path, file_name, &settings.extend_exclude)
+            {
+                debug!("Ignored path via `extend-exclude`: {:?}", path);
                 return true;
             }
+        } else {
+            debug!("Ignored path due to error in parsing: {:?}", path);
+            return true;
         }
         if path == settings.project_root {
             // Bail out; we'd end up past the project root on the next iteration
@@ -421,7 +417,6 @@ mod tests {
     use globset::GlobSet;
     use path_absolutize::Absolutize;
 
-    use crate::fs;
     use crate::resolver::{
         is_file_excluded, match_exclusion, resolve_settings_with_processor, NoOpProcessor,
         PyprojectDiscovery, Relativity, Resolver,
@@ -437,7 +432,7 @@ mod tests {
     }
 
     #[test]
-    fn exclusions() -> Result<()> {
+    fn exclusions() {
         let project_root = Path::new("/tmp/");
 
         let path = Path::new("foo").absolutize_from(project_root).unwrap();
@@ -448,7 +443,8 @@ mod tests {
                 .unwrap()
                 .to_path_buf(),
         );
-        let (file_path, file_basename) = fs::extract_path_names(&path)?;
+        let file_path = &path;
+        let file_basename = path.file_name().unwrap();
         assert!(match_exclusion(
             file_path,
             file_basename,
@@ -463,7 +459,8 @@ mod tests {
                 .unwrap()
                 .to_path_buf(),
         );
-        let (file_path, file_basename) = fs::extract_path_names(&path)?;
+        let file_path = &path;
+        let file_basename = path.file_name().unwrap();
         assert!(match_exclusion(
             file_path,
             file_basename,
@@ -480,7 +477,8 @@ mod tests {
                 .unwrap()
                 .to_path_buf(),
         );
-        let (file_path, file_basename) = fs::extract_path_names(&path)?;
+        let file_path = &path;
+        let file_basename = path.file_name().unwrap();
         assert!(match_exclusion(
             file_path,
             file_basename,
@@ -495,7 +493,8 @@ mod tests {
                 .unwrap()
                 .to_path_buf(),
         );
-        let (file_path, file_basename) = fs::extract_path_names(&path)?;
+        let file_path = &path;
+        let file_basename = path.file_name().unwrap();
         assert!(match_exclusion(
             file_path,
             file_basename,
@@ -512,7 +511,8 @@ mod tests {
                 .unwrap()
                 .to_path_buf(),
         );
-        let (file_path, file_basename) = fs::extract_path_names(&path)?;
+        let file_path = &path;
+        let file_basename = path.file_name().unwrap();
         assert!(match_exclusion(
             file_path,
             file_basename,
@@ -529,7 +529,8 @@ mod tests {
                 .unwrap()
                 .to_path_buf(),
         );
-        let (file_path, file_basename) = fs::extract_path_names(&path)?;
+        let file_path = &path;
+        let file_basename = path.file_name().unwrap();
         assert!(match_exclusion(
             file_path,
             file_basename,
@@ -546,14 +547,13 @@ mod tests {
                 .unwrap()
                 .to_path_buf(),
         );
-        let (file_path, file_basename) = fs::extract_path_names(&path)?;
+        let file_path = &path;
+        let file_basename = path.file_name().unwrap();
         assert!(!match_exclusion(
             file_path,
             file_basename,
             &make_exclusion(exclude),
         ));
-
-        Ok(())
     }
 
     #[test]

@@ -1,201 +1,113 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 62
-    column: 24
-  end_location:
-    row: 62
-    column: 33
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 66
-    column: 29
-  end_location:
-    row: 66
-    column: 31
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 70
-    column: 19
-  end_location:
-    row: 70
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 74
-    column: 19
-  end_location:
-    row: 74
-    column: 44
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 78
-    column: 31
-  end_location:
-    row: 78
-    column: 56
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 82
-    column: 25
-  end_location:
-    row: 82
-    column: 44
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 87
-    column: 45
-  end_location:
-    row: 87
-    column: 69
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 91
-    column: 45
-  end_location:
-    row: 91
-    column: 72
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 95
-    column: 44
-  end_location:
-    row: 95
-    column: 68
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 99
-    column: 32
-  end_location:
-    row: 99
-    column: 34
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 192
-    column: 19
-  end_location:
-    row: 192
-    column: 48
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 225
-    column: 26
-  end_location:
-    row: 225
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 226
-    column: 34
-  end_location:
-    row: 226
-    column: 36
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MutableArgumentDefault
-    body: Do not use mutable data structures for argument defaults
-    suggestion: ~
-    fixable: false
-  location:
-    row: 227
-    column: 61
-  end_location:
-    row: 227
-    column: 66
-  fix:
-    edits: []
-  parent: ~
+B006_B008.py:62:25: B006 Do not use mutable data structures for argument defaults
+   |
+62 | def this_is_wrong(value=[1, 2, 3]):
+   |                         ^^^^^^^^^ B006
+63 |     ...
+   |
+
+B006_B008.py:66:30: B006 Do not use mutable data structures for argument defaults
+   |
+66 | def this_is_also_wrong(value={}):
+   |                              ^^ B006
+67 |     ...
+   |
+
+B006_B008.py:70:20: B006 Do not use mutable data structures for argument defaults
+   |
+70 | def and_this(value=set()):
+   |                    ^^^^^ B006
+71 |     ...
+   |
+
+B006_B008.py:74:20: B006 Do not use mutable data structures for argument defaults
+   |
+74 | def this_too(value=collections.OrderedDict()):
+   |                    ^^^^^^^^^^^^^^^^^^^^^^^^^ B006
+75 |     ...
+   |
+
+B006_B008.py:78:32: B006 Do not use mutable data structures for argument defaults
+   |
+78 | async def async_this_too(value=collections.defaultdict()):
+   |                                ^^^^^^^^^^^^^^^^^^^^^^^^^ B006
+79 |     ...
+   |
+
+B006_B008.py:82:26: B006 Do not use mutable data structures for argument defaults
+   |
+82 | def dont_forget_me(value=collections.deque()):
+   |                          ^^^^^^^^^^^^^^^^^^^ B006
+83 |     ...
+   |
+
+B006_B008.py:87:46: B006 Do not use mutable data structures for argument defaults
+   |
+87 | # N.B. we're also flagging the function call in the comprehension
+88 | def list_comprehension_also_not_okay(default=[i**2 for i in range(3)]):
+   |                                              ^^^^^^^^^^^^^^^^^^^^^^^^ B006
+89 |     pass
+   |
+
+B006_B008.py:91:46: B006 Do not use mutable data structures for argument defaults
+   |
+91 | def dict_comprehension_also_not_okay(default={i: i**2 for i in range(3)}):
+   |                                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^ B006
+92 |     pass
+   |
+
+B006_B008.py:95:45: B006 Do not use mutable data structures for argument defaults
+   |
+95 | def set_comprehension_also_not_okay(default={i**2 for i in range(3)}):
+   |                                             ^^^^^^^^^^^^^^^^^^^^^^^^ B006
+96 |     pass
+   |
+
+B006_B008.py:99:33: B006 Do not use mutable data structures for argument defaults
+    |
+ 99 | def kwonlyargs_mutable(*, value=[]):
+    |                                 ^^ B006
+100 |     ...
+    |
+
+B006_B008.py:192:20: B006 Do not use mutable data structures for argument defaults
+    |
+192 | # B006 and B008
+193 | # We should handle arbitrary nesting of these B008.
+194 | def nested_combo(a=[float(3), dt.datetime.now()]):
+    |                    ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B006
+195 |     pass
+    |
+
+B006_B008.py:225:27: B006 Do not use mutable data structures for argument defaults
+    |
+225 | def mutable_annotations(
+226 |     a: list[int] | None = [],
+    |                           ^^ B006
+227 |     b: Optional[Dict[int, int]] = {},
+228 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+    |
+
+B006_B008.py:226:35: B006 Do not use mutable data structures for argument defaults
+    |
+226 | def mutable_annotations(
+227 |     a: list[int] | None = [],
+228 |     b: Optional[Dict[int, int]] = {},
+    |                                   ^^ B006
+229 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+230 | ):
+    |
+
+B006_B008.py:227:62: B006 Do not use mutable data structures for argument defaults
+    |
+227 |     a: list[int] | None = [],
+228 |     b: Optional[Dict[int, int]] = {},
+229 |     c: Annotated[Union[Set[str], abc.Sized], "annotation"] = set(),
+    |                                                              ^^^^^ B006
+230 | ):
+231 |     pass
+    |
+
 

@@ -116,7 +116,8 @@ pub fn multiple_with_statements(
             ) {
                 Ok(fix) => {
                     if fix
-                        .content
+                        .content()
+                        .unwrap_or_default()
                         .universal_newlines()
                         .all(|line| line.width() <= checker.settings.line_length)
                     {

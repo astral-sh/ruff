@@ -8,7 +8,7 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::collect_call_path;
+use ruff_python_ast::call_path::collect_call_path;
 use ruff_python_ast::source_code::{Locator, Stylist};
 use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::indentation;
@@ -241,14 +241,16 @@ fn format_import_from(
             content
         })
     } else {
-        unreachable!("Expected ImportNames::Aliases | ImportNames::Star");
+        panic!("Expected ImportNames::Aliases | ImportNames::Star");
     }
 }
 
 /// UP026
 pub fn deprecated_mock_attribute(checker: &mut Checker, expr: &Expr) {
     if let ExprKind::Attribute { value, .. } = &expr.node {
-        if collect_call_path(value).as_slice() == ["mock", "mock"] {
+        if collect_call_path(value)
+            .map_or(false, |call_path| call_path.as_slice() == ["mock", "mock"])
+        {
             let mut diagnostic = Diagnostic::new(
                 DeprecatedMockImport {
                     reference_type: MockReference::Attribute,

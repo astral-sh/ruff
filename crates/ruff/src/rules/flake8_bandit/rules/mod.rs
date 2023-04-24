@@ -22,6 +22,11 @@ pub use request_with_no_cert_validation::{
     request_with_no_cert_validation, RequestWithNoCertValidation,
 };
 pub use request_without_timeout::{request_without_timeout, RequestWithoutTimeout};
+pub use shell_injection::{
+    shell_injection, CallWithShellEqualsTrue, StartProcessWithAShell, StartProcessWithNoShell,
+    StartProcessWithPartialPath, SubprocessPopenWithShellEqualsTrue,
+    SubprocessWithoutShellEqualsTrue,
+};
 pub use snmp_insecure_version::{snmp_insecure_version, SnmpInsecureVersion};
 pub use snmp_weak_cryptography::{snmp_weak_cryptography, SnmpWeakCryptography};
 pub use suspicious_function_call::{
@@ -52,6 +57,7 @@ mod jinja2_autoescape_false;
 mod logging_config_insecure_listen;
 mod request_with_no_cert_validation;
 mod request_without_timeout;
+mod shell_injection;
 mod snmp_insecure_version;
 mod snmp_weak_cryptography;
 mod suspicious_function_call;

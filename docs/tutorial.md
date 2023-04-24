@@ -8,9 +8,9 @@ detailed overview, see [_Configuration_](configuration.md).
 Let's assume that our project structure looks like:
 
 ```text
-numbers/
-    __init__.py
-    numbers.py
+numbers                   
+  ├── __init__.py
+  └── numbers.py  
 ```
 
 Where `numbers.py` contains the following code:
@@ -242,7 +242,7 @@ This tutorial has focused on Ruff's command-line interface, but Ruff can also be
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.260'
+  rev: 'v0.0.262'
   hooks:
     - id: ruff
 ```

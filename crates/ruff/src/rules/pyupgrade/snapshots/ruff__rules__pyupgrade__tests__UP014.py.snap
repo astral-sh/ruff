@@ -1,110 +1,116 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: ConvertNamedTupleFunctionalToClass
-    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 67
-  fix:
-    edits:
-      - content: "class MyType(NamedTuple):\n    a: int\n    b: tuple[str, ...]"
-        location:
-          row: 5
-          column: 0
-        end_location:
-          row: 5
-          column: 67
-  parent: ~
-- kind:
-    name: ConvertNamedTupleFunctionalToClass
-    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 12
-    column: 1
-  fix:
-    edits:
-      - content: "class MyType(NamedTuple):\n    a: int\n    b: str = \"foo\"\n    c: list[bool] = [True]"
-        location:
-          row: 8
-          column: 0
-        end_location:
-          row: 12
-          column: 1
-  parent: ~
-- kind:
-    name: ConvertNamedTupleFunctionalToClass
-    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 15
-    column: 62
-  fix:
-    edits:
-      - content: "class MyType(typing.NamedTuple):\n    a: int\n    b: str"
-        location:
-          row: 15
-          column: 0
-        end_location:
-          row: 15
-          column: 62
-  parent: ~
-- kind:
-    name: ConvertNamedTupleFunctionalToClass
-    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 28
-    column: 0
-  end_location:
-    row: 28
-    column: 36
-  fix:
-    edits:
-      - content: "class MyType(typing.NamedTuple):\n    pass"
-        location:
-          row: 28
-          column: 0
-        end_location:
-          row: 28
-          column: 36
-  parent: ~
-- kind:
-    name: ConvertNamedTupleFunctionalToClass
-    body: "Convert `MyType` from `NamedTuple` functional to class syntax"
-    suggestion: "Convert `MyType` to class syntax"
-    fixable: true
-  location:
-    row: 31
-    column: 0
-  end_location:
-    row: 31
-    column: 40
-  fix:
-    edits:
-      - content: "class MyType(typing.NamedTuple):\n    pass"
-        location:
-          row: 31
-          column: 0
-        end_location:
-          row: 31
-          column: 40
-  parent: ~
+UP014.py:5:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+  |
+5 | # with complex annotations
+6 | MyType = NamedTuple("MyType", [("a", int), ("b", tuple[str, ...])])
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP014
+7 | 
+8 | # with default values as list
+  |
+  = help: Convert `MyType` to class syntax
+
+ℹ Suggested fix
+2 2 | import typing
+3 3 | 
+4 4 | # with complex annotations
+5   |-MyType = NamedTuple("MyType", [("a", int), ("b", tuple[str, ...])])
+  5 |+class MyType(NamedTuple):
+  6 |+    a: int
+  7 |+    b: tuple[str, ...]
+6 8 | 
+7 9 | # with default values as list
+8 10 | MyType = NamedTuple(
+
+UP014.py:8:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+   |
+ 8 |   # with default values as list
+ 9 | / MyType = NamedTuple(
+10 | |     "MyType",
+11 | |     [("a", int), ("b", str), ("c", list[bool])],
+12 | |     defaults=["foo", [True]],
+13 | | )
+   | |_^ UP014
+14 |   
+15 |   # with namespace
+   |
+   = help: Convert `MyType` to class syntax
+
+ℹ Suggested fix
+5  5  | MyType = NamedTuple("MyType", [("a", int), ("b", tuple[str, ...])])
+6  6  | 
+7  7  | # with default values as list
+8     |-MyType = NamedTuple(
+9     |-    "MyType",
+10    |-    [("a", int), ("b", str), ("c", list[bool])],
+11    |-    defaults=["foo", [True]],
+12    |-)
+   8  |+class MyType(NamedTuple):
+   9  |+    a: int
+   10 |+    b: str = "foo"
+   11 |+    c: list[bool] = [True]
+13 12 | 
+14 13 | # with namespace
+15 14 | MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
+
+UP014.py:15:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+   |
+15 | # with namespace
+16 | MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP014
+17 | 
+18 | # too many default values (OK)
+   |
+   = help: Convert `MyType` to class syntax
+
+ℹ Suggested fix
+12 12 | )
+13 13 | 
+14 14 | # with namespace
+15    |-MyType = typing.NamedTuple("MyType", [("a", int), ("b", str)])
+   15 |+class MyType(typing.NamedTuple):
+   16 |+    a: int
+   17 |+    b: str
+16 18 | 
+17 19 | # too many default values (OK)
+18 20 | MyType = NamedTuple(
+
+UP014.py:28:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+   |
+28 | # no fields
+29 | MyType = typing.NamedTuple("MyType")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP014
+30 | 
+31 | # empty fields
+   |
+   = help: Convert `MyType` to class syntax
+
+ℹ Suggested fix
+25 25 | MyType = NamedTuple("MyType", [("x-y", int), ("b", tuple[str, ...])])
+26 26 | 
+27 27 | # no fields
+28    |-MyType = typing.NamedTuple("MyType")
+   28 |+class MyType(typing.NamedTuple):
+   29 |+    pass
+29 30 | 
+30 31 | # empty fields
+31 32 | MyType = typing.NamedTuple("MyType", [])
+
+UP014.py:31:1: UP014 [*] Convert `MyType` from `NamedTuple` functional to class syntax
+   |
+31 | # empty fields
+32 | MyType = typing.NamedTuple("MyType", [])
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP014
+   |
+   = help: Convert `MyType` to class syntax
+
+ℹ Suggested fix
+28 28 | MyType = typing.NamedTuple("MyType")
+29 29 | 
+30 30 | # empty fields
+31    |-MyType = typing.NamedTuple("MyType", [])
+   31 |+class MyType(typing.NamedTuple):
+   32 |+    pass
+
 

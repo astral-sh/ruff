@@ -6,12 +6,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     #[test_case(Rule::DuplicateIsinstanceCall, Path::new("SIM101.py"); "SIM101")]
     #[test_case(Rule::CollapsibleIf, Path::new("SIM102.py"); "SIM102")]
@@ -38,6 +38,7 @@ mod tests {
     #[test_case(Rule::ExprAndFalse, Path::new("SIM223.py"); "SIM223")]
     #[test_case(Rule::YodaConditions, Path::new("SIM300.py"); "SIM300")]
     #[test_case(Rule::IfElseBlockInsteadOfDictGet, Path::new("SIM401.py"); "SIM401")]
+    #[test_case(Rule::DictGetWithNoneDefault, Path::new("SIM910.py"); "SIM910")]
     #[test_case(Rule::IfElseBlockInsteadOfDictLookup, Path::new("SIM116.py"); "SIM116")]
     #[test_case(Rule::IfWithSameArms, Path::new("SIM114.py"); "SIM114")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
@@ -46,7 +47,7 @@ mod tests {
             Path::new("flake8_simplify").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 }

@@ -22,7 +22,6 @@ pub struct DiagnosticKind {
 }
 
 #[derive(Debug, PartialEq, Eq)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Diagnostic {
     pub kind: DiagnosticKind,
     pub location: Location,
@@ -43,12 +42,22 @@ impl Diagnostic {
     }
 
     /// Set the [`Fix`] used to fix the diagnostic.
+    #[inline]
     pub fn set_fix<T: Into<Fix>>(&mut self, fix: T) {
         self.fix = fix.into();
     }
 
+    /// Consumes `self` and returns a new `Diagnostic` with the given `fix`.
+    #[inline]
+    #[must_use]
+    pub fn with_fix<T: Into<Fix>>(mut self, fix: T) -> Self {
+        self.set_fix(fix);
+        self
+    }
+
     /// Set the [`Fix`] used to fix the diagnostic, if the provided function returns `Ok`.
     /// Otherwise, log the error.
+    #[inline]
     pub fn try_set_fix<T: Into<Fix>>(&mut self, func: impl FnOnce() -> Result<T>) {
         match func() {
             Ok(fix) => self.fix = fix.into(),
@@ -57,6 +66,7 @@ impl Diagnostic {
     }
 
     /// Set the location of the diagnostic's parent node.
+    #[inline]
     pub fn set_parent(&mut self, parent: Location) {
         self.parent = Some(parent);
     }

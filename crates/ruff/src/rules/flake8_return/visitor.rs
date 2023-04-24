@@ -10,9 +10,9 @@ pub struct Stack<'a> {
     pub yields: Vec<&'a Expr>,
     pub elses: Vec<&'a Stmt>,
     pub elifs: Vec<&'a Stmt>,
-    pub refs: FxHashMap<&'a str, Vec<Location>>,
+    pub references: FxHashMap<&'a str, Vec<Location>>,
     pub non_locals: FxHashSet<&'a str>,
-    pub assigns: FxHashMap<&'a str, Vec<Location>>,
+    pub assignments: FxHashMap<&'a str, Vec<Location>>,
     pub loops: Vec<(Location, Location)>,
     pub tries: Vec<(Location, Location)>,
 }
@@ -34,7 +34,7 @@ impl<'a> ReturnVisitor<'a> {
             }
             ExprKind::Name { id, .. } => {
                 self.stack
-                    .assigns
+                    .assignments
                     .entry(id)
                     .or_insert_with(Vec::new)
                     .push(expr.location);
@@ -44,9 +44,9 @@ impl<'a> ReturnVisitor<'a> {
                 // Attribute assignments are often side-effects (e.g., `self.property = value`),
                 // so we conservatively treat them as references to every known
                 // variable.
-                for name in self.stack.assigns.keys() {
+                for name in self.stack.assignments.keys() {
                     self.stack
-                        .refs
+                        .references
                         .entry(name)
                         .or_insert_with(Vec::new)
                         .push(expr.location);
@@ -126,7 +126,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
             StmtKind::Assign { targets, value, .. } => {
                 if let ExprKind::Name { id, .. } = &value.node {
                     self.stack
-                        .refs
+                        .references
                         .entry(id)
                         .or_insert_with(Vec::new)
                         .push(value.location);
@@ -176,9 +176,9 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
             ExprKind::Call { .. } => {
                 // Arbitrary function calls can have side effects, so we conservatively treat
                 // every function call as a reference to every known variable.
-                for name in self.stack.assigns.keys() {
+                for name in self.stack.assignments.keys() {
                     self.stack
-                        .refs
+                        .references
                         .entry(name)
                         .or_insert_with(Vec::new)
                         .push(expr.location);
@@ -186,7 +186,7 @@ impl<'a> Visitor<'a> for ReturnVisitor<'a> {
             }
             ExprKind::Name { id, .. } => {
                 self.stack
-                    .refs
+                    .references
                     .entry(id)
                     .or_insert_with(Vec::new)
                     .push(expr.location);

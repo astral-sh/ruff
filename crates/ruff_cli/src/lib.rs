@@ -179,9 +179,6 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     let printer = Printer::new(format, log_level, autofix, printer_flags);
 
     if cli.watch {
-        if !matches!(autofix, flags::FixMode::None) {
-            warn_user_once!("--fix is unsupported in watch mode.");
-        }
         if format != SerializationFormat::Text {
             warn_user_once!("--format 'text' is used in watch mode.");
         }
@@ -226,7 +223,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
                             &overrides,
                             cache.into(),
                             noqa.into(),
-                            flags::FixMode::None,
+                            autofix,
                         )?;
                         printer.write_continuously(&messages)?;
                     }

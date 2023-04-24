@@ -1,0 +1,78 @@
+---
+source: crates/ruff/src/rules/flake8_import_conventions/mod.rs
+---
+custom_banned.py:1:1: ICN002 `typing` should not be imported as `t`
+  |
+1 | import typing as t  # banned
+  | ^^^^^^^^^^^^^^^^^^ ICN002
+2 | import typing as ty  # banned
+  |
+
+custom_banned.py:2:1: ICN002 `typing` should not be imported as `ty`
+  |
+2 | import typing as t  # banned
+3 | import typing as ty  # banned
+  | ^^^^^^^^^^^^^^^^^^^ ICN002
+4 | 
+5 | import numpy as nmp  # banned
+  |
+
+custom_banned.py:4:1: ICN002 `numpy` should not be imported as `nmp`
+  |
+4 | import typing as ty  # banned
+5 | 
+6 | import numpy as nmp  # banned
+  | ^^^^^^^^^^^^^^^^^^^ ICN002
+7 | import numpy as npy  # banned
+8 | import tensorflow.keras.backend as K  # banned
+  |
+
+custom_banned.py:5:1: ICN002 `numpy` should not be imported as `npy`
+  |
+5 | import numpy as nmp  # banned
+6 | import numpy as npy  # banned
+  | ^^^^^^^^^^^^^^^^^^^ ICN002
+7 | import tensorflow.keras.backend as K  # banned
+8 | import torch.nn.functional as F  # banned
+  |
+
+custom_banned.py:6:1: ICN002 `tensorflow.keras.backend` should not be imported as `K`
+   |
+ 6 | import numpy as nmp  # banned
+ 7 | import numpy as npy  # banned
+ 8 | import tensorflow.keras.backend as K  # banned
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN002
+ 9 | import torch.nn.functional as F  # banned
+10 | from tensorflow.keras import backend as K  # banned
+   |
+
+custom_banned.py:7:1: ICN002 `torch.nn.functional` should not be imported as `F`
+   |
+ 7 | import numpy as npy  # banned
+ 8 | import tensorflow.keras.backend as K  # banned
+ 9 | import torch.nn.functional as F  # banned
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN002
+10 | from tensorflow.keras import backend as K  # banned
+11 | from torch.nn import functional as F  # banned
+   |
+
+custom_banned.py:8:1: ICN002 `tensorflow.keras.backend` should not be imported as `K`
+   |
+ 8 | import tensorflow.keras.backend as K  # banned
+ 9 | import torch.nn.functional as F  # banned
+10 | from tensorflow.keras import backend as K  # banned
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN002
+11 | from torch.nn import functional as F  # banned
+   |
+
+custom_banned.py:9:1: ICN002 `torch.nn.functional` should not be imported as `F`
+   |
+ 9 | import torch.nn.functional as F  # banned
+10 | from tensorflow.keras import backend as K  # banned
+11 | from torch.nn import functional as F  # banned
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ ICN002
+12 | 
+13 | from typing import Any  # ok
+   |
+
+

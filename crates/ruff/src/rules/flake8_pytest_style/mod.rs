@@ -8,12 +8,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use test_case::test_case;
 
     use crate::registry::Rule;
-    use crate::settings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     use super::settings::Settings;
     use super::types;
@@ -248,15 +248,14 @@ mod tests {
         plugin_settings: Settings,
         name: &str,
     ) -> Result<()> {
-        let mut diagnostics = test_path(
+        let diagnostics = test_path(
             Path::new("flake8_pytest_style").join(path).as_path(),
             &settings::Settings {
                 flake8_pytest_style: plugin_settings,
                 ..settings::Settings::for_rule(rule_code)
             },
         )?;
-        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
-        assert_yaml_snapshot!(name, diagnostics);
+        assert_messages!(name, diagnostics);
         Ok(())
     }
 }

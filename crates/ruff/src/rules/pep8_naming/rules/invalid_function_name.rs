@@ -1,9 +1,11 @@
-use rustpython_parser::ast::Stmt;
+use rustpython_parser::ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::identifier_range;
 use ruff_python_ast::source_code::Locator;
+use ruff_python_semantic::analyze::visibility;
+use ruff_python_semantic::context::Context;
 
 /// ## What it does
 /// Checks for functions names that do not follow the `snake_case` naming
@@ -47,21 +49,33 @@ impl Violation for InvalidFunctionName {
 
 /// N802
 pub fn invalid_function_name(
-    func_def: &Stmt,
+    stmt: &Stmt,
     name: &str,
+    decorator_list: &[Expr],
     ignore_names: &[String],
+    ctx: &Context,
     locator: &Locator,
 ) -> Option<Diagnostic> {
+    // Ignore any explicitly-ignored function names.
     if ignore_names.iter().any(|ignore_name| ignore_name == name) {
         return None;
     }
-    if name.to_lowercase() != name {
-        return Some(Diagnostic::new(
-            InvalidFunctionName {
-                name: name.to_string(),
-            },
-            identifier_range(func_def, locator),
-        ));
+
+    // Ignore any function names that are already lowercase.
+    if name.to_lowercase() == name {
+        return None;
     }
-    None
+
+    // Ignore any functions that are explicitly `@override`. These are defined elsewhere,
+    // so if they're first-party, we'll flag them at the definition site.
+    if visibility::is_override(ctx, decorator_list) {
+        return None;
+    }
+
+    Some(Diagnostic::new(
+        InvalidFunctionName {
+            name: name.to_string(),
+        },
+        identifier_range(stmt, locator),
+    ))
 }

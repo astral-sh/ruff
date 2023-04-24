@@ -6,11 +6,11 @@ use rustpython_parser::{lexer, Mode, Tok};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::scope::{ScopeId, ScopeKind};
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_semantic::scope::{ScopeId, ScopeKind};
 
-use crate::autofix::helpers::delete_stmt;
+use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -66,7 +66,7 @@ fn match_token_after<F, T>(located: &Located<T>, locator: &Locator, f: F) -> Ran
 where
     F: Fn(Tok) -> bool,
 {
-    let contents = locator.skip(located.location);
+    let contents = locator.after(located.location);
 
     // Track the bracket depth.
     let mut par_count = 0;
@@ -129,7 +129,7 @@ fn match_token<F, T>(located: &Located<T>, locator: &Locator, f: F) -> Range
 where
     F: Fn(Tok) -> bool,
 {
-    let contents = locator.skip(located.location);
+    let contents = locator.after(located.location);
 
     // Track the bracket depth.
     let mut par_count = 0;
@@ -202,7 +202,9 @@ fn remove_unused_variable(
             range.location == target.location && range.end_location == target.end_location.unwrap()
         }) {
             if matches!(target.node, ExprKind::Name { .. }) {
-                return if targets.len() > 1 || contains_effect(&checker.ctx, value) {
+                return if targets.len() > 1
+                    || contains_effect(value, |id| checker.ctx.is_builtin(id))
+                {
                     // If the expression is complex (`x = foo()`), remove the assignment,
                     // but preserve the right-hand side.
                     Some((
@@ -248,7 +250,7 @@ fn remove_unused_variable(
     } = &stmt.node
     {
         if matches!(target.node, ExprKind::Name { .. }) {
-            return if contains_effect(&checker.ctx, value) {
+            return if contains_effect(value, |id| checker.ctx.is_builtin(id)) {
                 // If the expression is complex (`x = foo()`), remove the assignment,
                 // but preserve the right-hand side.
                 Some((

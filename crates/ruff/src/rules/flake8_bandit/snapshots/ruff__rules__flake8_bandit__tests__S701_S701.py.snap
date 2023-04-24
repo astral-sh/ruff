@@ -1,75 +1,51 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: Jinja2AutoescapeFalse
-    body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 67
-  end_location:
-    row: 9
-    column: 76
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Jinja2AutoescapeFalse
-    body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 44
-  end_location:
-    row: 10
-    column: 49
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Jinja2AutoescapeFalse
-    body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 23
-  end_location:
-    row: 13
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Jinja2AutoescapeFalse
-    body: "By default, jinja2 sets `autoescape` to `False`. Consider using `autoescape=True` or the `select_autoescape` function to mitigate XSS vulnerabilities."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 15
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: Jinja2AutoescapeFalse
-    body: "Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function."
-    suggestion: ~
-    fixable: false
-  location:
-    row: 29
-    column: 46
-  end_location:
-    row: 29
-    column: 57
-  fix:
-    edits: []
-  parent: ~
+S701.py:9:68: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+   |
+ 9 | templateEnv = jinja2.Environment(autoescape=True,
+10 |         loader=templateLoader )
+11 | Environment(loader=templateLoader, load=templateLoader, autoescape=something)  # S701
+   |                                                                    ^^^^^^^^^ S701
+12 | templateEnv = jinja2.Environment(autoescape=False, loader=templateLoader )  # S701
+13 | Environment(loader=templateLoader,
+   |
+
+S701.py:10:45: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+   |
+10 |         loader=templateLoader )
+11 | Environment(loader=templateLoader, load=templateLoader, autoescape=something)  # S701
+12 | templateEnv = jinja2.Environment(autoescape=False, loader=templateLoader )  # S701
+   |                                             ^^^^^ S701
+13 | Environment(loader=templateLoader,
+14 |             load=templateLoader,
+   |
+
+S701.py:13:24: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+   |
+13 | Environment(loader=templateLoader,
+14 |             load=templateLoader,
+15 |             autoescape=False)  # S701
+   |                        ^^^^^ S701
+16 | 
+17 | Environment(loader=templateLoader,  # S701
+   |
+
+S701.py:15:1: S701 By default, jinja2 sets `autoescape` to `False`. Consider using `autoescape=True` or the `select_autoescape` function to mitigate XSS vulnerabilities.
+   |
+15 |             autoescape=False)  # S701
+16 | 
+17 | Environment(loader=templateLoader,  # S701
+   | ^^^^^^^^^^^ S701
+18 |             load=templateLoader)
+   |
+
+S701.py:29:47: S701 Using jinja2 templates with `autoescape=False` is dangerous and can lead to XSS. Ensure `autoescape=True` or use the `select_autoescape` function.
+   |
+29 | def fake_func():
+30 |     return 'foobar'
+31 | Environment(loader=templateLoader, autoescape=fake_func())  # S701
+   |                                               ^^^^^^^^^^^ S701
+   |
+
 

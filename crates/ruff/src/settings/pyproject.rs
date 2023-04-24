@@ -378,6 +378,8 @@ other-attribute = 1
                         "dask.dataframe".to_string(),
                         "dd".to_string(),
                     )])),
+                    banned_aliases: None,
+                    banned_from: None,
                 }),
                 mccabe: Some(mccabe::settings::Options {
                     max_complexity: Some(10),

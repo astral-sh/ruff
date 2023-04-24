@@ -23,7 +23,7 @@ pub(crate) fn error_to_string(err: &FormatParseError) -> String {
 #[derive(Debug)]
 pub(crate) struct FormatSummary {
     pub autos: Vec<usize>,
-    pub indexes: Vec<usize>,
+    pub indices: Vec<usize>,
     pub keywords: Vec<String>,
     pub has_nested_parts: bool,
     pub format_string: FormatString,
@@ -36,7 +36,7 @@ impl TryFrom<&str> for FormatSummary {
         let format_string = FormatString::from_str(literal)?;
 
         let mut autos = Vec::new();
-        let mut indexes = Vec::new();
+        let mut indices = Vec::new();
         let mut keywords = Vec::new();
         let mut has_nested_parts = false;
 
@@ -51,7 +51,7 @@ impl TryFrom<&str> for FormatSummary {
             let parsed = FieldName::parse(field_name)?;
             match parsed.field_type {
                 FieldType::Auto => autos.push(autos.len()),
-                FieldType::Index(i) => indexes.push(i),
+                FieldType::Index(i) => indices.push(i),
                 FieldType::Keyword(k) => keywords.push(k),
             };
 
@@ -63,7 +63,7 @@ impl TryFrom<&str> for FormatSummary {
                 let parsed = FieldName::parse(&field_name)?;
                 match parsed.field_type {
                     FieldType::Auto => autos.push(autos.len()),
-                    FieldType::Index(i) => indexes.push(i),
+                    FieldType::Index(i) => indices.push(i),
                     FieldType::Keyword(k) => keywords.push(k),
                 };
                 has_nested_parts = true;
@@ -72,7 +72,7 @@ impl TryFrom<&str> for FormatSummary {
 
         Ok(FormatSummary {
             autos,
-            indexes,
+            indices,
             keywords,
             has_nested_parts,
             format_string,
@@ -89,7 +89,7 @@ mod tests {
         let literal = "foo{foo}a{}b{2}c{2}d{1}{}{}e{bar}{foo}f{spam}";
 
         let expected_autos = [0usize, 1usize, 2usize].to_vec();
-        let expected_indexes = [2usize, 2usize, 1usize].to_vec();
+        let expected_indices = [2usize, 2usize, 1usize].to_vec();
         let expected_keywords: Vec<_> = ["foo", "bar", "foo", "spam"]
             .into_iter()
             .map(String::from)
@@ -98,7 +98,7 @@ mod tests {
         let format_summary = FormatSummary::try_from(literal).unwrap();
 
         assert_eq!(format_summary.autos, expected_autos);
-        assert_eq!(format_summary.indexes, expected_indexes);
+        assert_eq!(format_summary.indices, expected_indices);
         assert_eq!(format_summary.keywords, expected_keywords);
         assert!(!format_summary.has_nested_parts);
     }
@@ -108,7 +108,7 @@ mod tests {
         let literal = "foo{foo}a{:{}{}}b{2:{3}{4}}c{2}d{1}{}e{bar:{spam}{eggs}}";
 
         let expected_autos = [0usize, 1usize, 2usize, 3usize].to_vec();
-        let expected_indexes = [2usize, 3usize, 4usize, 2usize, 1usize].to_vec();
+        let expected_indices = [2usize, 3usize, 4usize, 2usize, 1usize].to_vec();
         let expected_keywords: Vec<_> = ["foo", "bar", "spam", "eggs"]
             .into_iter()
             .map(String::from)
@@ -117,7 +117,7 @@ mod tests {
         let format_summary = FormatSummary::try_from(literal).unwrap();
 
         assert_eq!(format_summary.autos, expected_autos);
-        assert_eq!(format_summary.indexes, expected_indexes);
+        assert_eq!(format_summary.indices, expected_indices);
         assert_eq!(format_summary.keywords, expected_keywords);
         assert!(format_summary.has_nested_parts);
     }

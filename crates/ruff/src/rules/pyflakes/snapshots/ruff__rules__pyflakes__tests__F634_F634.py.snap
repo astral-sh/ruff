@@ -1,33 +1,25 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: IfTuple
-    body: "If test is a tuple, which is always `True`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 2
-    column: 8
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: IfTuple
-    body: "If test is a tuple, which is always `True`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 4
-  end_location:
-    row: 10
-    column: 12
-  fix:
-    edits: []
-  parent: ~
+F634.py:1:1: F634 If test is a tuple, which is always `True`
+  |
+1 | / if (1, 2):
+2 | |     pass
+  | |________^ F634
+3 |   
+4 |   for _ in range(5):
+  |
+
+F634.py:7:5: F634 If test is a tuple, which is always `True`
+   |
+ 7 |       if True:
+ 8 |           pass
+ 9 |       elif (3, 4):
+   |  _____^
+10 | |         pass
+11 | |     elif ():
+12 | |         pass
+   | |____________^ F634
+   |
+
 

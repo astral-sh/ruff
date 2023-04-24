@@ -6,8 +6,7 @@ edition = { workspace = true }
 rust-version = { workspace = true }
 
 [dependencies]
-serde = { workspace = true, optional = true, default_features = false, features = [
-] }
+serde = { workspace = true, optional = true }
 schemars = { workspace = true, optional = true }
 
 [dev-dependencies]

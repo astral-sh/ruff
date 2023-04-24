@@ -1,68 +1,62 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NoBlankLineAfterFunction
-    body: No blank lines allowed after function docstring (found 2)
-    suggestion: Remove blank line(s) after function docstring
-    fixable: true
-  location:
-    row: 57
-    column: 4
-  end_location:
-    row: 57
-    column: 30
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 58
-          column: 0
-        end_location:
-          row: 60
-          column: 0
-  parent: ~
-- kind:
-    name: NoBlankLineAfterFunction
-    body: No blank lines allowed after function docstring (found 2)
-    suggestion: Remove blank line(s) after function docstring
-    fixable: true
-  location:
-    row: 68
-    column: 4
-  end_location:
-    row: 68
-    column: 30
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 69
-          column: 0
-        end_location:
-          row: 71
-          column: 0
-  parent: ~
-- kind:
-    name: NoBlankLineAfterFunction
-    body: No blank lines allowed after function docstring (found 1)
-    suggestion: Remove blank line(s) after function docstring
-    fixable: true
-  location:
-    row: 80
-    column: 4
-  end_location:
-    row: 80
-    column: 30
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 81
-          column: 0
-        end_location:
-          row: 82
-          column: 0
-  parent: ~
+D202.py:57:5: D202 [*] No blank lines allowed after function docstring (found 2)
+   |
+57 | # D202
+58 | def outer():
+59 |     """This is a docstring."""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
+   |
+   = help: Remove blank line(s) after function docstring
+
+ℹ Suggested fix
+55 55 | # D202
+56 56 | def outer():
+57 57 |     """This is a docstring."""
+58    |-
+59    |-
+60 58 |     def inner():
+61 59 |         return
+62 60 | 
+
+D202.py:68:5: D202 [*] No blank lines allowed after function docstring (found 2)
+   |
+68 | # D202
+69 | def outer():
+70 |     """This is a docstring."""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
+   |
+   = help: Remove blank line(s) after function docstring
+
+ℹ Suggested fix
+66 66 | # D202
+67 67 | def outer():
+68 68 |     """This is a docstring."""
+69    |-
+70    |-
+71 69 |     # This is a comment.
+72 70 |     def inner():
+73 71 |         return
+
+D202.py:80:5: D202 [*] No blank lines allowed after function docstring (found 1)
+   |
+80 | # D202
+81 | def outer():
+82 |     """This is a docstring."""
+   |     ^^^^^^^^^^^^^^^^^^^^^^^^^^ D202
+83 | 
+84 |     # This is a comment.
+   |
+   = help: Remove blank line(s) after function docstring
+
+ℹ Suggested fix
+78 78 | # D202
+79 79 | def outer():
+80 80 |     """This is a docstring."""
+81    |-
+82 81 |     # This is a comment.
+83 82 | 
+84 83 |     def inner():
+
 

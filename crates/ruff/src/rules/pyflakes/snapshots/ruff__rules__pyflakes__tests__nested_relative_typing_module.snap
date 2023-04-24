@@ -1,33 +1,18 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `foo`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 26
-    column: 16
-  end_location:
-    row: 26
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UndefinedName
-    body: "Undefined name `foo`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 33
-    column: 16
-  end_location:
-    row: 33
-    column: 19
-  fix:
-    edits: []
-  parent: ~
+baz.py:26:17: F821 Undefined name `foo`
+   |
+26 |     # F821
+27 |     x: Literal["foo"]
+   |                 ^^^ F821
+   |
+
+baz.py:33:17: F821 Undefined name `foo`
+   |
+33 |     # F821
+34 |     x: Literal["foo"]
+   |                 ^^^ F821
+   |
+
 

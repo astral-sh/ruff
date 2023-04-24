@@ -5,11 +5,11 @@ use once_cell::sync::Lazy;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use ruff_python_ast::cast;
-use ruff_python_ast::helpers::to_call_path;
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::types::{CallPath, Range};
-use ruff_python_ast::visibility::{is_property, is_test};
+use ruff_python_ast::types::Range;
+use ruff_python_semantic::analyze::visibility::{is_property, is_test};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
@@ -33,7 +33,7 @@ pub fn non_imperative_mood(
 
     let property_decorators = property_decorators
         .iter()
-        .map(|decorator| to_call_path(decorator))
+        .map(|decorator| from_qualified_name(decorator))
         .collect::<Vec<CallPath>>();
 
     if is_test(cast::name(parent))

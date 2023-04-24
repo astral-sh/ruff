@@ -1,33 +1,22 @@
 ---
 source: crates/ruff/src/rules/pylint/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: YieldInInit
-    body: "`__init__` method is a generator"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 8
-  end_location:
-    row: 9
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: YieldInInit
-    body: "`__init__` method is a generator"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 8
-  end_location:
-    row: 14
-    column: 29
-  fix:
-    edits: []
-  parent: ~
+yield_in_init.py:9:9: PLE0100 `__init__` method is a generator
+   |
+ 9 | class A:
+10 |     def __init__(self):
+11 |         yield
+   |         ^^^^^ PLE0100
+   |
+
+yield_in_init.py:14:9: PLE0100 `__init__` method is a generator
+   |
+14 | class B:
+15 |     def __init__(self):
+16 |         yield from self.gen()
+   |         ^^^^^^^^^^^^^^^^^^^^^ PLE0100
+17 | 
+18 |     def gen(self):
+   |
+
 

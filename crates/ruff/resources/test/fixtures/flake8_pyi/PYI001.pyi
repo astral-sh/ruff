@@ -11,3 +11,6 @@ _T = TypeVar("_T")  # OK
 _TTuple = TypeVarTuple("_TTuple")  # OK
 
 _P = ParamSpec("_P")  # OK
+
+def f():
+    T = TypeVar("T")  # OK

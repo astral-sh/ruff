@@ -1,8 +1,9 @@
+use unicode_width::UnicodeWidthStr;
+
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::leading_quote;
 use ruff_python_ast::types::Range;
-use unicode_width::UnicodeWidthStr;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};

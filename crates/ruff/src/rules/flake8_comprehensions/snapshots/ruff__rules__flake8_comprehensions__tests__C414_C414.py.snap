@@ -1,299 +1,361 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `list` call within `list()`"
-    suggestion: "Remove the inner `list` call"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 13
-  fix:
-    edits:
-      - content: list(x)
-        location:
-          row: 2
-          column: 0
-        end_location:
-          row: 2
-          column: 13
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `tuple` call within `list()`"
-    suggestion: "Remove the inner `tuple` call"
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 14
-  fix:
-    edits:
-      - content: list(x)
-        location:
-          row: 3
-          column: 0
-        end_location:
-          row: 3
-          column: 14
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `list` call within `tuple()`"
-    suggestion: "Remove the inner `list` call"
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 14
-  fix:
-    edits:
-      - content: tuple(x)
-        location:
-          row: 4
-          column: 0
-        end_location:
-          row: 4
-          column: 14
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `tuple` call within `tuple()`"
-    suggestion: "Remove the inner `tuple` call"
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 15
-  fix:
-    edits:
-      - content: tuple(x)
-        location:
-          row: 5
-          column: 0
-        end_location:
-          row: 5
-          column: 15
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `set` call within `set()`"
-    suggestion: "Remove the inner `set` call"
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 11
-  fix:
-    edits:
-      - content: set(x)
-        location:
-          row: 6
-          column: 0
-        end_location:
-          row: 6
-          column: 11
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `list` call within `set()`"
-    suggestion: "Remove the inner `list` call"
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 12
-  fix:
-    edits:
-      - content: set(x)
-        location:
-          row: 7
-          column: 0
-        end_location:
-          row: 7
-          column: 12
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `tuple` call within `set()`"
-    suggestion: "Remove the inner `tuple` call"
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 13
-  fix:
-    edits:
-      - content: set(x)
-        location:
-          row: 8
-          column: 0
-        end_location:
-          row: 8
-          column: 13
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `sorted` call within `set()`"
-    suggestion: "Remove the inner `sorted` call"
-    fixable: true
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 14
-  fix:
-    edits:
-      - content: set(x)
-        location:
-          row: 9
-          column: 0
-        end_location:
-          row: 9
-          column: 14
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `reversed` call within `set()`"
-    suggestion: "Remove the inner `reversed` call"
-    fixable: true
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 16
-  fix:
-    edits:
-      - content: set(x)
-        location:
-          row: 10
-          column: 0
-        end_location:
-          row: 10
-          column: 16
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `list` call within `sorted()`"
-    suggestion: "Remove the inner `list` call"
-    fixable: true
-  location:
-    row: 11
-    column: 0
-  end_location:
-    row: 11
-    column: 15
-  fix:
-    edits:
-      - content: sorted(x)
-        location:
-          row: 11
-          column: 0
-        end_location:
-          row: 11
-          column: 15
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `tuple` call within `sorted()`"
-    suggestion: "Remove the inner `tuple` call"
-    fixable: true
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 12
-    column: 16
-  fix:
-    edits:
-      - content: sorted(x)
-        location:
-          row: 12
-          column: 0
-        end_location:
-          row: 12
-          column: 16
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `sorted` call within `sorted()`"
-    suggestion: "Remove the inner `sorted` call"
-    fixable: true
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 17
-  fix:
-    edits:
-      - content: sorted(x)
-        location:
-          row: 13
-          column: 0
-        end_location:
-          row: 13
-          column: 17
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `reversed` call within `sorted()`"
-    suggestion: "Remove the inner `reversed` call"
-    fixable: true
-  location:
-    row: 14
-    column: 0
-  end_location:
-    row: 14
-    column: 19
-  fix:
-    edits:
-      - content: sorted(x)
-        location:
-          row: 14
-          column: 0
-        end_location:
-          row: 14
-          column: 19
-  parent: ~
-- kind:
-    name: UnnecessaryDoubleCastOrProcess
-    body: "Unnecessary `list` call within `tuple()`"
-    suggestion: "Remove the inner `list` call"
-    fixable: true
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 20
-    column: 1
-  fix:
-    edits:
-      - content: "tuple(\n    [x, 3, \"hell\"\\\n        \"o\"]\n    )"
-        location:
-          row: 15
-          column: 0
-        end_location:
-          row: 20
-          column: 1
-  parent: ~
+C414.py:2:1: C414 [*] Unnecessary `list` call within `list()`
+  |
+2 | x = [1, 2, 3]
+3 | list(list(x))
+  | ^^^^^^^^^^^^^ C414
+4 | list(tuple(x))
+5 | tuple(list(x))
+  |
+  = help: Remove the inner `list` call
+
+ℹ Suggested fix
+1 1 | x = [1, 2, 3]
+2   |-list(list(x))
+  2 |+list(x)
+3 3 | list(tuple(x))
+4 4 | tuple(list(x))
+5 5 | tuple(tuple(x))
+
+C414.py:3:1: C414 [*] Unnecessary `tuple` call within `list()`
+  |
+3 | x = [1, 2, 3]
+4 | list(list(x))
+5 | list(tuple(x))
+  | ^^^^^^^^^^^^^^ C414
+6 | tuple(list(x))
+7 | tuple(tuple(x))
+  |
+  = help: Remove the inner `tuple` call
+
+ℹ Suggested fix
+1 1 | x = [1, 2, 3]
+2 2 | list(list(x))
+3   |-list(tuple(x))
+  3 |+list(x)
+4 4 | tuple(list(x))
+5 5 | tuple(tuple(x))
+6 6 | set(set(x))
+
+C414.py:4:1: C414 [*] Unnecessary `list` call within `tuple()`
+  |
+4 | list(list(x))
+5 | list(tuple(x))
+6 | tuple(list(x))
+  | ^^^^^^^^^^^^^^ C414
+7 | tuple(tuple(x))
+8 | set(set(x))
+  |
+  = help: Remove the inner `list` call
+
+ℹ Suggested fix
+1 1 | x = [1, 2, 3]
+2 2 | list(list(x))
+3 3 | list(tuple(x))
+4   |-tuple(list(x))
+  4 |+tuple(x)
+5 5 | tuple(tuple(x))
+6 6 | set(set(x))
+7 7 | set(list(x))
+
+C414.py:5:1: C414 [*] Unnecessary `tuple` call within `tuple()`
+  |
+5 | list(tuple(x))
+6 | tuple(list(x))
+7 | tuple(tuple(x))
+  | ^^^^^^^^^^^^^^^ C414
+8 | set(set(x))
+9 | set(list(x))
+  |
+  = help: Remove the inner `tuple` call
+
+ℹ Suggested fix
+2 2 | list(list(x))
+3 3 | list(tuple(x))
+4 4 | tuple(list(x))
+5   |-tuple(tuple(x))
+  5 |+tuple(x)
+6 6 | set(set(x))
+7 7 | set(list(x))
+8 8 | set(tuple(x))
+
+C414.py:6:1: C414 [*] Unnecessary `set` call within `set()`
+   |
+ 6 | tuple(list(x))
+ 7 | tuple(tuple(x))
+ 8 | set(set(x))
+   | ^^^^^^^^^^^ C414
+ 9 | set(list(x))
+10 | set(tuple(x))
+   |
+   = help: Remove the inner `set` call
+
+ℹ Suggested fix
+3 3 | list(tuple(x))
+4 4 | tuple(list(x))
+5 5 | tuple(tuple(x))
+6   |-set(set(x))
+  6 |+set(x)
+7 7 | set(list(x))
+8 8 | set(tuple(x))
+9 9 | set(sorted(x))
+
+C414.py:7:1: C414 [*] Unnecessary `list` call within `set()`
+   |
+ 7 | tuple(tuple(x))
+ 8 | set(set(x))
+ 9 | set(list(x))
+   | ^^^^^^^^^^^^ C414
+10 | set(tuple(x))
+11 | set(sorted(x))
+   |
+   = help: Remove the inner `list` call
+
+ℹ Suggested fix
+4 4 | tuple(list(x))
+5 5 | tuple(tuple(x))
+6 6 | set(set(x))
+7   |-set(list(x))
+  7 |+set(x)
+8 8 | set(tuple(x))
+9 9 | set(sorted(x))
+10 10 | set(sorted(x, key=lambda y: y))
+
+C414.py:8:1: C414 [*] Unnecessary `tuple` call within `set()`
+   |
+ 8 | set(set(x))
+ 9 | set(list(x))
+10 | set(tuple(x))
+   | ^^^^^^^^^^^^^ C414
+11 | set(sorted(x))
+12 | set(sorted(x, key=lambda y: y))
+   |
+   = help: Remove the inner `tuple` call
+
+ℹ Suggested fix
+5 5 | tuple(tuple(x))
+6 6 | set(set(x))
+7 7 | set(list(x))
+8   |-set(tuple(x))
+  8 |+set(x)
+9 9 | set(sorted(x))
+10 10 | set(sorted(x, key=lambda y: y))
+11 11 | set(reversed(x))
+
+C414.py:9:1: C414 [*] Unnecessary `sorted` call within `set()`
+   |
+ 9 | set(list(x))
+10 | set(tuple(x))
+11 | set(sorted(x))
+   | ^^^^^^^^^^^^^^ C414
+12 | set(sorted(x, key=lambda y: y))
+13 | set(reversed(x))
+   |
+   = help: Remove the inner `sorted` call
+
+ℹ Suggested fix
+6  6  | set(set(x))
+7  7  | set(list(x))
+8  8  | set(tuple(x))
+9     |-set(sorted(x))
+   9  |+set(x)
+10 10 | set(sorted(x, key=lambda y: y))
+11 11 | set(reversed(x))
+12 12 | sorted(list(x))
+
+C414.py:10:1: C414 [*] Unnecessary `sorted` call within `set()`
+   |
+10 | set(tuple(x))
+11 | set(sorted(x))
+12 | set(sorted(x, key=lambda y: y))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414
+13 | set(reversed(x))
+14 | sorted(list(x))
+   |
+   = help: Remove the inner `sorted` call
+
+ℹ Suggested fix
+7  7  | set(list(x))
+8  8  | set(tuple(x))
+9  9  | set(sorted(x))
+10    |-set(sorted(x, key=lambda y: y))
+   10 |+set(x, )
+11 11 | set(reversed(x))
+12 12 | sorted(list(x))
+13 13 | sorted(tuple(x))
+
+C414.py:11:1: C414 [*] Unnecessary `reversed` call within `set()`
+   |
+11 | set(sorted(x))
+12 | set(sorted(x, key=lambda y: y))
+13 | set(reversed(x))
+   | ^^^^^^^^^^^^^^^^ C414
+14 | sorted(list(x))
+15 | sorted(tuple(x))
+   |
+   = help: Remove the inner `reversed` call
+
+ℹ Suggested fix
+8  8  | set(tuple(x))
+9  9  | set(sorted(x))
+10 10 | set(sorted(x, key=lambda y: y))
+11    |-set(reversed(x))
+   11 |+set(x)
+12 12 | sorted(list(x))
+13 13 | sorted(tuple(x))
+14 14 | sorted(sorted(x))
+
+C414.py:12:1: C414 [*] Unnecessary `list` call within `sorted()`
+   |
+12 | set(sorted(x, key=lambda y: y))
+13 | set(reversed(x))
+14 | sorted(list(x))
+   | ^^^^^^^^^^^^^^^ C414
+15 | sorted(tuple(x))
+16 | sorted(sorted(x))
+   |
+   = help: Remove the inner `list` call
+
+ℹ Suggested fix
+9  9  | set(sorted(x))
+10 10 | set(sorted(x, key=lambda y: y))
+11 11 | set(reversed(x))
+12    |-sorted(list(x))
+   12 |+sorted(x)
+13 13 | sorted(tuple(x))
+14 14 | sorted(sorted(x))
+15 15 | sorted(sorted(x, key=lambda y: y))
+
+C414.py:13:1: C414 [*] Unnecessary `tuple` call within `sorted()`
+   |
+13 | set(reversed(x))
+14 | sorted(list(x))
+15 | sorted(tuple(x))
+   | ^^^^^^^^^^^^^^^^ C414
+16 | sorted(sorted(x))
+17 | sorted(sorted(x, key=lambda y: y))
+   |
+   = help: Remove the inner `tuple` call
+
+ℹ Suggested fix
+10 10 | set(sorted(x, key=lambda y: y))
+11 11 | set(reversed(x))
+12 12 | sorted(list(x))
+13    |-sorted(tuple(x))
+   13 |+sorted(x)
+14 14 | sorted(sorted(x))
+15 15 | sorted(sorted(x, key=lambda y: y))
+16 16 | sorted(reversed(x))
+
+C414.py:14:1: C414 [*] Unnecessary `sorted` call within `sorted()`
+   |
+14 | sorted(list(x))
+15 | sorted(tuple(x))
+16 | sorted(sorted(x))
+   | ^^^^^^^^^^^^^^^^^ C414
+17 | sorted(sorted(x, key=lambda y: y))
+18 | sorted(reversed(x))
+   |
+   = help: Remove the inner `sorted` call
+
+ℹ Suggested fix
+11 11 | set(reversed(x))
+12 12 | sorted(list(x))
+13 13 | sorted(tuple(x))
+14    |-sorted(sorted(x))
+   14 |+sorted(x)
+15 15 | sorted(sorted(x, key=lambda y: y))
+16 16 | sorted(reversed(x))
+17 17 | sorted(list(x), key=lambda y: y)
+
+C414.py:15:1: C414 [*] Unnecessary `sorted` call within `sorted()`
+   |
+15 | sorted(tuple(x))
+16 | sorted(sorted(x))
+17 | sorted(sorted(x, key=lambda y: y))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414
+18 | sorted(reversed(x))
+19 | sorted(list(x), key=lambda y: y)
+   |
+   = help: Remove the inner `sorted` call
+
+ℹ Suggested fix
+12 12 | sorted(list(x))
+13 13 | sorted(tuple(x))
+14 14 | sorted(sorted(x))
+15    |-sorted(sorted(x, key=lambda y: y))
+   15 |+sorted(x, )
+16 16 | sorted(reversed(x))
+17 17 | sorted(list(x), key=lambda y: y)
+18 18 | tuple(
+
+C414.py:16:1: C414 [*] Unnecessary `reversed` call within `sorted()`
+   |
+16 | sorted(sorted(x))
+17 | sorted(sorted(x, key=lambda y: y))
+18 | sorted(reversed(x))
+   | ^^^^^^^^^^^^^^^^^^^ C414
+19 | sorted(list(x), key=lambda y: y)
+20 | tuple(
+   |
+   = help: Remove the inner `reversed` call
+
+ℹ Suggested fix
+13 13 | sorted(tuple(x))
+14 14 | sorted(sorted(x))
+15 15 | sorted(sorted(x, key=lambda y: y))
+16    |-sorted(reversed(x))
+   16 |+sorted(x)
+17 17 | sorted(list(x), key=lambda y: y)
+18 18 | tuple(
+19 19 |     list(
+
+C414.py:17:1: C414 [*] Unnecessary `list` call within `sorted()`
+   |
+17 | sorted(sorted(x, key=lambda y: y))
+18 | sorted(reversed(x))
+19 | sorted(list(x), key=lambda y: y)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C414
+20 | tuple(
+21 |     list(
+   |
+   = help: Remove the inner `list` call
+
+ℹ Suggested fix
+14 14 | sorted(sorted(x))
+15 15 | sorted(sorted(x, key=lambda y: y))
+16 16 | sorted(reversed(x))
+17    |-sorted(list(x), key=lambda y: y)
+   17 |+sorted(x, key=lambda y: y)
+18 18 | tuple(
+19 19 |     list(
+20 20 |         [x, 3, "hell"\
+
+C414.py:18:1: C414 [*] Unnecessary `list` call within `tuple()`
+   |
+18 |   sorted(reversed(x))
+19 |   sorted(list(x), key=lambda y: y)
+20 | / tuple(
+21 | |     list(
+22 | |         [x, 3, "hell"\
+23 | |         "o"]
+24 | |     )
+25 | | )
+   | |_^ C414
+   |
+   = help: Remove the inner `list` call
+
+ℹ Suggested fix
+16 16 | sorted(reversed(x))
+17 17 | sorted(list(x), key=lambda y: y)
+18 18 | tuple(
+19    |-    list(
+20    |-        [x, 3, "hell"\
+   19 |+    [x, 3, "hell"\
+21 20 |         "o"]
+22 21 |     )
+23    |-)
+
 

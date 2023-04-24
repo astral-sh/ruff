@@ -24,7 +24,7 @@ impl AlwaysAutofixableViolation for FormatLiterals {
     }
 
     fn autofix_title(&self) -> String {
-        "Remove explicit positional indexes".to_string()
+        "Remove explicit positional indices".to_string()
     }
 }
 
@@ -135,7 +135,7 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
     if !summary.autos.is_empty() {
         return;
     }
-    if !(0..summary.indexes.len()).all(|index| summary.indexes.contains(&index)) {
+    if !(0..summary.indices.len()).all(|index| summary.indices.contains(&index)) {
         return;
     }
 
@@ -144,7 +144,7 @@ pub(crate) fn format_literals(checker: &mut Checker, summary: &FormatSummary, ex
         // Currently, the only issue we know of is in LibCST:
         // https://github.com/Instagram/LibCST/issues/846
         if let Ok(contents) =
-            generate_call(expr, &summary.indexes, checker.locator, checker.stylist)
+            generate_call(expr, &summary.indices, checker.locator, checker.stylist)
         {
             diagnostic.set_fix(Edit::replacement(
                 contents,

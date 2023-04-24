@@ -1,0 +1,66 @@
+---
+source: crates/ruff/src/message/json.rs
+expression: content
+---
+[
+  {
+    "code": "F401",
+    "message": "`os` imported but unused",
+    "fix": null,
+    "location": {
+      "row": 1,
+      "column": 8
+    },
+    "end_location": {
+      "row": 1,
+      "column": 10
+    },
+    "filename": "fib.py",
+    "noqa_row": 1
+  },
+  {
+    "code": "F841",
+    "message": "Local variable `x` is assigned to but never used",
+    "fix": {
+      "message": "Remove assignment to unused variable `x`",
+      "edits": [
+        {
+          "content": "",
+          "location": {
+            "row": 6,
+            "column": 4
+          },
+          "end_location": {
+            "row": 6,
+            "column": 9
+          }
+        }
+      ]
+    },
+    "location": {
+      "row": 6,
+      "column": 5
+    },
+    "end_location": {
+      "row": 6,
+      "column": 6
+    },
+    "filename": "fib.py",
+    "noqa_row": 1
+  },
+  {
+    "code": "F821",
+    "message": "Undefined name `a`",
+    "fix": null,
+    "location": {
+      "row": 1,
+      "column": 4
+    },
+    "end_location": {
+      "row": 1,
+      "column": 5
+    },
+    "filename": "undef.py",
+    "noqa_row": 1
+  }
+]

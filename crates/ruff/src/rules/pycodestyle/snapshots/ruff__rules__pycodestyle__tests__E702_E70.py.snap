@@ -1,89 +1,64 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MultipleStatementsOnOneLineSemicolon
-    body: Multiple statements on one line (semicolon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 9
-  end_location:
-    row: 6
-    column: 10
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineSemicolon
-    body: Multiple statements on one line (semicolon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 16
-  end_location:
-    row: 8
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineSemicolon
-    body: Multiple statements on one line (semicolon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 8
-  end_location:
-    row: 12
-    column: 9
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineSemicolon
-    body: Multiple statements on one line (semicolon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 25
-    column: 10
-  end_location:
-    row: 25
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineSemicolon
-    body: Multiple statements on one line (semicolon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 54
-    column: 12
-  end_location:
-    row: 54
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleStatementsOnOneLineSemicolon
-    body: Multiple statements on one line (semicolon)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 56
-    column: 12
-  end_location:
-    row: 56
-    column: 13
-  fix:
-    edits: []
-  parent: ~
+E70.py:6:10: E702 Multiple statements on one line (semicolon)
+   |
+ 6 | if not header or header[:6] != 'bytes=': return
+ 7 | #: E702:1:10
+ 8 | a = False; b = True
+   |          ^ E702
+ 9 | #: E702:1:17
+10 | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
+   |
+
+E70.py:8:17: E702 Multiple statements on one line (semicolon)
+   |
+ 8 | a = False; b = True
+ 9 | #: E702:1:17
+10 | import bdist_egg; bdist_egg.write_safety_flag(cmd.egg_info, safe)
+   |                 ^ E702
+11 | #: E703:1:13
+12 | import shlex;
+   |
+
+E70.py:12:9: E702 Multiple statements on one line (semicolon)
+   |
+12 | import shlex;
+13 | #: E702:1:9 E703:1:23
+14 | del a[:]; a.append(42);
+   |         ^ E702
+15 | #: E704:1:1
+16 | def f(x): return 2
+   |
+
+E70.py:25:11: E702 Multiple statements on one line (semicolon)
+   |
+25 |     def f(x): return 2*x
+26 | #: E704:1:8 E702:1:11 E703:1:14
+27 | if True: x; y;
+   |           ^ E702
+28 | #: E701:1:8
+29 | if True: lambda a: b
+   |
+
+E70.py:54:13: E702 Multiple statements on one line (semicolon)
+   |
+54 | def f(): ...
+55 | #: E701:1:8 E702:1:13
+56 | class C: ...; x = 1
+   |             ^ E702
+57 | #: E701:1:8 E702:1:13
+58 | class C: ...; ...
+   |
+
+E70.py:56:13: E702 Multiple statements on one line (semicolon)
+   |
+56 | class C: ...; x = 1
+57 | #: E701:1:8 E702:1:13
+58 | class C: ...; ...
+   |             ^ E702
+59 | #: E701:2:12
+60 | match *0, 1, *2:
+   |
+
 

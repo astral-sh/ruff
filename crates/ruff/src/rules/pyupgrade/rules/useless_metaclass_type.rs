@@ -5,7 +5,7 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
 
-use crate::autofix::helpers;
+use crate::autofix::actions;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
@@ -52,7 +52,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
         let defined_by = checker.ctx.current_stmt();
         let defined_in = checker.ctx.current_stmt_parent();
-        match helpers::delete_stmt(
+        match actions::delete_stmt(
             defined_by.into(),
             defined_in.map(Into::into),
             &deleted,
@@ -61,7 +61,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
             checker.stylist,
         ) {
             Ok(fix) => {
-                if fix.content.is_empty() || fix.content == "pass" {
+                if fix.is_deletion() || fix.content() == Some("pass") {
                     checker.deletions.insert(*defined_by);
                 }
                 diagnostic.set_fix(fix);

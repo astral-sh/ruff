@@ -1,5 +1,3 @@
-use std::path::Path;
-
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, StmtKind,
@@ -8,11 +6,9 @@ use rustpython_parser::ast::{
 
 use ruff_python_ast::source_code::Locator;
 use ruff_python_ast::visitor::Visitor;
-use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::directives::IsortDirectives;
-
-use super::helpers;
+use crate::rules::isort::helpers;
 
 #[derive(Debug, Copy, Clone)]
 pub enum Trailer {
@@ -38,11 +34,11 @@ pub struct ImportTracker<'a> {
 }
 
 impl<'a> ImportTracker<'a> {
-    pub fn new(locator: &'a Locator<'a>, directives: &'a IsortDirectives, path: &'a Path) -> Self {
+    pub fn new(locator: &'a Locator<'a>, directives: &'a IsortDirectives, is_stub: bool) -> Self {
         Self {
             locator,
             directives,
-            is_stub: is_python_stub_file(path),
+            is_stub,
             blocks: vec![Block::default()],
             split_index: 0,
             nested: false,

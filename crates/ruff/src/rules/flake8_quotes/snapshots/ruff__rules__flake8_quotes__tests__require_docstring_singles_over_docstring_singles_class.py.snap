@@ -1,47 +1,45 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 3
-    column: 4
-  end_location:
-    row: 3
-    column: 27
-  fix:
-    edits:
-      - content: "\"\"\" Not a docstring \"\"\""
-        location:
-          row: 3
-          column: 4
-        end_location:
-          row: 3
-          column: 27
-  parent: ~
-- kind:
-    name: BadQuotesMultilineString
-    body: Single quote multiline found but double quotes preferred
-    suggestion: Replace single multiline quotes with double quotes
-    fixable: true
-  location:
-    row: 5
-    column: 22
-  end_location:
-    row: 5
-    column: 43
-  fix:
-    edits:
-      - content: "\"\"\"not a docstring\"\"\""
-        location:
-          row: 5
-          column: 22
-        end_location:
-          row: 5
-          column: 43
-  parent: ~
+docstring_singles_class.py:3:5: Q001 [*] Single quote multiline found but double quotes preferred
+  |
+3 | class SingleLineDocstrings():
+4 |     ''' Double quotes single line class docstring '''
+5 |     ''' Not a docstring '''
+  |     ^^^^^^^^^^^^^^^^^^^^^^^ Q001
+6 | 
+7 |     def foo(self, bar='''not a docstring'''):
+  |
+  = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+1 1 | class SingleLineDocstrings():
+2 2 |     ''' Double quotes single line class docstring '''
+3   |-    ''' Not a docstring '''
+  3 |+    """ Not a docstring """
+4 4 | 
+5 5 |     def foo(self, bar='''not a docstring'''):
+6 6 |         ''' Double quotes single line method docstring'''
+
+docstring_singles_class.py:5:23: Q001 [*] Single quote multiline found but double quotes preferred
+  |
+5 |     ''' Not a docstring '''
+6 | 
+7 |     def foo(self, bar='''not a docstring'''):
+  |                       ^^^^^^^^^^^^^^^^^^^^^ Q001
+8 |         ''' Double quotes single line method docstring'''
+9 |         pass
+  |
+  = help: Replace single multiline quotes with double quotes
+
+ℹ Suggested fix
+2 2 |     ''' Double quotes single line class docstring '''
+3 3 |     ''' Not a docstring '''
+4 4 | 
+5   |-    def foo(self, bar='''not a docstring'''):
+  5 |+    def foo(self, bar="""not a docstring"""):
+6 6 |         ''' Double quotes single line method docstring'''
+7 7 |         pass
+8 8 | 
+
 

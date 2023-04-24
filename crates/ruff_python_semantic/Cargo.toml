@@ -1,0 +1,19 @@
+[package]
+name = "ruff_python_semantic"
+version = "0.0.0"
+publish = false
+edition = { workspace = true }
+rust-version = { workspace = true }
+
+[lib]
+
+[dependencies]
+ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_stdlib = { path = "../ruff_python_stdlib" }
+
+bitflags = { workspace = true }
+is-macro = { workspace = true }
+nohash-hasher = { workspace = true }
+rustc-hash = { workspace = true }
+rustpython-parser = { workspace = true }
+smallvec = { workspace = true }
