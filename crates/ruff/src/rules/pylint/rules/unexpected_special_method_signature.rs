@@ -126,7 +126,7 @@ pub fn unexpected_special_method_signature(
                     actual_params,
                 },
                 identifier_range(stmt, locator),
-            ))
+            ));
         }
     }
 }
