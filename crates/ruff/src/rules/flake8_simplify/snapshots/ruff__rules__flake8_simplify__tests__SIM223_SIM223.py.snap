@@ -658,7 +658,7 @@ SIM223.py:92:7: SIM223 [*] Use `False` instead of `... and False and ...`
 94 94 | 
 95 95 | # Inside test `a` is simplified
 
-SIM223.py:97:6: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:97:6: SIM223 [*] Use `False` instead of `... and False and ...`
     |
  97 | # Inside test `a` is simplified
  98 | 
@@ -667,19 +667,19 @@ SIM223.py:97:6: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
 100 | 
 101 | assert a and [] and False and []  # SIM223
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 94 94 | 
 95 95 | # Inside test `a` is simplified
 96 96 | 
 97    |-bool(a and [] and False and [])  # SIM223
-   97 |+bool([])  # SIM223
+   97 |+bool(False)  # SIM223
 98 98 | 
 99 99 | assert a and [] and False and []  # SIM223
 100 100 | 
 
-SIM223.py:99:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:99:8: SIM223 [*] Use `False` instead of `... and False and ...`
     |
  99 | bool(a and [] and False and [])  # SIM223
 100 | 
@@ -688,19 +688,19 @@ SIM223.py:99:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
 102 | 
 103 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 96  96  | 
 97  97  | bool(a and [] and False and [])  # SIM223
 98  98  | 
 99      |-assert a and [] and False and []  # SIM223
-    99  |+assert []  # SIM223
+    99  |+assert False  # SIM223
 100 100 | 
 101 101 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
 102 102 |     pass
 
-SIM223.py:101:5: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:101:5: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 101 | assert a and [] and False and []  # SIM223
 102 | 
@@ -708,19 +708,19 @@ SIM223.py:101:5: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |     ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
 104 |     pass
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 98  98  | 
 99  99  | assert a and [] and False and []  # SIM223
 100 100 | 
 101     |-if (a and [] and False and []) or (a and [] and False and []):  # SIM223
-    101 |+if ([]) or (a and [] and False and []):  # SIM223
+    101 |+if (False) or (a and [] and False and []):  # SIM223
 102 102 |     pass
 103 103 | 
 104 104 | 0 if a and [] and False and [] else 1  # SIM222
 
-SIM223.py:101:36: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:101:36: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 101 | assert a and [] and False and []  # SIM223
 102 | 
@@ -728,19 +728,19 @@ SIM223.py:101:36: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |                                    ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
 104 |     pass
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 98  98  | 
 99  99  | assert a and [] and False and []  # SIM223
 100 100 | 
 101     |-if (a and [] and False and []) or (a and [] and False and []):  # SIM223
-    101 |+if (a and [] and False and []) or ([]):  # SIM223
+    101 |+if (a and [] and False and []) or (False):  # SIM223
 102 102 |     pass
 103 103 | 
 104 104 | 0 if a and [] and False and [] else 1  # SIM222
 
-SIM223.py:104:6: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:104:6: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 104 |     pass
 105 | 
@@ -749,19 +749,19 @@ SIM223.py:104:6: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
 107 | 
 108 | while a and [] and False and []:  # SIM223
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 101 101 | if (a and [] and False and []) or (a and [] and False and []):  # SIM223
 102 102 |     pass
 103 103 | 
 104     |-0 if a and [] and False and [] else 1  # SIM222
-    104 |+0 if [] else 1  # SIM222
+    104 |+0 if False else 1  # SIM222
 105 105 | 
 106 106 | while a and [] and False and []:  # SIM223
 107 107 |     pass
 
-SIM223.py:106:7: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:106:7: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 106 | 0 if a and [] and False and [] else 1  # SIM222
 107 | 
@@ -769,19 +769,19 @@ SIM223.py:106:7: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |       ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
 109 |     pass
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 103 103 | 
 104 104 | 0 if a and [] and False and [] else 1  # SIM222
 105 105 | 
 106     |-while a and [] and False and []:  # SIM223
-    106 |+while []:  # SIM223
+    106 |+while False:  # SIM223
 107 107 |     pass
 108 108 | 
 109 109 | [
 
-SIM223.py:113:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:113:8: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 113 |     for a in range(10)
 114 |     for b in range(10)
@@ -790,19 +790,19 @@ SIM223.py:113:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
 116 |     if b and [] and False and []  # SIM223
 117 | ]
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 110 110 |     0
 111 111 |     for a in range(10)
 112 112 |     for b in range(10)
 113     |-    if a and [] and False and []  # SIM223
-    113 |+    if []  # SIM223
+    113 |+    if False  # SIM223
 114 114 |     if b and [] and False and []  # SIM223
 115 115 | ]
 116 116 | 
 
-SIM223.py:114:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:114:8: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 114 |     for b in range(10)
 115 |     if a and [] and False and []  # SIM223
@@ -810,19 +810,19 @@ SIM223.py:114:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
 117 | ]
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 111 111 |     for a in range(10)
 112 112 |     for b in range(10)
 113 113 |     if a and [] and False and []  # SIM223
 114     |-    if b and [] and False and []  # SIM223
-    114 |+    if []  # SIM223
+    114 |+    if False  # SIM223
 115 115 | ]
 116 116 | 
 117 117 | {
 
-SIM223.py:121:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:121:8: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 121 |     for a in range(10)
 122 |     for b in range(10)
@@ -831,19 +831,19 @@ SIM223.py:121:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
 124 |     if b and [] and False and []  # SIM223
 125 | }
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 118 118 |     0
 119 119 |     for a in range(10)
 120 120 |     for b in range(10)
 121     |-    if a and [] and False and []  # SIM223
-    121 |+    if []  # SIM223
+    121 |+    if False  # SIM223
 122 122 |     if b and [] and False and []  # SIM223
 123 123 | }
 124 124 | 
 
-SIM223.py:122:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:122:8: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 122 |     for b in range(10)
 123 |     if a and [] and False and []  # SIM223
@@ -851,19 +851,19 @@ SIM223.py:122:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
 125 | }
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 119 119 |     for a in range(10)
 120 120 |     for b in range(10)
 121 121 |     if a and [] and False and []  # SIM223
 122     |-    if b and [] and False and []  # SIM223
-    122 |+    if []  # SIM223
+    122 |+    if False  # SIM223
 123 123 | }
 124 124 | 
 125 125 | {
 
-SIM223.py:129:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:129:8: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 129 |     for a in range(10)
 130 |     for b in range(10)
@@ -872,19 +872,19 @@ SIM223.py:129:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
 132 |     if b and [] and False and []  # SIM223
 133 | }
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 126 126 |     0: 0
 127 127 |     for a in range(10)
 128 128 |     for b in range(10)
 129     |-    if a and [] and False and []  # SIM223
-    129 |+    if []  # SIM223
+    129 |+    if False  # SIM223
 130 130 |     if b and [] and False and []  # SIM223
 131 131 | }
 132 132 | 
 
-SIM223.py:130:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:130:8: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 130 |     for b in range(10)
 131 |     if a and [] and False and []  # SIM223
@@ -892,19 +892,19 @@ SIM223.py:130:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
 133 | }
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 127 127 |     for a in range(10)
 128 128 |     for b in range(10)
 129 129 |     if a and [] and False and []  # SIM223
 130     |-    if b and [] and False and []  # SIM223
-    130 |+    if []  # SIM223
+    130 |+    if False  # SIM223
 131 131 | }
 132 132 | 
 133 133 | (
 
-SIM223.py:137:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:137:8: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 137 |     for a in range(10)
 138 |     for b in range(10)
@@ -913,19 +913,19 @@ SIM223.py:137:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
 140 |     if b and [] and False and []  # SIM223
 141 | )
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 134 134 |     0
 135 135 |     for a in range(10)
 136 136 |     for b in range(10)
 137     |-    if a and [] and False and []  # SIM223
-    137 |+    if []  # SIM223
+    137 |+    if False  # SIM223
 138 138 |     if b and [] and False and []  # SIM223
 139 139 | )
 140 140 | 
 
-SIM223.py:138:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
+SIM223.py:138:8: SIM223 [*] Use `False` instead of `... and False and ...`
     |
 138 |     for b in range(10)
 139 |     if a and [] and False and []  # SIM223
@@ -933,14 +933,14 @@ SIM223.py:138:8: SIM223 [*] Use falsey `[]` instead of `... and [] and ...`
     |        ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
 141 | )
     |
-    = help: Replace with falsey `[]`
+    = help: Replace with `False`
 
 ℹ Suggested fix
 135 135 |     for a in range(10)
 136 136 |     for b in range(10)
 137 137 |     if a and [] and False and []  # SIM223
 138     |-    if b and [] and False and []  # SIM223
-    138 |+    if []  # SIM223
+    138 |+    if False  # SIM223
 139 139 | )
 140 140 | 
 141 141 | # Outside test `a` is not simplified

@@ -3,8 +3,9 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
+use ruff_python_ast::source_code::Stylist;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Boolop, Cmpop, Expr, ExprContext, ExprKind, Unaryop};
+use rustpython_parser::ast::{Boolop, Cmpop, Expr, ExprContext, ExprKind, Location, Unaryop};
 
 use ruff_diagnostics::{
     AlwaysAutofixableViolation, AutofixKind, Diagnostic, DiagnosticKind, Edit, Violation,
@@ -131,6 +132,12 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
 /// ## What it does
 /// Checks if `or` expressions with truthy value can be simplified.
 ///
+/// If the expression is used as a condition, it can be replaced with
+/// `False`. It can be simplified further than in other cases.
+///
+/// In other cases, the expression can be replaced with the first truthy
+/// value.
+///
 /// ## Why is this bad?
 /// The code is less readable and more difficult to understand.
 /// The code is also less efficient, as multiple expressions are evaluated
@@ -138,14 +145,18 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
 ///
 /// ## Example
 /// ```python
-/// if x or True:
+/// if x or [1] or y:
 ///     pass
+///
+/// a = x or [1] or y
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if True:
 ///     pass
+///
+/// a = x or [1]
 /// ```
 #[violation]
 pub struct ExprOrTrue {
@@ -166,7 +177,9 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
             (false, true) => format!("{expr} or ..."),
             (true, false) => format!("... or {expr}"),
             (true, true) => format!("... or {expr} or ..."),
-            (false, false) => panic!("`remove_before` and `remove_after` cannot both be false"),
+            (false, false) => {
+                unreachable!("`remove_before` and `remove_after` cannot both be false")
+            }
         };
         if matches!(expr.as_str(), "True") {
             format!("Use `True` instead of `{replaced}`")
@@ -188,6 +201,12 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
 /// ## What it does
 /// Checks if `and` expressions with falsey value can be simplified.
 ///
+/// If the expression is used as a condition, it can be replaced with
+/// `False`. It can be simplified further than in other cases.
+///
+/// In other cases, the expression can be replaced with the first falsey
+/// value.
+///
 /// ## Why is this bad?
 /// The code is less readable and more difficult to understand.
 /// The code is also less efficient, as multiple expressions are evaluated
@@ -195,14 +214,18 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
 ///
 /// ## Example
 /// ```python
-/// if x and False:
+/// if x and [] and y:
 ///     pass
+///
+/// a = x and [] and y
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// if False:
 ///     pass
+///
+/// a = x and []
 /// ```
 #[violation]
 pub struct ExprAndFalse {
@@ -223,7 +246,9 @@ impl AlwaysAutofixableViolation for ExprAndFalse {
             (false, true) => format!(r#"{expr} and ..."#),
             (true, false) => format!("... and {expr}"),
             (true, true) => format!("... and {expr} and ..."),
-            (false, false) => panic!("`remove_before` and `remove_after` cannot both be false"),
+            (false, false) => {
+                unreachable!("`remove_before` and `remove_after` cannot both be false")
+            }
         };
         if matches!(expr.as_str(), "False") {
             format!("Use `False` instead of `{replaced}`")
@@ -590,6 +615,28 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     }
 }
 
+pub fn get_short_circuit_edit(
+    expr: &Expr,
+    location: Location,
+    end_location: Location,
+    truthiness: Truthiness,
+    in_boolean_test: bool,
+    stylist: &Stylist,
+) -> Edit {
+    let content = if in_boolean_test {
+        match truthiness {
+            Truthiness::Truthy => "True".to_string(),
+            Truthiness::Falsey => "False".to_string(),
+            Truthiness::Unknown => {
+                unreachable!("short_circuit_truthiness should be Truthy or Falsey")
+            }
+        }
+    } else {
+        unparse_expr(expr, stylist)
+    };
+    Edit::replacement(content, location, end_location)
+}
+
 pub fn is_short_circuit(
     checker: &Checker,
     expr: &Expr,
@@ -632,10 +679,13 @@ pub fn is_short_circuit(
         if value_truthiness == short_circuit_truthiness {
             remove_before = location != value.location;
             remove_after = true;
-            edit = Some(Edit::replacement(
-                unparse_expr(value, checker.stylist),
+            edit = Some(get_short_circuit_edit(
+                value,
                 location,
                 expr.end_location.unwrap(),
+                short_circuit_truthiness,
+                checker.ctx.in_boolean_test,
+                checker.stylist,
             ));
             break;
         }
@@ -645,10 +695,13 @@ pub fn is_short_circuit(
         if next_value_truthiness == short_circuit_truthiness {
             remove_before = true;
             remove_after = index != values.len() - 2;
-            edit = Some(Edit::replacement(
-                unparse_expr(next_value, checker.stylist),
+            edit = Some(get_short_circuit_edit(
+                next_value,
                 location,
                 expr.end_location.unwrap(),
+                short_circuit_truthiness,
+                checker.ctx.in_boolean_test,
+                checker.stylist,
             ));
             break;
         }
