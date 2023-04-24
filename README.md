@@ -370,7 +370,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [Poetry](https://github.com/python-poetry/poetry)
 - [Polars](https://github.com/pola-rs/polars)
 - [PostHog](https://github.com/PostHog/posthog)
-- Prefect ([Marvin](https://github.com/PrefectHQ/marvin))
+- Prefect ([Python SDK](https://github.com/PrefectHQ/prefect), [Marvin](https://github.com/PrefectHQ/marvin))
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [PyInstaller](https://github.com/pyinstaller/pyinstaller)
 - [Pylint](https://github.com/PyCQA/pylint)
