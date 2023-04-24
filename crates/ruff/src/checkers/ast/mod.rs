@@ -590,6 +590,21 @@ where
                     );
                 }
 
+                if self
+                    .settings
+                    .rules
+                    .enabled(Rule::UnexpectedSpecialMethodSignature)
+                {
+                    pylint::rules::unexpected_special_method_signature(
+                        self,
+                        stmt,
+                        name,
+                        decorator_list,
+                        args,
+                        self.locator,
+                    );
+                }
+
                 self.check_builtin_shadowing(name, stmt, true);
 
                 // Visit the decorators and arguments, but avoid the body, which will be
