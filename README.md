@@ -367,6 +367,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PDM](https://github.com/pdm-project/pdm)
 - [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)
 - [Pandas](https://github.com/pandas-dev/pandas)
+- [Poetry](https://github.com/python-poetry/poetry)
 - [Polars](https://github.com/pola-rs/polars)
 - [PostHog](https://github.com/PostHog/posthog)
 - Prefect ([Marvin](https://github.com/PrefectHQ/marvin))
