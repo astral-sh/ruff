@@ -1,6 +1,6 @@
 import typing
 from dataclasses import dataclass, field
-from typing import Sequence
+from typing import ClassVar, Sequence
 
 KNOWINGLY_MUTABLE_DEFAULT = []
 
@@ -13,6 +13,7 @@ class A:
     ignored_via_comment: list[int] = []  # noqa: RUF008
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
+    class_variable: typing.ClassVar[list[int]] = []
 
 
 @dataclass
@@ -23,3 +24,4 @@ class B:
     ignored_via_comment: list[int] = []  # noqa: RUF008
     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
     perfectly_fine: list[int] = field(default_factory=list)
+    class_variable: ClassVar[list[int]] = []

@@ -1,5 +1,6 @@
+import typing
 from dataclasses import dataclass
-from typing import NamedTuple
+from typing import ClassVar, NamedTuple
 
 
 def default_function() -> list[int]:
@@ -13,6 +14,8 @@ class ImmutableType(NamedTuple):
 @dataclass()
 class A:
     hidden_mutable_default: list[int] = default_function()
+    class_variable: typing.ClassVar[list[int]] = default_function()
+    another_class_var: ClassVar[list[int]] = default_function()
 
 
 DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES = ImmutableType(40)
