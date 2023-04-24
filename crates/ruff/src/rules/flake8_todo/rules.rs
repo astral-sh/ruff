@@ -3,11 +3,16 @@ use std::iter::Peekable;
 use once_cell::sync::Lazy;
 
 use regex::{CaptureMatches, Regex, RegexSet};
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::types::Range;
-use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
+use rustpython_parser::{ast::Location, lexer::LexResult};
+
+use crate::{
+    registry::Rule,
+    settings::{flags, Settings},
+};
 
 /// ## What it does
 /// Checks that a TODO comment is actually labelled with "TODO".
@@ -32,8 +37,6 @@ use rustpython_parser::Tok;
 pub struct InvalidTodoTag {
     pub tag: String,
 }
-
-// TODO - autofix this to just insert TODO instead of the tag?
 impl Violation for InvalidTodoTag {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -89,7 +92,7 @@ pub struct MissingLinkInTodo;
 impl Violation for MissingLinkInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing issue link in TODO")
+        format!("Missing issue link following TODO")
     }
 }
 
@@ -161,11 +164,15 @@ impl Violation for MissingTextInTodo {
 pub struct InvalidCapitalizationInTodo {
     pub tag: String,
 }
-impl Violation for InvalidCapitalizationInTodo {
+impl AlwaysAutofixableViolation for InvalidCapitalizationInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
         let InvalidCapitalizationInTodo { tag } = self;
         format!("Invalid TODO capitalization: `{tag}` should be `TODO`")
+    }
+
+    fn autofix_title(&self) -> String {
+        "Fix capitalization in `TODO`".to_string()
     }
 }
 
@@ -232,7 +239,11 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
 
 static NUM_CAPTURE_GROUPS: usize = 5usize;
 
-pub fn check_rules(tokens: &[LexResult]) -> Vec<Diagnostic> {
+pub fn check_todos(
+    tokens: &[LexResult],
+    autofix: flags::Autofix,
+    settings: &Settings,
+) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     let mut prev_token_is_todo = false;
 
@@ -256,11 +267,10 @@ pub fn check_rules(tokens: &[LexResult]) -> Vec<Diagnostic> {
             diagnostics_ref.push(Diagnostic::new(MissingLinkInTodo, range));
         }
 
-        if let Some(captures_ref) = get_captured_matches(comment).peek() {
-            let captures = captures_ref.to_owned();
-
-            // captures.get(1) is the tag, which is required for the regex to match. The unwrap()
-            // call is therefore safe
+        // TODO: gotta be a way to remove this nest
+        if let Some(captures) = get_captured_matches(comment).peek() {
+            // Unwrap is safe because the "tag" capture group is required to enter the current
+            // block
             let tag = captures.name("tag").unwrap().as_str();
             if tag != "TODO" {
                 diagnostics_ref.push(Diagnostic::new(
@@ -271,12 +281,39 @@ pub fn check_rules(tokens: &[LexResult]) -> Vec<Diagnostic> {
                 ));
 
                 if tag.to_uppercase() == "TODO" {
-                    diagnostics_ref.push(Diagnostic::new(
+                    let invalid_capitalization = Diagnostic::new(
                         InvalidCapitalizationInTodo {
                             tag: String::from(tag),
                         },
                         range,
-                    ));
+                    )
+                    .with_fix(
+                        if should_autofix(autofix, settings, Rule::InvalidCapitalizationInTodo) {
+                            // The TODO regex allows for any number of spaces, so let's find where the first "t"
+                            // or "T" is. We know the unwrap is safe because of the mandatory regex
+                            // match. We'll use position() since "#" is 2 bytes which could throw
+                            // off an implementation that uses byte-indexing.
+                            let first_t_location = comment
+                                .chars()
+                                .position(|c| c.to_string() == "t" || c.to_string() == "T")
+                                .unwrap();
+
+                            Fix::new(vec![Edit::replacement(
+                                "TODO".to_string(),
+                                Location::new(range.location.row(), first_t_location),
+                                Location::new(
+                                    range.location.row(),
+                                    // We know `tag` is 4 bytes long because we've already ensured
+                                    // it's some variant of "TODO"
+                                    first_t_location + tag.len(),
+                                ),
+                            )])
+                        } else {
+                            Fix::empty()
+                        },
+                    );
+
+                    diagnostics_ref.push(invalid_capitalization);
                 }
             }
 
@@ -324,4 +361,8 @@ fn get_regex_error(i: usize, range: &Range, diagnostics: &mut [Diagnostic]) -> O
         5usize => Some(Diagnostic::new(MissingTextInTodo, *range)),
         _ => None,
     }
+}
+
+fn should_autofix(autofix: flags::Autofix, settings: &Settings, rule: Rule) -> bool {
+    autofix.into() && settings.rules.should_fix(rule)
 }
