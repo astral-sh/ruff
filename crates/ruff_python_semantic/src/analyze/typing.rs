@@ -10,6 +10,7 @@ use crate::context::Context;
 
 #[derive(Copy, Clone)]
 pub enum Callable {
+    Bool,
     Cast,
     NewType,
     TypeVar,

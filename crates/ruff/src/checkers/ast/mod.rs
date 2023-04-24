@@ -161,6 +161,18 @@ macro_rules! visit_non_type_definition {
     }};
 }
 
+/// Visit an [`Expr`], and treat it as a boolean test. This is useful for detecting whether an
+/// expressions return value is significant, or whether the calling context only relies on
+/// its truthiness.
+macro_rules! visit_boolean_test {
+    ($self:ident, $expr:expr) => {{
+        let prev_in_boolean_test = $self.ctx.in_boolean_test;
+        $self.ctx.in_boolean_test = true;
+        $self.visit_expr($expr);
+        $self.ctx.in_boolean_test = prev_in_boolean_test;
+    }};
+}
+
 impl<'a, 'b> Visitor<'b> for Checker<'a>
 where
     'b: 'a,
@@ -2154,8 +2166,19 @@ where
                 }
                 self.visit_expr(target);
             }
+            StmtKind::Assert { test, msg } => {
+                visit_boolean_test!(self, test);
+                if let Some(expr) = msg {
+                    self.visit_expr(expr);
+                }
+            }
+            StmtKind::While { test, body, orelse } => {
+                visit_boolean_test!(self, test);
+                self.visit_body(body);
+                self.visit_body(orelse);
+            }
             StmtKind::If { test, body, orelse } => {
-                self.visit_expr(test);
+                visit_boolean_test!(self, test);
 
                 if flake8_type_checking::helpers::is_type_checking_block(&self.ctx, test) {
                     if self.settings.rules.enabled(Rule::EmptyTypeCheckingBlock) {
@@ -2242,6 +2265,11 @@ where
 
         let prev_in_literal = self.ctx.in_literal;
         let prev_in_type_definition = self.ctx.in_type_definition;
+        let prev_in_boolean_test = self.ctx.in_boolean_test;
+
+        if !matches!(expr.node, ExprKind::BoolOp { .. }) {
+            self.ctx.in_boolean_test = false;
+        }
 
         // Pre-visit.
         match &expr.node {
@@ -3582,6 +3610,11 @@ where
                     (self.ctx.scope_stack.clone(), self.ctx.parents.clone()),
                 ));
             }
+            ExprKind::IfExp { test, body, orelse } => {
+                visit_boolean_test!(self, test);
+                self.visit_expr(body);
+                self.visit_expr(orelse);
+            }
             ExprKind::Call {
                 func,
                 args,
@@ -3610,11 +3643,22 @@ where
                     .any(|target| call_path.as_slice() == ["mypy_extensions", target])
                     {
                         Some(Callable::MypyExtension)
+                    } else if call_path.as_slice() == ["", "bool"] {
+                        Some(Callable::Bool)
                     } else {
                         None
                     }
                 });
                 match callable {
+                    Some(Callable::Bool) => {
+                        self.visit_expr(func);
+                        if !args.is_empty() {
+                            visit_boolean_test!(self, &args[0]);
+                        }
+                        for expr in args.iter().skip(1) {
+                            self.visit_expr(expr);
+                        }
+                    }
                     Some(Callable::Cast) => {
                         self.visit_expr(func);
                         if !args.is_empty() {
@@ -3813,6 +3857,7 @@ where
 
         self.ctx.in_type_definition = prev_in_type_definition;
         self.ctx.in_literal = prev_in_literal;
+        self.ctx.in_boolean_test = prev_in_boolean_test;
 
         self.ctx.pop_expr();
     }
@@ -3825,7 +3870,11 @@ where
                 &comprehension.iter,
             );
         }
-        visitor::walk_comprehension(self, comprehension);
+        self.visit_expr(&comprehension.iter);
+        self.visit_expr(&comprehension.target);
+        for expr in &comprehension.ifs {
+            visit_boolean_test!(self, expr);
+        }
     }
 
     fn visit_excepthandler(&mut self, excepthandler: &'b Excepthandler) {
