@@ -1,13 +1,15 @@
 use crate::rules::isort::types::TrailingComma;
+use std::collections::BTreeSet;
 
 use super::types::{AliasData, ImportBlock, ImportFromData};
 use super::AnnotatedImport;
 
-pub fn normalize_imports(
-    imports: Vec<AnnotatedImport>,
+pub fn normalize_imports<'a>(
+    imports: Vec<AnnotatedImport<'a>>,
     combine_as_imports: bool,
     force_single_line: bool,
-) -> ImportBlock {
+    single_line_exclusions: &'a BTreeSet<String>,
+) -> ImportBlock<'a> {
     let mut block = ImportBlock::default();
     for import in imports {
         match import {
@@ -52,20 +54,15 @@ pub fn normalize_imports(
                 inline,
                 trailing_comma,
             } => {
+                // Whether to track each member of the import as a separate entry.
+                let isolate_aliases = force_single_line
+                    && module.map_or(true, |module| !single_line_exclusions.contains(module));
+
                 // Insert comments on the statement itself.
-                if let Some(alias) = names.first() {
-                    let import_from = if alias.name == "*" {
-                        block
-                            .import_from_star
-                            .entry(ImportFromData { module, level })
-                            .or_default()
-                    } else if alias.asname.is_none() || combine_as_imports || force_single_line {
-                        block
-                            .import_from
-                            .entry(ImportFromData { module, level })
-                            .or_default()
-                    } else {
-                        block
+                if isolate_aliases {
+                    let mut first = true;
+                    for alias in &names {
+                        let import_from = block
                             .import_from_as
                             .entry((
                                 ImportFromData { module, level },
@@ -74,26 +71,64 @@ pub fn normalize_imports(
                                     asname: alias.asname,
                                 },
                             ))
-                            .or_default()
-                    };
+                            .or_default();
 
-                    for comment in atop {
-                        import_from.comments.atop.push(comment.value);
+                        // Associate the comments above the import statement with the first alias
+                        // (best effort).
+                        if std::mem::take(&mut first) {
+                            for comment in &atop {
+                                import_from.comments.atop.push(comment.value.clone());
+                            }
+                        }
+
+                        // Replicate the inline comments onto every member.
+                        for comment in &inline {
+                            import_from.comments.inline.push(comment.value.clone());
+                        }
                     }
+                } else {
+                    if let Some(alias) = names.first() {
+                        let import_from = if alias.name == "*" {
+                            block
+                                .import_from_star
+                                .entry(ImportFromData { module, level })
+                                .or_default()
+                        } else if alias.asname.is_none() || combine_as_imports {
+                            block
+                                .import_from
+                                .entry(ImportFromData { module, level })
+                                .or_default()
+                        } else {
+                            block
+                                .import_from_as
+                                .entry((
+                                    ImportFromData { module, level },
+                                    AliasData {
+                                        name: alias.name,
+                                        asname: alias.asname,
+                                    },
+                                ))
+                                .or_default()
+                        };
 
-                    for comment in inline {
-                        import_from.comments.inline.push(comment.value);
+                        for comment in atop {
+                            import_from.comments.atop.push(comment.value);
+                        }
+
+                        for comment in inline {
+                            import_from.comments.inline.push(comment.value);
+                        }
                     }
                 }
 
-                // Create an entry for every alias (import) within the statement.
+                // Create an entry for every alias (member) within the statement.
                 for alias in names {
                     let import_from = if alias.name == "*" {
                         block
                             .import_from_star
                             .entry(ImportFromData { module, level })
                             .or_default()
-                    } else if alias.asname.is_none() || combine_as_imports || force_single_line {
+                    } else if !isolate_aliases && (alias.asname.is_none() || combine_as_imports) {
                         block
                             .import_from
                             .entry(ImportFromData { module, level })
@@ -127,7 +162,7 @@ pub fn normalize_imports(
                     }
 
                     // Propagate trailing commas.
-                    if matches!(trailing_comma, TrailingComma::Present) {
+                    if !isolate_aliases && matches!(trailing_comma, TrailingComma::Present) {
                         import_from.trailing_comma = TrailingComma::Present;
                     }
                 }
