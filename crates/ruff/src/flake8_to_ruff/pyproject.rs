@@ -1,11 +1,11 @@
 use std::path::Path;
 
 use anyhow::Result;
+use pyproject_toml::Project;
 use serde::{Deserialize, Serialize};
 
 use super::black::Black;
 use super::isort::Isort;
-use super::pep621::Project;
 
 #[derive(Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Tools {

@@ -4,9 +4,9 @@ use std::path::{Path, PathBuf};
 
 use anyhow::Result;
 use log::debug;
+use pyproject_toml::Project;
 use serde::{Deserialize, Serialize};
 
-use crate::flake8_to_ruff::pep621::Project;
 use crate::settings::options::Options;
 use crate::settings::types::PythonVersion;
 
@@ -319,7 +319,7 @@ other-attribute = 1
                     ]),
                 }),
                 flake8_builtins: Some(flake8_builtins::settings::Options {
-                    builtins_ignorelist: Some(vec!["id".to_string(), "dir".to_string(),]),
+                    builtins_ignorelist: Some(vec!["id".to_string(), "dir".to_string()]),
                 }),
                 flake8_errmsg: Some(flake8_errmsg::settings::Options {
                     max_string_length: Some(20),

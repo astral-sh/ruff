@@ -1,6 +1,7 @@
+use pyproject_toml::Project;
+
 use super::black::Black;
 use super::isort::Isort;
-use super::pep621::Project;
 
 #[derive(Default)]
 pub struct ExternalConfig<'a> {
