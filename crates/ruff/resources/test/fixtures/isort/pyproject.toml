@@ -2,12 +2,7 @@
 line-length = 88
 
 [tool.ruff.isort]
-#lines-after-imports = 3
-#lines-between-types = 2
-#known-local-folder = ["ruff"]
-#force-to-top = ["lib1", "lib3", "lib5", "lib3.lib4", "z"]
-force-single-line = true
-
-[tool.isort]
-force_single_line = true
-profile = "black"
+lines-after-imports = 3
+lines-between-types = 2
+known-local-folder = ["ruff"]
+force-to-top = ["lib1", "lib3", "lib5", "lib3.lib4", "z"]
