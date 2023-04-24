@@ -1615,9 +1615,7 @@ where
                     flake8_bugbear::rules::assert_false(self, stmt, test, msg.as_deref());
                 }
                 if self.settings.rules.enabled(Rule::PytestAssertAlwaysFalse) {
-                    if let Some(diagnostic) = flake8_pytest_style::rules::assert_falsy(stmt, test) {
-                        self.diagnostics.push(diagnostic);
-                    }
+                    flake8_pytest_style::rules::assert_falsy(self, stmt, test);
                 }
                 if self.settings.rules.enabled(Rule::PytestCompositeAssertion) {
                     flake8_pytest_style::rules::composite_condition(
