@@ -44,83 +44,57 @@ if a and False and f() and b and g():  # OK
     pass
 
 
-if a or "" or True:  # SIM222
-    pass
+a or "" or True  # SIM222
 
-if a or "foo" or True or "bar":  # SIM222
-    pass
+a or "foo" or True or "bar"  # SIM222
 
-if a or 0 or True:  # SIM222
-    pass
+a or 0 or True  # SIM222
 
-if a or 1 or True or 2:  # SIM222
-    pass
+a or 1 or True or 2  # SIM222
 
-if a or 0.0 or True:  # SIM222
-    pass
+a or 0.0 or True  # SIM222
 
-if a or 0.1 or True or 0.2:  # SIM222
-    pass
+a or 0.1 or True or 0.2  # SIM222
 
-if a or [] or True:  # SIM222
-    pass
+a or [] or True  # SIM222
 
-if a or list([]) or True:  # SIM222
-    pass
+a or list([]) or True  # SIM222
 
-if a or [1] or True or [2]:  # SIM222
-    pass
+a or [1] or True or [2]  # SIM222
 
-if a or list([1]) or True or list([2]):  # SIM222
-    pass
+a or list([1]) or True or list([2])  # SIM222
 
-if a or {} or True:  # SIM222
-    pass
+a or {} or True  # SIM222
 
-if a or dict() or True:  # SIM222
-    pass
+a or dict() or True  # SIM222
 
-if a or {1: 1} or True or {2: 2}:  # SIM222
-    pass
+a or {1: 1} or True or {2: 2}  # SIM222
 
-if a or dict({1: 1}) or True or dict({2: 2}):  # SIM222
-    pass
+a or dict({1: 1}) or True or dict({2: 2})  # SIM222
 
-if a or set() or True:  # SIM222
-    pass
+a or set() or True  # SIM222
 
-if a or set(set()) or True:  # SIM222
-    pass
+a or set(set()) or True  # SIM222
 
-if a or {1} or True or {2}:  # SIM222
-    pass
+a or {1} or True or {2}  # SIM222
 
-if a or set({1}) or True or set({2}):  # SIM222
-    pass
+a or set({1}) or True or set({2})  # SIM222
 
-if a or () or True:  # SIM222
-    pass
+a or () or True  # SIM222
 
-if a or tuple(()) or True:  # SIM222
-    pass
+a or tuple(()) or True  # SIM222
 
-if a or (1,) or True or (2,):  # SIM222
-    pass
+a or (1,) or True or (2,)  # SIM222
 
-if a or tuple((1,)) or True or tuple((2,)):  # SIM222
-    pass
+a or tuple((1,)) or True or tuple((2,))  # SIM222
 
-if a or frozenset() or True:  # SIM222
-    pass
+a or frozenset() or True  # SIM222
 
-if a or frozenset(frozenset()) or True:  # SIM222
-    pass
+a or frozenset(frozenset()) or True  # SIM222
 
-if a or frozenset({1}) or True or frozenset({2}):  # SIM222
-    pass
+a or frozenset({1}) or True or frozenset({2})  # SIM222
 
-if a or frozenset(frozenset({1})) or True or frozenset(frozenset({2})):  # SIM222
-    pass
+a or frozenset(frozenset({1})) or True or frozenset(frozenset({2}))  # SIM222
 
 
 # Inside test `a` is simplified

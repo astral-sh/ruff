@@ -39,83 +39,57 @@ if a or True or f() or b or g():  # OK
     pass
 
 
-if a and "" and False:  # SIM223
-    pass
+a and "" and False  # SIM223
 
-if a and "foo" and False and "bar":  # SIM223
-    pass
+a and "foo" and False and "bar"  # SIM223
 
-if a and 0 and False:  # SIM223
-    pass
+a and 0 and False  # SIM223
 
-if a and 1 and False and 2:  # SIM223
-    pass
+a and 1 and False and 2  # SIM223
 
-if a and 0.0 and False:  # SIM223
-    pass
+a and 0.0 and False  # SIM223
 
-if a and 0.1 and False and 0.2:  # SIM223
-    pass
+a and 0.1 and False and 0.2  # SIM223
 
-if a and [] and False:  # SIM223
-    pass
+a and [] and False  # SIM223
 
-if a and list([]) and False:  # SIM223
-    pass
+a and list([]) and False  # SIM223
 
-if a and [1] and False and [2]:  # SIM223
-    pass
+a and [1] and False and [2]  # SIM223
 
-if a and list([1]) and False and list([2]):  # SIM223
-    pass
+a and list([1]) and False and list([2])  # SIM223
 
-if a and {} and False:  # SIM223
-    pass
+a and {} and False  # SIM223
 
-if a and dict() and False:  # SIM223
-    pass
+a and dict() and False  # SIM223
 
-if a and {1: 1} and False and {2: 2}:  # SIM223
-    pass
+a and {1: 1} and False and {2: 2}  # SIM223
 
-if a and dict({1: 1}) and False and dict({2: 2}):  # SIM223
-    pass
+a and dict({1: 1}) and False and dict({2: 2})  # SIM223
 
-if a and set() and False:  # SIM223
-    pass
+a and set() and False  # SIM223
 
-if a and set(set()) and False:  # SIM223
-    pass
+a and set(set()) and False  # SIM223
 
-if a and {1} and False and {2}:  # SIM223
-    pass
+a and {1} and False and {2}  # SIM223
 
-if a and set({1}) and False and set({2}):  # SIM223
-    pass
+a and set({1}) and False and set({2})  # SIM223
 
-if a and () and False:  # SIM222
-    pass
+a and () and False  # SIM222
 
-if a and tuple(()) and False:  # SIM222
-    pass
+a and tuple(()) and False  # SIM222
 
-if a and (1,) and False and (2,):  # SIM222
-    pass
+a and (1,) and False and (2,)  # SIM222
 
-if a and tuple((1,)) and False and tuple((2,)):  # SIM222
-    pass
+a and tuple((1,)) and False and tuple((2,))  # SIM222
 
-if a and frozenset() and False:  # SIM222
-    pass
+a and frozenset() and False  # SIM222
 
-if a and frozenset(frozenset()) and False:  # SIM222
-    pass
+a and frozenset(frozenset()) and False  # SIM222
 
-if a and frozenset({1}) and False and frozenset({2}):  # SIM222
-    pass
+a and frozenset({1}) and False and frozenset({2})  # SIM222
 
-if a and frozenset(frozenset({1})) and False and frozenset(frozenset({2})):  # SIM222
-    pass
+a and frozenset(frozenset({1})) and False and frozenset(frozenset({2}))  # SIM222
 
 
 # Inside test `a` is simplified
