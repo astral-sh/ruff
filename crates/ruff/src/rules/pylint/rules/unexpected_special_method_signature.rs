@@ -37,7 +37,7 @@ impl Violation for UnexpectedSpecialMethodSignature {
             )
         } else {
             format!(
-                "The special method '{}' expects {} param(s)s, {} {} given",
+                "The special method '{}' expects {} param(s), {} {} given",
                 self.method_name,
                 self.expected_params.start(),
                 self.actual_params,
