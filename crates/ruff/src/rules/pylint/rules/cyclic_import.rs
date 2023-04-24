@@ -121,7 +121,8 @@ pub fn cyclic_import(
     };
     let module_name = module_name.join(".");
     // if the module name isn't in the import map, it can't possibly have cycles
-    // this also allows us to use `unwrap` whenever we use methods on the `ModulMapping`
+    // this also allows us to use `unwrap` whenever we use methods on the `ModuleMapping`
+    // as any modules as part of cycles are guaranteed to be in the `ModuleMapping`
     debug!("Checking module {module_name}");
     let Some((module_name, _)) = imports.get_key_value(&module_name as &str) else {
         return None;
