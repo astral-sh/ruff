@@ -129,6 +129,13 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum ContentAround {
+    Before,
+    After,
+    Both,
+}
+
 /// ## What it does
 /// Checks if `or` expressions with truthy value can be simplified.
 ///
@@ -161,40 +168,24 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
 #[violation]
 pub struct ExprOrTrue {
     pub expr: String,
-    pub remove_before: bool,
-    pub remove_after: bool,
+    pub remove: ContentAround,
 }
 
 impl AlwaysAutofixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ExprOrTrue {
-            expr,
-            remove_before,
-            remove_after,
-        } = self;
-        let replaced = match (remove_before, remove_after) {
-            (false, true) => format!("{expr} or ..."),
-            (true, false) => format!("... or {expr}"),
-            (true, true) => format!("... or {expr} or ..."),
-            (false, false) => {
-                unreachable!("`remove_before` and `remove_after` cannot both be false")
-            }
+        let ExprOrTrue { expr, remove } = self;
+        let replaced = match remove {
+            ContentAround::After => format!("{expr} or ..."),
+            ContentAround::Before => format!("... or {expr}"),
+            ContentAround::Both => format!("... or {expr} or ..."),
         };
-        if matches!(expr.as_str(), "True") {
-            format!("Use `True` instead of `{replaced}`")
-        } else {
-            format!("Use truthy `{expr}` instead of `{replaced}`")
-        }
+        format!("Use `{expr}` instead of `{replaced}`")
     }
 
     fn autofix_title(&self) -> String {
         let ExprOrTrue { expr, .. } = self;
-        if matches!(self.expr.as_str(), "True") {
-            format!("Replace with `True`")
-        } else {
-            format!("Replace with truthy `{expr}`")
-        }
+        format!("Replace with `{expr}`")
     }
 }
 
@@ -230,40 +221,24 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
 #[violation]
 pub struct ExprAndFalse {
     pub expr: String,
-    pub remove_before: bool,
-    pub remove_after: bool,
+    pub remove: ContentAround,
 }
 
 impl AlwaysAutofixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        let ExprAndFalse {
-            expr,
-            remove_before,
-            remove_after,
-        } = self;
-        let replaced = match (remove_before, remove_after) {
-            (false, true) => format!(r#"{expr} and ..."#),
-            (true, false) => format!("... and {expr}"),
-            (true, true) => format!("... and {expr} and ..."),
-            (false, false) => {
-                unreachable!("`remove_before` and `remove_after` cannot both be false")
-            }
+        let ExprAndFalse { expr, remove } = self;
+        let replaced = match remove {
+            ContentAround::After => format!(r#"{expr} and ..."#),
+            ContentAround::Before => format!("... and {expr}"),
+            ContentAround::Both => format!("... and {expr} and ..."),
         };
-        if matches!(expr.as_str(), "False") {
-            format!("Use `False` instead of `{replaced}`")
-        } else {
-            format!("Use falsey `{expr}` instead of `{replaced}`")
-        }
+        format!("Use `{expr}` instead of `{replaced}`")
     }
 
     fn autofix_title(&self) -> String {
         let ExprAndFalse { expr, .. } = self;
-        if matches!(self.expr.as_str(), "False") {
-            format!("Replace with `False`")
-        } else {
-            format!("Replace with falsey `{expr}`")
-        }
+        format!("Replace with `{expr}`")
     }
 }
 
@@ -655,15 +630,15 @@ pub fn is_short_circuit(
 
     let mut location = expr.location;
     let mut edit = None;
-    let mut remove_before = false;
-    let mut remove_after = false;
+    let mut remove = None;
+
     for (index, (value, next_value)) in values.iter().tuple_windows().enumerate() {
-        // Keep track of the location of the furthest-right, truthy or falsey expression
+        // Keep track of the location of the furthest-right, truthy or falsey expression.
         let value_truthiness = Truthiness::from_expr(value, |id| checker.ctx.is_builtin(id));
         let next_value_truthiness =
             Truthiness::from_expr(next_value, |id| checker.ctx.is_builtin(id));
 
-        // Keep track of the location of the furthest-right, non-effectful expression
+        // Keep track of the location of the furthest-right, non-effectful expression.
         if value_truthiness.is_unknown()
             && (!checker.ctx.in_boolean_test
                 || contains_effect(value, |id| checker.ctx.is_builtin(id)))
@@ -677,8 +652,11 @@ pub fn is_short_circuit(
         // short-circuit expression is the first expression in the list; otherwise, we'll see it
         // as `next_value` before we see it as `value`.
         if value_truthiness == short_circuit_truthiness {
-            remove_before = location != value.location;
-            remove_after = true;
+            remove = Some(if location == value.location {
+                ContentAround::After
+            } else {
+                ContentAround::Both
+            });
             edit = Some(get_short_circuit_edit(
                 value,
                 location,
@@ -693,8 +671,11 @@ pub fn is_short_circuit(
         // If the next expression is a constant, and it matches the short-circuit value, then
         // we can return the location of the expression.
         if next_value_truthiness == short_circuit_truthiness {
-            remove_before = true;
-            remove_after = index != values.len() - 2;
+            remove = Some(if index == values.len() - 2 {
+                ContentAround::Before
+            } else {
+                ContentAround::Both
+            });
             edit = Some(get_short_circuit_edit(
                 next_value,
                 location,
@@ -706,32 +687,34 @@ pub fn is_short_circuit(
             break;
         }
     }
-    if let Some(edit) = edit {
-        let diagnostic_kind: DiagnosticKind = match op {
-            Boolop::And => ExprAndFalse {
-                expr: edit.content().unwrap().to_string(),
-                remove_before,
-                remove_after,
-            }
-            .into(),
-            Boolop::Or => ExprOrTrue {
-                expr: edit.content().unwrap().to_string(),
-                remove_before,
-                remove_after,
-            }
-            .into(),
-        };
-        let mut diagnostic = Diagnostic::new(
-            diagnostic_kind,
-            Range::new(edit.location(), edit.end_location()),
-        );
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(edit);
+
+    let Some(edit) = edit else {
+        return None;
+    };
+    let Some(remove) = remove else {
+        return None;
+    };
+
+    let diagnostic_kind: DiagnosticKind = match op {
+        Boolop::And => ExprAndFalse {
+            expr: edit.content().unwrap_or_default().to_string(),
+            remove,
         }
-        Some(diagnostic)
-    } else {
-        None
+        .into(),
+        Boolop::Or => ExprOrTrue {
+            expr: edit.content().unwrap_or_default().to_string(),
+            remove,
+        }
+        .into(),
+    };
+    let mut diagnostic = Diagnostic::new(
+        diagnostic_kind,
+        Range::new(edit.location(), edit.end_location()),
+    );
+    if checker.patch(diagnostic.kind.rule()) {
+        diagnostic.set_fix(edit);
     }
+    Some(diagnostic)
 }
 
 /// SIM222
