@@ -34,6 +34,9 @@ pub use too_many_arguments::{too_many_arguments, TooManyArguments};
 pub use too_many_branches::{too_many_branches, TooManyBranches};
 pub use too_many_return_statements::{too_many_return_statements, TooManyReturnStatements};
 pub use too_many_statements::{too_many_statements, TooManyStatements};
+pub use unexpected_special_method_signature::{
+    unexpected_special_method_signature, UnexpectedSpecialMethodSignature,
+};
 pub use unnecessary_direct_lambda_call::{
     unnecessary_direct_lambda_call, UnnecessaryDirectLambdaCall,
 };
@@ -73,6 +76,7 @@ mod too_many_arguments;
 mod too_many_branches;
 mod too_many_return_statements;
 mod too_many_statements;
+mod unexpected_special_method_signature;
 mod unnecessary_direct_lambda_call;
 mod useless_else_on_loop;
 mod useless_import_alias;
