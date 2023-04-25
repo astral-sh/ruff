@@ -280,14 +280,18 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
 
     match convention {
         Some(Convention::Google) => {
-            for context in &section_contexts(&lines, SectionStyle::Google) {
-                google_section(checker, docstring, context);
-            }
+            parse_google_sections(
+                checker,
+                docstring,
+                &section_contexts(&lines, SectionStyle::Google),
+            );
         }
         Some(Convention::Numpy) => {
-            for context in &section_contexts(&lines, SectionStyle::Numpy) {
-                numpy_section(checker, docstring, context);
-            }
+            parse_numpy_sections(
+                checker,
+                docstring,
+                &section_contexts(&lines, SectionStyle::Numpy),
+            );
         }
         Some(Convention::Pep257) | None => {
             // There are some overlapping section names, between the Google and NumPy conventions
@@ -300,36 +304,37 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
             if numpy_sections.iter().any(|context| {
                 matches!(
                     context.kind,
-                    SectionKind::Parameters | SectionKind::OtherParameters
+                    SectionKind::Parameters
+                        | SectionKind::OtherParams
+                        | SectionKind::OtherParameters
                 )
             }) {
-                for context in &numpy_sections {
-                    numpy_section(checker, docstring, context);
-                }
+                parse_numpy_sections(checker, docstring, &numpy_sections);
                 return;
             }
 
-            // If the docstring contains `Args:` or `Arguments:`, use the Google convention.
+            // If the docstring contains any argument specifier, use the Google convention.
             let google_sections = section_contexts(&lines, SectionStyle::Google);
-            if google_sections
-                .iter()
-                .any(|context| matches!(context.kind, SectionKind::Arguments | SectionKind::Args))
-            {
-                for context in &google_sections {
-                    google_section(checker, docstring, context);
-                }
+            if google_sections.iter().any(|context| {
+                matches!(
+                    context.kind,
+                    SectionKind::Args
+                        | SectionKind::Arguments
+                        | SectionKind::KeywordArgs
+                        | SectionKind::KeywordArguments
+                        | SectionKind::OtherArgs
+                        | SectionKind::OtherArguments
+                )
+            }) {
+                parse_google_sections(checker, docstring, &google_sections);
                 return;
             }
 
             // Otherwise, use whichever convention matched more sections.
             if google_sections.len() > numpy_sections.len() {
-                for context in &google_sections {
-                    google_section(checker, docstring, context);
-                }
+                parse_google_sections(checker, docstring, &google_sections);
             } else {
-                for context in &numpy_sections {
-                    numpy_section(checker, docstring, context);
-                }
+                parse_numpy_sections(checker, docstring, &numpy_sections);
             }
         }
     }
@@ -790,7 +795,7 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
     blanks_and_section_underline(checker, docstring, context);
 }
 
-fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<&str>) {
+fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &FxHashSet<String>) {
     let (
         DefinitionKind::Function(parent)
         | DefinitionKind::NestedFunction(parent)
@@ -824,8 +829,8 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
             ),
         )
     {
-        let arg_name = arg.node.arg.as_str();
-        if !arg_name.starts_with('_') && !docstrings_args.contains(&arg_name) {
+        let arg_name = &arg.node.arg;
+        if !arg_name.starts_with('_') && !docstrings_args.contains(arg_name) {
             missing_arg_names.insert(arg_name.to_string());
         }
     }
@@ -833,21 +838,21 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
     // Check specifically for `vararg` and `kwarg`, which can be prefixed with a
     // single or double star, respectively.
     if let Some(arg) = &arguments.vararg {
-        let arg_name = arg.node.arg.as_str();
+        let arg_name = &arg.node.arg;
         let starred_arg_name = format!("*{arg_name}");
         if !arg_name.starts_with('_')
-            && !docstrings_args.contains(&arg_name)
-            && !docstrings_args.contains(&starred_arg_name.as_str())
+            && !docstrings_args.contains(arg_name)
+            && !docstrings_args.contains(&starred_arg_name)
         {
             missing_arg_names.insert(starred_arg_name);
         }
     }
     if let Some(arg) = &arguments.kwarg {
-        let arg_name = arg.node.arg.as_str();
+        let arg_name = &arg.node.arg;
         let starred_arg_name = format!("**{arg_name}");
         if !arg_name.starts_with('_')
-            && !docstrings_args.contains(&arg_name)
-            && !docstrings_args.contains(&starred_arg_name.as_str())
+            && !docstrings_args.contains(arg_name)
+            && !docstrings_args.contains(&starred_arg_name)
         {
             missing_arg_names.insert(starred_arg_name);
         }
@@ -866,10 +871,9 @@ fn missing_args(checker: &mut Checker, docstring: &Docstring, docstrings_args: &
 static GOOGLE_ARGS_REGEX: Lazy<Regex> =
     Lazy::new(|| Regex::new(r"^\s*(\*?\*?\w+)\s*(\(.*?\))?\s*:(\r\n|\n)?\s*.+").unwrap());
 
-fn args_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
+fn args_section(context: &SectionContext) -> FxHashSet<String> {
     if context.following_lines.is_empty() {
-        missing_args(checker, docstring, &FxHashSet::default());
-        return;
+        return FxHashSet::default();
     }
 
     // Normalize leading whitespace, by removing any lines with less indentation
@@ -908,17 +912,16 @@ fn args_section(checker: &mut Checker, docstring: &Docstring, context: &SectionC
             matches.push(captures);
         }
     }
-    let docstrings_args = matches
-        .iter()
-        .filter_map(|captures| captures.get(1).map(|arg_name| arg_name.as_str()))
-        .collect();
 
-    missing_args(checker, docstring, &docstrings_args);
+    matches
+        .iter()
+        .filter_map(|captures| captures.get(1).map(|arg_name| arg_name.as_str().to_owned()))
+        .collect::<FxHashSet<String>>()
 }
 
 fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
     // Collect the list of arguments documented in the docstring.
-    let mut docstring_args: FxHashSet<&str> = FxHashSet::default();
+    let mut docstring_args: FxHashSet<String> = FxHashSet::default();
     let section_level_indent = whitespace::leading_space(context.line);
 
     // Join line continuations, then resplit by line.
@@ -941,7 +944,7 @@ fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &Se
                 // Notably, NumPy lets you put multiple parameters of the same type on the same
                 // line.
                 for parameter in parameters.split(',') {
-                    docstring_args.insert(parameter.trim());
+                    docstring_args.insert(parameter.trim().to_owned());
                 }
             }
 
@@ -1044,10 +1047,49 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
             checker.diagnostics.push(diagnostic);
         }
     }
+}
+
+fn parse_numpy_sections(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    section_contexts: &[SectionContext],
+) {
+    for section_context in section_contexts {
+        numpy_section(checker, docstring, section_context);
+    }
+}
+
+fn parse_google_sections(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    section_contexts: &[SectionContext],
+) {
+    for section_context in section_contexts {
+        google_section(checker, docstring, section_context);
+    }
 
     if checker.settings.rules.enabled(Rule::UndocumentedParam) {
-        if matches!(context.kind, SectionKind::Args | SectionKind::Arguments) {
-            args_section(checker, docstring, context);
+        let mut has_args = false;
+        let mut documented_args: FxHashSet<String> = FxHashSet::default();
+        for section_context in section_contexts {
+            // Checks occur at the section level. Since two sections (args/keyword args and their
+            // variants) can list arguments, we need to unify the sets of arguments mentioned in both
+            // then check for missing arguments at the end of the section check.
+            if matches!(
+                section_context.kind,
+                SectionKind::Args
+                    | SectionKind::Arguments
+                    | SectionKind::KeywordArgs
+                    | SectionKind::KeywordArguments
+                    | SectionKind::OtherArgs
+                    | SectionKind::OtherArguments
+            ) {
+                has_args = true;
+                documented_args.extend(args_section(section_context));
+            }
+        }
+        if has_args {
+            missing_args(checker, docstring, &documented_args);
         }
     }
 }
