@@ -280,12 +280,18 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
 
     match convention {
         Some(Convention::Google) => {
-            parse_google_sections(checker, &lines, docstring);
+            parse_google_sections(
+                checker,
+                docstring,
+                &section_contexts(&lines, SectionStyle::Google),
+            );
         }
         Some(Convention::Numpy) => {
-            for context in &section_contexts(&lines, SectionStyle::Numpy) {
-                numpy_section(checker, docstring, context);
-            }
+            parse_numpy_sections(
+                checker,
+                docstring,
+                &section_contexts(&lines, SectionStyle::Numpy),
+            );
         }
         Some(Convention::Pep257) | None => {
             // There are some overlapping section names, between the Google and NumPy conventions
@@ -303,9 +309,7 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
                         | SectionKind::OtherParameters
                 )
             }) {
-                for context in &numpy_sections {
-                    numpy_section(checker, docstring, context);
-                }
+                parse_numpy_sections(checker, docstring, &numpy_sections);
                 return;
             }
 
@@ -322,17 +326,15 @@ pub fn sections(checker: &mut Checker, docstring: &Docstring, convention: Option
                         | SectionKind::OtherArguments
                 )
             }) {
-                parse_google_sections(checker, &lines, docstring);
+                parse_google_sections(checker, docstring, &google_sections);
                 return;
             }
 
             // Otherwise, use whichever convention matched more sections.
             if google_sections.len() > numpy_sections.len() {
-                parse_google_sections(checker, &lines, docstring);
+                parse_google_sections(checker, docstring, &google_sections);
             } else {
-                for context in &numpy_sections {
-                    numpy_section(checker, docstring, context);
-                }
+                parse_numpy_sections(checker, docstring, &numpy_sections);
             }
         }
     }
@@ -1047,37 +1049,47 @@ fn google_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
     }
 }
 
-fn parse_google_sections(checker: &mut Checker, lines: &[&str], docstring: &Docstring) {
-    let mut arg_section_present = false;
-    let mut documented_args: FxHashSet<String> = FxHashSet::default();
-    let section_contexts = &section_contexts(lines, SectionStyle::Google);
+fn parse_numpy_sections(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    section_contexts: &[SectionContext],
+) {
     for section_context in section_contexts {
-        // Checks occur at the section level. Since two sections (args/keyword args and their
-        // variants) can list arguments, we need to unify the sets of arguments mentioned in both
-        // then check for missing arguments at the end of the section check.
-        if matches!(
-            section_context.kind,
-            SectionKind::Args
-                | SectionKind::Arguments
-                | SectionKind::KeywordArgs
-                | SectionKind::KeywordArguments
-                | SectionKind::OtherArgs
-                | SectionKind::OtherArguments
-        ) {
-            if matches!(
-                section_context.kind,
-                SectionKind::Args | SectionKind::Arguments
-            ) {
-                arg_section_present = true;
-            }
+        numpy_section(checker, docstring, section_context);
+    }
+}
 
-            documented_args.extend(args_section(section_context));
-        }
-
+fn parse_google_sections(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    section_contexts: &[SectionContext],
+) {
+    for section_context in section_contexts {
         google_section(checker, docstring, section_context);
     }
 
-    if checker.settings.rules.enabled(Rule::UndocumentedParam) && arg_section_present {
-        missing_args(checker, docstring, &documented_args);
+    if checker.settings.rules.enabled(Rule::UndocumentedParam) {
+        let mut has_args = false;
+        let mut documented_args: FxHashSet<String> = FxHashSet::default();
+        for section_context in section_contexts {
+            // Checks occur at the section level. Since two sections (args/keyword args and their
+            // variants) can list arguments, we need to unify the sets of arguments mentioned in both
+            // then check for missing arguments at the end of the section check.
+            if matches!(
+                section_context.kind,
+                SectionKind::Args
+                    | SectionKind::Arguments
+                    | SectionKind::KeywordArgs
+                    | SectionKind::KeywordArguments
+                    | SectionKind::OtherArgs
+                    | SectionKind::OtherArguments
+            ) {
+                has_args = true;
+                documented_args.extend(args_section(section_context));
+            }
+        }
+        if has_args {
+            missing_args(checker, docstring, &documented_args);
+        }
     }
 }
