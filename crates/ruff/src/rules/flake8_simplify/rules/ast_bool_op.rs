@@ -3,19 +3,18 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
-use ruff_python_ast::source_code::Stylist;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Boolop, Cmpop, Expr, ExprContext, ExprKind, Location, Unaryop};
 
-use ruff_diagnostics::{
-    AlwaysAutofixableViolation, AutofixKind, Diagnostic, DiagnosticKind, Edit, Violation,
-};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{
     contains_effect, create_expr, has_comments, unparse_expr, Truthiness,
 };
+use ruff_python_ast::source_code::Stylist;
 use ruff_python_ast::types::Range;
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -612,11 +611,12 @@ pub fn get_short_circuit_edit(
     Edit::replacement(content, location, end_location)
 }
 
-pub fn is_short_circuit(
-    checker: &Checker,
+fn is_short_circuit(
     expr: &Expr,
     expected_op: &Boolop,
-) -> Option<Diagnostic> {
+    context: &Context,
+    stylist: &Stylist,
+) -> Option<(Edit, ContentAround)> {
     let ExprKind::BoolOp { op, values, } = &expr.node else {
         return None;
     };
@@ -634,14 +634,12 @@ pub fn is_short_circuit(
 
     for (index, (value, next_value)) in values.iter().tuple_windows().enumerate() {
         // Keep track of the location of the furthest-right, truthy or falsey expression.
-        let value_truthiness = Truthiness::from_expr(value, |id| checker.ctx.is_builtin(id));
-        let next_value_truthiness =
-            Truthiness::from_expr(next_value, |id| checker.ctx.is_builtin(id));
+        let value_truthiness = Truthiness::from_expr(value, |id| context.is_builtin(id));
+        let next_value_truthiness = Truthiness::from_expr(next_value, |id| context.is_builtin(id));
 
         // Keep track of the location of the furthest-right, non-effectful expression.
         if value_truthiness.is_unknown()
-            && (!checker.ctx.in_boolean_test
-                || contains_effect(value, |id| checker.ctx.is_builtin(id)))
+            && (!context.in_boolean_test || contains_effect(value, |id| context.is_builtin(id)))
         {
             location = next_value.location;
             continue;
@@ -662,8 +660,8 @@ pub fn is_short_circuit(
                 location,
                 expr.end_location.unwrap(),
                 short_circuit_truthiness,
-                checker.ctx.in_boolean_test,
-                checker.stylist,
+                context.in_boolean_test,
+                stylist,
             ));
             break;
         }
@@ -681,52 +679,52 @@ pub fn is_short_circuit(
                 location,
                 expr.end_location.unwrap(),
                 short_circuit_truthiness,
-                checker.ctx.in_boolean_test,
-                checker.stylist,
+                context.in_boolean_test,
+                stylist,
             ));
             break;
         }
     }
 
-    let Some(edit) = edit else {
-        return None;
-    };
-    let Some(remove) = remove else {
-        return None;
-    };
-
-    let diagnostic_kind: DiagnosticKind = match op {
-        Boolop::And => ExprAndFalse {
-            expr: edit.content().unwrap_or_default().to_string(),
-            remove,
-        }
-        .into(),
-        Boolop::Or => ExprOrTrue {
-            expr: edit.content().unwrap_or_default().to_string(),
-            remove,
-        }
-        .into(),
-    };
-    let mut diagnostic = Diagnostic::new(
-        diagnostic_kind,
-        Range::new(edit.location(), edit.end_location()),
-    );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(edit);
+    match (edit, remove) {
+        (Some(edit), Some(remove)) => Some((edit, remove)),
+        _ => None,
     }
-    Some(diagnostic)
 }
 
 /// SIM222
 pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
-    if let Some(diagnostic) = is_short_circuit(checker, expr, &Boolop::Or) {
+    if let Some((edit, remove)) = is_short_circuit(expr, &Boolop::Or, &checker.ctx, checker.stylist)
+    {
+        let mut diagnostic = Diagnostic::new(
+            ExprOrTrue {
+                expr: edit.content().unwrap_or_default().to_string(),
+                remove,
+            },
+            Range::new(edit.location(), edit.end_location()),
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.set_fix(edit);
+        }
         checker.diagnostics.push(diagnostic);
     }
 }
 
 /// SIM223
 pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
-    if let Some(diagnostic) = is_short_circuit(checker, expr, &Boolop::And) {
+    if let Some((edit, remove)) =
+        is_short_circuit(expr, &Boolop::And, &checker.ctx, checker.stylist)
+    {
+        let mut diagnostic = Diagnostic::new(
+            ExprAndFalse {
+                expr: edit.content().unwrap_or_default().to_string(),
+                remove,
+            },
+            Range::new(edit.location(), edit.end_location()),
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.set_fix(edit);
+        }
         checker.diagnostics.push(diagnostic);
     }
 }
