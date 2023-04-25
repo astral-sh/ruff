@@ -656,11 +656,11 @@ SIM223.py:92:7: SIM223 [*] Use `False` instead of `... and False and ...`
    92 |+a and False  # SIM222
 93 93 | 
 94 94 | 
-95 95 | # Inside test `a` is simplified
+95 95 | # Inside test `a` is simplified.
 
 SIM223.py:97:6: SIM223 [*] Use `False` instead of `... and False and ...`
     |
- 97 | # Inside test `a` is simplified
+ 97 | # Inside test `a` is simplified.
  98 | 
  99 | bool(a and [] and False and [])  # SIM223
     |      ^^^^^^^^^^^^^^^^^^^^^^^^^ SIM223
@@ -671,7 +671,7 @@ SIM223.py:97:6: SIM223 [*] Use `False` instead of `... and False and ...`
 
 ℹ Suggested fix
 94 94 | 
-95 95 | # Inside test `a` is simplified
+95 95 | # Inside test `a` is simplified.
 96 96 | 
 97    |-bool(a and [] and False and [])  # SIM223
    97 |+bool(False)  # SIM223
@@ -943,11 +943,11 @@ SIM223.py:138:8: SIM223 [*] Use `False` instead of `... and False and ...`
     138 |+    if False  # SIM223
 139 139 | )
 140 140 | 
-141 141 | # Outside test `a` is not simplified
+141 141 | # Outside test `a` is not simplified.
 
 SIM223.py:143:7: SIM223 [*] Use `[]` instead of `[] and ...`
     |
-143 | # Outside test `a` is not simplified
+143 | # Outside test `a` is not simplified.
 144 | 
 145 | a and [] and False and []  # SIM223
     |       ^^^^^^^^^^^^^^^^^^^ SIM223
@@ -958,7 +958,7 @@ SIM223.py:143:7: SIM223 [*] Use `[]` instead of `[] and ...`
 
 ℹ Suggested fix
 140 140 | 
-141 141 | # Outside test `a` is not simplified
+141 141 | # Outside test `a` is not simplified.
 142 142 | 
 143     |-a and [] and False and []  # SIM223
     143 |+a and []  # SIM223

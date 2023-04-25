@@ -136,18 +136,17 @@ pub enum ContentAround {
 }
 
 /// ## What it does
-/// Checks if `or` expressions with truthy value can be simplified.
-///
-/// If the expression is used as a condition, it can be replaced with
-/// `False`. It can be simplified further than in other cases.
-///
-/// In other cases, the expression can be replaced with the first truthy
-/// value.
+/// Checks for `or` expressions that contain truthy values.
 ///
 /// ## Why is this bad?
-/// The code is less readable and more difficult to understand.
-/// The code is also less efficient, as multiple expressions are evaluated
-/// instead of just one.
+/// If the expression is used as a condition, it can be replaced in-full with
+/// `True`.
+///
+/// In other cases, the expression can be short-circuited to the first truthy
+/// value.
+///
+/// By using `True` (or the first truthy value), the code is more concise
+/// and easier to understand, since it no longer contains redundant conditions.
 ///
 /// ## Example
 /// ```python
@@ -189,18 +188,17 @@ impl AlwaysAutofixableViolation for ExprOrTrue {
 }
 
 /// ## What it does
-/// Checks if `and` expressions with falsey value can be simplified.
-///
-/// If the expression is used as a condition, it can be replaced with
-/// `False`. It can be simplified further than in other cases.
-///
-/// In other cases, the expression can be replaced with the first falsey
-/// value.
+/// Checks for `and` expressions that contain falsey values.
 ///
 /// ## Why is this bad?
-/// The code is less readable and more difficult to understand.
-/// The code is also less efficient, as multiple expressions are evaluated
-/// instead of just one.
+/// If the expression is used as a condition, it can be replaced in-full with
+/// `False`.
+///
+/// In other cases, the expression can be short-circuited to the first falsey
+/// value.
+///
+/// By using `False` (or the first falsey value), the code is more concise
+/// and easier to understand, since it no longer contains redundant conditions.
 ///
 /// ## Example
 /// ```python

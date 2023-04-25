@@ -92,7 +92,7 @@ a and frozenset({1}) and False and frozenset({2})  # SIM222
 a and frozenset(frozenset({1})) and False and frozenset(frozenset({2}))  # SIM222
 
 
-# Inside test `a` is simplified
+# Inside test `a` is simplified.
 
 bool(a and [] and False and [])  # SIM223
 
@@ -138,7 +138,7 @@ while a and [] and False and []:  # SIM223
     if b and [] and False and []  # SIM223
 )
 
-# Outside test `a` is not simplified
+# Outside test `a` is not simplified.
 
 a and [] and False and []  # SIM223
 

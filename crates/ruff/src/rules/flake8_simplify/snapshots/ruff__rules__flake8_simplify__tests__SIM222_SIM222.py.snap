@@ -656,11 +656,11 @@ SIM222.py:97:6: SIM222 [*] Use `frozenset(frozenset({1}))` instead of `frozenset
    97 |+a or frozenset(frozenset({1}))  # SIM222
 98 98 | 
 99 99 | 
-100 100 | # Inside test `a` is simplified
+100 100 | # Inside test `a` is simplified.
 
 SIM222.py:102:6: SIM222 [*] Use `True` instead of `... or True or ...`
     |
-102 | # Inside test `a` is simplified
+102 | # Inside test `a` is simplified.
 103 | 
 104 | bool(a or [1] or True or [2])  # SIM222
     |      ^^^^^^^^^^^^^^^^^^^^^^^ SIM222
@@ -671,7 +671,7 @@ SIM222.py:102:6: SIM222 [*] Use `True` instead of `... or True or ...`
 
 ℹ Suggested fix
 99  99  | 
-100 100 | # Inside test `a` is simplified
+100 100 | # Inside test `a` is simplified.
 101 101 | 
 102     |-bool(a or [1] or True or [2])  # SIM222
     102 |+bool(True)  # SIM222
@@ -943,11 +943,11 @@ SIM222.py:143:8: SIM222 [*] Use `True` instead of `... or True or ...`
     143 |+    if True  # SIM222
 144 144 | )
 145 145 | 
-146 146 | # Outside test `a` is not simplified
+146 146 | # Outside test `a` is not simplified.
 
 SIM222.py:148:6: SIM222 [*] Use `[1]` instead of `[1] or ...`
     |
-148 | # Outside test `a` is not simplified
+148 | # Outside test `a` is not simplified.
 149 | 
 150 | a or [1] or True or [2]  # SIM222
     |      ^^^^^^^^^^^^^^^^^^ SIM222
@@ -958,7 +958,7 @@ SIM222.py:148:6: SIM222 [*] Use `[1]` instead of `[1] or ...`
 
 ℹ Suggested fix
 145 145 | 
-146 146 | # Outside test `a` is not simplified
+146 146 | # Outside test `a` is not simplified.
 147 147 | 
 148     |-a or [1] or True or [2]  # SIM222
     148 |+a or [1]  # SIM222

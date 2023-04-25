@@ -97,7 +97,7 @@ a or frozenset({1}) or True or frozenset({2})  # SIM222
 a or frozenset(frozenset({1})) or True or frozenset(frozenset({2}))  # SIM222
 
 
-# Inside test `a` is simplified
+# Inside test `a` is simplified.
 
 bool(a or [1] or True or [2])  # SIM222
 
@@ -143,7 +143,7 @@ while a or [1] or True or [2]:  # SIM222
     if b or [1] or True or [2]  # SIM222
 )
 
-# Outside test `a` is not simplified
+# Outside test `a` is not simplified.
 
 a or [1] or True or [2]  # SIM222
 
