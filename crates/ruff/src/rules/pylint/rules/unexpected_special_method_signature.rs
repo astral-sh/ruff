@@ -19,7 +19,7 @@ pub enum ExpectedParams {
 
 impl ExpectedParams {
     fn from_method(name: &str, is_staticmethod: bool) -> Option<ExpectedParams> {
-        let p = match name {
+        let expected_params = match name {
             "__del__" | "__repr__" | "__str__" | "__bytes__" | "__hash__" | "__bool__"
             | "__dir__" | "__len__" | "__length_hint__" | "__iter__" | "__reversed__"
             | "__neg__" | "__pos__" | "__abs__" | "__invert__" | "__complex__" | "__int__"
@@ -53,9 +53,9 @@ impl ExpectedParams {
         }?;
 
         Some(if is_staticmethod {
-            p
+            expected_params
         } else {
-            match p {
+            match expected_params {
                 ExpectedParams::Fixed(n) => ExpectedParams::Fixed(n + 1),
                 ExpectedParams::Range(min, max) => ExpectedParams::Range(min + 1, max + 1),
             }
@@ -91,7 +91,7 @@ impl Violation for UnexpectedSpecialMethodSignature {
             "was"
         };
         format!(
-            "The special method '{}' expects {}, {} {} given",
+            "The special method `{}` expects {}, {} {} given",
             self.method_name,
             self.expected_params.message(),
             self.actual_params,
