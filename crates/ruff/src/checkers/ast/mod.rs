@@ -843,19 +843,43 @@ where
 
                 if self.settings.rules.any_enabled(&[
                     Rule::MutableDataclassDefault,
+                    Rule::MutableClassDefault,
                     Rule::FunctionCallInDataclassDefaultArgument,
-                ]) && ruff::rules::is_dataclass(self, decorator_list)
-                {
-                    if self.settings.rules.enabled(Rule::MutableDataclassDefault) {
-                        ruff::rules::mutable_dataclass_default(self, body);
+                    Rule::FunctionCallInClassDefaultArgument,
+                ]) {
+                    let is_dataclass = ruff::rules::is_dataclass(self, decorator_list);
+                    if is_dataclass && self.settings.rules.enabled(Rule::MutableDataclassDefault) {
+                        ruff::rules::mutable_class_default(self, true, body);
+                    }
+
+                    if is_dataclass
+                        && self
+                            .settings
+                            .rules
+                            .enabled(Rule::FunctionCallInDataclassDefaultArgument)
+                    {
+                        ruff::rules::function_call_in_class_defaults(
+                            self,
+                            body,
+                            is_dataclass,
+                            true,
+                        );
+                    }
+                    if self.settings.rules.enabled(Rule::MutableClassDefault) {
+                        ruff::rules::mutable_class_default(self, false, body);
                     }
 
                     if self
                         .settings
                         .rules
-                        .enabled(Rule::FunctionCallInDataclassDefaultArgument)
+                        .enabled(Rule::FunctionCallInClassDefaultArgument)
                     {
-                        ruff::rules::function_call_in_dataclass_defaults(self, body);
+                        ruff::rules::function_call_in_class_defaults(
+                            self,
+                            body,
+                            is_dataclass,
+                            false,
+                        );
                     }
                 }
 

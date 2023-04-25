@@ -1,0 +1,42 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+---
+RUF010.py:9:34: RUF010 Do not use mutable default values for class attributes
+   |
+ 9 | class A:
+10 |     mutable_default: list[int] = []
+   |                                  ^^ RUF010
+11 |     immutable_annotation: typing.Sequence[int] = []
+12 |     without_annotation = []
+   |
+
+RUF010.py:11:26: RUF010 Do not use mutable default values for class attributes
+   |
+11 |     mutable_default: list[int] = []
+12 |     immutable_annotation: typing.Sequence[int] = []
+13 |     without_annotation = []
+   |                          ^^ RUF010
+14 |     ignored_via_comment: list[int] = []  # noqa: RUF010
+15 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+   |
+
+RUF010.py:17:34: RUF010 Do not use mutable default values for class attributes
+   |
+17 | class B:
+18 |     mutable_default: list[int] = []
+   |                                  ^^ RUF010
+19 |     immutable_annotation: Sequence[int] = []
+20 |     without_annotation = []
+   |
+
+RUF010.py:19:26: RUF010 Do not use mutable default values for class attributes
+   |
+19 |     mutable_default: list[int] = []
+20 |     immutable_annotation: Sequence[int] = []
+21 |     without_annotation = []
+   |                          ^^ RUF010
+22 |     ignored_via_comment: list[int] = []  # noqa: RUF010
+23 |     correct_code: list[int] = KNOWINGLY_MUTABLE_DEFAULT
+   |
+
+

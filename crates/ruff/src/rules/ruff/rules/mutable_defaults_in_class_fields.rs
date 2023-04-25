@@ -57,6 +57,17 @@ impl Violation for MutableDataclassDefault {
     }
 }
 
+/// This rule is same as MutableDataclassDefault, but for any class. The same arguments apply.
+#[violation]
+pub struct MutableClassDefault;
+
+impl Violation for MutableClassDefault {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        format!("Do not use mutable default values for class attributes")
+    }
+}
+
 /// ## What it does
 /// Checks for function calls in dataclass defaults.
 ///
@@ -129,6 +140,25 @@ impl Violation for FunctionCallInDataclassDefaultArgument {
     }
 }
 
+/// Same as FunctionCallInDataclassDefaultArgument, but for any class.
+/// Importantly, this error will be issued on calls to dataclasses.field
+#[violation]
+pub struct FunctionCallInClassDefaultArgument {
+    pub name: Option<String>,
+}
+
+impl Violation for FunctionCallInClassDefaultArgument {
+    #[derive_message_formats]
+    fn message(&self) -> String {
+        let FunctionCallInClassDefaultArgument { name } = self;
+        if let Some(name) = name {
+            format!("Do not perform function call `{name}` in non-dataclass attribute defaults")
+        } else {
+            format!("Do not perform function call in non-dataclass attribute defaults")
+        }
+    }
+}
+
 fn is_mutable_expr(expr: &Expr) -> bool {
     matches!(
         &expr.node,
@@ -143,7 +173,7 @@ fn is_mutable_expr(expr: &Expr) -> bool {
 
 const ALLOWED_FUNCS: &[&[&str]] = &[&["dataclasses", "field"]];
 
-fn is_allowed_func(context: &Context, func: &Expr) -> bool {
+fn is_allowed_dataclass_func(context: &Context, func: &Expr) -> bool {
     context.resolve_call_path(func).map_or(false, |call_path| {
         ALLOWED_FUNCS
             .iter()
@@ -159,8 +189,13 @@ fn is_class_var_annotation(context: &Context, annotation: &Expr) -> bool {
     context.match_typing_expr(value, "ClassVar")
 }
 
-/// RUF009
-pub fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &[Stmt]) {
+/// RUF009/RUF011
+pub fn function_call_in_class_defaults(
+    checker: &mut Checker,
+    body: &[Stmt],
+    is_dataclass: bool,
+    emit_dataclass_error: bool,
+) {
     for statement in body {
         if let StmtKind::AnnAssign {
             annotation,
@@ -172,21 +207,39 @@ pub fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &[Stmt])
                 continue;
             }
             if let ExprKind::Call { func, .. } = &expr.node {
-                if !is_allowed_func(&checker.ctx, func) {
-                    checker.diagnostics.push(Diagnostic::new(
-                        FunctionCallInDataclassDefaultArgument {
-                            name: compose_call_path(func),
-                        },
-                        Range::from(expr),
-                    ));
+                if !is_dataclass || !is_allowed_dataclass_func(&checker.ctx, func) {
+                    let diagnostic: Diagnostic = if emit_dataclass_error {
+                        Diagnostic::new(
+                            FunctionCallInDataclassDefaultArgument {
+                                name: compose_call_path(func),
+                            },
+                            Range::from(expr),
+                        )
+                    } else {
+                        Diagnostic::new(
+                            FunctionCallInClassDefaultArgument {
+                                name: compose_call_path(func),
+                            },
+                            Range::from(expr),
+                        )
+                    };
+                    checker.diagnostics.push(diagnostic);
                 }
             }
         }
     }
 }
 
-/// RUF008
-pub fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
+/// RUF008/RUF010
+pub fn mutable_class_default(checker: &mut Checker, emit_dataclass_error: bool, body: &[Stmt]) {
+    fn diagnostic(emit_dataclass_error: bool, value: &Expr) -> Diagnostic {
+        if emit_dataclass_error {
+            Diagnostic::new(MutableDataclassDefault, Range::from(value))
+        } else {
+            Diagnostic::new(MutableClassDefault, Range::from(value))
+        }
+    }
+
     for statement in body {
         match &statement.node {
             StmtKind::AnnAssign {
@@ -200,14 +253,14 @@ pub fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
                 {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(MutableDataclassDefault, Range::from(value)));
+                        .push(diagnostic(emit_dataclass_error, value));
                 }
             }
             StmtKind::Assign { value, .. } => {
                 if is_mutable_expr(value) {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(MutableDataclassDefault, Range::from(value)));
+                        .push(diagnostic(emit_dataclass_error, value));
                 }
             }
             _ => (),

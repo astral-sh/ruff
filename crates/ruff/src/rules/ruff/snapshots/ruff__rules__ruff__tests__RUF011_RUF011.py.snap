@@ -1,0 +1,48 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+---
+RUF011.py:14:41: RUF011 Do not perform function call `default_function` in non-dataclass attribute defaults
+   |
+14 | class A:
+15 |     hidden_mutable_default: list[int] = default_function()
+   |                                         ^^^^^^^^^^^^^^^^^^ RUF011
+   |
+
+RUF011.py:22:41: RUF011 Do not perform function call `default_function` in non-dataclass attribute defaults
+   |
+22 | class B:
+23 |     hidden_mutable_default: list[int] = default_function()
+   |                                         ^^^^^^^^^^^^^^^^^^ RUF011
+24 |     another_dataclass: A = A()
+25 |     not_optimal: ImmutableType = ImmutableType(20)
+   |
+
+RUF011.py:23:28: RUF011 Do not perform function call `A` in non-dataclass attribute defaults
+   |
+23 | class B:
+24 |     hidden_mutable_default: list[int] = default_function()
+25 |     another_dataclass: A = A()
+   |                            ^^^ RUF011
+26 |     not_optimal: ImmutableType = ImmutableType(20)
+27 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
+   |
+
+RUF011.py:24:34: RUF011 Do not perform function call `ImmutableType` in non-dataclass attribute defaults
+   |
+24 |     hidden_mutable_default: list[int] = default_function()
+25 |     another_dataclass: A = A()
+26 |     not_optimal: ImmutableType = ImmutableType(20)
+   |                                  ^^^^^^^^^^^^^^^^^ RUF011
+27 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
+28 |     okay_variant: A = DEFAULT_A_FOR_ALL_DATACLASSES
+   |
+
+RUF011.py:27:24: RUF011 Do not perform function call `field` in non-dataclass attribute defaults
+   |
+27 |     good_variant: ImmutableType = DEFAULT_IMMUTABLETYPE_FOR_ALL_DATACLASSES
+28 |     okay_variant: A = DEFAULT_A_FOR_ALL_DATACLASSES
+29 |     field: list[int] = field(default_vactory=list)
+   |                        ^^^^^^^^^^^^^^^^^^^^^^^^^^^ RUF011
+   |
+
+
