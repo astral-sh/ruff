@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.262"
+version = "0.0.263"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = { workspace = true }
 rust-version = { workspace = true }
