@@ -224,7 +224,7 @@ impl Violation for MissingSpaceAfterColonInTodo {
 //
 // Note: Regexes taken from https://github.com/orsinium-labs/flake8-todos/blob/master/flake8_todos/_rules.py#L12.
 static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^#\s*(?P<tag>[tT][oO][dD][oO]|BUG|FIXME|XXX)( {0,1}\(.*\))?(:)?( )?(.+)?$")
+    Regex::new(r"^# {0,1}(?P<tag>[tT][oO][dD][oO]|BUG|FIXME|XXX)( {0,1}\(.*\))?(:)?( )?(.+)?$")
         .unwrap()
 });
 
@@ -238,6 +238,7 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
 });
 
 static NUM_CAPTURE_GROUPS: usize = 5usize;
+static TODO_LENGTH: usize = 4usize;
 
 pub fn check_todos(
     tokens: &[LexResult],
@@ -246,10 +247,32 @@ pub fn check_todos(
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
     let mut prev_token_is_todo = false;
+    let mut prev_token_todo_start = 2; // Default to 2, the position of "T" in a properly formed TODO
 
     for (start, token, end) in tokens.iter().flatten() {
         let diagnostics_ref = &mut diagnostics;
         let range = Range::new(*start, *end);
+
+        let token_opt = match token {
+            Tok::Comment(s) => Some(s),
+            _ => None,
+        };
+
+        // Check for errors due to a missing link: TDO003.
+        if prev_token_is_todo {
+            if token_opt.is_some() && ISSUE_LINK_REGEX_SET.is_match(token_opt.unwrap()) {
+                prev_token_is_todo = false;
+                continue;
+            }
+
+            diagnostics_ref.push(Diagnostic::new(
+                MissingLinkInTodo,
+                Range::new(
+                    Location::new(start.row() - 1, prev_token_todo_start),
+                    Location::new(end.row() - 1, prev_token_todo_start + TODO_LENGTH),
+                ),
+            ));
+        }
 
         let Some(comment) = token_opt else {
             prev_token_is_todo = false;
@@ -264,7 +287,7 @@ pub fn check_todos(
             continue;
         };
 
-        // Check for errors on the tag.
+        // Check for errors on the tag: TDO001/TDO006.
         // Unwrap is safe because the "tag" capture group is required to get here.
         let captures = captures_opt.peek().unwrap();
         let tag = captures.name("tag").unwrap().as_str();
@@ -285,25 +308,12 @@ pub fn check_todos(
                 )
                 .with_fix(
                     if should_autofix(autofix, settings, Rule::InvalidCapitalizationInTodo) {
-                        // The TODO regex allows for any number of spaces, so let's find where the first "t"
-                        // or "T" is. We know the unwrap is safe because of the mandatory regex
-                        // match. We'll use position() since "#" is 2 bytes which could throw
-                        // off an implementation that uses byte-indexing.
-                        let first_t_position = comment
-                            .chars()
-                            .position(|c| c.to_string() == "t" || c.to_string() == "T")
-                            .unwrap();
+                        let first_t_position = find_first_t_position(comment);
 
                         Fix::new(vec![Edit::replacement(
                             "TODO".to_string(),
                             Location::new(range.location.row(), first_t_position),
-                            Location::new(
-                                range.location.row(),
-                                // We know `tag` is 4 bytes long because we've already ensured
-                                // it's some variant of "TODO", so we're guaranteed to have
-                                // consistency.
-                                first_t_position + tag.len(),
-                            ),
+                            Location::new(range.location.row(), first_t_position + TODO_LENGTH),
                         )])
                     } else {
                         Fix::empty()
@@ -327,6 +337,7 @@ pub fn check_todos(
         }
 
         prev_token_is_todo = true;
+        prev_token_todo_start = find_first_t_position(comment);
     }
 
     diagnostics
@@ -359,4 +370,15 @@ fn should_autofix(autofix: flags::Autofix, settings: &Settings, rule: Rule) -> b
 
 fn get_captured_matches(text: &str) -> Peekable<CaptureMatches> {
     TODO_REGEX.captures_iter(text).peekable()
+}
+
+fn find_first_t_position(comment: &str) -> usize {
+    // The TODO regex allows for 0 or 1 spaces, so let's find where the first "t"
+    // or "T" is. We know the unwrap is safe because of the mandatory regex
+    // match. We'll use position() since "#" is 2 bytes which could throw
+    // off an implementation that uses byte-indexing.
+    comment
+        .chars()
+        .position(|c| c.to_string() == "t" || c.to_string() == "T")
+        .unwrap()
 }

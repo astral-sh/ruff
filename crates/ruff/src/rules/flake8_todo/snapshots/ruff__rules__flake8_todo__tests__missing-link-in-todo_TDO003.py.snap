@@ -1,12 +1,22 @@
 ---
 source: crates/ruff/src/rules/flake8_todo/mod.rs
 ---
-TDO003.py:10:1: TDO003 Missing issue link in TODO
+TDO003.py:9:3: TDO003 Missing issue link following TODO
    |
-10 | # TDO003 - errors
-11 | # TODO: this comment has no
+ 9 | # TDO003 - errors
+10 | # TODO: this comment has no
+   |   ^^^^ TDO003
+11 | # link after it
+   |
+
+TDO003.py:12:3: TDO003 Missing issue link following TODO
+   |
 12 | # link after it
-   | ^^^^^^^^^^^^^^^ TDO003
+13 | 
+14 | # TODO: here's a TODO with no link after it
+   |   ^^^^ TDO003
+15 | def foo(x):
+16 |     return x
    |
 
 

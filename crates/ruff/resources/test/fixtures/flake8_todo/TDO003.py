@@ -8,3 +8,7 @@
 # TDO003 - errors
 # TODO: this comment has no
 # link after it
+
+# TODO: here's a TODO with no link after it
+def foo(x):
+    return x
