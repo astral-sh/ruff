@@ -1156,11 +1156,24 @@ pub fn fix_unnecessary_comprehension_any_all(
         );
     };
 
+    let mut lpar = list_comp.lpar.clone();
+    lpar.push(LeftParen {
+        whitespace_after: list_comp.lbracket.whitespace_after.clone(),
+    });
+
+    let mut rpar = list_comp.rpar.clone();
+    rpar.insert(
+        0,
+        RightParen {
+            whitespace_before: list_comp.rbracket.whitespace_before.clone(),
+        },
+    );
+
     call.args[0].value = Expression::GeneratorExp(Box::new(GeneratorExp {
         elt: list_comp.elt.clone(),
         for_in: list_comp.for_in.clone(),
-        lpar: list_comp.lpar.clone(),
-        rpar: list_comp.rpar.clone(),
+        lpar,
+        rpar,
     }));
 
     if let Some(comma) = &call.args[0].comma {
