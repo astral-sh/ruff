@@ -3643,7 +3643,7 @@ where
                     .any(|target| call_path.as_slice() == ["mypy_extensions", target])
                     {
                         Some(Callable::MypyExtension)
-                    } else if call_path.as_slice() == ["", "bool"] && self.ctx.is_builtin("bool") {
+                    } else if call_path.as_slice() == ["", "bool"] {
                         Some(Callable::Bool)
                     } else {
                         None
