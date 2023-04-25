@@ -202,7 +202,7 @@ impl Violation for MissingSpaceAfterColonInTodo {
 
 // Capture groups correspond to checking:
 //      1. Tag (used to match against `TODO` in capitalization and spelling, e.g. ToDo and FIXME)
-//      2. Author exists (in parentheses) after tag, but before colon
+//      2. Author exists (in parentheses) with 0 or 1 spaces between it and the tag, but before colon
 //      3. Colon exists after author
 //      4. Space exists after colon
 //      5. Text exists after space
@@ -248,98 +248,88 @@ pub fn check_todos(
     let mut prev_token_is_todo = false;
 
     for (start, token, end) in tokens.iter().flatten() {
-        let Tok::Comment(comment) = token else {
-            continue;
-        };
-
         let diagnostics_ref = &mut diagnostics;
         let range = Range::new(*start, *end);
 
-        // The previous token is a TODO, so let's check if this token is a link
-        if prev_token_is_todo {
-            if ISSUE_LINK_REGEX_SET.is_match(comment) {
-                prev_token_is_todo = false;
-                // continuing here avoids an expensive call to captures_iter(). if this line is a
-                // link, we can skip checking if it's a TODO
-                continue;
-            }
+        let Some(comment) = token_opt else {
+            prev_token_is_todo = false;
+            continue;
+        };
 
-            diagnostics_ref.push(Diagnostic::new(MissingLinkInTodo, range));
-        }
+        let mut captures_opt = get_captured_matches(comment);
+        if captures_opt.peek().is_none() {
+            // If we didn't match the regex at all, we know that this token isn't a TODO. The regex
+            // defined above requires that the `tag` capture group is matched.
+            prev_token_is_todo = false;
+            continue;
+        };
 
-        // TODO: gotta be a way to remove this nest
-        if let Some(captures) = get_captured_matches(comment).peek() {
-            // Unwrap is safe because the "tag" capture group is required to enter the current
-            // block
-            let tag = captures.name("tag").unwrap().as_str();
-            if tag != "TODO" {
-                diagnostics_ref.push(Diagnostic::new(
-                    InvalidTodoTag {
+        // Check for errors on the tag.
+        // Unwrap is safe because the "tag" capture group is required to get here.
+        let captures = captures_opt.peek().unwrap();
+        let tag = captures.name("tag").unwrap().as_str();
+        if tag != "TODO" {
+            diagnostics_ref.push(Diagnostic::new(
+                InvalidTodoTag {
+                    tag: String::from(tag),
+                },
+                range,
+            ));
+
+            if tag.to_uppercase() == "TODO" {
+                let invalid_capitalization = Diagnostic::new(
+                    InvalidCapitalizationInTodo {
                         tag: String::from(tag),
                     },
                     range,
-                ));
+                )
+                .with_fix(
+                    if should_autofix(autofix, settings, Rule::InvalidCapitalizationInTodo) {
+                        // The TODO regex allows for any number of spaces, so let's find where the first "t"
+                        // or "T" is. We know the unwrap is safe because of the mandatory regex
+                        // match. We'll use position() since "#" is 2 bytes which could throw
+                        // off an implementation that uses byte-indexing.
+                        let first_t_position = comment
+                            .chars()
+                            .position(|c| c.to_string() == "t" || c.to_string() == "T")
+                            .unwrap();
 
-                if tag.to_uppercase() == "TODO" {
-                    let invalid_capitalization = Diagnostic::new(
-                        InvalidCapitalizationInTodo {
-                            tag: String::from(tag),
-                        },
-                        range,
-                    )
-                    .with_fix(
-                        if should_autofix(autofix, settings, Rule::InvalidCapitalizationInTodo) {
-                            // The TODO regex allows for any number of spaces, so let's find where the first "t"
-                            // or "T" is. We know the unwrap is safe because of the mandatory regex
-                            // match. We'll use position() since "#" is 2 bytes which could throw
-                            // off an implementation that uses byte-indexing.
-                            let first_t_location = comment
-                                .chars()
-                                .position(|c| c.to_string() == "t" || c.to_string() == "T")
-                                .unwrap();
+                        Fix::new(vec![Edit::replacement(
+                            "TODO".to_string(),
+                            Location::new(range.location.row(), first_t_position),
+                            Location::new(
+                                range.location.row(),
+                                // We know `tag` is 4 bytes long because we've already ensured
+                                // it's some variant of "TODO", so we're guaranteed to have
+                                // consistency.
+                                first_t_position + tag.len(),
+                            ),
+                        )])
+                    } else {
+                        Fix::empty()
+                    },
+                );
 
-                            Fix::new(vec![Edit::replacement(
-                                "TODO".to_string(),
-                                Location::new(range.location.row(), first_t_location),
-                                Location::new(
-                                    range.location.row(),
-                                    // We know `tag` is 4 bytes long because we've already ensured
-                                    // it's some variant of "TODO"
-                                    first_t_location + tag.len(),
-                                ),
-                            )])
-                        } else {
-                            Fix::empty()
-                        },
-                    );
-
-                    diagnostics_ref.push(invalid_capitalization);
-                }
+                diagnostics_ref.push(invalid_capitalization);
             }
-
-            for capture_group_index in 2..=NUM_CAPTURE_GROUPS {
-                if captures.get(capture_group_index).is_some() {
-                    continue;
-                }
-
-                if let Some(diagnostic) =
-                    get_regex_error(capture_group_index, &range, diagnostics_ref)
-                {
-                    diagnostics_ref.push(diagnostic);
-                };
-            }
-
-            prev_token_is_todo = true;
-        } else {
-            prev_token_is_todo = false;
         }
+
+        // Check the rest of the capture groups for errors
+        for capture_group_index in 2..=NUM_CAPTURE_GROUPS {
+            if captures.get(capture_group_index).is_some() {
+                continue;
+            }
+
+            if let Some(diagnostic) = get_regex_error(capture_group_index, &range, diagnostics_ref)
+            {
+                diagnostics_ref.push(diagnostic);
+            };
+        }
+
+        prev_token_is_todo = true;
     }
 
     diagnostics
-}
-
-fn get_captured_matches(text: &str) -> Peekable<CaptureMatches> {
-    TODO_REGEX.captures_iter(text).peekable()
 }
 
 /// Mapper for static regex errors caused by a capture group at index i (i > 1 since the tag
@@ -365,4 +355,8 @@ fn get_regex_error(i: usize, range: &Range, diagnostics: &mut [Diagnostic]) -> O
 
 fn should_autofix(autofix: flags::Autofix, settings: &Settings, rule: Rule) -> bool {
     autofix.into() && settings.rules.should_fix(rule)
+}
+
+fn get_captured_matches(text: &str) -> Peekable<CaptureMatches> {
+    TODO_REGEX.captures_iter(text).peekable()
 }
