@@ -1,6 +1,6 @@
 use std::collections::VecDeque;
 
-use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind};
+use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
@@ -18,12 +18,33 @@ impl Violation for ExceptWithNonExceptionClasses {
     }
 }
 
+////Given an [`Expr`], break down Unions from lhs and rhs of the expression.
+fn extract_union_types(expr: &Expr) -> Vec<&Expr> {
+    let mut union_exprs: Vec<&Expr> = vec![];
+    match &expr.node {
+        ExprKind::BinOp {
+            left,
+            op: Operator::BitOr,
+            right,
+        } => {
+            union_exprs.append(&mut extract_union_types(left));
+            union_exprs.push(right);
+        }
+        _ => return vec![expr],
+    };
+    union_exprs
+}
+
 /// Given an [`Expr`], flatten any [`ExprKind::Starred`] expressions.
 /// This should leave any unstarred iterables alone (subsequently raising a
 /// warning for B029).
 fn flatten_starred_iterables(expr: &Expr) -> Vec<&Expr> {
-    let ExprKind::Tuple { elts, .. } = &expr.node else {
-        return vec![expr];
+    let elts = match &expr.node {
+        ExprKind::Tuple { elts, .. } => elts,
+        ExprKind::BinOp { .. } => {
+            return extract_union_types(expr);
+        }
+        _ => return vec![expr],
     };
     let mut flattened_exprs: Vec<&Expr> = Vec::with_capacity(elts.len());
     let mut exprs_to_process: VecDeque<&Expr> = elts.iter().collect();

@@ -76,3 +76,9 @@ try:
     pass
 except what_to_catch():  # ok
     pass
+
+
+try:
+    pass
+except ValueError | TypeError | KeyError:
+    pass
