@@ -1,8 +1,8 @@
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_python_ast::newlines::Line;
 use ruff_python_ast::whitespace::leading_space;
 
 #[violation]
@@ -16,50 +16,30 @@ impl Violation for TabIndentation {
 }
 
 /// W191
-pub fn tab_indentation(lineno: usize, line: &str, string_ranges: &[Range]) -> Option<Diagnostic> {
+pub(crate) fn tab_indentation(line: &Line, string_ranges: &[TextRange]) -> Option<Diagnostic> {
     let indent = leading_space(line);
     if let Some(tab_index) = indent.find('\t') {
-        // If the tab character is within a multi-line string, abort.
-        if let Ok(range_index) = string_ranges.binary_search_by(|range| {
-            let start = range.location.row();
-            let end = range.end_location.row();
-            if start > lineno {
+        let tab_offset = line.start() + TextSize::try_from(tab_index).unwrap();
+
+        let string_range_index = string_ranges.binary_search_by(|range| {
+            if tab_offset < range.start() {
                 std::cmp::Ordering::Greater
-            } else if end < lineno {
-                std::cmp::Ordering::Less
-            } else {
+            } else if range.contains(tab_offset) {
                 std::cmp::Ordering::Equal
+            } else {
+                std::cmp::Ordering::Less
             }
-        }) {
-            let string_range = &string_ranges[range_index];
-            let start = string_range.location;
-            let end = string_range.end_location;
+        });
 
-            // Tab is contained in the string range by virtue of lines.
-            if lineno != start.row() && lineno != end.row() {
-                return None;
-            }
-
-            let tab_column = line[..tab_index].chars().count();
-
-            // Tab on first line of the quoted range, following the quote.
-            if lineno == start.row() && tab_column > start.column() {
-                return None;
-            }
-
-            // Tab on last line of the quoted range, preceding the quote.
-            if lineno == end.row() && tab_column < end.column() {
-                return None;
-            }
+        // If the tab character is within a multi-line string, abort.
+        if string_range_index.is_ok() {
+            None
+        } else {
+            Some(Diagnostic::new(
+                TabIndentation,
+                TextRange::at(line.start(), indent.text_len()),
+            ))
         }
-
-        Some(Diagnostic::new(
-            TabIndentation,
-            Range::new(
-                Location::new(lineno, 0),
-                Location::new(lineno, indent.chars().count()),
-            ),
-        ))
     } else {
         None
     }

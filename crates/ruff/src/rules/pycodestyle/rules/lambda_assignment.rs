@@ -1,16 +1,13 @@
-use ruff_python_semantic::context::Context;
-use rustpython_parser::ast::{
-    Arg, ArgData, Arguments, Constant, Expr, ExprKind, Location, Stmt, StmtKind,
-};
-
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::{match_leading_content, match_trailing_content, unparse_stmt};
+use ruff_python_ast::helpers::{has_leading_content, has_trailing_content, unparse_stmt};
 use ruff_python_ast::newlines::StrExt;
 use ruff_python_ast::source_code::Stylist;
-use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace::leading_space;
+use ruff_python_semantic::context::Context;
 use ruff_python_semantic::scope::ScopeKind;
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::{Arg, ArgData, Arguments, Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -82,18 +79,15 @@ pub fn lambda_assignment(
                     name: id.to_string(),
                     fixable,
                 },
-                Range::from(stmt),
+                stmt.range(),
             );
 
             if checker.patch(diagnostic.kind.rule())
                 && fixable
-                && !match_leading_content(stmt, checker.locator)
-                && !match_trailing_content(stmt, checker.locator)
+                && !has_leading_content(stmt, checker.locator)
+                && !has_trailing_content(stmt, checker.locator)
             {
-                let first_line = checker.locator.slice(Range::new(
-                    Location::new(stmt.location.row(), 0),
-                    Location::new(stmt.location.row() + 1, 0),
-                ));
+                let first_line = checker.locator.line(stmt.start());
                 let indentation = &leading_space(first_line);
                 let mut indented = String::new();
                 for (idx, line) in
@@ -102,18 +96,14 @@ pub fn lambda_assignment(
                         .enumerate()
                 {
                     if idx == 0 {
-                        indented.push_str(line);
+                        indented.push_str(&line);
                     } else {
                         indented.push_str(checker.stylist.line_ending().as_str());
                         indented.push_str(indentation);
-                        indented.push_str(line);
+                        indented.push_str(&line);
                     }
                 }
-                diagnostic.set_fix(Edit::replacement(
-                    indented,
-                    stmt.location,
-                    stmt.end_location.unwrap(),
-                ));
+                diagnostic.set_fix(Edit::range_replacement(indented, stmt.range()));
             }
 
             checker.diagnostics.push(diagnostic);
@@ -169,8 +159,8 @@ fn function(
     stylist: &Stylist,
 ) -> String {
     let body = Stmt::new(
-        Location::default(),
-        Location::default(),
+        TextSize::default(),
+        TextSize::default(),
         StmtKind::Return {
             value: Some(Box::new(body.clone())),
         },
@@ -184,15 +174,14 @@ fn function(
                 .iter()
                 .enumerate()
                 .map(|(idx, arg)| {
-                    Arg::new(
-                        Location::default(),
-                        Location::default(),
+                    Arg::with_range(
                         ArgData {
                             annotation: arg_types
                                 .get(idx)
                                 .map(|arg_type| Box::new(arg_type.clone())),
                             ..arg.node.clone()
                         },
+                        TextRange::default(),
                     )
                 })
                 .collect::<Vec<_>>();
@@ -201,21 +190,18 @@ fn function(
                 .iter()
                 .enumerate()
                 .map(|(idx, arg)| {
-                    Arg::new(
-                        Location::default(),
-                        Location::default(),
+                    Arg::with_range(
                         ArgData {
                             annotation: arg_types
                                 .get(idx + new_posonlyargs.len())
                                 .map(|arg_type| Box::new(arg_type.clone())),
                             ..arg.node.clone()
                         },
+                        TextRange::default(),
                     )
                 })
                 .collect::<Vec<_>>();
-            let func = Stmt::new(
-                Location::default(),
-                Location::default(),
+            let func = Stmt::with_range(
                 StmtKind::FunctionDef {
                     name: name.to_string(),
                     args: Box::new(Arguments {
@@ -228,13 +214,14 @@ fn function(
                     returns: Some(Box::new(return_type)),
                     type_comment: None,
                 },
+                TextRange::default(),
             );
             return unparse_stmt(&func, stylist);
         }
     }
     let func = Stmt::new(
-        Location::default(),
-        Location::default(),
+        TextSize::default(),
+        TextSize::default(),
         StmtKind::FunctionDef {
             name: name.to_string(),
             args: Box::new(args.clone()),

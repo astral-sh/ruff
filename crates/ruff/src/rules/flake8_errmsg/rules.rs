@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -166,7 +165,7 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                         if string.len() > checker.settings.flake8_errmsg.max_string_length {
                             checker
                                 .diagnostics
-                                .push(Diagnostic::new(RawStringInException, Range::from(first)));
+                                .push(Diagnostic::new(RawStringInException, first.range()));
                         }
                     }
                 }
@@ -175,7 +174,7 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                     if checker.settings.rules.enabled(Rule::FStringInException) {
                         checker
                             .diagnostics
-                            .push(Diagnostic::new(FStringInException, Range::from(first)));
+                            .push(Diagnostic::new(FStringInException, first.range()));
                     }
                 }
                 // Check for .format() calls
@@ -183,10 +182,9 @@ pub fn string_in_exception(checker: &mut Checker, exc: &Expr) {
                     if checker.settings.rules.enabled(Rule::DotFormatInException) {
                         if let ExprKind::Attribute { value, attr, .. } = &func.node {
                             if attr == "format" && matches!(value.node, ExprKind::Constant { .. }) {
-                                checker.diagnostics.push(Diagnostic::new(
-                                    DotFormatInException,
-                                    Range::from(first),
-                                ));
+                                checker
+                                    .diagnostics
+                                    .push(Diagnostic::new(DotFormatInException, first.range()));
                             }
                         }
                     }

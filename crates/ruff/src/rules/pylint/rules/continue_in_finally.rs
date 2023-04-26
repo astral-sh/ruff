@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -48,7 +47,7 @@ fn traverse_body(checker: &mut Checker, body: &[Stmt]) {
         if matches!(stmt.node, StmtKind::Continue { .. }) {
             checker
                 .diagnostics
-                .push(Diagnostic::new(ContinueInFinally, Range::from(stmt)));
+                .push(Diagnostic::new(ContinueInFinally, stmt.range()));
         }
 
         match &stmt.node {

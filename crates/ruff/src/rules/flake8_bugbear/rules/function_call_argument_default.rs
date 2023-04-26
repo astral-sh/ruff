@@ -1,3 +1,4 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::Violation;
@@ -5,7 +6,6 @@ use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::call_path::{compose_call_path, CallPath};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
@@ -61,7 +61,7 @@ fn is_immutable_func(checker: &Checker, func: &Expr, extend_immutable_calls: &[C
 
 struct ArgumentDefaultVisitor<'a> {
     checker: &'a Checker<'a>,
-    diagnostics: Vec<(DiagnosticKind, Range)>,
+    diagnostics: Vec<(DiagnosticKind, TextRange)>,
     extend_immutable_calls: Vec<CallPath<'a>>,
 }
 
@@ -81,7 +81,7 @@ where
                             name: compose_call_path(func),
                         }
                         .into(),
-                        Range::from(expr),
+                        expr.range(),
                     ));
                 }
                 visitor::walk_expr(self, expr);

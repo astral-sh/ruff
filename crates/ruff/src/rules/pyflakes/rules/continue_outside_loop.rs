@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 #[violation]
 pub struct ContinueOutsideLoop;
@@ -44,6 +43,6 @@ pub fn continue_outside_loop<'a>(
     if allowed {
         None
     } else {
-        Some(Diagnostic::new(ContinueOutsideLoop, Range::from(stmt)))
+        Some(Diagnostic::new(ContinueOutsideLoop, stmt.range()))
     }
 }

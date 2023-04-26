@@ -3,7 +3,6 @@ use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks for member imports that should instead be accessed by importing the
@@ -52,7 +51,7 @@ pub fn banned_import_from(
             BannedImportFrom {
                 name: name.to_string(),
             },
-            Range::from(stmt),
+            stmt.range(),
         ));
     }
     None

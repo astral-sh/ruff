@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -33,7 +32,7 @@ fn walk_stmt(checker: &mut Checker, body: &[Stmt], f: fn(&Stmt) -> bool) {
                         ),
                     },
                 },
-                Range::from(stmt),
+                stmt.range(),
             ));
         }
         match &stmt.node {

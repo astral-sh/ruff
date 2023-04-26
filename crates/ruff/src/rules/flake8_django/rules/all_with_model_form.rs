@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::rules::flake8_django::rules::helpers::is_model_form;
@@ -76,18 +75,12 @@ pub fn all_with_model_form(checker: &Checker, bases: &[Expr], body: &[Stmt]) -> 
                 match &value {
                     Constant::Str(s) => {
                         if s == "__all__" {
-                            return Some(Diagnostic::new(
-                                DjangoAllWithModelForm,
-                                Range::from(element),
-                            ));
+                            return Some(Diagnostic::new(DjangoAllWithModelForm, element.range()));
                         }
                     }
                     Constant::Bytes(b) => {
                         if b == "__all__".as_bytes() {
-                            return Some(Diagnostic::new(
-                                DjangoAllWithModelForm,
-                                Range::from(element),
-                            ));
+                            return Some(Diagnostic::new(DjangoAllWithModelForm, element.range()));
                         }
                     }
                     _ => (),

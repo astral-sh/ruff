@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Comprehension, Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -64,7 +63,7 @@ fn add_diagnostic(checker: &mut Checker, expr: &Expr) {
         UnnecessaryComprehension {
             obj_type: id.to_string(),
         },
-        Range::from(expr),
+        expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {

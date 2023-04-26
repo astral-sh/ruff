@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
@@ -159,10 +158,9 @@ fn check_raise_type(checker: &mut Checker, exc: &Expr) -> bool {
 
 fn check_raise(checker: &mut Checker, exc: &Expr, item: &Stmt) {
     if check_raise_type(checker, exc) {
-        checker.diagnostics.push(Diagnostic::new(
-            TypeCheckWithoutTypeError,
-            Range::from(item),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(TypeCheckWithoutTypeError, item.range()));
     }
 }
 

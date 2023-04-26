@@ -1,9 +1,8 @@
-use rustpython_parser::ast::Location;
-
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
+use ruff_text_size::TextSize;
 
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLineTokens;
 
@@ -55,15 +54,15 @@ impl Violation for MissingWhitespaceAroundModuloOperator {
 #[allow(clippy::if_same_then_else)]
 pub(crate) fn missing_whitespace_around_operator(
     tokens: &LogicalLineTokens,
-) -> Vec<(Location, DiagnosticKind)> {
+) -> Vec<(TextSize, DiagnosticKind)> {
     let mut diagnostics = vec![];
 
     let mut needs_space_main: Option<bool> = Some(false);
     let mut needs_space_aux: Option<bool> = None;
-    let mut prev_end_aux: Option<Location> = None;
+    let mut prev_end_aux: Option<TextSize> = None;
     let mut parens = 0u32;
     let mut prev_type: Option<TokenKind> = None;
-    let mut prev_end: Option<Location> = None;
+    let mut prev_end: Option<TextSize> = None;
 
     for token in tokens {
         let kind = token.kind();

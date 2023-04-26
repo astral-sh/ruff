@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
@@ -98,7 +97,7 @@ pub fn verbose_log_message(checker: &mut Checker, handlers: &[Excepthandler]) {
                         if id == target {
                             checker
                                 .diagnostics
-                                .push(Diagnostic::new(VerboseLogMessage, Range::from(expr)));
+                                .push(Diagnostic::new(VerboseLogMessage, expr.range()));
                         }
                     }
                 }

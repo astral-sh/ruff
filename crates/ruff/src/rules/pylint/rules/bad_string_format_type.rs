@@ -1,14 +1,14 @@
+use ruff_text_size::TextRange;
 use std::str::FromStr;
 
 use rustc_hash::FxHashMap;
 use rustpython_common::cformat::{CFormatPart, CFormatSpec, CFormatStrOrBytes, CFormatString};
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Operator};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::str::{leading_quote, trailing_quote};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -243,11 +243,11 @@ fn is_valid_dict(
 /// PLE1307
 pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) {
     // Grab each string segment (in case there's an implicit concatenation).
-    let content = checker.locator.slice(expr);
-    let mut strings: Vec<(Location, Location)> = vec![];
-    for (start, tok, end) in lexer::lex_located(content, Mode::Module, expr.location).flatten() {
+    let content = checker.locator.slice(expr.range());
+    let mut strings: Vec<TextRange> = vec![];
+    for (tok, range) in lexer::lex_located(content, Mode::Module, expr.start()).flatten() {
         if matches!(tok, Tok::String { .. }) {
-            strings.push((start, end));
+            strings.push(range);
         } else if matches!(tok, Tok::Percent) {
             // Break as soon as we find the modulo symbol.
             break;
@@ -261,8 +261,8 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) 
 
     // Parse each string segment.
     let mut format_strings = vec![];
-    for (start, end) in &strings {
-        let string = checker.locator.slice(Range::new(*start, *end));
+    for range in &strings {
+        let string = checker.locator.slice(*range);
         let (Some(leader), Some(trailer)) = (leading_quote(string), trailing_quote(string)) else {
             return;
         };
@@ -284,6 +284,6 @@ pub fn bad_string_format_type(checker: &mut Checker, expr: &Expr, right: &Expr) 
     if !is_valid {
         checker
             .diagnostics
-            .push(Diagnostic::new(BadStringFormatType, Range::from(expr)));
+            .push(Diagnostic::new(BadStringFormatType, expr.range()));
     }
 }

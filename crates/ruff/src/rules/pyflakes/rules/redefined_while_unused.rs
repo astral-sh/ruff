@@ -1,10 +1,11 @@
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::OneIndexed;
 
 #[violation]
 pub struct RedefinedWhileUnused {
     pub name: String,
-    pub line: usize,
+    pub line: OneIndexed,
 }
 
 impl Violation for RedefinedWhileUnused {

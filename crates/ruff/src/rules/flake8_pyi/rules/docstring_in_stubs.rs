@@ -2,7 +2,6 @@ use rustpython_parser::ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -21,6 +20,6 @@ pub fn docstring_in_stubs(checker: &mut Checker, docstring: Option<&Expr>) {
     if let Some(docstr) = &docstring {
         checker
             .diagnostics
-            .push(Diagnostic::new(DocstringInStub, Range::from(*docstr)));
+            .push(Diagnostic::new(DocstringInStub, docstr.range()));
     }
 }

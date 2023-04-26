@@ -10,7 +10,5 @@ rust-version = { workspace = true }
 [dependencies]
 anyhow = { workspace = true }
 log = { workspace = true }
-ruff_python_ast = { path = "../ruff_python_ast" }
-
-rustpython-parser = { workspace = true }
+ruff_text_size = { workspace = true }
 serde = { workspace = true, optional = true, features = [] }

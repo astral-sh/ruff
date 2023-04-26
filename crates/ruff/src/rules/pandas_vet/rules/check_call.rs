@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Expr, ExprKind};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_semantic::binding::{BindingKind, Importation};
 
 use crate::checkers::ast::Checker;
@@ -111,5 +110,5 @@ pub fn check_call(checker: &mut Checker, func: &Expr) {
 
     checker
         .diagnostics
-        .push(Diagnostic::new(violation, Range::from(func)));
+        .push(Diagnostic::new(violation, func.range()));
 }

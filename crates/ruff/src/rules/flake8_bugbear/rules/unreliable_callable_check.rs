@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -42,5 +41,5 @@ pub fn unreliable_callable_check(checker: &mut Checker, expr: &Expr, func: &Expr
     }
     checker
         .diagnostics
-        .push(Diagnostic::new(UnreliableCallableCheck, Range::from(expr)));
+        .push(Diagnostic::new(UnreliableCallableCheck, expr.range()));
 }

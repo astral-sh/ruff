@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind, Located};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -141,13 +140,13 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                     {
                         checker
                             .diagnostics
-                            .push(Diagnostic::new(SysVersionSlice1, Range::from(value)));
+                            .push(Diagnostic::new(SysVersionSlice1, value.range()));
                     } else if *i == BigInt::from(3)
                         && checker.settings.rules.enabled(Rule::SysVersionSlice3)
                     {
                         checker
                             .diagnostics
-                            .push(Diagnostic::new(SysVersionSlice3, Range::from(value)));
+                            .push(Diagnostic::new(SysVersionSlice3, value.range()));
                     }
                 }
             }
@@ -159,12 +158,12 @@ pub fn subscript(checker: &mut Checker, value: &Expr, slice: &Expr) {
                 if *i == BigInt::from(2) && checker.settings.rules.enabled(Rule::SysVersion2) {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(SysVersion2, Range::from(value)));
+                        .push(Diagnostic::new(SysVersion2, value.range()));
                 } else if *i == BigInt::from(0) && checker.settings.rules.enabled(Rule::SysVersion0)
                 {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(SysVersion0, Range::from(value)));
+                        .push(Diagnostic::new(SysVersion0, value.range()));
                 }
             }
 
@@ -200,7 +199,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                         {
                             checker
                                 .diagnostics
-                                .push(Diagnostic::new(SysVersionInfo0Eq3, Range::from(left)));
+                                .push(Diagnostic::new(SysVersionInfo0Eq3, left.range()));
                         }
                     }
                 } else if *i == BigInt::from(1) {
@@ -219,7 +218,7 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                         if checker.settings.rules.enabled(Rule::SysVersionInfo1CmpInt) {
                             checker
                                 .diagnostics
-                                .push(Diagnostic::new(SysVersionInfo1CmpInt, Range::from(left)));
+                                .push(Diagnostic::new(SysVersionInfo1CmpInt, left.range()));
                         }
                     }
                 }
@@ -246,10 +245,9 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                     .rules
                     .enabled(Rule::SysVersionInfoMinorCmpInt)
                 {
-                    checker.diagnostics.push(Diagnostic::new(
-                        SysVersionInfoMinorCmpInt,
-                        Range::from(left),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(SysVersionInfoMinorCmpInt, left.range()));
                 }
             }
         }
@@ -274,12 +272,12 @@ pub fn compare(checker: &mut Checker, left: &Expr, ops: &[Cmpop], comparators: &
                 if checker.settings.rules.enabled(Rule::SysVersionCmpStr10) {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(SysVersionCmpStr10, Range::from(left)));
+                        .push(Diagnostic::new(SysVersionCmpStr10, left.range()));
                 }
             } else if checker.settings.rules.enabled(Rule::SysVersionCmpStr3) {
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(SysVersionCmpStr3, Range::from(left)));
+                    .push(Diagnostic::new(SysVersionCmpStr3, left.range()));
             }
         }
     }
@@ -294,6 +292,6 @@ pub fn name_or_attribute(checker: &mut Checker, expr: &Expr) {
     {
         checker
             .diagnostics
-            .push(Diagnostic::new(SixPY3, Range::from(expr)));
+            .push(Diagnostic::new(SixPY3, expr.range()));
     }
 }

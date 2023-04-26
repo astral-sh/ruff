@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind, Operator, Unar
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
@@ -106,17 +105,17 @@ fn is_valid_default_value_with_annotation(
         ExprKind::Constant {
             value: Constant::Str(..),
             ..
-        } => return checker.locator.slice(default).len() <= 50,
+        } => return checker.locator.slice(default.range()).len() <= 50,
         ExprKind::Constant {
             value: Constant::Bytes(..),
             ..
-        } => return checker.locator.slice(default).len() <= 50,
+        } => return checker.locator.slice(default.range()).len() <= 50,
         // Ex) `123`, `True`, `False`, `3.14`
         ExprKind::Constant {
             value: Constant::Int(..) | Constant::Bool(..) | Constant::Float(..),
             ..
         } => {
-            return checker.locator.slice(default).len() <= 10;
+            return checker.locator.slice(default.range()).len() <= 10;
         }
         // Ex) `2j`
         ExprKind::Constant {
@@ -124,7 +123,7 @@ fn is_valid_default_value_with_annotation(
             ..
         } => {
             if *real == 0.0 {
-                return checker.locator.slice(default).len() <= 10;
+                return checker.locator.slice(default.range()).len() <= 10;
             }
         }
         ExprKind::UnaryOp {
@@ -137,7 +136,7 @@ fn is_valid_default_value_with_annotation(
                 ..
             } = &operand.node
             {
-                return checker.locator.slice(operand).len() <= 10;
+                return checker.locator.slice(operand.range()).len() <= 10;
             }
             // Ex) `-2j`
             if let ExprKind::Constant {
@@ -146,7 +145,7 @@ fn is_valid_default_value_with_annotation(
             } = &operand.node
             {
                 if *real == 0.0 {
-                    return checker.locator.slice(operand).len() <= 10;
+                    return checker.locator.slice(operand.range()).len() <= 10;
                 }
             }
             // Ex) `-math.inf`, `-math.pi`, etc.
@@ -182,7 +181,7 @@ fn is_valid_default_value_with_annotation(
                     ..
                 } = &left.node
                 {
-                    return checker.locator.slice(left).len() <= 10;
+                    return checker.locator.slice(left.range()).len() <= 10;
                 } else if let ExprKind::UnaryOp {
                     op: Unaryop::USub,
                     operand,
@@ -194,7 +193,7 @@ fn is_valid_default_value_with_annotation(
                         ..
                     } = &operand.node
                     {
-                        return checker.locator.slice(operand).len() <= 10;
+                        return checker.locator.slice(operand.range()).len() <= 10;
                     }
                 }
             }
@@ -296,13 +295,12 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 if arg.node.annotation.is_some() {
                     if !is_valid_default_value_with_annotation(default, checker, true) {
                         let mut diagnostic =
-                            Diagnostic::new(TypedArgumentDefaultInStub, Range::from(default));
+                            Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            diagnostic.set_fix(Edit::range_replacement(
                                 "...".to_string(),
-                                default.location,
-                                default.end_location.unwrap(),
+                                default.range(),
                             ));
                         }
 
@@ -323,13 +321,12 @@ pub fn typed_argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 if kwarg.node.annotation.is_some() {
                     if !is_valid_default_value_with_annotation(default, checker, true) {
                         let mut diagnostic =
-                            Diagnostic::new(TypedArgumentDefaultInStub, Range::from(default));
+                            Diagnostic::new(TypedArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            diagnostic.set_fix(Edit::range_replacement(
                                 "...".to_string(),
-                                default.location,
-                                default.end_location.unwrap(),
+                                default.range(),
                             ));
                         }
 
@@ -353,13 +350,12 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 if arg.node.annotation.is_none() {
                     if !is_valid_default_value_with_annotation(default, checker, true) {
                         let mut diagnostic =
-                            Diagnostic::new(ArgumentDefaultInStub, Range::from(default));
+                            Diagnostic::new(ArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            diagnostic.set_fix(Edit::range_replacement(
                                 "...".to_string(),
-                                default.location,
-                                default.end_location.unwrap(),
+                                default.range(),
                             ));
                         }
 
@@ -380,13 +376,12 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
                 if kwarg.node.annotation.is_none() {
                     if !is_valid_default_value_with_annotation(default, checker, true) {
                         let mut diagnostic =
-                            Diagnostic::new(ArgumentDefaultInStub, Range::from(default));
+                            Diagnostic::new(ArgumentDefaultInStub, default.range());
 
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            diagnostic.set_fix(Edit::range_replacement(
                                 "...".to_string(),
-                                default.location,
-                                default.end_location.unwrap(),
+                                default.range(),
                             ));
                         }
 
@@ -413,13 +408,9 @@ pub fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, Range::from(value));
+    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
-            "...".to_string(),
-            value.location,
-            value.end_location.unwrap(),
-        ));
+        diagnostic.set_fix(Edit::range_replacement("...".to_string(), value.range()));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -444,13 +435,9 @@ pub fn annotated_assignment_default_in_stub(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, Range::from(value));
+    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
-            "...".to_string(),
-            value.location,
-            value.end_location.unwrap(),
-        ));
+        diagnostic.set_fix(Edit::range_replacement("...".to_string(), value.range()));
     }
     checker.diagnostics.push(diagnostic);
 }

@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -73,7 +72,7 @@ pub fn nullable_model_string_field(checker: &Checker, body: &[Stmt]) -> Vec<Diag
                 DjangoNullableModelStringField {
                     field_name: field_name.to_string(),
                 },
-                Range::from(value),
+                value.range(),
             ));
         }
     }

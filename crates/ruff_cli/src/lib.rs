@@ -113,6 +113,8 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
+    let top_level_settings = pyproject_strategy.top_level_settings();
+
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
     let CliSettings {
@@ -122,7 +124,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         show_fixes,
         update_check,
         ..
-    } = pyproject_strategy.top_level_settings().cli.clone();
+    } = top_level_settings.cli.clone();
 
     // Autofix rules are as follows:
     // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
@@ -151,6 +153,10 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     }
     if show_fixes {
         printer_flags |= PrinterFlags::SHOW_FIXES;
+    }
+
+    if top_level_settings.lib.show_source {
+        printer_flags |= PrinterFlags::SHOW_SOURCE;
     }
 
     #[cfg(debug_assertions)]

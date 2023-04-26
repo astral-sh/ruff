@@ -2,7 +2,6 @@ use rustpython_parser::ast::Expr;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_semantic::scope::{FunctionDef, ScopeKind};
 
 use crate::checkers::ast::Checker;
@@ -33,6 +32,6 @@ pub fn await_outside_async(checker: &mut Checker, expr: &Expr) {
     {
         checker
             .diagnostics
-            .push(Diagnostic::new(AwaitOutsideAsync, Range::from(expr)));
+            .push(Diagnostic::new(AwaitOutsideAsync, expr.range()));
     }
 }

@@ -4,7 +4,6 @@ use std::fmt;
 use std::ops::Deref;
 
 use once_cell::unsync::OnceCell;
-use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
@@ -12,48 +11,21 @@ use ruff_rustpython::vendor;
 
 use crate::source_code::Locator;
 use crate::str::leading_quote;
-use crate::types::Range;
 
 pub struct Stylist<'a> {
     locator: &'a Locator<'a>,
-    indentation: OnceCell<Indentation>,
-    indent_end: Option<Location>,
-    quote: OnceCell<Quote>,
-    quote_range: Option<Range>,
+    indentation: Indentation,
+    quote: Quote,
     line_ending: OnceCell<LineEnding>,
 }
 
 impl<'a> Stylist<'a> {
     pub fn indentation(&'a self) -> &'a Indentation {
-        self.indentation.get_or_init(|| {
-            if let Some(indent_end) = self.indent_end {
-                let start = Location::new(indent_end.row(), 0);
-                let whitespace = self.locator.slice(Range::new(start, indent_end));
-                Indentation(whitespace.to_string())
-            } else {
-                Indentation::default()
-            }
-        })
+        &self.indentation
     }
 
     pub fn quote(&'a self) -> Quote {
-        *self.quote.get_or_init(|| {
-            self.quote_range
-                .and_then(|quote_range| {
-                    let content = self.locator.slice(quote_range);
-                    leading_quote(content)
-                })
-                .map(|pattern| {
-                    if pattern.contains('\'') {
-                        Quote::Single
-                    } else if pattern.contains('"') {
-                        Quote::Double
-                    } else {
-                        unreachable!("Expected string to start with a valid quote prefix")
-                    }
-                })
-                .unwrap_or_default()
-        })
+        self.quote
     }
 
     pub fn line_ending(&'a self) -> LineEnding {
@@ -63,30 +35,57 @@ impl<'a> Stylist<'a> {
     }
 
     pub fn from_tokens(tokens: &[LexResult], locator: &'a Locator<'a>) -> Self {
-        let indent_end = tokens.iter().flatten().find_map(|(_, t, end)| {
-            if matches!(t, Tok::Indent) {
-                Some(*end)
-            } else {
-                None
-            }
-        });
-
-        let quote_range = tokens.iter().flatten().find_map(|(start, t, end)| match t {
-            Tok::String {
-                triple_quoted: false,
-                ..
-            } => Some(Range::new(*start, *end)),
-            _ => None,
-        });
+        let indentation = detect_indention(tokens, locator);
 
         Self {
             locator,
-            indentation: OnceCell::default(),
-            indent_end,
-            quote_range,
-            quote: OnceCell::default(),
+            indentation,
+            quote: detect_quote(tokens, locator),
             line_ending: OnceCell::default(),
         }
+    }
+}
+
+fn detect_quote(tokens: &[LexResult], locator: &Locator) -> Quote {
+    let quote_range = tokens.iter().flatten().find_map(|(t, range)| match t {
+        Tok::String {
+            triple_quoted: false,
+            ..
+        } => Some(*range),
+        _ => None,
+    });
+
+    if let Some(quote_range) = quote_range {
+        let content = &locator.slice(quote_range);
+        if let Some(quotes) = leading_quote(content) {
+            return if quotes.contains('\'') {
+                Quote::Single
+            } else if quotes.contains('"') {
+                Quote::Double
+            } else {
+                unreachable!("Expected string to start with a valid quote prefix")
+            };
+        }
+    }
+
+    Quote::default()
+}
+
+fn detect_indention(tokens: &[LexResult], locator: &Locator) -> Indentation {
+    let indent_range = tokens.iter().flatten().find_map(|(t, range)| {
+        if matches!(t, Tok::Indent) {
+            Some(range)
+        } else {
+            None
+        }
+    });
+
+    if let Some(indent_range) = indent_range {
+        let whitespace = locator.slice(*indent_range);
+
+        Indentation(whitespace.to_string())
+    } else {
+        Indentation::default()
     }
 }
 
@@ -198,17 +197,18 @@ impl Deref for LineEnding {
 
 /// Detect the line ending style of the given contents.
 fn detect_line_ending(contents: &str) -> Option<LineEnding> {
-    if let Some(position) = contents.find('\n') {
-        let position = position.saturating_sub(1);
-        return if let Some('\r') = contents.chars().nth(position) {
+    if let Some(position) = contents.find(['\n', '\r']) {
+        let bytes = contents.as_bytes();
+        if bytes[position] == b'\n' {
+            Some(LineEnding::Lf)
+        } else if bytes.get(position.saturating_add(1)) == Some(&b'\n') {
             Some(LineEnding::CrLf)
         } else {
-            Some(LineEnding::Lf)
-        };
-    } else if contents.find('\r').is_some() {
-        return Some(LineEnding::Cr);
+            Some(LineEnding::Cr)
+        }
+    } else {
+        None
     }
-    None
 }
 
 #[cfg(test)]

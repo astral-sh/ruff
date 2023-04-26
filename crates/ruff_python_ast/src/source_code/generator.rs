@@ -3,10 +3,11 @@
 use std::ops::Deref;
 
 use rustpython_parser::ast::{
-    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag, Excepthandler,
+    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprKind, MatchCase, Operator, Pattern, PatternKind, Stmt, StmtKind,
     Suite, Withitem,
 };
+use rustpython_parser::ConversionFlag;
 
 use ruff_rustpython::vendor::{bytes, str};
 

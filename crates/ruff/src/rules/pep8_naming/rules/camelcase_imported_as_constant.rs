@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Alias, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_stdlib::str::{self};
 
 use crate::rules::pep8_naming::helpers;
@@ -61,9 +60,9 @@ pub fn camelcase_imported_as_constant(
                 name: name.to_string(),
                 asname: asname.to_string(),
             },
-            Range::from(alias),
+            alias.range(),
         );
-        diagnostic.set_parent(stmt.location);
+        diagnostic.set_parent(stmt.start());
         return Some(diagnostic);
     }
     None

@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -108,7 +107,7 @@ pub fn unnecessary_double_cast_or_process(
                 inner: inner.to_string(),
                 outer: outer.to_string(),
             },
-            Range::from(expr),
+            expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {

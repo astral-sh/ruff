@@ -1,3 +1,5 @@
+use ruff_text_size::{TextLen, TextRange};
+
 /// See: <https://docs.python.org/3/reference/lexical_analysis.html#string-and-bytes-literals>
 const TRIPLE_QUOTE_STR_PREFIXES: &[&str] = &[
     "u\"\"\"", "u'''", "r\"\"\"", "r'''", "U\"\"\"", "U'''", "R\"\"\"", "R'''", "\"\"\"", "'''",
@@ -21,9 +23,19 @@ const SINGLE_QUOTE_SUFFIXES: &[&str] = &["\"", "'"];
 /// Assumes that the string is a valid string literal, but does not verify that the string
 /// is a "simple" string literal (i.e., that it does not contain any implicit concatenations).
 pub fn raw_contents(contents: &str) -> Option<&str> {
+    let range = raw_contents_range(contents)?;
+
+    Some(&contents[range])
+}
+
+pub fn raw_contents_range(contents: &str) -> Option<TextRange> {
     let leading_quote_str = leading_quote(contents)?;
     let trailing_quote_str = trailing_quote(contents)?;
-    Some(&contents[leading_quote_str.len()..contents.len() - trailing_quote_str.len()])
+
+    Some(TextRange::new(
+        leading_quote_str.text_len(),
+        contents.text_len() - trailing_quote_str.text_len(),
+    ))
 }
 
 /// Return the leading quote for a string or byte literal (e.g., `"""`).

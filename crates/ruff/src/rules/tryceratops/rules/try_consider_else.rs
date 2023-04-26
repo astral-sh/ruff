@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Excepthandler, Stmt, StmtKind};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -73,7 +72,7 @@ pub fn try_consider_else(
                 }
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(TryConsiderElse, Range::from(stmt)));
+                    .push(Diagnostic::new(TryConsiderElse, stmt.range()));
             }
         }
     }

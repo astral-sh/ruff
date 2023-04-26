@@ -1,9 +1,9 @@
-use rustpython_parser::ast::Location;
+use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 
 use ruff_diagnostics::{Diagnostic, Fix};
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
+use ruff_python_ast::token_kind::TokenKind;
 
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle::rules::logical_lines::{
@@ -63,8 +63,7 @@ pub fn check_logical_lines(
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
-                        location,
-                        end_location: location,
+                        range: TextRange::empty(location),
                         fix: Fix::empty(),
                         parent: None,
                     });
@@ -75,8 +74,7 @@ pub fn check_logical_lines(
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
-                        location,
-                        end_location: location,
+                        range: TextRange::empty(location),
                         fix: Fix::empty(),
                         parent: None,
                     });
@@ -86,8 +84,7 @@ pub fn check_logical_lines(
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
-                        location,
-                        end_location: location,
+                        range: TextRange::empty(location),
                         fix: Fix::empty(),
                         parent: None,
                     });
@@ -108,8 +105,7 @@ pub fn check_logical_lines(
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
-                        location,
-                        end_location: location,
+                        range: TextRange::empty(location),
                         fix: Fix::empty(),
                         parent: None,
                     });
@@ -121,8 +117,7 @@ pub fn check_logical_lines(
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
-                        location,
-                        end_location: location,
+                        range: TextRange::empty(location),
                         fix: Fix::empty(),
                         parent: None,
                     });
@@ -133,8 +128,7 @@ pub fn check_logical_lines(
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
-                        location,
-                        end_location: location,
+                        range: TextRange::empty(location),
                         fix: Fix::empty(),
                         parent: None,
                     });
@@ -142,12 +136,13 @@ pub fn check_logical_lines(
             }
         }
         if line.flags().contains(TokenFlags::COMMENT) {
-            for (range, kind) in whitespace_before_comment(&line.tokens(), locator) {
+            for (range, kind) in
+                whitespace_before_comment(&line.tokens(), locator, prev_line.is_none())
+            {
                 if settings.rules.enabled(kind.rule()) {
                     diagnostics.push(Diagnostic {
                         kind,
-                        location: range.location,
-                        end_location: range.end_location,
+                        range,
                         fix: Fix::empty(),
                         parent: None,
                     });
@@ -167,12 +162,21 @@ pub fn check_logical_lines(
         }
 
         // Extract the indentation level.
-        let Some(start_loc) = line.first_token_location() else { continue; };
-        let start_line = locator.slice(Range::new(Location::new(start_loc.row(), 0), start_loc));
-        let indent_level = expand_indent(start_line);
+        let Some(first_token) = line.first_token() else {
+            continue;
+        };
+
+        let range = if first_token.kind() == TokenKind::Indent {
+            first_token.range()
+        } else {
+            TextRange::new(locator.line_start(first_token.start()), first_token.start())
+        };
+
+        let indent_level = expand_indent(locator.slice(range));
+
         let indent_size = 4;
 
-        for (location, kind) in indentation(
+        for kind in indentation(
             &line,
             prev_line.as_ref(),
             indent_char,
@@ -183,8 +187,7 @@ pub fn check_logical_lines(
             if settings.rules.enabled(kind.rule()) {
                 diagnostics.push(Diagnostic {
                     kind,
-                    location: Location::new(start_loc.row(), 0),
-                    end_location: location,
+                    range,
                     fix: Fix::empty(),
                     parent: None,
                 });

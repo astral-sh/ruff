@@ -3,7 +3,6 @@ use regex::Regex;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
@@ -32,7 +31,7 @@ pub fn backslashes(checker: &mut Checker, docstring: &Docstring) {
     if BACKSLASH_REGEX.is_match(contents) {
         checker.diagnostics.push(Diagnostic::new(
             EscapeSequenceInDocstring,
-            Range::from(docstring.expr),
+            docstring.range(),
         ));
     }
 }
