@@ -848,22 +848,24 @@ where
                     Rule::FunctionCallInClassDefaultArgument,
                 ]) {
                     let is_dataclass = ruff::rules::is_dataclass(self, decorator_list);
-                    if is_dataclass && self.settings.rules.enabled(Rule::MutableDataclassDefault) {
-                        ruff::rules::mutable_class_default(self, true, body);
-                    }
+                    
+                    if is_dataclass {
+	                    if self.settings.rules.enabled(Rule::MutableDataclassDefault) {
+	                        ruff::rules::mutable_class_default(self, true, body);
+	                    }
 
-                    if is_dataclass
-                        && self
-                            .settings
-                            .rules
-                            .enabled(Rule::FunctionCallInDataclassDefaultArgument)
-                    {
-                        ruff::rules::function_call_in_class_defaults(
-                            self,
-                            body,
-                            is_dataclass,
-                            true,
-                        );
+	                    if self
+	                            .settings
+	                            .rules
+	                            .enabled(Rule::FunctionCallInDataclassDefaultArgument)
+	                    {
+	                        ruff::rules::function_call_in_class_defaults(
+	                            self,
+	                            body,
+	                            is_dataclass,
+	                            true,
+	                        );
+	                    }
                     }
                     if self.settings.rules.enabled(Rule::MutableClassDefault) {
                         ruff::rules::mutable_class_default(self, false, body);
