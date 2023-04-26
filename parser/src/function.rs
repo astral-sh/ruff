@@ -35,12 +35,12 @@ pub(crate) fn validate_arguments(
 
     let mut all_arg_names = FxHashSet::with_hasher(Default::default());
     for arg in all_args {
-        let arg_name = &arg.node.arg;
+        let arg_name = &arg.arg;
         // Check for duplicate arguments in the function definition.
         if !all_arg_names.insert(arg_name) {
             return Err(LexicalError {
                 error: LexicalErrorType::DuplicateArgumentError(arg_name.to_string()),
-                location: arg.location,
+                location: arg.start(),
             });
         }
     }
@@ -64,7 +64,7 @@ pub(crate) fn parse_params(
             // have defaults.
             return Err(LexicalError {
                 error: LexicalErrorType::DefaultArgumentError,
-                location: name.location,
+                location: name.start(),
             });
         }
         Ok(())
@@ -126,14 +126,14 @@ pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentLis
                 if !keywords.is_empty() && !is_starred(&value) {
                     return Err(LexicalError {
                         error: LexicalErrorType::PositionalArgumentError,
-                        location: value.location,
+                        location: value.start(),
                     });
                 // Allow starred arguments after keyword arguments but
                 // not after double-starred arguments.
                 } else if double_starred {
                     return Err(LexicalError {
                         error: LexicalErrorType::UnpackedArgumentError,
-                        location: value.location,
+                        location: value.start(),
                     });
                 }
 
