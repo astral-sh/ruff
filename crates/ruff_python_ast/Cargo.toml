@@ -13,10 +13,10 @@ ruff_text_size = { workspace = true, features = ["serde"] }
 
 anyhow = { workspace = true }
 bitflags = { workspace = true }
-memchr = "2.5.0"
 is-macro = { workspace = true }
 itertools = { workspace = true }
 log = { workspace = true }
+memchr = "2.5.0"
 num-bigint = { version = "0.4.3" }
 num-traits = { version = "0.2.15" }
 once_cell = { workspace = true }

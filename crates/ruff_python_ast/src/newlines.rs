@@ -56,7 +56,7 @@ impl<'a> UniversalNewlineIterator<'a> {
 pub fn find_newline(text: &str) -> Option<(usize, LineEnding)> {
     let bytes = text.as_bytes();
     if let Some(position) = memchr2(b'\n', b'\r', bytes) {
-        // SAFEtY: memchr guarantees to return valid positions
+        // SAFETY: memchr guarantees to return valid positions
         #[allow(unsafe_code)]
         let newline_character = unsafe { *bytes.get_unchecked(position) };
 
