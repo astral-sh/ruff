@@ -1,3 +1,4 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind};
 use rustpython_parser::{lexer, Mode, Tok};
 
@@ -5,7 +6,6 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -94,24 +94,24 @@ fn elts_to_csv(elts: &[Expr], checker: &Checker) -> Option<String> {
 /// ```
 ///
 /// This method assumes that the first argument is a string.
-fn get_parametrize_name_range(checker: &Checker, decorator: &Expr, expr: &Expr) -> Range {
+fn get_parametrize_name_range(checker: &Checker, decorator: &Expr, expr: &Expr) -> TextRange {
     let mut locations = Vec::new();
     let mut implicit_concat = None;
 
     // The parenthesis are not part of the AST, so we need to tokenize the
     // decorator to find them.
-    for (start, tok, end) in lexer::lex_located(
-        checker.locator.slice(decorator),
+    for (tok, range) in lexer::lex_located(
+        checker.locator.slice(decorator.range()),
         Mode::Module,
-        decorator.location,
+        decorator.start(),
     )
     .flatten()
     {
         match tok {
-            Tok::Lpar => locations.push(start),
+            Tok::Lpar => locations.push(range.start()),
             Tok::Rpar => {
                 if let Some(start) = locations.pop() {
-                    implicit_concat = Some(Range::new(start, end));
+                    implicit_concat = Some(TextRange::new(start, range.end()));
                 }
             }
             // Stop after the first argument.
@@ -123,7 +123,7 @@ fn get_parametrize_name_range(checker: &Checker, decorator: &Expr, expr: &Expr) 
     if let Some(range) = implicit_concat {
         range
     } else {
-        Range::from(expr)
+        expr.range()
     }
 }
 
@@ -148,7 +148,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             name_range,
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            diagnostic.set_fix(Edit::range_replacement(
                                 format!(
                                     "({})",
                                     unparse_expr(
@@ -167,8 +167,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                                         checker.stylist,
                                     )
                                 ),
-                                name_range.location,
-                                name_range.end_location,
+                                name_range,
                             ));
                         }
                         checker.diagnostics.push(diagnostic);
@@ -182,7 +181,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             name_range,
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            diagnostic.set_fix(Edit::range_replacement(
                                 unparse_expr(
                                     &create_expr(ExprKind::List {
                                         elts: names
@@ -198,8 +197,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                                     }),
                                     checker.stylist,
                                 ),
-                                name_range.location,
-                                name_range.end_location,
+                                name_range,
                             ));
                         }
                         checker.diagnostics.push(diagnostic);
@@ -221,10 +219,10 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
                             },
-                            Range::from(expr),
+                            expr.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            diagnostic.set_fix(Edit::range_replacement(
                                 unparse_expr(
                                     &create_expr(ExprKind::List {
                                         elts: elts.clone(),
@@ -232,8 +230,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                                     }),
                                     checker.stylist,
                                 ),
-                                expr.location,
-                                expr.end_location.unwrap(),
+                                expr.range(),
                             ));
                         }
                         checker.diagnostics.push(diagnostic);
@@ -243,15 +240,11 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
                             },
-                            Range::from(expr),
+                            expr.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
-                                diagnostic.set_fix(Edit::replacement(
-                                    content,
-                                    expr.location,
-                                    expr.end_location.unwrap(),
-                                ));
+                                diagnostic.set_fix(Edit::range_replacement(content, expr.range()));
                             }
                         }
                         checker.diagnostics.push(diagnostic);
@@ -272,10 +265,10 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
                             },
-                            Range::from(expr),
+                            expr.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            diagnostic.set_fix(Edit::range_replacement(
                                 format!(
                                     "({})",
                                     unparse_expr(
@@ -286,8 +279,7 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                                         checker.stylist,
                                     )
                                 ),
-                                expr.location,
-                                expr.end_location.unwrap(),
+                                expr.range(),
                             ));
                         }
                         checker.diagnostics.push(diagnostic);
@@ -297,15 +289,11 @@ fn check_names(checker: &mut Checker, decorator: &Expr, expr: &Expr) {
                             PytestParametrizeNamesWrongType {
                                 expected: names_type,
                             },
-                            Range::from(expr),
+                            expr.range(),
                         );
                         if checker.patch(diagnostic.kind.rule()) {
                             if let Some(content) = elts_to_csv(elts, checker) {
-                                diagnostic.set_fix(Edit::replacement(
-                                    content,
-                                    expr.location,
-                                    expr.end_location.unwrap(),
-                                ));
+                                diagnostic.set_fix(Edit::range_replacement(content, expr.range()));
                             }
                         }
                         checker.diagnostics.push(diagnostic);
@@ -344,7 +332,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                         values: values_type,
                         row: values_row_type,
                     },
-                    Range::from(values),
+                    values.range(),
                 ));
             }
             if is_multi_named {
@@ -358,7 +346,7 @@ fn check_values(checker: &mut Checker, names: &Expr, values: &Expr) {
                         values: values_type,
                         row: values_row_type,
                     },
-                    Range::from(values),
+                    values.range(),
                 ));
             }
             if is_multi_named {
@@ -374,14 +362,13 @@ fn handle_single_name(checker: &mut Checker, expr: &Expr, value: &Expr) {
         PytestParametrizeNamesWrongType {
             expected: types::ParametrizeNameType::Csv,
         },
-        Range::from(expr),
+        expr.range(),
     );
 
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             unparse_expr(&create_expr(value.node.clone()), checker.stylist),
-            expr.location,
-            expr.end_location.unwrap(),
+            expr.range(),
         ));
     }
     checker.diagnostics.push(diagnostic);
@@ -402,7 +389,7 @@ fn handle_value_rows(
                             values: values_type,
                             row: values_row_type,
                         },
-                        Range::from(elt),
+                        elt.range(),
                     ));
                 }
             }
@@ -413,7 +400,7 @@ fn handle_value_rows(
                             values: values_type,
                             row: values_row_type,
                         },
-                        Range::from(elt),
+                        elt.range(),
                     ));
                 }
             }

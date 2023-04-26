@@ -1,3 +1,4 @@
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{
     Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprContext, Keyword, MatchCase, Operator, Pattern, Stmt, StmtKind,
@@ -26,10 +27,10 @@ pub struct Block<'a> {
 
 pub struct ImportTracker<'a> {
     locator: &'a Locator<'a>,
-    directives: &'a IsortDirectives,
     is_stub: bool,
     blocks: Vec<Block<'a>>,
-    split_index: usize,
+    splits: &'a [TextSize],
+    exclusions: &'a [TextRange],
     nested: bool,
 }
 
@@ -37,10 +38,10 @@ impl<'a> ImportTracker<'a> {
     pub fn new(locator: &'a Locator<'a>, directives: &'a IsortDirectives, is_stub: bool) -> Self {
         Self {
             locator,
-            directives,
             is_stub,
             blocks: vec![Block::default()],
-            split_index: 0,
+            splits: &directives.splits,
+            exclusions: &directives.exclusions,
             nested: false,
         }
     }
@@ -116,11 +117,22 @@ where
 {
     fn visit_stmt(&mut self, stmt: &'b Stmt) {
         // Track manual splits.
-        while self.split_index < self.directives.splits.len() {
-            if stmt.location.row() >= self.directives.splits[self.split_index] {
+        for (index, split) in self.splits.iter().enumerate() {
+            if stmt.end() >= *split {
                 self.finalize(self.trailer_for(stmt));
-                self.split_index += 1;
+                self.splits = &self.splits[index + 1..];
             } else {
+                break;
+            }
+        }
+
+        // Test if the statement is in an excluded range
+        let mut is_excluded = false;
+        for (index, exclusion) in self.exclusions.iter().enumerate() {
+            if exclusion.end() < stmt.start() {
+                self.exclusions = &self.exclusions[index + 1..];
+            } else {
+                is_excluded = exclusion.contains(stmt.start());
                 break;
             }
         }
@@ -129,7 +141,7 @@ where
         if matches!(
             stmt.node,
             StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
-        ) && !self.directives.exclusions.contains(&stmt.location.row())
+        ) && !is_excluded
         {
             self.track_import(stmt);
         } else {

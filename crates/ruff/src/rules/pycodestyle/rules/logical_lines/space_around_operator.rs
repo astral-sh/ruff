@@ -1,4 +1,4 @@
-use rustpython_parser::ast::Location;
+use ruff_text_size::TextSize;
 
 use super::{LogicalLine, Whitespace};
 use ruff_diagnostics::DiagnosticKind;
@@ -123,7 +123,7 @@ impl Violation for MultipleSpacesAfterOperator {
 }
 
 /// E221, E222, E223, E224
-pub(crate) fn space_around_operator(line: &LogicalLine) -> Vec<(Location, DiagnosticKind)> {
+pub(crate) fn space_around_operator(line: &LogicalLine) -> Vec<(TextSize, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut after_operator = false;
 
@@ -135,17 +135,11 @@ pub(crate) fn space_around_operator(line: &LogicalLine) -> Vec<(Location, Diagno
                 match line.leading_whitespace(&token) {
                     (Whitespace::Tab, offset) => {
                         let start = token.start();
-                        diagnostics.push((
-                            Location::new(start.row(), start.column() - offset),
-                            TabBeforeOperator.into(),
-                        ));
+                        diagnostics.push((start - offset, TabBeforeOperator.into()));
                     }
                     (Whitespace::Many, offset) => {
                         let start = token.start();
-                        diagnostics.push((
-                            Location::new(start.row(), start.column() - offset),
-                            MultipleSpacesBeforeOperator.into(),
-                        ));
+                        diagnostics.push((start - offset, MultipleSpacesBeforeOperator.into()));
                     }
                     _ => {}
                 }

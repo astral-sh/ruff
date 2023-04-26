@@ -347,7 +347,7 @@ pub struct Options {
         default = "false",
         value_type = "bool",
         example = r#"
-            # By default, always enumerate fixed violations.
+            # Enumerate all fixed violations.
             show-fixes = true
         "#
     )]

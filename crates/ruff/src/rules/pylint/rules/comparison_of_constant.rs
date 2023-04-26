@@ -6,7 +6,6 @@ use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Located};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_constant;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -111,7 +110,7 @@ pub fn comparison_of_constant(
                     op: op.into(),
                     right_constant: unparse_constant(right_constant, checker.stylist),
                 },
-                Range::from(left),
+                left.range(),
             );
 
             checker.diagnostics.push(diagnostic);

@@ -4,7 +4,6 @@ use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::Diagnostic;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -78,7 +77,7 @@ pub fn unnecessary_comprehension_any_all(
         if !checker.ctx.is_builtin(id) {
             return;
         }
-        let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from(&args[0]));
+        let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, args[0].range());
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
                 fixes::fix_unnecessary_comprehension_any_all(checker.locator, checker.stylist, expr)

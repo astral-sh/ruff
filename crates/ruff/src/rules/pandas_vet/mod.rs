@@ -27,16 +27,19 @@ mod tests {
         let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
-        let indexer: Indexer = tokens.as_slice().into();
-        let directives =
-            directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
+        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let directives = directives::extract_directives(
+            &tokens,
+            directives::Flags::from_settings(&settings),
+            &locator,
+            &indexer,
+        );
         let LinterResult {
             data: (diagnostics, _imports),
             ..
         } = check_path(
             Path::new("<filename>"),
             None,
-            &contents,
             tokens,
             &locator,
             &stylist,

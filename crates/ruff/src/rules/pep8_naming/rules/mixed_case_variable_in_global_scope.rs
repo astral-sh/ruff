@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
@@ -41,7 +40,7 @@ pub fn mixed_case_variable_in_global_scope(
             MixedCaseVariableInGlobalScope {
                 name: name.to_string(),
             },
-            Range::from(expr),
+            expr.range(),
         ));
     }
 }

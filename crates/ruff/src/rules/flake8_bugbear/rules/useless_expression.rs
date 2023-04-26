@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -62,7 +61,7 @@ pub fn useless_expression(checker: &mut Checker, value: &Expr) {
                 UselessExpression {
                     kind: Kind::Attribute,
                 },
-                Range::from(value),
+                value.range(),
             ));
         }
         return;
@@ -72,6 +71,6 @@ pub fn useless_expression(checker: &mut Checker, value: &Expr) {
         UselessExpression {
             kind: Kind::Expression,
         },
-        Range::from(value),
+        value.range(),
     ));
 }

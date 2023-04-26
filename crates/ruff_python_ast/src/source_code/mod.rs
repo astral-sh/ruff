@@ -5,17 +5,17 @@ mod locator;
 mod stylist;
 
 pub use crate::source_code::line_index::{LineIndex, OneIndexed};
-use crate::types::Range;
 pub use generator::Generator;
 pub use indexer::Indexer;
 pub use locator::Locator;
 use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser as parser;
-use rustpython_parser::ast::Location;
 use rustpython_parser::{lexer, Mode, ParseError};
+#[cfg(feature = "serde")]
+use serde::{Deserialize, Serialize};
 use std::fmt::{Debug, Formatter};
-
 use std::sync::Arc;
+
 pub use stylist::{LineEnding, Stylist};
 
 /// Run round-trip source code generation on a given Python code.
@@ -29,7 +29,7 @@ pub fn round_trip(code: &str, source_path: &str) -> Result<String, ParseError> {
     Ok(generator.generate())
 }
 
-/// Gives access to the source code of a file and allows mapping between [`Location`] and byte offsets.
+/// Gives access to the source code of a file and allows mapping between [`TextSize`] and [`SourceLocation`].
 #[derive(Debug)]
 pub struct SourceCode<'src, 'index> {
     text: &'src str,
@@ -44,35 +44,32 @@ impl<'src, 'index> SourceCode<'src, 'index> {
         }
     }
 
-    /// Take the source code up to the given [`Location`].
-    pub fn up_to(&self, location: Location) -> &'src str {
-        let offset = self.index.location_offset(location, self.text);
+    /// Computes the one indexed row and column numbers for `offset`.
+    #[inline]
+    pub fn source_location(&self, offset: TextSize) -> SourceLocation {
+        self.index.source_location(offset, self.text)
+    }
+
+    #[inline]
+    pub fn line_index(&self, offset: TextSize) -> OneIndexed {
+        self.index.line_index(offset)
+    }
+
+    /// Take the source code up to the given [`TextSize`].
+    #[inline]
+    pub fn up_to(&self, offset: TextSize) -> &'src str {
         &self.text[TextRange::up_to(offset)]
     }
 
-    /// Take the source code after the given [`Location`].
-    pub fn after(&self, location: Location) -> &'src str {
-        let offset = self.index.location_offset(location, self.text);
+    /// Take the source code after the given [`TextSize`].
+    #[inline]
+    pub fn after(&self, offset: TextSize) -> &'src str {
         &self.text[usize::from(offset)..]
     }
 
-    /// Take the source code between the given [`Range`].
-    pub fn slice<R: Into<Range>>(&self, range: R) -> &'src str {
-        let range = self.text_range(range);
+    /// Take the source code between the given [`TextRange`].
+    pub fn slice(&self, range: TextRange) -> &'src str {
         &self.text[range]
-    }
-
-    /// Converts a [`Location`] range to a byte offset range
-    pub fn text_range<R: Into<Range>>(&self, range: R) -> TextRange {
-        let range = range.into();
-        let start = self.index.location_offset(range.location, self.text);
-        let end = self.index.location_offset(range.end_location, self.text);
-        TextRange::new(start, end)
-    }
-
-    /// Return the byte offset of the given [`Location`].
-    pub fn offset(&self, location: Location) -> TextSize {
-        self.index.location_offset(location, self.text)
     }
 
     pub fn line_start(&self, line: OneIndexed) -> TextSize {
@@ -85,20 +82,6 @@ impl<'src, 'index> SourceCode<'src, 'index> {
 
     pub fn line_range(&self, line: OneIndexed) -> TextRange {
         self.index.line_range(line, self.text)
-    }
-
-    /// Returns a string with the lines spawning between location and end location.
-    pub fn lines(&self, range: Range) -> &'src str {
-        let start_line = self
-            .index
-            .line_range(OneIndexed::new(range.location.row()).unwrap(), self.text);
-
-        let end_line = self.index.line_range(
-            OneIndexed::new(range.end_location.row()).unwrap(),
-            self.text,
-        );
-
-        &self.text[TextRange::new(start_line.start(), end_line.end())]
     }
 
     /// Returns the source text of the line with the given index
@@ -131,69 +114,43 @@ impl Eq for SourceCode<'_, '_> {}
 /// A Builder for constructing a [`SourceFile`]
 pub struct SourceFileBuilder {
     name: Box<str>,
-    code: Option<FileSourceCode>,
+    code: Box<str>,
+    index: Option<LineIndex>,
 }
 
 impl SourceFileBuilder {
     /// Creates a new builder for a file named `name`.
-    pub fn new(name: &str) -> Self {
+    pub fn new<Name: Into<Box<str>>, Code: Into<Box<str>>>(name: Name, code: Code) -> Self {
         Self {
-            name: Box::from(name),
-            code: None,
+            name: name.into(),
+            code: code.into(),
+            index: None,
         }
     }
 
-    /// Creates a enw builder for a file named `name`
-    pub fn from_string(name: String) -> Self {
-        Self {
-            name: Box::from(name),
-            code: None,
-        }
-    }
-
-    /// Consumes `self` and returns a builder for a file with the source text and the [`LineIndex`] copied
-    /// from `source`.
     #[must_use]
-    pub fn source_code(mut self, source: &SourceCode) -> Self {
-        self.set_source_code(source);
+    pub fn line_index(mut self, index: LineIndex) -> Self {
+        self.index = Some(index);
         self
     }
 
-    /// Copies the source text and [`LineIndex`] from `source`.
-    pub fn set_source_code(&mut self, source: &SourceCode) {
-        self.code = Some(FileSourceCode {
-            text: Box::from(source.text()),
-            index: source.index.clone(),
-        });
-    }
-
-    /// Consumes `self` and returns a builder for a file with the source text `text`. Builds the [`LineIndex`] from `text`.
-    #[must_use]
-    pub fn source_text(self, text: &str) -> Self {
-        self.source_code(&SourceCode::new(text, &LineIndex::from_source_text(text)))
-    }
-
-    /// Consumes `self` and returns a builder for a file with the source text `text`. Builds the [`LineIndex`] from `text`.
-    #[must_use]
-    pub fn source_text_string(mut self, text: String) -> Self {
-        self.set_source_text_string(text);
-        self
-    }
-
-    /// Copies the source text `text` and builds the [`LineIndex`] from `text`.
-    pub fn set_source_text_string(&mut self, text: String) {
-        self.code = Some(FileSourceCode {
-            index: LineIndex::from_source_text(&text),
-            text: Box::from(text),
-        });
+    pub fn set_line_index(&mut self, index: LineIndex) {
+        self.index = Some(index);
     }
 
     /// Consumes `self` and returns the [`SourceFile`].
     pub fn finish(self) -> SourceFile {
+        let index = if let Some(index) = self.index {
+            once_cell::sync::OnceCell::with_value(index)
+        } else {
+            once_cell::sync::OnceCell::new()
+        };
+
         SourceFile {
             inner: Arc::new(SourceFileInner {
                 name: self.name,
                 code: self.code,
+                line_index: index,
             }),
         }
     }
@@ -211,7 +168,7 @@ impl Debug for SourceFile {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("SourceFile")
             .field("name", &self.name())
-            .field("code", &self.source_code())
+            .field("code", &self.source_text())
             .finish()
     }
 }
@@ -223,38 +180,57 @@ impl SourceFile {
         &self.inner.name
     }
 
-    /// Returns `Some` with the source code if set, or `None`.
     #[inline]
-    pub fn source_code(&self) -> Option<SourceCode> {
-        self.inner.code.as_ref().map(|code| SourceCode {
-            text: &code.text,
-            index: &code.index,
-        })
+    pub fn slice(&self, range: TextRange) -> &str {
+        &self.source_text()[range]
+    }
+
+    pub fn to_source_code(&self) -> SourceCode {
+        SourceCode {
+            text: self.source_text(),
+            index: self.index(),
+        }
+    }
+
+    fn index(&self) -> &LineIndex {
+        self.inner
+            .line_index
+            .get_or_init(|| LineIndex::from_source_text(self.source_text()))
     }
 
     /// Returns `Some` with the source text if set, or `None`.
     #[inline]
-    pub fn source_text(&self) -> Option<&str> {
-        self.inner.code.as_ref().map(|code| &*code.text)
+    pub fn source_text(&self) -> &str {
+        &self.inner.code
     }
 }
 
-#[derive(Eq, PartialEq)]
 struct SourceFileInner {
     name: Box<str>,
-    code: Option<FileSourceCode>,
+    code: Box<str>,
+    line_index: once_cell::sync::OnceCell<LineIndex>,
 }
 
-struct FileSourceCode {
-    text: Box<str>,
-    index: LineIndex,
-}
-
-impl PartialEq for FileSourceCode {
+impl PartialEq for SourceFileInner {
     fn eq(&self, other: &Self) -> bool {
-        // It should be safe to assume that the index for two source files are identical
-        self.text == other.text
+        self.name == other.name && self.code == other.code
     }
 }
 
-impl Eq for FileSourceCode {}
+impl Eq for SourceFileInner {}
+
+#[derive(Clone, Eq, PartialEq, Ord, PartialOrd, Hash)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+pub struct SourceLocation {
+    pub row: OneIndexed,
+    pub column: OneIndexed,
+}
+
+impl Debug for SourceLocation {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("SourceLocation")
+            .field("row", &self.row.get())
+            .field("column", &self.column.get())
+            .finish()
+    }
+}

@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use super::super::helpers::{matches_password_name, string_literal};
 
@@ -52,7 +51,7 @@ pub fn compare_to_hardcoded_password_string(left: &Expr, comparators: &[Expr]) -
                 HardcodedPasswordString {
                     string: string.to_string(),
                 },
-                Range::from(comp),
+                comp.range(),
             ))
         })
         .collect()
@@ -67,7 +66,7 @@ pub fn assign_hardcoded_password_string(value: &Expr, targets: &[Expr]) -> Optio
                     HardcodedPasswordString {
                         string: string.to_string(),
                     },
-                    Range::from(value),
+                    value.range(),
                 ));
             }
         }

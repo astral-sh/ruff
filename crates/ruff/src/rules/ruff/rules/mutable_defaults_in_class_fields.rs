@@ -2,7 +2,7 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{call_path::compose_call_path, helpers::map_callable, types::Range};
+use ruff_python_ast::{call_path::compose_call_path, helpers::map_callable};
 use ruff_python_semantic::analyze::typing::is_immutable_annotation;
 use ruff_python_semantic::context::Context;
 
@@ -213,14 +213,14 @@ pub fn function_call_in_class_defaults(
                             FunctionCallInDataclassDefaultArgument {
                                 name: compose_call_path(func),
                             },
-                            Range::from(expr),
+                            expr.range(),
                         )
                     } else {
                         Diagnostic::new(
                             FunctionCallInClassDefaultArgument {
                                 name: compose_call_path(func),
                             },
-                            Range::from(expr),
+                            expr.range(),
                         )
                     };
                     checker.diagnostics.push(diagnostic);
@@ -234,9 +234,9 @@ pub fn function_call_in_class_defaults(
 pub fn mutable_class_default(checker: &mut Checker, emit_dataclass_error: bool, body: &[Stmt]) {
     fn diagnostic(emit_dataclass_error: bool, value: &Expr) -> Diagnostic {
         if emit_dataclass_error {
-            Diagnostic::new(MutableDataclassDefault, Range::from(value))
+            Diagnostic::new(MutableDataclassDefault, value.range())
         } else {
-            Diagnostic::new(MutableClassDefault, Range::from(value))
+            Diagnostic::new(MutableClassDefault, value.range())
         }
     }
 

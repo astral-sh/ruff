@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Cmpop, Expr, ExprKind, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -98,12 +97,11 @@ pub fn not_tests(
                 match op {
                     Cmpop::In => {
                         if check_not_in {
-                            let mut diagnostic = Diagnostic::new(NotInTest, Range::from(operand));
+                            let mut diagnostic = Diagnostic::new(NotInTest, operand.range());
                             if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Edit::replacement(
+                                diagnostic.set_fix(Edit::range_replacement(
                                     compare(left, &[Cmpop::NotIn], comparators, checker.stylist),
-                                    expr.location,
-                                    expr.end_location.unwrap(),
+                                    expr.range(),
                                 ));
                             }
                             checker.diagnostics.push(diagnostic);
@@ -111,12 +109,11 @@ pub fn not_tests(
                     }
                     Cmpop::Is => {
                         if check_not_is {
-                            let mut diagnostic = Diagnostic::new(NotIsTest, Range::from(operand));
+                            let mut diagnostic = Diagnostic::new(NotIsTest, operand.range());
                             if checker.patch(diagnostic.kind.rule()) {
-                                diagnostic.set_fix(Edit::replacement(
+                                diagnostic.set_fix(Edit::range_replacement(
                                     compare(left, &[Cmpop::IsNot], comparators, checker.stylist),
-                                    expr.location,
-                                    expr.end_location.unwrap(),
+                                    expr.range(),
                                 ));
                             }
                             checker.diagnostics.push(diagnostic);

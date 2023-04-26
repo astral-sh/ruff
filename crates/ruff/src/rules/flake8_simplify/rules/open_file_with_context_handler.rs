@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, ExprKind, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -112,10 +111,9 @@ pub fn open_file_with_context_handler(checker: &mut Checker, func: &Expr) {
                 return;
             }
 
-            checker.diagnostics.push(Diagnostic::new(
-                OpenFileWithContextHandler,
-                Range::from(func),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(OpenFileWithContextHandler, func.range()));
         }
     }
 }

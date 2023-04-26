@@ -12,3 +12,6 @@ indent_size = 2
 
 [*.{rs,py}]
 indent_size = 4
+
+[*.snap]
+trim_trailing_whitespace = false

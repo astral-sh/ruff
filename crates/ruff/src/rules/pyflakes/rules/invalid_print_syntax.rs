@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -29,5 +28,5 @@ pub fn invalid_print_syntax(checker: &mut Checker, left: &Expr) {
     };
     checker
         .diagnostics
-        .push(Diagnostic::new(InvalidPrintSyntax, Range::from(left)));
+        .push(Diagnostic::new(InvalidPrintSyntax, left.range()));
 }

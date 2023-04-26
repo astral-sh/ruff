@@ -1,5 +1,5 @@
 use itertools::Itertools;
-use rustpython_parser::ast::Location;
+use ruff_text_size::TextSize;
 
 use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
@@ -21,7 +21,7 @@ impl Violation for MissingWhitespaceAfterKeyword {
 /// E275
 pub(crate) fn missing_whitespace_after_keyword(
     tokens: &LogicalLineTokens,
-) -> Vec<(Location, DiagnosticKind)> {
+) -> Vec<(TextSize, DiagnosticKind)> {
     let mut diagnostics = vec![];
 
     for (tok0, tok1) in tokens.iter().tuple_windows() {

@@ -1,11 +1,11 @@
 use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_python_ast::newlines::Line;
 
 #[violation]
 pub struct BlanketTypeIgnore;
@@ -18,17 +18,15 @@ impl Violation for BlanketTypeIgnore {
 }
 
 /// PGH003
-pub fn blanket_type_ignore(diagnostics: &mut Vec<Diagnostic>, lineno: usize, line: &str) {
+pub(crate) fn blanket_type_ignore(diagnostics: &mut Vec<Diagnostic>, line: &Line) {
     for match_ in TYPE_IGNORE_PATTERN.find_iter(line) {
         if let Ok(codes) = parse_type_ignore_tag(line[match_.end()..].trim()) {
             if codes.is_empty() {
-                let start = line[..match_.start()].chars().count();
-                let end = start + line[match_.start()..match_.end()].chars().count();
                 diagnostics.push(Diagnostic::new(
                     BlanketTypeIgnore,
-                    Range::new(
-                        Location::new(lineno + 1, start),
-                        Location::new(lineno + 1, end),
+                    TextRange::at(
+                        line.start() + TextSize::try_from(match_.start()).unwrap(),
+                        match_.as_str().text_len(),
                     ),
                 ));
             }

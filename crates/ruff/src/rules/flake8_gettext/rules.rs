@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 #[violation]
 pub struct FStringInGetTextFuncCall;
@@ -46,10 +45,7 @@ pub fn is_gettext_func_call(func: &Expr, functions_names: &[String]) -> bool {
 pub fn f_string_in_gettext_func_call(args: &[Expr]) -> Option<Diagnostic> {
     if let Some(first) = args.first() {
         if matches!(first.node, ExprKind::JoinedStr { .. }) {
-            return Some(Diagnostic::new(
-                FStringInGetTextFuncCall {},
-                Range::from(first),
-            ));
+            return Some(Diagnostic::new(FStringInGetTextFuncCall {}, first.range()));
         }
     }
     None
@@ -61,10 +57,7 @@ pub fn format_in_gettext_func_call(args: &[Expr]) -> Option<Diagnostic> {
         if let ExprKind::Call { func, .. } = &first.node {
             if let ExprKind::Attribute { attr, .. } = &func.node {
                 if attr == "format" {
-                    return Some(Diagnostic::new(
-                        FormatInGetTextFuncCall {},
-                        Range::from(first),
-                    ));
+                    return Some(Diagnostic::new(FormatInGetTextFuncCall {}, first.range()));
                 }
             }
         }
@@ -86,10 +79,7 @@ pub fn printf_in_gettext_func_call(args: &[Expr]) -> Option<Diagnostic> {
                 ..
             } = left.node
             {
-                return Some(Diagnostic::new(
-                    PrintfInGetTextFuncCall {},
-                    Range::from(first),
-                ));
+                return Some(Diagnostic::new(PrintfInGetTextFuncCall {}, first.range()));
             }
         }
     }

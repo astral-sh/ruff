@@ -2,7 +2,6 @@ use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -67,7 +66,7 @@ pub fn global_statement(checker: &mut Checker, name: &str) {
                 },
                 // Match Pylint's behavior by reporting on the `global` statement`, rather
                 // than the variable usage.
-                Range::from(source),
+                source.range(),
             );
             checker.diagnostics.push(diagnostic);
         }

@@ -2,7 +2,6 @@ use rustpython_parser::ast::Stmt;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
@@ -25,7 +24,7 @@ pub fn return_outside_function(checker: &mut Checker, stmt: &Stmt) {
         ) {
             checker
                 .diagnostics
-                .push(Diagnostic::new(ReturnOutsideFunction, Range::from(stmt)));
+                .push(Diagnostic::new(ReturnOutsideFunction, stmt.range()));
         }
     }
 }

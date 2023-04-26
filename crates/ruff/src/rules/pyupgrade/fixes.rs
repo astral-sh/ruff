@@ -3,18 +3,18 @@ use libcst_native::{
     Codegen, CodegenState, CompoundStatement, Expression, ParenthesizableWhitespace,
     SmallStatement, Statement, Suite,
 };
-use rustpython_parser::ast::{Expr, Location};
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::Expr;
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
 
 use crate::cst::matchers::match_module;
 
-/// Safely adjust the indentation of the indented block at [`Range`].
+/// Safely adjust the indentation of the indented block at [`TextRange`].
 pub fn adjust_indentation(
-    range: Range,
+    range: TextRange,
     indentation: &str,
     locator: &Locator,
     stylist: &Stylist,
@@ -51,7 +51,7 @@ pub fn adjust_indentation(
 
 /// Generate a fix to remove arguments from a `super` call.
 pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr) -> Option<Edit> {
-    let range = Range::from(expr);
+    let range = expr.range();
     let contents = locator.slice(range);
 
     let mut tree = libcst_native::parse_module(contents, None).ok()?;
@@ -77,38 +77,35 @@ pub fn remove_super_arguments(locator: &Locator, stylist: &Stylist, expr: &Expr)
     };
     tree.codegen(&mut state);
 
-    Some(Edit::replacement(
-        state.to_string(),
-        range.location,
-        range.end_location,
-    ))
+    Some(Edit::range_replacement(state.to_string(), range))
 }
 
 /// Remove any imports matching `members` from an import-from statement.
 pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
-    let mut names: Vec<Range> = vec![];
-    let mut commas: Vec<Range> = vec![];
+    let mut names: Vec<TextRange> = vec![];
+    let mut commas: Vec<TextRange> = vec![];
     let mut removal_indices: Vec<usize> = vec![];
 
     // Find all Tok::Name tokens that are not preceded by Tok::As, and all
     // Tok::Comma tokens.
     let mut prev_tok = None;
-    for (start, tok, end) in lexer::lex(contents, Mode::Module)
+    for (tok, range) in lexer::lex(contents, Mode::Module)
         .flatten()
-        .skip_while(|(_, tok, _)| !matches!(tok, Tok::Import))
+        .skip_while(|(tok, _)| !matches!(tok, Tok::Import))
     {
         if let Tok::Name { name } = &tok {
             if matches!(prev_tok, Some(Tok::As)) {
                 // Adjust the location to take the alias into account.
-                names.last_mut().unwrap().end_location = end;
+                let last_range = names.last_mut().unwrap();
+                *last_range = TextRange::new(last_range.start(), range.end());
             } else {
                 if members.contains(&name.as_str()) {
                     removal_indices.push(names.len());
                 }
-                names.push(Range::new(start, end));
+                names.push(range);
             }
         } else if matches!(tok, Tok::Comma) {
-            commas.push(Range::new(start, end));
+            commas.push(range);
         }
         prev_tok = Some(tok);
     }
@@ -116,7 +113,7 @@ pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
     // Reconstruct the source code by skipping any names that are in `members`.
     let locator = Locator::new(contents);
     let mut output = String::with_capacity(contents.len());
-    let mut last_pos: Location = Location::new(1, 0);
+    let mut last_pos = TextSize::default();
     let mut is_first = true;
     for index in 0..names.len() {
         if !removal_indices.contains(&index) {
@@ -124,21 +121,21 @@ pub fn remove_import_members(contents: &str, members: &[&str]) -> String {
             continue;
         }
 
-        let (start_location, end_location) = if is_first {
-            (names[index].location, names[index + 1].location)
+        let range = if is_first {
+            TextRange::new(names[index].start(), names[index + 1].start())
         } else {
-            (commas[index - 1].location, names[index].end_location)
+            TextRange::new(commas[index - 1].start(), names[index].end())
         };
 
         // Add all contents from `last_pos` to `fix.location`.
         // It's possible that `last_pos` is after `fix.location`, if we're removing the
         // first _two_ members.
-        if start_location > last_pos {
-            let slice = locator.slice(Range::new(last_pos, start_location));
+        if range.start() > last_pos {
+            let slice = locator.slice(TextRange::new(last_pos, range.start()));
             output.push_str(slice);
         }
 
-        last_pos = end_location;
+        last_pos = range.end();
     }
 
     // Add the remaining content.

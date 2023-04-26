@@ -1,6 +1,6 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_text_size::TextRange;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -20,14 +20,10 @@ impl AlwaysAutofixableViolation for QuotedAnnotation {
 }
 
 /// UP037
-pub fn quoted_annotation(checker: &mut Checker, annotation: &str, range: Range) {
+pub fn quoted_annotation(checker: &mut Checker, annotation: &str, range: TextRange) {
     let mut diagnostic = Diagnostic::new(QuotedAnnotation, range);
     if checker.patch(Rule::QuotedAnnotation) {
-        diagnostic.set_fix(Edit::replacement(
-            annotation.to_string(),
-            range.location,
-            range.end_location,
-        ));
+        diagnostic.set_fix(Edit::range_replacement(annotation.to_string(), range));
     }
     checker.diagnostics.push(diagnostic);
 }

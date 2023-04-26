@@ -6,7 +6,6 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::hashable::HashableExpr;
 use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -68,7 +67,7 @@ pub fn repeated_isinstance_calls(checker: &mut Checker, expr: &Expr, op: &Boolop
                         .sorted()
                         .collect(),
                 },
-                Range::from(expr),
+                expr.range(),
             ));
         }
     }

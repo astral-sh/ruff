@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -23,5 +22,5 @@ pub fn cannot_raise_literal(checker: &mut Checker, expr: &Expr) {
     };
     checker
         .diagnostics
-        .push(Diagnostic::new(CannotRaiseLiteral, Range::from(expr)));
+        .push(Diagnostic::new(CannotRaiseLiteral, expr.range()));
 }

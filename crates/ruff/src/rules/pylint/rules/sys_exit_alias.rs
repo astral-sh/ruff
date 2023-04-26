@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
@@ -43,7 +42,7 @@ pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
             SysExitAlias {
                 name: name.to_string(),
             },
-            Range::from(func),
+            func.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
             diagnostic.try_set_fix(|| {
@@ -54,8 +53,7 @@ pub fn sys_exit_alias(checker: &mut Checker, func: &Expr) {
                     &checker.importer,
                     checker.locator,
                 )?;
-                let reference_edit =
-                    Edit::replacement(binding, func.location, func.end_location.unwrap());
+                let reference_edit = Edit::range_replacement(binding, func.range());
                 Ok(Fix::from_iter([import_edit, reference_edit]))
             });
         }

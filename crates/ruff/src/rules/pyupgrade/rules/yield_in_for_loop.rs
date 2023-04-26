@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_ast::types::RefEquality;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
@@ -172,15 +172,11 @@ pub fn yield_in_for_loop(checker: &mut Checker, stmt: &Stmt) {
                 continue;
             }
 
-            let mut diagnostic = Diagnostic::new(YieldInForLoop, Range::from(item.stmt));
+            let mut diagnostic = Diagnostic::new(YieldInForLoop, item.stmt.range());
             if checker.patch(diagnostic.kind.rule()) {
-                let contents = checker.locator.slice(item.iter);
+                let contents = checker.locator.slice(item.iter.range());
                 let contents = format!("yield from {contents}");
-                diagnostic.set_fix(Edit::replacement(
-                    contents,
-                    item.stmt.location,
-                    item.stmt.end_location.unwrap(),
-                ));
+                diagnostic.set_fix(Edit::range_replacement(contents, item.stmt.range()));
             }
             checker.diagnostics.push(diagnostic);
         }

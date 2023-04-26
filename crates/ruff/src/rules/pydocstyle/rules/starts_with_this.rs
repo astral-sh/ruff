@@ -1,6 +1,5 @@
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::Docstring;
@@ -18,7 +17,7 @@ impl Violation for DocstringStartsWithThis {
 
 /// D404
 pub fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
-    let body = docstring.body;
+    let body = docstring.body();
 
     let trimmed = body.trim();
     if trimmed.is_empty() {
@@ -31,8 +30,7 @@ pub fn starts_with_this(checker: &mut Checker, docstring: &Docstring) {
     if normalize_word(first_word) != "this" {
         return;
     }
-    checker.diagnostics.push(Diagnostic::new(
-        DocstringStartsWithThis,
-        Range::from(docstring.expr),
-    ));
+    checker
+        .diagnostics
+        .push(Diagnostic::new(DocstringStartsWithThis, docstring.range()));
 }

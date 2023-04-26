@@ -1,7 +1,7 @@
 use ruff_python_semantic::scope::ScopeStack;
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, Stmt};
 
-use ruff_python_ast::types::Range;
 use ruff_python_ast::types::RefEquality;
 use ruff_python_semantic::analyze::visibility::{Visibility, VisibleScope};
 
@@ -16,7 +16,7 @@ type Context<'a> = (ScopeStack, Vec<RefEquality<'a, Stmt>>);
 #[derive(Default)]
 pub struct Deferred<'a> {
     pub definitions: Vec<(Definition<'a>, Visibility, Context<'a>)>,
-    pub string_type_definitions: Vec<(Range, &'a str, AnnotationContext, Context<'a>)>,
+    pub string_type_definitions: Vec<(TextRange, &'a str, AnnotationContext, Context<'a>)>,
     pub type_definitions: Vec<(&'a Expr, AnnotationContext, Context<'a>)>,
     pub functions: Vec<(&'a Stmt, Context<'a>, VisibleScope)>,
     pub lambdas: Vec<(&'a Expr, Context<'a>)>,

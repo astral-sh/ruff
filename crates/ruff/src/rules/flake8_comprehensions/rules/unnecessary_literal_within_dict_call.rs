@@ -3,7 +3,6 @@ use std::fmt;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -88,7 +87,7 @@ pub fn unnecessary_literal_within_dict_call(
         UnnecessaryLiteralWithinDictCall {
             kind: argument_kind,
         },
-        Range::from(expr),
+        expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {

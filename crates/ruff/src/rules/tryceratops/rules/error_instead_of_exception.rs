@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
@@ -67,7 +66,7 @@ pub fn error_instead_of_exception(checker: &mut Checker, handlers: &[Excepthandl
                 if attr == "error" {
                     checker
                         .diagnostics
-                        .push(Diagnostic::new(ErrorInsteadOfException, Range::from(expr)));
+                        .push(Diagnostic::new(ErrorInsteadOfException, expr.range()));
                 }
             }
         }

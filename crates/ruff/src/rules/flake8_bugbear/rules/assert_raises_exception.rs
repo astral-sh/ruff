@@ -2,7 +2,6 @@ use rustpython_parser::ast::{ExprKind, Stmt, Withitem};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -99,6 +98,6 @@ pub fn assert_raises_exception(checker: &mut Checker, stmt: &Stmt, items: &[With
 
     checker.diagnostics.push(Diagnostic::new(
         AssertRaisesException { kind },
-        Range::from(stmt),
+        stmt.range(),
     ));
 }

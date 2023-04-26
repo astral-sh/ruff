@@ -3,12 +3,10 @@ use rustpython_parser::ast::{Expr, Located};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation, CacheKey};
 use ruff_python_ast::call_path::from_qualified_name;
-use ruff_python_ast::types::Range;
-
-use crate::checkers::ast::Checker;
 
 pub type Settings = FxHashMap<String, ApiBan>;
 
@@ -59,7 +57,7 @@ pub fn name_is_banned<T>(checker: &mut Checker, name: String, located: &Located<
                 name,
                 message: ban.msg.to_string(),
             },
-            Range::from(located),
+            located.range(),
         ));
     }
 }
@@ -75,7 +73,7 @@ pub fn name_or_parent_is_banned<T>(checker: &mut Checker, name: &str, located: &
                     name: name.to_string(),
                     message: ban.msg.to_string(),
                 },
-                Range::from(located),
+                located.range(),
             ));
             return;
         }
@@ -101,7 +99,7 @@ pub fn banned_attribute_access(checker: &mut Checker, expr: &Expr) {
                 name: banned_path.to_string(),
                 message: ban.msg.to_string(),
             },
-            Range::from(expr),
+            expr.range(),
         ));
     }
 }

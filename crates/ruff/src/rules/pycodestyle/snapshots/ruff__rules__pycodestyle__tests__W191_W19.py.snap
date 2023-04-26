@@ -282,6 +282,16 @@ W19.py:133:1: W191 Indentation contains tabs
 137 | def test_keys(self):
     |
 
+W19.py:136:1: W191 Indentation contains tabs
+    |
+136 | #: W191 W191 W191 W191 W191
+137 | def test_keys(self):
+138 | 	"""areas.json - All regions are accounted for."""
+    |  W191
+139 | 	expected = set([
+140 | 		u'Norrbotten',
+    |
+
 W19.py:137:1: W191 Indentation contains tabs
     |
 137 | def test_keys(self):

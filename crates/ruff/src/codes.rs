@@ -1,7 +1,14 @@
 use crate::registry::{Linter, Rule};
+use std::fmt::Formatter;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoqaCode(&'static str, &'static str);
+
+impl std::fmt::Debug for NoqaCode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
 
 impl std::fmt::Display for NoqaCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {

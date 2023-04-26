@@ -3,7 +3,7 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_ast::types::RefEquality;
 
 use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
@@ -56,7 +56,7 @@ pub fn empty_type_checking_block<'a, 'b>(
     'b: 'a,
 {
     if body.len() == 1 && matches!(body[0].node, StmtKind::Pass) {
-        let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, Range::from(&body[0]));
+        let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, body[0].range());
 
         // Delete the entire type-checking block.
         if checker.patch(diagnostic.kind.rule()) {

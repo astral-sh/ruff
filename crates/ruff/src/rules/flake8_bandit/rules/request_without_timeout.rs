@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{unparse_constant, SimpleCallArgs};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -56,13 +55,13 @@ pub fn request_without_timeout(
                     RequestWithoutTimeout {
                         timeout: Some(timeout),
                     },
-                    Range::from(timeout_arg),
+                    timeout_arg.range(),
                 ));
             }
         } else {
             checker.diagnostics.push(Diagnostic::new(
                 RequestWithoutTimeout { timeout: None },
-                Range::from(func),
+                func.range(),
             ));
         }
     }

@@ -30,6 +30,7 @@ bitflags! {
     pub(crate) struct Flags: u8 {
         const SHOW_VIOLATIONS = 0b0000_0001;
         const SHOW_FIXES = 0b0000_0010;
+        const SHOW_SOURCE = 0b000_0100;
     }
 }
 
@@ -180,6 +181,7 @@ impl Printer {
             SerializationFormat::Text => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.autofix_level))
+                    .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
                     .emit(writer, &diagnostics.messages, &context)?;
 
                 if self.flags.contains(Flags::SHOW_FIXES) {
@@ -194,6 +196,7 @@ impl Printer {
             }
             SerializationFormat::Grouped => {
                 GroupedEmitter::default()
+                    .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
                     .with_show_fix_status(show_fix_status(self.autofix_level))
                     .emit(writer, &diagnostics.messages, &context)?;
 
@@ -346,6 +349,7 @@ impl Printer {
             let context = EmitterContext::new(&diagnostics.jupyter_index);
             TextEmitter::default()
                 .with_show_fix_status(show_fix_status(self.autofix_level))
+                .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
                 .emit(&mut stdout, &diagnostics.messages, &context)?;
         }
         stdout.flush()?;

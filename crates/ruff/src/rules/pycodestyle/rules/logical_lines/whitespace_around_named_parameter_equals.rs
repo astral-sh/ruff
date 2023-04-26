@@ -2,7 +2,7 @@ use ruff_diagnostics::DiagnosticKind;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use rustpython_parser::ast::Location;
+use ruff_text_size::TextSize;
 
 use super::LogicalLineTokens;
 
@@ -41,11 +41,11 @@ fn is_in_def(tokens: &LogicalLineTokens) -> bool {
 /// E251, E252
 pub(crate) fn whitespace_around_named_parameter_equals(
     tokens: &LogicalLineTokens,
-) -> Vec<(Location, DiagnosticKind)> {
+) -> Vec<(TextSize, DiagnosticKind)> {
     let mut diagnostics = vec![];
     let mut parens = 0u32;
     let mut annotated_func_arg = false;
-    let mut prev_end: Option<Location> = None;
+    let mut prev_end: Option<TextSize> = None;
 
     let in_def = is_in_def(tokens);
     let mut iter = tokens.iter().peekable();
