@@ -242,8 +242,9 @@ jobs:
       - uses: Swatinem/rust-cache@v2
       - name: "Install dependencies"
         run: pip install -r docs/requirements.txt
-      - name: "Copy README File"
-        run: |
-          python scripts/transform_readme.py --target mkdocs
-          python scripts/generate_mkdocs.py
-          mkdocs build --strict
+      - name: "Update README File"
+        run: python scripts/transform_readme.py --target mkdocs
+      - name: "Generate docs"
+        run: python scripts/generate_mkdocs.py
+      - name: "Build docs"
+        run: mkdocs build --strict
