@@ -1,3 +1,4 @@
+use ruff_python_semantic::analyze::typing::is_immutable_func;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
@@ -30,35 +31,6 @@ impl Violation for FunctionCallInDefaultArgument {
     }
 }
 
-const IMMUTABLE_FUNCS: &[&[&str]] = &[
-    &["", "tuple"],
-    &["", "frozenset"],
-    &["datetime", "date"],
-    &["datetime", "datetime"],
-    &["datetime", "timedelta"],
-    &["decimal", "Decimal"],
-    &["operator", "attrgetter"],
-    &["operator", "itemgetter"],
-    &["operator", "methodcaller"],
-    &["pathlib", "Path"],
-    &["types", "MappingProxyType"],
-    &["re", "compile"],
-];
-
-fn is_immutable_func(checker: &Checker, func: &Expr, extend_immutable_calls: &[CallPath]) -> bool {
-    checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            IMMUTABLE_FUNCS
-                .iter()
-                .any(|target| call_path.as_slice() == *target)
-                || extend_immutable_calls
-                    .iter()
-                    .any(|target| call_path == *target)
-        })
-}
-
 struct ArgumentDefaultVisitor<'a> {
     checker: &'a Checker<'a>,
     diagnostics: Vec<(DiagnosticKind, TextRange)>,
@@ -73,7 +45,7 @@ where
         match &expr.node {
             ExprKind::Call { func, args, .. } => {
                 if !is_mutable_func(self.checker, func)
-                    && !is_immutable_func(self.checker, func, &self.extend_immutable_calls)
+                    && !is_immutable_func(&self.checker.ctx, func, &self.extend_immutable_calls)
                     && !is_nan_or_infinity(func, args)
                 {
                     self.diagnostics.push((
