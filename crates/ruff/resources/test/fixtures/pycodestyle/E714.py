@@ -4,11 +4,11 @@ if not X is Y:
 #: E714
 if not X.B is Y:
     pass
-#: E714
+
+#: Okay
 if not X is Y is not Z:
     pass
 
-#: Okay
 if not X is not Y:
     pass
 

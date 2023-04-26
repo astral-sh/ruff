@@ -130,6 +130,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7de8ce5e0f9f8d88245311066a578d72b7af3e7088f32783804676302df237e4"
 
 [[package]]
+name = "argfile"
+version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "265f5108974489a217d5098cd81666b60480c8dd67302acbbe7cbdd8aa09d638"
+dependencies = [
+ "os_str_bytes",
+]
+
+[[package]]
 name = "ascii"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1503,6 +1512,9 @@ name = "os_str_bytes"
 version = "6.5.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ceedf44fb00f2d1984b0bc98102627ce622e083e49a5bacdb3e514fa4238e267"
+dependencies = [
+ "memchr",
+]
 
 [[package]]
 name = "output_vt100"
@@ -2085,6 +2097,7 @@ version = "0.0.263"
 dependencies = [
  "annotate-snippets 0.9.1",
  "anyhow",
+ "argfile",
  "assert_cmd",
  "atty",
  "bincode",
