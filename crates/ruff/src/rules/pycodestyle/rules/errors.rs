@@ -1,6 +1,7 @@
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustpython_parser::ParseError;
 
+use crate::logging::DisplayParseErrorType;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
@@ -50,7 +51,7 @@ pub fn syntax_error(
 
     diagnostics.push(Diagnostic::new(
         SyntaxError {
-            message: parse_error.error.to_string(),
+            message: format!("{}", DisplayParseErrorType::new(&parse_error.error)),
         },
         TextRange::at(parse_error.location, len),
     ));
