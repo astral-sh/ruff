@@ -161,7 +161,7 @@ impl<'a> IntoIterator for &'a ImportMap {
 #[derive(Default)]
 pub struct ModuleMapping {
     pub(super) module_to_id: FxHashMap<Arc<str>, u32>,
-    pub(super) id_to_module: FxHashMap<u32, Arc<str>>,
+    pub(super) id_to_module: Vec<Arc<str>>,
     id: u32,
 }
 
@@ -169,14 +169,14 @@ impl ModuleMapping {
     pub fn new() -> Self {
         Self {
             module_to_id: FxHashMap::default(),
-            id_to_module: FxHashMap::default(),
+            id_to_module: vec![],
             id: 0,
         }
     }
 
     pub(super) fn insert(&mut self, module: &Arc<str>) {
         self.module_to_id.insert(module.clone(), self.id);
-        self.id_to_module.insert(self.id, module.clone());
+        self.id_to_module.push(module.clone());
         self.id += 1;
     }
 
@@ -185,11 +185,7 @@ impl ModuleMapping {
     }
 
     pub fn to_module(&self, id: &u32) -> Option<&Arc<str>> {
-        self.id_to_module.get(id)
-    }
-
-    pub fn contains_module(&self, module: &Arc<str>) -> bool {
-        self.module_to_id.contains_key(module)
+        self.id_to_module.get(*id as usize)
     }
 }
 

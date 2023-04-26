@@ -148,7 +148,7 @@ pub fn run(
     debug!("{:#?}", diagnostics.imports);
     let mut cycle_helper: CyclicImportHelper = CyclicImportHelper::new(&diagnostics.imports);
 
-    for (path, package, settings) in
+    let path_package_settings_map =
         paths
             .iter()
             .filter_map(|entry| entry.as_ref().ok())
@@ -160,8 +160,9 @@ pub fn run(
                     .and_then(|package| *package);
                 let settings = resolver.resolve_all(path, pyproject_strategy);
                 (path, package, settings)
-            })
-    {
+            });
+
+    for (path, package, settings) in path_package_settings_map {
         if settings.lib.rules.enabled(Rule::CyclicImport) {
             if let Some(cycle_diagnostics) = pylint_cyclic_import(
                 path,
