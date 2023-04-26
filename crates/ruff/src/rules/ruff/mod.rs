@@ -164,6 +164,7 @@ mod tests {
         assert_messages!(snapshot, diagnostics);
         Ok(())
     }
+
     #[test_case(Rule::MutableClassDefault, Path::new("RUF010.py"); "RUF010")]
     #[test_case(Rule::FunctionCallInClassDefaultArgument, Path::new("RUF011.py"); "RUF011")]
     fn mutable_class_defaults(rule_code: Rule, path: &Path) -> Result<()> {
