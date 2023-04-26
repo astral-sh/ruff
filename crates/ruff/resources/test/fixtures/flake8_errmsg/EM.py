@@ -21,3 +21,31 @@ def f_c():
 def f_ok():
     msg = "hello"
     raise RuntimeError(msg)
+
+
+def f_unfixable():
+    msg = "hello"
+    raise RuntimeError("This is an example exception")
+
+
+def f_msg_in_nested_scope():
+    def nested():
+        msg = "hello"
+
+    raise RuntimeError("This is an example exception")
+
+
+def f_msg_in_parent_scope():
+    msg = "hello"
+
+    def nested():
+        raise RuntimeError("This is an example exception")
+
+
+def f_fix_indentation_check(foo):
+    if foo:
+        raise RuntimeError("This is an example exception")
+    else:
+        if foo == "foo":
+            raise RuntimeError(f"This is an exception: {foo}")
+    raise RuntimeError("This is an exception: {}".format(foo))
