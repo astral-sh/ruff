@@ -7,6 +7,7 @@ use once_cell::unsync::OnceCell;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
+use crate::newlines::{find_newline, LineEnding};
 use ruff_rustpython::vendor;
 
 use crate::source_code::Locator;
@@ -29,9 +30,12 @@ impl<'a> Stylist<'a> {
     }
 
     pub fn line_ending(&'a self) -> LineEnding {
-        *self
-            .line_ending
-            .get_or_init(|| detect_line_ending(self.locator.contents()).unwrap_or_default())
+        *self.line_ending.get_or_init(|| {
+            let contents = self.locator.contents();
+            find_newline(contents)
+                .map(|(_, ending)| ending)
+                .unwrap_or_default()
+        })
     }
 
     pub fn from_tokens(tokens: &[LexResult], locator: &'a Locator<'a>) -> Self {
@@ -158,65 +162,13 @@ impl Deref for Indentation {
     }
 }
 
-/// The line ending style used in Python source code.
-/// See <https://docs.python.org/3/reference/lexical_analysis.html#physical-lines>
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
-pub enum LineEnding {
-    Lf,
-    Cr,
-    CrLf,
-}
-
-impl Default for LineEnding {
-    fn default() -> Self {
-        if cfg!(windows) {
-            LineEnding::CrLf
-        } else {
-            LineEnding::Lf
-        }
-    }
-}
-
-impl LineEnding {
-    pub const fn as_str(&self) -> &'static str {
-        match self {
-            LineEnding::CrLf => "\r\n",
-            LineEnding::Lf => "\n",
-            LineEnding::Cr => "\r",
-        }
-    }
-}
-
-impl Deref for LineEnding {
-    type Target = str;
-
-    fn deref(&self) -> &Self::Target {
-        self.as_str()
-    }
-}
-
-/// Detect the line ending style of the given contents.
-fn detect_line_ending(contents: &str) -> Option<LineEnding> {
-    if let Some(position) = contents.find(['\n', '\r']) {
-        let bytes = contents.as_bytes();
-        if bytes[position] == b'\n' {
-            Some(LineEnding::Lf)
-        } else if bytes.get(position.saturating_add(1)) == Some(&b'\n') {
-            Some(LineEnding::CrLf)
-        } else {
-            Some(LineEnding::Cr)
-        }
-    } else {
-        None
-    }
-}
-
 #[cfg(test)]
 mod tests {
+    use crate::newlines::{find_newline, LineEnding};
     use rustpython_parser::lexer::lex;
     use rustpython_parser::Mode;
 
-    use crate::source_code::stylist::{detect_line_ending, Indentation, LineEnding, Quote};
+    use crate::source_code::stylist::{Indentation, Quote};
     use crate::source_code::{Locator, Stylist};
 
     #[test]
@@ -354,15 +306,24 @@ a = "v"
     #[test]
     fn line_ending() {
         let contents = "x = 1";
-        assert_eq!(detect_line_ending(contents), None);
+        assert_eq!(find_newline(contents).map(|(_, ending)| ending), None);
 
         let contents = "x = 1\n";
-        assert_eq!(detect_line_ending(contents), Some(LineEnding::Lf));
+        assert_eq!(
+            find_newline(contents).map(|(_, ending)| ending),
+            Some(LineEnding::Lf)
+        );
 
         let contents = "x = 1\r";
-        assert_eq!(detect_line_ending(contents), Some(LineEnding::Cr));
+        assert_eq!(
+            find_newline(contents).map(|(_, ending)| ending),
+            Some(LineEnding::Cr)
+        );
 
         let contents = "x = 1\r\n";
-        assert_eq!(detect_line_ending(contents), Some(LineEnding::CrLf));
+        assert_eq!(
+            find_newline(contents).map(|(_, ending)| ending),
+            Some(LineEnding::CrLf)
+        );
     }
 }

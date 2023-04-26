@@ -1,6 +1,8 @@
 //! Struct used to efficiently slice source code at (row, column) Locations.
 
+use crate::newlines::find_newline;
 use crate::source_code::{LineIndex, OneIndexed, SourceCode, SourceLocation};
+use memchr::{memchr2, memrchr2};
 use once_cell::unsync::OnceCell;
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::ops::Add;
@@ -68,7 +70,8 @@ impl<'a> Locator<'a> {
     /// ## Panics
     /// If `offset` is out of bounds.
     pub fn line_start(&self, offset: TextSize) -> TextSize {
-        if let Some(index) = self.contents[TextRange::up_to(offset)].rfind(['\n', '\r']) {
+        let bytes = self.contents[TextRange::up_to(offset)].as_bytes();
+        if let Some(index) = memrchr2(b'\n', b'\r', bytes) {
             // SAFETY: Safe because `index < offset`
             TextSize::try_from(index).unwrap().add(TextSize::from(1))
         } else {
@@ -101,19 +104,8 @@ impl<'a> Locator<'a> {
     /// If `offset` is passed the end of the content.
     pub fn full_line_end(&self, offset: TextSize) -> TextSize {
         let slice = &self.contents[usize::from(offset)..];
-        if let Some(index) = slice.find(['\n', '\r']) {
-            let bytes = slice.as_bytes();
-
-            // `\r\n`
-            let relative_offset = if bytes[index] == b'\r' && bytes.get(index + 1) == Some(&b'\n') {
-                TextSize::try_from(index + 2).unwrap()
-            }
-            // `\r` or `\n`
-            else {
-                TextSize::try_from(index + 1).unwrap()
-            };
-
-            offset.add(relative_offset)
+        if let Some((index, line_ending)) = find_newline(slice) {
+            offset + TextSize::try_from(index).unwrap() + line_ending.text_len()
         } else {
             self.contents.text_len()
         }
@@ -139,7 +131,7 @@ impl<'a> Locator<'a> {
     /// If `offset` is passed the end of the content.
     pub fn line_end(&self, offset: TextSize) -> TextSize {
         let slice = &self.contents[usize::from(offset)..];
-        if let Some(index) = slice.find(['\n', '\r']) {
+        if let Some(index) = memchr2(b'\n', b'\r', slice.as_bytes()) {
             offset + TextSize::try_from(index).unwrap()
         } else {
             self.contents.text_len()
