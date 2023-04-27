@@ -266,6 +266,7 @@ struct SectionContextData {
     summary_full_end: TextSize,
 }
 
+#[derive(Clone)]
 pub struct SectionContext<'a> {
     data: &'a SectionContextData,
     docstring_body: DocstringBody<'a>,
