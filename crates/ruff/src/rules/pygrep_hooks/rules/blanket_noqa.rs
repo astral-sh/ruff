@@ -6,6 +6,29 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::Line;
 
+/// ## What it does
+/// Check for `noqa` annotations that suppress all diagnostics, as opposed to
+/// targeting specific diagnostics.
+///
+/// ## Why is this bad?
+/// Suppressing all diagnostics can hide issues in the code.
+///
+/// Blanket `noqa` annotations are also more difficult to interpret and
+/// maintain, as the annotation does not clarify which diagnostics are intended
+/// to be suppressed.
+///
+/// ## Example
+/// ```python
+/// from .base import *  # noqa
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from .base import *  # noqa: F403
+/// ```
+///
+/// ## References
+/// - [Ruff documentation](https://beta.ruff.rs/docs/configuration/#error-suppression)
 #[violation]
 pub struct BlanketNOQA;
 
