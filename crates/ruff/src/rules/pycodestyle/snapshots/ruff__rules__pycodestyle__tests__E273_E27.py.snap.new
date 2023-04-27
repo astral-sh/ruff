@@ -1,0 +1,55 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+assertion_line: 114
+---
+E27.py:10:9: E273 Tab after keyword
+   |
+10 | if   1:
+11 | #: E273
+12 | True and        False
+   |         ^^^^ E273
+13 | #: E273 E274
+14 | True        and False
+   |
+
+E27.py:12:5: E273 Tab after keyword
+   |
+12 | True and        False
+13 | #: E273 E274
+14 | True        and False
+   |     ^^^^ E273
+15 | #: E271
+16 | a and  b
+   |
+
+E27.py:12:10: E273 Tab after keyword
+   |
+12 | True and        False
+13 | #: E273 E274
+14 | True        and False
+   |                ^ E273
+15 | #: E271
+16 | a and  b
+   |
+
+E27.py:26:6: E273 Tab after keyword
+   |
+26 | this  and False
+27 | #: E273
+28 | a and   b
+   |      ^^^ E273
+29 | #: E274
+30 | a       and b
+   |
+
+E27.py:30:10: E273 Tab after keyword
+   |
+30 | a       and b
+31 | #: E273 E274
+32 | this        and False
+   |                ^ E273
+33 | #: Okay
+34 | from u import (a, b)
+   |
+
+

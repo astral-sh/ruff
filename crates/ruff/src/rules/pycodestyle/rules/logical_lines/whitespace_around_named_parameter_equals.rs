@@ -3,7 +3,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineTo
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_text_size::{TextRange, TextSize};
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 #[violation]
 pub struct UnexpectedSpacesAroundKeywordParameterEquals;
@@ -78,10 +78,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                 if annotated_func_arg && parens == 1 {
                     let start = token.start();
                     if start == prev_end && prev_end != TextSize::new(0) {
-                        context.push(
-                            MissingWhitespaceAroundParameterEquals,
-                            TextRange::empty(start),
-                        );
+                        context.push(MissingWhitespaceAroundParameterEquals, token.range());
                     }
 
                     while let Some(next) = iter.peek() {
@@ -91,10 +88,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                             let next_start = next.start();
 
                             if next_start == token.end() {
-                                context.push(
-                                    MissingWhitespaceAroundParameterEquals,
-                                    TextRange::empty(next_start),
-                                );
+                                context.push(MissingWhitespaceAroundParameterEquals, token.range());
                             }
                             break;
                         }
@@ -103,7 +97,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                     if token.start() != prev_end {
                         context.push(
                             UnexpectedSpacesAroundKeywordParameterEquals,
-                            TextRange::empty(prev_end),
+                            TextRange::new(prev_end, token.start()),
                         );
                     }
 
@@ -114,7 +108,7 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                             if next.start() != token.end() {
                                 context.push(
                                     UnexpectedSpacesAroundKeywordParameterEquals,
-                                    TextRange::empty(token.end()),
+                                    TextRange::new(token.end(), next.start()),
                                 );
                             }
                             break;

@@ -35,7 +35,7 @@ pub(crate) fn missing_whitespace_after_keyword(
                 || matches!(tok1_kind, TokenKind::Colon | TokenKind::Newline))
             && tok0.end() == tok1.start()
         {
-            context.push(MissingWhitespaceAfterKeyword, TextRange::empty(tok0.end()));
+            context.push(MissingWhitespaceAfterKeyword, tok0.range());
         }
     }
 }

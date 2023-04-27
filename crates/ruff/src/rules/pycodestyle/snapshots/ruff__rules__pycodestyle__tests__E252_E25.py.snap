@@ -6,27 +6,27 @@ E25.py:46:15: E252 Missing whitespace around parameter equals
 46 |     return a + b
 47 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
 48 | def add(a: int=0, b: int =0, c: int= 0) -> int:
-   |                E252
+   |               ^ E252
 49 |     return a + b + c
 50 | #: Okay
    |
 
-E25.py:46:16: E252 Missing whitespace around parameter equals
+E25.py:46:15: E252 Missing whitespace around parameter equals
    |
 46 |     return a + b
 47 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
 48 | def add(a: int=0, b: int =0, c: int= 0) -> int:
-   |                 E252
+   |               ^ E252
 49 |     return a + b + c
 50 | #: Okay
    |
 
-E25.py:46:27: E252 Missing whitespace around parameter equals
+E25.py:46:26: E252 Missing whitespace around parameter equals
    |
 46 |     return a + b
 47 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
 48 | def add(a: int=0, b: int =0, c: int= 0) -> int:
-   |                            E252
+   |                          ^ E252
 49 |     return a + b + c
 50 | #: Okay
    |
@@ -36,7 +36,7 @@ E25.py:46:36: E252 Missing whitespace around parameter equals
 46 |     return a + b
 47 | #: E252:1:15 E252:1:16 E252:1:27 E252:1:36
 48 | def add(a: int=0, b: int =0, c: int= 0) -> int:
-   |                                     E252
+   |                                    ^ E252
 49 |     return a + b + c
 50 | #: Okay
    |

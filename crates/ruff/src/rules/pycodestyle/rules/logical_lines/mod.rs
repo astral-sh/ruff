@@ -230,6 +230,10 @@ impl<'a> LogicalLine<'a> {
             .slice(TextRange::new(token.end(), last_token.end()))
     }
 
+    pub fn token_text(&self, token: &'a LogicalLineToken) -> &str {
+        self.lines.locator.slice(token.range)
+    }
+
     /// Returns the text before `token`
     #[inline]
     pub fn text_before(&self, token: &'a LogicalLineToken) -> &str {
@@ -240,8 +244,8 @@ impl<'a> LogicalLine<'a> {
             .slice(TextRange::new(first_token.start(), token.start()))
     }
 
-    /// Returns the whitespace *after* the `token`
-    pub fn trailing_whitespace(&self, token: &'a LogicalLineToken) -> Whitespace {
+    /// Returns the whitespace *after* the `token` with the byte length
+    pub fn trailing_whitespace(&self, token: &'a LogicalLineToken) -> (Whitespace, TextSize) {
         Whitespace::leading(self.text_after(token))
     }
 
@@ -358,25 +362,27 @@ pub(crate) enum Whitespace {
 }
 
 impl Whitespace {
-    fn leading(content: &str) -> Self {
+    fn leading(content: &str) -> (Self, TextSize) {
         let mut count = 0u32;
+        let mut len = TextSize::default();
 
         for c in content.chars() {
             if c == '\t' {
-                return Self::Tab;
+                return (Self::Tab, len + c.text_len());
             } else if matches!(c, '\n' | '\r') {
                 break;
             } else if c.is_whitespace() {
                 count += 1;
+                len += c.text_len();
             } else {
                 break;
             }
         }
 
         match count {
-            0 => Whitespace::None,
-            1 => Whitespace::Single,
-            _ => Whitespace::Many,
+            0 => (Whitespace::None, len),
+            1 => (Whitespace::Single, len),
+            _ => (Whitespace::Many, len),
         }
     }
 
