@@ -631,7 +631,28 @@ fn common_section(
     let line_end = checker.stylist.line_ending().as_str();
     let last_line = context.following_lines().last();
     if last_line.map_or(true, |line| !line.trim().is_empty()) {
-        if next_context.is_none() {
+        if let Some(next_context) = next_context {
+            if checker
+                .settings
+                .rules
+                .enabled(Rule::NoBlankLineAfterSection)
+            {
+                let mut diagnostic = Diagnostic::new(
+                    NoBlankLineAfterSection {
+                        name: context.section_name().to_string(),
+                    },
+                    docstring.range(),
+                );
+                if checker.patch(diagnostic.kind.rule()) {
+                    // Add a newline at the beginning of the next section.
+                    diagnostic.set_fix(Edit::insertion(
+                        line_end.to_string(),
+                        next_context.range().start(),
+                    ));
+                }
+                checker.diagnostics.push(diagnostic);
+            }
+        } else {
             if checker
                 .settings
                 .rules
@@ -648,28 +669,6 @@ fn common_section(
                     diagnostic.set_fix(Edit::insertion(
                         format!("{}{}", line_end, docstring.indentation),
                         context.range().end(),
-                    ));
-                }
-                checker.diagnostics.push(diagnostic);
-            }
-        } else {
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::NoBlankLineAfterSection)
-            {
-                let mut diagnostic = Diagnostic::new(
-                    NoBlankLineAfterSection {
-                        name: context.section_name().to_string(),
-                    },
-                    docstring.range(),
-                );
-                if checker.patch(diagnostic.kind.rule()) {
-                    // Add a newline at the beginning of the next section to deduplicate autofixes.
-                    diagnostic.set_fix(Edit::insertion(
-                        line_end.to_string(),
-                        // Unwrap() is safe because next_context must be Some() to get here.
-                        next_context.unwrap().range().start(),
                     ));
                 }
                 checker.diagnostics.push(diagnostic);
