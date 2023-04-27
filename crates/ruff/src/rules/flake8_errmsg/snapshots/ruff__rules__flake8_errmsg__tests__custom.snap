@@ -134,6 +134,8 @@ EM.py:50:32: EM102 [*] Exception must not use an f-string literal, assign to var
    50 |+            msg = f"This is an exception: {foo}"
    51 |+            raise RuntimeError(msg)
 51 52 |     raise RuntimeError("This is an exception: {}".format(foo))
+52 53 | 
+53 54 | 
 
 EM.py:51:24: EM103 [*] Exception must not use a `.format()` string directly, assign to variable first
    |
@@ -151,5 +153,24 @@ EM.py:51:24: EM103 [*] Exception must not use a `.format()` string directly, ass
 51    |-    raise RuntimeError("This is an exception: {}".format(foo))
    51 |+    msg = "This is an exception: {}".format(foo)
    52 |+    raise RuntimeError(msg)
+52 53 | 
+53 54 | 
+54 55 | # Report these, but don't fix them
+
+EM.py:55:28: EM101 Exception must not use a string literal, assign to variable first
+   |
+55 | # Report these, but don't fix them
+56 | if foo: raise RuntimeError("This is an example exception")
+   |                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
+57 | if foo: x = 1; raise RuntimeError("This is an example exception")
+   |
+
+EM.py:56:35: EM101 Exception must not use a string literal, assign to variable first
+   |
+56 | # Report these, but don't fix them
+57 | if foo: raise RuntimeError("This is an example exception")
+58 | if foo: x = 1; raise RuntimeError("This is an example exception")
+   |                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ EM101
+   |
 
 
