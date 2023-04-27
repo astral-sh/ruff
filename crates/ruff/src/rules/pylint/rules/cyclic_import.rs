@@ -1,7 +1,5 @@
-use std::path::Path;
-use std::sync::Arc;
-
 use log::debug;
+use std::path::Path;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -44,12 +42,13 @@ impl VisitedAndCycles {
 }
 
 struct CyclicImportChecker<'a> {
-    imports: &'a FxHashMap<Arc<str>, Vec<ModuleImport>>,
+    imports: &'a FxHashMap<String, Vec<ModuleImport>>,
 }
 
 impl CyclicImportChecker<'_> {
-    fn has_cycles(&self, name: &Arc<str>, module_mapping: &ModuleMapping) -> VisitedAndCycles {
-        let mut stack: Vec<u32> = vec![*module_mapping.to_id(name).unwrap()]; // we check before hand that the name is is in in the imports, ergo it will be in the module mapping
+    fn has_cycles(&self, name: &str, module_mapping: &ModuleMapping) -> VisitedAndCycles {
+        // we check before hand that the name is in the imports, ergo it will be in the module mapping and thus this unwrap is safe
+        let mut stack: Vec<u32> = vec![*module_mapping.to_id(name).unwrap()];
         let mut fully_visited: FxHashSet<u32> = FxHashSet::default();
         let mut cycles: FxHashSet<Vec<u32>> = FxHashSet::default();
         self.has_cycles_helper(
@@ -65,7 +64,7 @@ impl CyclicImportChecker<'_> {
 
     fn has_cycles_helper(
         &self,
-        name: &Arc<str>,
+        name: &str,
         module_mapping: &ModuleMapping,
         stack: &mut Vec<u32>,
         cycles: &mut FxHashSet<Vec<u32>>,
@@ -110,7 +109,7 @@ impl CyclicImportChecker<'_> {
 pub fn cyclic_import(
     path: &Path,
     package: Option<&Path>,
-    imports: &FxHashMap<Arc<str>, Vec<ModuleImport>>,
+    imports: &FxHashMap<String, Vec<ModuleImport>>,
     cyclic_import_helper: &mut CyclicImportHelper,
 ) -> Option<Vec<Diagnostic>> {
     let Some(package) = package else {
@@ -146,10 +145,7 @@ pub fn cyclic_import(
                             cycle: cycle
                                 .iter()
                                 .map(|id| {
-                                    cyclic_import_helper
-                                        .module_mapping
-                                        .to_module(id)
-                                        .unwrap()
+                                    (*cyclic_import_helper.module_mapping.to_module(id).unwrap())
                                         .to_string()
                                 })
                                 .collect::<Vec<_>>()
@@ -183,11 +179,11 @@ pub fn cyclic_import(
                                 cycle: new_cycle
                                     .iter()
                                     .map(|id| {
-                                        cyclic_import_helper
+                                        (*cyclic_import_helper
                                             .module_mapping
                                             .to_module(id)
-                                            .unwrap()
-                                            .to_string()
+                                            .unwrap())
+                                        .to_string()
                                     })
                                     .collect::<Vec<_>>()
                                     .join(" -> "),

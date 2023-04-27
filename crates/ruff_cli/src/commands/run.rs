@@ -162,6 +162,8 @@ pub fn run(
                 (path, package, settings)
             });
 
+    let mut new_diags = Diagnostics::default();
+
     for (path, package, settings) in path_package_settings_map {
         if settings.lib.rules.enabled(Rule::CyclicImport) {
             if let Some(cycle_diagnostics) = pylint_cyclic_import(
@@ -181,7 +183,7 @@ pub fn run(
 
                     builder.finish()
                 };
-                diagnostics += Diagnostics::new(
+                new_diags += Diagnostics::new(
                     cycle_diagnostics
                         .into_iter()
                         .map(|diagnostic| Message::from_diagnostic(diagnostic, file.clone(), 0))
@@ -191,7 +193,7 @@ pub fn run(
             }
         }
     }
-
+    diagnostics += new_diags;
     diagnostics.messages.sort_unstable();
     let duration = start.elapsed();
     debug!("Checked {:?} files in: {:?}", paths.len(), duration);

@@ -1,5 +1,3 @@
-use std::sync::Arc;
-
 use rustc_hash::{FxHashMap, FxHashSet};
 use rustpython_parser::ast::Location;
 use serde::{Deserialize, Serialize};
@@ -106,7 +104,7 @@ impl FutureImport for AnyImport<'_> {
 /// A representation of a module reference in an import statement.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ModuleImport {
-    pub module: Arc<str>,
+    pub module: String,
     location: Location,
     end_location: Location,
 }
@@ -114,7 +112,7 @@ pub struct ModuleImport {
 impl ModuleImport {
     pub fn new(module: String, location: Location, end_location: Location) -> Self {
         Self {
-            module: Arc::from(module),
+            module,
             location,
             end_location,
         }
@@ -131,17 +129,16 @@ impl From<&ModuleImport> for Range {
 #[derive(Debug, Clone, Default, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ImportMap {
     /// A map from dot-delimited module name to the list of imports in that module.
-    pub module_to_imports: FxHashMap<Arc<str>, Vec<ModuleImport>>,
+    pub module_to_imports: FxHashMap<String, Vec<ModuleImport>>,
 }
 
 impl ImportMap {
-    pub fn new(module_to_imports: FxHashMap<Arc<str>, Vec<ModuleImport>>) -> Self {
+    pub fn new(module_to_imports: FxHashMap<String, Vec<ModuleImport>>) -> Self {
         Self { module_to_imports }
     }
 
     pub fn insert(&mut self, module: String, imports_vec: Vec<ModuleImport>) {
-        self.module_to_imports
-            .insert(Arc::from(module), imports_vec);
+        self.module_to_imports.insert(module, imports_vec);
     }
 
     pub fn extend(&mut self, other: Self) {
@@ -150,8 +147,8 @@ impl ImportMap {
 }
 
 impl<'a> IntoIterator for &'a ImportMap {
-    type Item = (&'a Arc<str>, &'a Vec<ModuleImport>);
-    type IntoIter = std::collections::hash_map::Iter<'a, Arc<str>, Vec<ModuleImport>>;
+    type Item = <&'a FxHashMap<String, Vec<ModuleImport>> as IntoIterator>::Item;
+    type IntoIter = <&'a FxHashMap<String, Vec<ModuleImport>> as IntoIterator>::IntoIter;
 
     fn into_iter(self) -> Self::IntoIter {
         self.module_to_imports.iter()
@@ -159,13 +156,13 @@ impl<'a> IntoIterator for &'a ImportMap {
 }
 
 #[derive(Default)]
-pub struct ModuleMapping {
-    pub(super) module_to_id: FxHashMap<Arc<str>, u32>,
-    pub(super) id_to_module: Vec<Arc<str>>,
+pub struct ModuleMapping<'a> {
+    pub(super) module_to_id: FxHashMap<&'a str, u32>,
+    pub(super) id_to_module: Vec<&'a str>,
     id: u32,
 }
 
-impl ModuleMapping {
+impl<'a> ModuleMapping<'a> {
     pub fn new() -> Self {
         Self {
             module_to_id: FxHashMap::default(),
@@ -174,29 +171,29 @@ impl ModuleMapping {
         }
     }
 
-    pub(super) fn insert(&mut self, module: &Arc<str>) {
-        self.module_to_id.insert(module.clone(), self.id);
-        self.id_to_module.push(module.clone());
+    pub(super) fn insert(&mut self, module: &'a str) {
+        self.module_to_id.insert(module, self.id);
+        self.id_to_module.push(module);
         self.id += 1;
     }
 
-    pub fn to_id(&self, module: &Arc<str>) -> Option<&u32> {
+    pub fn to_id(&self, module: &str) -> Option<&u32> {
         self.module_to_id.get(module)
     }
 
-    pub fn to_module(&self, id: &u32) -> Option<&Arc<str>> {
+    pub fn to_module(&self, id: &u32) -> Option<&&str> {
         self.id_to_module.get(*id as usize)
     }
 }
 
 #[derive(Default)]
-pub struct CyclicImportHelper {
+pub struct CyclicImportHelper<'a> {
     pub cycles: FxHashMap<u32, FxHashSet<Vec<u32>>>,
-    pub module_mapping: ModuleMapping,
+    pub module_mapping: ModuleMapping<'a>,
 }
 
-impl CyclicImportHelper {
-    pub fn new(import_map: &ImportMap) -> Self {
+impl<'a> CyclicImportHelper<'a> {
+    pub fn new(import_map: &'a ImportMap) -> Self {
         let mut module_mapping = ModuleMapping::new();
         import_map.module_to_imports.keys().for_each(|module| {
             module_mapping.insert(module);
