@@ -1,3 +1,4 @@
+use memchr::{memchr2, memrchr2};
 use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::iter::FusedIterator;
 use std::ops::Deref;
@@ -50,6 +51,30 @@ impl<'a> UniversalNewlineIterator<'a> {
     }
 }
 
+/// Finds the next newline character. Returns its position and the [`LineEnding`].
+#[inline]
+pub fn find_newline(text: &str) -> Option<(usize, LineEnding)> {
+    let bytes = text.as_bytes();
+    if let Some(position) = memchr2(b'\n', b'\r', bytes) {
+        // SAFETY: memchr guarantees to return valid positions
+        #[allow(unsafe_code)]
+        let newline_character = unsafe { *bytes.get_unchecked(position) };
+
+        let line_ending = match newline_character {
+            // Explicit branch for `\n` as this is the most likely path
+            b'\n' => LineEnding::Lf,
+            // '\r\n'
+            b'\r' if bytes.get(position.saturating_add(1)) == Some(&b'\n') => LineEnding::CrLf,
+            // '\r'
+            _ => LineEnding::Cr,
+        };
+
+        Some((position, line_ending))
+    } else {
+        None
+    }
+}
+
 impl<'a> Iterator for UniversalNewlineIterator<'a> {
     type Item = Line<'a>;
 
@@ -59,35 +84,25 @@ impl<'a> Iterator for UniversalNewlineIterator<'a> {
             return None;
         }
 
-        let line = match self.text.find(['\n', '\r']) {
-            // Non-last line
-            Some(line_end) => {
-                let offset: usize = match self.text.as_bytes()[line_end] {
-                    // Explicit branch for `\n` as this is the most likely path
-                    b'\n' => 1,
-                    // '\r\n'
-                    b'\r' if self.text.as_bytes().get(line_end + 1) == Some(&b'\n') => 2,
-                    // '\r'
-                    _ => 1,
-                };
+        let line = if let Some((newline_position, line_ending)) = find_newline(self.text) {
+            let (text, remainder) = self.text.split_at(newline_position + line_ending.len());
 
-                let (text, remainder) = self.text.split_at(line_end + offset);
+            let line = Line {
+                offset: self.offset,
+                text,
+            };
 
-                let line = Line {
-                    offset: self.offset,
-                    text,
-                };
+            self.text = remainder;
+            self.offset += text.text_len();
 
-                self.text = remainder;
-                self.offset += text.text_len();
-
-                line
-            }
-            // Last line
-            None => Line {
+            line
+        }
+        // Last line
+        else {
+            Line {
                 offset: self.offset,
                 text: std::mem::take(&mut self.text),
-            },
+            }
         };
 
         Some(line)
@@ -116,7 +131,7 @@ impl DoubleEndedIterator for UniversalNewlineIterator<'_> {
 
         // Find the end of the previous line. The previous line is the text up to, but not including
         // the newline character.
-        let line = if let Some(line_end) = haystack.rfind(['\n', '\r']) {
+        let line = if let Some(line_end) = memrchr2(b'\n', b'\r', haystack.as_bytes()) {
             // '\n' or '\r' or '\r\n'
             let (remainder, line) = self.text.split_at(line_end + 1);
             self.text = remainder;
@@ -265,6 +280,58 @@ impl PartialEq<&str> for Line<'_> {
 impl PartialEq<Line<'_>> for &str {
     fn eq(&self, other: &Line<'_>) -> bool {
         *self == other.as_str()
+    }
+}
+
+/// The line ending style used in Python source code.
+/// See <https://docs.python.org/3/reference/lexical_analysis.html#physical-lines>
+#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+pub enum LineEnding {
+    Lf,
+    Cr,
+    CrLf,
+}
+
+impl Default for LineEnding {
+    fn default() -> Self {
+        if cfg!(windows) {
+            LineEnding::CrLf
+        } else {
+            LineEnding::Lf
+        }
+    }
+}
+
+impl LineEnding {
+    pub const fn as_str(&self) -> &'static str {
+        match self {
+            LineEnding::Lf => "\n",
+            LineEnding::CrLf => "\r\n",
+            LineEnding::Cr => "\r",
+        }
+    }
+
+    #[allow(clippy::len_without_is_empty)]
+    pub const fn len(&self) -> usize {
+        match self {
+            LineEnding::Lf | LineEnding::Cr => 1,
+            LineEnding::CrLf => 2,
+        }
+    }
+
+    pub const fn text_len(&self) -> TextSize {
+        match self {
+            LineEnding::Lf | LineEnding::Cr => TextSize::new(1),
+            LineEnding::CrLf => TextSize::new(2),
+        }
+    }
+}
+
+impl Deref for LineEnding {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.as_str()
     }
 }
 
