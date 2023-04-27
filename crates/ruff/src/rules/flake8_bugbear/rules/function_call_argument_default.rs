@@ -14,6 +14,45 @@ use crate::checkers::ast::Checker;
 
 use super::mutable_argument_default::is_mutable_func;
 
+/// ## What it does
+/// Checks for function calls in function defaults.
+///
+/// ## Why is it bad?
+/// The function calls in the defaults are only performed once, at definition
+/// time. The returned value is then reused by all calls to the function.
+///
+/// ## Options
+/// - `flake8-bugbear.extend-immutable-calls`
+///
+/// ## Examples:
+/// ```python
+/// def create_list() -> list[int]:
+///     return [1, 2, 3]
+///
+/// def mutable_default(arg: list[int] = create_list()) -> list[int]:
+///     arg.append(4)
+///     return arg
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def better(arg: list[int] | None = None) -> list[int]:
+///     if arg is None:
+///         arg = create_list()
+///
+///     arg.append(4)
+///     return arg
+/// ```
+///
+/// Alternatively, if you _want_ the shared behaviour, make it more obvious
+/// by assigning it to a module-level variable:
+/// ```python
+/// I_KNOW_THIS_IS_SHARED_STATE = create_list()
+///
+/// def mutable_default(arg: list[int] = I_KNOW_THIS_IS_SHARED_STATE) -> list[int]:
+///     arg.append(4)
+///     return arg
+/// ```
 #[violation]
 pub struct FunctionCallInDefaultArgument {
     pub name: Option<String>,
