@@ -7,13 +7,15 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::Line;
 
 /// ## What it does
-/// Check for `noqa` annotations that suppress unspecified warnings.
+/// Check for `noqa` annotations that suppress all diagnostics, as opposed to
+/// targeting specific diagnostics.
 ///
 /// ## Why is this bad?
-/// Suppressing all warnings can obfuscate warnings you wish to keep.
+/// Suppressing all diagnostics can hide issues in the code.
 ///
-/// Blanket `noqa` annotations are also more difficult to read as it is unclear
-/// which warnings are intended to be suppressed.
+/// Blanket `noqa` annotations are also more difficult to interpret and
+/// maintain, as the annotation does not clarify which diagnostics are intended
+/// to be suppressed.
 ///
 /// ## Example
 /// ```python

@@ -6,10 +6,10 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Check for the `warn` logging method.
+/// Check for usages of the deprecated `warn` method from the `logging` module.
 ///
 /// ## Why is this bad?
-/// The `warn` function is deprecated. Use `warning` instead.
+/// The `warn` method is deprecated. Use `warning` instead.
 ///
 /// ## Example
 /// ```python

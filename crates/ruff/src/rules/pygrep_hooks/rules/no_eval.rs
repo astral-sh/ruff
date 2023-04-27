@@ -6,11 +6,10 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 
 /// ## What it does
-/// Checks for the use of the builtin `eval()` function.
+/// Checks for usages of the builtin `eval()` function.
 ///
 /// ## Why is this bad?
-/// The `eval()` function is insecure as it allows arbitrary code execution. It
-/// is also harder to debug and slower than non-`eval()` alternatives.
+/// The `eval()` function is insecure as it enables arbitrary code execution.
 ///
 /// ## Example
 /// ```python
@@ -28,7 +27,7 @@ use crate::checkers::ast::Checker;
 ///
 /// ## References
 /// - [Python documentation](https://docs.python.org/3/library/functions.html#eval)
-/// - ['Eval really is dangerous' by Ned Batchelder](https://nedbatchelder.com/blog/201206/eval_really_is_dangerous.html)
+/// - [_Eval really is dangerous_](https://nedbatchelder.com/blog/201206/eval_really_is_dangerous.html)
 #[violation]
 pub struct Eval;
 

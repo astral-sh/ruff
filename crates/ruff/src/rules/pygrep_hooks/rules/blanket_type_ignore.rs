@@ -8,13 +8,15 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::Line;
 
 /// ## What it does
-/// Check for `type: ignore` annotations that suppress unspecified warnings.
+/// Check for `type: ignore` annotations that suppress all type warnings, as
+/// opposed to targeting specific type warnings.
 ///
 /// ## Why is this bad?
-/// Suppressing all warnings can obfuscate warnings you wish to keep.
+/// Suppressing all warnings can hide issues in the code.
 ///
-/// Blanket `type: ignore` annotations are also more difficult to read as it is
-/// unclear which warnings are intended to be suppressed.
+/// Blanket `type: ignore` annotations are also more difficult to interpret and
+/// maintain, as the annotation does not clarify which warnings are intended
+/// to be suppressed.
 ///
 /// ## Example
 /// ```python
@@ -27,7 +29,7 @@ use ruff_python_ast::newlines::Line;
 /// ```
 ///
 /// ## References
-/// - [mypy documentation](https://mypy.readthedocs.io/en/stable/common_issues.html#spurious-errors-and-locally-silencing-the-checker)
+/// - [mypy](https://mypy.readthedocs.io/en/stable/common_issues.html#spurious-errors-and-locally-silencing-the-checker)
 #[violation]
 pub struct BlanketTypeIgnore;
 
