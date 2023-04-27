@@ -7,6 +7,27 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::Line;
 
+/// ## What it does
+/// Check for `type: ignore` annotations that suppress unspecified warnings.
+///
+/// ## Why is this bad?
+/// Suppressing all warnings can obfuscate warnings you wish to keep.
+///
+/// Blanket `type: ignore` annotations are also more difficult to read as it is
+/// unclear which warnings are intended to be suppressed.
+///
+/// ## Example
+/// ```python
+/// from foo import secrets  # type: ignore
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from foo import secrets  # type: ignore[attr-defined]
+/// ```
+///
+/// ## References
+/// - [mypy documentation](https://mypy.readthedocs.io/en/stable/common_issues.html#spurious-errors-and-locally-silencing-the-checker)
 #[violation]
 pub struct BlanketTypeIgnore;
 

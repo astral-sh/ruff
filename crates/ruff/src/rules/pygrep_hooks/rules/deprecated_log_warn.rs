@@ -5,6 +5,31 @@ use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Check for the `warn` logging method.
+///
+/// ## Why is this bad?
+/// The `warn` function is deprecated. Use `warning` instead.
+///
+/// ## Example
+/// ```python
+/// import logging
+///
+///
+/// def foo():
+///     logging.warn("Something happened")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import logging
+///
+/// def foo():
+///     logging.warning("Something happened")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/logging.html#logging.Logger.warning)
 #[violation]
 pub struct DeprecatedLogWarn;
 

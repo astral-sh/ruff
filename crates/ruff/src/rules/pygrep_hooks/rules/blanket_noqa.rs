@@ -6,6 +6,27 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::Line;
 
+/// ## What it does
+/// Check for `noqa` annotations that suppress unspecified warnings.
+///
+/// ## Why is this bad?
+/// Suppressing all warnings can obfuscate warnings you wish to keep.
+///
+/// Blanket `noqa` annotations are also more difficult to read as it is unclear
+/// which warnings are intended to be suppressed.
+///
+/// ## Example
+/// ```python
+/// from .base import *  # noqa
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from .base import *  # noqa: F403
+/// ```
+///
+/// ## References
+/// - [Ruff documentation](https://beta.ruff.rs/docs/configuration/#error-suppression)
 #[violation]
 pub struct BlanketNOQA;
 
