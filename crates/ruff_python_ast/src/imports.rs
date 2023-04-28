@@ -1,11 +1,5 @@
-<<<<<<< HEAD
-use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::Location;
-use serde::{Deserialize, Serialize};
-=======
 use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
->>>>>>> upstream/main
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
