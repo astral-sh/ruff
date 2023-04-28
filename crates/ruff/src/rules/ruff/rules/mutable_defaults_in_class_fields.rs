@@ -221,8 +221,8 @@ pub fn function_call_in_class_defaults(
                 continue;
             }
             if let ExprKind::Call { func, .. } = &expr.node {
-                if !is_immutable_func(&checker.ctx, func, &extend_immutable_calls)
-                    && !(is_dataclass && is_allowed_dataclass_function(&checker.ctx, func))
+                if !(is_immutable_func(&checker.ctx, func, &extend_immutable_calls)
+                    || is_dataclass && is_allowed_dataclass_function(&checker.ctx, func))
                 {
                     let diagnostic: Diagnostic = if emit_dataclass_error {
                         Diagnostic::new(
