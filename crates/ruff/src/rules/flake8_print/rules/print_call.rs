@@ -63,7 +63,6 @@ impl Violation for Print {
 /// ```python
 /// def merge_dicts(dict_a, dict_b):
 ///     dict_c = {**dict_a, **dict_b}
-///     pprint.pprint(dict_c)
 ///     return dict_c
 /// ```
 #[violation]
