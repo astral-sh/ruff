@@ -1,5 +1,4 @@
 import typing
-from dataclasses import dataclass, field
 from typing import Sequence
 
 KNOWINGLY_MUTABLE_DEFAULT = []
