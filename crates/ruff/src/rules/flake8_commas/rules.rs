@@ -146,6 +146,41 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
     }
 }
 
+/// ## What it does
+/// Checks for trailing commas on bare tuples.
+///
+/// ## Why is this bad?
+/// The addition of a missplaced comma can change a value into a tuple which could lead to
+/// unexpected behaviour.
+///
+/// ## Example
+/// ```python
+/// import json
+///
+/// foo = json.dumps({
+///     "bar": 1,
+/// }),
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import json
+///
+/// foo = json.dumps({
+///     "bar": 1,
+/// })
+/// ```
+/// 
+/// For the case that a tuple was expected then use instead:
+/// ```python
+/// import json
+/// 
+/// foo = (
+///     json.dumps({
+///         "bar": 1,
+///     }),
+/// )
+/// ```
 #[violation]
 pub struct TrailingCommaOnBareTuple;
 
