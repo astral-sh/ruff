@@ -4861,7 +4861,12 @@ impl<'a> Checker<'a> {
                         Rule::UnusedLambdaArgument,
                     ]) {
                         let scope = &self.ctx.scopes[scope_id];
-                        let parent = &self.ctx.scopes[scope.parent.unwrap()];
+                        let parent = &self
+                            .ctx
+                            .scopes
+                            .parent(scope_id)
+                            .map(|scope_id| &self.ctx.scopes[scope_id])
+                            .unwrap();
                         self.diagnostics
                             .extend(flake8_unused_arguments::rules::unused_arguments(
                                 self,
