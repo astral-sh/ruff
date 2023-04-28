@@ -110,6 +110,28 @@ impl Context {
     }
 }
 
+/// ## What it does
+/// Checks for missing trailing commas.
+///
+/// ## Why is this bad?
+/// Adding a trailing comma reduces the diff when adding or removing parameters rediging the
+/// changes of merge conflicts in diftionaries or lists.
+///
+/// ## Example
+/// ```python
+/// foo = {
+///     "bar": 1,
+///     "baz": 2
+/// }
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = {
+///     "bar": 1,
+///     "baz": 2,
+/// }
+/// ```
 #[violation]
 pub struct MissingTrailingComma;
 
