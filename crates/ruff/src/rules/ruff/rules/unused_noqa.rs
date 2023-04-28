@@ -14,12 +14,12 @@ pub struct UnusedCodes {
 /// Checks for `noqa` directives that are no longer applicable.
 ///
 /// ## Why is this bad?
-/// A `noqa` that is defined but is not applicable is likely a mistake, and should
-/// be removed to avoid confusion.
+/// A `noqa` directive that no longer matches any diagnostic violations is
+/// likely included by mistake, and should be removed to avoid confusion.
 ///
 /// ## Example
 /// ```python
-/// import foo # noqa: F401
+/// import foo  # noqa: F401
 ///
 /// def bar():
 ///     foo.bar()
