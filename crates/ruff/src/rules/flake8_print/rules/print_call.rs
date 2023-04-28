@@ -13,7 +13,7 @@ use crate::registry::AsRule;
 /// ## Why is this bad?
 /// `print` statements are useful in some situations (e.g. debugging), but they have a few downsides:
 /// - They can make it harder to maintain code as it can be challenging to keep track of numerous
-/// print statements as a codebase grows larger.
+/// `print` statements as a codebase grows larger.
 /// - `print` statements can be slow, especially if they are printing large amounts of information.
 ///
 /// ## Example
