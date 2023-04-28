@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
@@ -105,7 +105,7 @@ impl FutureImport for AnyImport<'_> {
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct ModuleImport {
-    module: String,
+    pub module: String,
     range: TextRange,
 }
 

@@ -240,18 +240,20 @@ pub fn cyclic_import(
 #[cfg(test)]
 mod tests {
     use ruff_python_ast::imports::ImportMap;
-    use rustpython_parser::ast::Location;
+    use ruff_text_size::{TextRange, TextSize};
 
     use super::*;
 
     #[test]
     fn cyclic_import_unrelated_module_not_traversed() {
         let mut map = FxHashMap::default();
-        let location1 = Location::new(1, 1);
-        let location2 = Location::new(2, 2);
+        let size1 = TextSize::from(1);
+        let size2 = TextSize::from(2);
+        let range1 = TextRange::new(size1, size2);
+        let range2 = TextRange::new(size1, size2);
 
-        let a = ModuleImport::new("a".to_string(), location1, location1);
-        let b = ModuleImport::new("b".to_string(), location2, location2);
+        let a = ModuleImport::new("a".to_string(), range1);
+        let b = ModuleImport::new("b".to_string(), range2);
         map.insert(a.module.clone(), vec![]);
         map.insert(b.module, vec![a.clone()]);
         let import_map = ImportMap::new(map);
@@ -274,13 +276,19 @@ mod tests {
     #[test]
     fn cyclic_import_multiple_cycles() {
         let mut map = FxHashMap::default();
-        let location1 = Location::new(1, 1);
-        let location2 = Location::new(2, 2);
+        let size1 = TextSize::from(1);
+        let size2 = TextSize::from(2);
+        let size3 = TextSize::from(3);
+        let size4 = TextSize::from(4);
+        let range1 = TextRange::new(size1, size2);
+        let range2 = TextRange::new(size1, size3);
+        let range3 = TextRange::new(size1, size4);
+        let range4 = TextRange::new(size2, size3);
 
-        let a = ModuleImport::new("a".to_string(), location1, location1);
-        let b = ModuleImport::new("b".to_string(), location2, location2);
-        let c = ModuleImport::new("c".to_string(), location1, location2);
-        let d = ModuleImport::new("d".to_string(), location2, location2);
+        let a = ModuleImport::new("a".to_string(), range1);
+        let b = ModuleImport::new("b".to_string(), range2);
+        let c = ModuleImport::new("c".to_string(), range3);
+        let d = ModuleImport::new("d".to_string(), range4);
 
         map.insert(a.module.clone(), vec![b.clone(), c.clone()]);
         map.insert(b.module.clone(), vec![c.clone(), d.clone()]);
@@ -321,16 +329,21 @@ mod tests {
 
     #[test]
     fn cyclic_import_check_diagnostics() {
-        let location1 = Location::new(1, 1);
-        let location2 = Location::new(2, 2);
-        let location3 = Location::new(3, 3);
-        let location4 = Location::new(4, 4);
+        let size1 = TextSize::from(1);
+        let size2 = TextSize::from(2);
+        let size3 = TextSize::from(3);
+        let size4 = TextSize::from(4);
+        let range1 = TextRange::new(size1, size2);
+        let range2 = TextRange::new(size1, size3);
+        let range3 = TextRange::new(size1, size4);
+        let range4 = TextRange::new(size2, size3);
+        let range5 = TextRange::new(size2, size4);
 
-        let a_a = ModuleImport::new("a.a".to_string(), location1, location1);
-        let a_b = ModuleImport::new("a.b".to_string(), location2, location2);
-        let a_c = ModuleImport::new("a.c".to_string(), location1, location2);
-        let b_in_a = ModuleImport::new("a.b".to_string(), location3, location3);
-        let a_in_b = ModuleImport::new("a.a".to_string(), location4, location4);
+        let a_a = ModuleImport::new("a.a".to_string(), range1);
+        let a_b = ModuleImport::new("a.b".to_string(), range2);
+        let a_c = ModuleImport::new("a.c".to_string(), range3);
+        let b_in_a = ModuleImport::new("a.b".to_string(), range4);
+        let a_in_b = ModuleImport::new("a.a".to_string(), range5);
         let mut map = FxHashMap::default();
         map.insert(a_a.module.clone(), vec![b_in_a.clone()]);
         map.insert(a_b.module.clone(), vec![a_in_b.clone()]);
@@ -398,8 +411,10 @@ mod tests {
 
     #[test]
     fn cyclic_import_test_no_cycles_on_import_self() {
-        let location = Location::new(1, 1);
-        let a = ModuleImport::new("a".to_string(), location, location);
+        let size1 = TextSize::from(1);
+        let size2 = TextSize::from(2);
+        let range = TextRange::new(size1, size2);
+        let a = ModuleImport::new("a".to_string(), range);
         let mut map = FxHashMap::default();
         map.insert(a.module.clone(), vec![a.clone()]);
 

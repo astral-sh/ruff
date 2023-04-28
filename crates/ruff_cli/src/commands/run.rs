@@ -175,9 +175,13 @@ pub fn run(
                 let contents = std::fs::read_to_string(path)?;
                 let locator = ruff_python_ast::source_code::Locator::new(&contents);
                 let file = {
-                    let mut builder = SourceFileBuilder::new(&path.to_string_lossy());
+                    let mut builder =
+                        SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents());
                     if settings.lib.show_source {
-                        builder.set_source_code(&locator.to_source_code());
+                        if let Some(line_index) = locator.line_index() {
+                            builder.set_line_index(line_index.clone());
+                        }
+                        // builder.set_source_code(&locator.to_source_code());
                     }
 
                     builder.finish()
@@ -185,7 +189,9 @@ pub fn run(
                 new_diags += Diagnostics::new(
                     cycle_diagnostics
                         .into_iter()
-                        .map(|diagnostic| Message::from_diagnostic(diagnostic, file.clone(), 0))
+                        .map(|diagnostic| {
+                            Message::from_diagnostic(diagnostic, file.clone(), 0.into())
+                        })
                         .collect::<Vec<_>>(),
                     ImportMap::default(),
                 );
