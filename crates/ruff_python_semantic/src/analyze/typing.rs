@@ -122,3 +122,33 @@ pub fn is_immutable_annotation(context: &Context, expr: &Expr) -> bool {
         _ => false,
     }
 }
+
+const IMMUTABLE_FUNCS: &[&[&str]] = &[
+    &["", "tuple"],
+    &["", "frozenset"],
+    &["datetime", "date"],
+    &["datetime", "datetime"],
+    &["datetime", "timedelta"],
+    &["decimal", "Decimal"],
+    &["operator", "attrgetter"],
+    &["operator", "itemgetter"],
+    &["operator", "methodcaller"],
+    &["pathlib", "Path"],
+    &["types", "MappingProxyType"],
+    &["re", "compile"],
+];
+
+pub fn is_immutable_func(
+    context: &Context,
+    func: &Expr,
+    extend_immutable_calls: &[CallPath],
+) -> bool {
+    context.resolve_call_path(func).map_or(false, |call_path| {
+        IMMUTABLE_FUNCS
+            .iter()
+            .any(|target| call_path.as_slice() == *target)
+            || extend_immutable_calls
+                .iter()
+                .any(|target| call_path == *target)
+    })
+}

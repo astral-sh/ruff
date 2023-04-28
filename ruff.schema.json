@@ -669,7 +669,7 @@
       "type": "object",
       "properties": {
         "extend-immutable-calls": {
-          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the `no-mutable-default-argument` rule (`B006`).",
+          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the `no-mutable-default-argument` rule (`B006`) or `no-function-call-in-dataclass-defaults` rule (`RUF009`).",
           "type": [
             "array",
             "null"

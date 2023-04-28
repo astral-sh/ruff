@@ -33,11 +33,8 @@ struct LoadedNamesVisitor<'a> {
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
-impl<'a, 'b> Visitor<'b> for LoadedNamesVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_expr(&mut self, expr: &'b Expr) {
+impl<'a> Visitor<'a> for LoadedNamesVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         match &expr.node {
             ExprKind::Name { id, ctx } => match ctx {
                 ExprContext::Load => self.loaded.push((id, expr, expr.range())),
@@ -57,11 +54,8 @@ struct SuspiciousVariablesVisitor<'a> {
 
 /// `Visitor` to collect all suspicious variables (those referenced in
 /// functions, but not bound as arguments).
-impl<'a, 'b> Visitor<'b> for SuspiciousVariablesVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> Visitor<'a> for SuspiciousVariablesVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         match &stmt.node {
             StmtKind::FunctionDef { args, body, .. }
             | StmtKind::AsyncFunctionDef { args, body, .. } => {
@@ -77,9 +71,10 @@ where
                 self.names.extend(
                     visitor
                         .loaded
-                        .iter()
+                        .into_iter()
                         .filter(|(id, ..)| !arg_names.contains(id)),
                 );
+                return;
             }
             StmtKind::Return { value: Some(value) } => {
                 // Mark `return lambda: x` as safe.
@@ -92,7 +87,7 @@ where
         visitor::walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&mut self, expr: &'b Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         match &expr.node {
             ExprKind::Call {
                 func,
@@ -146,6 +141,8 @@ where
                             .iter()
                             .filter(|(id, ..)| !arg_names.contains(id)),
                     );
+
+                    return;
                 }
             }
             _ => {}
@@ -160,11 +157,8 @@ struct NamesFromAssignmentsVisitor<'a> {
 }
 
 /// `Visitor` to collect all names used in an assignment expression.
-impl<'a, 'b> Visitor<'b> for NamesFromAssignmentsVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_expr(&mut self, expr: &'b Expr) {
+impl<'a> Visitor<'a> for NamesFromAssignmentsVisitor<'a> {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         match &expr.node {
             ExprKind::Name { id, .. } => {
                 self.names.insert(id.as_str());
@@ -188,11 +182,8 @@ struct AssignedNamesVisitor<'a> {
 }
 
 /// `Visitor` to collect all used identifiers in a statement.
-impl<'a, 'b> Visitor<'b> for AssignedNamesVisitor<'a>
-where
-    'b: 'a,
-{
-    fn visit_stmt(&mut self, stmt: &'b Stmt) {
+impl<'a> Visitor<'a> for AssignedNamesVisitor<'a> {
+    fn visit_stmt(&mut self, stmt: &'a Stmt) {
         if matches!(
             &stmt.node,
             StmtKind::FunctionDef { .. } | StmtKind::AsyncFunctionDef { .. }
@@ -223,7 +214,7 @@ where
         visitor::walk_stmt(self, stmt);
     }
 
-    fn visit_expr(&mut self, expr: &'b Expr) {
+    fn visit_expr(&mut self, expr: &'a Expr) {
         if matches!(&expr.node, ExprKind::Lambda { .. }) {
             // Don't recurse.
             return;
@@ -232,7 +223,7 @@ where
         visitor::walk_expr(self, expr);
     }
 
-    fn visit_comprehension(&mut self, comprehension: &'b Comprehension) {
+    fn visit_comprehension(&mut self, comprehension: &'a Comprehension) {
         let mut visitor = NamesFromAssignmentsVisitor::default();
         visitor.visit_expr(&comprehension.target);
         self.names.extend(visitor.names);
@@ -242,14 +233,11 @@ where
 }
 
 /// B023
-pub fn function_uses_loop_variable<'a, 'b>(checker: &'a mut Checker<'b>, node: &Node<'b>)
-where
-    'b: 'a,
-{
+pub fn function_uses_loop_variable<'a>(checker: &mut Checker<'a>, node: &Node<'a>) {
     // Identify any "suspicious" variables. These are defined as variables that are
     // referenced in a function or lambda body, but aren't bound as arguments.
     let suspicious_variables = {
-        let mut visitor = SuspiciousVariablesVisitor::<'b>::default();
+        let mut visitor = SuspiciousVariablesVisitor::default();
         match node {
             Node::Stmt(stmt) => visitor.visit_stmt(stmt),
             Node::Expr(expr) => visitor.visit_expr(expr),
@@ -260,7 +248,7 @@ where
     if !suspicious_variables.is_empty() {
         // Identify any variables that are assigned in the loop (ignoring functions).
         let reassigned_in_loop = {
-            let mut visitor = AssignedNamesVisitor::<'b>::default();
+            let mut visitor = AssignedNamesVisitor::default();
             match node {
                 Node::Stmt(stmt) => visitor.visit_stmt(stmt),
                 Node::Expr(expr) => visitor.visit_expr(expr),

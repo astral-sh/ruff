@@ -1,5 +1,5 @@
-use super::LogicalLineTokens;
-use ruff_diagnostics::DiagnosticKind;
+use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
@@ -137,13 +137,13 @@ impl Violation for MultipleLeadingHashesForBlockComment {
 
 /// E261, E262, E265, E266
 pub(crate) fn whitespace_before_comment(
-    tokens: &LogicalLineTokens,
+    line: &LogicalLine,
     locator: &Locator,
     is_first_row: bool,
-) -> Vec<(TextRange, DiagnosticKind)> {
-    let mut diagnostics = vec![];
+    context: &mut LogicalLinesContext,
+) {
     let mut prev_end = TextSize::default();
-    for token in tokens {
+    for token in line.tokens() {
         let kind = token.kind();
 
         if let TokenKind::Comment = kind {
@@ -158,10 +158,10 @@ pub(crate) fn whitespace_before_comment(
             let is_inline_comment = !line.trim().is_empty();
             if is_inline_comment {
                 if range.start() - prev_end < "  ".text_len() {
-                    diagnostics.push((
+                    context.push(
+                        TooFewSpacesBeforeInlineComment,
                         TextRange::new(prev_end, range.start()),
-                        TooFewSpacesBeforeInlineComment.into(),
-                    ));
+                    );
                 }
             }
 
@@ -179,14 +179,14 @@ pub(crate) fn whitespace_before_comment(
             if is_inline_comment {
                 if bad_prefix.is_some() || comment.chars().next().map_or(false, char::is_whitespace)
                 {
-                    diagnostics.push((range, NoSpaceAfterInlineComment.into()));
+                    context.push(NoSpaceAfterInlineComment, range);
                 }
             } else if let Some(bad_prefix) = bad_prefix {
                 if bad_prefix != '!' || !is_first_row {
                     if bad_prefix != '#' {
-                        diagnostics.push((range, NoSpaceAfterBlockComment.into()));
+                        context.push(NoSpaceAfterBlockComment, range);
                     } else if !comment.is_empty() {
-                        diagnostics.push((range, MultipleLeadingHashesForBlockComment.into()));
+                        context.push(MultipleLeadingHashesForBlockComment, range);
                     }
                 }
             }
@@ -194,5 +194,4 @@ pub(crate) fn whitespace_before_comment(
             prev_end = token.end();
         }
     }
-    diagnostics
 }

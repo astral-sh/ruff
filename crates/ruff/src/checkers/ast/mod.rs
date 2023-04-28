@@ -1538,7 +1538,7 @@ where
                     Rule::DotFormatInException,
                 ]) {
                     if let Some(exc) = exc {
-                        flake8_errmsg::rules::string_in_exception(self, exc);
+                        flake8_errmsg::rules::string_in_exception(self, stmt, exc);
                     }
                 }
                 if self.settings.rules.enabled(Rule::OSErrorAlias) {

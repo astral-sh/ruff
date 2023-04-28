@@ -580,7 +580,12 @@ fn blanks_and_section_underline(
     }
 }
 
-fn common_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
+fn common_section(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    context: &SectionContext,
+    next: Option<&SectionContext>,
+) {
     if checker.settings.rules.enabled(Rule::CapitalizeSectionName) {
         let capitalized_section_name = context.kind().as_str();
         if context.section_name() != capitalized_section_name {
@@ -626,7 +631,25 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
     let line_end = checker.stylist.line_ending().as_str();
     let last_line = context.following_lines().last();
     if last_line.map_or(true, |line| !line.trim().is_empty()) {
-        if context.is_last() {
+        if let Some(next) = next {
+            if checker
+                .settings
+                .rules
+                .enabled(Rule::NoBlankLineAfterSection)
+            {
+                let mut diagnostic = Diagnostic::new(
+                    NoBlankLineAfterSection {
+                        name: context.section_name().to_string(),
+                    },
+                    docstring.range(),
+                );
+                if checker.patch(diagnostic.kind.rule()) {
+                    // Add a newline at the beginning of the next section.
+                    diagnostic.set_fix(Edit::insertion(line_end.to_string(), next.range().start()));
+                }
+                checker.diagnostics.push(diagnostic);
+            }
+        } else {
             if checker
                 .settings
                 .rules
@@ -644,25 +667,6 @@ fn common_section(checker: &mut Checker, docstring: &Docstring, context: &Sectio
                         format!("{}{}", line_end, docstring.indentation),
                         context.range().end(),
                     ));
-                }
-                checker.diagnostics.push(diagnostic);
-            }
-        } else {
-            if checker
-                .settings
-                .rules
-                .enabled(Rule::NoBlankLineAfterSection)
-            {
-                let mut diagnostic = Diagnostic::new(
-                    NoBlankLineAfterSection {
-                        name: context.section_name().to_string(),
-                    },
-                    docstring.range(),
-                );
-                if checker.patch(diagnostic.kind.rule()) {
-                    // Add a newline after the section.
-                    diagnostic
-                        .set_fix(Edit::insertion(line_end.to_string(), context.range().end()));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -861,8 +865,13 @@ fn parameters_section(checker: &mut Checker, docstring: &Docstring, context: &Se
     missing_args(checker, docstring, &docstring_args);
 }
 
-fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
-    common_section(checker, docstring, context);
+fn numpy_section(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    context: &SectionContext,
+    next: Option<&SectionContext>,
+) {
+    common_section(checker, docstring, context, next);
 
     if checker
         .settings
@@ -897,8 +906,13 @@ fn numpy_section(checker: &mut Checker, docstring: &Docstring, context: &Section
     }
 }
 
-fn google_section(checker: &mut Checker, docstring: &Docstring, context: &SectionContext) {
-    common_section(checker, docstring, context);
+fn google_section(
+    checker: &mut Checker,
+    docstring: &Docstring,
+    context: &SectionContext,
+    next: Option<&SectionContext>,
+) {
+    common_section(checker, docstring, context, next);
 
     if checker.settings.rules.enabled(Rule::SectionNameEndsInColon) {
         let suffix = context.summary_after_section_name();
@@ -927,8 +941,9 @@ fn parse_numpy_sections(
     docstring: &Docstring,
     section_contexts: &SectionContexts,
 ) {
-    for section_context in section_contexts {
-        numpy_section(checker, docstring, &section_context);
+    let mut iterator = section_contexts.iter().peekable();
+    while let Some(context) = iterator.next() {
+        numpy_section(checker, docstring, &context, iterator.peek());
     }
 }
 
@@ -937,8 +952,9 @@ fn parse_google_sections(
     docstring: &Docstring,
     section_contexts: &SectionContexts,
 ) {
-    for section_context in section_contexts {
-        google_section(checker, docstring, &section_context);
+    let mut iterator = section_contexts.iter().peekable();
+    while let Some(context) = iterator.next() {
+        google_section(checker, docstring, &context, iterator.peek());
     }
 
     if checker.settings.rules.enabled(Rule::UndocumentedParam) {

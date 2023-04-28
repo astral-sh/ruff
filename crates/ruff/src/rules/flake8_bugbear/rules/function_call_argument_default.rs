@@ -8,11 +8,51 @@ use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::call_path::{compose_call_path, CallPath};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_semantic::analyze::typing::is_immutable_func;
 
 use crate::checkers::ast::Checker;
+use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_func;
 
-use super::mutable_argument_default::is_mutable_func;
-
+/// ## What it does
+/// Checks for function calls in default function arguments.
+///
+/// ## Why is it bad?
+/// Any function call that's used in a default argument will only be performed
+/// once, at definition time. The returned value will then be reused by all
+/// calls to the function, which can lead to unexpected behaviour.
+///
+/// ## Options
+/// - `flake8-bugbear.extend-immutable-calls`
+///
+/// ## Example
+/// ```python
+/// def create_list() -> list[int]:
+///     return [1, 2, 3]
+///
+/// def mutable_default(arg: list[int] = create_list()) -> list[int]:
+///     arg.append(4)
+///     return arg
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def better(arg: list[int] | None = None) -> list[int]:
+///     if arg is None:
+///         arg = create_list()
+///
+///     arg.append(4)
+///     return arg
+/// ```
+///
+/// Alternatively, if shared behavior is desirable, clarify the intent by
+/// assigning to a module-level variable:
+/// ```python
+/// I_KNOW_THIS_IS_SHARED_STATE = create_list()
+///
+/// def mutable_default(arg: list[int] = I_KNOW_THIS_IS_SHARED_STATE) -> list[int]:
+///     arg.append(4)
+///     return arg
+/// ```
 #[violation]
 pub struct FunctionCallInDefaultArgument {
     pub name: Option<String>,
@@ -30,35 +70,6 @@ impl Violation for FunctionCallInDefaultArgument {
     }
 }
 
-const IMMUTABLE_FUNCS: &[&[&str]] = &[
-    &["", "tuple"],
-    &["", "frozenset"],
-    &["datetime", "date"],
-    &["datetime", "datetime"],
-    &["datetime", "timedelta"],
-    &["decimal", "Decimal"],
-    &["operator", "attrgetter"],
-    &["operator", "itemgetter"],
-    &["operator", "methodcaller"],
-    &["pathlib", "Path"],
-    &["types", "MappingProxyType"],
-    &["re", "compile"],
-];
-
-fn is_immutable_func(checker: &Checker, func: &Expr, extend_immutable_calls: &[CallPath]) -> bool {
-    checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            IMMUTABLE_FUNCS
-                .iter()
-                .any(|target| call_path.as_slice() == *target)
-                || extend_immutable_calls
-                    .iter()
-                    .any(|target| call_path == *target)
-        })
-}
-
 struct ArgumentDefaultVisitor<'a> {
     checker: &'a Checker<'a>,
     diagnostics: Vec<(DiagnosticKind, TextRange)>,
@@ -73,7 +84,7 @@ where
         match &expr.node {
             ExprKind::Call { func, args, .. } => {
                 if !is_mutable_func(self.checker, func)
-                    && !is_immutable_func(self.checker, func, &self.extend_immutable_calls)
+                    && !is_immutable_func(&self.checker.ctx, func, &self.extend_immutable_calls)
                     && !is_nan_or_infinity(func, args)
                 {
                     self.diagnostics.push((

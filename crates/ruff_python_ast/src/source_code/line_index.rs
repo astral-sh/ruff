@@ -24,13 +24,13 @@ struct LineIndexInner {
 impl LineIndex {
     /// Builds the [`LineIndex`] from the source text of a file.
     pub fn from_source_text(text: &str) -> Self {
-        assert!(u32::try_from(text.len()).is_ok());
-
         let mut line_starts: Vec<TextSize> = Vec::with_capacity(text.len() / 88);
         line_starts.push(TextSize::default());
 
         let bytes = text.as_bytes();
         let mut utf8 = false;
+
+        assert!(u32::try_from(bytes.len()).is_ok());
 
         for (i, byte) in bytes.iter().enumerate() {
             utf8 |= !byte.is_ascii();
@@ -39,7 +39,9 @@ impl LineIndex {
                 // Only track one line break for `\r\n`.
                 b'\r' if bytes.get(i + 1) == Some(&b'\n') => continue,
                 b'\n' | b'\r' => {
-                    line_starts.push(TextSize::try_from(i + 1).unwrap());
+                    // SAFETY: Assertion above guarantees `i <= u32::MAX`
+                    #[allow(clippy::cast_possible_truncation)]
+                    line_starts.push(TextSize::from(i as u32) + TextSize::from(1));
                 }
                 _ => {}
             }

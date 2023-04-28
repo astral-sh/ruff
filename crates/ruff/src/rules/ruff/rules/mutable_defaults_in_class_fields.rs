@@ -1,10 +1,13 @@
+use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::{call_path::compose_call_path, helpers::map_callable};
-use ruff_python_semantic::analyze::typing::is_immutable_annotation;
-use ruff_python_semantic::context::Context;
+use ruff_python_semantic::{
+    analyze::typing::{is_immutable_annotation, is_immutable_func},
+    context::Context,
+};
 
 use crate::checkers::ast::Checker;
 
@@ -74,6 +77,9 @@ impl Violation for MutableClassDefault {
 /// ## Why is it bad?
 /// Function calls are only performed once, at definition time. The returned
 /// value is then reused by all instances of the dataclass.
+///
+/// ## Options
+/// - `flake8-bugbear.extend-immutable-calls`
 ///
 /// ## Examples:
 /// ```python
@@ -171,11 +177,11 @@ fn is_mutable_expr(expr: &Expr) -> bool {
     )
 }
 
-const ALLOWED_FUNCS: &[&[&str]] = &[&["dataclasses", "field"]];
+const ALLOWED_DATACLASS_SPECIFIC_FUNCTIONS: &[&[&str]] = &[&["dataclasses", "field"]];
 
-fn is_allowed_dataclass_func(context: &Context, func: &Expr) -> bool {
+fn is_allowed_dataclass_function(context: &Context, func: &Expr) -> bool {
     context.resolve_call_path(func).map_or(false, |call_path| {
-        ALLOWED_FUNCS
+        ALLOWED_DATACLASS_SPECIFIC_FUNCTIONS
             .iter()
             .any(|target| call_path.as_slice() == *target)
     })
@@ -196,6 +202,14 @@ pub fn function_call_in_class_defaults(
     is_dataclass: bool,
     emit_dataclass_error: bool,
 ) {
+    let extend_immutable_calls: Vec<CallPath> = checker
+        .settings
+        .flake8_bugbear
+        .extend_immutable_calls
+        .iter()
+        .map(|target| from_qualified_name(target))
+        .collect();
+
     for statement in body {
         if let StmtKind::AnnAssign {
             annotation,
@@ -207,7 +221,9 @@ pub fn function_call_in_class_defaults(
                 continue;
             }
             if let ExprKind::Call { func, .. } = &expr.node {
-                if !is_dataclass || !is_allowed_dataclass_func(&checker.ctx, func) {
+                if !is_immutable_func(&checker.ctx, func, &extend_immutable_calls)
+                    && !(is_dataclass && is_allowed_dataclass_function(&checker.ctx, func))
+                {
                     let diagnostic: Diagnostic = if emit_dataclass_error {
                         Diagnostic::new(
                             FunctionCallInDataclassDefaultArgument {
