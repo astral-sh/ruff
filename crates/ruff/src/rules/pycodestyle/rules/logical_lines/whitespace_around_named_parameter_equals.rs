@@ -1,10 +1,9 @@
-use ruff_diagnostics::DiagnosticKind;
+use crate::checkers::logical_lines::LogicalLinesContext;
+use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineToken};
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use rustpython_parser::ast::Location;
-
-use super::LogicalLineTokens;
+use ruff_text_size::{TextRange, TextSize};
 
 #[violation]
 pub struct UnexpectedSpacesAroundKeywordParameterEquals;
@@ -26,7 +25,7 @@ impl Violation for MissingWhitespaceAroundParameterEquals {
     }
 }
 
-fn is_in_def(tokens: &LogicalLineTokens) -> bool {
+fn is_in_def(tokens: &[LogicalLineToken]) -> bool {
     for token in tokens {
         match token.kind() {
             TokenKind::Async | TokenKind::Indent | TokenKind::Dedent => continue,
@@ -40,15 +39,15 @@ fn is_in_def(tokens: &LogicalLineTokens) -> bool {
 
 /// E251, E252
 pub(crate) fn whitespace_around_named_parameter_equals(
-    tokens: &LogicalLineTokens,
-) -> Vec<(Location, DiagnosticKind)> {
-    let mut diagnostics = vec![];
+    line: &LogicalLine,
+    context: &mut LogicalLinesContext,
+) {
     let mut parens = 0u32;
     let mut annotated_func_arg = false;
-    let mut prev_end: Option<Location> = None;
+    let mut prev_end = TextSize::default();
 
-    let in_def = is_in_def(tokens);
-    let mut iter = tokens.iter().peekable();
+    let in_def = is_in_def(line.tokens());
+    let mut iter = line.tokens().iter().peekable();
 
     while let Some(token) = iter.next() {
         let kind = token.kind();
@@ -78,8 +77,11 @@ pub(crate) fn whitespace_around_named_parameter_equals(
             TokenKind::Equal if parens > 0 => {
                 if annotated_func_arg && parens == 1 {
                     let start = token.start();
-                    if Some(start) == prev_end {
-                        diagnostics.push((start, MissingWhitespaceAroundParameterEquals.into()));
+                    if start == prev_end && prev_end != TextSize::new(0) {
+                        context.push(
+                            MissingWhitespaceAroundParameterEquals,
+                            TextRange::empty(start),
+                        );
                     }
 
                     while let Some(next) = iter.peek() {
@@ -89,20 +91,20 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                             let next_start = next.start();
 
                             if next_start == token.end() {
-                                diagnostics.push((
-                                    next_start,
-                                    MissingWhitespaceAroundParameterEquals.into(),
-                                ));
+                                context.push(
+                                    MissingWhitespaceAroundParameterEquals,
+                                    TextRange::empty(next_start),
+                                );
                             }
                             break;
                         }
                     }
                 } else {
-                    if Some(token.start()) != prev_end {
-                        diagnostics.push((
-                            prev_end.unwrap(),
-                            UnexpectedSpacesAroundKeywordParameterEquals.into(),
-                        ));
+                    if token.start() != prev_end {
+                        context.push(
+                            UnexpectedSpacesAroundKeywordParameterEquals,
+                            TextRange::empty(prev_end),
+                        );
                     }
 
                     while let Some(next) = iter.peek() {
@@ -110,10 +112,10 @@ pub(crate) fn whitespace_around_named_parameter_equals(
                             iter.next();
                         } else {
                             if next.start() != token.end() {
-                                diagnostics.push((
-                                    token.end(),
-                                    UnexpectedSpacesAroundKeywordParameterEquals.into(),
-                                ));
+                                context.push(
+                                    UnexpectedSpacesAroundKeywordParameterEquals,
+                                    TextRange::empty(token.end()),
+                                );
                             }
                             break;
                         }
@@ -123,7 +125,6 @@ pub(crate) fn whitespace_around_named_parameter_equals(
             _ => {}
         }
 
-        prev_end = Some(token.end());
+        prev_end = token.end();
     }
-    diagnostics
 }

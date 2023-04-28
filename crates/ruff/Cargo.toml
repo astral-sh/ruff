@@ -1,6 +1,6 @@
 [package]
 name = "ruff"
-version = "0.0.261"
+version = "0.0.263"
 authors.workspace = true
 edition.workspace = true
 rust-version.workspace = true
@@ -17,11 +17,11 @@ name = "ruff"
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics", features = ["serde"] }
 ruff_macros = { path = "../ruff_macros" }
-ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_python_ast = { path = "../ruff_python_ast", features = ["serde"] }
 ruff_python_semantic = { path = "../ruff_python_semantic" }
 ruff_python_stdlib = { path = "../ruff_python_stdlib" }
 ruff_rustpython = { path = "../ruff_rustpython" }
-ruff_text_size = { path = "../ruff_text_size" }
+ruff_text_size = { workspace = true }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }
@@ -29,7 +29,7 @@ bitflags = { workspace = true }
 chrono = { workspace = true }
 clap = { workspace = true, features = ["derive", "string"], optional = true }
 colored = { workspace = true }
-dirs = { version = "4.0.0" }
+dirs = { version = "5.0.0" }
 fern = { version = "0.6.1" }
 glob = { workspace = true }
 globset = { workspace = true }

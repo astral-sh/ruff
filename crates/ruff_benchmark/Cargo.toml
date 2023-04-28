@@ -16,6 +16,10 @@ bench = false
 name = "linter"
 harness = false
 
+[[bench]]
+name = "parser"
+harness = false
+
 [dependencies]
 once_cell.workspace = true
 serde.workspace = true
@@ -25,7 +29,9 @@ ureq = "2.6.2"
 
 [dev-dependencies]
 ruff.path = "../ruff"
+ruff_python_ast.path = "../ruff_python_ast"
 criterion = { version = "0.4.0"}
+rustpython-parser.workspace = true
 
 [target.'cfg(target_os = "windows")'.dev-dependencies]
 mimalloc = "0.1.34"

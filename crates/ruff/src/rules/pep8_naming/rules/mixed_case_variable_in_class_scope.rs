@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
@@ -26,6 +25,7 @@ pub fn mixed_case_variable_in_class_scope(
     expr: &Expr,
     stmt: &Stmt,
     name: &str,
+    bases: &[Expr],
 ) {
     if checker
         .settings
@@ -36,12 +36,15 @@ pub fn mixed_case_variable_in_class_scope(
     {
         return;
     }
-    if helpers::is_mixed_case(name) && !helpers::is_namedtuple_assignment(checker, stmt) {
+    if helpers::is_mixed_case(name)
+        && !helpers::is_named_tuple_assignment(&checker.ctx, stmt)
+        && !helpers::is_typed_dict_class(&checker.ctx, bases)
+    {
         checker.diagnostics.push(Diagnostic::new(
             MixedCaseVariableInClassScope {
                 name: name.to_string(),
             },
-            Range::from(expr),
+            expr.range(),
         ));
     }
 }

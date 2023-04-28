@@ -1,12 +1,35 @@
 use anyhow::{anyhow, Result};
 use once_cell::sync::Lazy;
 use regex::Regex;
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_python_ast::newlines::Line;
 
+/// ## What it does
+/// Check for `type: ignore` annotations that suppress all type warnings, as
+/// opposed to targeting specific type warnings.
+///
+/// ## Why is this bad?
+/// Suppressing all warnings can hide issues in the code.
+///
+/// Blanket `type: ignore` annotations are also more difficult to interpret and
+/// maintain, as the annotation does not clarify which warnings are intended
+/// to be suppressed.
+///
+/// ## Example
+/// ```python
+/// from foo import secrets  # type: ignore
+/// ```
+///
+/// Use instead:
+/// ```python
+/// from foo import secrets  # type: ignore[attr-defined]
+/// ```
+///
+/// ## References
+/// - [mypy](https://mypy.readthedocs.io/en/stable/common_issues.html#spurious-errors-and-locally-silencing-the-checker)
 #[violation]
 pub struct BlanketTypeIgnore;
 
@@ -18,17 +41,15 @@ impl Violation for BlanketTypeIgnore {
 }
 
 /// PGH003
-pub fn blanket_type_ignore(diagnostics: &mut Vec<Diagnostic>, lineno: usize, line: &str) {
+pub(crate) fn blanket_type_ignore(diagnostics: &mut Vec<Diagnostic>, line: &Line) {
     for match_ in TYPE_IGNORE_PATTERN.find_iter(line) {
         if let Ok(codes) = parse_type_ignore_tag(line[match_.end()..].trim()) {
             if codes.is_empty() {
-                let start = line[..match_.start()].chars().count();
-                let end = start + line[match_.start()..match_.end()].chars().count();
                 diagnostics.push(Diagnostic::new(
                     BlanketTypeIgnore,
-                    Range::new(
-                        Location::new(lineno + 1, start),
-                        Location::new(lineno + 1, end),
+                    TextRange::at(
+                        line.start() + TextSize::try_from(match_.start()).unwrap(),
+                        match_.as_str().text_len(),
                     ),
                 ));
             }

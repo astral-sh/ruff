@@ -4,7 +4,6 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -161,7 +160,7 @@ pub fn unordered_body_content_in_model(checker: &mut Checker, bases: &[Expr], bo
                 elem_type: current_element_type,
                 before: element_type,
             },
-            Range::from(element),
+            element.range(),
         );
         checker.diagnostics.push(diagnostic);
     }

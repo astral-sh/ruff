@@ -3,10 +3,48 @@ use rustpython_parser::ast::{Excepthandler, Stmt, StmtKind};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::contains_effect;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for `return` statements in `try` blocks.
+///
+/// ## Why is this bad?
+/// The `try`-`except` statement has an `else` clause for code that should
+/// run _only_ if no exceptions were raised. Using the `else` clause is more
+/// explicit than using a `return` statement inside of a `try` block.
+///
+/// ## Example
+/// ```python
+/// import logging
+///
+///
+/// def reciprocal(n):
+///     try:
+///         rec = 1 / n
+///         print(f"reciprocal of {n} is {rec}")
+///         return rec
+///     except ZeroDivisionError as exc:
+///         logging.exception("Exception occurred")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import logging
+///
+///
+/// def reciprocal(n):
+///     try:
+///         rec = 1 / n
+///     except ZeroDivisionError as exc:
+///         logging.exception("Exception occurred")
+///     else:
+///         print(f"reciprocal of {n} is {rec}")
+///         return rec
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/tutorial/errors.html)
 #[violation]
 pub struct TryConsiderElse;
 
@@ -34,7 +72,7 @@ pub fn try_consider_else(
                 }
                 checker
                     .diagnostics
-                    .push(Diagnostic::new(TryConsiderElse, Range::from(stmt)));
+                    .push(Diagnostic::new(TryConsiderElse, stmt.range()));
             }
         }
     }

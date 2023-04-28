@@ -6,9 +6,14 @@
 # Either download https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl as
 # `github_search.jsonl` or follow the instructions in the README to scrape your own dataset.
 #
+# Setup:
+# ```
+# apt-get install musl-tools # or corresponding command to install musl on your platform, e.g. `yay musl`
+# rustup target add x86_64-unknown-linux-musl
+# ```
 # From the project root:
 # ```
-# cargo build
+# cargo build --target x86_64-unknown-linux-musl
 # docker buildx build -f scripts/Dockerfile.ecosystem -t ruff-ecosystem-checker --load .
 # docker run --rm ruff-ecosystem-checker
 # ```
@@ -17,6 +22,6 @@ FROM python:3.11
 RUN python -m venv .venv && .venv/bin/pip install ruff
 ADD scripts/check_ecosystem.py check_ecosystem.py
 ADD github_search.jsonl github_search.jsonl
-ADD target/debug/ruff ruff-new
+ADD target/x86_64-unknown-linux-musl/debug/ruff ruff-new
 
 CMD ["python", "check_ecosystem.py", "--verbose", "--projects", "github_search.jsonl", "ruff-new", ".venv/bin/ruff"]

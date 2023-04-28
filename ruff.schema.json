@@ -669,7 +669,7 @@
       "type": "object",
       "properties": {
         "extend-immutable-calls": {
-          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the `no-mutable-default-argument` rule (`B006`).",
+          "description": "Additional callable functions to consider \"immutable\" when evaluating, e.g., the `no-mutable-default-argument` rule (`B006`) or `no-function-call-in-dataclass-defaults` rule (`RUF009`).",
           "type": [
             "array",
             "null"
@@ -787,6 +787,17 @@
               "type": "string"
             }
           }
+        },
+        "banned-from": {
+          "description": "A list of modules that are allowed to be imported from",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
+          "uniqueItems": true
         },
         "extend-aliases": {
           "description": "A mapping from module to conventional import alias. These aliases will be added to the `aliases` mapping.",
@@ -1844,6 +1855,7 @@
         "ICN00",
         "ICN001",
         "ICN002",
+        "ICN003",
         "INP",
         "INP0",
         "INP00",
@@ -1949,6 +1961,9 @@
         "PLE0116",
         "PLE0117",
         "PLE0118",
+        "PLE03",
+        "PLE030",
+        "PLE0302",
         "PLE06",
         "PLE060",
         "PLE0604",

@@ -2,7 +2,6 @@ use rustpython_parser::ast::Arg;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 #[violation]
 pub struct InvalidArgumentName {
@@ -27,7 +26,7 @@ pub fn invalid_argument_name(name: &str, arg: &Arg, ignore_names: &[String]) -> 
             InvalidArgumentName {
                 name: name.to_string(),
             },
-            Range::from(arg),
+            arg.range(),
         ));
     }
     None

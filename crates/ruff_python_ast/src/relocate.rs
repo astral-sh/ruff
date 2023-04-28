@@ -1,18 +1,15 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
-use crate::types::Range;
-
-fn relocate_keyword(keyword: &mut Keyword, location: Range) {
-    keyword.location = location.location;
-    keyword.end_location = Some(location.end_location);
+fn relocate_keyword(keyword: &mut Keyword, location: TextRange) {
+    keyword.range = location;
     relocate_expr(&mut keyword.node.value, location);
 }
 
 /// Change an expression's location (recursively) to match a desired, fixed
 /// location.
-pub fn relocate_expr(expr: &mut Expr, location: Range) {
-    expr.location = location.location;
-    expr.end_location = Some(location.end_location);
+pub fn relocate_expr(expr: &mut Expr, location: TextRange) {
+    expr.range = location;
     match &mut expr.node {
         ExprKind::BoolOp { values, .. } => {
             for expr in values {

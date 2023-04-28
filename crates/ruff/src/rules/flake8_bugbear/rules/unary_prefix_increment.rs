@@ -21,7 +21,6 @@ use rustpython_parser::ast::{Expr, ExprKind, Unaryop};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -48,5 +47,5 @@ pub fn unary_prefix_increment(checker: &mut Checker, expr: &Expr, op: &Unaryop, 
     }
     checker
         .diagnostics
-        .push(Diagnostic::new(UnaryPrefixIncrement, Range::from(expr)));
+        .push(Diagnostic::new(UnaryPrefixIncrement, expr.range()));
 }

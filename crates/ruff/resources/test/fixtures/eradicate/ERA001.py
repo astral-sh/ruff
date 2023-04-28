@@ -9,6 +9,7 @@ def foo(x, y, z):
     print(x, y, z)
 
     # This is a real comment.
+    # # This is a (nested) comment.
     #return True
     return False
 

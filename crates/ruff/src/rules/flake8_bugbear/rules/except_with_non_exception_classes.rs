@@ -4,7 +4,6 @@ use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -55,10 +54,9 @@ pub fn except_with_non_exception_classes(checker: &mut Checker, excepthandler: &
                 | ExprKind::Name { .. }
                 | ExprKind::Call { .. },
         ) {
-            checker.diagnostics.push(Diagnostic::new(
-                ExceptWithNonExceptionClasses,
-                Range::from(expr),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(ExceptWithNonExceptionClasses, expr.range()));
         }
     }
 }

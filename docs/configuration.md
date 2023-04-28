@@ -201,7 +201,7 @@ Options:
       --show-fixes
           Show an enumeration of all autofixed lint violations
       --diff
-          Avoid writing any fixed files back; instead, output a diff for each changed file to stdout
+          Avoid writing any fixed files back; instead, output a diff for each changed file to stdout. Implies `--fix-only`
   -w, --watch
           Run in watch mode by re-running whenever files change
       --fix-only

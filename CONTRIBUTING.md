@@ -225,7 +225,7 @@ python scripts/check_ecosystem.py path/to/your/ruff path/to/older/ruff
 
 You can also run the Ecosystem CI check in a Docker container across a larger set of projects by
 downloading the [`known-github-tomls.json`](https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl)
-as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](scripts/Dockerfile.ecosystem).
+as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](https://github.com/charliermarsh/ruff/blob/main/scripts/Dockerfile.ecosystem).
 Note that this check will take a while to run.
 
 ## Benchmarks

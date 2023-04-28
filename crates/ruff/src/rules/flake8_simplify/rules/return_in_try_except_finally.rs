@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -39,7 +38,7 @@ pub fn return_in_try_except_finally(
         if try_has_return || except_has_return {
             checker.diagnostics.push(Diagnostic::new(
                 ReturnInTryExceptFinally,
-                Range::from(finally_return),
+                finally_return.range(),
             ));
         }
     }

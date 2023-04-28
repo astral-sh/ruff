@@ -1,4 +1,5 @@
 use log::error;
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 use unicode_width::UnicodeWidthStr;
@@ -11,7 +12,6 @@ use ruff_python_ast::helpers::{
     has_comments_in, unparse_expr, unparse_stmt,
 };
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::types::Range;
 use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
@@ -276,7 +276,7 @@ pub fn nested_if_statements(
     };
 
     let colon = first_colon_range(
-        Range::new(test.end_location.unwrap(), first_stmt.location),
+        TextRange::new(test.end(), first_stmt.start()),
         checker.locator,
     );
 
@@ -284,15 +284,15 @@ pub fn nested_if_statements(
     // the outer and inner if statements.
     let nested_if = &body[0];
     let fixable = !has_comments_in(
-        Range::new(stmt.location, nested_if.location),
+        TextRange::new(stmt.start(), nested_if.start()),
         checker.locator,
     );
 
     let mut diagnostic = Diagnostic::new(
         CollapsibleIf { fixable },
         colon.map_or_else(
-            || Range::from(stmt),
-            |colon| Range::new(stmt.location, colon.end_location),
+            || stmt.range(),
+            |colon| TextRange::new(stmt.start(), colon.end()),
         ),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
@@ -366,24 +366,23 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
         && !has_comments(stmt, checker.locator)
         && (matches!(test.node, ExprKind::Compare { .. }) || checker.ctx.is_builtin("bool"));
 
-    let mut diagnostic = Diagnostic::new(NeedlessBool { condition, fixable }, Range::from(stmt));
+    let mut diagnostic = Diagnostic::new(NeedlessBool { condition, fixable }, stmt.range());
     if fixable && checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
             // If the condition is a comparison, we can replace it with the condition.
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
                         value: Some(test.clone()),
                     }),
                     checker.stylist,
                 ),
-                stmt.location,
-                stmt.end_location.unwrap(),
+                stmt.range(),
             ));
         } else {
             // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
             // verified, above, that `bool` is a builtin.)
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
                         value: Some(Box::new(create_expr(ExprKind::Call {
@@ -397,8 +396,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     }),
                     checker.stylist,
                 ),
-                stmt.location,
-                stmt.end_location.unwrap(),
+                stmt.range(),
             ));
         };
     }
@@ -513,7 +511,11 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
     let contents = unparse_stmt(&ternary, checker.stylist);
 
     // Don't flag if the resulting expression would exceed the maximum line length.
-    if stmt.location.column() + contents.width() > checker.settings.line_length {
+    let line_start = checker.locator.line_start(stmt.start());
+    if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
+        + contents.width()
+        > checker.settings.line_length
+    {
         return;
     }
 
@@ -523,14 +525,10 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
             contents: contents.clone(),
             fixable,
         },
-        Range::from(stmt),
+        stmt.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
-            contents,
-            stmt.location,
-            stmt.end_location.unwrap(),
-        ));
+        diagnostic.set_fix(Edit::range_replacement(contents, stmt.range()));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -598,9 +596,9 @@ pub fn if_with_same_arms(checker: &mut Checker, stmt: &Stmt, parent: Option<&Stm
         if compare_body(body, next_body) {
             checker.diagnostics.push(Diagnostic::new(
                 IfWithSameArms,
-                Range::new(
-                    if i == 0 { stmt.location } else { test.location },
-                    next_body.last().unwrap().end_location.unwrap(),
+                TextRange::new(
+                    if i == 0 { stmt.start() } else { test.start() },
+                    next_body.last().unwrap().end(),
                 ),
             ));
         }
@@ -749,7 +747,7 @@ pub fn manual_dict_lookup(
 
     checker.diagnostics.push(Diagnostic::new(
         IfElseBlockInsteadOfDictLookup,
-        Range::from(stmt),
+        stmt.range(),
     ));
 }
 
@@ -860,7 +858,11 @@ pub fn use_dict_get_with_default(
     );
 
     // Don't flag if the resulting expression would exceed the maximum line length.
-    if stmt.location.column() + contents.width() > checker.settings.line_length {
+    let line_start = checker.locator.line_start(stmt.start());
+    if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
+        + contents.width()
+        > checker.settings.line_length
+    {
         return;
     }
 
@@ -870,14 +872,10 @@ pub fn use_dict_get_with_default(
             contents: contents.clone(),
             fixable,
         },
-        Range::from(stmt),
+        stmt.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
-            contents,
-            stmt.location,
-            stmt.end_location.unwrap(),
-        ));
+        diagnostic.set_fix(Edit::range_replacement(contents, stmt.range()));
     }
     checker.diagnostics.push(diagnostic);
 }

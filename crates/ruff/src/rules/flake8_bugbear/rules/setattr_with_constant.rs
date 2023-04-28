@@ -1,10 +1,10 @@
-use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind};
+use ruff_text_size::TextSize;
+use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_stmt;
 use ruff_python_ast::source_code::Stylist;
-use ruff_python_ast::types::Range;
 use ruff_python_stdlib::identifiers::{is_identifier, is_mangled_private};
 
 use crate::checkers::ast::Checker;
@@ -29,12 +29,12 @@ impl AlwaysAutofixableViolation for SetAttrWithConstant {
 
 fn assignment(obj: &Expr, name: &str, value: &Expr, stylist: &Stylist) -> String {
     let stmt = Stmt::new(
-        Location::default(),
-        Location::default(),
+        TextSize::default(),
+        TextSize::default(),
         StmtKind::Assign {
             targets: vec![Expr::new(
-                Location::default(),
-                Location::default(),
+                TextSize::default(),
+                TextSize::default(),
                 ExprKind::Attribute {
                     value: Box::new(obj.clone()),
                     attr: name.to_string(),
@@ -76,13 +76,12 @@ pub fn setattr_with_constant(checker: &mut Checker, expr: &Expr, func: &Expr, ar
     // (i.e., it's directly within an `StmtKind::Expr`).
     if let StmtKind::Expr { value: child } = &checker.ctx.current_stmt().node {
         if expr == child.as_ref() {
-            let mut diagnostic = Diagnostic::new(SetAttrWithConstant, Range::from(expr));
+            let mut diagnostic = Diagnostic::new(SetAttrWithConstant, expr.range());
 
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::replacement(
+                diagnostic.set_fix(Edit::range_replacement(
                     assignment(obj, name, value, checker.stylist),
-                    expr.location,
-                    expr.end_location.unwrap(),
+                    expr.range(),
                 ));
             }
             checker.diagnostics.push(diagnostic);

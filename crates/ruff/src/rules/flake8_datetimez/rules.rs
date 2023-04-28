@@ -1,9 +1,9 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_non_none_keyword, is_const_none};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -122,7 +122,7 @@ pub fn call_datetime_without_tzinfo(
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
-    location: Range,
+    location: TextRange,
 ) {
     if !checker
         .ctx
@@ -156,7 +156,7 @@ pub fn call_datetime_without_tzinfo(
 ///
 /// It uses the system local timezone.
 /// Use `datetime.datetime.now(tz=)` instead.
-pub fn call_datetime_today(checker: &mut Checker, func: &Expr, location: Range) {
+pub fn call_datetime_today(checker: &mut Checker, func: &Expr, location: TextRange) {
     if checker
         .ctx
         .resolve_call_path(func)
@@ -178,7 +178,7 @@ pub fn call_datetime_today(checker: &mut Checker, func: &Expr, location: Range) 
 /// local times, it is preferred to use aware datetimes to represent times in
 /// UTC. As such, the recommended way to create an object representing the
 /// current time in UTC is by calling `datetime.now(timezone.utc)`.
-pub fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: Range) {
+pub fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: TextRange) {
     if checker
         .ctx
         .resolve_call_path(func)
@@ -201,7 +201,7 @@ pub fn call_datetime_utcnow(checker: &mut Checker, func: &Expr, location: Range)
 /// UTC. As such, the recommended way to create an object representing a
 /// specific timestamp in UTC is by calling `datetime.fromtimestamp(timestamp,
 /// tz=timezone.utc)`.
-pub fn call_datetime_utcfromtimestamp(checker: &mut Checker, func: &Expr, location: Range) {
+pub fn call_datetime_utcfromtimestamp(checker: &mut Checker, func: &Expr, location: TextRange) {
     if checker
         .ctx
         .resolve_call_path(func)
@@ -221,7 +221,7 @@ pub fn call_datetime_now_without_tzinfo(
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
-    location: Range,
+    location: TextRange,
 ) {
     if !checker
         .ctx
@@ -263,7 +263,7 @@ pub fn call_datetime_fromtimestamp(
     func: &Expr,
     args: &[Expr],
     keywords: &[Keyword],
-    location: Range,
+    location: TextRange,
 ) {
     if !checker
         .ctx
@@ -304,7 +304,7 @@ pub fn call_datetime_strptime_without_zone(
     checker: &mut Checker,
     func: &Expr,
     args: &[Expr],
-    location: Range,
+    location: TextRange,
 ) {
     if !checker
         .ctx
@@ -362,7 +362,7 @@ pub fn call_datetime_strptime_without_zone(
 ///
 /// It uses the system local timezone.
 /// Use `datetime.datetime.now(tz=).date()` instead.
-pub fn call_date_today(checker: &mut Checker, func: &Expr, location: Range) {
+pub fn call_date_today(checker: &mut Checker, func: &Expr, location: TextRange) {
     if checker
         .ctx
         .resolve_call_path(func)
@@ -382,7 +382,7 @@ pub fn call_date_today(checker: &mut Checker, func: &Expr, location: Range) {
 ///
 /// It uses the system local timezone.
 /// Use `datetime.datetime.fromtimestamp(, tz=).date()` instead.
-pub fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, location: Range) {
+pub fn call_date_fromtimestamp(checker: &mut Checker, func: &Expr, location: TextRange) {
     if checker
         .ctx
         .resolve_call_path(func)

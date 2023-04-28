@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -40,6 +39,6 @@ pub fn strip_with_multi_characters(checker: &mut Checker, expr: &Expr, func: &Ex
     if num_chars > 1 && num_chars != value.chars().unique().count() {
         checker
             .diagnostics
-            .push(Diagnostic::new(StripWithMultiCharacters, Range::from(expr)));
+            .push(Diagnostic::new(StripWithMultiCharacters, expr.range()));
     }
 }

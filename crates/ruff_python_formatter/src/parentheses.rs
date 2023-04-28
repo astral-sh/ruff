@@ -155,7 +155,7 @@ impl<'a> Visitor<'a> for ParenthesesNormalizer<'_> {
                     },
                 ) {
                     // TODO(charlie): Encode this in the AST via separate node types.
-                    if !is_radix_literal(self.locator.slice(&**value)) {
+                    if !is_radix_literal(self.locator.slice(value.range())) {
                         value.parentheses = Parenthesize::Always;
                     }
                 }

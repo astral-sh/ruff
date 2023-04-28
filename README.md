@@ -55,8 +55,8 @@ Ruff is extremely actively developed and used in major open-source projects like
 
 ...and many more.
 
-Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster) or
-the most recent [project update](https://notes.crmarsh.com/ruff-the-first-200-releases).
+Ruff is backed by [Astral](https://astral.sh). Read the [launch post](https://astral.sh/blog/announcing-astral-the-company-behind-ruff),
+or the original [project announcement](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
 ## Testimonials
 
@@ -137,7 +137,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.261'
+  rev: 'v0.0.263'
   hooks:
     - id: ruff
 ```
@@ -359,7 +359,7 @@ Ruff is used by a number of major open-source projects and companies, including:
 - Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
 - Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
 - [MegaLinter](https://github.com/oxsecurity/megalinter)
-- Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel))
+- Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel), [ONNX Runtime](https://github.com/microsoft/onnxruntime))
 - Netflix ([Dispatch](https://github.com/Netflix/dispatch))
 - [Neon](https://github.com/neondatabase/neon)
 - [ONNX](https://github.com/onnx/onnx)
@@ -367,13 +367,15 @@ Ruff is used by a number of major open-source projects and companies, including:
 - [PDM](https://github.com/pdm-project/pdm)
 - [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)
 - [Pandas](https://github.com/pandas-dev/pandas)
+- [Poetry](https://github.com/python-poetry/poetry)
 - [Polars](https://github.com/pola-rs/polars)
 - [PostHog](https://github.com/PostHog/posthog)
-- Prefect ([Marvin](https://github.com/PrefectHQ/marvin))
+- Prefect ([Python SDK](https://github.com/PrefectHQ/prefect), [Marvin](https://github.com/PrefectHQ/marvin))
 - [Pydantic](https://github.com/pydantic/pydantic)
 - [PyInstaller](https://github.com/pyinstaller/pyinstaller)
 - [Pylint](https://github.com/PyCQA/pylint)
 - [Pynecone](https://github.com/pynecone-io/pynecone)
+- [Robyn](https://github.com/sansyrox/robyn)
 - Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
 - Snowflake ([SnowCLI](https://github.com/Snowflake-Labs/snowcli))
 - [Saleor](https://github.com/saleor/saleor)

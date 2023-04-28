@@ -5,7 +5,6 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -512,7 +511,7 @@ pub fn suspicious_function_call(checker: &mut Checker, expr: &Expr) {
         Reason::Telnet => SuspiciousTelnetUsage.into(),
         Reason::FTPLib => SuspiciousFTPLibUsage.into(),
     };
-    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, Range::from(expr));
+    let diagnostic = Diagnostic::new::<DiagnosticKind>(diagnostic_kind, expr.range());
     if checker.settings.rules.enabled(diagnostic.kind.rule()) {
         checker.diagnostics.push(diagnostic);
     }

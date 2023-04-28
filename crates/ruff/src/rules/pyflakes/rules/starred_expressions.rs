@@ -1,8 +1,8 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 #[violation]
 pub struct ExpressionsInStarAssignment;
@@ -29,7 +29,7 @@ pub fn starred_expressions(
     elts: &[Expr],
     check_too_many_expressions: bool,
     check_two_starred_expressions: bool,
-    location: Range,
+    location: TextRange,
 ) -> Option<Diagnostic> {
     let mut has_starred: bool = false;
     let mut starred_index: Option<usize> = None;

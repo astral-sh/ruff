@@ -48,6 +48,7 @@ pub struct Context<'a> {
     pub in_deferred_type_definition: bool,
     pub in_exception_handler: bool,
     pub in_f_string: bool,
+    pub in_boolean_test: bool,
     pub in_literal: bool,
     pub in_subscript: bool,
     pub in_type_checking_block: bool,
@@ -88,6 +89,7 @@ impl<'a> Context<'a> {
             in_deferred_type_definition: false,
             in_exception_handler: false,
             in_f_string: false,
+            in_boolean_test: false,
             in_literal: false,
             in_subscript: false,
             in_type_checking_block: false,
@@ -174,8 +176,12 @@ impl<'a> Context<'a> {
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
-                        source_path.extend(call_path.into_iter().skip(1));
-                        Some(source_path)
+                        if source_path.is_empty() {
+                            None
+                        } else {
+                            source_path.extend(call_path.into_iter().skip(1));
+                            Some(source_path)
+                        }
                     } else {
                         None
                     }
@@ -191,8 +197,12 @@ impl<'a> Context<'a> {
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
-                        source_path.extend(call_path.into_iter().skip(1));
-                        Some(source_path)
+                        if source_path.is_empty() {
+                            None
+                        } else {
+                            source_path.extend(call_path.into_iter().skip(1));
+                            Some(source_path)
+                        }
                     } else {
                         None
                     }

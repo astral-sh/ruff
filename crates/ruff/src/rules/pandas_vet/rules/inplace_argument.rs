@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, StmtKind};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -82,13 +81,12 @@ pub fn inplace_argument(
                     && matches!(checker.ctx.current_stmt().node, StmtKind::Expr { .. })
                     && checker.ctx.current_expr_parent().is_none();
                 let mut diagnostic =
-                    Diagnostic::new(PandasUseOfInplaceArgument { fixable }, Range::from(keyword));
+                    Diagnostic::new(PandasUseOfInplaceArgument { fixable }, keyword.range());
                 if fixable && checker.patch(diagnostic.kind.rule()) {
                     if let Some(fix) = convert_inplace_argument_to_assignment(
                         checker.locator,
                         expr,
-                        diagnostic.location,
-                        diagnostic.end_location,
+                        diagnostic.range(),
                         args,
                         keywords,
                     ) {

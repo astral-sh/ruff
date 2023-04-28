@@ -8,13 +8,14 @@ use ignore::Error;
 use log::{debug, error, warn};
 #[cfg(not(target_family = "wasm"))]
 use rayon::prelude::*;
+use ruff_text_size::{TextRange, TextSize};
 
-use ruff::message::{Location, Message};
+use ruff::message::Message;
 use ruff::registry::Rule;
 use ruff::resolver::PyprojectDiscovery;
 use ruff::rules::pylint::pylint_cyclic_import;
 use ruff::settings::{flags, AllSettings};
-use ruff::{fs, packaging, resolver, warn_user_once, IOError, Range};
+use ruff::{fs, packaging, resolver, warn_user_once, IOError};
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::{CyclicImportHelper, ImportMap};
 use ruff_python_ast::source_code::SourceFileBuilder;
@@ -118,16 +119,14 @@ pub fn run(
                     );
                     let settings = resolver.resolve(path, pyproject_strategy);
                     if settings.rules.enabled(Rule::IOError) {
-                        let file = SourceFileBuilder::new(&path.to_string_lossy()).finish();
+                        let file =
+                            SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
 
                         Diagnostics::new(
                             vec![Message::from_diagnostic(
-                                Diagnostic::new(
-                                    IOError { message },
-                                    Range::new(Location::default(), Location::default()),
-                                ),
+                                Diagnostic::new(IOError { message }, TextRange::default()),
                                 file,
-                                1,
+                                TextSize::default(),
                             )],
                             ImportMap::default(),
                         )

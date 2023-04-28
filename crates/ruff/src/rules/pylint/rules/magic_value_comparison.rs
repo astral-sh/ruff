@@ -4,7 +4,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Unaryop};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pylint::settings::ConstantType;
@@ -81,7 +80,7 @@ pub fn magic_value_comparison(checker: &mut Checker, left: &Expr, comparators: &
                     MagicValueComparison {
                         value: unparse_expr(comparison_expr, checker.stylist),
                     },
-                    Range::from(comparison_expr),
+                    comparison_expr.range(),
                 ));
             }
         }

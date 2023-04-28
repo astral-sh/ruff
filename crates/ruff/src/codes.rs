@@ -1,7 +1,14 @@
 use crate::registry::{Linter, Rule};
+use std::fmt::Formatter;
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoqaCode(&'static str, &'static str);
+
+impl std::fmt::Debug for NoqaCode {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        std::fmt::Display::fmt(self, f)
+    }
+}
 
 impl std::fmt::Display for NoqaCode {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> Result<(), std::fmt::Error> {
@@ -203,6 +210,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "W0711") => Rule::BinaryOpException,
         (Pylint, "W1508") => Rule::InvalidEnvvarDefault,
         (Pylint, "W2901") => Rule::RedefinedLoopName,
+        (Pylint, "E0302") => Rule::UnexpectedSpecialMethodSignature,
 
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,
@@ -535,6 +543,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         // flake8-import-conventions
         (Flake8ImportConventions, "001") => Rule::UnconventionalImportAlias,
         (Flake8ImportConventions, "002") => Rule::BannedImportAlias,
+        (Flake8ImportConventions, "003") => Rule::BannedImportFrom,
 
         // flake8-datetimez
         (Flake8Datetimez, "001") => Rule::CallDatetimeWithoutTzinfo,

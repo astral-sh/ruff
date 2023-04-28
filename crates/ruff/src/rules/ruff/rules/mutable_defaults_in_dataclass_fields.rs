@@ -1,9 +1,13 @@
+use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::{call_path::compose_call_path, helpers::map_callable, types::Range};
-use ruff_python_semantic::context::Context;
+use ruff_python_ast::{call_path::compose_call_path, helpers::map_callable};
+use ruff_python_semantic::{
+    analyze::typing::{is_immutable_annotation, is_immutable_func},
+    context::Context,
+};
 
 use crate::checkers::ast::Checker;
 
@@ -62,6 +66,9 @@ impl Violation for MutableDataclassDefault {
 /// ## Why is it bad?
 /// Function calls are only performed once, at definition time. The returned
 /// value is then reused by all instances of the dataclass.
+///
+/// ## Options
+/// - `flake8-bugbear.extend-immutable-calls`
 ///
 /// ## Examples:
 /// ```python
@@ -140,30 +147,53 @@ fn is_mutable_expr(expr: &Expr) -> bool {
     )
 }
 
-const ALLOWED_FUNCS: &[&[&str]] = &[&["dataclasses", "field"]];
+const ALLOWED_DATACLASS_SPECIFIC_FUNCTIONS: &[&[&str]] = &[&["dataclasses", "field"]];
 
-fn is_allowed_func(context: &Context, func: &Expr) -> bool {
+fn is_allowed_dataclass_function(context: &Context, func: &Expr) -> bool {
     context.resolve_call_path(func).map_or(false, |call_path| {
-        ALLOWED_FUNCS
+        ALLOWED_DATACLASS_SPECIFIC_FUNCTIONS
             .iter()
             .any(|target| call_path.as_slice() == *target)
     })
 }
 
+/// Returns `true` if the given [`Expr`] is a `typing.ClassVar` annotation.
+fn is_class_var_annotation(context: &Context, annotation: &Expr) -> bool {
+    let ExprKind::Subscript { value, .. } = &annotation.node else {
+        return false;
+    };
+    context.match_typing_expr(value, "ClassVar")
+}
+
 /// RUF009
 pub fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &[Stmt]) {
+    let extend_immutable_calls: Vec<CallPath> = checker
+        .settings
+        .flake8_bugbear
+        .extend_immutable_calls
+        .iter()
+        .map(|target| from_qualified_name(target))
+        .collect();
+
     for statement in body {
         if let StmtKind::AnnAssign {
-            value: Some(expr), ..
+            annotation,
+            value: Some(expr),
+            ..
         } = &statement.node
         {
+            if is_class_var_annotation(&checker.ctx, annotation) {
+                continue;
+            }
             if let ExprKind::Call { func, .. } = &expr.node {
-                if !is_allowed_func(&checker.ctx, func) {
+                if !is_immutable_func(&checker.ctx, func, &extend_immutable_calls)
+                    && !is_allowed_dataclass_function(&checker.ctx, func)
+                {
                     checker.diagnostics.push(Diagnostic::new(
                         FunctionCallInDataclassDefaultArgument {
                             name: compose_call_path(func),
                         },
-                        Range::from(expr),
+                        expr.range(),
                     ));
                 }
             }
@@ -174,16 +204,29 @@ pub fn function_call_in_dataclass_defaults(checker: &mut Checker, body: &[Stmt])
 /// RUF008
 pub fn mutable_dataclass_default(checker: &mut Checker, body: &[Stmt]) {
     for statement in body {
-        if let StmtKind::AnnAssign {
-            value: Some(value), ..
-        }
-        | StmtKind::Assign { value, .. } = &statement.node
-        {
-            if is_mutable_expr(value) {
-                checker
-                    .diagnostics
-                    .push(Diagnostic::new(MutableDataclassDefault, Range::from(value)));
+        match &statement.node {
+            StmtKind::AnnAssign {
+                annotation,
+                value: Some(value),
+                ..
+            } => {
+                if !is_class_var_annotation(&checker.ctx, annotation)
+                    && !is_immutable_annotation(&checker.ctx, annotation)
+                    && is_mutable_expr(value)
+                {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(MutableDataclassDefault, value.range()));
+                }
             }
+            StmtKind::Assign { value, .. } => {
+                if is_mutable_expr(value) {
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(MutableDataclassDefault, value.range()));
+                }
+            }
+            _ => (),
         }
     }
 }

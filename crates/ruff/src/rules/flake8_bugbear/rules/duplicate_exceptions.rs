@@ -1,8 +1,7 @@
 use itertools::Itertools;
+use ruff_text_size::TextSize;
 use rustc_hash::{FxHashMap, FxHashSet};
-use rustpython_parser::ast::{
-    Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind, Location,
-};
+use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext, ExprKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
@@ -10,7 +9,6 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path;
 use ruff_python_ast::call_path::CallPath;
 use ruff_python_ast::helpers::unparse_expr;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -52,8 +50,8 @@ impl AlwaysAutofixableViolation for DuplicateHandlerException {
 
 fn type_pattern(elts: Vec<&Expr>) -> Expr {
     Expr::new(
-        Location::default(),
-        Location::default(),
+        TextSize::default(),
+        TextSize::default(),
         ExprKind::Tuple {
             elts: elts.into_iter().cloned().collect(),
             ctx: ExprContext::Load,
@@ -95,17 +93,16 @@ fn duplicate_handler_exceptions<'a>(
                         .sorted()
                         .collect::<Vec<String>>(),
                 },
-                Range::from(expr),
+                expr.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
-                diagnostic.set_fix(Edit::replacement(
+                diagnostic.set_fix(Edit::range_replacement(
                     if unique_elts.len() == 1 {
                         unparse_expr(unique_elts[0], checker.stylist)
                     } else {
                         unparse_expr(&type_pattern(unique_elts), checker.stylist)
                     },
-                    expr.location,
-                    expr.end_location.unwrap(),
+                    expr.range(),
                 ));
             }
             checker.diagnostics.push(diagnostic);
@@ -156,7 +153,7 @@ pub fn duplicate_exceptions(checker: &mut Checker, handlers: &[Excepthandler]) {
                     DuplicateTryBlockException {
                         name: name.join("."),
                     },
-                    Range::from(expr),
+                    expr.range(),
                 ));
             }
         }

@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -57,7 +56,7 @@ pub fn unnecessary_generator_dict(
     if let ExprKind::GeneratorExp { elt, .. } = argument {
         match &elt.node {
             ExprKind::Tuple { elts, .. } if elts.len() == 2 => {
-                let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, Range::from(expr));
+                let mut diagnostic = Diagnostic::new(UnnecessaryGeneratorDict, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     diagnostic.try_set_fix(|| {
                         fixes::fix_unnecessary_generator_dict(

@@ -348,7 +348,9 @@ impl Default for Settings {
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
         // Extract any configuration options that deal with user-defined sections.
-        let mut section_order: Vec<_> = options.section_order.unwrap_or_default();
+        let mut section_order: Vec<_> = options
+            .section_order
+            .unwrap_or_else(|| ImportType::iter().map(ImportSection::Known).collect());
         let known_first_party = options.known_first_party.unwrap_or_default();
         let known_third_party = options.known_third_party.unwrap_or_default();
         let known_local_folder = options.known_local_folder.unwrap_or_default();

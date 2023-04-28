@@ -3,7 +3,6 @@ use rustpython_parser::ast::Located;
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_stdlib::builtins::BUILTINS;
 
 use super::types::ShadowingType;
@@ -191,7 +190,7 @@ pub fn builtin_shadowing<T>(
                 }
                 .into(),
             },
-            Range::from(located),
+            located.range(),
         ))
     } else {
         None

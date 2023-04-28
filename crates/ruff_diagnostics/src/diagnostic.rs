@@ -1,14 +1,13 @@
 use anyhow::Result;
 use log::error;
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextRange, TextSize};
+
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
-use ruff_python_ast::types::Range;
-
 use crate::Fix;
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct DiagnosticKind {
     /// The identifier of the diagnostic, used to align the diagnostic with a rule.
@@ -21,21 +20,19 @@ pub struct DiagnosticKind {
     pub fixable: bool,
 }
 
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Diagnostic {
     pub kind: DiagnosticKind,
-    pub location: Location,
-    pub end_location: Location,
+    pub range: TextRange,
     pub fix: Fix,
-    pub parent: Option<Location>,
+    pub parent: Option<TextSize>,
 }
 
 impl Diagnostic {
-    pub fn new<T: Into<DiagnosticKind>>(kind: T, range: Range) -> Self {
+    pub fn new<T: Into<DiagnosticKind>>(kind: T, range: TextRange) -> Self {
         Self {
             kind: kind.into(),
-            location: range.location,
-            end_location: range.end_location,
+            range,
             fix: Fix::empty(),
             parent: None,
         }
@@ -65,9 +62,21 @@ impl Diagnostic {
         }
     }
 
+    pub const fn range(&self) -> TextRange {
+        self.range
+    }
+
+    pub const fn start(&self) -> TextSize {
+        self.range.start()
+    }
+
+    pub const fn end(&self) -> TextSize {
+        self.range.end()
+    }
+
     /// Set the location of the diagnostic's parent node.
     #[inline]
-    pub fn set_parent(&mut self, parent: Location) {
+    pub fn set_parent(&mut self, parent: TextSize) {
         self.parent = Some(parent);
     }
 }

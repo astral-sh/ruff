@@ -1,6 +1,5 @@
 use ruff_formatter::prelude::*;
 use ruff_formatter::{write, Format};
-use ruff_python_ast::types::Range;
 use ruff_text_size::{TextRange, TextSize};
 
 use crate::context::ASTFormatContext;
@@ -68,25 +67,22 @@ pub fn statements(suite: &[Stmt]) -> Statements {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct Literal {
-    range: Range,
+    range: TextRange,
 }
 
 impl Format<ASTFormatContext<'_>> for Literal {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
         let text = f.context().contents();
-        let locator = f.context().locator();
-        let start_index = locator.offset(self.range.location);
-        let end_index = locator.offset(self.range.end_location);
 
         f.write_element(FormatElement::StaticTextSlice {
             text,
-            range: TextRange::new(start_index, end_index),
+            range: self.range,
         })
     }
 }
 
 #[inline]
-pub const fn literal(range: Range) -> Literal {
+pub const fn literal(range: TextRange) -> Literal {
     Literal { range }
 }
 

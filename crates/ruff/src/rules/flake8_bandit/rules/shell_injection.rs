@@ -1,13 +1,12 @@
 //! Checks relating to shell injection.
 
-use num_bigint::BigInt;
 use once_cell::sync::Lazy;
 use regex::Regex;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_python_ast::helpers::Truthiness;
 use ruff_python_semantic::context::Context;
 
 use crate::{
@@ -131,74 +130,6 @@ fn get_call_kind(func: &Expr, context: &Context) -> Option<CallKind> {
 }
 
 #[derive(Copy, Clone, Debug)]
-enum Truthiness {
-    // The `shell` keyword argument is set and evaluates to `False`.
-    Falsey,
-    // The `shell` keyword argument is set and evaluates to `True`.
-    Truthy,
-    // The `shell` keyword argument is set, but its value is unknown.
-    Unknown,
-}
-
-impl From<&Keyword> for Truthiness {
-    fn from(value: &Keyword) -> Self {
-        match &value.node.value.node {
-            ExprKind::Constant {
-                value: Constant::Bool(b),
-                ..
-            } => {
-                if *b {
-                    Truthiness::Truthy
-                } else {
-                    Truthiness::Falsey
-                }
-            }
-            ExprKind::Constant {
-                value: Constant::Int(int),
-                ..
-            } => {
-                if int == &BigInt::from(0u8) {
-                    Truthiness::Falsey
-                } else {
-                    Truthiness::Truthy
-                }
-            }
-            ExprKind::Constant {
-                value: Constant::Float(float),
-                ..
-            } => {
-                if (float - 0.0).abs() < f64::EPSILON {
-                    Truthiness::Falsey
-                } else {
-                    Truthiness::Truthy
-                }
-            }
-            ExprKind::Constant {
-                value: Constant::None,
-                ..
-            } => Truthiness::Falsey,
-            ExprKind::List { elts, .. }
-            | ExprKind::Set { elts, .. }
-            | ExprKind::Tuple { elts, .. } => {
-                if elts.is_empty() {
-                    Truthiness::Falsey
-                } else {
-                    Truthiness::Truthy
-                }
-            }
-            ExprKind::Dict { keys, .. } => {
-                if keys.is_empty() {
-                    Truthiness::Falsey
-                } else {
-                    Truthiness::Truthy
-                }
-            }
-            _ => Truthiness::Unknown,
-        }
-    }
-}
-
-#[derive(Copy, Clone, Debug)]
 struct ShellKeyword<'a> {
     /// Whether the `shell` keyword argument is set and evaluates to `True`.
     truthiness: Truthiness,
@@ -207,7 +138,7 @@ struct ShellKeyword<'a> {
 }
 
 /// Return the `shell` keyword argument to the given function call, if any.
-fn find_shell_keyword(keywords: &[Keyword]) -> Option<ShellKeyword> {
+fn find_shell_keyword<'a>(ctx: &Context, keywords: &'a [Keyword]) -> Option<ShellKeyword<'a>> {
     keywords
         .iter()
         .find(|keyword| {
@@ -218,7 +149,7 @@ fn find_shell_keyword(keywords: &[Keyword]) -> Option<ShellKeyword> {
                 .map_or(false, |arg| arg == "shell")
         })
         .map(|keyword| ShellKeyword {
-            truthiness: keyword.into(),
+            truthiness: Truthiness::from_expr(&keyword.node.value, |id| ctx.is_builtin(id)),
             keyword,
         })
 }
@@ -255,7 +186,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
 
     if matches!(call_kind, Some(CallKind::Subprocess)) {
         if let Some(arg) = args.first() {
-            match find_shell_keyword(keywords) {
+            match find_shell_keyword(&checker.ctx, keywords) {
                 // S602
                 Some(ShellKeyword {
                     truthiness: Truthiness::Truthy,
@@ -270,7 +201,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                             SubprocessPopenWithShellEqualsTrue {
                                 seems_safe: shell_call_seems_safe(arg),
                             },
-                            Range::from(keyword),
+                            keyword.range(),
                         ));
                     }
                 }
@@ -286,7 +217,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
-                            Range::from(keyword),
+                            keyword.range(),
                         ));
                     }
                 }
@@ -299,7 +230,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                     {
                         checker.diagnostics.push(Diagnostic::new(
                             SubprocessWithoutShellEqualsTrue,
-                            Range::from(arg),
+                            arg.range(),
                         ));
                     }
                 }
@@ -308,7 +239,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
     } else if let Some(ShellKeyword {
         truthiness: Truthiness::Truthy,
         keyword,
-    }) = find_shell_keyword(keywords)
+    }) = find_shell_keyword(&checker.ctx, keywords)
     {
         // S604
         if checker
@@ -316,10 +247,9 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
             .rules
             .enabled(Rule::CallWithShellEqualsTrue)
         {
-            checker.diagnostics.push(Diagnostic::new(
-                CallWithShellEqualsTrue,
-                Range::from(keyword),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(CallWithShellEqualsTrue, keyword.range()));
         }
     }
 
@@ -331,7 +261,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
                     StartProcessWithAShell {
                         seems_safe: shell_call_seems_safe(arg),
                     },
-                    Range::from(arg),
+                    arg.range(),
                 ));
             }
         }
@@ -346,7 +276,7 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
         {
             checker
                 .diagnostics
-                .push(Diagnostic::new(StartProcessWithNoShell, Range::from(func)));
+                .push(Diagnostic::new(StartProcessWithNoShell, func.range()));
         }
     }
 
@@ -360,10 +290,9 @@ pub fn shell_injection(checker: &mut Checker, func: &Expr, args: &[Expr], keywor
             {
                 if let Some(value) = try_string_literal(arg) {
                     if FULL_PATH_REGEX.find(value).is_none() {
-                        checker.diagnostics.push(Diagnostic::new(
-                            StartProcessWithPartialPath,
-                            Range::from(arg),
-                        ));
+                        checker
+                            .diagnostics
+                            .push(Diagnostic::new(StartProcessWithPartialPath, arg.range()));
                     }
                 }
             }

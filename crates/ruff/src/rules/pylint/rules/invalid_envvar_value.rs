@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Operator};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -101,7 +100,7 @@ pub fn invalid_envvar_value(
         if !is_valid_key(expr) {
             checker
                 .diagnostics
-                .push(Diagnostic::new(InvalidEnvvarValue, Range::from(expr)));
+                .push(Diagnostic::new(InvalidEnvvarValue, expr.range()));
         }
     }
 }

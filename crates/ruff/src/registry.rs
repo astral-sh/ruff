@@ -188,6 +188,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::RedefinedLoopName,
     rules::pylint::rules::LoggingTooFewArgs,
     rules::pylint::rules::LoggingTooManyArgs,
+    rules::pylint::rules::UnexpectedSpecialMethodSignature,
     // flake8-builtins
     rules::flake8_builtins::rules::BuiltinVariableShadowing,
     rules::flake8_builtins::rules::BuiltinArgumentShadowing,
@@ -492,6 +493,7 @@ ruff_macros::register_rules!(
     // flake8-import-conventions
     rules::flake8_import_conventions::rules::UnconventionalImportAlias,
     rules::flake8_import_conventions::rules::BannedImportAlias,
+    rules::flake8_import_conventions::rules::BannedImportFrom,
     // flake8-datetimez
     rules::flake8_datetimez::rules::CallDatetimeWithoutTzinfo,
     rules::flake8_datetimez::rules::CallDatetimeToday,

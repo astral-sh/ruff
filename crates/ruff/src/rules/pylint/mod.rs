@@ -61,6 +61,7 @@ mod tests {
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"); "PLR0912")]
     #[test_case(Rule::TooManyReturnStatements, Path::new("too_many_return_statements.py"); "PLR0911")]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"); "PLR0915")]
+    #[test_case(Rule::UnexpectedSpecialMethodSignature, Path::new("unexpected_special_method_signature.py"); "PLE0302")]
     #[test_case(Rule::UnnecessaryDirectLambdaCall, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
     #[test_case(Rule::LoadBeforeGlobalDeclaration, Path::new("load_before_global_declaration.py"); "PLE0118")]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]

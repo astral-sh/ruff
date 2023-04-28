@@ -4,7 +4,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::SimpleCallArgs;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -40,10 +39,9 @@ pub fn snmp_insecure_version(
             } = &mp_model_arg.node
             {
                 if value.is_zero() || value.is_one() {
-                    checker.diagnostics.push(Diagnostic::new(
-                        SnmpInsecureVersion,
-                        Range::from(mp_model_arg),
-                    ));
+                    checker
+                        .diagnostics
+                        .push(Diagnostic::new(SnmpInsecureVersion, mp_model_arg.range()));
                 }
             }
         }

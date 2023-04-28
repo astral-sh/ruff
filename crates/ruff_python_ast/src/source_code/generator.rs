@@ -3,14 +3,16 @@
 use std::ops::Deref;
 
 use rustpython_parser::ast::{
-    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, ConversionFlag, Excepthandler,
+    Alias, Arg, Arguments, Boolop, Cmpop, Comprehension, Constant, Excepthandler,
     ExcepthandlerKind, Expr, ExprKind, MatchCase, Operator, Pattern, PatternKind, Stmt, StmtKind,
     Suite, Withitem,
 };
+use rustpython_parser::ConversionFlag;
 
+use crate::newlines::LineEnding;
 use ruff_rustpython::vendor::{bytes, str};
 
-use crate::source_code::stylist::{Indentation, LineEnding, Quote, Stylist};
+use crate::source_code::stylist::{Indentation, Quote, Stylist};
 
 mod precedence {
     pub const ASSIGN: u8 = 3;
@@ -1255,9 +1257,10 @@ impl<'a> Generator<'a> {
 
 #[cfg(test)]
 mod tests {
+    use crate::newlines::LineEnding;
     use rustpython_parser as parser;
 
-    use crate::source_code::stylist::{Indentation, LineEnding, Quote};
+    use crate::source_code::stylist::{Indentation, Quote};
     use crate::source_code::Generator;
 
     fn round_trip(contents: &str) -> String {

@@ -7,7 +7,6 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers::SimpleCallArgs;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -114,7 +113,7 @@ pub fn bad_file_permissions(
                 if (int_value & WRITE_WORLD > 0) || (int_value & EXECUTE_GROUP > 0) {
                     checker.diagnostics.push(Diagnostic::new(
                         BadFilePermissions { mask: int_value },
-                        Range::from(mode_arg),
+                        mode_arg.range(),
                     ));
                 }
             }
