@@ -332,7 +332,7 @@ impl<'a> Context<'a> {
 
     /// Push a [`Scope`] with the given [`ScopeKind`] onto the stack.
     pub fn push_scope(&mut self, kind: ScopeKind<'a>) {
-        let id = self.scopes.push_scope(self.scope_id, kind);
+        let id = self.scopes.push_scope(kind, self.scope_id);
         self.scope_id = id;
     }
 
@@ -389,26 +389,17 @@ impl<'a> Context<'a> {
         &self.scopes[self.scope_id]
     }
 
-    /// Returns the id of the top-most scope
-    pub fn scope_id(&self) -> ScopeId {
-        self.scope_id
-    }
-
     /// Returns a mutable reference to the current top most scope.
     pub fn scope_mut(&mut self) -> &mut Scope<'a> {
         &mut self.scopes[self.scope_id]
     }
 
-    pub fn parent_scope(&self) -> Option<&Scope> {
-        self.scopes[self.scope_id]
-            .parent
-            .map(|index| &self.scopes[index])
-    }
-
+    /// Returns an iterator over all scopes, starting from the current scope.
     pub fn scopes(&self) -> impl Iterator<Item = &Scope> {
         self.scopes.ancestor_scopes(self.scope_id)
     }
 
+    /// Returns `true` if the context is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.in_exception_handler
     }

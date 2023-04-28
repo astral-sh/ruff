@@ -208,8 +208,7 @@ where
             &stmt.node,
             StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
         ) {
-            let scope_id = self.ctx.scope_id();
-            if scope_id.is_global() && self.ctx.current_stmt_parent().is_none() {
+            if self.ctx.scope_id.is_global() && self.ctx.current_stmt_parent().is_none() {
                 self.importer.visit_import(stmt);
             }
         }
@@ -217,13 +216,12 @@ where
         // Pre-visit.
         match &stmt.node {
             StmtKind::Global { names } => {
-                let scope_id = self.ctx.scope_id();
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
-                if !scope_id.is_global() {
+                if !self.ctx.scope_id.is_global() {
                     // Add the binding to the current scope.
                     let context = self.ctx.execution_context();
                     let exceptions = self.ctx.exceptions();
-                    let scope = &mut self.ctx.scopes[scope_id];
+                    let scope = &mut self.ctx.scopes[self.ctx.scope_id];
                     let usage = Some((scope.id, stmt.range()));
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let id = self.ctx.bindings.push(Binding {
@@ -248,12 +246,11 @@ where
                 }
             }
             StmtKind::Nonlocal { names } => {
-                let scope_id = self.ctx.scope_id();
                 let ranges: Vec<TextRange> = helpers::find_names(stmt, self.locator).collect();
-                if !scope_id.is_global() {
+                if !self.ctx.scope_id.is_global() {
                     let context = self.ctx.execution_context();
                     let exceptions = self.ctx.exceptions();
-                    let scope = &mut self.ctx.scopes[scope_id];
+                    let scope = &mut self.ctx.scopes[self.ctx.scope_id];
                     let usage = Some((scope.id, stmt.range()));
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
@@ -276,7 +273,7 @@ where
                         let binding_id = self
                             .ctx
                             .scopes
-                            .ancestors(scope_id)
+                            .ancestors(self.ctx.scope_id)
                             .skip(1)
                             .take_while(|scope_id| !scope_id.is_global())
                             .find_map(|scope_id| {
@@ -907,7 +904,7 @@ where
                                 kind: BindingKind::FutureImportation,
                                 runtime_usage: None,
                                 // Always mark `__future__` imports as used.
-                                synthetic_usage: Some((self.ctx.scope_id(), alias.range())),
+                                synthetic_usage: Some((self.ctx.scope_id, alias.range())),
                                 typing_usage: None,
                                 range: alias.range(),
                                 source: Some(*self.ctx.current_stmt()),
@@ -962,7 +959,7 @@ where
                                 kind: BindingKind::Importation(Importation { name, full_name }),
                                 runtime_usage: None,
                                 synthetic_usage: if is_explicit_reexport {
-                                    Some((self.ctx.scope_id(), alias.range()))
+                                    Some((self.ctx.scope_id, alias.range()))
                                 } else {
                                     None
                                 },
@@ -1218,7 +1215,7 @@ where
                                 kind: BindingKind::FutureImportation,
                                 runtime_usage: None,
                                 // Always mark `__future__` imports as used.
-                                synthetic_usage: Some((self.ctx.scope_id(), alias.range())),
+                                synthetic_usage: Some((self.ctx.scope_id, alias.range())),
                                 typing_usage: None,
                                 range: alias.range(),
                                 source: Some(*self.ctx.current_stmt()),
@@ -1311,7 +1308,7 @@ where
                                 }),
                                 runtime_usage: None,
                                 synthetic_usage: if is_explicit_reexport {
-                                    Some((self.ctx.scope_id(), alias.range()))
+                                    Some((self.ctx.scope_id, alias.range()))
                                 } else {
                                     None
                                 },
