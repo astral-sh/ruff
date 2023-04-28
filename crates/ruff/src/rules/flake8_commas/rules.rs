@@ -171,7 +171,7 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
 /// })
 /// ```
 /// 
-/// For the case that a tuple was expected then use instead:
+/// For the case that a tuple was intended then use instead:
 /// ```python
 /// import json
 /// 
