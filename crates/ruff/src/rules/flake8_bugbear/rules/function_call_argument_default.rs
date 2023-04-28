@@ -1,4 +1,3 @@
-use ruff_python_semantic::analyze::typing::is_immutable_func;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
@@ -9,22 +8,23 @@ use ruff_python_ast::call_path::from_qualified_name;
 use ruff_python_ast::call_path::{compose_call_path, CallPath};
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_semantic::analyze::typing::is_immutable_func;
 
 use crate::checkers::ast::Checker;
-
-use super::mutable_argument_default::is_mutable_func;
+use crate::rules::flake8_bugbear::rules::mutable_argument_default::is_mutable_func;
 
 /// ## What it does
-/// Checks for function calls in function defaults.
+/// Checks for function calls in default function arguments.
 ///
 /// ## Why is it bad?
-/// The function calls in the defaults are only performed once, at definition
-/// time. The returned value is then reused by all calls to the function.
+/// Any function call that's used in a default argument will only be performed
+/// once, at definition time. The returned value will then be reused by all
+/// calls to the function, which can lead to unexpected behaviour.
 ///
 /// ## Options
 /// - `flake8-bugbear.extend-immutable-calls`
 ///
-/// ## Examples:
+/// ## Example
 /// ```python
 /// def create_list() -> list[int]:
 ///     return [1, 2, 3]
@@ -44,8 +44,8 @@ use super::mutable_argument_default::is_mutable_func;
 ///     return arg
 /// ```
 ///
-/// Alternatively, if you _want_ the shared behaviour, make it more obvious
-/// by assigning it to a module-level variable:
+/// Alternatively, if shared behavior is desirable, clarify the intent by
+/// assigning to a module-level variable:
 /// ```python
 /// I_KNOW_THIS_IS_SHARED_STATE = create_list()
 ///
