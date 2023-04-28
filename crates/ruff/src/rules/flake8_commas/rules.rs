@@ -191,6 +191,22 @@ impl Violation for TrailingCommaOnBareTuple {
     }
 }
 
+/// ## What it does
+/// Checks for prohibited trailing commas.
+///
+/// ## Why is this bad?
+/// Trailing commas are not essential in some cases and can therefore be viewed as unnecessary
+/// so can be removed.
+///
+/// ## Example
+/// ```python
+/// foo = (1, 2, 3,)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = (1, 2, 3)
+/// ```
 #[violation]
 pub struct ProhibitedTrailingComma;
 
