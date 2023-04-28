@@ -7,6 +7,27 @@ use ruff_python_ast::helpers::is_const_none;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for `print` statements.
+///
+/// ## Why is this bad?
+/// `print` statements are useful in some situations (e.g. debugging), but they have a few downsides:
+/// - They can make it harder to maintain code as it can be challenging to keep track of numerous
+/// print statements as a codebase grows larger.
+/// - `print` statements can be slow, especially if they are printing large amounts of information.
+///
+/// ## Example
+/// ```python
+/// def add_numbers(a, b):
+///     print(f"The sum of {a} and {b} is {a + b}")
+///     return a + b
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def add_numbers(a, b):
+///     return a + b
+/// ```
 #[violation]
 pub struct Print;
 
