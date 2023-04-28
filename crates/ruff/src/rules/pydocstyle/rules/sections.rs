@@ -584,7 +584,7 @@ fn common_section(
     checker: &mut Checker,
     docstring: &Docstring,
     context: &SectionContext,
-    next_context: Option<&SectionContext>,
+    next: Option<&SectionContext>,
 ) {
     if checker.settings.rules.enabled(Rule::CapitalizeSectionName) {
         let capitalized_section_name = context.kind().as_str();
@@ -631,7 +631,7 @@ fn common_section(
     let line_end = checker.stylist.line_ending().as_str();
     let last_line = context.following_lines().last();
     if last_line.map_or(true, |line| !line.trim().is_empty()) {
-        if let Some(next_context) = next_context {
+        if let Some(next) = next {
             if checker
                 .settings
                 .rules
@@ -645,10 +645,7 @@ fn common_section(
                 );
                 if checker.patch(diagnostic.kind.rule()) {
                     // Add a newline at the beginning of the next section.
-                    diagnostic.set_fix(Edit::insertion(
-                        line_end.to_string(),
-                        next_context.range().start(),
-                    ));
+                    diagnostic.set_fix(Edit::insertion(line_end.to_string(), next.range().start()));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -872,9 +869,9 @@ fn numpy_section(
     checker: &mut Checker,
     docstring: &Docstring,
     context: &SectionContext,
-    next_context: Option<&SectionContext>,
+    next: Option<&SectionContext>,
 ) {
-    common_section(checker, docstring, context, next_context);
+    common_section(checker, docstring, context, next);
 
     if checker
         .settings
@@ -913,9 +910,9 @@ fn google_section(
     checker: &mut Checker,
     docstring: &Docstring,
     context: &SectionContext,
-    next_context: Option<&SectionContext>,
+    next: Option<&SectionContext>,
 ) {
-    common_section(checker, docstring, context, next_context);
+    common_section(checker, docstring, context, next);
 
     if checker.settings.rules.enabled(Rule::SectionNameEndsInColon) {
         let suffix = context.summary_after_section_name();
@@ -944,12 +941,9 @@ fn parse_numpy_sections(
     docstring: &Docstring,
     section_contexts: &SectionContexts,
 ) {
-    for (curr, next) in section_contexts.iter().tuple_windows() {
-        numpy_section(checker, docstring, &curr, Some(&next));
-
-        if next.is_last() {
-            numpy_section(checker, docstring, &next, None);
-        }
+    let mut iterator = section_contexts.iter().peekable();
+    while let Some(context) = iterator.next() {
+        numpy_section(checker, docstring, &context, iterator.peek());
     }
 }
 
@@ -958,12 +952,9 @@ fn parse_google_sections(
     docstring: &Docstring,
     section_contexts: &SectionContexts,
 ) {
-    for (curr, next) in section_contexts.iter().tuple_windows() {
-        google_section(checker, docstring, &curr, Some(&next));
-
-        if next.is_last() {
-            google_section(checker, docstring, &next, None);
-        }
+    let mut iterator = section_contexts.iter().peekable();
+    while let Some(context) = iterator.next() {
+        google_section(checker, docstring, &context, iterator.peek());
     }
 
     if checker.settings.rules.enabled(Rule::UndocumentedParam) {
