@@ -170,11 +170,11 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
 ///     "bar": 1,
 /// })
 /// ```
-/// 
+///
 /// For the case that a tuple was intended then use instead:
 /// ```python
 /// import json
-/// 
+///
 /// foo = (
 ///     json.dumps({
 ///         "bar": 1,
