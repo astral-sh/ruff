@@ -1,3 +1,4 @@
+use ruff_python_semantic::analyze::typing::is_immutable_func;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Arguments, Constant, Expr, ExprKind};
 
@@ -13,6 +14,45 @@ use crate::checkers::ast::Checker;
 
 use super::mutable_argument_default::is_mutable_func;
 
+/// ## What it does
+/// Checks for function calls in function defaults.
+///
+/// ## Why is it bad?
+/// The function calls in the defaults are only performed once, at definition
+/// time. The returned value is then reused by all calls to the function.
+///
+/// ## Options
+/// - `flake8-bugbear.extend-immutable-calls`
+///
+/// ## Examples:
+/// ```python
+/// def create_list() -> list[int]:
+///     return [1, 2, 3]
+///
+/// def mutable_default(arg: list[int] = create_list()) -> list[int]:
+///     arg.append(4)
+///     return arg
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def better(arg: list[int] | None = None) -> list[int]:
+///     if arg is None:
+///         arg = create_list()
+///
+///     arg.append(4)
+///     return arg
+/// ```
+///
+/// Alternatively, if you _want_ the shared behaviour, make it more obvious
+/// by assigning it to a module-level variable:
+/// ```python
+/// I_KNOW_THIS_IS_SHARED_STATE = create_list()
+///
+/// def mutable_default(arg: list[int] = I_KNOW_THIS_IS_SHARED_STATE) -> list[int]:
+///     arg.append(4)
+///     return arg
+/// ```
 #[violation]
 pub struct FunctionCallInDefaultArgument {
     pub name: Option<String>,
@@ -30,35 +70,6 @@ impl Violation for FunctionCallInDefaultArgument {
     }
 }
 
-const IMMUTABLE_FUNCS: &[&[&str]] = &[
-    &["", "tuple"],
-    &["", "frozenset"],
-    &["datetime", "date"],
-    &["datetime", "datetime"],
-    &["datetime", "timedelta"],
-    &["decimal", "Decimal"],
-    &["operator", "attrgetter"],
-    &["operator", "itemgetter"],
-    &["operator", "methodcaller"],
-    &["pathlib", "Path"],
-    &["types", "MappingProxyType"],
-    &["re", "compile"],
-];
-
-fn is_immutable_func(checker: &Checker, func: &Expr, extend_immutable_calls: &[CallPath]) -> bool {
-    checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            IMMUTABLE_FUNCS
-                .iter()
-                .any(|target| call_path.as_slice() == *target)
-                || extend_immutable_calls
-                    .iter()
-                    .any(|target| call_path == *target)
-        })
-}
-
 struct ArgumentDefaultVisitor<'a> {
     checker: &'a Checker<'a>,
     diagnostics: Vec<(DiagnosticKind, TextRange)>,
@@ -73,7 +84,7 @@ where
         match &expr.node {
             ExprKind::Call { func, args, .. } => {
                 if !is_mutable_func(self.checker, func)
-                    && !is_immutable_func(self.checker, func, &self.extend_immutable_calls)
+                    && !is_immutable_func(&self.checker.ctx, func, &self.extend_immutable_calls)
                     && !is_nan_or_infinity(func, args)
                 {
                     self.diagnostics.push((
