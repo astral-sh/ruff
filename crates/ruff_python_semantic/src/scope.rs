@@ -10,6 +10,7 @@ use crate::binding::{BindingId, StarImportation};
 pub struct Scope<'a> {
     pub id: ScopeId,
     pub kind: ScopeKind<'a>,
+    pub parent: Option<ScopeId>,
     /// Whether this scope uses the `locals()` builtin.
     pub uses_locals: bool,
     /// A list of star imports in this scope. These represent _module_ imports (e.g., `sys` in
@@ -26,6 +27,7 @@ impl<'a> Scope<'a> {
         Scope {
             id: ScopeId::global(),
             kind: ScopeKind::Module,
+            parent: None,
             uses_locals: false,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
@@ -33,10 +35,11 @@ impl<'a> Scope<'a> {
         }
     }
 
-    pub fn local(id: ScopeId, kind: ScopeKind<'a>) -> Self {
+    pub fn local(id: ScopeId, parent: ScopeId, kind: ScopeKind<'a>) -> Self {
         Scope {
             id,
             kind,
+            parent: Some(parent),
             uses_locals: false,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
@@ -183,7 +186,7 @@ pub struct Lambda<'a> {
 
 /// The scopes of a program indexed by [`ScopeId`]
 #[derive(Debug)]
-pub struct Scopes<'a>(Vec<Scope<'a>>, Vec<ScopeId>);
+pub struct Scopes<'a>(Vec<Scope<'a>>);
 
 impl<'a> Scopes<'a> {
     /// Returns a reference to the global scope
@@ -199,33 +202,26 @@ impl<'a> Scopes<'a> {
     /// Pushes a new scope and returns its unique id
     pub fn push_scope(&mut self, parent: ScopeId, kind: ScopeKind<'a>) -> ScopeId {
         let next_id = ScopeId::try_from(self.0.len()).unwrap();
-        self.0.push(Scope::local(next_id, kind));
-        self.1.push(parent);
+        self.0.push(Scope::local(next_id, parent, kind));
         next_id
     }
 
     /// Returns an iterator over all [`ScopeId`] ancestors, starting from the given [`ScopeId`].
     pub fn ancestors(&self, scope: ScopeId) -> impl Iterator<Item = ScopeId> + '_ {
-        std::iter::successors(Some(scope), |&scope| self.parent(scope))
+        std::iter::successors(Some(scope), |&scope| self[scope].parent)
     }
 
     /// Returns an iterator over all [`Scope`] ancestors, starting from the given [`ScopeId`].
     pub fn ancestor_scopes(&self, scope: ScopeId) -> impl Iterator<Item = &Scope> + '_ {
-        self.ancestors(scope).map(move |scope| &self[scope])
-    }
-
-    pub fn parent(&self, scope: ScopeId) -> Option<ScopeId> {
-        if scope.is_global() {
-            None
-        } else {
-            Some(self.1[usize::from(scope) - 1])
-        }
+        std::iter::successors(Some(&self[scope]), |&scope| {
+            scope.parent.map(|parent| &self[parent])
+        })
     }
 }
 
 impl Default for Scopes<'_> {
     fn default() -> Self {
-        Self(vec![Scope::global()], Vec::new())
+        Self(vec![Scope::global()])
     }
 }
 

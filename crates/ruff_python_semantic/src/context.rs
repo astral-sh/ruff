@@ -339,9 +339,8 @@ impl<'a> Context<'a> {
     /// Pop the current [`Scope`] off the stack.
     pub fn pop_scope(&mut self) {
         self.dead_scopes.push(self.scope_id);
-        self.scope_id = self
-            .scopes
-            .parent(self.scope_id)
+        self.scope_id = self.scopes[self.scope_id]
+            .parent
             .expect("Attempted to pop without scope");
     }
 
@@ -401,9 +400,9 @@ impl<'a> Context<'a> {
     }
 
     pub fn parent_scope(&self) -> Option<&Scope> {
-        self.scopes
-            .parent(self.scope_id)
-            .map(|scope_id| &self.scopes[scope_id])
+        self.scopes[self.scope_id]
+            .parent
+            .map(|index| &self.scopes[index])
     }
 
     pub fn scopes(&self) -> impl Iterator<Item = &Scope> {

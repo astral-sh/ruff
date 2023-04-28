@@ -27,12 +27,12 @@ pub fn undefined_local(checker: &mut Checker, name: &str) {
         return;
     }
 
-    let Some(parent_scope_id) = checker.ctx.scopes.parent(current.id) else {
+    let Some(parent) = current.parent else {
         return;
     };
 
     // For every function and module scope above us...
-    for scope_id in checker.ctx.scopes.ancestors(parent_scope_id) {
+    for scope_id in checker.ctx.scopes.ancestors(parent) {
         let scope = &checker.ctx.scopes[scope_id];
         if !(scope.kind.is_function() || scope.kind.is_module()) {
             continue;
