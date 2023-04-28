@@ -38,6 +38,34 @@ impl Violation for Print {
     }
 }
 
+/// ## What it does
+/// Checks for `pprint` statements.
+///
+/// ## Why is this bad?
+/// Like print statements, `pprint` statements are useful in some situations (e.g. debugging), but
+/// they have a few downsides:
+/// - They can make it harder to maintain code as it can be challenging to keep track of numerous
+/// `pprint` (and `print`) statements as a codebase grows larger.
+/// - `pprint` statements can be slow, especially if they are printing large amounts of information.
+///
+///
+/// ## Example
+/// ```python
+/// import pprint
+///
+/// def merge_dicts(dict_a, dict_b):
+///     dict_c = {**dict_a, **dict_b}
+///     pprint.pprint(dict_c)
+///     return dict_c
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def merge_dicts(dict_a, dict_b):
+///     dict_c = {**dict_a, **dict_b}
+///     pprint.pprint(dict_c)
+///     return dict_c
+/// ```
 #[violation]
 pub struct PPrint;
 
