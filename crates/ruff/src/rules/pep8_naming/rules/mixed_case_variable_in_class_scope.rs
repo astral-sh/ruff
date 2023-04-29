@@ -6,6 +6,36 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
 
+/// ## What it does
+/// Checks for class variable names that follow the `mixedCase` convention.
+///
+/// ## Why is this bad?
+/// [PEP 8] recommends that variable names should be lower case and seperated
+/// by underscores (also known as `snake_case`).
+///
+/// > Function names should be lowercase, with words separated by underscores
+/// as necessary to improve readability.
+/// >
+/// > Variable names follow the same convention as function names.
+/// >
+/// > mixedCase is allowed only in contexts where that’s already the
+/// prevailing style (e.g. threading.py), to retain backwards compatibility.
+///
+/// ## Example
+/// ```python
+/// class MyClass:
+///     myVariable = "hello"
+///     another_variable = "world"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class MyClass:
+///     my_variable = "hello"
+///     another_variable = "world"
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[violation]
 pub struct MixedCaseVariableInClassScope {
     pub name: String,
