@@ -120,6 +120,34 @@ impl Violation for UnusedClassMethodArgument {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of unused arguments in a static method.
+///
+/// ## Why is this bad?
+/// An argument that is defined but not used is likely a mistake, and should
+/// be removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// class MyClass:
+///     @staticmethod
+///     def my_static_method(self, arg1, arg2):
+///         print(arg1)
+/// 
+///     def other_method(self):
+///         self.my_static_method("foo", "bar")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class MyClass:
+///     @static
+///     def my_static_method(self, arg1):
+///         print(arg1)
+/// 
+///     def other_method(self):
+///         self.my_static_method("foo", "bar")
+/// ```
 #[violation]
 pub struct UnusedStaticMethodArgument {
     pub name: String,
