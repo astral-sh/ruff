@@ -50,7 +50,7 @@ pub fn type_comment_in_stub(tokens: &[LexResult]) -> Vec<Diagnostic> {
 }
 
 static TYPE_COMMENT_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#\s*(type|pyright):\s*([^#]+)(\s*#.*?)?$").unwrap());
+    Lazy::new(|| Regex::new(r"^#\s*type:\s*([^#]+)(\s*#.*?)?$").unwrap());
 
 static TYPE_IGNORE_REGEX: Lazy<Regex> =
-    Lazy::new(|| Regex::new(r"^#\s*(type|pyright):\s*ignore([^#]+)?(\s*#.*?)?$").unwrap());
+    Lazy::new(|| Regex::new(r"^#\s*type:\s*ignore([^#]+)?(\s*#.*?)?$").unwrap());
