@@ -79,6 +79,34 @@ impl Violation for UnusedMethodArgument {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of unused arguments in a class method.
+///
+/// ## Why is this bad?
+/// An argument that is defined but not used is likely a mistake, and should
+/// be removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// class MyClass:
+///     @classmethod
+///     def my_method(self, arg1, arg2):
+///         print(arg1)
+/// 
+///     def other_method(self):
+///         self.my_method("foo", "bar")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class MyClass:
+///     @classmethod
+///     def my_method(self, arg1):
+///         print(arg1)
+/// 
+///     def other_method(self):
+///         self.my_method("foo", "bar")
+/// ```
 #[violation]
 pub struct UnusedClassMethodArgument {
     pub name: String,
