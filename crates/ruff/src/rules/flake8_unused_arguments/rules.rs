@@ -92,7 +92,7 @@ impl Violation for UnusedMethodArgument {
 ///     @classmethod
 ///     def my_method(self, arg1, arg2):
 ///         print(arg1)
-/// 
+///
 ///     def other_method(self):
 ///         self.my_method("foo", "bar")
 /// ```
@@ -103,7 +103,7 @@ impl Violation for UnusedMethodArgument {
 ///     @classmethod
 ///     def my_method(self, arg1):
 ///         print(arg1)
-/// 
+///
 ///     def other_method(self):
 ///         self.my_method("foo", "bar")
 /// ```
@@ -133,7 +133,7 @@ impl Violation for UnusedClassMethodArgument {
 ///     @staticmethod
 ///     def my_static_method(self, arg1, arg2):
 ///         print(arg1)
-/// 
+///
 ///     def other_method(self):
 ///         self.my_static_method("foo", "bar")
 /// ```
@@ -144,7 +144,7 @@ impl Violation for UnusedClassMethodArgument {
 ///     @static
 ///     def my_static_method(self, arg1):
 ///         print(arg1)
-/// 
+///
 ///     def other_method(self):
 ///         self.my_static_method("foo", "bar")
 /// ```
