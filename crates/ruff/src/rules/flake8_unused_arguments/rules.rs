@@ -17,7 +17,7 @@ use super::helpers;
 use super::types::Argumentable;
 
 /// ## What it does
-/// Checks for the presence of unused arguments in function scopes.
+/// Checks for the presence of unused arguments in function definitions.
 ///
 /// ## Why is this bad?
 /// An argument that is defined but not used is likely a mistake, and should
@@ -48,7 +48,7 @@ impl Violation for UnusedFunctionArgument {
 }
 
 /// ## What it does
-/// Checks for the presence of unused arguments in a method.
+/// Checks for the presence of unused arguments in instance method definitions.
 ///
 /// ## Why is this bad?
 /// An argument that is defined but not used is likely a mistake, and should
@@ -80,7 +80,7 @@ impl Violation for UnusedMethodArgument {
 }
 
 /// ## What it does
-/// Checks for the presence of unused arguments in a class method.
+/// Checks for the presence of unused arguments in class method definitions.
 ///
 /// ## Why is this bad?
 /// An argument that is defined but not used is likely a mistake, and should
@@ -121,7 +121,7 @@ impl Violation for UnusedClassMethodArgument {
 }
 
 /// ## What it does
-/// Checks for the presence of unused arguments in a static method.
+/// Checks for the presence of unused arguments in static method definitions.
 ///
 /// ## Why is this bad?
 /// An argument that is defined but not used is likely a mistake, and should
@@ -162,7 +162,8 @@ impl Violation for UnusedStaticMethodArgument {
 }
 
 /// ## What it does
-/// Checks for the presence of unused arguments in a lambda expression.
+/// Checks for the presence of unused arguments in lambda expression
+/// definitions.
 ///
 /// ## Why is this bad?
 /// An argument that is defined but not used is likely a mistake, and should
