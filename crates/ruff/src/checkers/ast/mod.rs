@@ -4267,19 +4267,19 @@ impl<'a> Checker<'a> {
         }
 
         // Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), named
-        // expressions in generators and comprehensions bind to the parent scope.
+        // expressions in generators and comprehensions bind to the scope that contains the
+        // outermost comprehension.
         let scope_id = if binding.kind.is_named_expr_assignment() {
             self.ctx
                 .scopes
-                .ancestor_scopes(self.ctx.scope_id)
-                .find(|scope| !scope.kind.is_generator())
-                .expect("Every scope must descend from the global scope.")
-                .id
+                .ancestor_ids(self.ctx.scope_id)
+                .find_or_last(|scope_id| !self.ctx.scopes[*scope_id].kind.is_generator())
+                .unwrap_or(self.ctx.scope_id)
         } else {
             self.ctx.scope_id
         };
+        let scope = &mut self.ctx.scopes[scope_id];
 
-        let scope = &self.ctx.scopes[scope_id];
         let binding = if let Some(index) = scope.get(name) {
             let existing = &self.ctx.bindings[*index];
             match &existing.kind {
@@ -4317,7 +4317,6 @@ impl<'a> Checker<'a> {
         }
 
         // Add the binding to the scope.
-        let scope = &mut self.ctx.scopes[scope_id];
         scope.add(name, binding_id);
 
         // Add the binding to the arena.
