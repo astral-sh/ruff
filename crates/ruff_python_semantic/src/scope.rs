@@ -8,7 +8,6 @@ use crate::binding::{BindingId, StarImportation};
 
 #[derive(Debug)]
 pub struct Scope<'a> {
-    pub id: ScopeId,
     pub kind: ScopeKind<'a>,
     pub parent: Option<ScopeId>,
     /// Whether this scope uses the `locals()` builtin.
@@ -25,7 +24,6 @@ pub struct Scope<'a> {
 impl<'a> Scope<'a> {
     pub fn global() -> Self {
         Scope {
-            id: ScopeId::global(),
             kind: ScopeKind::Module,
             parent: None,
             uses_locals: false,
@@ -35,9 +33,8 @@ impl<'a> Scope<'a> {
         }
     }
 
-    pub fn local(id: ScopeId, parent: ScopeId, kind: ScopeKind<'a>) -> Self {
+    pub fn local(kind: ScopeKind<'a>, parent: ScopeId) -> Self {
         Scope {
-            id,
             kind,
             parent: Some(parent),
             uses_locals: false,
@@ -202,19 +199,19 @@ impl<'a> Scopes<'a> {
     /// Pushes a new scope and returns its unique id
     pub fn push_scope(&mut self, kind: ScopeKind<'a>, parent: ScopeId) -> ScopeId {
         let next_id = ScopeId::try_from(self.0.len()).unwrap();
-        self.0.push(Scope::local(next_id, parent, kind));
+        self.0.push(Scope::local(kind, parent));
         next_id
     }
 
     /// Returns an iterator over all [`ScopeId`] ancestors, starting from the given [`ScopeId`].
-    pub fn ancestors(&self, scope: ScopeId) -> impl Iterator<Item = ScopeId> + '_ {
-        std::iter::successors(Some(scope), |&scope| self[scope].parent)
+    pub fn ancestor_ids(&self, scope_id: ScopeId) -> impl Iterator<Item = ScopeId> + '_ {
+        std::iter::successors(Some(scope_id), |&scope_id| self[scope_id].parent)
     }
 
     /// Returns an iterator over all [`Scope`] ancestors, starting from the given [`ScopeId`].
-    pub fn ancestor_scopes(&self, scope: ScopeId) -> impl Iterator<Item = &Scope> + '_ {
-        std::iter::successors(Some(&self[scope]), |&scope| {
-            scope.parent.map(|parent| &self[parent])
+    pub fn ancestors(&self, scope_id: ScopeId) -> impl Iterator<Item = &Scope> + '_ {
+        std::iter::successors(Some(&self[scope_id]), |&scope| {
+            scope.parent.map(|scope_id| &self[scope_id])
         })
     }
 }

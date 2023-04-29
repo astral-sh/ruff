@@ -222,7 +222,7 @@ where
                     let context = self.ctx.execution_context();
                     let exceptions = self.ctx.exceptions();
                     let scope = &mut self.ctx.scopes[self.ctx.scope_id];
-                    let usage = Some((scope.id, stmt.range()));
+                    let usage = Some((self.ctx.scope_id, stmt.range()));
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         let id = self.ctx.bindings.push(Binding {
                             kind: BindingKind::Global,
@@ -251,7 +251,7 @@ where
                     let context = self.ctx.execution_context();
                     let exceptions = self.ctx.exceptions();
                     let scope = &mut self.ctx.scopes[self.ctx.scope_id];
-                    let usage = Some((scope.id, stmt.range()));
+                    let usage = Some((self.ctx.scope_id, stmt.range()));
                     for (name, range) in names.iter().zip(ranges.iter()) {
                         // Add a binding to the current scope.
                         let id = self.ctx.bindings.push(Binding {
@@ -275,11 +275,8 @@ where
                             .scopes
                             .ancestors(self.ctx.scope_id)
                             .skip(1)
-                            .take_while(|scope_id| !scope_id.is_global())
-                            .find_map(|scope_id| {
-                                let scope = &self.ctx.scopes[scope_id];
-                                scope.get(name.as_str())
-                            });
+                            .take_while(|scope| !scope.kind.is_module())
+                            .find_map(|scope| scope.get(name.as_str()));
 
                         if let Some(binding_id) = binding_id {
                             self.ctx.bindings[*binding_id].runtime_usage = usage;
@@ -4179,7 +4176,7 @@ impl<'a> Checker<'a> {
         if let Some((stack_index, existing_binding_id)) = self
             .ctx
             .scopes
-            .ancestor_scopes(self.ctx.scope_id)
+            .ancestors(self.ctx.scope_id)
             .enumerate()
             .find_map(|(stack_index, scope)| {
                 scope.get(name).map(|binding_id| (stack_index, *binding_id))
@@ -4341,7 +4338,7 @@ impl<'a> Checker<'a> {
         let mut in_generator = false;
         let mut import_starred = false;
 
-        for scope in self.ctx.scopes.ancestor_scopes(self.ctx.scope_id) {
+        for scope in self.ctx.scopes.ancestors(self.ctx.scope_id) {
             if scope.kind.is_class() {
                 if id == "__class__" {
                     return;
@@ -4988,7 +4985,7 @@ impl<'a> Checker<'a> {
         for scope_id in self.ctx.dead_scopes.iter().rev() {
             let scope = &self.ctx.scopes[*scope_id];
 
-            if scope_id.is_global() {
+            if scope.kind.is_module() {
                 // F822
                 if self.settings.rules.enabled(Rule::UndefinedExport) {
                     if !self.path.ends_with("__init__.py") {
@@ -5116,8 +5113,8 @@ impl<'a> Checker<'a> {
                 } else {
                     self.ctx
                         .scopes
-                        .ancestors(*scope_id)
-                        .flat_map(|index| runtime_imports[usize::from(index)].iter())
+                        .ancestor_ids(*scope_id)
+                        .flat_map(|scope_id| runtime_imports[usize::from(scope_id)].iter())
                         .copied()
                         .collect()
                 };

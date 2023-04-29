@@ -396,7 +396,7 @@ impl<'a> Context<'a> {
 
     /// Returns an iterator over all scopes, starting from the current scope.
     pub fn scopes(&self) -> impl Iterator<Item = &Scope> {
-        self.scopes.ancestor_scopes(self.scope_id)
+        self.scopes.ancestors(self.scope_id)
     }
 
     /// Returns `true` if the context is in an exception handler.
