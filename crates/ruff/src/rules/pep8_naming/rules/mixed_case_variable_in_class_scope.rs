@@ -10,7 +10,7 @@ use crate::rules::pep8_naming::helpers;
 /// Checks for class variable names that follow the `mixedCase` convention.
 ///
 /// ## Why is this bad?
-/// [PEP 8] recommends that variable names should be lower case and seperated
+/// [PEP 8] recommends that variable names should be lower case and separated
 /// by underscores (also known as `snake_case`).
 ///
 /// > Function names should be lowercase, with words separated by underscores

@@ -11,7 +11,7 @@ use crate::rules::pep8_naming::helpers;
 ///
 /// ## Why is this bad?
 /// [PEP 8] recommends that global variable names should be lower case and
-/// seperated by underscores (also known as `snake_case`).
+/// separated by underscores (also known as `snake_case`).
 ///
 /// > ### Global Variable Names
 /// > (Let’s hope that these variables are meant for use inside one module

@@ -7,7 +7,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// Checks for argument names that do not follow the `snake_case` convention.
 ///
 /// ## Why is this bad?
-/// [PEP 8] recommends that function names should be lower case and seperated
+/// [PEP 8] recommends that function names should be lower case and separated
 /// by underscores (also known as `snake_case`).
 ///
 /// > Function names should be lowercase, with words separated by underscores
