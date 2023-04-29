@@ -11,10 +11,10 @@ use crate::registry::AsRule;
 /// Checks for `print` statements.
 ///
 /// ## Why is this bad?
-/// `print` statements are useful in some situations (e.g. debugging), but they have a few downsides:
-/// - They can make it harder to maintain code as it can be challenging to keep track of numerous
-/// `print` statements as a codebase grows larger.
-/// - `print` statements can be slow, especially if they are printing large amounts of information.
+/// `print` statements are useful in some situations (e.g., debugging), but
+/// should typically be omitted from production code. `print` statements can
+/// lead to the accidental inclusion of sensitive information in logs, and are
+/// not configurable by clients, unlike `logging` statements.
 ///
 /// ## Example
 /// ```python
@@ -42,16 +42,16 @@ impl Violation for Print {
 /// Checks for `pprint` statements.
 ///
 /// ## Why is this bad?
-/// Like print statements, `pprint` statements are useful in some situations (e.g. debugging), but
-/// they have a few downsides:
-/// - They can make it harder to maintain code as it can be challenging to keep track of numerous
-/// `pprint` (and `print`) statements as a codebase grows larger.
-/// - `pprint` statements can be slow, especially if they are printing large amounts of information.
-///
+/// Like `print` statements, `pprint` statements are useful in some situations
+/// (e.g., debugging), but should typically be omitted from production code.
+/// `pprint` statements can lead to the accidental inclusion of sensitive
+/// information in logs, and are not configurable by clients, unlike `logging`
+/// statements.
 ///
 /// ## Example
 /// ```python
 /// import pprint
+///
 ///
 /// def merge_dicts(dict_a, dict_b):
 ///     dict_c = {**dict_a, **dict_b}
