@@ -161,6 +161,24 @@ impl Violation for UnusedStaticMethodArgument {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of unused arguments in a lambda expression.
+///
+/// ## Why is this bad?
+/// An argument that is defined but not used is likely a mistake, and should
+/// be removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// my_list = [1, 2, 3, 4, 5]
+/// squares = map(lambda x, y: x**2, my_list)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// my_list = [1, 2, 3, 4, 5]
+/// squares = map(lambda x: x**2, my_list)
+/// ```
 #[violation]
 pub struct UnusedLambdaArgument {
     pub name: String,
