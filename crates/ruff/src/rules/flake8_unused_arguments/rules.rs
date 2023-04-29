@@ -16,6 +16,24 @@ use crate::checkers::ast::Checker;
 use super::helpers;
 use super::types::Argumentable;
 
+/// ## What it does
+/// Checks for the presence of unused arguments in function scopes.
+///
+/// ## Why is this bad?
+/// An argument that is defined but not used is likely a mistake, and should
+/// be removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// def foo(bar, baz):
+///     return bar * 2
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar):
+///     return bar * 2
+/// ```
 #[violation]
 pub struct UnusedFunctionArgument {
     pub name: String,
