@@ -111,11 +111,12 @@ impl Context {
 }
 
 /// ## What it does
-/// Checks for missing trailing commas.
+/// Checks for the absence of trailing commas.
 ///
 /// ## Why is this bad?
-/// Adding a trailing comma reduces the diff when adding or removing parameters rediging the
-/// changes of merge conflicts in diftionaries or lists.
+/// The presence of a trailing comma can reduce diff size when parameters or
+/// elements are added or removed from function calls, function definitions,
+/// literals, etc.
 ///
 /// ## Example
 /// ```python
@@ -147,15 +148,17 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
 }
 
 /// ## What it does
-/// Checks for trailing commas on bare tuples.
+/// Checks for the presence of trailing commas on bare (i.e., unparenthesized)
+/// tuples.
 ///
 /// ## Why is this bad?
-/// The addition of a missplaced comma can change a value into a tuple which could lead to
-/// unexpected behaviour.
+/// The presence of a misplaced comma will cause Python to interpret the value
+/// as a tuple, which can lead to unexpected behaviour.
 ///
 /// ## Example
 /// ```python
 /// import json
+///
 ///
 /// foo = json.dumps({
 ///     "bar": 1,
@@ -166,14 +169,16 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
 /// ```python
 /// import json
 ///
+///
 /// foo = json.dumps({
 ///     "bar": 1,
 /// })
 /// ```
 ///
-/// For the case that a tuple was intended then use instead:
+/// In the event that a tuple is intended, then use instead:
 /// ```python
 /// import json
+///
 ///
 /// foo = (
 ///     json.dumps({
@@ -192,11 +197,11 @@ impl Violation for TrailingCommaOnBareTuple {
 }
 
 /// ## What it does
-/// Checks for prohibited trailing commas.
+/// Checks for the presence of prohibited trailing commas.
 ///
 /// ## Why is this bad?
-/// Trailing commas are not essential in some cases and can therefore be viewed as unnecessary
-/// so can be removed.
+/// Trailing commas are not essential in some cases and can therefore be viewed
+/// as unnecessary.
 ///
 /// ## Example
 /// ```python
