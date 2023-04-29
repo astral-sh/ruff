@@ -121,3 +121,8 @@ def f(x: int):
             print("A")
         case y:
             pass
+
+
+def f():
+    if any((key := (value := x)) for x in ["ok"]):
+        print(key)

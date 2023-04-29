@@ -4266,7 +4266,20 @@ impl<'a> Checker<'a> {
             }
         }
 
-        let scope = self.ctx.scope();
+        // Per [PEP 572](https://peps.python.org/pep-0572/#scope-of-the-target), named
+        // expressions in generators and comprehensions bind to the scope that contains the
+        // outermost comprehension.
+        let scope_id = if binding.kind.is_named_expr_assignment() {
+            self.ctx
+                .scopes
+                .ancestor_ids(self.ctx.scope_id)
+                .find_or_last(|scope_id| !self.ctx.scopes[*scope_id].kind.is_generator())
+                .unwrap_or(self.ctx.scope_id)
+        } else {
+            self.ctx.scope_id
+        };
+        let scope = &mut self.ctx.scopes[scope_id];
+
         let binding = if let Some(index) = scope.get(name) {
             let existing = &self.ctx.bindings[*index];
             match &existing.kind {
@@ -4298,11 +4311,15 @@ impl<'a> Checker<'a> {
 
         // Don't treat annotations as assignments if there is an existing value
         // in scope.
-        let scope = self.ctx.scope_mut();
-        if !(binding.kind.is_annotation() && scope.defines(name)) {
-            scope.add(name, binding_id);
+        if binding.kind.is_annotation() && scope.defines(name) {
+            self.ctx.bindings.push(binding);
+            return;
         }
 
+        // Add the binding to the scope.
+        scope.add(name, binding_id);
+
+        // Add the binding to the arena.
         self.ctx.bindings.push(binding);
     }
 
@@ -4579,9 +4596,10 @@ impl<'a> Checker<'a> {
             return;
         }
 
-        let current = self.ctx.scope();
+        let scope = self.ctx.scope();
+
         if id == "__all__"
-            && matches!(current.kind, ScopeKind::Module)
+            && scope.kind.is_module()
             && matches!(
                 parent.node,
                 StmtKind::Assign { .. } | StmtKind::AugAssign { .. } | StmtKind::AnnAssign { .. }
@@ -4619,7 +4637,7 @@ impl<'a> Checker<'a> {
 
                     // Grab the existing bound __all__ values.
                     if let StmtKind::AugAssign { .. } = &parent.node {
-                        if let Some(index) = current.get("__all__") {
+                        if let Some(index) = scope.get("__all__") {
                             if let BindingKind::Export(Export { names: existing }) =
                                 &self.ctx.bindings[*index].kind
                             {
@@ -4660,6 +4678,27 @@ impl<'a> Checker<'a> {
                 );
                 return;
             }
+        }
+
+        if self
+            .ctx
+            .expr_ancestors()
+            .any(|expr| matches!(expr.node, ExprKind::NamedExpr { .. }))
+        {
+            self.add_binding(
+                id,
+                Binding {
+                    kind: BindingKind::NamedExprAssignment,
+                    runtime_usage: None,
+                    synthetic_usage: None,
+                    typing_usage: None,
+                    range: expr.range(),
+                    source: Some(*self.ctx.current_stmt()),
+                    context: self.ctx.execution_context(),
+                    exceptions: self.ctx.exceptions(),
+                },
+            );
+            return;
         }
 
         self.add_binding(
