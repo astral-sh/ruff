@@ -204,6 +204,30 @@ impl Violation for SuperfluousElseReturn {
     }
 }
 
+/// ## What it does
+/// Checks for else statements after a raise statement.
+///
+/// ## Why is this bad?
+/// The else statement is not needed because the raise statement will always
+/// break out of the function. This check will reduce nesting and make the code
+/// more readable.
+///
+/// ## Example
+/// ```python
+/// def x(y, z):
+///     if y:  
+///         raise Exception(y)
+///     else:
+///         raise Exception(z)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def x(y, z):
+///     if y:  
+///         raise Exception(y)
+///     raise Exception(z)
+/// ```
 #[violation]
 pub struct SuperfluousElseRaise {
     pub branch: Branch,
@@ -217,6 +241,32 @@ impl Violation for SuperfluousElseRaise {
     }
 }
 
+/// ## What it does
+/// Checks for else statements after a continue statement.
+///
+/// ## Why is this bad?
+/// The else statement is not needed because the return statement will always
+/// continue onto the next iteration of a loop. This check will reduce nesting
+/// and make the code more readable.
+///
+/// ## Example
+/// ```python
+///def x(y, z):
+///    for i in y:
+///        if i < z:  
+///            continue
+///        else:
+///            a = 0
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def x(y, z):
+///     for i in y:
+///         if i < z:  
+///             continue
+///         a = 0
+/// ```
 #[violation]
 pub struct SuperfluousElseContinue {
     pub branch: Branch,
@@ -230,6 +280,32 @@ impl Violation for SuperfluousElseContinue {
     }
 }
 
+/// ## What it does
+/// Checks for else statements after a break statement.
+///
+/// ## Why is this bad?
+/// The else statement is not needed because the break statement will always
+/// break out of the loop. This check will reduce nesting and make the code more
+///  readable.
+///
+/// ## Example
+/// ```python
+/// def x(y, z):
+///     for i in y:
+///         if i > z:  
+///             break
+///         else:
+///             a = 0
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def x(y, z):
+///     for i in y:
+///         if i > z:  
+///             break
+///         a = 0
+/// ```
 #[violation]
 pub struct SuperfluousElseBreak {
     pub branch: Branch,
