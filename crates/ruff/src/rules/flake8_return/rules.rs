@@ -133,6 +133,30 @@ impl AlwaysAutofixableViolation for ImplicitReturn {
     }
 }
 
+/// ## What it does
+/// Checks for a variable assignment that is not used between being defined and
+// being returned.
+///
+/// ## Why is this bad?
+/// The variable assignment is not used so it should be removed and the value
+/// should be returned directly.
+///
+/// ## Example
+/// ```python
+/// def x():
+///     a = 1
+///     # some code that not using `a`
+///     print('test')
+///     return a
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def x():
+///     # some code that not using `a`
+///     print('test')
+///     return 1
+/// ```
 #[violation]
 pub struct UnnecessaryAssign;
 
