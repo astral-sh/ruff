@@ -7,8 +7,9 @@ pub mod settings;
 mod tests {
     use std::path::Path;
 
+    use crate::assert_messages;
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use regex::Regex;
     use test_case::test_case;
 
@@ -60,6 +61,7 @@ mod tests {
     #[test_case(Rule::TooManyBranches, Path::new("too_many_branches.py"); "PLR0912")]
     #[test_case(Rule::TooManyReturnStatements, Path::new("too_many_return_statements.py"); "PLR0911")]
     #[test_case(Rule::TooManyStatements, Path::new("too_many_statements.py"); "PLR0915")]
+    #[test_case(Rule::UnexpectedSpecialMethodSignature, Path::new("unexpected_special_method_signature.py"); "PLE0302")]
     #[test_case(Rule::UnnecessaryDirectLambdaCall, Path::new("unnecessary_direct_lambda_call.py"); "PLC3002")]
     #[test_case(Rule::LoadBeforeGlobalDeclaration, Path::new("load_before_global_declaration.py"); "PLE0118")]
     #[test_case(Rule::UselessElseOnLoop, Path::new("useless_else_on_loop.py"); "PLW0120")]
@@ -72,7 +74,7 @@ mod tests {
             Path::new("pylint").join(path).as_path(),
             &Settings::for_rules(vec![rule_code]),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -85,7 +87,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::ContinueInFinally])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -101,7 +103,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::MagicValueComparison])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -117,7 +119,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::TooManyArguments])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -130,7 +132,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::TooManyArguments])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -146,7 +148,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::TooManyBranches])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -162,7 +164,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::TooManyStatements])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -178,7 +180,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::TooManyReturnStatements])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

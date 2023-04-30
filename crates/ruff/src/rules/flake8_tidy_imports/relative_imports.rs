@@ -4,9 +4,8 @@ use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation, CacheKey};
-use ruff_python_ast::helpers::{create_stmt, from_relative_import, unparse_stmt};
+use ruff_python_ast::helpers::{create_stmt, resolve_imported_module_path, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
-use ruff_python_ast::types::Range;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::checkers::ast::Checker;
@@ -90,66 +89,33 @@ fn fix_banned_relative_import(
     stmt: &Stmt,
     level: Option<usize>,
     module: Option<&str>,
-    module_path: Option<&Vec<String>>,
+    module_path: Option<&[String]>,
     stylist: &Stylist,
 ) -> Option<Edit> {
     // Only fix is the module path is known.
-    if let Some(mut parts) = module_path.cloned() {
-        if level? >= parts.len() {
-            return None;
-        }
+    let Some(module_path) = resolve_imported_module_path(level, module, module_path) else {
+        return None;
+    };
 
-        // Remove relative level from module path.
-        for _ in 0..level? {
-            parts.pop();
-        }
-
-        let module_name = if let Some(module) = module {
-            let call_path = from_relative_import(&parts, module);
-            // Require import to be a valid module:
-            // https://python.org/dev/peps/pep-0008/#package-and-module-names
-            if !call_path.iter().all(|part| is_identifier(part)) {
-                return None;
-            }
-            call_path.as_slice().join(".")
-        } else if parts.len() > 1 {
-            let module = parts.pop().unwrap();
-            let call_path = from_relative_import(&parts, &module);
-            // Require import to be a valid module:
-            // https://python.org/dev/peps/pep-0008/#package-and-module-names
-            if !call_path.iter().all(|part| is_identifier(part)) {
-                return None;
-            }
-            call_path.as_slice().join(".")
-        } else {
-            // Require import to be a valid module:
-            // https://python.org/dev/peps/pep-0008/#package-and-module-names
-            if !parts.iter().all(|part| is_identifier(part)) {
-                return None;
-            }
-            parts.join(".")
-        };
-
-        let StmtKind::ImportFrom { names, .. } = &stmt.node else {
-            panic!("Expected StmtKind::ImportFrom");
-        };
-        let content = unparse_stmt(
-            &create_stmt(StmtKind::ImportFrom {
-                module: Some(module_name),
-                names: names.clone(),
-                level: Some(0),
-            }),
-            stylist,
-        );
-
-        Some(Edit::replacement(
-            content,
-            stmt.location,
-            stmt.end_location.unwrap(),
-        ))
-    } else {
-        None
+    // Require import to be a valid module:
+    // https://python.org/dev/peps/pep-0008/#package-and-module-names
+    if !module_path.split('.').all(is_identifier) {
+        return None;
     }
+
+    let StmtKind::ImportFrom { names, .. } = &stmt.node else {
+        panic!("Expected StmtKind::ImportFrom");
+    };
+    let content = unparse_stmt(
+        &create_stmt(StmtKind::ImportFrom {
+            module: Some(module_path.to_string()),
+            names: names.clone(),
+            level: Some(0),
+        }),
+        stylist,
+    );
+
+    Some(Edit::range_replacement(content, stmt.range()))
 }
 
 /// TID252
@@ -158,7 +124,7 @@ pub fn banned_relative_import(
     stmt: &Stmt,
     level: Option<usize>,
     module: Option<&str>,
-    module_path: Option<&Vec<String>>,
+    module_path: Option<&[String]>,
     strictness: &Strictness,
 ) -> Option<Diagnostic> {
     let strictness_level = match strictness {
@@ -170,7 +136,7 @@ pub fn banned_relative_import(
             RelativeImports {
                 strictness: *strictness,
             },
-            Range::from(stmt),
+            stmt.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
             if let Some(fix) =
@@ -190,8 +156,8 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
 
+    use crate::assert_messages;
     use crate::registry::Rule;
     use crate::settings::Settings;
     use crate::test::test_path;
@@ -210,7 +176,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -226,14 +192,14 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
     #[test]
     fn ban_parent_imports_package() -> Result<()> {
         let diagnostics = test_path(
-            Path::new("flake8_tidy_imports/TID252/my_package/sublib/api/application.py"),
+            Path::new("flake8_tidy_imports/TID/my_package/sublib/api/application.py"),
             &Settings {
                 flake8_tidy_imports: super::super::Settings {
                     ban_relative_imports: Strictness::Parents,
@@ -243,7 +209,7 @@ mod tests {
                 ..Settings::for_rules(vec![Rule::RelativeImports])
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

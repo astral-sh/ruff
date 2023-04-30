@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::ops::Deref;
 use std::path::Path;
 
 use anyhow::{anyhow, Result};
@@ -10,7 +11,7 @@ use rustpython_parser::ParseError;
 
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist};
 use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::autofix::fix_file;
@@ -22,7 +23,8 @@ use crate::checkers::physical_lines::check_physical_lines;
 use crate::checkers::tokens::check_tokens;
 use crate::directives::Directives;
 use crate::doc_lines::{doc_lines_from_ast, doc_lines_from_tokens};
-use crate::message::{Message, Source};
+use crate::logging::DisplayParseError;
+use crate::message::Message;
 use crate::noqa::add_noqa;
 use crate::registry::{AsRule, Rule};
 use crate::rules::pycodestyle;
@@ -67,7 +69,6 @@ pub struct FixerResult<'a> {
 pub fn check_path(
     path: &Path,
     package: Option<&Path>,
-    contents: &str,
     tokens: Vec<LexResult>,
     locator: &Locator,
     stylist: &Stylist,
@@ -87,7 +88,7 @@ pub fn check_path(
     let use_doc_lines = settings.rules.enabled(Rule::DocLineTooLong);
     let mut doc_lines = vec![];
     if use_doc_lines {
-        doc_lines.extend(doc_lines_from_tokens(&tokens));
+        doc_lines.extend(doc_lines_from_tokens(&tokens, locator));
     }
 
     // Run the token-based rules.
@@ -177,7 +178,7 @@ pub fn check_path(
                 // if it's disabled via any of the usual mechanisms (e.g., `noqa`,
                 // `per-file-ignores`), and the easiest way to detect that suppression is
                 // to see if the diagnostic persists to the end of the function.
-                pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error);
+                pycodestyle::rules::syntax_error(&mut diagnostics, &parse_error, locator);
                 error = Some(parse_error);
             }
         }
@@ -196,13 +197,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         diagnostics.extend(check_physical_lines(
-            path,
-            locator,
-            stylist,
-            indexer.commented_lines(),
-            &doc_lines,
-            settings,
-            autofix,
+            path, locator, stylist, indexer, &doc_lines, settings, autofix,
         ));
     }
 
@@ -223,8 +218,8 @@ pub fn check_path(
     {
         let ignored = check_noqa(
             &mut diagnostics,
-            contents,
-            indexer.commented_lines(),
+            locator,
+            indexer.comment_ranges(),
             &directives.noqa_line_for,
             settings,
             error.as_ref().map_or(autofix, |_| flags::Autofix::Disabled),
@@ -273,11 +268,15 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
     let stylist = Stylist::from_tokens(&tokens, &locator);
 
     // Extra indices from the code.
-    let indexer: Indexer = tokens.as_slice().into();
+    let indexer = Indexer::from_tokens(&tokens, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives =
-        directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
+    let directives = directives::extract_directives(
+        &tokens,
+        directives::Flags::from_settings(settings),
+        &locator,
+        &indexer,
+    );
 
     // Generate diagnostics, ignoring any existing `noqa` directives.
     let LinterResult {
@@ -286,7 +285,6 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
     } = check_path(
         path,
         package,
-        &contents,
         tokens,
         &locator,
         &stylist,
@@ -299,20 +297,15 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
 
     // Log any parse errors.
     if let Some(err) = error {
-        error!(
-            "{}{}{} {err:?}",
-            "Failed to parse ".bold(),
-            fs::relativize_path(path).bold(),
-            ":".bold()
-        );
+        error!("{}", DisplayParseError::new(err, locator.to_source_code()));
     }
 
     // Add any missing `# noqa` pragmas.
     add_noqa(
         path,
         &diagnostics.0,
-        &contents,
-        indexer.commented_lines(),
+        &locator,
+        indexer.comment_ranges(),
         &directives.noqa_line_for,
         stylist.line_ending(),
     )
@@ -338,17 +331,20 @@ pub fn lint_only(
     let stylist = Stylist::from_tokens(&tokens, &locator);
 
     // Extra indices from the code.
-    let indexer: Indexer = tokens.as_slice().into();
+    let indexer = Indexer::from_tokens(&tokens, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives =
-        directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
+    let directives = directives::extract_directives(
+        &tokens,
+        directives::Flags::from_settings(settings),
+        &locator,
+        &indexer,
+    );
 
     // Generate diagnostics.
     let result = check_path(
         path,
         package,
-        contents,
         tokens,
         &locator,
         &stylist,
@@ -359,26 +355,39 @@ pub fn lint_only(
         autofix,
     );
 
-    // Convert from diagnostics to messages.
-    let path_lossy = path.to_string_lossy();
-    result.map(|(messages, imports)| {
+    result.map(|(diagnostics, imports)| {
         (
-            messages
-                .into_iter()
-                .map(|diagnostic| {
-                    let source = if settings.show_source {
-                        Some(Source::from_diagnostic(&diagnostic, &locator))
-                    } else {
-                        None
-                    };
-                    let lineno = diagnostic.location.row();
-                    let noqa_row = *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-                    Message::from_diagnostic(diagnostic, path_lossy.to_string(), source, noqa_row)
-                })
-                .collect(),
+            diagnostics_to_messages(diagnostics, path, &locator, &directives),
             imports,
         )
     })
+}
+
+/// Convert from diagnostics to messages.
+fn diagnostics_to_messages(
+    diagnostics: Vec<Diagnostic>,
+    path: &Path,
+    locator: &Locator,
+    directives: &Directives,
+) -> Vec<Message> {
+    let file = once_cell::unsync::Lazy::new(|| {
+        let mut builder =
+            SourceFileBuilder::new(path.to_string_lossy().as_ref(), locator.contents());
+
+        if let Some(line_index) = locator.line_index() {
+            builder.set_line_index(line_index.clone());
+        }
+
+        builder.finish()
+    });
+
+    diagnostics
+        .into_iter()
+        .map(|diagnostic| {
+            let noqa_offset = directives.noqa_line_for.resolve(diagnostic.start());
+            Message::from_diagnostic(diagnostic, file.deref().clone(), noqa_offset)
+        })
+        .collect()
 }
 
 /// Generate `Diagnostic`s from source code content, iteratively autofixing
@@ -413,17 +422,20 @@ pub fn lint_fix<'a>(
         let stylist = Stylist::from_tokens(&tokens, &locator);
 
         // Extra indices from the code.
-        let indexer: Indexer = tokens.as_slice().into();
+        let indexer = Indexer::from_tokens(&tokens, &locator);
 
         // Extract the `# noqa` and `# isort: skip` directives from the source.
-        let directives =
-            directives::extract_directives(&tokens, directives::Flags::from_settings(settings));
+        let directives = directives::extract_directives(
+            &tokens,
+            directives::Flags::from_settings(settings),
+            &locator,
+            &indexer,
+        );
 
         // Generate diagnostics.
         let result = check_path(
             path,
             package,
-            &transformed,
             tokens,
             &locator,
             &stylist,
@@ -502,30 +514,10 @@ This indicates a bug in `{}`. If you could open an issue at:
             }
         }
 
-        // Convert to messages.
-        let path_lossy = path.to_string_lossy();
         return Ok(FixerResult {
-            result: result.map(|(messages, imports)| {
+            result: result.map(|(diagnostics, imports)| {
                 (
-                    messages
-                        .into_iter()
-                        .map(|diagnostic| {
-                            let source = if settings.show_source {
-                                Some(Source::from_diagnostic(&diagnostic, &locator))
-                            } else {
-                                None
-                            };
-                            let lineno = diagnostic.location.row();
-                            let noqa_row =
-                                *directives.noqa_line_for.get(&lineno).unwrap_or(&lineno);
-                            Message::from_diagnostic(
-                                diagnostic,
-                                path_lossy.to_string(),
-                                source,
-                                noqa_row,
-                            )
-                        })
-                        .collect(),
+                    diagnostics_to_messages(diagnostics, path, &locator, &directives),
                     imports,
                 )
             }),

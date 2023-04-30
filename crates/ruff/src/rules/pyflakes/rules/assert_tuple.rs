@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -22,7 +21,7 @@ pub fn assert_tuple(checker: &mut Checker, stmt: &Stmt, test: &Expr) {
         if !elts.is_empty() {
             checker
                 .diagnostics
-                .push(Diagnostic::new(AssertTuple, Range::from(stmt)));
+                .push(Diagnostic::new(AssertTuple, stmt.range()));
         }
     }
 }

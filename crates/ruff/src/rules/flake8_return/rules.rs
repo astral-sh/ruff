@@ -1,14 +1,15 @@
 use itertools::Itertools;
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Location, Stmt, StmtKind};
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::elif_else_range;
 use ruff_python_ast::helpers::is_const_none;
-use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::whitespace::indentation;
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -139,13 +140,9 @@ fn unnecessary_return_none(checker: &mut Checker, stack: &Stack) {
         ) {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, Range::from(*stmt));
+        let mut diagnostic = Diagnostic::new(UnnecessaryReturnNone, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
-                "return".to_string(),
-                stmt.location,
-                stmt.end_location.unwrap(),
-            ));
+            diagnostic.set_fix(Edit::range_replacement("return".to_string(), stmt.range()));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -157,12 +154,11 @@ fn implicit_return_value(checker: &mut Checker, stack: &Stack) {
         if expr.is_some() {
             continue;
         }
-        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, Range::from(*stmt));
+        let mut diagnostic = Diagnostic::new(ImplicitReturnValue, stmt.range());
         if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 "return None".to_string(),
-                stmt.location,
-                stmt.end_location.unwrap(),
+                stmt.range(),
             ));
         }
         checker.diagnostics.push(diagnostic);
@@ -181,8 +177,6 @@ const NORETURN_FUNCS: &[&[&str]] = &[
     &["posix", "_exit"],
     &["posix", "abort"],
     &["sys", "exit"],
-    &["typing", "assert_never"],
-    &["typing_extensions", "assert_never"],
     &["_thread", "exit"],
     &["_winapi", "ExitProcess"],
     // third-party modules
@@ -193,15 +187,13 @@ const NORETURN_FUNCS: &[&[&str]] = &[
 ];
 
 /// Return `true` if the `func` is a known function that never returns.
-fn is_noreturn_func(checker: &Checker, func: &Expr) -> bool {
-    checker
-        .ctx
-        .resolve_call_path(func)
-        .map_or(false, |call_path| {
-            NORETURN_FUNCS
-                .iter()
-                .any(|target| call_path.as_slice() == *target)
-        })
+fn is_noreturn_func(context: &Context, func: &Expr) -> bool {
+    context.resolve_call_path(func).map_or(false, |call_path| {
+        NORETURN_FUNCS
+            .iter()
+            .any(|target| call_path.as_slice() == *target)
+            || context.match_typing_call_path(&call_path, "assert_never")
+    })
 }
 
 /// RET503
@@ -214,7 +206,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
             } else {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
+                let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         let mut content = String::new();
@@ -252,7 +244,7 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if let Some(last_stmt) = orelse.last() {
                 implicit_return(checker, last_stmt);
             } else {
-                let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
+                let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(indent) = indentation(checker.locator, stmt) {
                         let mut content = String::new();
@@ -288,10 +280,10 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
             if matches!(
                 &value.node,
                 ExprKind::Call { func, ..  }
-                    if is_noreturn_func(checker, func)
+                    if is_noreturn_func(&checker.ctx, func)
             ) => {}
         _ => {
-            let mut diagnostic = Diagnostic::new(ImplicitReturn, Range::from(stmt));
+            let mut diagnostic = Diagnostic::new(ImplicitReturn, stmt.range());
             if checker.patch(diagnostic.kind.rule()) {
                 if let Some(indent) = indentation(checker.locator, stmt) {
                     let mut content = String::new();
@@ -309,8 +301,9 @@ fn implicit_return(checker: &mut Checker, stmt: &Stmt) {
     }
 }
 
+/// Return `true` if the `id` has multiple assignments within the function.
 fn has_multiple_assigns(id: &str, stack: &Stack) -> bool {
-    if let Some(assigns) = stack.assigns.get(&id) {
+    if let Some(assigns) = stack.assignments.get(&id) {
         if assigns.len() > 1 {
             return true;
         }
@@ -318,64 +311,73 @@ fn has_multiple_assigns(id: &str, stack: &Stack) -> bool {
     false
 }
 
-fn has_refs_before_next_assign(id: &str, return_location: Location, stack: &Stack) -> bool {
-    let mut before_assign: &Location = &Location::default();
-    let mut after_assign: Option<&Location> = None;
-    if let Some(assigns) = stack.assigns.get(&id) {
-        for location in assigns.iter().sorted() {
-            if location.row() > return_location.row() {
-                after_assign = Some(location);
+/// Return `true` if the `id` has a (read) reference between the `return_location` and its
+/// preceding assignment.
+fn has_refs_before_next_assign(id: &str, return_range: TextRange, stack: &Stack) -> bool {
+    let mut assignment_before_return: Option<TextSize> = None;
+    let mut assignment_after_return: Option<TextSize> = None;
+    if let Some(assignments) = stack.assignments.get(&id) {
+        for location in assignments.iter().sorted() {
+            if *location > return_range.start() {
+                assignment_after_return = Some(*location);
                 break;
             }
-            if location.row() <= return_location.row() {
-                before_assign = location;
+            assignment_before_return = Some(*location);
+        }
+    }
+
+    // If there is no assignment before the return, then the variable must be defined in
+    // some other way (e.g., a function argument). No need to check for references.
+    let Some(assignment_before_return) = assignment_before_return else {
+        return true;
+    };
+
+    if let Some(references) = stack.references.get(&id) {
+        for location in references {
+            if return_range.contains(*location) {
+                continue;
+            }
+
+            if assignment_before_return < *location {
+                if let Some(assignment_after_return) = assignment_after_return {
+                    if *location <= assignment_after_return {
+                        return true;
+                    }
+                } else {
+                    return true;
+                }
             }
         }
     }
 
-    if let Some(refs) = stack.refs.get(&id) {
-        for location in refs {
-            if location.row() == return_location.row() {
-                continue;
-            }
-            if let Some(after_assign) = after_assign {
-                if before_assign.row() < location.row() && location.row() <= after_assign.row() {
-                    return true;
-                }
-            } else if before_assign.row() < location.row() {
-                return true;
-            }
-        }
-    }
     false
 }
 
+/// Return `true` if the `id` has a read or write reference within a `try` or loop body.
 fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
-    if let Some(refs) = stack.refs.get(&id) {
-        for location in refs {
-            for (try_location, try_end_location) in &stack.tries {
-                if try_location.row() < location.row() && location.row() <= try_end_location.row() {
+    if let Some(references) = stack.references.get(&id) {
+        for location in references {
+            for try_range in &stack.tries {
+                if try_range.contains(*location) {
                     return true;
                 }
             }
-            for (loop_location, loop_end_location) in &stack.loops {
-                if loop_location.row() < location.row() && location.row() <= loop_end_location.row()
-                {
+            for loop_range in &stack.loops {
+                if loop_range.contains(*location) {
                     return true;
                 }
             }
         }
     }
-    if let Some(refs) = stack.assigns.get(&id) {
-        for location in refs {
-            for (try_location, try_end_location) in &stack.tries {
-                if try_location.row() < location.row() && location.row() <= try_end_location.row() {
+    if let Some(references) = stack.assignments.get(&id) {
+        for location in references {
+            for try_range in &stack.tries {
+                if try_range.contains(*location) {
                     return true;
                 }
             }
-            for (loop_location, loop_end_location) in &stack.loops {
-                if loop_location.row() < location.row() && location.row() <= loop_end_location.row()
-                {
+            for loop_range in &stack.loops {
+                if loop_range.contains(*location) {
                     return true;
                 }
             }
@@ -387,19 +389,19 @@ fn has_refs_or_assigns_within_try_or_loop(id: &str, stack: &Stack) -> bool {
 /// RET504
 fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
     if let ExprKind::Name { id, .. } = &expr.node {
-        if !stack.assigns.contains_key(id.as_str()) {
+        if !stack.assignments.contains_key(id.as_str()) {
             return;
         }
 
-        if !stack.refs.contains_key(id.as_str()) {
+        if !stack.references.contains_key(id.as_str()) {
             checker
                 .diagnostics
-                .push(Diagnostic::new(UnnecessaryAssign, Range::from(expr)));
+                .push(Diagnostic::new(UnnecessaryAssign, expr.range()));
             return;
         }
 
         if has_multiple_assigns(id, stack)
-            || has_refs_before_next_assign(id, expr.location, stack)
+            || has_refs_before_next_assign(id, expr.range(), stack)
             || has_refs_or_assigns_within_try_or_loop(id, stack)
         {
             return;
@@ -411,7 +413,7 @@ fn unnecessary_assign(checker: &mut Checker, stack: &Stack, expr: &Expr) {
 
         checker
             .diagnostics
-            .push(Diagnostic::new(UnnecessaryAssign, Range::from(expr)));
+            .push(Diagnostic::new(UnnecessaryAssign, expr.range()));
     }
 }
 
@@ -424,7 +426,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Return { .. }) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseReturn { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -434,7 +436,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Break) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseBreak { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -444,7 +446,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Raise { .. }) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseRaise { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -454,7 +456,7 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
         if matches!(child.node, StmtKind::Continue) {
             let diagnostic = Diagnostic::new(
                 SuperfluousElseContinue { branch },
-                elif_else_range(stmt, checker.locator).unwrap_or_else(|| Range::from(stmt)),
+                elif_else_range(stmt, checker.locator).unwrap_or_else(|| stmt.range()),
             );
             if checker.settings.rules.enabled(diagnostic.kind.rule()) {
                 checker.diagnostics.push(diagnostic);
@@ -466,34 +468,26 @@ fn superfluous_else_node(checker: &mut Checker, stmt: &Stmt, branch: Branch) -> 
 }
 
 /// RET505, RET506, RET507, RET508
-fn superfluous_elif(checker: &mut Checker, stack: &Stack) -> bool {
+fn superfluous_elif(checker: &mut Checker, stack: &Stack) {
     for stmt in &stack.elifs {
-        if superfluous_else_node(checker, stmt, Branch::Elif) {
-            return true;
-        }
+        superfluous_else_node(checker, stmt, Branch::Elif);
     }
-    false
 }
 
 /// RET505, RET506, RET507, RET508
-fn superfluous_else(checker: &mut Checker, stack: &Stack) -> bool {
+fn superfluous_else(checker: &mut Checker, stack: &Stack) {
     for stmt in &stack.elses {
-        if superfluous_else_node(checker, stmt, Branch::Else) {
-            return true;
-        }
+        superfluous_else_node(checker, stmt, Branch::Else);
     }
-    false
 }
 
 /// Run all checks from the `flake8-return` plugin.
 pub fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
-    // Skip empty functions.
-    if body.is_empty() {
-        return;
-    }
-
     // Find the last statement in the function.
-    let last_stmt = body.last().unwrap();
+    let Some(last_stmt) = body.last() else {
+        // Skip empty functions.
+        return;
+    };
 
     // Skip functions that consist of a single return statement.
     if body.len() == 1 && matches!(last_stmt.node, StmtKind::Return { .. }) {
@@ -514,20 +508,14 @@ pub fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
         return;
     }
 
-    if checker.settings.rules.enabled(Rule::SuperfluousElseReturn)
-        || checker.settings.rules.enabled(Rule::SuperfluousElseRaise)
-        || checker
-            .settings
-            .rules
-            .enabled(Rule::SuperfluousElseContinue)
-        || checker.settings.rules.enabled(Rule::SuperfluousElseBreak)
-    {
-        if superfluous_elif(checker, &stack) {
-            return;
-        }
-        if superfluous_else(checker, &stack) {
-            return;
-        }
+    if checker.settings.rules.any_enabled(&[
+        Rule::SuperfluousElseReturn,
+        Rule::SuperfluousElseRaise,
+        Rule::SuperfluousElseContinue,
+        Rule::SuperfluousElseBreak,
+    ]) {
+        superfluous_elif(checker, &stack);
+        superfluous_else(checker, &stack);
     }
 
     // Skip any functions without return statements.
@@ -535,27 +523,27 @@ pub fn function(checker: &mut Checker, body: &[Stmt], returns: Option<&Expr>) {
         return;
     }
 
-    if !result_exists(&stack.returns) {
+    // If we have at least one non-`None` return...
+    if result_exists(&stack.returns) {
+        if checker.settings.rules.enabled(Rule::ImplicitReturnValue) {
+            implicit_return_value(checker, &stack);
+        }
+        if checker.settings.rules.enabled(Rule::ImplicitReturn) {
+            implicit_return(checker, last_stmt);
+        }
+
+        if checker.settings.rules.enabled(Rule::UnnecessaryAssign) {
+            for (_, expr) in &stack.returns {
+                if let Some(expr) = expr {
+                    unnecessary_assign(checker, &stack, expr);
+                }
+            }
+        }
+    } else {
         if checker.settings.rules.enabled(Rule::UnnecessaryReturnNone) {
             // Skip functions that have a return annotation that is not `None`.
             if returns.map_or(true, is_const_none) {
                 unnecessary_return_none(checker, &stack);
-            }
-        }
-        return;
-    }
-
-    if checker.settings.rules.enabled(Rule::ImplicitReturnValue) {
-        implicit_return_value(checker, &stack);
-    }
-    if checker.settings.rules.enabled(Rule::ImplicitReturn) {
-        implicit_return(checker, last_stmt);
-    }
-
-    if checker.settings.rules.enabled(Rule::UnnecessaryAssign) {
-        for (_, expr) in &stack.returns {
-            if let Some(expr) = expr {
-                unnecessary_assign(checker, &stack, expr);
             }
         }
     }

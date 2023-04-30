@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `captured`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 19
-  end_location:
-    row: 22
-    column: 27
-  fix:
-    edits: []
-  parent: ~
+F821_9.py:22:20: F821 Undefined name `captured`
+   |
+22 |     match provided:
+23 |         case True:
+24 |             return captured  # F821
+   |                    ^^^^^^^^ F821
+   |
+
 

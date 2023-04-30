@@ -1,19 +1,13 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndefinedName
-    body: "Undefined name `Model`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 12
-  end_location:
-    row: 5
-    column: 17
-  fix:
-    edits: []
-  parent: ~
+F821_2.py:5:13: F821 Undefined name `Model`
+  |
+5 | # F821 Undefined name `Model`
+6 | x: Literal["Model"]
+  |             ^^^^^ F821
+7 | 
+8 | from typing_extensions import Literal
+  |
+
 

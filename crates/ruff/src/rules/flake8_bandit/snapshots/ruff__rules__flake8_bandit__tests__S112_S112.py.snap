@@ -1,61 +1,48 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: TryExceptContinue
-    body: "`try`-`except`-`continue` detected, consider logging the exception"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 4
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TryExceptContinue
-    body: "`try`-`except`-`continue` detected, consider logging the exception"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 9
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TryExceptContinue
-    body: "`try`-`except`-`continue` detected, consider logging the exception"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 14
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: TryExceptContinue
-    body: "`try`-`except`-`continue` detected, consider logging the exception"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 0
-  end_location:
-    row: 19
-    column: 12
-  fix:
-    edits: []
-  parent: ~
+S112.py:3:1: S112 `try`-`except`-`continue` detected, consider logging the exception
+  |
+3 |   try:
+4 |       pass
+5 | / except Exception:
+6 | |     continue
+  | |____________^ S112
+7 |   
+8 |   try:
+  |
+
+S112.py:8:1: S112 `try`-`except`-`continue` detected, consider logging the exception
+   |
+ 8 |   try:
+ 9 |       pass
+10 | / except:
+11 | |     continue
+   | |____________^ S112
+12 |   
+13 |   try:
+   |
+
+S112.py:13:1: S112 `try`-`except`-`continue` detected, consider logging the exception
+   |
+13 |   try:
+14 |       pass
+15 | / except (Exception,):
+16 | |     continue
+   | |____________^ S112
+17 |   
+18 |   try:
+   |
+
+S112.py:18:1: S112 `try`-`except`-`continue` detected, consider logging the exception
+   |
+18 |   try:
+19 |       pass
+20 | / except (Exception, ValueError):
+21 | |     continue
+   | |____________^ S112
+22 |   
+23 |   try:
+   |
+
 

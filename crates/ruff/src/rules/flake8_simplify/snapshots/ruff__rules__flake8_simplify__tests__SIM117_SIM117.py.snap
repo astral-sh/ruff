@@ -1,166 +1,215 @@
 ---
 source: crates/ruff/src/rules/flake8_simplify/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MultipleWithStatements
-    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    suggestion: "Combine `with` statements"
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 3
-    column: 18
-  fix:
-    edits:
-      - content: "with A() as a, B() as b:\n    print(\"hello\")\n"
-        location:
-          row: 2
-          column: 0
-        end_location:
-          row: 5
-          column: 0
-  parent: ~
-- kind:
-    name: MultipleWithStatements
-    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    suggestion: "Combine `with` statements"
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 9
-    column: 17
-  fix:
-    edits:
-      - content: "with A(), B():\n    with C():\n        print(\"hello\")\n"
-        location:
-          row: 7
-          column: 0
-        end_location:
-          row: 11
-          column: 0
-  parent: ~
-- kind:
-    name: MultipleWithStatements
-    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 15
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: MultipleWithStatements
-    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    suggestion: "Combine `with` statements"
-    fixable: true
-  location:
-    row: 19
-    column: 0
-  end_location:
-    row: 20
-    column: 18
-  fix:
-    edits:
-      - content: "with A() as a, B() as b:\n    # Fixable due to placement of this comment.\n    print(\"hello\")\n"
-        location:
-          row: 19
-          column: 0
-        end_location:
-          row: 23
-          column: 0
-  parent: ~
-- kind:
-    name: MultipleWithStatements
-    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    suggestion: "Combine `with` statements"
-    fixable: true
-  location:
-    row: 53
-    column: 4
-  end_location:
-    row: 54
-    column: 22
-  fix:
-    edits:
-      - content: "    with A() as a, B() as b:\n        \"\"\"this\nis valid\"\"\"\n\n        \"\"\"the indentation on\n            this line is significant\"\"\"\n\n        \"this is\" \\\n\"allowed too\"\n\n        (\"so is\"\n\"this for some reason\")\n"
-        location:
-          row: 53
-          column: 0
-        end_location:
-          row: 66
-          column: 0
-  parent: ~
-- kind:
-    name: MultipleWithStatements
-    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    suggestion: "Combine `with` statements"
-    fixable: true
-  location:
-    row: 68
-    column: 0
-  end_location:
-    row: 72
-    column: 18
-  fix:
-    edits:
-      - content: "with (\n    A() as a,\n    B() as b,C() as c\n):\n    print(\"hello\")\n"
-        location:
-          row: 68
-          column: 0
-        end_location:
-          row: 74
-          column: 0
-  parent: ~
-- kind:
-    name: MultipleWithStatements
-    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    suggestion: "Combine `with` statements"
-    fixable: true
-  location:
-    row: 76
-    column: 0
-  end_location:
-    row: 80
-    column: 6
-  fix:
-    edits:
-      - content: "with (\n    A() as a, B() as b,\n    C() as c,\n):\n    print(\"hello\")\n"
-        location:
-          row: 76
-          column: 0
-        end_location:
-          row: 82
-          column: 0
-  parent: ~
-- kind:
-    name: MultipleWithStatements
-    body: "Use a single `with` statement with multiple contexts instead of nested `with` statements"
-    suggestion: "Combine `with` statements"
-    fixable: true
-  location:
-    row: 84
-    column: 0
-  end_location:
-    row: 91
-    column: 6
-  fix:
-    edits:
-      - content: "with (\n    A() as a,\n    B() as b,C() as c,\n    D() as d,\n):\n    print(\"hello\")\n"
-        location:
-          row: 84
-          column: 0
-        end_location:
-          row: 93
-          column: 0
-  parent: ~
+SIM117.py:2:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+  |
+2 |   # SIM117
+3 | / with A() as a:
+4 | |     with B() as b:
+  | |__________________^ SIM117
+5 |           print("hello")
+  |
+  = help: Combine `with` statements
+
+ℹ Suggested fix
+1 1 | # SIM117
+2   |-with A() as a:
+3   |-    with B() as b:
+4   |-        print("hello")
+  2 |+with A() as a, B() as b:
+  3 |+    print("hello")
+5 4 | 
+6 5 | # SIM117
+7 6 | with A():
+
+SIM117.py:7:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+   |
+ 7 |   # SIM117
+ 8 | / with A():
+ 9 | |     with B():
+10 | |         with C():
+   | |_________________^ SIM117
+11 |               print("hello")
+   |
+   = help: Combine `with` statements
+
+ℹ Suggested fix
+4  4  |         print("hello")
+5  5  | 
+6  6  | # SIM117
+7     |-with A():
+8     |-    with B():
+9     |-        with C():
+10    |-            print("hello")
+   7  |+with A(), B():
+   8  |+    with C():
+   9  |+        print("hello")
+11 10 | 
+12 11 | # SIM117
+13 12 | with A() as a:
+
+SIM117.py:13:1: SIM117 Use a single `with` statement with multiple contexts instead of nested `with` statements
+   |
+13 |   # SIM117
+14 | / with A() as a:
+15 | |     # Unfixable due to placement of this comment.
+16 | |     with B() as b:
+   | |__________________^ SIM117
+17 |           print("hello")
+   |
+
+SIM117.py:19:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+   |
+19 |   # SIM117
+20 | / with A() as a:
+21 | |     with B() as b:
+   | |__________________^ SIM117
+22 |           # Fixable due to placement of this comment.
+23 |           print("hello")
+   |
+   = help: Combine `with` statements
+
+ℹ Suggested fix
+16 16 |         print("hello")
+17 17 | 
+18 18 | # SIM117
+19    |-with A() as a:
+20    |-    with B() as b:
+21    |-        # Fixable due to placement of this comment.
+22    |-        print("hello")
+   19 |+with A() as a, B() as b:
+   20 |+    # Fixable due to placement of this comment.
+   21 |+    print("hello")
+23 22 | 
+24 23 | # OK
+25 24 | with A() as a:
+
+SIM117.py:53:5: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+   |
+53 |   while True:
+54 |       # SIM117
+55 |       with A() as a:
+   |  _____^
+56 | |         with B() as b:
+   | |______________________^ SIM117
+57 |               """this
+58 |   is valid"""
+   |
+   = help: Combine `with` statements
+
+ℹ Suggested fix
+50 50 | 
+51 51 | while True:
+52 52 |     # SIM117
+53    |-    with A() as a:
+54    |-        with B() as b:
+55    |-            """this
+   53 |+    with A() as a, B() as b:
+   54 |+        """this
+56 55 | is valid"""
+57 56 | 
+58    |-            """the indentation on
+   57 |+        """the indentation on
+59 58 |             this line is significant"""
+60 59 | 
+61    |-            "this is" \
+   60 |+        "this is" \
+62 61 | "allowed too"
+63 62 | 
+64    |-            ("so is"
+   63 |+        ("so is"
+65 64 | "this for some reason")
+66 65 | 
+67 66 | # SIM117
+
+SIM117.py:68:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+   |
+68 |   # SIM117
+69 | / with (
+70 | |     A() as a,
+71 | |     B() as b,
+72 | | ):
+73 | |     with C() as c:
+   | |__________________^ SIM117
+74 |           print("hello")
+   |
+   = help: Combine `with` statements
+
+ℹ Suggested fix
+67 67 | # SIM117
+68 68 | with (
+69 69 |     A() as a,
+70    |-    B() as b,
+   70 |+    B() as b,C() as c
+71 71 | ):
+72    |-    with C() as c:
+73    |-        print("hello")
+   72 |+    print("hello")
+74 73 | 
+75 74 | # SIM117
+76 75 | with A() as a:
+
+SIM117.py:76:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+   |
+76 |   # SIM117
+77 | / with A() as a:
+78 | |     with (
+79 | |         B() as b,
+80 | |         C() as c,
+81 | |     ):
+   | |______^ SIM117
+82 |           print("hello")
+   |
+   = help: Combine `with` statements
+
+ℹ Suggested fix
+73 73 |         print("hello")
+74 74 | 
+75 75 | # SIM117
+76    |-with A() as a:
+77    |-    with (
+78    |-        B() as b,
+79    |-        C() as c,
+80    |-    ):
+81    |-        print("hello")
+   76 |+with (
+   77 |+    A() as a, B() as b,
+   78 |+    C() as c,
+   79 |+):
+   80 |+    print("hello")
+82 81 | 
+83 82 | # SIM117
+84 83 | with (
+
+SIM117.py:84:1: SIM117 [*] Use a single `with` statement with multiple contexts instead of nested `with` statements
+   |
+84 |   # SIM117
+85 | / with (
+86 | |     A() as a,
+87 | |     B() as b,
+88 | | ):
+89 | |     with (
+90 | |         C() as c,
+91 | |         D() as d,
+92 | |     ):
+   | |______^ SIM117
+93 |           print("hello")
+   |
+   = help: Combine `with` statements
+
+ℹ Suggested fix
+83 83 | # SIM117
+84 84 | with (
+85 85 |     A() as a,
+86    |-    B() as b,
+   86 |+    B() as b,C() as c,
+   87 |+    D() as d,
+87 88 | ):
+88    |-    with (
+89    |-        C() as c,
+90    |-        D() as d,
+91    |-    ):
+92    |-        print("hello")
+   89 |+    print("hello")
+
 

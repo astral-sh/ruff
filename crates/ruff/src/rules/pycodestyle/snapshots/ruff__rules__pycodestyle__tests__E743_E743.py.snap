@@ -1,47 +1,26 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: AmbiguousFunctionName
-    body: "Ambiguous function name: `l`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 4
-  end_location:
-    row: 1
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AmbiguousFunctionName
-    body: "Ambiguous function name: `I`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 4
-  end_location:
-    row: 5
-    column: 5
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: AmbiguousFunctionName
-    body: "Ambiguous function name: `O`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 8
-  end_location:
-    row: 10
-    column: 9
-  fix:
-    edits: []
-  parent: ~
+E743.py:1:5: E743 Ambiguous function name: `l`
+  |
+1 | def l():
+  |     ^ E743
+2 |     pass
+  |
+
+E743.py:5:5: E743 Ambiguous function name: `I`
+  |
+5 | def I():
+  |     ^ E743
+6 |     pass
+  |
+
+E743.py:10:9: E743 Ambiguous function name: `O`
+   |
+10 | class X:
+11 |     def O(self):
+   |         ^ E743
+12 |         pass
+   |
+
 

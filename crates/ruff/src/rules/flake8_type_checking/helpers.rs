@@ -1,11 +1,11 @@
 use num_traits::Zero;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-use ruff_python_ast::binding::{Binding, BindingKind, ExecutionContext};
 use ruff_python_ast::call_path::from_qualified_name;
-use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers::map_callable;
-use ruff_python_ast::scope::ScopeKind;
+use ruff_python_semantic::binding::{Binding, BindingKind, ExecutionContext};
+use ruff_python_semantic::context::Context;
+use ruff_python_semantic::scope::ScopeKind;
 
 /// Return `true` if [`Expr`] is a guard for a type-checking block.
 pub fn is_type_checking_block(context: &Context, test: &Expr) -> bool {

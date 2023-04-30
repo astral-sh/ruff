@@ -1,15 +1,13 @@
-use rustpython_parser::ast::{Located, Location};
+use ruff_text_size::TextRange;
+use rustpython_parser::ast::Located;
 
 use crate::source_code::Locator;
-use crate::types::Range;
 
 /// Extract the leading indentation from a line.
-pub fn indentation<'a, T>(locator: &'a Locator, located: &'a Located<T>) -> Option<&'a str> {
-    let range = Range::from(located);
-    let indentation = locator.slice(Range::new(
-        Location::new(range.location.row(), 0),
-        Location::new(range.location.row(), range.location.column()),
-    ));
+pub fn indentation<'a, T>(locator: &'a Locator, located: &Located<T>) -> Option<&'a str> {
+    let line_start = locator.line_start(located.start());
+    let indentation = &locator.contents()[TextRange::new(line_start, located.start())];
+
     if indentation.chars().all(char::is_whitespace) {
         Some(indentation)
     } else {

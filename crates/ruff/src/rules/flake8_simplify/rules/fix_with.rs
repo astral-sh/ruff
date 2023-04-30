@@ -1,10 +1,8 @@
 use anyhow::{bail, Result};
 use libcst_native::{Codegen, CodegenState, CompoundStatement, Statement, Suite, With};
-use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::Edit;
 use ruff_python_ast::source_code::{Locator, Stylist};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::whitespace;
 
 use crate::cst::matchers::match_module;
@@ -21,10 +19,7 @@ pub(crate) fn fix_multiple_with_statements(
     };
 
     // Extract the module text.
-    let contents = locator.slice(Range::new(
-        Location::new(stmt.location.row(), 0),
-        Location::new(stmt.end_location.unwrap().row() + 1, 0),
-    ));
+    let contents = locator.lines(stmt.range());
 
     // If the block is indented, "embed" it in a function definition, to preserve
     // indentation while retaining valid source code. (We'll strip the prefix later
@@ -95,9 +90,7 @@ pub(crate) fn fix_multiple_with_statements(
             .to_string()
     };
 
-    Ok(Edit::replacement(
-        contents,
-        Location::new(stmt.location.row(), 0),
-        Location::new(stmt.end_location.unwrap().row() + 1, 0),
-    ))
+    let range = locator.lines_range(stmt.range());
+
+    Ok(Edit::range_replacement(contents, range))
 }

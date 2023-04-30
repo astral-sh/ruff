@@ -3,8 +3,7 @@ use rustpython_parser::ast::{Expr, ExprKind};
 use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::binding::BindingKind;
-use ruff_python_ast::types::Range;
+use ruff_python_semantic::binding::BindingKind;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -93,5 +92,5 @@ pub fn check_attr(checker: &mut Checker, attr: &str, value: &Expr, attr_expr: &E
 
     checker
         .diagnostics
-        .push(Diagnostic::new(violation, Range::from(attr_expr)));
+        .push(Diagnostic::new(violation, attr_expr.range()));
 }

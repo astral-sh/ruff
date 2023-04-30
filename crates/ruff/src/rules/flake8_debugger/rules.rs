@@ -1,12 +1,10 @@
 use rustpython_parser::ast::{Expr, Stmt};
 
+use crate::checkers::ast::Checker;
+use crate::rules::flake8_debugger::types::DebuggerUsingType;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{format_call_path, from_unqualified_name, CallPath};
-use ruff_python_ast::types::Range;
-
-use crate::checkers::ast::Checker;
-use crate::rules::flake8_debugger::types::DebuggerUsingType;
 
 #[violation]
 pub struct Debugger {
@@ -53,7 +51,7 @@ pub fn debugger_call(checker: &mut Checker, expr: &Expr, func: &Expr) {
             Debugger {
                 using_type: DebuggerUsingType::Call(format_call_path(target)),
             },
-            Range::from(expr),
+            expr.range(),
         ));
     }
 }
@@ -77,7 +75,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
                 Debugger {
                     using_type: DebuggerUsingType::Import(format_call_path(&call_path)),
                 },
-                Range::from(stmt),
+                stmt.range(),
             ));
         }
     } else {
@@ -90,7 +88,7 @@ pub fn debugger_import(stmt: &Stmt, module: Option<&str>, name: &str) -> Option<
                 Debugger {
                     using_type: DebuggerUsingType::Import(name.to_string()),
                 },
-                Range::from(stmt),
+                stmt.range(),
             ));
         }
     }

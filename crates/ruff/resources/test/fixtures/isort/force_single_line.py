@@ -22,3 +22,6 @@ from bar import (
      a, # comment 7
      b, # comment 8
 )
+
+# comment 9
+from baz import *  # comment 10

@@ -1,929 +1,902 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 16
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 1
-          column: 10
-        end_location:
-          row: 1
-          column: 15
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 2
-    column: 0
-  end_location:
-    row: 2
-    column: 17
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 2
-          column: 10
-        end_location:
-          row: 2
-          column: 16
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 17
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 3
-          column: 12
-        end_location:
-          row: 3
-          column: 16
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 18
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 4
-          column: 12
-        end_location:
-          row: 4
-          column: 17
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 5
-    column: 0
-  end_location:
-    row: 5
-    column: 16
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 5
-          column: 10
-        end_location:
-          row: 5
-          column: 15
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 17
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 6
-          column: 10
-        end_location:
-          row: 6
-          column: 16
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 32
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 7
-          column: 8
-        end_location:
-          row: 7
-          column: 13
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"w\"\""
-    suggestion: "Replace with \"\"w\"\""
-    fixable: true
-  location:
-    row: 8
-    column: 0
-  end_location:
-    row: 8
-    column: 15
-  fix:
-    edits:
-      - content: "\"w\""
-        location:
-          row: 8
-          column: 10
-        end_location:
-          row: 8
-          column: 14
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 10
-    column: 5
-  end_location:
-    row: 10
-    column: 21
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 10
-          column: 15
-        end_location:
-          row: 10
-          column: 20
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 12
-    column: 5
-  end_location:
-    row: 12
-    column: 22
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 12
-          column: 15
-        end_location:
-          row: 12
-          column: 21
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 14
-    column: 5
-  end_location:
-    row: 14
-    column: 22
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 14
-          column: 17
-        end_location:
-          row: 14
-          column: 21
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 16
-    column: 5
-  end_location:
-    row: 16
-    column: 23
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 16
-          column: 17
-        end_location:
-          row: 16
-          column: 22
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 18
-    column: 5
-  end_location:
-    row: 18
-    column: 21
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 18
-          column: 15
-        end_location:
-          row: 18
-          column: 20
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 20
-    column: 5
-  end_location:
-    row: 20
-    column: 22
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 20
-          column: 15
-        end_location:
-          row: 20
-          column: 21
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 22
-    column: 5
-  end_location:
-    row: 22
-    column: 39
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 22
-          column: 15
-        end_location:
-          row: 22
-          column: 20
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"w\"\""
-    suggestion: "Replace with \"\"w\"\""
-    fixable: true
-  location:
-    row: 24
-    column: 5
-  end_location:
-    row: 24
-    column: 22
-  fix:
-    edits:
-      - content: "\"w\""
-        location:
-          row: 24
-          column: 17
-        end_location:
-          row: 24
-          column: 21
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 27
-    column: 0
-  end_location:
-    row: 27
-    column: 27
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 27
-          column: 21
-        end_location:
-          row: 27
-          column: 26
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 28
-    column: 0
-  end_location:
-    row: 28
-    column: 28
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 28
-          column: 23
-        end_location:
-          row: 28
-          column: 27
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 30
-    column: 5
-  end_location:
-    row: 30
-    column: 32
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 30
-          column: 26
-        end_location:
-          row: 30
-          column: 31
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 32
-    column: 5
-  end_location:
-    row: 32
-    column: 33
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 32
-          column: 28
-        end_location:
-          row: 32
-          column: 32
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 35
-    column: 5
-  end_location:
-    row: 35
-    column: 21
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 35
-          column: 15
-        end_location:
-          row: 35
-          column: 20
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 35
-    column: 29
-  end_location:
-    row: 35
-    column: 45
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 35
-          column: 39
-        end_location:
-          row: 35
-          column: 44
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 37
-    column: 5
-  end_location:
-    row: 37
-    column: 22
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 37
-          column: 17
-        end_location:
-          row: 37
-          column: 21
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 37
-    column: 30
-  end_location:
-    row: 37
-    column: 47
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 37
-          column: 42
-        end_location:
-          row: 37
-          column: 46
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 40
-    column: 0
-  end_location:
-    row: 40
-    column: 21
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 40
-          column: 10
-        end_location:
-          row: 40
-          column: 20
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 41
-    column: 0
-  end_location:
-    row: 41
-    column: 26
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 41
-          column: 15
-        end_location:
-          row: 41
-          column: 25
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 42
-    column: 0
-  end_location:
-    row: 42
-    column: 26
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 42
-          column: 5
-        end_location:
-          row: 42
-          column: 15
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 44
-    column: 5
-  end_location:
-    row: 44
-    column: 26
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 44
-          column: 15
-        end_location:
-          row: 44
-          column: 25
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 46
-    column: 5
-  end_location:
-    row: 46
-    column: 31
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 46
-          column: 20
-        end_location:
-          row: 46
-          column: 30
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 48
-    column: 5
-  end_location:
-    row: 48
-    column: 31
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 48
-          column: 10
-        end_location:
-          row: 48
-          column: 20
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 51
-    column: 0
-  end_location:
-    row: 51
-    column: 22
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 51
-          column: 17
-        end_location:
-          row: 51
-          column: 21
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 52
-    column: 0
-  end_location:
-    row: 52
-    column: 27
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 52
-          column: 22
-        end_location:
-          row: 52
-          column: 26
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 53
-    column: 0
-  end_location:
-    row: 53
-    column: 27
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 53
-          column: 10
-        end_location:
-          row: 53
-          column: 14
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 55
-    column: 5
-  end_location:
-    row: 55
-    column: 27
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 55
-          column: 22
-        end_location:
-          row: 55
-          column: 26
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 57
-    column: 5
-  end_location:
-    row: 57
-    column: 32
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 57
-          column: 27
-        end_location:
-          row: 57
-          column: 31
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 59
-    column: 5
-  end_location:
-    row: 59
-    column: 32
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 59
-          column: 15
-        end_location:
-          row: 59
-          column: 19
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 62
-    column: 0
-  end_location:
-    row: 62
-    column: 110
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 62
-          column: 15
-        end_location:
-          row: 62
-          column: 25
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 63
-    column: 0
-  end_location:
-    row: 63
-    column: 110
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 63
-          column: 99
-        end_location:
-          row: 63
-          column: 109
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 64
-    column: 0
-  end_location:
-    row: 64
-    column: 110
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 64
-          column: 58
-        end_location:
-          row: 64
-          column: 68
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: Unnecessary open mode parameters
-    suggestion: Remove open mode parameters
-    fixable: true
-  location:
-    row: 65
-    column: 0
-  end_location:
-    row: 65
-    column: 110
-  fix:
-    edits:
-      - content: ""
-        location:
-          row: 65
-          column: 5
-        end_location:
-          row: 65
-          column: 15
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 67
-    column: 0
-  end_location:
-    row: 67
-    column: 111
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 67
-          column: 22
-        end_location:
-          row: 67
-          column: 26
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 68
-    column: 0
-  end_location:
-    row: 68
-    column: 111
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 68
-          column: 106
-        end_location:
-          row: 68
-          column: 110
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 69
-    column: 0
-  end_location:
-    row: 69
-    column: 111
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 69
-          column: 65
-        end_location:
-          row: 69
-          column: 69
-  parent: ~
-- kind:
-    name: RedundantOpenModes
-    body: "Unnecessary open mode parameters, use \"\"rb\"\""
-    suggestion: "Replace with \"\"rb\"\""
-    fixable: true
-  location:
-    row: 70
-    column: 0
-  end_location:
-    row: 70
-    column: 111
-  fix:
-    edits:
-      - content: "\"rb\""
-        location:
-          row: 70
-          column: 10
-        end_location:
-          row: 70
-          column: 14
-  parent: ~
+UP015.py:1:1: UP015 [*] Unnecessary open mode parameters
+  |
+1 | open("foo", "U")
+  | ^^^^^^^^^^^^^^^^ UP015
+2 | open("foo", "Ur")
+3 | open("foo", "Ub")
+  |
+  = help: Remove open mode parameters
+
+ℹ Suggested fix
+1   |-open("foo", "U")
+  1 |+open("foo")
+2 2 | open("foo", "Ur")
+3 3 | open("foo", "Ub")
+4 4 | open("foo", "rUb")
+
+UP015.py:2:1: UP015 [*] Unnecessary open mode parameters
+  |
+2 | open("foo", "U")
+3 | open("foo", "Ur")
+  | ^^^^^^^^^^^^^^^^^ UP015
+4 | open("foo", "Ub")
+5 | open("foo", "rUb")
+  |
+  = help: Remove open mode parameters
+
+ℹ Suggested fix
+1 1 | open("foo", "U")
+2   |-open("foo", "Ur")
+  2 |+open("foo")
+3 3 | open("foo", "Ub")
+4 4 | open("foo", "rUb")
+5 5 | open("foo", "r")
+
+UP015.py:3:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+  |
+3 | open("foo", "U")
+4 | open("foo", "Ur")
+5 | open("foo", "Ub")
+  | ^^^^^^^^^^^^^^^^^ UP015
+6 | open("foo", "rUb")
+7 | open("foo", "r")
+  |
+  = help: Replace with ""rb""
+
+ℹ Suggested fix
+1 1 | open("foo", "U")
+2 2 | open("foo", "Ur")
+3   |-open("foo", "Ub")
+  3 |+open("foo", "rb")
+4 4 | open("foo", "rUb")
+5 5 | open("foo", "r")
+6 6 | open("foo", "rt")
+
+UP015.py:4:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+  |
+4 | open("foo", "Ur")
+5 | open("foo", "Ub")
+6 | open("foo", "rUb")
+  | ^^^^^^^^^^^^^^^^^^ UP015
+7 | open("foo", "r")
+8 | open("foo", "rt")
+  |
+  = help: Replace with ""rb""
+
+ℹ Suggested fix
+1 1 | open("foo", "U")
+2 2 | open("foo", "Ur")
+3 3 | open("foo", "Ub")
+4   |-open("foo", "rUb")
+  4 |+open("foo", "rb")
+5 5 | open("foo", "r")
+6 6 | open("foo", "rt")
+7 7 | open("f", "r", encoding="UTF-8")
+
+UP015.py:5:1: UP015 [*] Unnecessary open mode parameters
+  |
+5 | open("foo", "Ub")
+6 | open("foo", "rUb")
+7 | open("foo", "r")
+  | ^^^^^^^^^^^^^^^^ UP015
+8 | open("foo", "rt")
+9 | open("f", "r", encoding="UTF-8")
+  |
+  = help: Remove open mode parameters
+
+ℹ Suggested fix
+2 2 | open("foo", "Ur")
+3 3 | open("foo", "Ub")
+4 4 | open("foo", "rUb")
+5   |-open("foo", "r")
+  5 |+open("foo")
+6 6 | open("foo", "rt")
+7 7 | open("f", "r", encoding="UTF-8")
+8 8 | open("f", "wt")
+
+UP015.py:6:1: UP015 [*] Unnecessary open mode parameters
+   |
+ 6 | open("foo", "rUb")
+ 7 | open("foo", "r")
+ 8 | open("foo", "rt")
+   | ^^^^^^^^^^^^^^^^^ UP015
+ 9 | open("f", "r", encoding="UTF-8")
+10 | open("f", "wt")
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+3 3 | open("foo", "Ub")
+4 4 | open("foo", "rUb")
+5 5 | open("foo", "r")
+6   |-open("foo", "rt")
+  6 |+open("foo")
+7 7 | open("f", "r", encoding="UTF-8")
+8 8 | open("f", "wt")
+9 9 | 
+
+UP015.py:7:1: UP015 [*] Unnecessary open mode parameters
+   |
+ 7 | open("foo", "r")
+ 8 | open("foo", "rt")
+ 9 | open("f", "r", encoding="UTF-8")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+10 | open("f", "wt")
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+4 4 | open("foo", "rUb")
+5 5 | open("foo", "r")
+6 6 | open("foo", "rt")
+7   |-open("f", "r", encoding="UTF-8")
+  7 |+open("f", encoding="UTF-8")
+8 8 | open("f", "wt")
+9 9 | 
+10 10 | with open("foo", "U") as f:
+
+UP015.py:8:1: UP015 [*] Unnecessary open mode parameters, use ""w""
+   |
+ 8 | open("foo", "rt")
+ 9 | open("f", "r", encoding="UTF-8")
+10 | open("f", "wt")
+   | ^^^^^^^^^^^^^^^ UP015
+11 | 
+12 | with open("foo", "U") as f:
+   |
+   = help: Replace with ""w""
+
+ℹ Suggested fix
+5 5 | open("foo", "r")
+6 6 | open("foo", "rt")
+7 7 | open("f", "r", encoding="UTF-8")
+8   |-open("f", "wt")
+  8 |+open("f", "w")
+9 9 | 
+10 10 | with open("foo", "U") as f:
+11 11 |     pass
+
+UP015.py:10:6: UP015 [*] Unnecessary open mode parameters
+   |
+10 | open("f", "wt")
+11 | 
+12 | with open("foo", "U") as f:
+   |      ^^^^^^^^^^^^^^^^ UP015
+13 |     pass
+14 | with open("foo", "Ur") as f:
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+7  7  | open("f", "r", encoding="UTF-8")
+8  8  | open("f", "wt")
+9  9  | 
+10    |-with open("foo", "U") as f:
+   10 |+with open("foo") as f:
+11 11 |     pass
+12 12 | with open("foo", "Ur") as f:
+13 13 |     pass
+
+UP015.py:12:6: UP015 [*] Unnecessary open mode parameters
+   |
+12 | with open("foo", "U") as f:
+13 |     pass
+14 | with open("foo", "Ur") as f:
+   |      ^^^^^^^^^^^^^^^^^ UP015
+15 |     pass
+16 | with open("foo", "Ub") as f:
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+9  9  | 
+10 10 | with open("foo", "U") as f:
+11 11 |     pass
+12    |-with open("foo", "Ur") as f:
+   12 |+with open("foo") as f:
+13 13 |     pass
+14 14 | with open("foo", "Ub") as f:
+15 15 |     pass
+
+UP015.py:14:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+14 | with open("foo", "Ur") as f:
+15 |     pass
+16 | with open("foo", "Ub") as f:
+   |      ^^^^^^^^^^^^^^^^^ UP015
+17 |     pass
+18 | with open("foo", "rUb") as f:
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+11 11 |     pass
+12 12 | with open("foo", "Ur") as f:
+13 13 |     pass
+14    |-with open("foo", "Ub") as f:
+   14 |+with open("foo", "rb") as f:
+15 15 |     pass
+16 16 | with open("foo", "rUb") as f:
+17 17 |     pass
+
+UP015.py:16:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+16 | with open("foo", "Ub") as f:
+17 |     pass
+18 | with open("foo", "rUb") as f:
+   |      ^^^^^^^^^^^^^^^^^^ UP015
+19 |     pass
+20 | with open("foo", "r") as f:
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+13 13 |     pass
+14 14 | with open("foo", "Ub") as f:
+15 15 |     pass
+16    |-with open("foo", "rUb") as f:
+   16 |+with open("foo", "rb") as f:
+17 17 |     pass
+18 18 | with open("foo", "r") as f:
+19 19 |     pass
+
+UP015.py:18:6: UP015 [*] Unnecessary open mode parameters
+   |
+18 | with open("foo", "rUb") as f:
+19 |     pass
+20 | with open("foo", "r") as f:
+   |      ^^^^^^^^^^^^^^^^ UP015
+21 |     pass
+22 | with open("foo", "rt") as f:
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+15 15 |     pass
+16 16 | with open("foo", "rUb") as f:
+17 17 |     pass
+18    |-with open("foo", "r") as f:
+   18 |+with open("foo") as f:
+19 19 |     pass
+20 20 | with open("foo", "rt") as f:
+21 21 |     pass
+
+UP015.py:20:6: UP015 [*] Unnecessary open mode parameters
+   |
+20 | with open("foo", "r") as f:
+21 |     pass
+22 | with open("foo", "rt") as f:
+   |      ^^^^^^^^^^^^^^^^^ UP015
+23 |     pass
+24 | with open("foo", "r", encoding="UTF-8") as f:
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+17 17 |     pass
+18 18 | with open("foo", "r") as f:
+19 19 |     pass
+20    |-with open("foo", "rt") as f:
+   20 |+with open("foo") as f:
+21 21 |     pass
+22 22 | with open("foo", "r", encoding="UTF-8") as f:
+23 23 |     pass
+
+UP015.py:22:6: UP015 [*] Unnecessary open mode parameters
+   |
+22 | with open("foo", "rt") as f:
+23 |     pass
+24 | with open("foo", "r", encoding="UTF-8") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+25 |     pass
+26 | with open("foo", "wt") as f:
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+19 19 |     pass
+20 20 | with open("foo", "rt") as f:
+21 21 |     pass
+22    |-with open("foo", "r", encoding="UTF-8") as f:
+   22 |+with open("foo", encoding="UTF-8") as f:
+23 23 |     pass
+24 24 | with open("foo", "wt") as f:
+25 25 |     pass
+
+UP015.py:24:6: UP015 [*] Unnecessary open mode parameters, use ""w""
+   |
+24 | with open("foo", "r", encoding="UTF-8") as f:
+25 |     pass
+26 | with open("foo", "wt") as f:
+   |      ^^^^^^^^^^^^^^^^^ UP015
+27 |     pass
+   |
+   = help: Replace with ""w""
+
+ℹ Suggested fix
+21 21 |     pass
+22 22 | with open("foo", "r", encoding="UTF-8") as f:
+23 23 |     pass
+24    |-with open("foo", "wt") as f:
+   24 |+with open("foo", "w") as f:
+25 25 |     pass
+26 26 | 
+27 27 | open(f("a", "b", "c"), "U")
+
+UP015.py:27:1: UP015 [*] Unnecessary open mode parameters
+   |
+27 |     pass
+28 | 
+29 | open(f("a", "b", "c"), "U")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+30 | open(f("a", "b", "c"), "Ub")
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+24 24 | with open("foo", "wt") as f:
+25 25 |     pass
+26 26 | 
+27    |-open(f("a", "b", "c"), "U")
+   27 |+open(f("a", "b", "c"))
+28 28 | open(f("a", "b", "c"), "Ub")
+29 29 | 
+30 30 | with open(f("a", "b", "c"), "U") as f:
+
+UP015.py:28:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+28 | open(f("a", "b", "c"), "U")
+29 | open(f("a", "b", "c"), "Ub")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+30 | 
+31 | with open(f("a", "b", "c"), "U") as f:
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+25 25 |     pass
+26 26 | 
+27 27 | open(f("a", "b", "c"), "U")
+28    |-open(f("a", "b", "c"), "Ub")
+   28 |+open(f("a", "b", "c"), "rb")
+29 29 | 
+30 30 | with open(f("a", "b", "c"), "U") as f:
+31 31 |     pass
+
+UP015.py:30:6: UP015 [*] Unnecessary open mode parameters
+   |
+30 | open(f("a", "b", "c"), "Ub")
+31 | 
+32 | with open(f("a", "b", "c"), "U") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+33 |     pass
+34 | with open(f("a", "b", "c"), "Ub") as f:
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+27 27 | open(f("a", "b", "c"), "U")
+28 28 | open(f("a", "b", "c"), "Ub")
+29 29 | 
+30    |-with open(f("a", "b", "c"), "U") as f:
+   30 |+with open(f("a", "b", "c")) as f:
+31 31 |     pass
+32 32 | with open(f("a", "b", "c"), "Ub") as f:
+33 33 |     pass
+
+UP015.py:32:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+32 | with open(f("a", "b", "c"), "U") as f:
+33 |     pass
+34 | with open(f("a", "b", "c"), "Ub") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+35 |     pass
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+29 29 | 
+30 30 | with open(f("a", "b", "c"), "U") as f:
+31 31 |     pass
+32    |-with open(f("a", "b", "c"), "Ub") as f:
+   32 |+with open(f("a", "b", "c"), "rb") as f:
+33 33 |     pass
+34 34 | 
+35 35 | with open("foo", "U") as fa, open("bar", "U") as fb:
+
+UP015.py:35:6: UP015 [*] Unnecessary open mode parameters
+   |
+35 |     pass
+36 | 
+37 | with open("foo", "U") as fa, open("bar", "U") as fb:
+   |      ^^^^^^^^^^^^^^^^ UP015
+38 |     pass
+39 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+32 32 | with open(f("a", "b", "c"), "Ub") as f:
+33 33 |     pass
+34 34 | 
+35    |-with open("foo", "U") as fa, open("bar", "U") as fb:
+   35 |+with open("foo") as fa, open("bar", "U") as fb:
+36 36 |     pass
+37 37 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
+38 38 |     pass
+
+UP015.py:35:30: UP015 [*] Unnecessary open mode parameters
+   |
+35 |     pass
+36 | 
+37 | with open("foo", "U") as fa, open("bar", "U") as fb:
+   |                              ^^^^^^^^^^^^^^^^ UP015
+38 |     pass
+39 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+32 32 | with open(f("a", "b", "c"), "Ub") as f:
+33 33 |     pass
+34 34 | 
+35    |-with open("foo", "U") as fa, open("bar", "U") as fb:
+   35 |+with open("foo", "U") as fa, open("bar") as fb:
+36 36 |     pass
+37 37 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
+38 38 |     pass
+
+UP015.py:37:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+37 | with open("foo", "U") as fa, open("bar", "U") as fb:
+38 |     pass
+39 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
+   |      ^^^^^^^^^^^^^^^^^ UP015
+40 |     pass
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+34 34 | 
+35 35 | with open("foo", "U") as fa, open("bar", "U") as fb:
+36 36 |     pass
+37    |-with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
+   37 |+with open("foo", "rb") as fa, open("bar", "Ub") as fb:
+38 38 |     pass
+39 39 | 
+40 40 | open("foo", mode="U")
+
+UP015.py:37:31: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+37 | with open("foo", "U") as fa, open("bar", "U") as fb:
+38 |     pass
+39 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
+   |                               ^^^^^^^^^^^^^^^^^ UP015
+40 |     pass
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+34 34 | 
+35 35 | with open("foo", "U") as fa, open("bar", "U") as fb:
+36 36 |     pass
+37    |-with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
+   37 |+with open("foo", "Ub") as fa, open("bar", "rb") as fb:
+38 38 |     pass
+39 39 | 
+40 40 | open("foo", mode="U")
+
+UP015.py:40:1: UP015 [*] Unnecessary open mode parameters
+   |
+40 |     pass
+41 | 
+42 | open("foo", mode="U")
+   | ^^^^^^^^^^^^^^^^^^^^^ UP015
+43 | open(name="foo", mode="U")
+44 | open(mode="U", name="foo")
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+37 37 | with open("foo", "Ub") as fa, open("bar", "Ub") as fb:
+38 38 |     pass
+39 39 | 
+40    |-open("foo", mode="U")
+   40 |+open("foo")
+41 41 | open(name="foo", mode="U")
+42 42 | open(mode="U", name="foo")
+43 43 | 
+
+UP015.py:41:1: UP015 [*] Unnecessary open mode parameters
+   |
+41 | open("foo", mode="U")
+42 | open(name="foo", mode="U")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+43 | open(mode="U", name="foo")
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+38 38 |     pass
+39 39 | 
+40 40 | open("foo", mode="U")
+41    |-open(name="foo", mode="U")
+   41 |+open(name="foo")
+42 42 | open(mode="U", name="foo")
+43 43 | 
+44 44 | with open("foo", mode="U") as f:
+
+UP015.py:42:1: UP015 [*] Unnecessary open mode parameters
+   |
+42 | open("foo", mode="U")
+43 | open(name="foo", mode="U")
+44 | open(mode="U", name="foo")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+45 | 
+46 | with open("foo", mode="U") as f:
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+39 39 | 
+40 40 | open("foo", mode="U")
+41 41 | open(name="foo", mode="U")
+42    |-open(mode="U", name="foo")
+   42 |+open(name="foo")
+43 43 | 
+44 44 | with open("foo", mode="U") as f:
+45 45 |     pass
+
+UP015.py:44:6: UP015 [*] Unnecessary open mode parameters
+   |
+44 | open(mode="U", name="foo")
+45 | 
+46 | with open("foo", mode="U") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^ UP015
+47 |     pass
+48 | with open(name="foo", mode="U") as f:
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+41 41 | open(name="foo", mode="U")
+42 42 | open(mode="U", name="foo")
+43 43 | 
+44    |-with open("foo", mode="U") as f:
+   44 |+with open("foo") as f:
+45 45 |     pass
+46 46 | with open(name="foo", mode="U") as f:
+47 47 |     pass
+
+UP015.py:46:6: UP015 [*] Unnecessary open mode parameters
+   |
+46 | with open("foo", mode="U") as f:
+47 |     pass
+48 | with open(name="foo", mode="U") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+49 |     pass
+50 | with open(mode="U", name="foo") as f:
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+43 43 | 
+44 44 | with open("foo", mode="U") as f:
+45 45 |     pass
+46    |-with open(name="foo", mode="U") as f:
+   46 |+with open(name="foo") as f:
+47 47 |     pass
+48 48 | with open(mode="U", name="foo") as f:
+49 49 |     pass
+
+UP015.py:48:6: UP015 [*] Unnecessary open mode parameters
+   |
+48 | with open(name="foo", mode="U") as f:
+49 |     pass
+50 | with open(mode="U", name="foo") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+51 |     pass
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+45 45 |     pass
+46 46 | with open(name="foo", mode="U") as f:
+47 47 |     pass
+48    |-with open(mode="U", name="foo") as f:
+   48 |+with open(name="foo") as f:
+49 49 |     pass
+50 50 | 
+51 51 | open("foo", mode="Ub")
+
+UP015.py:51:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+51 |     pass
+52 | 
+53 | open("foo", mode="Ub")
+   | ^^^^^^^^^^^^^^^^^^^^^^ UP015
+54 | open(name="foo", mode="Ub")
+55 | open(mode="Ub", name="foo")
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+48 48 | with open(mode="U", name="foo") as f:
+49 49 |     pass
+50 50 | 
+51    |-open("foo", mode="Ub")
+   51 |+open("foo", mode="rb")
+52 52 | open(name="foo", mode="Ub")
+53 53 | open(mode="Ub", name="foo")
+54 54 | 
+
+UP015.py:52:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+52 | open("foo", mode="Ub")
+53 | open(name="foo", mode="Ub")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+54 | open(mode="Ub", name="foo")
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+49 49 |     pass
+50 50 | 
+51 51 | open("foo", mode="Ub")
+52    |-open(name="foo", mode="Ub")
+   52 |+open(name="foo", mode="rb")
+53 53 | open(mode="Ub", name="foo")
+54 54 | 
+55 55 | with open("foo", mode="Ub") as f:
+
+UP015.py:53:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+53 | open("foo", mode="Ub")
+54 | open(name="foo", mode="Ub")
+55 | open(mode="Ub", name="foo")
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+56 | 
+57 | with open("foo", mode="Ub") as f:
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+50 50 | 
+51 51 | open("foo", mode="Ub")
+52 52 | open(name="foo", mode="Ub")
+53    |-open(mode="Ub", name="foo")
+   53 |+open(mode="rb", name="foo")
+54 54 | 
+55 55 | with open("foo", mode="Ub") as f:
+56 56 |     pass
+
+UP015.py:55:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+55 | open(mode="Ub", name="foo")
+56 | 
+57 | with open("foo", mode="Ub") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^ UP015
+58 |     pass
+59 | with open(name="foo", mode="Ub") as f:
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+52 52 | open(name="foo", mode="Ub")
+53 53 | open(mode="Ub", name="foo")
+54 54 | 
+55    |-with open("foo", mode="Ub") as f:
+   55 |+with open("foo", mode="rb") as f:
+56 56 |     pass
+57 57 | with open(name="foo", mode="Ub") as f:
+58 58 |     pass
+
+UP015.py:57:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+57 | with open("foo", mode="Ub") as f:
+58 |     pass
+59 | with open(name="foo", mode="Ub") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+60 |     pass
+61 | with open(mode="Ub", name="foo") as f:
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+54 54 | 
+55 55 | with open("foo", mode="Ub") as f:
+56 56 |     pass
+57    |-with open(name="foo", mode="Ub") as f:
+   57 |+with open(name="foo", mode="rb") as f:
+58 58 |     pass
+59 59 | with open(mode="Ub", name="foo") as f:
+60 60 |     pass
+
+UP015.py:59:6: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+59 | with open(name="foo", mode="Ub") as f:
+60 |     pass
+61 | with open(mode="Ub", name="foo") as f:
+   |      ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+62 |     pass
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+56 56 |     pass
+57 57 | with open(name="foo", mode="Ub") as f:
+58 58 |     pass
+59    |-with open(mode="Ub", name="foo") as f:
+   59 |+with open(mode="rb", name="foo") as f:
+60 60 |     pass
+61 61 | 
+62 62 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+
+UP015.py:62:1: UP015 [*] Unnecessary open mode parameters
+   |
+62 |     pass
+63 | 
+64 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+65 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+66 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+59 59 | with open(mode="Ub", name="foo") as f:
+60 60 |     pass
+61 61 | 
+62    |-open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   62 |+open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+63 63 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+64 64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+65 65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+
+UP015.py:63:1: UP015 [*] Unnecessary open mode parameters
+   |
+63 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+64 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+65 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+66 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+60 60 |     pass
+61 61 | 
+62 62 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+63    |-open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+   63 |+open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+64 64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+65 65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+66 66 | 
+
+UP015.py:64:1: UP015 [*] Unnecessary open mode parameters
+   |
+64 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+65 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+66 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+67 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+61 61 | 
+62 62 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+63 63 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+64    |-open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+   64 |+open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+65 65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+66 66 | 
+67 67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+
+UP015.py:65:1: UP015 [*] Unnecessary open mode parameters
+   |
+65 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+66 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+67 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+68 | 
+69 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   |
+   = help: Remove open mode parameters
+
+ℹ Suggested fix
+62 62 | open(file="foo", mode='U', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+63 63 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='U')
+64 64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+65    |-open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   65 |+open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+66 66 | 
+67 67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68 68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+
+UP015.py:67:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+67 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68 | 
+69 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+70 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+71 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+64 64 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='U', newline=None, closefd=True, opener=None)
+65 65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+66 66 | 
+67    |-open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   67 |+open(file="foo", mode="rb", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68 68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+69 69 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+70 70 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+
+UP015.py:68:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+68 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+69 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+70 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+71 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+65 65 | open(mode='U', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+66 66 | 
+67 67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68    |-open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+   68 |+open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode="rb")
+69 69 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+70 70 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+71 71 | 
+
+UP015.py:69:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+69 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+70 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+71 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+72 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+66 66 | 
+67 67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68 68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+69    |-open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+   69 |+open(file="foo", buffering=- 1, encoding=None, errors=None, mode="rb", newline=None, closefd=True, opener=None)
+70 70 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+71 71 | 
+72 72 | open = 1
+
+UP015.py:70:1: UP015 [*] Unnecessary open mode parameters, use ""rb""
+   |
+70 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+71 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+72 | open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP015
+73 | 
+74 | open = 1
+   |
+   = help: Replace with ""rb""
+
+ℹ Suggested fix
+67 67 | open(file="foo", mode='Ub', buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+68 68 | open(file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None, mode='Ub')
+69 69 | open(file="foo", buffering=- 1, encoding=None, errors=None, mode='Ub', newline=None, closefd=True, opener=None)
+70    |-open(mode='Ub', file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+   70 |+open(mode="rb", file="foo", buffering=- 1, encoding=None, errors=None, newline=None, closefd=True, opener=None)
+71 71 | 
+72 72 | open = 1
+73 73 | open("foo", "U")
+
 

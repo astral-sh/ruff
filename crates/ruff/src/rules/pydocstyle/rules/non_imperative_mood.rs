@@ -8,8 +8,7 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::{from_qualified_name, CallPath};
 use ruff_python_ast::cast;
 use ruff_python_ast::newlines::StrExt;
-use ruff_python_ast::types::Range;
-use ruff_python_ast::visibility::{is_property, is_test};
+use ruff_python_semantic::analyze::visibility::{is_property, is_test};
 
 use crate::checkers::ast::Checker;
 use crate::docstrings::definition::{DefinitionKind, Docstring};
@@ -46,11 +45,11 @@ pub fn non_imperative_mood(
         return;
     }
 
-    let body = docstring.body;
+    let body = docstring.body();
 
     // Find first line, disregarding whitespace.
     let line = match body.trim().universal_newlines().next() {
-        Some(line) => line.trim(),
+        Some(line) => line.as_str().trim(),
         None => return,
     };
     // Find the first word on that line and normalize it to lower-case.
@@ -62,10 +61,7 @@ pub fn non_imperative_mood(
         return;
     }
     if let Some(false) = MOOD.is_imperative(&first_word_norm) {
-        let diagnostic = Diagnostic::new(
-            NonImperativeMood(line.to_string()),
-            Range::from(docstring.expr),
-        );
+        let diagnostic = Diagnostic::new(NonImperativeMood(line.to_string()), docstring.range());
         checker.diagnostics.push(diagnostic);
     }
 }

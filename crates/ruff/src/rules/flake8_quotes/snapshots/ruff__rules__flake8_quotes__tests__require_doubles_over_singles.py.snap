@@ -1,68 +1,54 @@
 ---
 source: crates/ruff/src/rules/flake8_quotes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: BadQuotesInlineString
-    body: Single quotes found but double quotes preferred
-    suggestion: Replace single quotes with double quotes
-    fixable: true
-  location:
-    row: 1
-    column: 24
-  end_location:
-    row: 1
-    column: 45
-  fix:
-    edits:
-      - content: "\"single quote string\""
-        location:
-          row: 1
-          column: 24
-        end_location:
-          row: 1
-          column: 45
-  parent: ~
-- kind:
-    name: BadQuotesInlineString
-    body: Single quotes found but double quotes preferred
-    suggestion: Replace single quotes with double quotes
-    fixable: true
-  location:
-    row: 2
-    column: 24
-  end_location:
-    row: 2
-    column: 46
-  fix:
-    edits:
-      - content: "u\"double quote string\""
-        location:
-          row: 2
-          column: 24
-        end_location:
-          row: 2
-          column: 46
-  parent: ~
-- kind:
-    name: BadQuotesInlineString
-    body: Single quotes found but double quotes preferred
-    suggestion: Replace single quotes with double quotes
-    fixable: true
-  location:
-    row: 3
-    column: 24
-  end_location:
-    row: 3
-    column: 46
-  fix:
-    edits:
-      - content: "f\"double quote string\""
-        location:
-          row: 3
-          column: 24
-        end_location:
-          row: 3
-          column: 46
-  parent: ~
+singles.py:1:25: Q000 [*] Single quotes found but double quotes preferred
+  |
+1 | this_should_be_linted = 'single quote string'
+  |                         ^^^^^^^^^^^^^^^^^^^^^ Q000
+2 | this_should_be_linted = u'double quote string'
+3 | this_should_be_linted = f'double quote string'
+  |
+  = help: Replace single quotes with double quotes
+
+ℹ Suggested fix
+1   |-this_should_be_linted = 'single quote string'
+  1 |+this_should_be_linted = "single quote string"
+2 2 | this_should_be_linted = u'double quote string'
+3 3 | this_should_be_linted = f'double quote string'
+4 4 | this_should_be_linted = f'double {"quote"} string'
+
+singles.py:2:25: Q000 [*] Single quotes found but double quotes preferred
+  |
+2 | this_should_be_linted = 'single quote string'
+3 | this_should_be_linted = u'double quote string'
+  |                         ^^^^^^^^^^^^^^^^^^^^^^ Q000
+4 | this_should_be_linted = f'double quote string'
+5 | this_should_be_linted = f'double {"quote"} string'
+  |
+  = help: Replace single quotes with double quotes
+
+ℹ Suggested fix
+1 1 | this_should_be_linted = 'single quote string'
+2   |-this_should_be_linted = u'double quote string'
+  2 |+this_should_be_linted = u"double quote string"
+3 3 | this_should_be_linted = f'double quote string'
+4 4 | this_should_be_linted = f'double {"quote"} string'
+
+singles.py:3:25: Q000 [*] Single quotes found but double quotes preferred
+  |
+3 | this_should_be_linted = 'single quote string'
+4 | this_should_be_linted = u'double quote string'
+5 | this_should_be_linted = f'double quote string'
+  |                         ^^^^^^^^^^^^^^^^^^^^^^ Q000
+6 | this_should_be_linted = f'double {"quote"} string'
+  |
+  = help: Replace single quotes with double quotes
+
+ℹ Suggested fix
+1 1 | this_should_be_linted = 'single quote string'
+2 2 | this_should_be_linted = u'double quote string'
+3   |-this_should_be_linted = f'double quote string'
+  3 |+this_should_be_linted = f"double quote string"
+4 4 | this_should_be_linted = f'double {"quote"} string'
+
 

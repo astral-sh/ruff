@@ -1,47 +1,29 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: InvalidFirstArgumentNameForClassMethod
-    body: "First argument of a class method should be named `cls`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 30
-    column: 26
-  end_location:
-    row: 30
-    column: 30
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: InvalidFirstArgumentNameForClassMethod
-    body: "First argument of a class method should be named `cls`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 38
-    column: 55
-  end_location:
-    row: 38
-    column: 59
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: InvalidFirstArgumentNameForClassMethod
-    body: "First argument of a class method should be named `cls`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 43
-    column: 19
-  end_location:
-    row: 43
-    column: 23
-  fix:
-    edits: []
-  parent: ~
+N804.py:30:27: N804 First argument of a class method should be named `cls`
+   |
+30 |         ...
+31 | 
+32 |     def __init_subclass__(self, default_name, **kwargs):
+   |                           ^^^^ N804
+33 |         ...
+   |
+
+N804.py:38:56: N804 First argument of a class method should be named `cls`
+   |
+38 |     @classmethod
+39 |     def bad_class_method_with_positional_only_argument(self, x, /, other):
+   |                                                        ^^^^ N804
+40 |         ...
+   |
+
+N804.py:43:20: N804 First argument of a class method should be named `cls`
+   |
+43 | class MetaClass(ABCMeta):
+44 |     def bad_method(self):
+   |                    ^^^^ N804
+45 |         pass
+   |
+
 

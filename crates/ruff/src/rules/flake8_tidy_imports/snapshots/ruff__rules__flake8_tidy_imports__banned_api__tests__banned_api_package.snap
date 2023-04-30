@@ -1,0 +1,31 @@
+---
+source: crates/ruff/src/rules/flake8_tidy_imports/banned_api.rs
+---
+application.py:3:8: TID251 `attrs` is banned: The attrs module is deprecated.
+  |
+3 | from typing import TYPE_CHECKING, Any, ClassVar
+4 | 
+5 | import attrs
+  |        ^^^^^ TID251
+6 | 
+7 | from ....import unknown
+  |
+
+application.py:6:1: TID251 `my_package.sublib.protocol` is banned: The protocol module is deprecated.
+  |
+6 | from ....import unknown
+7 | from ..protocol import commands, definitions, responses
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID251
+8 | from ..server import example
+9 | from .. import server
+  |
+
+application.py:10:1: TID251 `my_package.sublib.protocol` is banned: The protocol module is deprecated.
+   |
+10 | from .. import server
+11 | from . import logger, models
+12 | from ..protocol.UpperCaseModule import some_function
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ TID251
+   |
+
+

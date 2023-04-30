@@ -12,16 +12,13 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{any_over_expr, create_expr, match_trailing_comment, unparse_expr};
-use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_ast::helpers::{create_expr, trailing_comment_start_offset, unparse_expr};
+use ruff_python_ast::types::RefEquality;
 use ruff_python_stdlib::identifiers::is_identifier;
 
 use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
-use crate::message::Location;
 use crate::registry::AsRule;
-
-use super::fixes;
 
 #[violation]
 pub struct UnnecessaryPass;
@@ -63,50 +60,6 @@ impl Violation for NonUniqueEnums {
     fn message(&self) -> String {
         let NonUniqueEnums { value } = self;
         format!("Enum contains duplicate value: `{value}`")
-    }
-}
-
-/// ## What it does
-/// Checks for unnecessary list comprehensions passed to `any` and `all`.
-///
-/// ## Why is this bad?
-/// `any` and `all` take any iterators, including generators. Converting a generator to a list
-/// by way of a list comprehension is unnecessary and reduces performance due to the
-/// overhead of creating the list.
-///
-/// For example, compare the performance of `all` with a list comprehension against that
-/// of a generator (~40x faster here):
-///
-/// ```console
-/// In [1]: %timeit all([i for i in range(1000)])
-/// 8.14 µs ± 25.4 ns per loop (mean ± std. dev. of 7 runs, 100,000 loops each)
-///
-/// In [2]: %timeit all(i for i in range(1000))
-/// 212 ns ± 0.892 ns per loop (mean ± std. dev. of 7 runs, 1,000,000 loops each)
-/// ```
-///
-/// ## Examples
-/// ```python
-/// any([x.id for x in bar])
-/// all([x.id for x in bar])
-/// ```
-///
-/// Use instead:
-/// ```python
-/// any(x.id for x in bar)
-/// all(x.id for x in bar)
-/// ```
-#[violation]
-pub struct UnnecessaryComprehensionAnyAll;
-
-impl AlwaysAutofixableViolation for UnnecessaryComprehensionAnyAll {
-    #[derive_message_formats]
-    fn message(&self) -> String {
-        format!("Unnecessary list comprehension.")
-    }
-
-    fn autofix_title(&self) -> String {
-        "Remove unnecessary list comprehension".to_string()
     }
 }
 
@@ -180,16 +133,10 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
             }
         ) {
             if matches!(pass_stmt.node, StmtKind::Pass) {
-                let mut diagnostic = Diagnostic::new(UnnecessaryPass, Range::from(pass_stmt));
+                let mut diagnostic = Diagnostic::new(UnnecessaryPass, pass_stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    if let Some(index) = match_trailing_comment(pass_stmt, checker.locator) {
-                        diagnostic.set_fix(Edit::deletion(
-                            pass_stmt.location,
-                            Location::new(
-                                pass_stmt.end_location.unwrap().row(),
-                                pass_stmt.end_location.unwrap().column() + index,
-                            ),
-                        ));
+                    if let Some(index) = trailing_comment_start_offset(pass_stmt, checker.locator) {
+                        diagnostic.set_fix(Edit::range_deletion(pass_stmt.range().add_end(index)));
                     } else {
                         diagnostic.try_set_fix(|| {
                             delete_stmt(
@@ -244,7 +191,7 @@ pub fn duplicate_class_field_definition<'a, 'b>(
         if !seen_targets.insert(target) {
             let mut diagnostic = Diagnostic::new(
                 DuplicateClassFieldDefinition(target.to_string()),
-                Range::from(stmt),
+                stmt.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
@@ -310,7 +257,7 @@ where
                 NonUniqueEnums {
                     value: unparse_expr(value, checker.stylist),
                 },
-                Range::from(stmt),
+                stmt.range(),
             );
             checker.diagnostics.push(diagnostic);
         }
@@ -324,45 +271,10 @@ pub fn unnecessary_spread(checker: &mut Checker, keys: &[Option<Expr>], values: 
             // We only care about when the key is None which indicates a spread `**`
             // inside a dict.
             if let ExprKind::Dict { .. } = value.node {
-                let diagnostic = Diagnostic::new(UnnecessarySpread, Range::from(value));
+                let diagnostic = Diagnostic::new(UnnecessarySpread, value.range());
                 checker.diagnostics.push(diagnostic);
             }
         }
-    }
-}
-
-/// Return `true` if the `Expr` contains an `await` expression.
-fn is_async_generator(expr: &Expr) -> bool {
-    any_over_expr(expr, &|expr| matches!(expr.node, ExprKind::Await { .. }))
-}
-
-/// PIE802
-pub fn unnecessary_comprehension_any_all(
-    checker: &mut Checker,
-    expr: &Expr,
-    func: &Expr,
-    args: &[Expr],
-) {
-    let ExprKind::Name { id, .. } = &func.node  else {
-        return;
-    };
-    if (matches!(id.as_str(), "all" | "any")) && args.len() == 1 {
-        let (ExprKind::ListComp { elt, .. } | ExprKind::SetComp { elt, .. }) = &args[0].node else {
-            return;
-        };
-        if is_async_generator(elt) {
-            return;
-        }
-        if !checker.ctx.is_builtin(id) {
-            return;
-        }
-        let mut diagnostic = Diagnostic::new(UnnecessaryComprehensionAnyAll, Range::from(&args[0]));
-        if checker.patch(diagnostic.kind.rule()) {
-            diagnostic.try_set_fix(|| {
-                fixes::fix_unnecessary_comprehension_any_all(checker.locator, checker.stylist, expr)
-            });
-        }
-        checker.diagnostics.push(diagnostic);
     }
 }
 
@@ -390,7 +302,7 @@ pub fn unnecessary_dict_kwargs(checker: &mut Checker, expr: &Expr, kwargs: &[Key
                     // handle case of foo(**{**bar})
                     (keys.len() == 1 && keys[0].is_none())
                 {
-                    let diagnostic = Diagnostic::new(UnnecessaryDictKwargs, Range::from(expr));
+                    let diagnostic = Diagnostic::new(UnnecessaryDictKwargs, expr.range());
                     checker.diagnostics.push(diagnostic);
                 }
             }
@@ -444,7 +356,7 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                 MultipleStartsEndsWith {
                     attr: attr_name.to_string(),
                 },
-                Range::from(expr),
+                expr.range(),
             );
             if checker.patch(diagnostic.kind.rule()) {
                 let words: Vec<&Expr> = indices
@@ -502,10 +414,9 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                         .collect(),
                 });
 
-                diagnostic.set_fix(Edit::replacement(
+                diagnostic.set_fix(Edit::range_replacement(
                     unparse_expr(&bool_op, checker.stylist),
-                    expr.location,
-                    expr.end_location.unwrap(),
+                    expr.range(),
                 ));
             }
             checker.diagnostics.push(diagnostic);
@@ -526,13 +437,9 @@ pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
     {
         if let ExprKind::List { elts, .. } = &body.node {
             if elts.is_empty() {
-                let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, Range::from(expr));
+                let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
-                        "list".to_string(),
-                        expr.location,
-                        expr.end_location.unwrap(),
-                    ));
+                    diagnostic.set_fix(Edit::range_replacement("list".to_string(), expr.range()));
                 }
                 checker.diagnostics.push(diagnostic);
             }

@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/flake8_pytest_style/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: PytestRaisesWithoutException
-    body: "set the expected exception in `pytest.raises()`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 5
-    column: 9
-  end_location:
-    row: 5
-    column: 22
-  fix:
-    edits: []
-  parent: ~
+PT010.py:5:10: PT010 set the expected exception in `pytest.raises()`
+  |
+5 | def test_ok():
+6 |     with pytest.raises():
+  |          ^^^^^^^^^^^^^ PT010
+7 |         pass
+  |
+
 

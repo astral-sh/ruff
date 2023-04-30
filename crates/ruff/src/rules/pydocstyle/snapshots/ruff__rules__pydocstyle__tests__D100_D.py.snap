@@ -1,19 +1,12 @@
 ---
 source: crates/ruff/src/rules/pydocstyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UndocumentedPublicModule
-    body: Missing docstring in public module
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 0
-  fix:
-    edits: []
-  parent: ~
+D.py:1:1: D100 Missing docstring in public module
+  |
+1 | # No docstring, so we can test D100
+  |  D100
+2 | from functools import wraps
+3 | import os
+  |
+
 

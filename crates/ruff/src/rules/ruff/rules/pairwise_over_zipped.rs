@@ -5,7 +5,6 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::checkers::ast::Checker;
-use crate::Range;
 
 #[violation]
 pub struct PairwiseOverZipped;
@@ -137,5 +136,5 @@ pub fn pairwise_over_zipped(checker: &mut Checker, func: &Expr, args: &[Expr]) {
 
     checker
         .diagnostics
-        .push(Diagnostic::new(PairwiseOverZipped, Range::from(func)));
+        .push(Diagnostic::new(PairwiseOverZipped, func.range()));
 }

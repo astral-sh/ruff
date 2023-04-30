@@ -9,14 +9,12 @@ mod tests {
     use std::path::Path;
 
     use anyhow::Result;
-    use insta::assert_yaml_snapshot;
+
     use test_case::test_case;
 
-    use ruff_python_ast::source_code::LineEnding;
-
     use crate::registry::Rule;
-    use crate::settings;
     use crate::test::test_path;
+    use crate::{assert_messages, settings};
 
     use super::settings::Settings;
 
@@ -54,7 +52,7 @@ mod tests {
             Path::new("pycodestyle").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -65,16 +63,7 @@ mod tests {
             &settings::Settings::for_rule(Rule::MissingNewlineAtEndOfFile),
         )?;
 
-        assert_yaml_snapshot!(
-            diagnostics,
-            // Replaces the platform's default line ending with `<LineEnding>` to make the test platform-
-            // agnostic
-            {
-                "[].fix.edits[].content" => insta::dynamic_redaction(|value, _path| {
-                    value.as_str().unwrap().replace(LineEnding::default().as_str(), "<LineEnding>")
-                })
-            }
-        );
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -122,7 +111,7 @@ mod tests {
             Path::new("pycodestyle").join(path).as_path(),
             &settings::Settings::for_rule(rule_code),
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -136,7 +125,7 @@ mod tests {
                 Rule::IsLiteral,
             ]),
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 
@@ -154,7 +143,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::LineTooLong)
             },
         )?;
-        assert_yaml_snapshot!(snapshot, diagnostics);
+        assert_messages!(snapshot, diagnostics);
         Ok(())
     }
 
@@ -170,7 +159,7 @@ mod tests {
                 ..settings::Settings::for_rule(Rule::DocLineTooLong)
             },
         )?;
-        assert_yaml_snapshot!(diagnostics);
+        assert_messages!(diagnostics);
         Ok(())
     }
 }

@@ -1,6 +1,5 @@
 use std::path::Path;
 
-use rustpython_parser::ast::Location;
 use rustpython_parser::lexer::LexResult;
 use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
@@ -19,7 +18,7 @@ use ruff::settings::configuration::Configuration;
 use ruff::settings::options::Options;
 use ruff::settings::{defaults, flags, Settings};
 use ruff_diagnostics::Edit;
-use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
+use ruff_python_ast::source_code::{Indexer, Locator, SourceLocation, Stylist};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -63,8 +62,8 @@ pub struct ExpandedFix {
 pub struct ExpandedMessage {
     pub code: String,
     pub message: String,
-    pub location: Location,
-    pub end_location: Location,
+    pub location: SourceLocation,
+    pub end_location: SourceLocation,
     pub fix: Option<ExpandedFix>,
 }
 
@@ -110,11 +109,13 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         exclude: None,
         extend: None,
         extend_exclude: None,
+        extend_include: None,
         fix: None,
         fix_only: None,
         fixable: None,
         force_exclude: None,
         format: None,
+        include: None,
         ignore_init_module_imports: None,
         namespace_packages: None,
         per_file_ignores: None,
@@ -178,10 +179,11 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     let stylist = Stylist::from_tokens(&tokens, &locator);
 
     // Extra indices from the code.
-    let indexer: Indexer = tokens.as_slice().into();
+    let indexer = Indexer::from_tokens(&tokens, &locator);
 
     // Extract the `# noqa` and `# isort: skip` directives from the source.
-    let directives = directives::extract_directives(&tokens, directives::Flags::empty());
+    let directives =
+        directives::extract_directives(&tokens, directives::Flags::empty(), &locator, &indexer);
 
     // Generate checks.
     let LinterResult {
@@ -190,7 +192,6 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
     } = check_path(
         Path::new("<filename>"),
         None,
-        contents,
         tokens,
         &locator,
         &stylist,
@@ -201,21 +202,28 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
         flags::Autofix::Enabled,
     );
 
+    let source_code = locator.to_source_code();
+
     let messages: Vec<ExpandedMessage> = diagnostics
         .into_iter()
-        .map(|message| ExpandedMessage {
-            code: message.kind.rule().noqa_code().to_string(),
-            message: message.kind.body,
-            location: message.location,
-            end_location: message.end_location,
-            fix: if message.fix.is_empty() {
-                None
-            } else {
-                Some(ExpandedFix {
-                    message: message.kind.suggestion,
-                    edits: message.fix.edits().to_vec(),
-                })
-            },
+        .map(|message| {
+            let start_location = source_code.source_location(message.start());
+            let end_location = source_code.source_location(message.end());
+
+            ExpandedMessage {
+                code: message.kind.rule().noqa_code().to_string(),
+                message: message.kind.body,
+                location: start_location,
+                end_location,
+                fix: if message.fix.is_empty() {
+                    None
+                } else {
+                    Some(ExpandedFix {
+                        message: message.kind.suggestion,
+                        edits: message.fix.into_edits(),
+                    })
+                },
+            }
         })
         .collect();
 

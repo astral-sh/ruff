@@ -1,26 +1,46 @@
 ---
 source: crates/ruff/src/rules/isort/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnsortedImports
-    body: Import block is un-sorted or un-formatted
-    suggestion: Organize imports
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 17
-    column: 0
-  fix:
-    edits:
-      - content: "import numpy1\nimport numpy2\nimport numpy10\nfrom numpy import (\n    cos,\n    int8,\n    int16,\n    int32,\n    int64,\n    sin,\n    tan,\n    uint8,\n    uint16,\n    uint32,\n    uint64,\n)\n"
-        location:
-          row: 1
-          column: 0
-        end_location:
-          row: 17
-          column: 0
-  parent: ~
+natural_order.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+   |
+ 1 | / import numpy1
+ 2 | | import numpy10
+ 3 | | import numpy2
+ 4 | | from numpy import (
+ 5 | |     cos,
+ 6 | |     int8,
+ 7 | |     sin,
+ 8 | |     int32,
+ 9 | |     int64,
+10 | |     tan,
+11 | |     uint8,
+12 | |     uint16,
+13 | |     int16,
+14 | |     uint32,
+15 | |     uint64,
+16 | | )
+   |
+   = help: Organize imports
+
+ℹ Suggested fix
+1  1  | import numpy1
+   2  |+import numpy2
+2  3  | import numpy10
+3     |-import numpy2
+4  4  | from numpy import (
+5  5  |     cos,
+6  6  |     int8,
+7     |-    sin,
+   7  |+    int16,
+8  8  |     int32,
+9  9  |     int64,
+   10 |+    sin,
+10 11 |     tan,
+11 12 |     uint8,
+12 13 |     uint16,
+13    |-    int16,
+14 14 |     uint32,
+15 15 |     uint64,
+16 16 | )
+
 

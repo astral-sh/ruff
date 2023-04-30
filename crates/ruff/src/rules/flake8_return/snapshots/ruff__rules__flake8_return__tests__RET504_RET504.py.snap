@@ -1,33 +1,28 @@
 ---
 source: crates/ruff/src/rules/flake8_return/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryAssign
-    body: "Unnecessary variable assignment before `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 11
-  end_location:
-    row: 6
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnnecessaryAssign
-    body: "Unnecessary variable assignment before `return` statement"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 249
-    column: 11
-  end_location:
-    row: 249
-    column: 19
-  fix:
-    edits: []
-  parent: ~
+RET504.py:6:12: RET504 Unnecessary variable assignment before `return` statement
+  |
+6 | def x():
+7 |     a = 1
+8 |     return a  # RET504
+  |            ^ RET504
+  |
+
+RET504.py:250:12: RET504 Unnecessary variable assignment before `return` statement
+    |
+250 | def get_queryset():
+251 |     queryset = Model.filter(a=1)
+252 |     return queryset  # RET504
+    |            ^^^^^^^^ RET504
+    |
+
+RET504.py:268:12: RET504 Unnecessary variable assignment before `return` statement
+    |
+268 |         return val
+269 |     val = 1
+270 |     return val  # RET504
+    |            ^^^ RET504
+    |
+
 

@@ -2,11 +2,40 @@ use rustpython_parser::ast::{Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::rules::pep8_naming::helpers;
 
+/// ## What it does
+/// Checks for class variable names that follow the `mixedCase` convention.
+///
+/// ## Why is this bad?
+/// [PEP 8] recommends that variable names should be lower case and separated
+/// by underscores (also known as `snake_case`).
+///
+/// > Function names should be lowercase, with words separated by underscores
+/// as necessary to improve readability.
+/// >
+/// > Variable names follow the same convention as function names.
+/// >
+/// > mixedCase is allowed only in contexts where that’s already the
+/// prevailing style (e.g. threading.py), to retain backwards compatibility.
+///
+/// ## Example
+/// ```python
+/// class MyClass:
+///     myVariable = "hello"
+///     another_variable = "world"
+/// ```
+///
+/// Use instead:
+/// ```python
+/// class MyClass:
+///     my_variable = "hello"
+///     another_variable = "world"
+/// ```
+///
+/// [PEP 8]: https://peps.python.org/pep-0008/#function-and-method-arguments
 #[violation]
 pub struct MixedCaseVariableInClassScope {
     pub name: String,
@@ -26,6 +55,7 @@ pub fn mixed_case_variable_in_class_scope(
     expr: &Expr,
     stmt: &Stmt,
     name: &str,
+    bases: &[Expr],
 ) {
     if checker
         .settings
@@ -36,12 +66,15 @@ pub fn mixed_case_variable_in_class_scope(
     {
         return;
     }
-    if helpers::is_mixed_case(name) && !helpers::is_namedtuple_assignment(checker, stmt) {
+    if helpers::is_mixed_case(name)
+        && !helpers::is_named_tuple_assignment(&checker.ctx, stmt)
+        && !helpers::is_typed_dict_class(&checker.ctx, bases)
+    {
         checker.diagnostics.push(Diagnostic::new(
             MixedCaseVariableInClassScope {
                 name: name.to_string(),
             },
-            Range::from(expr),
+            expr.range(),
         ));
     }
 }

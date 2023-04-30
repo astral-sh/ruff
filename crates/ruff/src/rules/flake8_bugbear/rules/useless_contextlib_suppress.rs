@@ -1,10 +1,8 @@
 use rustpython_parser::ast::Expr;
 
+use crate::checkers::ast::Checker;
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
-
-use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct UselessContextlibSuppress;
@@ -29,9 +27,8 @@ pub fn useless_contextlib_suppress(checker: &mut Checker, expr: &Expr, func: &Ex
                 call_path.as_slice() == ["contextlib", "suppress"]
             })
     {
-        checker.diagnostics.push(Diagnostic::new(
-            UselessContextlibSuppress,
-            Range::from(expr),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(UselessContextlibSuppress, expr.range()));
     }
 }

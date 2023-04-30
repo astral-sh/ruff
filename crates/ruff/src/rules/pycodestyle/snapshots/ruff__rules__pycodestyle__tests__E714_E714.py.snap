@@ -1,61 +1,42 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NotIsTest
-    body: "Test for object identity should be `is not`"
-    suggestion: "Convert to `is not`"
-    fixable: true
-  location:
-    row: 2
-    column: 7
-  end_location:
-    row: 2
-    column: 13
-  fix:
-    edits:
-      - content: X is not Y
-        location:
-          row: 2
-          column: 3
-        end_location:
-          row: 2
-          column: 13
-  parent: ~
-- kind:
-    name: NotIsTest
-    body: "Test for object identity should be `is not`"
-    suggestion: "Convert to `is not`"
-    fixable: true
-  location:
-    row: 5
-    column: 7
-  end_location:
-    row: 5
-    column: 15
-  fix:
-    edits:
-      - content: X.B is not Y
-        location:
-          row: 5
-          column: 3
-        end_location:
-          row: 5
-          column: 15
-  parent: ~
-- kind:
-    name: NotIsTest
-    body: "Test for object identity should be `is not`"
-    suggestion: "Convert to `is not`"
-    fixable: true
-  location:
-    row: 8
-    column: 7
-  end_location:
-    row: 8
-    column: 22
-  fix:
-    edits: []
-  parent: ~
+E714.py:2:8: E714 [*] Test for object identity should be `is not`
+  |
+2 | #: E714
+3 | if not X is Y:
+  |        ^^^^^^ E714
+4 |     pass
+5 | #: E714
+  |
+  = help: Convert to `is not`
+
+ℹ Suggested fix
+1 1 | #: E714
+2   |-if not X is Y:
+  2 |+if X is not Y:
+3 3 |     pass
+4 4 | #: E714
+5 5 | if not X.B is Y:
+
+E714.py:5:8: E714 [*] Test for object identity should be `is not`
+  |
+5 |     pass
+6 | #: E714
+7 | if not X.B is Y:
+  |        ^^^^^^^^ E714
+8 |     pass
+  |
+  = help: Convert to `is not`
+
+ℹ Suggested fix
+2 2 | if not X is Y:
+3 3 |     pass
+4 4 | #: E714
+5   |-if not X.B is Y:
+  5 |+if X.B is not Y:
+6 6 |     pass
+7 7 | 
+8 8 | #: Okay
+
 

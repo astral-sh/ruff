@@ -1,61 +1,43 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NoSpaceAfterBlockComment
-    body: "Block comment should start with `# `"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NoSpaceAfterBlockComment
-    body: "Block comment should start with `# `"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 14
-    column: 0
-  end_location:
-    row: 14
-    column: 20
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NoSpaceAfterBlockComment
-    body: "Block comment should start with `# `"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 25
-    column: 0
-  end_location:
-    row: 25
-    column: 11
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: NoSpaceAfterBlockComment
-    body: "Block comment should start with `# `"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 32
-    column: 0
-  end_location:
-    row: 32
-    column: 21
-  fix:
-    edits: []
-  parent: ~
+E26.py:10:1: E265 Block comment should start with `# `
+   |
+10 | x = y + 1  #:  Increment x
+11 | #: E265:1:1
+12 | #Block comment
+   | ^^^^^^^^^^^^^^ E265
+13 | a = 1
+14 | #: E265:2:1
+   |
+
+E26.py:14:1: E265 Block comment should start with `# `
+   |
+14 | #: E265:2:1
+15 | m = 42
+16 | #! This is important
+   | ^^^^^^^^^^^^^^^^^^^^ E265
+17 | mx = 42 - 42
+18 | #: E266:3:5 E266:6:5
+   |
+
+E26.py:25:1: E265 Block comment should start with `# `
+   |
+25 |     return
+26 | #: E265:1:1 E266:2:1
+27 | ##if DEBUG:
+   | ^^^^^^^^^^^ E265
+28 | ##    logging.error()
+29 | #: W291:1:42
+   |
+
+E26.py:32:1: E265 Block comment should start with `# `
+   |
+32 | #: Okay
+33 | #!/usr/bin/env python
+   | ^^^^^^^^^^^^^^^^^^^^^ E265
+34 | 
+35 | pass  # an inline comment
+   |
+
 

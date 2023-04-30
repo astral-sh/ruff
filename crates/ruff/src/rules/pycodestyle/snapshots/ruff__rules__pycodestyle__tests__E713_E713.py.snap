@@ -1,110 +1,105 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: NotInTest
-    body: "Test for membership should be `not in`"
-    suggestion: "Convert to `not in`"
-    fixable: true
-  location:
-    row: 2
-    column: 7
-  end_location:
-    row: 2
-    column: 13
-  fix:
-    edits:
-      - content: X not in Y
-        location:
-          row: 2
-          column: 3
-        end_location:
-          row: 2
-          column: 13
-  parent: ~
-- kind:
-    name: NotInTest
-    body: "Test for membership should be `not in`"
-    suggestion: "Convert to `not in`"
-    fixable: true
-  location:
-    row: 5
-    column: 7
-  end_location:
-    row: 5
-    column: 15
-  fix:
-    edits:
-      - content: X.B not in Y
-        location:
-          row: 5
-          column: 3
-        end_location:
-          row: 5
-          column: 15
-  parent: ~
-- kind:
-    name: NotInTest
-    body: "Test for membership should be `not in`"
-    suggestion: "Convert to `not in`"
-    fixable: true
-  location:
-    row: 8
-    column: 7
-  end_location:
-    row: 8
-    column: 13
-  fix:
-    edits:
-      - content: X not in Y
-        location:
-          row: 8
-          column: 3
-        end_location:
-          row: 8
-          column: 13
-  parent: ~
-- kind:
-    name: NotInTest
-    body: "Test for membership should be `not in`"
-    suggestion: "Convert to `not in`"
-    fixable: true
-  location:
-    row: 11
-    column: 22
-  end_location:
-    row: 11
-    column: 28
-  fix:
-    edits:
-      - content: Y not in Z
-        location:
-          row: 11
-          column: 18
-        end_location:
-          row: 11
-          column: 28
-  parent: ~
-- kind:
-    name: NotInTest
-    body: "Test for membership should be `not in`"
-    suggestion: "Convert to `not in`"
-    fixable: true
-  location:
-    row: 14
-    column: 8
-  end_location:
-    row: 14
-    column: 14
-  fix:
-    edits:
-      - content: X not in Y
-        location:
-          row: 14
-          column: 3
-        end_location:
-          row: 14
-          column: 15
-  parent: ~
+E713.py:2:8: E713 [*] Test for membership should be `not in`
+  |
+2 | #: E713
+3 | if not X in Y:
+  |        ^^^^^^ E713
+4 |     pass
+5 | #: E713
+  |
+  = help: Convert to `not in`
+
+ℹ Suggested fix
+1 1 | #: E713
+2   |-if not X in Y:
+  2 |+if X not in Y:
+3 3 |     pass
+4 4 | #: E713
+5 5 | if not X.B in Y:
+
+E713.py:5:8: E713 [*] Test for membership should be `not in`
+  |
+5 |     pass
+6 | #: E713
+7 | if not X.B in Y:
+  |        ^^^^^^^^ E713
+8 |     pass
+9 | #: E713
+  |
+  = help: Convert to `not in`
+
+ℹ Suggested fix
+2 2 | if not X in Y:
+3 3 |     pass
+4 4 | #: E713
+5   |-if not X.B in Y:
+  5 |+if X.B not in Y:
+6 6 |     pass
+7 7 | #: E713
+8 8 | if not X in Y and Z == "zero":
+
+E713.py:8:8: E713 [*] Test for membership should be `not in`
+   |
+ 8 |     pass
+ 9 | #: E713
+10 | if not X in Y and Z == "zero":
+   |        ^^^^^^ E713
+11 |     pass
+12 | #: E713
+   |
+   = help: Convert to `not in`
+
+ℹ Suggested fix
+5 5 | if not X.B in Y:
+6 6 |     pass
+7 7 | #: E713
+8   |-if not X in Y and Z == "zero":
+  8 |+if X not in Y and Z == "zero":
+9 9 |     pass
+10 10 | #: E713
+11 11 | if X == "zero" or not Y in Z:
+
+E713.py:11:23: E713 [*] Test for membership should be `not in`
+   |
+11 |     pass
+12 | #: E713
+13 | if X == "zero" or not Y in Z:
+   |                       ^^^^^^ E713
+14 |     pass
+15 | #: E713
+   |
+   = help: Convert to `not in`
+
+ℹ Suggested fix
+8  8  | if not X in Y and Z == "zero":
+9  9  |     pass
+10 10 | #: E713
+11    |-if X == "zero" or not Y in Z:
+   11 |+if X == "zero" or Y not in Z:
+12 12 |     pass
+13 13 | #: E713
+14 14 | if not (X in Y):
+
+E713.py:14:9: E713 [*] Test for membership should be `not in`
+   |
+14 |     pass
+15 | #: E713
+16 | if not (X in Y):
+   |         ^^^^^^ E713
+17 |     pass
+   |
+   = help: Convert to `not in`
+
+ℹ Suggested fix
+11 11 | if X == "zero" or not Y in Z:
+12 12 |     pass
+13 13 | #: E713
+14    |-if not (X in Y):
+   14 |+if X not in Y:
+15 15 |     pass
+16 16 | 
+17 17 | #: Okay
+
 

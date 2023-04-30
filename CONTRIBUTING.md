@@ -116,8 +116,7 @@ At a high level, the steps involved in adding a new lint rule are as follows:
 To define the violation, start by creating a dedicated file for your rule under the appropriate
 rule linter (e.g., `crates/ruff/src/rules/flake8_bugbear/rules/abstract_base_class.rs`). That file should
 contain a struct defined via `#[violation]`, along with a function that creates the violation
-based on any required inputs. (Many of the existing examples live in `crates/ruff/src/violations.rs`,
-but we're looking to place new rules in their own files.)
+based on any required inputs.
 
 To trigger the violation, you'll likely want to augment the logic in `crates/ruff/src/checkers/ast.rs`,
 which defines the Python AST visitor, responsible for iterating over the abstract syntax tree and
@@ -214,6 +213,20 @@ them to [PyPI](https://pypi.org/project/ruff/).
 
 Ruff follows the [semver](https://semver.org/) versioning standard. However, as pre-1.0 software,
 even patch releases may contain [non-backwards-compatible changes](https://semver.org/#spec-item-4).
+
+## Ecosystem CI
+
+GitHub Actions will run your changes against a number of real-world projects from GitHub and
+report on any diagnostic differences. You can also run those checks locally via:
+
+```shell
+python scripts/check_ecosystem.py path/to/your/ruff path/to/older/ruff
+```
+
+You can also run the Ecosystem CI check in a Docker container across a larger set of projects by
+downloading the [`known-github-tomls.json`](https://github.com/akx/ruff-usage-aggregate/blob/master/data/known-github-tomls.jsonl)
+as `github_search.jsonl` and following the instructions in [scripts/Dockerfile.ecosystem](https://github.com/charliermarsh/ruff/blob/main/scripts/Dockerfile.ecosystem).
+Note that this check will take a while to run.
 
 ## Benchmarks
 

@@ -4,7 +4,6 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -84,9 +83,8 @@ pub fn prefix_type_params(checker: &mut Checker, value: &Expr, targets: &[Expr])
         }) else {
             return;
         };
-        checker.diagnostics.push(Diagnostic::new(
-            UnprefixedTypeParam { kind },
-            Range::from(value),
-        ));
+        checker
+            .diagnostics
+            .push(Diagnostic::new(UnprefixedTypeParam { kind }, value.range()));
     }
 }

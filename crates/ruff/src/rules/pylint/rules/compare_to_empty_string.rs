@@ -5,7 +5,6 @@ use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{unparse_constant, unparse_expr};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -103,7 +102,7 @@ pub fn compare_to_empty_string(
                                     existing,
                                     replacement,
                                 },
-                                Range::from(lhs),
+                                lhs.range(),
                             ));
                         }
                     }
@@ -123,7 +122,7 @@ pub fn compare_to_empty_string(
                                 existing,
                                 replacement,
                             },
-                            Range::from(rhs),
+                            rhs.range(),
                         ));
                     }
                 }

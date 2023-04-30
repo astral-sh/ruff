@@ -1,26 +1,17 @@
 ---
 source: crates/ruff/src/rules/flake8_comprehensions/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnnecessaryListComprehensionDict
-    body: "Unnecessary `list` comprehension (rewrite as a `dict` comprehension)"
-    suggestion: "Rewrite as a `dict` comprehension"
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 1
-    column: 32
-  fix:
-    edits:
-      - content: "{i: i for i in range(3)}"
-        location:
-          row: 1
-          column: 0
-        end_location:
-          row: 1
-          column: 32
-  parent: ~
+C404.py:1:1: C404 [*] Unnecessary `list` comprehension (rewrite as a `dict` comprehension)
+  |
+1 | dict([(i, i) for i in range(3)])
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ C404
+2 | dict([(i, i) for i in range(3)], z=4)
+  |
+  = help: Rewrite as a `dict` comprehension
+
+ℹ Suggested fix
+1   |-dict([(i, i) for i in range(3)])
+  1 |+{i: i for i in range(3)}
+2 2 | dict([(i, i) for i in range(3)], z=4)
+
 

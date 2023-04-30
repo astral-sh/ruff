@@ -1,89 +1,80 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DeprecatedUnittestAlias
-    body: "`assertEquals` is deprecated, use `assertEqual`"
-    suggestion: "Replace `assertEqual` with `assertEquals`"
-    fixable: true
-  location:
-    row: 6
-    column: 8
-  end_location:
-    row: 6
-    column: 25
-  fix:
-    edits:
-      - content: self.assertEqual
-        location:
-          row: 6
-          column: 8
-        end_location:
-          row: 6
-          column: 25
-  parent: ~
-- kind:
-    name: DeprecatedUnittestAlias
-    body: "`assertEquals` is deprecated, use `assertEqual`"
-    suggestion: "Replace `assertEqual` with `assertEquals`"
-    fixable: true
-  location:
-    row: 7
-    column: 8
-  end_location:
-    row: 7
-    column: 25
-  fix:
-    edits:
-      - content: self.assertEqual
-        location:
-          row: 7
-          column: 8
-        end_location:
-          row: 7
-          column: 25
-  parent: ~
-- kind:
-    name: DeprecatedUnittestAlias
-    body: "`failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`"
-    suggestion: "Replace `assertAlmostEqual` with `failUnlessAlmostEqual`"
-    fixable: true
-  location:
-    row: 9
-    column: 8
-  end_location:
-    row: 9
-    column: 34
-  fix:
-    edits:
-      - content: self.assertAlmostEqual
-        location:
-          row: 9
-          column: 8
-        end_location:
-          row: 9
-          column: 34
-  parent: ~
-- kind:
-    name: DeprecatedUnittestAlias
-    body: "`assertNotRegexpMatches` is deprecated, use `assertNotRegex`"
-    suggestion: "Replace `assertNotRegex` with `assertNotRegexpMatches`"
-    fixable: true
-  location:
-    row: 10
-    column: 8
-  end_location:
-    row: 10
-    column: 35
-  fix:
-    edits:
-      - content: self.assertNotRegex
-        location:
-          row: 10
-          column: 8
-        end_location:
-          row: 10
-          column: 35
-  parent: ~
+UP005.py:6:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
+   |
+ 6 | class Suite(unittest.TestCase):
+ 7 |     def test(self) -> None:
+ 8 |         self.assertEquals (1, 2)
+   |         ^^^^^^^^^^^^^^^^^ UP005
+ 9 |         self.assertEquals(1, 2)
+10 |         self.assertEqual(3, 4)
+   |
+   = help: Replace `assertEqual` with `assertEquals`
+
+ℹ Suggested fix
+3 3 | 
+4 4 | class Suite(unittest.TestCase):
+5 5 |     def test(self) -> None:
+6   |-        self.assertEquals (1, 2)
+  6 |+        self.assertEqual (1, 2)
+7 7 |         self.assertEquals(1, 2)
+8 8 |         self.assertEqual(3, 4)
+9 9 |         self.failUnlessAlmostEqual(1, 1.1)
+
+UP005.py:7:9: UP005 [*] `assertEquals` is deprecated, use `assertEqual`
+   |
+ 7 |     def test(self) -> None:
+ 8 |         self.assertEquals (1, 2)
+ 9 |         self.assertEquals(1, 2)
+   |         ^^^^^^^^^^^^^^^^^ UP005
+10 |         self.assertEqual(3, 4)
+11 |         self.failUnlessAlmostEqual(1, 1.1)
+   |
+   = help: Replace `assertEqual` with `assertEquals`
+
+ℹ Suggested fix
+4 4 | class Suite(unittest.TestCase):
+5 5 |     def test(self) -> None:
+6 6 |         self.assertEquals (1, 2)
+7   |-        self.assertEquals(1, 2)
+  7 |+        self.assertEqual(1, 2)
+8 8 |         self.assertEqual(3, 4)
+9 9 |         self.failUnlessAlmostEqual(1, 1.1)
+10 10 |         self.assertNotRegexpMatches("a", "b")
+
+UP005.py:9:9: UP005 [*] `failUnlessAlmostEqual` is deprecated, use `assertAlmostEqual`
+   |
+ 9 |         self.assertEquals(1, 2)
+10 |         self.assertEqual(3, 4)
+11 |         self.failUnlessAlmostEqual(1, 1.1)
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^ UP005
+12 |         self.assertNotRegexpMatches("a", "b")
+   |
+   = help: Replace `assertAlmostEqual` with `failUnlessAlmostEqual`
+
+ℹ Suggested fix
+6  6  |         self.assertEquals (1, 2)
+7  7  |         self.assertEquals(1, 2)
+8  8  |         self.assertEqual(3, 4)
+9     |-        self.failUnlessAlmostEqual(1, 1.1)
+   9  |+        self.assertAlmostEqual(1, 1.1)
+10 10 |         self.assertNotRegexpMatches("a", "b")
+
+UP005.py:10:9: UP005 [*] `assertNotRegexpMatches` is deprecated, use `assertNotRegex`
+   |
+10 |         self.assertEqual(3, 4)
+11 |         self.failUnlessAlmostEqual(1, 1.1)
+12 |         self.assertNotRegexpMatches("a", "b")
+   |         ^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP005
+   |
+   = help: Replace `assertNotRegex` with `assertNotRegexpMatches`
+
+ℹ Suggested fix
+7  7  |         self.assertEquals(1, 2)
+8  8  |         self.assertEqual(3, 4)
+9  9  |         self.failUnlessAlmostEqual(1, 1.1)
+10    |-        self.assertNotRegexpMatches("a", "b")
+   10 |+        self.assertNotRegex("a", "b")
+
 

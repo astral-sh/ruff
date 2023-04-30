@@ -1,53 +1,28 @@
 ---
 source: crates/ruff/src/rules/pep8_naming/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: CamelcaseImportedAsConstant
-    body: "Camelcase `Camel` imported as constant `CAMEL`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 1
-    column: 7
-  end_location:
-    row: 1
-    column: 25
-  fix:
-    edits: []
-  parent:
-    row: 1
-    column: 0
-- kind:
-    name: CamelcaseImportedAsConstant
-    body: "Camelcase `CamelCase` imported as constant `CAMELCASE`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 16
-  end_location:
-    row: 2
-    column: 38
-  fix:
-    edits: []
-  parent:
-    row: 2
-    column: 0
-- kind:
-    name: CamelcaseImportedAsConstant
-    body: "Camelcase `AnotherCamelCase` imported as constant `ANOTHER_CAMELCASE`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 16
-  end_location:
-    row: 3
-    column: 53
-  fix:
-    edits: []
-  parent:
-    row: 3
-    column: 0
+N814.py:1:8: N814 Camelcase `Camel` imported as constant `CAMEL`
+  |
+1 | import mod.Camel as CAMEL
+  |        ^^^^^^^^^^^^^^^^^^ N814
+2 | from mod import CamelCase as CAMELCASE
+3 | from mod import AnotherCamelCase as ANOTHER_CAMELCASE
+  |
+
+N814.py:2:17: N814 Camelcase `CamelCase` imported as constant `CAMELCASE`
+  |
+2 | import mod.Camel as CAMEL
+3 | from mod import CamelCase as CAMELCASE
+  |                 ^^^^^^^^^^^^^^^^^^^^^^ N814
+4 | from mod import AnotherCamelCase as ANOTHER_CAMELCASE
+  |
+
+N814.py:3:17: N814 Camelcase `AnotherCamelCase` imported as constant `ANOTHER_CAMELCASE`
+  |
+3 | import mod.Camel as CAMEL
+4 | from mod import CamelCase as CAMELCASE
+5 | from mod import AnotherCamelCase as ANOTHER_CAMELCASE
+  |                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ N814
+  |
+
 

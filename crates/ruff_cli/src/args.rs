@@ -80,7 +80,7 @@ pub struct CheckArgs {
     #[clap(long, overrides_with("show_fixes"), hide = true)]
     no_show_fixes: bool,
     /// Avoid writing any fixed files back; instead, output a diff for each
-    /// changed file to stdout.
+    /// changed file to stdout. Implies `--fix-only`.
     #[arg(long, conflicts_with = "show_fixes")]
     pub diff: bool,
     /// Run in watch mode by re-running whenever files change.

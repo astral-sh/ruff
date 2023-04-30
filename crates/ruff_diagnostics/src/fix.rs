@@ -1,11 +1,11 @@
-use rustpython_parser::ast::Location;
+use ruff_text_size::TextSize;
 #[cfg(feature = "serde")]
 use serde::{Deserialize, Serialize};
 
 use crate::edit::Edit;
 
 /// A collection of [`Edit`] elements to be applied to a source file.
-#[derive(Default, Debug, PartialEq, Eq)]
+#[derive(Default, Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Fix {
     edits: Vec<Edit>,
@@ -27,19 +27,18 @@ impl Fix {
         self.edits.is_empty()
     }
 
-    /// Return the [`Location`] of the first [`Edit`] in the [`Fix`].
-    pub fn location(&self) -> Option<Location> {
-        self.edits.iter().map(|edit| edit.location).min()
-    }
-
-    /// Return the [`Location`] of the last [`Edit`] in the [`Fix`].
-    pub fn end_location(&self) -> Option<Location> {
-        self.edits.iter().map(|edit| edit.end_location).max()
+    /// Return the [`TextSize`] of the first [`Edit`] in the [`Fix`].
+    pub fn min_start(&self) -> Option<TextSize> {
+        self.edits.iter().map(Edit::start).min()
     }
 
     /// Return a slice of the [`Edit`] elements in the [`Fix`].
     pub fn edits(&self) -> &[Edit] {
         &self.edits
+    }
+
+    pub fn into_edits(self) -> Vec<Edit> {
+        self.edits
     }
 }
 

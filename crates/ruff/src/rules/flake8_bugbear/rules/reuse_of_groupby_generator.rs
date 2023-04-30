@@ -1,8 +1,7 @@
-use rustpython_parser::ast::{Expr, ExprKind, Stmt, StmtKind};
+use rustpython_parser::ast::{Comprehension, Expr, ExprKind, Stmt, StmtKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor::{self, Visitor};
 
 use crate::checkers::ast::Checker;
@@ -91,6 +90,18 @@ impl<'a> GroupNameFinder<'a> {
             false
         }
     }
+
+    /// Increment the usage count for the group name by the given value.
+    /// If we're in one of the branches of a mutually exclusive statement,
+    /// then increment the count for that branch. Otherwise, increment the
+    /// global count.
+    fn increment_usage_count(&mut self, value: u32) {
+        if let Some(last) = self.counter_stack.last_mut() {
+            *last.last_mut().unwrap() += value;
+        } else {
+            self.usage_count += value;
+        }
+    }
 }
 
 impl<'a, 'b> Visitor<'b> for GroupNameFinder<'a>
@@ -109,7 +120,7 @@ where
                     self.overridden = true;
                 } else {
                     if self.name_matches(iter) {
-                        self.usage_count += 1;
+                        self.increment_usage_count(1);
                         // This could happen when the group is being looped
                         // over multiple times:
                         //      for item in group:
@@ -178,11 +189,7 @@ where
                         // This is the max number of group usage from all the
                         // branches of this `if` statement.
                         let max_count = last.into_iter().max().unwrap_or(0);
-                        if let Some(current_last) = self.counter_stack.last_mut() {
-                            *current_last.last_mut().unwrap() += max_count;
-                        } else {
-                            self.usage_count += max_count;
-                        }
+                        self.increment_usage_count(max_count);
                     }
                 }
             }
@@ -197,24 +204,39 @@ where
                     // This is the max number of group usage from all the
                     // branches of this `match` statement.
                     let max_count = last.into_iter().max().unwrap_or(0);
-                    if let Some(current_last) = self.counter_stack.last_mut() {
-                        *current_last.last_mut().unwrap() += max_count;
-                    } else {
-                        self.usage_count += max_count;
-                    }
+                    self.increment_usage_count(max_count);
                 }
             }
-            StmtKind::Assign { targets, .. } => {
+            StmtKind::Assign { targets, value, .. } => {
                 if targets.iter().any(|target| self.name_matches(target)) {
                     self.overridden = true;
+                } else {
+                    self.visit_expr(value);
                 }
             }
-            StmtKind::AnnAssign { target, .. } => {
+            StmtKind::AnnAssign { target, value, .. } => {
                 if self.name_matches(target) {
                     self.overridden = true;
+                } else if let Some(expr) = value {
+                    self.visit_expr(expr);
                 }
             }
             _ => visitor::walk_stmt(self, stmt),
+        }
+    }
+
+    fn visit_comprehension(&mut self, comprehension: &'a Comprehension) {
+        if self.name_matches(&comprehension.target) {
+            self.overridden = true;
+        }
+        if self.overridden {
+            return;
+        }
+        if self.name_matches(&comprehension.iter) {
+            self.increment_usage_count(1);
+            if self.usage_count > 1 {
+                self.exprs.push(&comprehension.iter);
+            }
         }
     }
 
@@ -227,37 +249,53 @@ where
         if self.overridden {
             return;
         }
-        if matches!(
-            &expr.node,
-            ExprKind::ListComp { .. } | ExprKind::DictComp { .. } | ExprKind::SetComp { .. }
-        ) {
-            self.nested = true;
-            visitor::walk_expr(self, expr);
-            self.nested = false;
-        } else if self.name_matches(expr) {
-            // If the stack isn't empty, then we're in one of the branches of
-            // a mutually exclusive statement. Otherwise, we'll add it to the
-            // global count.
-            if let Some(last) = self.counter_stack.last_mut() {
-                *last.last_mut().unwrap() += 1;
-            } else {
-                self.usage_count += 1;
-            }
 
-            let current_usage_count = self.usage_count
-                + self
-                    .counter_stack
-                    .iter()
-                    .map(|count| count.last().unwrap_or(&0))
-                    .sum::<u32>();
-
-            // For nested loops, the variable usage could be once but the
-            // loop makes it being used multiple times.
-            if self.nested || current_usage_count > 1 {
-                self.exprs.push(expr);
+        match &expr.node {
+            ExprKind::ListComp { elt, generators } | ExprKind::SetComp { elt, generators } => {
+                for comprehension in generators {
+                    self.visit_comprehension(comprehension);
+                }
+                if !self.overridden {
+                    self.nested = true;
+                    visitor::walk_expr(self, elt);
+                    self.nested = false;
+                }
             }
-        } else {
-            visitor::walk_expr(self, expr);
+            ExprKind::DictComp {
+                key,
+                value,
+                generators,
+            } => {
+                for comprehension in generators {
+                    self.visit_comprehension(comprehension);
+                }
+                if !self.overridden {
+                    self.nested = true;
+                    visitor::walk_expr(self, key);
+                    visitor::walk_expr(self, value);
+                    self.nested = false;
+                }
+            }
+            _ => {
+                if self.name_matches(expr) {
+                    self.increment_usage_count(1);
+
+                    let current_usage_count = self.usage_count
+                        + self
+                            .counter_stack
+                            .iter()
+                            .map(|count| count.last().unwrap_or(&0))
+                            .sum::<u32>();
+
+                    // For nested loops, the variable usage could be once but the
+                    // loop makes it being used multiple times.
+                    if self.nested || current_usage_count > 1 {
+                        self.exprs.push(expr);
+                    }
+                } else {
+                    visitor::walk_expr(self, expr);
+                }
+            }
         }
     }
 }
@@ -300,6 +338,6 @@ pub fn reuse_of_groupby_generator(
     for expr in finder.exprs {
         checker
             .diagnostics
-            .push(Diagnostic::new(ReuseOfGroupbyGenerator, Range::from(expr)));
+            .push(Diagnostic::new(ReuseOfGroupbyGenerator, expr.range()));
     }
 }

@@ -79,6 +79,21 @@ for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
         collect_shop_items(shopper, section_items)  # B031
 
 for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    _ = [collect_shop_items(shopper, section_items) for shopper in shoppers]  # B031
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    # The variable is overridden, skip checking.
+    _ = [_ for section_items in range(3)]
+    _ = [collect_shop_items(shopper, section_items) for shopper in shoppers]
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    _ = [item for item in section_items]
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    # The iterator is being used for the second time.
+    _ = [(item1, item2) for item1 in section_items for item2 in section_items]  # B031
+
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
     if _section == "greens":
         collect_shop_items(shopper, section_items)
     else:
@@ -133,6 +148,16 @@ for group in groupby(items, key=lambda p: p[1]):
     collect_shop_items("Jane", group[1])
     collect_shop_items("Joe", group[1])
 
+
+# https://github.com/charliermarsh/ruff/issues/4050
+for _section, section_items in itertools.groupby(items, key=lambda p: p[1]):
+    if _section == "greens":
+        for item in section_items:
+            collect_shop_items(shopper, item)
+    elif _section == "frozen items":
+        _ = [item for item in section_items]
+    else:
+        collect_shop_items(shopper, section_items)
 
 #  Make sure we ignore - but don't fail on more complicated invocations
 for _key, (_value1, _value2) in groupby(

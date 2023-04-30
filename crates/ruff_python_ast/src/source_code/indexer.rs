@@ -1,78 +1,135 @@
 //! Struct used to index source code, to enable efficient lookup of tokens that
 //! are omitted from the AST (e.g., commented lines).
 
-use rustpython_parser::ast::Location;
+use crate::source_code::Locator;
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 pub struct Indexer {
-    commented_lines: Vec<usize>,
-    continuation_lines: Vec<usize>,
+    /// Stores the ranges of comments sorted by [`TextRange::start`] in increasing order. No two ranges are overlapping.
+    comment_ranges: Vec<TextRange>,
+
+    /// Stores the start offset of continuation lines.
+    continuation_lines: Vec<TextSize>,
+
+    /// The range of all triple quoted strings in the source document. The ranges are sorted by their
+    /// [`TextRange::start`] position in increasing order. No two ranges are overlapping.
+    triple_quoted_string_ranges: Vec<TextRange>,
 }
 
 impl Indexer {
-    pub fn commented_lines(&self) -> &[usize] {
-        &self.commented_lines
-    }
+    pub fn from_tokens(tokens: &[LexResult], locator: &Locator) -> Self {
+        assert!(TextSize::try_from(locator.contents().len()).is_ok());
 
-    pub fn continuation_lines(&self) -> &[usize] {
-        &self.continuation_lines
-    }
-}
-
-impl From<&[LexResult]> for Indexer {
-    fn from(lxr: &[LexResult]) -> Self {
         let mut commented_lines = Vec::new();
         let mut continuation_lines = Vec::new();
-        let mut prev: Option<(&Location, &Tok, &Location)> = None;
-        for (start, tok, end) in lxr.iter().flatten() {
-            if matches!(tok, Tok::Comment(_)) {
-                commented_lines.push(start.row());
-            }
-            if let Some((.., prev_tok, prev_end)) = prev {
+        let mut string_ranges = Vec::new();
+        // Token, end
+        let mut prev_end = TextSize::default();
+        let mut prev_token: Option<&Tok> = None;
+        let mut line_start = TextSize::default();
+
+        for (tok, range) in tokens.iter().flatten() {
+            let trivia = &locator.contents()[TextRange::new(prev_end, range.start())];
+
+            // Get the trivia between the previous and the current token and detect any newlines.
+            // This is necessary because `RustPython` doesn't emit `[Tok::Newline]` tokens
+            // between any two tokens that form a continuation nor multiple newlines in a row.
+            // That's why we have to extract the newlines "manually".
+            for (index, text) in trivia.match_indices(['\n', '\r']) {
+                if text == "\r" && trivia.as_bytes().get(index + 1) == Some(&b'\n') {
+                    continue;
+                }
+
+                // Newlines after a comment or new-line never form a continuation.
                 if !matches!(
-                    prev_tok,
-                    Tok::Newline | Tok::NonLogicalNewline | Tok::Comment(..)
+                    prev_token,
+                    Some(Tok::Newline | Tok::NonLogicalNewline | Tok::Comment(..)) | None
                 ) {
-                    for line in prev_end.row()..start.row() {
-                        continuation_lines.push(line);
-                    }
+                    continuation_lines.push(line_start);
+                }
+
+                // SAFETY: Safe because of the len assertion at the top of the function.
+                #[allow(clippy::cast_possible_truncation)]
+                {
+                    line_start = prev_end + TextSize::new((index + 1) as u32);
                 }
             }
-            prev = Some((start, tok, end));
+
+            match tok {
+                Tok::Comment(..) => {
+                    commented_lines.push(*range);
+                }
+                Tok::Newline | Tok::NonLogicalNewline => {
+                    line_start = range.end();
+                }
+                Tok::String {
+                    triple_quoted: true,
+                    ..
+                } => string_ranges.push(*range),
+                _ => {}
+            }
+
+            prev_token = Some(tok);
+            prev_end = range.end();
         }
         Self {
-            commented_lines,
+            comment_ranges: commented_lines,
             continuation_lines,
+            triple_quoted_string_ranges: string_ranges,
         }
+    }
+
+    /// Returns the byte offset ranges of comments
+    pub fn comment_ranges(&self) -> &[TextRange] {
+        &self.comment_ranges
+    }
+
+    /// Returns the line start positions of continuations (backslash).
+    pub fn continuation_line_starts(&self) -> &[TextSize] {
+        &self.continuation_lines
+    }
+
+    /// Return a slice of all ranges that include a triple-quoted string. The ranges are sorted by
+    /// [`TextRange::start`] in increasing order. No two ranges are overlapping.
+    pub fn triple_quoted_string_ranges(&self) -> &[TextRange] {
+        &self.triple_quoted_string_ranges
+    }
+
+    pub fn is_continuation(&self, offset: TextSize, locator: &Locator) -> bool {
+        let line_start = locator.line_start(offset);
+        self.continuation_lines.binary_search(&line_start).is_ok()
     }
 }
 
 #[cfg(test)]
 mod tests {
+    use ruff_text_size::{TextRange, TextSize};
     use rustpython_parser::lexer::LexResult;
     use rustpython_parser::{lexer, Mode};
 
-    use crate::source_code::Indexer;
+    use crate::source_code::{Indexer, Locator};
 
     #[test]
     fn continuation() {
         let contents = r#"x = 1"#;
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer: Indexer = lxr.as_slice().into();
-        assert_eq!(indexer.continuation_lines(), Vec::<usize>::new().as_slice());
+        let indexer = Indexer::from_tokens(&lxr, &Locator::new(contents));
+        assert_eq!(indexer.continuation_line_starts(), &[]);
 
         let contents = r#"
-# Hello, world!
+        # Hello, world!
 
 x = 1
 
 y = 2
-"#
+        "#
         .trim();
+
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer: Indexer = lxr.as_slice().into();
-        assert_eq!(indexer.continuation_lines(), Vec::<usize>::new().as_slice());
+        let indexer = Indexer::from_tokens(&lxr, &Locator::new(contents));
+        assert_eq!(indexer.continuation_line_starts(), &[]);
 
         let contents = r#"
 x = \
@@ -91,8 +148,20 @@ if True:
 "#
         .trim();
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer: Indexer = lxr.as_slice().into();
-        assert_eq!(indexer.continuation_lines(), [1, 5, 6, 11]);
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        assert_eq!(
+            indexer.continuation_line_starts(),
+            [
+                // row 1
+                TextSize::from(0),
+                // row 5
+                TextSize::from(22),
+                // row 6
+                TextSize::from(32),
+                // row 11
+                TextSize::from(71),
+            ]
+        );
 
         let contents = r#"
 x = 1; import sys
@@ -111,7 +180,67 @@ import os
 "#
         .trim();
         let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
-        let indexer: Indexer = lxr.as_slice().into();
-        assert_eq!(indexer.continuation_lines(), [9, 12]);
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        assert_eq!(
+            indexer.continuation_line_starts(),
+            [
+                // row 9
+                TextSize::from(84),
+                // row 12
+                TextSize::from(116)
+            ]
+        );
+    }
+
+    #[test]
+    fn string_ranges() {
+        let contents = r#""this is a single-quoted string""#;
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        assert_eq!(indexer.triple_quoted_string_ranges(), []);
+
+        let contents = r#"
+            """
+            this is a multiline string
+            """
+            "#;
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        assert_eq!(
+            indexer.triple_quoted_string_ranges(),
+            [TextRange::new(TextSize::from(13), TextSize::from(71))]
+        );
+
+        let contents = r#"
+            """
+            '''this is a multiline string with multiple delimiter types'''
+            """
+            "#;
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        assert_eq!(
+            indexer.triple_quoted_string_ranges(),
+            [TextRange::new(TextSize::from(13), TextSize::from(107))]
+        );
+
+        let contents = r#"
+            """
+            this is one
+            multiline string
+            """
+            """
+            and this is
+            another
+            """
+            "#;
+        let lxr: Vec<LexResult> = lexer::lex(contents, Mode::Module).collect();
+        let indexer = Indexer::from_tokens(lxr.as_slice(), &Locator::new(contents));
+        assert_eq!(
+            indexer.triple_quoted_string_ranges(),
+            &[
+                TextRange::new(TextSize::from(13), TextSize::from(85)),
+                TextRange::new(TextSize::from(98), TextSize::from(161))
+            ]
+        );
     }
 }

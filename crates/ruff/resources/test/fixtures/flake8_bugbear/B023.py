@@ -172,3 +172,14 @@ def iter_f(names):
 
         if False:
             return [lambda: i for i in range(3)]  # error
+
+
+for val in range(3):
+    def make_func(val=val):
+        def tmp():
+            return print(val)
+
+        return tmp
+
+
+    funcs.append(make_func())

@@ -1,117 +1,84 @@
 ---
 source: crates/ruff/src/rules/flake8_bugbear/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 0
-  end_location:
-    row: 4
-    column: 24
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 0
-  end_location:
-    row: 7
-    column: 17
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 0
-  end_location:
-    row: 10
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 0
-  end_location:
-    row: 13
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 0
-  end_location:
-    row: 16
-    column: 25
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 0
-  end_location:
-    row: 19
-    column: 18
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 0
-  end_location:
-    row: 22
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: StripWithMultiCharacters
-    body: "Using `.strip()` with multi-character strings is misleading the reader"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 24
-    column: 0
-  end_location:
-    row: 24
-    column: 35
-  fix:
-    edits: []
-  parent: ~
+B005.py:4:1: B005 Using `.strip()` with multi-character strings is misleading the reader
+  |
+4 | s.strip(s)  # no warning
+5 | s.strip("we")  # no warning
+6 | s.strip(".facebook.com")  # warning
+  | ^^^^^^^^^^^^^^^^^^^^^^^^ B005
+7 | s.strip("e")  # no warning
+8 | s.strip("\n\t ")  # no warning
+  |
+
+B005.py:7:1: B005 Using `.strip()` with multi-character strings is misleading the reader
+   |
+ 7 | s.strip("e")  # no warning
+ 8 | s.strip("\n\t ")  # no warning
+ 9 | s.strip(r"\n\t ")  # warning
+   | ^^^^^^^^^^^^^^^^^ B005
+10 | s.lstrip(s)  # no warning
+11 | s.lstrip("we")  # no warning
+   |
+
+B005.py:10:1: B005 Using `.strip()` with multi-character strings is misleading the reader
+   |
+10 | s.lstrip(s)  # no warning
+11 | s.lstrip("we")  # no warning
+12 | s.lstrip(".facebook.com")  # warning
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ B005
+13 | s.lstrip("e")  # no warning
+14 | s.lstrip("\n\t ")  # no warning
+   |
+
+B005.py:13:1: B005 Using `.strip()` with multi-character strings is misleading the reader
+   |
+13 | s.lstrip("e")  # no warning
+14 | s.lstrip("\n\t ")  # no warning
+15 | s.lstrip(r"\n\t ")  # warning
+   | ^^^^^^^^^^^^^^^^^^ B005
+16 | s.rstrip(s)  # no warning
+17 | s.rstrip("we")  # warning
+   |
+
+B005.py:16:1: B005 Using `.strip()` with multi-character strings is misleading the reader
+   |
+16 | s.rstrip(s)  # no warning
+17 | s.rstrip("we")  # warning
+18 | s.rstrip(".facebook.com")  # warning
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ B005
+19 | s.rstrip("e")  # no warning
+20 | s.rstrip("\n\t ")  # no warning
+   |
+
+B005.py:19:1: B005 Using `.strip()` with multi-character strings is misleading the reader
+   |
+19 | s.rstrip("e")  # no warning
+20 | s.rstrip("\n\t ")  # no warning
+21 | s.rstrip(r"\n\t ")  # warning
+   | ^^^^^^^^^^^^^^^^^^ B005
+22 | s.strip("a")  # no warning
+23 | s.strip("あ")  # no warning
+   |
+
+B005.py:22:1: B005 Using `.strip()` with multi-character strings is misleading the reader
+   |
+22 | s.strip("a")  # no warning
+23 | s.strip("あ")  # no warning
+24 | s.strip("ああ")  # warning
+   | ^^^^^^^^^^^^^^^ B005
+25 | s.strip("\ufeff")  # no warning
+26 | s.strip("\u0074\u0065\u0073\u0074")  # warning
+   |
+
+B005.py:24:1: B005 Using `.strip()` with multi-character strings is misleading the reader
+   |
+24 | s.strip("ああ")  # warning
+25 | s.strip("\ufeff")  # no warning
+26 | s.strip("\u0074\u0065\u0073\u0074")  # warning
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ B005
+27 | 
+28 | from somewhere import other_type, strip
+   |
+
 

@@ -1,40 +1,36 @@
-use rustpython_parser::ast::Location;
+use std::ops::{Add, Sub};
 
 use ruff_formatter::prelude::*;
 use ruff_formatter::{write, Format};
-use ruff_python_ast::types::Range;
-use ruff_text_size::TextSize;
+use ruff_text_size::{TextRange, TextSize};
 
 use crate::context::ASTFormatContext;
 use crate::format::builders::literal;
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 struct FloatAtom {
-    range: Range,
+    range: TextRange,
 }
 
 impl Format<ASTFormatContext<'_>> for FloatAtom {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let locator = f.context().locator();
         let contents = f.context().contents();
-        let start_index = locator.offset(self.range.location);
-        let end_index = locator.offset(self.range.end_location);
 
-        if let Some(dot_index) = contents[start_index..end_index].find('.') {
-            let integer = &contents[start_index..start_index + dot_index];
-            let fractional = &contents[start_index + dot_index + 1..end_index];
+        let content = &contents[self.range];
+        if let Some(dot_index) = content.find('.') {
+            let integer = &content[..dot_index];
+            let fractional = &content[dot_index + 1..];
 
             if integer.is_empty() {
                 write!(f, [text("0")])?;
             } else {
                 write!(
                     f,
-                    [literal(Range::new(
-                        self.range.location,
-                        Location::new(
-                            self.range.location.row(),
-                            self.range.location.column() + dot_index
-                        ),
+                    [literal(TextRange::new(
+                        self.range.start(),
+                        self.range
+                            .start()
+                            .add(TextSize::try_from(dot_index).unwrap())
                     ))]
                 )?;
             }
@@ -46,12 +42,11 @@ impl Format<ASTFormatContext<'_>> for FloatAtom {
             } else {
                 write!(
                     f,
-                    [literal(Range::new(
-                        Location::new(
-                            self.range.location.row(),
-                            self.range.location.column() + dot_index + 1
-                        ),
-                        self.range.end_location
+                    [literal(TextRange::new(
+                        self.range
+                            .start()
+                            .add(TextSize::try_from(dot_index + 1).unwrap()),
+                        self.range.end()
                     ))]
                 )?;
             }
@@ -64,51 +59,45 @@ impl Format<ASTFormatContext<'_>> for FloatAtom {
 }
 
 #[inline]
-const fn float_atom(range: Range) -> FloatAtom {
+const fn float_atom(range: TextRange) -> FloatAtom {
     FloatAtom { range }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct FloatLiteral {
-    range: Range,
+    range: TextRange,
 }
 
 impl Format<ASTFormatContext<'_>> for FloatLiteral {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let locator = f.context().locator();
         let contents = f.context().contents();
-        let start_index = locator.offset(self.range.location);
-        let end_index = locator.offset(self.range.end_location);
+
+        let content = &contents[self.range];
 
         // Scientific notation
-        if let Some(exponent_index) = contents[start_index..end_index]
-            .find('e')
-            .or_else(|| contents[start_index..end_index].find('E'))
-        {
+        if let Some(exponent_index) = content.find('e').or_else(|| content.find('E')) {
             // Write the base.
             write!(
                 f,
-                [float_atom(Range::new(
-                    self.range.location,
-                    Location::new(
-                        self.range.location.row(),
-                        self.range.location.column() + exponent_index
-                    ),
+                [float_atom(TextRange::new(
+                    self.range.start(),
+                    self.range
+                        .start()
+                        .add(TextSize::try_from(exponent_index).unwrap())
                 ))]
             )?;
 
             write!(f, [text("e")])?;
 
             // Write the exponent, omitting the sign if it's positive.
-            let plus = contents[start_index + exponent_index + 1..end_index].starts_with('+');
+            let plus = content[exponent_index + 1..].starts_with('+');
             write!(
                 f,
-                [literal(Range::new(
-                    Location::new(
-                        self.range.location.row(),
-                        self.range.location.column() + exponent_index + 1 + usize::from(plus)
-                    ),
-                    self.range.end_location
+                [literal(TextRange::new(
+                    self.range
+                        .start()
+                        .add(TextSize::try_from(exponent_index + 1 + usize::from(plus)).unwrap()),
+                    self.range.end()
                 ))]
             )?;
         } else {
@@ -120,27 +109,25 @@ impl Format<ASTFormatContext<'_>> for FloatLiteral {
 }
 
 #[inline]
-pub const fn float_literal(range: Range) -> FloatLiteral {
+pub const fn float_literal(range: TextRange) -> FloatLiteral {
     FloatLiteral { range }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct IntLiteral {
-    range: Range,
+    range: TextRange,
 }
 
 impl Format<ASTFormatContext<'_>> for IntLiteral {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let locator = f.context().locator();
         let contents = f.context().contents();
-        let start_index = locator.offset(self.range.location);
-        let end_index = locator.offset(self.range.end_location);
 
         for prefix in ["0b", "0B", "0o", "0O", "0x", "0X"] {
-            if contents[start_index..end_index].starts_with(prefix) {
+            let content = &contents[self.range];
+            if content.starts_with(prefix) {
                 // In each case, the prefix must be lowercase, while the suffix must be uppercase.
-                let prefix = &contents[start_index..start_index + prefix.len()];
-                let suffix = &contents[start_index + prefix.len()..end_index];
+                let prefix = &content[..prefix.len()];
+                let suffix = &content[prefix.len()..];
 
                 if prefix.bytes().any(|b| b.is_ascii_uppercase())
                     || suffix.bytes().any(|b| b.is_ascii_lowercase())
@@ -169,33 +156,28 @@ impl Format<ASTFormatContext<'_>> for IntLiteral {
 }
 
 #[inline]
-pub const fn int_literal(range: Range) -> IntLiteral {
+pub const fn int_literal(range: TextRange) -> IntLiteral {
     IntLiteral { range }
 }
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub struct ComplexLiteral {
-    range: Range,
+    range: TextRange,
 }
 
 impl Format<ASTFormatContext<'_>> for ComplexLiteral {
     fn fmt(&self, f: &mut Formatter<ASTFormatContext<'_>>) -> FormatResult<()> {
-        let locator = f.context().locator();
         let contents = f.context().contents();
-        let start_index = locator.offset(self.range.location);
-        let end_index = locator.offset(self.range.end_location);
+        let content = &contents[self.range];
 
-        if contents[start_index..end_index].ends_with('j') {
+        if content.ends_with('j') {
             write!(f, [literal(self.range)])?;
-        } else if contents[start_index..end_index].ends_with('J') {
+        } else if content.ends_with('J') {
             write!(
                 f,
-                [literal(Range::new(
-                    self.range.location,
-                    Location::new(
-                        self.range.end_location.row(),
-                        self.range.end_location.column() - 1
-                    ),
+                [literal(TextRange::new(
+                    self.range.start(),
+                    self.range.end().sub(TextSize::from(1))
                 ))]
             )?;
             write!(f, [text("j")])?;
@@ -208,6 +190,6 @@ impl Format<ASTFormatContext<'_>> for ComplexLiteral {
 }
 
 #[inline]
-pub const fn complex_literal(range: Range) -> ComplexLiteral {
+pub const fn complex_literal(range: TextRange) -> ComplexLiteral {
     ComplexLiteral { range }
 }

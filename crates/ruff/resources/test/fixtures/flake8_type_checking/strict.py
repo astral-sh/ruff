@@ -1,3 +1,6 @@
+from __future__ import annotations
+
+
 def f():
     # Even in strict mode, this shouldn't rase an error, since `pkg` is used at runtime,
     # and implicitly imports `pkg.bar`.

@@ -47,16 +47,16 @@ all while executing tens or hundreds of times faster than any individual tool.
 
 Ruff is extremely actively developed and used in major open-source projects like:
 
-- [pandas](https://github.com/pandas-dev/pandas)
-- [FastAPI](https://github.com/tiangolo/fastapi)
-- [Transformers (Hugging Face)](https://github.com/huggingface/transformers)
 - [Apache Airflow](https://github.com/apache/airflow)
+- [FastAPI](https://github.com/tiangolo/fastapi)
+- [Hugging Face](https://github.com/huggingface/transformers)
+- [Pandas](https://github.com/pandas-dev/pandas)
 - [SciPy](https://github.com/scipy/scipy)
 
 ...and many more.
 
-Read the [launch blog post](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster) or
-the most recent [project update](https://notes.crmarsh.com/ruff-the-first-200-releases).
+Ruff is backed by [Astral](https://astral.sh). Read the [launch post](https://astral.sh/blog/announcing-astral-the-company-behind-ruff),
+or the original [project announcement](https://notes.crmarsh.com/python-tooling-could-be-much-much-faster).
 
 ## Testimonials
 
@@ -137,7 +137,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.260'
+  rev: 'v0.0.263'
   hooks:
     - id: ruff
 ```
@@ -332,53 +332,68 @@ Ruff is released under the MIT license.
 
 ## Who's Using Ruff?
 
-Ruff is used in a number of major open-source projects, including:
+Ruff is used by a number of major open-source projects and companies, including:
 
-- [pandas](https://github.com/pandas-dev/pandas)
-- [FastAPI](https://github.com/tiangolo/fastapi)
-- [Transformers (Hugging Face)](https://github.com/huggingface/transformers)
-- [Diffusers (Hugging Face)](https://github.com/huggingface/diffusers)
+- Amazon ([AWS SAM](https://github.com/aws/serverless-application-model))
 - [Apache Airflow](https://github.com/apache/airflow)
-- [SciPy](https://github.com/scipy/scipy)
-- [Zulip](https://github.com/zulip/zulip)
-- [Bokeh](https://github.com/bokeh/bokeh)
-- [Pydantic](https://github.com/pydantic/pydantic)
-- [PostHog](https://github.com/PostHog/posthog)
-- [Dagster](https://github.com/dagster-io/dagster)
-- [Dagger](https://github.com/dagger/dagger)
-- [Sphinx](https://github.com/sphinx-doc/sphinx)
-- [Hatch](https://github.com/pypa/hatch)
-- [PDM](https://github.com/pdm-project/pdm)
-- [Jupyter](https://github.com/jupyter-server/jupyter_server)
-- [Great Expectations](https://github.com/great-expectations/great_expectations)
-- [ONNX](https://github.com/onnx/onnx)
-- [Polars](https://github.com/pola-rs/polars)
-- [Ibis](https://github.com/ibis-project/ibis)
-- [Synapse (Matrix)](https://github.com/matrix-org/synapse)
-- [SnowCLI (Snowflake)](https://github.com/Snowflake-Labs/snowcli)
-- [Dispatch (Netflix)](https://github.com/Netflix/dispatch)
-- [Saleor](https://github.com/saleor/saleor)
-- [Pynecone](https://github.com/pynecone-io/pynecone)
-- [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
-- [Home Assistant](https://github.com/home-assistant/core)
-- [Pylint](https://github.com/PyCQA/pylint)
-- [Cryptography (PyCA)](https://github.com/pyca/cryptography)
-- [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
-- [build (PyPA)](https://github.com/pypa/build)
+- AstraZeneca ([Magnus](https://github.com/AstraZeneca/magnus-core))
+- Benchling ([Refac](https://github.com/benchling/refac))
 - [Babel](https://github.com/python-babel/babel)
+- [Bokeh](https://github.com/bokeh/bokeh)
+- [Cryptography (PyCA)](https://github.com/pyca/cryptography)
+- [Dagger](https://github.com/dagger/dagger)
+- [Dagster](https://github.com/dagster-io/dagster)
+- [DVC](https://github.com/iterative/dvc)
+- [FastAPI](https://github.com/tiangolo/fastapi)
+- [Gradio](https://github.com/gradio-app/gradio)
+- [Great Expectations](https://github.com/great-expectations/great_expectations)
+- Hugging Face ([Transformers](https://github.com/huggingface/transformers), [Datasets](https://github.com/huggingface/datasets), [Diffusers](https://github.com/huggingface/diffusers))
+- [Hatch](https://github.com/pypa/hatch)
+- [Home Assistant](https://github.com/home-assistant/core)
+- [Ibis](https://github.com/ibis-project/ibis)
+- [Jupyter](https://github.com/jupyter-server/jupyter_server)
+- [LangChain](https://github.com/hwchase17/langchain)
+- [LlamaIndex](https://github.com/jerryjliu/llama_index)
+- Matrix ([Synapse](https://github.com/matrix-org/synapse))
+- Meltano ([Meltano CLI](https://github.com/meltano/meltano), [Singer SDK](https://github.com/meltano/sdk))
+- Modern Treasury ([Python SDK](https://github.com/Modern-Treasury/modern-treasury-python-sdk))
+- Mozilla ([Firefox](https://github.com/mozilla/gecko-dev))
+- [MegaLinter](https://github.com/oxsecurity/megalinter)
+- Microsoft ([Semantic Kernel](https://github.com/microsoft/semantic-kernel), [ONNX Runtime](https://github.com/microsoft/onnxruntime))
+- Netflix ([Dispatch](https://github.com/Netflix/dispatch))
+- [Neon](https://github.com/neondatabase/neon)
+- [ONNX](https://github.com/onnx/onnx)
+- [OpenBB](https://github.com/OpenBB-finance/OpenBBTerminal)
+- [PDM](https://github.com/pdm-project/pdm)
+- [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)
+- [Pandas](https://github.com/pandas-dev/pandas)
+- [Poetry](https://github.com/python-poetry/poetry)
+- [Polars](https://github.com/pola-rs/polars)
+- [PostHog](https://github.com/PostHog/posthog)
+- Prefect ([Python SDK](https://github.com/PrefectHQ/prefect), [Marvin](https://github.com/PrefectHQ/marvin))
+- [Pydantic](https://github.com/pydantic/pydantic)
+- [PyInstaller](https://github.com/pyinstaller/pyinstaller)
+- [Pylint](https://github.com/PyCQA/pylint)
+- [Pynecone](https://github.com/pynecone-io/pynecone)
+- [Robyn](https://github.com/sansyrox/robyn)
+- Scale AI ([Launch SDK](https://github.com/scaleapi/launch-python-client))
+- Snowflake ([SnowCLI](https://github.com/Snowflake-Labs/snowcli))
+- [Saleor](https://github.com/saleor/saleor)
+- [SciPy](https://github.com/scipy/scipy)
+- [Sphinx](https://github.com/sphinx-doc/sphinx)
+- [Stable Baselines3](https://github.com/DLR-RM/stable-baselines3)
+- [Starlite](https://github.com/starlite-api/starlite)
+- [The Algorithms](https://github.com/TheAlgorithms/Python)
+- [Vega-Altair](https://github.com/altair-viz/altair)
+- WordPress ([Openverse](https://github.com/WordPress/openverse))
+- [ZenML](https://github.com/zenml-io/zenml)
+- [Zulip](https://github.com/zulip/zulip)
+- [build (PyPA)](https://github.com/pypa/build)
+- [cibuildwheel (PyPA)](https://github.com/pypa/cibuildwheel)
+- [delta-rs](https://github.com/delta-io/delta-rs)
 - [featuretools](https://github.com/alteryx/featuretools)
 - [meson-python](https://github.com/mesonbuild/meson-python)
-- [ZenML](https://github.com/zenml-io/zenml)
-- [delta-rs](https://github.com/delta-io/delta-rs)
-- [Starlite](https://github.com/starlite-api/starlite)
-- [telemetry-airflow (Mozilla)](https://github.com/mozilla/telemetry-airflow)
-- [Stable Baselines3](https://github.com/DLR-RM/stable-baselines3)
-- [PaddlePaddle](https://github.com/PaddlePaddle/Paddle)
 - [nox](https://github.com/wntrblm/nox)
-- [Neon](https://github.com/neondatabase/neon)
-- [The Algorithms](https://github.com/TheAlgorithms/Python)
-- [Openverse](https://github.com/WordPress/openverse)
-- [MegaLinter](https://github.com/oxsecurity/megalinter)
 
 ## License
 

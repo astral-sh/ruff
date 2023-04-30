@@ -1,10 +1,10 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
 use crate::registry::Rule;
 use crate::settings::{flags, Settings};
@@ -31,7 +31,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
         if i >= tokens.len() {
             return None;
         }
-        let Ok((_, tok, _)) = &tokens[i] else {
+        let Ok((tok, _)) = &tokens[i] else {
             return None;
         };
         match tok {
@@ -57,7 +57,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
         if i >= tokens.len() {
             return None;
         }
-        let Ok((_, tok, _)) = &tokens[i] else {
+        let Ok((tok, _)) = &tokens[i] else {
             return None;
         };
 
@@ -78,7 +78,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
     if (start + 1..i).all(|i| {
         matches!(
             tokens[i],
-            Ok((_, Tok::Comment(..) | Tok::NonLogicalNewline, _))
+            Ok((Tok::Comment(..) | Tok::NonLogicalNewline, _))
         )
     }) {
         return None;
@@ -90,7 +90,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
         if i >= tokens.len() {
             return None;
         }
-        let Ok((_, tok, _)) = &tokens[i] else {
+        let Ok(( tok, _)) = &tokens[i] else {
             return None;
         };
         match tok {
@@ -106,7 +106,7 @@ fn match_extraneous_parentheses(tokens: &[LexResult], mut i: usize) -> Option<(u
     if i >= tokens.len() {
         return None;
     }
-    let Ok((_, tok, _)) = &tokens[i] else {
+    let Ok(( tok, _)) = &tokens[i] else {
         return None;
     };
     if matches!(tok, Tok::Rpar) {
@@ -126,23 +126,26 @@ pub fn extraneous_parentheses(
     let mut diagnostics = vec![];
     let mut i = 0;
     while i < tokens.len() {
-        if matches!(tokens[i], Ok((_, Tok::Lpar, _))) {
+        if matches!(tokens[i], Ok((Tok::Lpar, _))) {
             if let Some((start, end)) = match_extraneous_parentheses(tokens, i) {
                 i = end + 1;
-                let Ok((start, ..)) = &tokens[start] else {
+                let Ok((_, start_range)) = &tokens[start] else {
                     return diagnostics;
                 };
-                let Ok((.., end)) = &tokens[end] else {
+                let Ok((.., end_range)) = &tokens[end] else {
                     return diagnostics;
                 };
-                let mut diagnostic =
-                    Diagnostic::new(ExtraneousParentheses, Range::new(*start, *end));
+                let mut diagnostic = Diagnostic::new(
+                    ExtraneousParentheses,
+                    TextRange::new(start_range.start(), end_range.end()),
+                );
                 if autofix.into() && settings.rules.should_fix(Rule::ExtraneousParentheses) {
-                    let contents = locator.slice(Range::new(*start, *end));
+                    let contents =
+                        locator.slice(TextRange::new(start_range.start(), end_range.end()));
                     diagnostic.set_fix(Edit::replacement(
                         contents[1..contents.len() - 1].to_string(),
-                        *start,
-                        *end,
+                        start_range.start(),
+                        end_range.end(),
                     ));
                 }
                 diagnostics.push(diagnostic);

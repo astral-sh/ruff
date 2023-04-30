@@ -1,47 +1,32 @@
 ---
 source: crates/ruff/src/rules/flake8_pyi/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnrecognizedPlatformCheck
-    body: "Unrecognized `sys.platform` check"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 3
-  end_location:
-    row: 7
-    column: 28
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnrecognizedPlatformCheck
-    body: "Unrecognized `sys.platform` check"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 3
-  end_location:
-    row: 9
-    column: 19
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: UnrecognizedPlatformCheck
-    body: "Unrecognized `sys.platform` check"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 11
-    column: 3
-  end_location:
-    row: 11
-    column: 24
-  fix:
-    edits: []
-  parent: ~
+PYI007.pyi:7:4: PYI007 Unrecognized `sys.platform` check
+   |
+ 7 | if sys.platform != "platform_name_2": ...  # OK
+ 8 | 
+ 9 | if sys.platform in ["linux"]: ...  # Error: PYI007 Unrecognized sys.platform check
+   |    ^^^^^^^^^^^^^^^^^^^^^^^^^ PYI007
+10 | 
+11 | if sys.platform > 3: ...  # Error: PYI007 Unrecognized sys.platform check
+   |
+
+PYI007.pyi:9:4: PYI007 Unrecognized `sys.platform` check
+   |
+ 9 | if sys.platform in ["linux"]: ...  # Error: PYI007 Unrecognized sys.platform check
+10 | 
+11 | if sys.platform > 3: ...  # Error: PYI007 Unrecognized sys.platform check
+   |    ^^^^^^^^^^^^^^^^ PYI007
+12 | 
+13 | if sys.platform == 10.12: ...  # Error: PYI007 Unrecognized sys.platform check
+   |
+
+PYI007.pyi:11:4: PYI007 Unrecognized `sys.platform` check
+   |
+11 | if sys.platform > 3: ...  # Error: PYI007 Unrecognized sys.platform check
+12 | 
+13 | if sys.platform == 10.12: ...  # Error: PYI007 Unrecognized sys.platform check
+   |    ^^^^^^^^^^^^^^^^^^^^^ PYI007
+   |
+
 

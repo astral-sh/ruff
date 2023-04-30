@@ -1,8 +1,8 @@
-use rustpython_parser::ast::Location;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_python_ast::newlines::Line;
 use ruff_python_ast::whitespace::leading_space;
 
 #[violation]
@@ -16,17 +16,30 @@ impl Violation for TabIndentation {
 }
 
 /// W191
-pub fn tab_indentation(lineno: usize, line: &str) -> Option<Diagnostic> {
+pub(crate) fn tab_indentation(line: &Line, string_ranges: &[TextRange]) -> Option<Diagnostic> {
     let indent = leading_space(line);
+    if let Some(tab_index) = indent.find('\t') {
+        let tab_offset = line.start() + TextSize::try_from(tab_index).unwrap();
 
-    if indent.contains('\t') {
-        Some(Diagnostic::new(
-            TabIndentation,
-            Range::new(
-                Location::new(lineno + 1, 0),
-                Location::new(lineno + 1, indent.chars().count()),
-            ),
-        ))
+        let string_range_index = string_ranges.binary_search_by(|range| {
+            if tab_offset < range.start() {
+                std::cmp::Ordering::Greater
+            } else if range.contains(tab_offset) {
+                std::cmp::Ordering::Equal
+            } else {
+                std::cmp::Ordering::Less
+            }
+        });
+
+        // If the tab character is within a multi-line string, abort.
+        if string_range_index.is_ok() {
+            None
+        } else {
+            Some(Diagnostic::new(
+                TabIndentation,
+                TextRange::at(line.start(), indent.text_len()),
+            ))
+        }
     } else {
         None
     }

@@ -1,12 +1,10 @@
 #![allow(unused_imports)]
 
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::path::Path;
-
-use rustpython_parser::ast::Location;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::registry::AsRule;
 #[cfg(target_family = "unix")]
@@ -27,17 +25,14 @@ impl Violation for ShebangNotExecutable {
 #[cfg(target_family = "unix")]
 pub fn shebang_not_executable(
     filepath: &Path,
-    lineno: usize,
+    range: TextRange,
     shebang: &ShebangDirective,
 ) -> Option<Diagnostic> {
-    if let ShebangDirective::Match(_, start, end, _) = shebang {
+    if let ShebangDirective::Match(_, start, content) = shebang {
         if let Ok(false) = is_executable(filepath) {
             let diagnostic = Diagnostic::new(
                 ShebangNotExecutable,
-                Range::new(
-                    Location::new(lineno + 1, *start),
-                    Location::new(lineno + 1, *end),
-                ),
+                TextRange::at(range.start() + start, content.text_len()),
             );
             return Some(diagnostic);
         }
@@ -48,7 +43,7 @@ pub fn shebang_not_executable(
 #[cfg(not(target_family = "unix"))]
 pub fn shebang_not_executable(
     _filepath: &Path,
-    _lineno: usize,
+    _range: TextRange,
     _shebang: &ShebangDirective,
 ) -> Option<Diagnostic> {
     None

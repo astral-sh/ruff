@@ -9,15 +9,18 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::{debug, error};
+use ruff_text_size::TextSize;
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
 use ruff::fs;
 use ruff::jupyter::{is_jupyter_notebook, JupyterIndex, JupyterNotebook};
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
+use ruff::logging::DisplayParseError;
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff_python_ast::imports::ImportMap;
+use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
 
 use crate::cache;
 
@@ -85,9 +88,8 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Box<Diag
             return Err(Box::new(Diagnostics {
                 messages: vec![Message::from_diagnostic(
                     *diagnostic,
-                    path.to_string_lossy().to_string(),
-                    None,
-                    1,
+                    SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish(),
+                    TextSize::default(),
                 )],
                 ..Diagnostics::default()
             }));
@@ -118,7 +120,7 @@ pub fn lint_path(
     {
         let metadata = path.metadata()?;
         if let Some((messages, imports)) =
-            cache::get(path, package.as_ref(), &metadata, settings, autofix.into())
+            cache::get(path, package, &metadata, settings, autofix.into())
         {
             debug!("Cache hit for: {}", path.display());
             return Ok(Diagnostics::new(messages, imports));
@@ -197,24 +199,24 @@ pub fn lint_path(
     let imports = imports.unwrap_or_default();
 
     if let Some(err) = parse_error {
-        // Notify the user of any parse errors.
         error!(
-            "{}{}{} {err}",
-            "Failed to parse ".bold(),
-            fs::relativize_path(path).bold(),
-            ":".bold()
+            "{}",
+            DisplayParseError::new(
+                err,
+                SourceCode::new(&contents, &LineIndex::from_source_text(&contents))
+            )
         );
 
         // Purge the cache.
         if let Some(metadata) = metadata {
-            cache::del(path, package.as_ref(), &metadata, settings, autofix.into());
+            cache::del(path, package, &metadata, settings, autofix.into());
         }
     } else {
         // Re-populate the cache.
         if let Some(metadata) = metadata {
             cache::set(
                 path,
-                package.as_ref(),
+                package,
                 &metadata,
                 settings,
                 autofix.into(),

@@ -119,8 +119,7 @@ fn test_stdin_json() -> Result<()> {
     "filename": "{file_path}",
     "noqa_row": 1
   }}
-]
-"#
+]"#
         )
     );
     Ok(())

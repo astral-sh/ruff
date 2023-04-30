@@ -4,7 +4,6 @@ use rustpython_parser::ast::{Alias, AliasData, Located, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::autofix;
 use crate::checkers::ast::Checker;
@@ -81,7 +80,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
                 .sorted()
                 .collect(),
         },
-        Range::from(stmt),
+        stmt.range(),
     );
 
     if checker.patch(diagnostic.kind.rule()) {
@@ -102,7 +101,7 @@ pub fn unnecessary_future_import(checker: &mut Checker, stmt: &Stmt, names: &[Lo
             checker.stylist,
         ) {
             Ok(fix) => {
-                if fix.content.is_empty() || fix.content == "pass" {
+                if fix.is_deletion() || fix.content() == Some("pass") {
                     checker.deletions.insert(*defined_by);
                 }
                 diagnostic.set_fix(fix);

@@ -2,8 +2,7 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::scope::ScopeKind;
-use ruff_python_ast::types::Range;
+use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 
@@ -51,10 +50,9 @@ pub fn cached_instance_method(checker: &mut Checker, decorator_list: &[Expr]) {
                 _ => decorator,
             },
         ) {
-            checker.diagnostics.push(Diagnostic::new(
-                CachedInstanceMethod,
-                Range::from(decorator),
-            ));
+            checker
+                .diagnostics
+                .push(Diagnostic::new(CachedInstanceMethod, decorator.range()));
         }
     }
 }

@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
@@ -74,7 +73,7 @@ pub fn loop_variable_overrides_iterator(checker: &mut Checker, target: &Expr, it
                 LoopVariableOverridesIterator {
                     name: name.to_string(),
                 },
-                Range::from(expr),
+                expr.range(),
             ));
         }
     }

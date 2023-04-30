@@ -2,7 +2,6 @@ use rustpython_parser::ast::Alias;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -33,13 +32,9 @@ pub fn useless_import_alias(checker: &mut Checker, alias: &Alias) {
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UselessImportAlias, Range::from(alias));
+    let mut diagnostic = Diagnostic::new(UselessImportAlias, alias.range());
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
-            asname.to_string(),
-            alias.location,
-            alias.end_location.unwrap(),
-        ));
+        diagnostic.set_fix(Edit::range_replacement(asname.to_string(), alias.range()));
     }
     checker.diagnostics.push(diagnostic);
 }

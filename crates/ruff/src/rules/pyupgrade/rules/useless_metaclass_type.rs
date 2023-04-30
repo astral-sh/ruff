@@ -1,9 +1,9 @@
 use log::error;
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::autofix::actions;
 use crate::checkers::ast::Checker;
@@ -23,7 +23,7 @@ impl AlwaysAutofixableViolation for UselessMetaclassType {
     }
 }
 
-fn rule(targets: &[Expr], value: &Expr, location: Range) -> Option<Diagnostic> {
+fn rule(targets: &[Expr], value: &Expr, location: TextRange) -> Option<Diagnostic> {
     if targets.len() != 1 {
         return None;
     }
@@ -45,7 +45,7 @@ fn rule(targets: &[Expr], value: &Expr, location: Range) -> Option<Diagnostic> {
 /// UP001
 pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, targets: &[Expr]) {
     let Some(mut diagnostic) =
-        rule(targets, value, Range::from(stmt)) else {
+        rule(targets, value, stmt.range()) else {
             return;
         };
     if checker.patch(diagnostic.kind.rule()) {
@@ -61,7 +61,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
             checker.stylist,
         ) {
             Ok(fix) => {
-                if fix.content.is_empty() || fix.content == "pass" {
+                if fix.is_deletion() || fix.content() == Some("pass") {
                     checker.deletions.insert(*defined_by);
                 }
                 diagnostic.set_fix(fix);

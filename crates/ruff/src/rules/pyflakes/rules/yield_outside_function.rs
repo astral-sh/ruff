@@ -4,8 +4,7 @@ use rustpython_parser::ast::{Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::scope::ScopeKind;
-use ruff_python_ast::types::Range;
+use ruff_python_semantic::scope::ScopeKind;
 
 use crate::checkers::ast::Checker;
 
@@ -52,7 +51,7 @@ pub fn yield_outside_function(checker: &mut Checker, expr: &Expr) {
         };
         checker.diagnostics.push(Diagnostic::new(
             YieldOutsideFunction { keyword },
-            Range::from(expr),
+            expr.range(),
         ));
     }
 }

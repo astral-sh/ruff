@@ -1,26 +1,22 @@
 ---
 source: crates/ruff/src/rules/pyupgrade/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: OSErrorAlias
-    body: "Replace aliased errors with `OSError`"
-    suggestion: "Replace with builtin `OSError`"
-    fixable: true
-  location:
-    row: 9
-    column: 7
-  end_location:
-    row: 9
-    column: 50
-  fix:
-    edits:
-      - content: "(OSError, exceptions.OperationalError)"
-        location:
-          row: 9
-          column: 7
-        end_location:
-          row: 9
-          column: 50
-  parent: ~
+UP024_4.py:9:8: UP024 [*] Replace aliased errors with `OSError`
+   |
+ 9 |     conn.ensure_connection(max_retries=2)
+10 |     conn._close()
+11 | except (socket.error, exceptions.OperationalError):
+   |        ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ UP024
+12 |     return HttpResponseServerError("cache: cannot connect to broker.")
+   |
+   = help: Replace with builtin `OSError`
+
+ℹ Suggested fix
+6  6  |     conn = Connection(settings.CELERY_BROKER_URL)
+7  7  |     conn.ensure_connection(max_retries=2)
+8  8  |     conn._close()
+9     |-except (socket.error, exceptions.OperationalError):
+   9  |+except (OSError, exceptions.OperationalError):
+10 10 |     return HttpResponseServerError("cache: cannot connect to broker.")
+
 

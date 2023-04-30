@@ -1,5 +1,6 @@
+use ruff_text_size::{TextRange, TextSize};
 use rustpython_parser::ast::{
-    Cmpop, Comprehension, Constant, Expr, ExprContext, ExprKind, Location, Stmt, StmtKind, Unaryop,
+    Cmpop, Comprehension, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind, Unaryop,
 };
 use unicode_width::UnicodeWidthStr;
 
@@ -7,7 +8,6 @@ use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, create_stmt, unparse_stmt};
 use ruff_python_ast::source_code::Stylist;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::{AsRule, Rule};
@@ -36,7 +36,7 @@ struct Loop<'a> {
     test: &'a Expr,
     target: &'a Expr,
     iter: &'a Expr,
-    terminal: Location,
+    terminal: TextSize,
 }
 
 /// Extract the returned boolean values a `StmtKind::For` with an `else` body.
@@ -99,7 +99,7 @@ fn return_values_for_else(stmt: &Stmt) -> Option<Loop> {
         test: nested_test,
         target,
         iter,
-        terminal: stmt.end_location.unwrap(),
+        terminal: stmt.end(),
     })
 }
 
@@ -164,7 +164,7 @@ fn return_values_for_siblings<'a>(stmt: &'a Stmt, sibling: &'a Stmt) -> Option<L
         test: nested_test,
         target,
         iter,
-        terminal: sibling.end_location.unwrap(),
+        terminal: sibling.end(),
     })
 }
 
@@ -212,7 +212,11 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                 );
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
-                if stmt.location.column() + contents.width() > checker.settings.line_length {
+                let line_start = checker.locator.line_start(stmt.start());
+                if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
+                    + contents.width()
+                    > checker.settings.line_length
+                {
                     return;
                 }
 
@@ -220,12 +224,12 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     ReimplementedBuiltin {
                         repl: contents.clone(),
                     },
-                    Range::from(stmt),
+                    stmt.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("any") {
                     diagnostic.set_fix(Edit::replacement(
                         contents,
-                        stmt.location,
+                        stmt.start(),
                         loop_info.terminal,
                     ));
                 }
@@ -289,7 +293,11 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                 );
 
                 // Don't flag if the resulting expression would exceed the maximum line length.
-                if stmt.location.column() + contents.width() > checker.settings.line_length {
+                let line_start = checker.locator.line_start(stmt.start());
+                if checker.locator.contents()[TextRange::new(line_start, stmt.start())].width()
+                    + contents.width()
+                    > checker.settings.line_length
+                {
                     return;
                 }
 
@@ -297,12 +305,12 @@ pub fn convert_for_loop_to_any_all(checker: &mut Checker, stmt: &Stmt, sibling: 
                     ReimplementedBuiltin {
                         repl: contents.clone(),
                     },
-                    Range::from(stmt),
+                    stmt.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) && checker.ctx.is_builtin("all") {
                     diagnostic.set_fix(Edit::replacement(
                         contents,
-                        stmt.location,
+                        stmt.start(),
                         loop_info.terminal,
                     ));
                 }

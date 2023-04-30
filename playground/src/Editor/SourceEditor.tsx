@@ -35,9 +35,9 @@ export default function SourceEditor({
       "owner",
       diagnostics.map((diagnostic) => ({
         startLineNumber: diagnostic.location.row,
-        startColumn: diagnostic.location.column + 1,
+        startColumn: diagnostic.location.column,
         endLineNumber: diagnostic.end_location.row,
-        endColumn: diagnostic.end_location.column + 1,
+        endColumn: diagnostic.end_location.column,
         message: `${diagnostic.code}: ${diagnostic.message}`,
         severity: MarkerSeverity.Error,
         tags:

@@ -1,13 +1,15 @@
 //! Struct used to efficiently slice source code at (row, column) Locations.
 
+use crate::newlines::find_newline;
+use crate::source_code::{LineIndex, OneIndexed, SourceCode, SourceLocation};
+use memchr::{memchr2, memrchr2};
 use once_cell::unsync::OnceCell;
-use rustpython_parser::ast::Location;
-
-use crate::types::Range;
+use ruff_text_size::{TextLen, TextRange, TextSize};
+use std::ops::Add;
 
 pub struct Locator<'a> {
     contents: &'a str,
-    index: OnceCell<Index>,
+    index: OnceCell<LineIndex>,
 }
 
 impl<'a> Locator<'a> {
@@ -18,37 +20,372 @@ impl<'a> Locator<'a> {
         }
     }
 
-    fn get_or_init_index(&self) -> &Index {
-        self.index.get_or_init(|| Index::from(self.contents))
+    #[deprecated(
+        note = "This is expensive, avoid using outside of the diagnostic phase. Prefer the other `Locator` methods instead."
+    )]
+    pub fn compute_line_index(&self, offset: TextSize) -> OneIndexed {
+        self.to_index().line_index(offset)
     }
 
-    /// Take the source code up to the given [`Location`].
-    pub fn take(&self, location: Location) -> &'a str {
-        let index = self.get_or_init_index();
-        let offset = index.byte_offset(location, self.contents);
-        &self.contents[..offset]
+    #[deprecated(
+        note = "This is expensive, avoid using outside of the diagnostic phase. Prefer the other `Locator` methods instead."
+    )]
+    pub fn compute_source_location(&self, offset: TextSize) -> SourceLocation {
+        self.to_source_code().source_location(offset)
     }
 
-    /// Take the source code after the given [`Location`].
-    pub fn skip(&self, location: Location) -> &'a str {
-        let index = self.get_or_init_index();
-        let offset = index.byte_offset(location, self.contents);
-        &self.contents[offset..]
+    fn to_index(&self) -> &LineIndex {
+        self.index
+            .get_or_init(|| LineIndex::from_source_text(self.contents))
     }
 
-    /// Take the source code between the given [`Range`].
-    pub fn slice<R: Into<Range>>(&self, range: R) -> &'a str {
-        let index = self.get_or_init_index();
-        let range = range.into();
-        let start = index.byte_offset(range.location, self.contents);
-        let end = index.byte_offset(range.end_location, self.contents);
-        &self.contents[start..end]
+    pub fn line_index(&self) -> Option<&LineIndex> {
+        self.index.get()
     }
 
-    /// Return the byte offset of the given [`Location`].
-    pub fn offset(&self, location: Location) -> usize {
-        let index = self.get_or_init_index();
-        index.byte_offset(location, self.contents)
+    pub fn to_source_code(&self) -> SourceCode {
+        SourceCode {
+            index: self.to_index(),
+            text: self.contents,
+        }
+    }
+
+    /// Computes the start position of the line of `offset`.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::TextSize;
+    /// # use ruff_python_ast::source_code::Locator;
+    ///
+    /// let locator = Locator::new("First line\nsecond line\rthird line");
+    ///
+    /// assert_eq!(locator.line_start(TextSize::from(0)), TextSize::from(0));
+    /// assert_eq!(locator.line_start(TextSize::from(4)), TextSize::from(0));
+    ///
+    /// assert_eq!(locator.line_start(TextSize::from(14)), TextSize::from(11));
+    /// assert_eq!(locator.line_start(TextSize::from(28)), TextSize::from(23));
+    /// ```
+    ///
+    /// ## Panics
+    /// If `offset` is out of bounds.
+    pub fn line_start(&self, offset: TextSize) -> TextSize {
+        let bytes = self.contents[TextRange::up_to(offset)].as_bytes();
+        if let Some(index) = memrchr2(b'\n', b'\r', bytes) {
+            // SAFETY: Safe because `index < offset`
+            TextSize::try_from(index).unwrap().add(TextSize::from(1))
+        } else {
+            TextSize::default()
+        }
+    }
+
+    pub fn is_at_start_of_line(&self, offset: TextSize) -> bool {
+        offset == TextSize::from(0)
+            || self.contents[TextRange::up_to(offset)].ends_with(['\n', '\r'])
+    }
+
+    /// Computes the offset that is right after the newline character that ends `offset`'s line.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_python_ast::source_code::Locator;
+    ///
+    /// let locator = Locator::new("First line\nsecond line\r\nthird line");
+    ///
+    /// assert_eq!(locator.full_line_end(TextSize::from(3)), TextSize::from(11));
+    /// assert_eq!(locator.full_line_end(TextSize::from(14)), TextSize::from(24));
+    /// assert_eq!(locator.full_line_end(TextSize::from(28)), TextSize::from(34));
+    /// ```
+    ///
+    /// ## Panics
+    ///
+    /// If `offset` is passed the end of the content.
+    pub fn full_line_end(&self, offset: TextSize) -> TextSize {
+        let slice = &self.contents[usize::from(offset)..];
+        if let Some((index, line_ending)) = find_newline(slice) {
+            offset + TextSize::try_from(index).unwrap() + line_ending.text_len()
+        } else {
+            self.contents.text_len()
+        }
+    }
+
+    /// Computes the offset that is right before the newline character that ends `offset`'s line.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_python_ast::source_code::Locator;
+    ///
+    /// let locator = Locator::new("First line\nsecond line\r\nthird line");
+    ///
+    /// assert_eq!(locator.line_end(TextSize::from(3)), TextSize::from(10));
+    /// assert_eq!(locator.line_end(TextSize::from(14)), TextSize::from(22));
+    /// assert_eq!(locator.line_end(TextSize::from(28)), TextSize::from(34));
+    /// ```
+    ///
+    /// ## Panics
+    ///
+    /// If `offset` is passed the end of the content.
+    pub fn line_end(&self, offset: TextSize) -> TextSize {
+        let slice = &self.contents[usize::from(offset)..];
+        if let Some(index) = memchr2(b'\n', b'\r', slice.as_bytes()) {
+            offset + TextSize::try_from(index).unwrap()
+        } else {
+            self.contents.text_len()
+        }
+    }
+
+    /// Computes the range of this `offset`s line.
+    ///
+    /// The range starts at the beginning of the line and goes up to, and including, the new line character
+    /// at the end of the line.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_python_ast::source_code::Locator;
+    ///
+    /// let locator = Locator::new("First line\nsecond line\r\nthird line");
+    ///
+    /// assert_eq!(locator.full_line_range(TextSize::from(3)), TextRange::new(TextSize::from(0), TextSize::from(11)));
+    /// assert_eq!(locator.full_line_range(TextSize::from(14)), TextRange::new(TextSize::from(11), TextSize::from(24)));
+    /// assert_eq!(locator.full_line_range(TextSize::from(28)), TextRange::new(TextSize::from(24), TextSize::from(34)));
+    /// ```
+    ///
+    /// ## Panics
+    /// If `offset` is out of bounds.
+    pub fn full_line_range(&self, offset: TextSize) -> TextRange {
+        TextRange::new(self.line_start(offset), self.full_line_end(offset))
+    }
+
+    /// Computes the range of this `offset`s line ending before the newline character.
+    ///
+    /// The range starts at the beginning of the line and goes up to, but excluding, the new line character
+    /// at the end of the line.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_python_ast::source_code::Locator;
+    ///
+    /// let locator = Locator::new("First line\nsecond line\r\nthird line");
+    ///
+    /// assert_eq!(locator.line_range(TextSize::from(3)), TextRange::new(TextSize::from(0), TextSize::from(10)));
+    /// assert_eq!(locator.line_range(TextSize::from(14)), TextRange::new(TextSize::from(11), TextSize::from(22)));
+    /// assert_eq!(locator.line_range(TextSize::from(28)), TextRange::new(TextSize::from(24), TextSize::from(34)));
+    /// ```
+    ///
+    /// ## Panics
+    /// If `offset` is out of bounds.
+    pub fn line_range(&self, offset: TextSize) -> TextRange {
+        TextRange::new(self.line_start(offset), self.line_end(offset))
+    }
+
+    /// Returns the text of the `offset`'s line.
+    ///
+    /// The line includes the newline characters at the end of the line.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_python_ast::source_code::Locator;
+    ///
+    /// let locator = Locator::new("First line\nsecond line\r\nthird line");
+    ///
+    /// assert_eq!(locator.full_line(TextSize::from(3)), "First line\n");
+    /// assert_eq!(locator.full_line(TextSize::from(14)), "second line\r\n");
+    /// assert_eq!(locator.full_line(TextSize::from(28)), "third line");
+    /// ```
+    ///
+    /// ## Panics
+    /// If `offset` is out of bounds.
+    pub fn full_line(&self, offset: TextSize) -> &'a str {
+        &self.contents[self.full_line_range(offset)]
+    }
+
+    /// Returns the text of the `offset`'s line.
+    ///
+    /// Excludes the newline characters at the end of the line.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_python_ast::source_code::Locator;
+    ///
+    /// let locator = Locator::new("First line\nsecond line\r\nthird line");
+    ///
+    /// assert_eq!(locator.line(TextSize::from(3)), "First line");
+    /// assert_eq!(locator.line(TextSize::from(14)), "second line");
+    /// assert_eq!(locator.line(TextSize::from(28)), "third line");
+    /// ```
+    ///
+    /// ## Panics
+    /// If `offset` is out of bounds.
+    pub fn line(&self, offset: TextSize) -> &'a str {
+        &self.contents[self.line_range(offset)]
+    }
+
+    /// Computes the range of all lines that this `range` covers.
+    ///
+    /// The range starts at the beginning of the line at `range.start()` and goes up to, and including, the new line character
+    /// at the end of `range.ends()`'s line.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_python_ast::source_code::Locator;
+    ///
+    /// let locator = Locator::new("First line\nsecond line\r\nthird line");
+    ///
+    /// assert_eq!(
+    ///     locator.full_lines_range(TextRange::new(TextSize::from(3), TextSize::from(5))),
+    ///     TextRange::new(TextSize::from(0), TextSize::from(11))
+    /// );
+    /// assert_eq!(
+    ///     locator.full_lines_range(TextRange::new(TextSize::from(3), TextSize::from(14))),
+    ///     TextRange::new(TextSize::from(0), TextSize::from(24))
+    /// );
+    /// ```
+    ///
+    /// ## Panics
+    /// If the start or end of `range` is out of bounds.
+    pub fn full_lines_range(&self, range: TextRange) -> TextRange {
+        TextRange::new(
+            self.line_start(range.start()),
+            self.full_line_end(range.end()),
+        )
+    }
+
+    /// Computes the range of all lines that this `range` covers.
+    ///
+    /// The range starts at the beginning of the line at `range.start()` and goes up to, but excluding, the new line character
+    /// at the end of `range.end()`'s line.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_python_ast::source_code::Locator;
+    ///
+    /// let locator = Locator::new("First line\nsecond line\r\nthird line");
+    ///
+    /// assert_eq!(
+    ///     locator.lines_range(TextRange::new(TextSize::from(3), TextSize::from(5))),
+    ///     TextRange::new(TextSize::from(0), TextSize::from(10))
+    /// );
+    /// assert_eq!(
+    ///     locator.lines_range(TextRange::new(TextSize::from(3), TextSize::from(14))),
+    ///     TextRange::new(TextSize::from(0), TextSize::from(22))
+    /// );
+    /// ```
+    ///
+    /// ## Panics
+    /// If the start or end of `range` is out of bounds.
+    pub fn lines_range(&self, range: TextRange) -> TextRange {
+        TextRange::new(self.line_start(range.start()), self.line_end(range.end()))
+    }
+
+    /// Returns true if the text of `range` contains any line break.
+    ///
+    /// ```
+    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_python_ast::source_code::Locator;
+    ///
+    /// let locator = Locator::new("First line\nsecond line\r\nthird line");
+    ///
+    /// assert!(
+    ///     !locator.contains_line_break(TextRange::new(TextSize::from(3), TextSize::from(5))),
+    /// );
+    /// assert!(
+    ///     locator.contains_line_break(TextRange::new(TextSize::from(3), TextSize::from(14))),
+    /// );
+    /// ```
+    ///
+    /// ## Panics
+    /// If the `range` is out of bounds.
+    pub fn contains_line_break(&self, range: TextRange) -> bool {
+        let text = &self.contents[range];
+        text.contains(['\n', '\r'])
+    }
+
+    /// Returns the text of all lines that include `range`.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_python_ast::source_code::Locator;
+    ///
+    /// let locator = Locator::new("First line\nsecond line\r\nthird line");
+    ///
+    /// assert_eq!(
+    ///     locator.lines(TextRange::new(TextSize::from(3), TextSize::from(5))),
+    ///     "First line"
+    /// );
+    /// assert_eq!(
+    ///     locator.lines(TextRange::new(TextSize::from(3), TextSize::from(14))),
+    ///     "First line\nsecond line"
+    /// );
+    /// ```
+    ///
+    /// ## Panics
+    /// If the start or end of `range` is out of bounds.
+    pub fn lines(&self, range: TextRange) -> &'a str {
+        &self.contents[self.lines_range(range)]
+    }
+
+    /// Returns the text of all lines that include `range`.
+    ///
+    /// Includes the newline characters of the last line.
+    ///
+    /// ## Examples
+    ///
+    /// ```
+    /// # use ruff_text_size::{TextRange, TextSize};
+    /// # use ruff_python_ast::source_code::Locator;
+    ///
+    /// let locator = Locator::new("First line\nsecond line\r\nthird line");
+    ///
+    /// assert_eq!(
+    ///     locator.full_lines(TextRange::new(TextSize::from(3), TextSize::from(5))),
+    ///     "First line\n"
+    /// );
+    /// assert_eq!(
+    ///     locator.full_lines(TextRange::new(TextSize::from(3), TextSize::from(14))),
+    ///     "First line\nsecond line\r\n"
+    /// );
+    /// ```
+    ///
+    /// ## Panics
+    /// If the start or end of `range` is out of bounds.
+    pub fn full_lines(&self, range: TextRange) -> &'a str {
+        &self.contents[self.full_lines_range(range)]
+    }
+
+    /// Take the source code up to the given [`TextSize`].
+    #[inline]
+    pub fn up_to(&self, offset: TextSize) -> &'a str {
+        &self.contents[TextRange::up_to(offset)]
+    }
+
+    /// Take the source code after the given [`TextSize`].
+    #[inline]
+    pub fn after(&self, offset: TextSize) -> &'a str {
+        &self.contents[usize::from(offset)..]
+    }
+
+    /// Take the source code between the given [`TextRange`].
+    #[inline]
+    pub fn slice(&self, range: TextRange) -> &'a str {
+        &self.contents[range]
     }
 
     /// Return the underlying source code.
@@ -56,318 +393,17 @@ impl<'a> Locator<'a> {
         self.contents
     }
 
-    /// Return the number of lines in the source code.
-    pub fn count_lines(&self) -> usize {
-        let index = self.get_or_init_index();
-        index.count_lines()
-    }
-
     /// Return the number of bytes in the source code.
     pub const fn len(&self) -> usize {
         self.contents.len()
     }
 
+    pub fn text_len(&self) -> TextSize {
+        self.contents.text_len()
+    }
+
     /// Return `true` if the source code is empty.
     pub const fn is_empty(&self) -> bool {
         self.contents.is_empty()
-    }
-}
-
-/// Index for fast [`Location`] to byte offset conversions.
-#[derive(Debug, Clone)]
-enum Index {
-    /// Optimized index for an ASCII only document
-    Ascii(AsciiIndex),
-
-    /// Index for UTF8 documents
-    Utf8(Utf8Index),
-}
-
-impl Index {
-    /// Truncate a [`Location`] to a byte offset in source code.
-    fn byte_offset(&self, location: Location, contents: &str) -> usize {
-        match self {
-            Index::Ascii(ascii) => ascii.byte_offset(location, contents),
-            Index::Utf8(utf8) => utf8.byte_offset(location, contents),
-        }
-    }
-
-    /// Return the number of lines in the source code.
-    fn count_lines(&self) -> usize {
-        match self {
-            Index::Ascii(ascii) => ascii.line_start_byte_offsets.len(),
-            Index::Utf8(utf8) => utf8.line_start_byte_offsets.len(),
-        }
-    }
-}
-
-impl From<&str> for Index {
-    fn from(contents: &str) -> Self {
-        assert!(u32::try_from(contents.len()).is_ok());
-
-        let mut line_start_offsets: Vec<u32> = Vec::with_capacity(48);
-        line_start_offsets.push(0);
-        let mut utf8 = false;
-
-        // SAFE because of length assertion above
-        #[allow(clippy::cast_possible_truncation)]
-        for (i, byte) in contents.bytes().enumerate() {
-            utf8 |= !byte.is_ascii();
-
-            match byte {
-                // Only track one line break for `\r\n`.
-                b'\r' if contents.as_bytes().get(i + 1) == Some(&b'\n') => continue,
-                b'\n' | b'\r' => {
-                    line_start_offsets.push((i + 1) as u32);
-                }
-                _ => {}
-            }
-        }
-
-        if utf8 {
-            Self::Utf8(Utf8Index::new(line_start_offsets))
-        } else {
-            Self::Ascii(AsciiIndex::new(line_start_offsets))
-        }
-    }
-}
-
-/// Index for fast [`Location`] to byte offset conversions for ASCII documents.
-///
-/// The index stores the byte offsets for every line. It computes the byte offset for a [`Location`]
-/// by retrieving the line offset from its index and adding the column.
-#[derive(Debug, Clone, Eq, PartialEq)]
-struct AsciiIndex {
-    line_start_byte_offsets: Vec<u32>,
-}
-
-impl AsciiIndex {
-    fn new(line_start_positions: Vec<u32>) -> Self {
-        Self {
-            line_start_byte_offsets: line_start_positions,
-        }
-    }
-
-    /// Truncate a [`Location`] to a byte offset in ASCII source code.
-    fn byte_offset(&self, location: Location, contents: &str) -> usize {
-        let index = &self.line_start_byte_offsets;
-
-        // If start-of-line position after last line
-        if location.row() - 1 == index.len() && location.column() == 0 {
-            contents.len()
-        } else {
-            let byte_offset = index[location.row() - 1] as usize + location.column();
-            byte_offset.min(contents.len())
-        }
-    }
-}
-
-/// Index for fast [`Location`] to byte offset conversions for UTF8 documents.
-///
-/// The index stores the byte offset of every line. The column offset is lazily computed by
-/// adding the line start offset and then iterating to the `nth` character.
-#[derive(Debug, Clone, PartialEq)]
-struct Utf8Index {
-    line_start_byte_offsets: Vec<u32>,
-}
-
-impl Utf8Index {
-    fn new(line_byte_positions: Vec<u32>) -> Self {
-        Self {
-            line_start_byte_offsets: line_byte_positions,
-        }
-    }
-
-    /// Truncate a [`Location`] to a byte offset in UTF-8 source code.
-    fn byte_offset(&self, location: Location, contents: &str) -> usize {
-        let index = &self.line_start_byte_offsets;
-
-        if location.row() - 1 == index.len() && location.column() == 0 {
-            contents.len()
-        } else {
-            // Casting is safe because the length of utf8 characters is always between 1-4
-            #[allow(clippy::cast_possible_truncation)]
-            let line_start = if location.row() == 1 && contents.starts_with('\u{feff}') {
-                '\u{feff}'.len_utf8() as u32
-            } else {
-                index[location.row() - 1]
-            };
-
-            let rest = &contents[line_start as usize..];
-
-            let column_offset = match rest.char_indices().nth(location.column()) {
-                Some((offset, _)) => offset,
-                None => contents.len(),
-            };
-
-            let offset = line_start as usize + column_offset;
-            offset.min(contents.len())
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use rustpython_parser::ast::Location;
-
-    use crate::source_code::locator::{AsciiIndex, Index, Utf8Index};
-
-    fn index_ascii(content: &str) -> AsciiIndex {
-        match Index::from(content) {
-            Index::Ascii(ascii) => ascii,
-            Index::Utf8(_) => {
-                panic!("Expected ASCII index")
-            }
-        }
-    }
-
-    fn index_utf8(content: &str) -> Utf8Index {
-        match Index::from(content) {
-            Index::Utf8(utf8) => utf8,
-            Index::Ascii(_) => {
-                panic!("Expected UTF8 index")
-            }
-        }
-    }
-
-    #[test]
-    fn ascii_index() {
-        let contents = "";
-        let index = index_ascii(contents);
-        assert_eq!(index, AsciiIndex::new(vec![0]));
-
-        let contents = "x = 1";
-        let index = index_ascii(contents);
-        assert_eq!(index, AsciiIndex::new(vec![0]));
-
-        let contents = "x = 1\n";
-        let index = index_ascii(contents);
-        assert_eq!(index, AsciiIndex::new(vec![0, 6]));
-
-        let contents = "x = 1\ny = 2\nz = x + y\n";
-        let index = index_ascii(contents);
-        assert_eq!(index, AsciiIndex::new(vec![0, 6, 12, 22]));
-    }
-
-    #[test]
-    fn ascii_byte_offset() {
-        let contents = "x = 1\ny = 2";
-        let index = index_ascii(contents);
-
-        // First row.
-        let loc = index.byte_offset(Location::new(1, 0), contents);
-        assert_eq!(loc, 0);
-
-        // Second row.
-        let loc = index.byte_offset(Location::new(2, 0), contents);
-        assert_eq!(loc, 6);
-
-        // One-past-the-end.
-        let loc = index.byte_offset(Location::new(3, 0), contents);
-        assert_eq!(loc, 11);
-    }
-
-    #[test]
-    fn ascii_carriage_return() {
-        let contents = "x = 4\ry = 3";
-        let index = index_ascii(contents);
-        assert_eq!(index, AsciiIndex::new(vec![0, 6]));
-
-        assert_eq!(index.byte_offset(Location::new(1, 4), contents), 4);
-        assert_eq!(index.byte_offset(Location::new(2, 0), contents), 6);
-        assert_eq!(index.byte_offset(Location::new(2, 1), contents), 7);
-    }
-
-    #[test]
-    fn ascii_carriage_return_newline() {
-        let contents = "x = 4\r\ny = 3";
-        let index = index_ascii(contents);
-        assert_eq!(index, AsciiIndex::new(vec![0, 7]));
-
-        assert_eq!(index.byte_offset(Location::new(1, 4), contents), 4);
-        assert_eq!(index.byte_offset(Location::new(2, 0), contents), 7);
-        assert_eq!(index.byte_offset(Location::new(2, 1), contents), 8);
-    }
-
-    impl Utf8Index {
-        fn line_count(&self) -> usize {
-            self.line_start_byte_offsets.len()
-        }
-    }
-
-    #[test]
-    fn utf8_index() {
-        let contents = "x = '🫣'";
-        let index = index_utf8(contents);
-        assert_eq!(index.line_count(), 1);
-        assert_eq!(index, Utf8Index::new(vec![0]));
-
-        let contents = "x = '🫣'\n";
-        let index = index_utf8(contents);
-        assert_eq!(index.line_count(), 2);
-        assert_eq!(index, Utf8Index::new(vec![0, 11]));
-
-        let contents = "x = '🫣'\ny = 2\nz = x + y\n";
-        let index = index_utf8(contents);
-        assert_eq!(index.line_count(), 4);
-        assert_eq!(index, Utf8Index::new(vec![0, 11, 17, 27]));
-
-        let contents = "# 🫣\nclass Foo:\n    \"\"\".\"\"\"";
-        let index = index_utf8(contents);
-        assert_eq!(index.line_count(), 3);
-        assert_eq!(index, Utf8Index::new(vec![0, 7, 18]));
-    }
-
-    #[test]
-    fn utf8_carriage_return() {
-        let contents = "x = '🫣'\ry = 3";
-        let index = index_utf8(contents);
-        assert_eq!(index.line_count(), 2);
-        assert_eq!(index, Utf8Index::new(vec![0, 11]));
-
-        // Second '
-        assert_eq!(index.byte_offset(Location::new(1, 6), contents), 9);
-        assert_eq!(index.byte_offset(Location::new(2, 0), contents), 11);
-        assert_eq!(index.byte_offset(Location::new(2, 1), contents), 12);
-    }
-
-    #[test]
-    fn utf8_carriage_return_newline() {
-        let contents = "x = '🫣'\r\ny = 3";
-        let index = index_utf8(contents);
-        assert_eq!(index.line_count(), 2);
-        assert_eq!(index, Utf8Index::new(vec![0, 12]));
-
-        // Second '
-        assert_eq!(index.byte_offset(Location::new(1, 6), contents), 9);
-        assert_eq!(index.byte_offset(Location::new(2, 0), contents), 12);
-        assert_eq!(index.byte_offset(Location::new(2, 1), contents), 13);
-    }
-
-    #[test]
-    fn utf8_byte_offset() {
-        let contents = "x = '☃'\ny = 2";
-        let index = index_utf8(contents);
-        assert_eq!(index, Utf8Index::new(vec![0, 10]));
-
-        // First row.
-        let loc = index.byte_offset(Location::new(1, 0), contents);
-        assert_eq!(loc, 0);
-
-        let loc = index.byte_offset(Location::new(1, 5), contents);
-        assert_eq!(loc, 5);
-        assert_eq!(&contents[loc..], "☃'\ny = 2");
-
-        let loc = index.byte_offset(Location::new(1, 6), contents);
-        assert_eq!(loc, 8);
-        assert_eq!(&contents[loc..], "'\ny = 2");
-
-        // Second row.
-        let loc = index.byte_offset(Location::new(2, 0), contents);
-        assert_eq!(loc, 10);
-
-        // One-past-the-end.
-        let loc = index.byte_offset(Location::new(3, 0), contents);
-        assert_eq!(loc, 15);
     }
 }

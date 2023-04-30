@@ -1,26 +1,15 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: MissingNewlineAtEndOfFile
-    body: No newline at end of file
-    suggestion: Add trailing newline
-    fixable: true
-  location:
-    row: 1
-    column: 1
-  end_location:
-    row: 1
-    column: 1
-  fix:
-    edits:
-      - content: "<LineEnding>"
-        location:
-          row: 1
-          column: 1
-        end_location:
-          row: 1
-          column: 1
-  parent: ~
+W292_4.py:1:2: W292 [*] No newline at end of file
+  |
+1 |  
+  |   W292
+  |
+  = help: Add trailing newline
+
+ℹ Suggested fix
+1   |- 
+  1 |+ 
+
 

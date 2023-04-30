@@ -1,61 +1,45 @@
 ---
 source: crates/ruff/src/rules/pycodestyle/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: DocLineTooLong
-    body: Doc line too long (57 > 50 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 2
-    column: 50
-  end_location:
-    row: 2
-    column: 57
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DocLineTooLong
-    body: Doc line too long (56 > 50 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 50
-  end_location:
-    row: 6
-    column: 56
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DocLineTooLong
-    body: Doc line too long (56 > 50 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 50
-  end_location:
-    row: 10
-    column: 56
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: DocLineTooLong
-    body: Doc line too long (61 > 50 characters)
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 50
-  end_location:
-    row: 15
-    column: 61
-  fix:
-    edits: []
-  parent: ~
+W505.py:2:51: W505 Doc line too long (57 > 50 characters)
+  |
+2 | #!/usr/bin/env python3
+3 | """Here's a top-level docstring that's over the limit."""
+  |                                                   ^^^^^^^ W505
+  |
+
+W505.py:6:51: W505 Doc line too long (56 > 50 characters)
+  |
+6 | def f():
+7 |     """Here's a docstring that's also over the limit."""
+  |                                                   ^^^^^^ W505
+8 | 
+9 |     x = 1  # Here's a comment that's over the limit, but it's not standalone.
+  |
+
+W505.py:10:51: W505 Doc line too long (56 > 50 characters)
+   |
+10 |     x = 1  # Here's a comment that's over the limit, but it's not standalone.
+11 | 
+12 |     # Here's a standalone comment that's over the limit.
+   |                                                   ^^^^^^ W505
+13 | 
+14 |     x = 2
+   |
+
+W505.py:13:51: W505 Doc line too long (93 > 50 characters)
+   |
+13 |     x = 2
+14 |     # Another standalone that is preceded by a newline and indent toke and is over the limit.
+   |                                                   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ W505
+15 | 
+16 |     print("Here's a string that's over the limit, but it's not a docstring.")
+   |
+
+W505.py:18:51: W505 Doc line too long (61 > 50 characters)
+   |
+18 | "This is also considered a docstring, and is over the limit."
+   |                                                   ^^^^^^^^^^^ W505
+   |
+
 

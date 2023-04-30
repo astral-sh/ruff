@@ -3,9 +3,8 @@ use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprContext
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
-use ruff_python_ast::context::Context;
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
-use ruff_python_ast::types::Range;
+use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -61,13 +60,12 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
         OSErrorAlias {
             name: compose_call_path(target),
         },
-        Range::from(target),
+        target.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             "OSError".to_string(),
-            target.location,
-            target.end_location.unwrap(),
+            target.range(),
         ));
     }
     checker.diagnostics.push(diagnostic);
@@ -75,7 +73,7 @@ fn atom_diagnostic(checker: &mut Checker, target: &Expr) {
 
 /// Create a [`Diagnostic`] for a tuple of expressions.
 fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
-    let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, Range::from(target));
+    let mut diagnostic = Diagnostic::new(OSErrorAlias { name: None }, target.range());
     if checker.patch(diagnostic.kind.rule()) {
         let ExprKind::Tuple { elts, ..} = &target.node else {
             panic!("Expected ExprKind::Tuple");
@@ -105,13 +103,12 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
         }
 
         if remaining.len() == 1 {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 "OSError".to_string(),
-                target.location,
-                target.end_location.unwrap(),
+                target.range(),
             ));
         } else {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 format!(
                     "({})",
                     unparse_expr(
@@ -122,8 +119,7 @@ fn tuple_diagnostic(checker: &mut Checker, target: &Expr, aliases: &[&Expr]) {
                         checker.stylist,
                     )
                 ),
-                target.location,
-                target.end_location.unwrap(),
+                target.range(),
             ));
         }
     }

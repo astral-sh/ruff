@@ -1,201 +1,142 @@
 ---
 source: crates/ruff/src/rules/flake8_bandit/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: RequestWithoutTimeout
-    body: Probable use of requests call without timeout
-    suggestion: ~
-    fixable: false
-  location:
-    row: 3
-    column: 0
-  end_location:
-    row: 3
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: "Probable use of requests call with timeout set to `None`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 4
-    column: 42
-  end_location:
-    row: 4
-    column: 46
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: Probable use of requests call without timeout
-    suggestion: ~
-    fixable: false
-  location:
-    row: 6
-    column: 0
-  end_location:
-    row: 6
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: "Probable use of requests call with timeout set to `None`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 7
-    column: 43
-  end_location:
-    row: 7
-    column: 47
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: Probable use of requests call without timeout
-    suggestion: ~
-    fixable: false
-  location:
-    row: 9
-    column: 0
-  end_location:
-    row: 9
-    column: 12
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: "Probable use of requests call with timeout set to `None`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 10
-    column: 42
-  end_location:
-    row: 10
-    column: 46
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: Probable use of requests call without timeout
-    suggestion: ~
-    fixable: false
-  location:
-    row: 12
-    column: 0
-  end_location:
-    row: 12
-    column: 15
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: "Probable use of requests call with timeout set to `None`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 13
-    column: 45
-  end_location:
-    row: 13
-    column: 49
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: Probable use of requests call without timeout
-    suggestion: ~
-    fixable: false
-  location:
-    row: 15
-    column: 0
-  end_location:
-    row: 15
-    column: 14
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: "Probable use of requests call with timeout set to `None`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 16
-    column: 44
-  end_location:
-    row: 16
-    column: 48
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: Probable use of requests call without timeout
-    suggestion: ~
-    fixable: false
-  location:
-    row: 18
-    column: 0
-  end_location:
-    row: 18
-    column: 16
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: "Probable use of requests call with timeout set to `None`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 19
-    column: 46
-  end_location:
-    row: 19
-    column: 50
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: Probable use of requests call without timeout
-    suggestion: ~
-    fixable: false
-  location:
-    row: 21
-    column: 0
-  end_location:
-    row: 21
-    column: 13
-  fix:
-    edits: []
-  parent: ~
-- kind:
-    name: RequestWithoutTimeout
-    body: "Probable use of requests call with timeout set to `None`"
-    suggestion: ~
-    fixable: false
-  location:
-    row: 22
-    column: 43
-  end_location:
-    row: 22
-    column: 47
-  fix:
-    edits: []
-  parent: ~
+S113.py:3:1: S113 Probable use of requests call without timeout
+  |
+3 | import requests
+4 | 
+5 | requests.get('https://gmail.com')
+  | ^^^^^^^^^^^^ S113
+6 | requests.get('https://gmail.com', timeout=None)
+7 | requests.get('https://gmail.com', timeout=5)
+  |
+
+S113.py:4:43: S113 Probable use of requests call with timeout set to `None`
+  |
+4 | requests.get('https://gmail.com')
+5 | requests.get('https://gmail.com', timeout=None)
+  |                                           ^^^^ S113
+6 | requests.get('https://gmail.com', timeout=5)
+7 | requests.post('https://gmail.com')
+  |
+
+S113.py:6:1: S113 Probable use of requests call without timeout
+   |
+ 6 | requests.get('https://gmail.com', timeout=None)
+ 7 | requests.get('https://gmail.com', timeout=5)
+ 8 | requests.post('https://gmail.com')
+   | ^^^^^^^^^^^^^ S113
+ 9 | requests.post('https://gmail.com', timeout=None)
+10 | requests.post('https://gmail.com', timeout=5)
+   |
+
+S113.py:7:44: S113 Probable use of requests call with timeout set to `None`
+   |
+ 7 | requests.get('https://gmail.com', timeout=5)
+ 8 | requests.post('https://gmail.com')
+ 9 | requests.post('https://gmail.com', timeout=None)
+   |                                            ^^^^ S113
+10 | requests.post('https://gmail.com', timeout=5)
+11 | requests.put('https://gmail.com')
+   |
+
+S113.py:9:1: S113 Probable use of requests call without timeout
+   |
+ 9 | requests.post('https://gmail.com', timeout=None)
+10 | requests.post('https://gmail.com', timeout=5)
+11 | requests.put('https://gmail.com')
+   | ^^^^^^^^^^^^ S113
+12 | requests.put('https://gmail.com', timeout=None)
+13 | requests.put('https://gmail.com', timeout=5)
+   |
+
+S113.py:10:43: S113 Probable use of requests call with timeout set to `None`
+   |
+10 | requests.post('https://gmail.com', timeout=5)
+11 | requests.put('https://gmail.com')
+12 | requests.put('https://gmail.com', timeout=None)
+   |                                           ^^^^ S113
+13 | requests.put('https://gmail.com', timeout=5)
+14 | requests.delete('https://gmail.com')
+   |
+
+S113.py:12:1: S113 Probable use of requests call without timeout
+   |
+12 | requests.put('https://gmail.com', timeout=None)
+13 | requests.put('https://gmail.com', timeout=5)
+14 | requests.delete('https://gmail.com')
+   | ^^^^^^^^^^^^^^^ S113
+15 | requests.delete('https://gmail.com', timeout=None)
+16 | requests.delete('https://gmail.com', timeout=5)
+   |
+
+S113.py:13:46: S113 Probable use of requests call with timeout set to `None`
+   |
+13 | requests.put('https://gmail.com', timeout=5)
+14 | requests.delete('https://gmail.com')
+15 | requests.delete('https://gmail.com', timeout=None)
+   |                                              ^^^^ S113
+16 | requests.delete('https://gmail.com', timeout=5)
+17 | requests.patch('https://gmail.com')
+   |
+
+S113.py:15:1: S113 Probable use of requests call without timeout
+   |
+15 | requests.delete('https://gmail.com', timeout=None)
+16 | requests.delete('https://gmail.com', timeout=5)
+17 | requests.patch('https://gmail.com')
+   | ^^^^^^^^^^^^^^ S113
+18 | requests.patch('https://gmail.com', timeout=None)
+19 | requests.patch('https://gmail.com', timeout=5)
+   |
+
+S113.py:16:45: S113 Probable use of requests call with timeout set to `None`
+   |
+16 | requests.delete('https://gmail.com', timeout=5)
+17 | requests.patch('https://gmail.com')
+18 | requests.patch('https://gmail.com', timeout=None)
+   |                                             ^^^^ S113
+19 | requests.patch('https://gmail.com', timeout=5)
+20 | requests.options('https://gmail.com')
+   |
+
+S113.py:18:1: S113 Probable use of requests call without timeout
+   |
+18 | requests.patch('https://gmail.com', timeout=None)
+19 | requests.patch('https://gmail.com', timeout=5)
+20 | requests.options('https://gmail.com')
+   | ^^^^^^^^^^^^^^^^ S113
+21 | requests.options('https://gmail.com', timeout=None)
+22 | requests.options('https://gmail.com', timeout=5)
+   |
+
+S113.py:19:47: S113 Probable use of requests call with timeout set to `None`
+   |
+19 | requests.patch('https://gmail.com', timeout=5)
+20 | requests.options('https://gmail.com')
+21 | requests.options('https://gmail.com', timeout=None)
+   |                                               ^^^^ S113
+22 | requests.options('https://gmail.com', timeout=5)
+23 | requests.head('https://gmail.com')
+   |
+
+S113.py:21:1: S113 Probable use of requests call without timeout
+   |
+21 | requests.options('https://gmail.com', timeout=None)
+22 | requests.options('https://gmail.com', timeout=5)
+23 | requests.head('https://gmail.com')
+   | ^^^^^^^^^^^^^ S113
+24 | requests.head('https://gmail.com', timeout=None)
+25 | requests.head('https://gmail.com', timeout=5)
+   |
+
+S113.py:22:44: S113 Probable use of requests call with timeout set to `None`
+   |
+22 | requests.options('https://gmail.com', timeout=5)
+23 | requests.head('https://gmail.com')
+24 | requests.head('https://gmail.com', timeout=None)
+   |                                            ^^^^ S113
+25 | requests.head('https://gmail.com', timeout=5)
+   |
+
 

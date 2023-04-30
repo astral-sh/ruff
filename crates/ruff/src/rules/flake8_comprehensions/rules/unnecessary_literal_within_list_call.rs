@@ -1,12 +1,10 @@
-use rustpython_parser::ast::{Expr, ExprKind};
-
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
 
 use super::helpers;
 
@@ -72,7 +70,11 @@ pub fn unnecessary_literal_within_list_call(
     expr: &Expr,
     func: &Expr,
     args: &[Expr],
+    keywords: &[Keyword],
 ) {
+    if !keywords.is_empty() {
+        return;
+    }
     let Some(argument) = helpers::first_argument_with_matching_function("list", func, args) else {
         return;
     };
@@ -88,7 +90,7 @@ pub fn unnecessary_literal_within_list_call(
         UnnecessaryLiteralWithinListCall {
             literal: argument_kind.to_string(),
         },
-        Range::from(expr),
+        expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {

@@ -1,26 +1,21 @@
 ---
 source: crates/ruff/src/rules/isort/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: UnsortedImports
-    body: Import block is un-sorted or un-formatted
-    suggestion: Organize imports
-    fixable: true
-  location:
-    row: 1
-    column: 0
-  end_location:
-    row: 4
-    column: 0
-  fix:
-    edits:
-      - content: "from .a import (\n    a1 as a1,\n    a2 as a2,\n)\nfrom .b import b1 as b1\nfrom .c import c1\n"
-        location:
-          row: 1
-          column: 0
-        end_location:
-          row: 4
-          column: 0
-  parent: ~
+force_wrap_aliases.py:1:1: I001 [*] Import block is un-sorted or un-formatted
+  |
+1 | / from .a import a1 as a1, a2 as a2
+2 | | from .b import b1 as b1
+3 | | from .c import c1
+  |
+  = help: Organize imports
+
+ℹ Suggested fix
+1   |-from .a import a1 as a1, a2 as a2
+  1 |+from .a import (
+  2 |+    a1 as a1,
+  3 |+    a2 as a2,
+  4 |+)
+2 5 | from .b import b1 as b1
+3 6 | from .c import c1
+
 

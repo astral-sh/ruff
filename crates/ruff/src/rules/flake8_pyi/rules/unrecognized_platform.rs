@@ -2,7 +2,6 @@ use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -102,7 +101,7 @@ pub fn unrecognized_platform(
     };
 
     let diagnostic_unrecognized_platform_check =
-        Diagnostic::new(UnrecognizedPlatformCheck, Range::from(expr));
+        Diagnostic::new(UnrecognizedPlatformCheck, expr.range());
     if !checker
         .ctx
         .resolve_call_path(left)
@@ -143,7 +142,7 @@ pub fn unrecognized_platform(
                     UnrecognizedPlatformName {
                         platform: value.clone(),
                     },
-                    Range::from(right),
+                    right.range(),
                 ));
             }
         }

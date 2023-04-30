@@ -137,6 +137,22 @@ pub struct Options {
     pub extend_exclude: Option<Vec<String>>,
     #[option(
         default = "[]",
+        value_type = "list[str]",
+        example = r#"
+            # In addition to the standard set of inclusions, include `.pyw` files.
+            extend-include = ["*.pyw"]
+        "#
+    )]
+    /// A list of file patterns to include when linting, in addition to those
+    /// specified by `include`.
+    ///
+    /// Inclusion are based on globs, and should be single-path patterns, like
+    /// `*.pyw`, to include any file with the `.pyw` extension.
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    pub extend_include: Option<Vec<String>>,
+    #[option(
+        default = "[]",
         value_type = "list[RuleSelector]",
         example = r#"
             # Skip unused variable rules (`F841`).
@@ -254,6 +270,20 @@ pub struct Options {
     /// re-exported with a redundant alias (e.g., `import os as os`).
     pub ignore_init_module_imports: Option<bool>,
     #[option(
+        default = r#"["*.py", "*.pyi"]"#,
+        value_type = "list[str]",
+        example = r#"
+            include = ["*.py"]
+        "#
+    )]
+    /// A list of file patterns to include when linting.
+    ///
+    /// Inclusion are based on globs, and should be single-path patterns, like
+    /// `*.pyw`, to include any file with the `.pyw` extension.
+    ///
+    /// For more information on the glob syntax, refer to the [`globset` documentation](https://docs.rs/globset/latest/globset/#syntax).
+    pub include: Option<Vec<String>>,
+    #[option(
         default = "88",
         value_type = "int",
         example = r#"
@@ -317,7 +347,7 @@ pub struct Options {
         default = "false",
         value_type = "bool",
         example = r#"
-            # By default, always enumerate fixed violations.
+            # Enumerate all fixed violations.
             show-fixes = true
         "#
     )]

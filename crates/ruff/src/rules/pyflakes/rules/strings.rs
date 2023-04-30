@@ -1,3 +1,4 @@
+use ruff_text_size::TextRange;
 use std::string::ToString;
 
 use rustc_hash::FxHashSet;
@@ -5,7 +6,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, KeywordData};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -225,7 +225,7 @@ pub(crate) fn percent_format_expected_mapping(
     checker: &mut Checker,
     summary: &CFormatSummary,
     right: &Expr,
-    location: Range,
+    location: TextRange,
 ) {
     if !summary.keywords.is_empty() {
         // Tuple, List, Set (+comprehensions)
@@ -248,7 +248,7 @@ pub(crate) fn percent_format_expected_sequence(
     checker: &mut Checker,
     summary: &CFormatSummary,
     right: &Expr,
-    location: Range,
+    location: TextRange,
 ) {
     if summary.num_positional > 1
         && matches!(
@@ -267,7 +267,7 @@ pub(crate) fn percent_format_extra_named_arguments(
     checker: &mut Checker,
     summary: &CFormatSummary,
     right: &Expr,
-    location: Range,
+    location: TextRange,
 ) {
     if summary.num_positional > 0 {
         return;
@@ -328,7 +328,7 @@ pub(crate) fn percent_format_missing_arguments(
     checker: &mut Checker,
     summary: &CFormatSummary,
     right: &Expr,
-    location: Range,
+    location: TextRange,
 ) {
     if summary.num_positional > 0 {
         return;
@@ -375,7 +375,7 @@ pub(crate) fn percent_format_missing_arguments(
 pub(crate) fn percent_format_mixed_positional_and_named(
     checker: &mut Checker,
     summary: &CFormatSummary,
-    location: Range,
+    location: TextRange,
 ) {
     if !(summary.num_positional == 0 || summary.keywords.is_empty()) {
         checker.diagnostics.push(Diagnostic::new(
@@ -390,7 +390,7 @@ pub(crate) fn percent_format_positional_count_mismatch(
     checker: &mut Checker,
     summary: &CFormatSummary,
     right: &Expr,
-    location: Range,
+    location: TextRange,
 ) {
     if !summary.keywords.is_empty() {
         return;
@@ -425,7 +425,7 @@ pub(crate) fn percent_format_star_requires_sequence(
     checker: &mut Checker,
     summary: &CFormatSummary,
     right: &Expr,
-    location: Range,
+    location: TextRange,
 ) {
     if summary.starred {
         match &right.node {
@@ -442,7 +442,7 @@ pub(crate) fn string_dot_format_extra_named_arguments(
     checker: &mut Checker,
     summary: &FormatSummary,
     keywords: &[Keyword],
-    location: Range,
+    location: TextRange,
 ) {
     if has_star_star_kwargs(keywords) {
         return;
@@ -491,14 +491,17 @@ pub(crate) fn string_dot_format_extra_positional_arguments(
     checker: &mut Checker,
     summary: &FormatSummary,
     args: &[Expr],
-    location: Range,
+    location: TextRange,
 ) {
-    if has_star_args(args) {
-        return;
-    }
-
-    let missing: Vec<usize> = (0..args.len())
-        .filter(|i| !(summary.autos.contains(i) || summary.indices.contains(i)))
+    let missing: Vec<usize> = args
+        .iter()
+        .enumerate()
+        .filter(|(i, arg)| {
+            !(matches!(arg.node, ExprKind::Starred { .. })
+                || summary.autos.contains(i)
+                || summary.indices.contains(i))
+        })
+        .map(|(i, _)| i)
         .collect();
 
     if missing.is_empty() {
@@ -534,7 +537,7 @@ pub(crate) fn string_dot_format_missing_argument(
     summary: &FormatSummary,
     args: &[Expr],
     keywords: &[Keyword],
-    location: Range,
+    location: TextRange,
 ) {
     if has_star_args(args) || has_star_star_kwargs(keywords) {
         return;
@@ -575,7 +578,7 @@ pub(crate) fn string_dot_format_missing_argument(
 pub(crate) fn string_dot_format_mixing_automatic(
     checker: &mut Checker,
     summary: &FormatSummary,
-    location: Range,
+    location: TextRange,
 ) {
     if !(summary.autos.is_empty() || summary.indices.is_empty()) {
         checker

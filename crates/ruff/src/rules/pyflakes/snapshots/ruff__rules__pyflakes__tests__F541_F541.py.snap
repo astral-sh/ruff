@@ -1,320 +1,315 @@
 ---
 source: crates/ruff/src/rules/pyflakes/mod.rs
-expression: diagnostics
 ---
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 6
-    column: 4
-  end_location:
-    row: 6
-    column: 10
-  fix:
-    edits:
-      - content: "\"def\""
-        location:
-          row: 6
-          column: 4
-        end_location:
-          row: 6
-          column: 10
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 7
-    column: 4
-  end_location:
-    row: 7
-    column: 10
-  fix:
-    edits:
-      - content: "\"def\""
-        location:
-          row: 7
-          column: 4
-        end_location:
-          row: 7
-          column: 10
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 9
-    column: 4
-  end_location:
-    row: 9
-    column: 10
-  fix:
-    edits:
-      - content: "\"def\""
-        location:
-          row: 9
-          column: 4
-        end_location:
-          row: 9
-          column: 10
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 13
-    column: 4
-  end_location:
-    row: 13
-    column: 8
-  fix:
-    edits:
-      - content: "\"a\""
-        location:
-          row: 13
-          column: 4
-        end_location:
-          row: 13
-          column: 8
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 14
-    column: 4
-  end_location:
-    row: 14
-    column: 8
-  fix:
-    edits:
-      - content: "\"b\""
-        location:
-          row: 14
-          column: 4
-        end_location:
-          row: 14
-          column: 8
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 16
-    column: 4
-  end_location:
-    row: 16
-    column: 9
-  fix:
-    edits:
-      - content: "\"d\""
-        location:
-          row: 16
-          column: 5
-        end_location:
-          row: 16
-          column: 9
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 17
-    column: 4
-  end_location:
-    row: 17
-    column: 9
-  fix:
-    edits:
-      - content: "r\"e\""
-        location:
-          row: 17
-          column: 4
-        end_location:
-          row: 17
-          column: 9
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 19
-    column: 4
-  end_location:
-    row: 19
-    column: 7
-  fix:
-    edits:
-      - content: "\"\""
-        location:
-          row: 19
-          column: 4
-        end_location:
-          row: 19
-          column: 7
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 25
-    column: 12
-  end_location:
-    row: 25
-    column: 16
-  fix:
-    edits:
-      - content: "\"z\""
-        location:
-          row: 25
-          column: 12
-        end_location:
-          row: 25
-          column: 16
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 34
-    column: 6
-  end_location:
-    row: 34
-    column: 13
-  fix:
-    edits:
-      - content: "'0.2f'"
-        location:
-          row: 34
-          column: 6
-        end_location:
-          row: 34
-          column: 13
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 35
-    column: 3
-  end_location:
-    row: 35
-    column: 6
-  fix:
-    edits:
-      - content: "''"
-        location:
-          row: 35
-          column: 3
-        end_location:
-          row: 35
-          column: 6
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 36
-    column: 0
-  end_location:
-    row: 36
-    column: 11
-  fix:
-    edits:
-      - content: "\"{test}\""
-        location:
-          row: 36
-          column: 0
-        end_location:
-          row: 36
-          column: 11
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 37
-    column: 0
-  end_location:
-    row: 37
-    column: 11
-  fix:
-    edits:
-      - content: "'{ 40 }'"
-        location:
-          row: 37
-          column: 0
-        end_location:
-          row: 37
-          column: 11
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 38
-    column: 0
-  end_location:
-    row: 38
-    column: 12
-  fix:
-    edits:
-      - content: "\"{a {x}\""
-        location:
-          row: 38
-          column: 0
-        end_location:
-          row: 38
-          column: 12
-  parent: ~
-- kind:
-    name: FStringMissingPlaceholders
-    body: f-string without any placeholders
-    suggestion: "Remove extraneous `f` prefix"
-    fixable: true
-  location:
-    row: 39
-    column: 0
-  end_location:
-    row: 39
-    column: 12
-  fix:
-    edits:
-      - content: "\"{{x}}\""
-        location:
-          row: 39
-          column: 0
-        end_location:
-          row: 39
-          column: 12
-  parent: ~
+F541.py:6:5: F541 [*] f-string without any placeholders
+  |
+6 | # Errors
+7 | c = f"def"
+  |     ^^^^^^ F541
+8 | d = f"def" + "ghi"
+9 | e = (
+  |
+  = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+3 3 | b = f"ghi{'jkl'}"
+4 4 | 
+5 5 | # Errors
+6   |-c = f"def"
+  6 |+c = "def"
+7 7 | d = f"def" + "ghi"
+8 8 | e = (
+9 9 |     f"def" +
+
+F541.py:7:5: F541 [*] f-string without any placeholders
+   |
+ 7 | # Errors
+ 8 | c = f"def"
+ 9 | d = f"def" + "ghi"
+   |     ^^^^^^ F541
+10 | e = (
+11 |     f"def" +
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+4 4 | 
+5 5 | # Errors
+6 6 | c = f"def"
+7   |-d = f"def" + "ghi"
+  7 |+d = "def" + "ghi"
+8 8 | e = (
+9 9 |     f"def" +
+10 10 |     "ghi"
+
+F541.py:9:5: F541 [*] f-string without any placeholders
+   |
+ 9 | d = f"def" + "ghi"
+10 | e = (
+11 |     f"def" +
+   |     ^^^^^^ F541
+12 |     "ghi"
+13 | )
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+6  6  | c = f"def"
+7  7  | d = f"def" + "ghi"
+8  8  | e = (
+9     |-    f"def" +
+   9  |+    "def" +
+10 10 |     "ghi"
+11 11 | )
+12 12 | f = (
+
+F541.py:13:5: F541 [*] f-string without any placeholders
+   |
+13 | )
+14 | f = (
+15 |     f"a"
+   |     ^^^^ F541
+16 |     F"b"
+17 |     "c"
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+10 10 |     "ghi"
+11 11 | )
+12 12 | f = (
+13    |-    f"a"
+   13 |+    "a"
+14 14 |     F"b"
+15 15 |     "c"
+16 16 |     rf"d"
+
+F541.py:14:5: F541 [*] f-string without any placeholders
+   |
+14 | f = (
+15 |     f"a"
+16 |     F"b"
+   |     ^^^^ F541
+17 |     "c"
+18 |     rf"d"
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+11 11 | )
+12 12 | f = (
+13 13 |     f"a"
+14    |-    F"b"
+   14 |+    "b"
+15 15 |     "c"
+16 16 |     rf"d"
+17 17 |     fr"e"
+
+F541.py:16:5: F541 [*] f-string without any placeholders
+   |
+16 |     F"b"
+17 |     "c"
+18 |     rf"d"
+   |     ^^^^^ F541
+19 |     fr"e"
+20 | )
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+13 13 |     f"a"
+14 14 |     F"b"
+15 15 |     "c"
+16    |-    rf"d"
+   16 |+    r"d"
+17 17 |     fr"e"
+18 18 | )
+19 19 | g = f""
+
+F541.py:17:5: F541 [*] f-string without any placeholders
+   |
+17 |     "c"
+18 |     rf"d"
+19 |     fr"e"
+   |     ^^^^^ F541
+20 | )
+21 | g = f""
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+14 14 |     F"b"
+15 15 |     "c"
+16 16 |     rf"d"
+17    |-    fr"e"
+   17 |+    r"e"
+18 18 | )
+19 19 | g = f""
+20 20 | 
+
+F541.py:19:5: F541 [*] f-string without any placeholders
+   |
+19 |     fr"e"
+20 | )
+21 | g = f""
+   |     ^^^ F541
+22 | 
+23 | # OK
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+16 16 |     rf"d"
+17 17 |     fr"e"
+18 18 | )
+19    |-g = f""
+   19 |+g = ""
+20 20 | 
+21 21 | # OK
+22 22 | g = f"ghi{123:{45}}"
+
+F541.py:25:13: F541 [*] f-string without any placeholders
+   |
+25 | # Error
+26 | h = "x" "y" f"z"
+   |             ^^^^ F541
+27 | 
+28 | v = 23.234234
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+22 22 | g = f"ghi{123:{45}}"
+23 23 | 
+24 24 | # Error
+25    |-h = "x" "y" f"z"
+   25 |+h = "x" "y" "z"
+26 26 | 
+27 27 | v = 23.234234
+28 28 | 
+
+F541.py:34:7: F541 [*] f-string without any placeholders
+   |
+34 | # Errors
+35 | f"{v:{f'0.2f'}}"
+   |       ^^^^^^^ F541
+36 | f"{f''}"
+37 | f"{{test}}"
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+31 31 | f"{f'{v:0.2f}'}"
+32 32 | 
+33 33 | # Errors
+34    |-f"{v:{f'0.2f'}}"
+   34 |+f"{v:{'0.2f'}}"
+35 35 | f"{f''}"
+36 36 | f"{{test}}"
+37 37 | f'{{ 40 }}'
+
+F541.py:35:4: F541 [*] f-string without any placeholders
+   |
+35 | # Errors
+36 | f"{v:{f'0.2f'}}"
+37 | f"{f''}"
+   |    ^^^ F541
+38 | f"{{test}}"
+39 | f'{{ 40 }}'
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+32 32 | 
+33 33 | # Errors
+34 34 | f"{v:{f'0.2f'}}"
+35    |-f"{f''}"
+   35 |+f"{''}"
+36 36 | f"{{test}}"
+37 37 | f'{{ 40 }}'
+38 38 | f"{{a {{x}}"
+
+F541.py:36:1: F541 [*] f-string without any placeholders
+   |
+36 | f"{v:{f'0.2f'}}"
+37 | f"{f''}"
+38 | f"{{test}}"
+   | ^^^^^^^^^^^ F541
+39 | f'{{ 40 }}'
+40 | f"{{a {{x}}"
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+33 33 | # Errors
+34 34 | f"{v:{f'0.2f'}}"
+35 35 | f"{f''}"
+36    |-f"{{test}}"
+   36 |+"{test}"
+37 37 | f'{{ 40 }}'
+38 38 | f"{{a {{x}}"
+39 39 | f"{{{{x}}}}"
+
+F541.py:37:1: F541 [*] f-string without any placeholders
+   |
+37 | f"{f''}"
+38 | f"{{test}}"
+39 | f'{{ 40 }}'
+   | ^^^^^^^^^^^ F541
+40 | f"{{a {{x}}"
+41 | f"{{{{x}}}}"
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+34 34 | f"{v:{f'0.2f'}}"
+35 35 | f"{f''}"
+36 36 | f"{{test}}"
+37    |-f'{{ 40 }}'
+   37 |+'{ 40 }'
+38 38 | f"{{a {{x}}"
+39 39 | f"{{{{x}}}}"
+40 40 | 
+
+F541.py:38:1: F541 [*] f-string without any placeholders
+   |
+38 | f"{{test}}"
+39 | f'{{ 40 }}'
+40 | f"{{a {{x}}"
+   | ^^^^^^^^^^^^ F541
+41 | f"{{{{x}}}}"
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+35 35 | f"{f''}"
+36 36 | f"{{test}}"
+37 37 | f'{{ 40 }}'
+38    |-f"{{a {{x}}"
+   38 |+"{a {x}"
+39 39 | f"{{{{x}}}}"
+40 40 | 
+41 41 | # To be fixed
+
+F541.py:39:1: F541 [*] f-string without any placeholders
+   |
+39 | f'{{ 40 }}'
+40 | f"{{a {{x}}"
+41 | f"{{{{x}}}}"
+   | ^^^^^^^^^^^^ F541
+42 | 
+43 | # To be fixed
+   |
+   = help: Remove extraneous `f` prefix
+
+ℹ Suggested fix
+36 36 | f"{{test}}"
+37 37 | f'{{ 40 }}'
+38 38 | f"{{a {{x}}"
+39    |-f"{{{{x}}}}"
+   39 |+"{{x}}"
+40 40 | 
+41 41 | # To be fixed
+42 42 | # Error: f-string: single '}' is not allowed at line 41 column 8
+
 

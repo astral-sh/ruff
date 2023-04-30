@@ -9,6 +9,7 @@ use ruff_python_ast::helpers::to_module_path;
 use ruff_python_ast::imports::{ImportMap, ModuleImport};
 use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::visitor::Visitor;
+use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::directives::IsortDirectives;
 use crate::registry::Rule;
@@ -29,13 +30,11 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
     for stmt in blocks.iter().flat_map(|block| &block.imports) {
         match &stmt.node {
             StmtKind::Import { names } => {
-                module_imports.extend(names.iter().map(|name| {
-                    ModuleImport::new(
-                        name.node.name.clone(),
-                        stmt.location,
-                        stmt.end_location.unwrap(),
-                    )
-                }));
+                module_imports.extend(
+                    names
+                        .iter()
+                        .map(|name| ModuleImport::new(name.node.name.clone(), stmt.range())),
+                );
             }
             StmtKind::ImportFrom {
                 module,
@@ -60,11 +59,7 @@ fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) ->
                     Cow::Owned(module_path[..module_path.len() - level].join("."))
                 };
                 module_imports.extend(names.iter().map(|name| {
-                    ModuleImport::new(
-                        format!("{}.{}", module, name.node.name),
-                        name.location,
-                        name.end_location.unwrap(),
-                    )
+                    ModuleImport::new(format!("{}.{}", module, name.node.name), name.range())
                 }));
             }
             _ => panic!("Expected StmtKind::Import | StmtKind::ImportFrom"),
@@ -88,9 +83,11 @@ pub fn check_imports(
     path: &Path,
     package: Option<&Path>,
 ) -> (Vec<Diagnostic>, Option<ImportMap>) {
+    let is_stub = is_python_stub_file(path);
+
     // Extract all imports from the AST.
     let tracker = {
-        let mut tracker = ImportTracker::new(locator, directives, path);
+        let mut tracker = ImportTracker::new(locator, directives, is_stub);
         tracker.visit_body(python_ast);
         tracker
     };
@@ -111,7 +108,7 @@ pub fn check_imports(
     }
     if settings.rules.enabled(Rule::MissingRequiredImport) {
         diagnostics.extend(isort::rules::add_required_imports(
-            &blocks, python_ast, locator, stylist, settings, autofix,
+            &blocks, python_ast, locator, stylist, settings, autofix, is_stub,
         ));
     }
 

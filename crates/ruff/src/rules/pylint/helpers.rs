@@ -1,6 +1,6 @@
-use ruff_python_ast::function_type;
-use ruff_python_ast::function_type::FunctionType;
-use ruff_python_ast::scope::{FunctionDef, ScopeKind};
+use ruff_python_semantic::analyze::function_type;
+use ruff_python_semantic::analyze::function_type::FunctionType;
+use ruff_python_semantic::scope::{FunctionDef, ScopeKind};
 
 use crate::checkers::ast::Checker;
 
@@ -16,7 +16,7 @@ pub fn in_dunder_init(checker: &Checker) -> bool {
     if name != "__init__" {
         return false;
     }
-    let Some(parent) = checker.ctx.parent_scope() else {
+    let Some(parent) = scope.parent.map(|scope_id| &checker.ctx.scopes[scope_id]) else {
         return false;
     };
 

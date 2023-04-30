@@ -2,7 +2,7 @@ use crate::autofix::actions::delete_stmt;
 use log::error;
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_ast::types::RefEquality;
 
 use crate::checkers::ast::Checker;
 
@@ -32,7 +32,7 @@ pub fn pass_in_class_body<'a>(checker: &mut Checker<'a>, parent: &'a Stmt, body:
 
     for stmt in body {
         if matches!(stmt.node, StmtKind::Pass) {
-            let mut diagnostic = Diagnostic::new(PassInClassBody, Range::from(stmt));
+            let mut diagnostic = Diagnostic::new(PassInClassBody, stmt.range());
 
             if checker.patch(diagnostic.kind.rule()) {
                 let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
@@ -45,7 +45,7 @@ pub fn pass_in_class_body<'a>(checker: &mut Checker<'a>, parent: &'a Stmt, body:
                     checker.stylist,
                 ) {
                     Ok(fix) => {
-                        if fix.content.is_empty() || fix.content == "pass" {
+                        if fix.is_deletion() || fix.content() == Some("pass") {
                             checker.deletions.insert(RefEquality(stmt));
                         }
                         diagnostic.set_fix(fix);

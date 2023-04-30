@@ -3,12 +3,36 @@ use rustpython_parser::ast::{Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_ast::types::RefEquality;
 
 use crate::autofix::actions::delete_stmt;
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for an empty type-checking block.
+///
+/// ## Why is this bad?
+/// The type-checking block does not do anything and should be removed to avoid
+/// confusion.
+///
+/// ## Example
+/// ```python
+/// from typing import TYPE_CHECKING
+///
+/// if TYPE_CHECKING:
+///    pass
+///
+/// print("Hello, world!")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// print("Hello, world!")
+/// ```
+///
+/// ## References
+/// - [PEP 535](https://peps.python.org/pep-0563/#runtime-annotation-resolution-and-type-checking)
 #[violation]
 pub struct EmptyTypeCheckingBlock;
 
@@ -32,7 +56,7 @@ pub fn empty_type_checking_block<'a, 'b>(
     'b: 'a,
 {
     if body.len() == 1 && matches!(body[0].node, StmtKind::Pass) {
-        let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, Range::from(&body[0]));
+        let mut diagnostic = Diagnostic::new(EmptyTypeCheckingBlock, body[0].range());
 
         // Delete the entire type-checking block.
         if checker.patch(diagnostic.kind.rule()) {
@@ -51,7 +75,7 @@ pub fn empty_type_checking_block<'a, 'b>(
                 checker.stylist,
             ) {
                 Ok(fix) => {
-                    if fix.content.is_empty() || fix.content == "pass" {
+                    if fix.is_deletion() || fix.content() == Some("pass") {
                         checker.deletions.insert(RefEquality(stmt));
                     }
                     diagnostic.set_fix(fix);

@@ -22,7 +22,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.260'
+  rev: 'v0.0.263'
   hooks:
     - id: ruff
 ```
@@ -32,7 +32,7 @@ Or, to enable autofix:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.260'
+  rev: 'v0.0.263'
   hooks:
     - id: ruff
       args: [ --fix, --exit-non-zero-on-fix ]
@@ -43,12 +43,12 @@ _unless_ you enable autofix, in which case, Ruff's pre-commit hook should run _b
 and other formatting tools, as Ruff's autofix behavior can output code changes that require
 reformatting.
 
-### VS Code
+## VS Code
 
 Ruff can also be used as a [VS Code extension](https://github.com/charliermarsh/ruff-vscode) or
 alongside any other editor through the [Ruff LSP](https://github.com/charliermarsh/ruff-lsp).
 
-### GitHub Action
+## GitHub Action
 
 Ruff can also be used as a GitHub Action via [`ruff-action`](https://github.com/chartboost/ruff-action).
 

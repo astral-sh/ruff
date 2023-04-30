@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Expr, ExprKind};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::CallPath;
-use ruff_python_ast::types::Range;
 
 /// ## What it does
 /// Checks that Django's `@receiver` decorator is listed first, prior to
@@ -68,7 +67,7 @@ where
         if i > 0 && is_receiver && !seen_receiver {
             diagnostics.push(Diagnostic::new(
                 DjangoNonLeadingReceiverDecorator,
-                Range::from(decorator),
+                decorator.range(),
             ));
         }
         if !is_receiver && seen_receiver {

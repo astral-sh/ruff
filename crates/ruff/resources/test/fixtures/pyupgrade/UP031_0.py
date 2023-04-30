@@ -83,3 +83,26 @@ print('Hello %s (%s)' % bar['bop'])
 print('Hello %(arg)s' % bar)
 print('Hello %(arg)s' % bar.baz)
 print('Hello %(arg)s' % bar['bop'])
+
+# Hanging modulos
+(
+    "foo %s "
+    "bar %s"
+) % (x, y)
+
+(
+    "foo %(foo)s "
+    "bar %(bar)s"
+) % {"foo": x, "bar": y}
+
+(
+    """foo %s"""
+    % (x,)
+)
+
+(
+    """
+    foo %s
+    """
+    % (x,)
+)

@@ -1,7 +1,9 @@
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
+use ruff_python_ast::newlines::Line;
 use ruff_python_ast::source_code::Stylist;
+use ruff_text_size::{TextLen, TextRange};
 use rustpython_parser::ast::{Cmpop, Expr, ExprKind};
-use unicode_width::UnicodeWidthStr;
+use unicode_width::{UnicodeWidthChar, UnicodeWidthStr};
 
 pub fn is_ambiguous_name(name: &str) -> bool {
     name == "l" || name == "I" || name == "O"
@@ -18,28 +20,38 @@ pub fn compare(left: &Expr, ops: &[Cmpop], comparators: &[Expr], stylist: &Styli
     )
 }
 
-pub fn is_overlong(
-    line: &str,
-    line_width: usize,
+pub(super) fn is_overlong(
+    line: &Line,
     limit: usize,
     ignore_overlong_task_comments: bool,
     task_tags: &[String],
-) -> bool {
-    if line_width <= limit {
-        return false;
+) -> Option<Overlong> {
+    let mut start_offset = line.start();
+    let mut width = 0;
+
+    for c in line.chars() {
+        if width < limit {
+            start_offset += c.text_len();
+        }
+
+        width += c.width().unwrap_or(0);
+    }
+
+    if width <= limit {
+        return None;
     }
 
     let mut chunks = line.split_whitespace();
     let (Some(first_chunk), Some(second_chunk)) = (chunks.next(), chunks.next()) else {
         // Single word / no printable chars - no way to make the line shorter
-        return false;
+        return None;
     };
 
     if first_chunk == "#" {
         if ignore_overlong_task_comments {
             let second = second_chunk.trim_end_matches(':');
             if task_tags.iter().any(|task_tag| task_tag == second) {
-                return false;
+                return None;
             }
         }
     }
@@ -48,10 +60,28 @@ pub fn is_overlong(
     // begins before the limit.
     let last_chunk = chunks.last().unwrap_or(second_chunk);
     if last_chunk.contains("://") {
-        if line_width - last_chunk.width() <= limit {
-            return false;
+        if width - last_chunk.width() <= limit {
+            return None;
         }
     }
 
-    true
+    Some(Overlong {
+        range: TextRange::new(start_offset, line.end()),
+        width,
+    })
+}
+
+pub(super) struct Overlong {
+    range: TextRange,
+    width: usize,
+}
+
+impl Overlong {
+    pub(super) const fn range(&self) -> TextRange {
+        self.range
+    }
+
+    pub(super) const fn width(&self) -> usize {
+        self.width
+    }
 }
