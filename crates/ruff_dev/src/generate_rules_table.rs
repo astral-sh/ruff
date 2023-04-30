@@ -2,6 +2,7 @@
 
 use itertools::Itertools;
 use ruff::registry::{Linter, Rule, RuleNamespace, UpstreamCategory};
+use ruff::settings::options::Options;
 use ruff_diagnostics::AutofixKind;
 use strum::IntoEnumIterator;
 
@@ -76,6 +77,18 @@ pub fn generate() -> String {
             ));
             table_out.push('\n');
             table_out.push('\n');
+        }
+
+        for (name, _) in Options::metadata().into_iter().collect::<Vec<_>>() {
+            if name == &linter.name() {
+                table_out.push_str(&format!(
+                    "For related settings, see [{}](settings.md#{}).",
+                    linter.name(),
+                    linter.name(),
+                ));
+                table_out.push('\n');
+                table_out.push('\n');
+            }
         }
 
         if let Some(categories) = linter.upstream_categories() {
