@@ -71,6 +71,10 @@ fn alternatives(stmt: RefEquality<Stmt>) -> Vec<Vec<RefEquality<Stmt>>> {
                 body.iter().map(RefEquality).collect()
             }))
             .collect(),
+        StmtKind::Match { cases, .. } => cases
+            .iter()
+            .map(|case| case.body.iter().map(RefEquality).collect())
+            .collect(),
         _ => vec![],
     }
 }
