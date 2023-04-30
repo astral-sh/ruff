@@ -1,4 +1,4 @@
-use log::debug;
+// use log::debug;
 use std::path::Path;
 
 use rustc_hash::{FxHashMap, FxHashSet};
@@ -57,7 +57,7 @@ impl CyclicImportChecker<'_> {
             &mut stack,
             &mut cycles,
             &mut fully_visited,
-            0,
+            // 0,
         );
         VisitedAndCycles::new(fully_visited, cycles)
     }
@@ -69,17 +69,17 @@ impl CyclicImportChecker<'_> {
         stack: &mut Vec<u32>,
         cycles: &mut FxHashSet<Vec<u32>>,
         fully_visited: &mut FxHashSet<u32>,
-        level: usize,
+        // level: usize,
     ) {
         let Some(&module_id) = module_mapping.to_id(name) else { return; };
         if let Some(imports) = self.imports.get(name) {
-            let tabs = "\t".repeat(level);
-            debug!("{tabs}{name}");
+            // let tabs = "\t".repeat(level);
+            // debug!("{tabs}{name}");
             for import in imports.iter() {
-                debug!("{tabs}\timport: {}", import.module);
+                // debug!("{tabs}\timport: {}", import.module);
                 let Some(check_module_id) = module_mapping.to_id(&import.module) else { continue; };
                 if let Some(idx) = stack.iter().position(|s| s == check_module_id) {
-                    debug!("{tabs}\t\t cycles: {:?}", stack[idx..].to_vec());
+                    // debug!("{tabs}\t\t cycles: {:?}", stack[idx..].to_vec());
                     // when the length is 1 and the only item is the import we're looking at
                     // then we're importing self, could we report this so we don't have to
                     // do this again for import-self W0406?
@@ -95,7 +95,7 @@ impl CyclicImportChecker<'_> {
                         stack,
                         cycles,
                         fully_visited,
-                        level + 1,
+                        // level + 1,
                     );
                     stack.pop();
                 }
@@ -122,7 +122,7 @@ pub fn cyclic_import(
     // if the module name isn't in the import map, it can't possibly have cycles
     // this also allows us to use `unwrap` whenever we use methods on the `ModuleMapping`
     // as any modules as part of cycles are guaranteed to be in the `ModuleMapping`
-    debug!("Checking module {module_name}");
+    // debug!("Checking module {module_name}");
     let Some((module_name, _)) = imports.get_key_value(&module_name as &str) else {
         return None;
     };
@@ -135,7 +135,7 @@ pub fn cyclic_import(
         if existing_cycles.is_empty() {
             return None;
         }
-        debug!("Existing cycles: {existing_cycles:#?}");
+        // debug!("Existing cycles: {existing_cycles:#?}");
         Some(
             existing_cycles
                 .iter()
@@ -165,7 +165,7 @@ pub fn cyclic_import(
         // we'll always have new visited stuff if we have
         let mut out_vec: Vec<Diagnostic> = Vec::new();
         if let Some(new_cycles) = new_cycles {
-            debug!("New cycles {new_cycles:#?}");
+            // debug!("New cycles {new_cycles:#?}");
             for new_cycle in &new_cycles {
                 if let [first, the_rest @ ..] = &new_cycle[..] {
                     if first
