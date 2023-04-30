@@ -23,7 +23,7 @@ pub fn resolve(
     if isolated {
         let mut config = Configuration::default();
         overrides.process_config(&mut config);
-        let settings = AllSettings::from_configuration(config, &path_dedot::CWD)?;
+        let settings = AllSettings::from_configuration(config, &path_dedot::CWD, None)?;
         return Ok(PyprojectDiscovery::Fixed(settings));
     }
 
@@ -68,6 +68,6 @@ pub fn resolve(
     // as the "default" settings.)
     let mut config = Configuration::default();
     overrides.process_config(&mut config);
-    let settings = AllSettings::from_configuration(config, &path_dedot::CWD)?;
+    let settings = AllSettings::from_configuration(config, &path_dedot::CWD, None)?;
     Ok(PyprojectDiscovery::Hierarchical(settings))
 }

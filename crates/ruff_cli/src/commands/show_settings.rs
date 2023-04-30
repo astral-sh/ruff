@@ -30,6 +30,9 @@ pub fn show_settings(
 
     let mut stdout = BufWriter::new(io::stdout().lock());
     writeln!(stdout, "Resolved settings for: {path:?}")?;
+    if let Some(settings_path) = pyproject_strategy.top_level_settings().settings_path() {
+        writeln!(stdout, "Settings path: {settings_path:?}")?;
+    }
     writeln!(stdout, "{settings:#?}")?;
 
     Ok(())

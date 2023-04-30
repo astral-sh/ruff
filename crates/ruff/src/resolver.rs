@@ -166,7 +166,11 @@ pub fn resolve_scoped_settings(
 ) -> Result<(PathBuf, AllSettings)> {
     let configuration = resolve_configuration(pyproject, relativity, processor)?;
     let project_root = relativity.resolve(pyproject);
-    let settings = AllSettings::from_configuration(configuration, &project_root)?;
+    let settings = AllSettings::from_configuration(
+        configuration,
+        &project_root,
+        Some(pyproject.to_path_buf()),
+    )?;
     Ok((project_root, settings))
 }
 

@@ -238,7 +238,11 @@ mod test {
 
         let diagnostics = run(
             &[root_path.join("valid.ipynb")],
-            &PyprojectDiscovery::Fixed(AllSettings::from_configuration(configuration, &root_path)?),
+            &PyprojectDiscovery::Fixed(AllSettings::from_configuration(
+                configuration,
+                &root_path,
+                None,
+            )?),
             &overrides,
             Cache::Disabled,
             Noqa::Enabled,
