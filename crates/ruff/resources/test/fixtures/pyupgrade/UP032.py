@@ -46,6 +46,14 @@ print("foo {} ".format(x))
 
 '({}={{0!e}})'.format(a)
 
+"{[b]}".format(a)
+
+'{[b]}'.format(a)
+
+"""{[b]}""".format(a)
+
+'''{[b]}'''.format(a)
+
 ###
 # Non-errors
 ###

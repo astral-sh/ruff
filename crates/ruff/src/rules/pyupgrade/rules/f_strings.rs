@@ -200,8 +200,15 @@ fn try_convert_to_f_string(checker: &Checker, expr: &Expr) -> Option<String> {
                             converted.push(']');
                         }
                         FieldNamePart::StringIndex(index) => {
+                            let quote = match *trailing_quote {
+                                "'" | "'''" | "\"\"\"" => '"',
+                                "\"" => '\'',
+                                _ => unreachable!("invalid trailing quote"),
+                            };
                             converted.push('[');
+                            converted.push(quote);
                             converted.push_str(&index);
+                            converted.push(quote);
                             converted.push(']');
                         }
                     }
