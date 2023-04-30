@@ -19,6 +19,30 @@ use super::branch::Branch;
 use super::helpers::result_exists;
 use super::visitor::{ReturnVisitor, Stack};
 
+/// ## What it does
+/// Checks for the presence of a `return None` statement when `None` is the only
+/// possible return value.
+///
+/// ## Why is this bad?
+/// Python implicitly assumes return `None` if no other return value is present.
+/// Therefore, explicitly returning `None` is redundant and should be avoided
+/// when it is the only possible return value.
+///
+/// ## Example
+/// ```python
+/// def foo(bar):
+///     if not bar:
+///         return
+///     return None
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar):
+///     if not bar:
+///         return
+///     return
+/// ```
 #[violation]
 pub struct UnnecessaryReturnNone;
 
