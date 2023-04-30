@@ -96,6 +96,29 @@ impl AlwaysAutofixableViolation for ImplicitReturnValue {
     }
 }
 
+/// ## What it does
+/// Checks for a missing explicit return at the end of a function that can
+/// return a non-`None` value.
+///
+/// ## Why is this bad?
+/// The lack of an explicit return statement at the end of a function that can
+/// cause confusion so an explicit `return None` value should be added when
+/// other non-`None` return values are present.
+///
+/// ## Example
+/// ```python
+/// def x(y):
+///     if not y:
+///         return 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def x(y):
+///     if not y:
+///         return 1
+///     return None
+/// ```
 #[violation]
 pub struct ImplicitReturn;
 
