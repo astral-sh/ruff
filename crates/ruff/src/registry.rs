@@ -156,6 +156,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
     rules::pylint::rules::BinaryOpException,
+    rules::pylint::rules::ImportSelf,
     rules::pylint::rules::InvalidCharacterBackspace,
     rules::pylint::rules::InvalidCharacterSub,
     rules::pylint::rules::InvalidCharacterEsc,

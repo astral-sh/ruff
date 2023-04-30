@@ -39,6 +39,7 @@ mod tests {
     #[test_case(Rule::ContinueInFinally, Path::new("continue_in_finally.py"); "PLE0116")]
     #[test_case(Rule::GlobalStatement, Path::new("global_statement.py"); "PLW0603")]
     #[test_case(Rule::GlobalVariableNotAssigned, Path::new("global_variable_not_assigned.py"); "PLW0602")]
+    #[test_case(Rule::ImportSelf, Path::new("import_self.py"); "PLW0406")]
     #[test_case(Rule::InvalidAllFormat, Path::new("invalid_all_format.py"); "PLE0605")]
     #[test_case(Rule::InvalidAllObject, Path::new("invalid_all_object.py"); "PLE0604")]
     #[test_case(Rule::InvalidCharacterBackspace, Path::new("invalid_characters.py"); "PLE2510")]
