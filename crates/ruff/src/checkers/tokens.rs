@@ -18,7 +18,6 @@ pub(crate) fn check_tokens(
     locator: &Locator,
     tokens: &[LexResult],
     settings: &Settings,
-    is_stub: bool,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
@@ -58,7 +57,7 @@ pub(crate) fn check_tokens(
         Rule::ProhibitedTrailingComma,
     ]);
     let enforce_extraneous_parenthesis = settings.rules.enabled(Rule::ExtraneousParentheses);
-    let enforce_type_comment_in_stub = settings.rules.enabled(Rule::TypeCommentInStub);
+    let enforce_type_comment = settings.rules.enabled(Rule::TypeComment);
     let enforce_todos = settings.rules.any_enabled(&[
         Rule::InvalidTodoTag,
         Rule::MissingTodoAuthor,
@@ -184,8 +183,8 @@ pub(crate) fn check_tokens(
     }
 
     // PYI033
-    if enforce_type_comment_in_stub && is_stub {
-        diagnostics.extend(flake8_pyi::rules::type_comment_in_stub(tokens));
+    if enforce_type_comment {
+        diagnostics.extend(flake8_pyi::rules::type_comment(tokens));
     }
 
     // TD001, TD002, TD003, TD004, TD005, TD006, TD007

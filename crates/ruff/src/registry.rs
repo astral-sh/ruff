@@ -516,7 +516,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::QuotedAnnotationInStub,
     rules::flake8_pyi::rules::SnakeCaseTypeAlias,
     rules::flake8_pyi::rules::TSuffixedTypeAlias,
-    rules::flake8_pyi::rules::TypeCommentInStub,
+    rules::flake8_pyi::rules::TypeComment,
     rules::flake8_pyi::rules::TypedArgumentDefaultInStub,
     rules::flake8_pyi::rules::UnannotatedAssignmentInStub,
     rules::flake8_pyi::rules::UnprefixedTypeParam,
@@ -933,7 +933,7 @@ impl Rule {
             | Rule::UselessSemicolon
             | Rule::MultipleStatementsOnOneLineSemicolon
             | Rule::ProhibitedTrailingComma
-            | Rule::TypeCommentInStub
+            | Rule::TypeComment
             | Rule::InvalidTodoTag
             | Rule::MissingTodoAuthor
             | Rule::MissingTodoLink

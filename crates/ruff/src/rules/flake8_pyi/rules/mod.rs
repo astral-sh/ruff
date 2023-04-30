@@ -16,7 +16,7 @@ pub(crate) use simple_defaults::{
 pub(crate) use type_alias_naming::{
     snake_case_type_alias, t_suffixed_type_alias, SnakeCaseTypeAlias, TSuffixedTypeAlias,
 };
-pub(crate) use type_comment_in_stub::{type_comment_in_stub, TypeCommentInStub};
+pub(crate) use type_comment::{type_comment, TypeComment};
 pub(crate) use unrecognized_platform::{
     unrecognized_platform, UnrecognizedPlatformCheck, UnrecognizedPlatformName,
 };
@@ -31,5 +31,5 @@ mod prefix_type_params;
 mod quoted_annotation_in_stub;
 mod simple_defaults;
 mod type_alias_naming;
-mod type_comment_in_stub;
+mod type_comment;
 mod unrecognized_platform;

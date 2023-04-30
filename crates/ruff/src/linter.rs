@@ -13,7 +13,6 @@ use rustpython_parser::ParseError;
 use ruff_diagnostics::Diagnostic;
 use ruff_python_ast::imports::ImportMap;
 use ruff_python_ast::source_code::{Indexer, Locator, SourceFileBuilder, Stylist};
-use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::autofix::fix_file;
 use crate::checkers::ast::check_ast;
@@ -97,8 +96,7 @@ pub fn check_path(
         .iter_enabled()
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
-        let is_stub = is_python_stub_file(path);
-        diagnostics.extend(check_tokens(locator, &tokens, settings, is_stub));
+        diagnostics.extend(check_tokens(locator, &tokens, settings));
     }
 
     // Run the filesystem-based rules.

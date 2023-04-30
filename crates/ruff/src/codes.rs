@@ -585,7 +585,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<(RuleGroup, Rule)> {
         (Flake8Pyi, "016") => (RuleGroup::Unspecified, Rule::DuplicateUnionMember),
         (Flake8Pyi, "020") => (RuleGroup::Unspecified, Rule::QuotedAnnotationInStub),
         (Flake8Pyi, "021") => (RuleGroup::Unspecified, Rule::DocstringInStub),
-        (Flake8Pyi, "033") => (RuleGroup::Unspecified, Rule::TypeCommentInStub),
+        (Flake8Pyi, "033") => (RuleGroup::Unspecified, Rule::TypeComment),
         (Flake8Pyi, "042") => (RuleGroup::Unspecified, Rule::SnakeCaseTypeAlias),
         (Flake8Pyi, "043") => (RuleGroup::Unspecified, Rule::TSuffixedTypeAlias),
         (Flake8Pyi, "052") => (RuleGroup::Unspecified, Rule::UnannotatedAssignmentInStub),
