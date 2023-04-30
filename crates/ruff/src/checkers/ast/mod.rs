@@ -971,9 +971,12 @@ where
                     }
 
                     if self.settings.rules.enabled(Rule::ImportSelf) {
-                        if let Some(diagnostic) =
-                            pylint::rules::import_self(stmt, self.path, self.module_path.as_deref())
-                        {
+                        if let Some(diagnostic) = pylint::rules::import_self(
+                            stmt,
+                            self.path,
+                            self.module_path.as_ref(),
+                            self.locator,
+                        ) {
                             self.diagnostics.push(diagnostic);
                         }
                     }
@@ -1422,9 +1425,12 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::ImportSelf) {
-                    if let Some(diagnostic) =
-                        pylint::rules::import_self(stmt, self.path, self.module_path.as_deref())
-                    {
+                    if let Some(diagnostic) = pylint::rules::import_self(
+                        stmt,
+                        self.path,
+                        self.module_path.as_ref(),
+                        self.locator,
+                    ) {
                         self.diagnostics.push(diagnostic);
                     }
                 }
