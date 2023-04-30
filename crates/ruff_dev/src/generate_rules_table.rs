@@ -22,7 +22,9 @@ fn generate_table(table_out: &mut String, rules: impl IntoIterator<Item = Rule>,
 
         #[allow(clippy::or_fun_call)]
         table_out.push_str(&format!(
-            "| {}{} | {} | {} | {} |",
+            "| <div id='{}{}'>{}{}</div> | {} | {} | {} |",
+            linter.common_prefix(),
+            linter.code_for_rule(rule).unwrap(),
             linter.common_prefix(),
             linter.code_for_rule(rule).unwrap(),
             rule.explanation()
