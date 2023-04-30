@@ -167,6 +167,30 @@ impl Violation for UnnecessaryAssign {
     }
 }
 
+/// ## What it does
+/// Checks for else statements after a return statement.
+///
+/// ## Why is this bad?
+/// The else statement is not needed because the return statement will always
+/// break out of the function. This check will reduce nesting and make the code
+/// more readable.
+///
+/// ## Example
+/// ```python
+/// def x(y, z):
+///     if y:
+///         return 1
+///     else:
+///         return z
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def x(y, z):
+///     if y:  
+///         return 1
+///     return z
+/// ```
 #[violation]
 pub struct SuperfluousElseReturn {
     pub branch: Branch,
