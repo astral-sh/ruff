@@ -69,16 +69,16 @@ impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
 ///
 /// ## Example
 /// ```python
-/// def x(y):
-///     if not y:
+/// def foo(bar):
+///     if not bar:
 ///         return
 ///     return 1
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def x(y):
-///     if not y:
+/// def foo(bar):
+///     if not bar:
 ///         return None
 ///     return 1
 /// ```
@@ -107,15 +107,15 @@ impl AlwaysAutofixableViolation for ImplicitReturnValue {
 ///
 /// ## Example
 /// ```python
-/// def x(y):
-///     if not y:
+/// def foo(bar):
+///     if not bar:
 ///         return 1
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def x(y):
-///     if not y:
+/// def foo(bar):
+///     if not bar:
 ///         return 1
 ///     return None
 /// ```
@@ -143,17 +143,17 @@ impl AlwaysAutofixableViolation for ImplicitReturn {
 ///
 /// ## Example
 /// ```python
-/// def x():
-///     a = 1
-///     # some code that not using `a`
+/// def foo():
+///     bar = 1
+///     # some code that not using `bar`
 ///     print('test')
-///     return a
+///     return bar
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def x():
-///     # some code that not using `a`
+/// def foo():
+///     # some code that not using `bar`
 ///     print('test')
 ///     return 1
 /// ```
@@ -177,19 +177,19 @@ impl Violation for UnnecessaryAssign {
 ///
 /// ## Example
 /// ```python
-/// def x(y, z):
-///     if y:
+/// def foo(bar, baz):
+///     if bar:
 ///         return 1
 ///     else:
-///         return z
+///         return baz
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def x(y, z):
-///     if y:  
+/// def foo(bar, baz):
+///     if bar:
 ///         return 1
-///     return z
+///     return baz
 /// ```
 #[violation]
 pub struct SuperfluousElseReturn {
@@ -214,19 +214,19 @@ impl Violation for SuperfluousElseReturn {
 ///
 /// ## Example
 /// ```python
-/// def x(y, z):
-///     if y:  
-///         raise Exception(y)
+/// def foo(bar, baz):
+///     if bar == "Specific Error":
+///         raise Exception(bar)
 ///     else:
-///         raise Exception(z)
+///         raise Exception(baz)
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def x(y, z):
-///     if y:  
-///         raise Exception(y)
-///     raise Exception(z)
+/// def foo(bar, baz):
+///     if bar == "Specific Error":
+///         raise Exception(bar)
+///     raise Exception(baz)
 /// ```
 #[violation]
 pub struct SuperfluousElseRaise {
@@ -251,21 +251,21 @@ impl Violation for SuperfluousElseRaise {
 ///
 /// ## Example
 /// ```python
-///def x(y, z):
-///    for i in y:
-///        if i < z:  
+///def foo(bar, baz):
+///    for i in bar:
+///        if i < baz:
 ///            continue
 ///        else:
-///            a = 0
+///            x = 0
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def x(y, z):
-///     for i in y:
-///         if i < z:  
+/// def foo(bar, baz):
+///     for i in bar:
+///         if i < baz:
 ///             continue
-///         a = 0
+///         x = 0
 /// ```
 #[violation]
 pub struct SuperfluousElseContinue {
@@ -290,21 +290,21 @@ impl Violation for SuperfluousElseContinue {
 ///
 /// ## Example
 /// ```python
-/// def x(y, z):
-///     for i in y:
-///         if i > z:  
+/// def foo(bar, baz):
+///     for i in bar:
+///         if i > baz:
 ///             break
 ///         else:
-///             a = 0
+///             x = 0
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// def x(y, z):
-///     for i in y:
-///         if i > z:  
+/// def foo(bar, baz):
+///     for i in bar:
+///         if i > baz:
 ///             break
-///         a = 0
+///         x = 0
 /// ```
 #[violation]
 pub struct SuperfluousElseBreak {
