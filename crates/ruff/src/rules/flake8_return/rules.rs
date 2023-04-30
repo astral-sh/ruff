@@ -59,6 +59,29 @@ impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of a statement with no value when a non-`None` value
+/// is returned elsewhere in the function.
+///
+/// ## Why is this bad?
+/// Defining a return statement with no value when other return statements exist
+/// within the function can cause confusion so a `None` value should be added.
+///
+/// ## Example
+/// ```python
+/// def x(y):
+///     if not y:
+///         return
+///     return 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def x(y):
+///     if not y:
+///         return None
+///     return 1
+/// ```
 #[violation]
 pub struct ImplicitReturnValue;
 
