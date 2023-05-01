@@ -26,18 +26,17 @@ fn get_module_from_path(path: &Path) -> Option<String> {
     )
 }
 
-fn check_import_self(stmt: &Stmt, path: &Path, module_path: Option<&Vec<String>>) -> bool {
+fn check_import_self(stmt: &Stmt, path: &Path, module_path: Option<&[String]>) -> bool {
     match &stmt.node {
         StmtKind::Import { names, .. } => {
             if let Some(module_path) = module_path {
                 names
                     .iter()
-                    .any(|name| name.node.name == module_path.join("."))
+                    .any(|name| name.node.name.split('.').eq(module_path))
+            } else if let Some(module) = get_module_from_path(path) {
+                names.iter().any(|name| name.node.name == module)
             } else {
-                let module = get_module_from_path(path);
-                names
-                    .iter()
-                    .any(|name| Some(&name.node.name) == module.as_ref())
+                false
             }
         }
         StmtKind::ImportFrom {
@@ -48,9 +47,9 @@ fn check_import_self(stmt: &Stmt, path: &Path, module_path: Option<&Vec<String>>
         } => {
             if let Some(module_path) = module_path {
                 if let Some(module) = module {
-                    module == &module_path.join(".")
+                    module.split('.').eq(module_path.iter())
                 } else {
-                    if matches!(level, Some(1)) {
+                    if *level == Some(1) && module_path.last().is_some() {
                         names
                             .iter()
                             .any(|name| Some(&name.node.name) == module_path.last())
@@ -70,7 +69,7 @@ fn check_import_self(stmt: &Stmt, path: &Path, module_path: Option<&Vec<String>>
 pub fn import_self(
     stmt: &Stmt,
     path: &Path,
-    module_path: Option<&Vec<String>>,
+    module_path: Option<&[String]>,
     locator: &Locator,
 ) -> Option<Diagnostic> {
     if check_import_self(stmt, path, module_path) {

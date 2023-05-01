@@ -1005,7 +1005,7 @@ where
                         if let Some(diagnostic) = pylint::rules::import_self(
                             stmt,
                             self.path,
-                            self.module_path.as_ref(),
+                            self.module_path.as_deref(),
                             self.locator,
                         ) {
                             self.diagnostics.push(diagnostic);
@@ -1492,7 +1492,7 @@ where
                     if let Some(diagnostic) = pylint::rules::import_self(
                         stmt,
                         self.path,
-                        self.module_path.as_ref(),
+                        self.module_path.as_deref(),
                         self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
