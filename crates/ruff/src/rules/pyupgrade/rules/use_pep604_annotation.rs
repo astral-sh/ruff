@@ -100,12 +100,13 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
         return;
     };
 
-    // Avoid fixing forward references.
-    let fixable = checker
-        .ctx
-        .in_deferred_string_type_definition
-        .as_ref()
-        .map_or(true, AnnotationKind::is_simple);
+    // Avoid fixing forward references, or types not in an annotation.
+    let fixable = checker.ctx.in_type_definition
+        && checker
+            .ctx
+            .in_deferred_string_type_definition
+            .as_ref()
+            .map_or(true, AnnotationKind::is_simple);
 
     match typing_member {
         TypingMember::Optional => {
