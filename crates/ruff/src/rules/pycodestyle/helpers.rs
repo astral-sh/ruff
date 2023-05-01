@@ -29,6 +29,7 @@ pub(super) fn is_overlong(
     limit: usize,
     ignore_overlong_task_comments: bool,
     task_tags: &[String],
+    tab_size: usize,
 ) -> Option<Overlong> {
     let mut start_offset = line.start();
     let mut width = 0;
@@ -37,7 +38,9 @@ pub(super) fn is_overlong(
         if width < limit {
             start_offset += c.text_len();
         }
-
+        if matches!(c, '\t') {
+            width += tab_size - (width % tab_size);
+        }
         width += c.width().unwrap_or(0);
     }
 

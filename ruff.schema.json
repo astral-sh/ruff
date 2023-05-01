@@ -1367,6 +1367,15 @@
           ],
           "format": "uint",
           "minimum": 0.0
+        },
+        "tab-size": {
+          "description": "The tabulation length to use when enforcing long-lines violations (like `E501`).",
+          "type": [
+            "integer",
+            "null"
+          ],
+          "format": "uint",
+          "minimum": 0.0
         }
       },
       "additionalProperties": false

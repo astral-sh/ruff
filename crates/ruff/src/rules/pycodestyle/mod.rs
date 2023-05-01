@@ -175,4 +175,24 @@ mod tests {
         assert_messages!(diagnostics);
         Ok(())
     }
+
+    #[test_case(1)]
+    #[test_case(2)]
+    #[test_case(4)]
+    #[test_case(8)]
+    fn tab_size(tab_size: usize) -> Result<()> {
+        let snapshot = format!("tab_size_{tab_size}");
+        let diagnostics = test_path(
+            Path::new("pycodestyle/E501_2.py"),
+            &settings::Settings {
+                pycodestyle: Settings {
+                    tab_size,
+                    ..Settings::default()
+                },
+                ..settings::Settings::for_rule(Rule::LineTooLong)
+            },
+        )?;
+        assert_messages!(snapshot, diagnostics);
+        Ok(())
+    }
 }
