@@ -23,6 +23,8 @@ mod panic;
 mod printer;
 mod resolve;
 
+const WATCHED_FILES: [&str; 5] = ["py", "pyi", "pyproject.toml", "ruff.toml", ".ruff.toml"];
+
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
     /// Linting was successful and there were no linting errors.
@@ -41,6 +43,19 @@ impl From<ExitStatus> for ExitCode {
             ExitStatus::Error => ExitCode::from(2),
         }
     }
+}
+
+pub fn has_file_changed(paths: &[PathBuf]) -> bool {
+    for path in paths {
+        if let (Some(file_name), Some(suffix)) = (path.file_name(), path.extension()) {
+            if let (Some(file_name), Some(suffix)) = (file_name.to_str(), suffix.to_str()) {
+                if WATCHED_FILES.contains(&file_name) || WATCHED_FILES.contains(&suffix) {
+                    return true;
+                }
+            }
+        }
+    }
+    false
 }
 
 pub fn run(
@@ -213,13 +228,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         loop {
             match rx.recv() {
                 Ok(event) => {
-                    let paths = event?.paths;
-                    let py_changed = paths.iter().any(|path| {
-                        path.extension()
-                            .map(|ext| ext == "py" || ext == "pyi")
-                            .unwrap_or_default()
-                    });
-                    if py_changed {
+                    if has_file_changed(&event?.paths) {
                         Printer::clear_screen()?;
                         printer.write_to_user("File change detected...\n");
 
@@ -296,4 +305,83 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         }
     }
     Ok(ExitStatus::Success)
+}
+
+#[cfg(test)]
+mod test {
+    use crate::has_file_changed;
+    use std::collections::HashMap;
+    use std::path::PathBuf;
+
+    #[test]
+    fn test_has_file_changed_should_detect_correct_file() {
+        let mut inputs: HashMap<bool, Vec<PathBuf>> = HashMap::new();
+        inputs.insert(
+            true,
+            vec![
+                PathBuf::from("tmp/pyproject.toml"),
+                PathBuf::from("tmp/bin/ruff.rs"),
+            ],
+        );
+        inputs.insert(
+            true,
+            vec![
+                PathBuf::from("pyproject.toml"),
+                PathBuf::from("tmp/bin/ruff.rs"),
+            ],
+        );
+        inputs.insert(
+            true,
+            vec![
+                PathBuf::from("tmp1/tmp2/tmp3/pyproject.toml"),
+                PathBuf::from("tmp/bin/ruff.rs"),
+            ],
+        );
+        inputs.insert(
+            true,
+            vec![
+                PathBuf::from("tmp/ruff.toml"),
+                PathBuf::from("tmp/bin/ruff.rs"),
+            ],
+        );
+        inputs.insert(
+            true,
+            vec![
+                PathBuf::from("tmp/.ruff.toml"),
+                PathBuf::from("tmp/bin/ruff.rs"),
+            ],
+        );
+        inputs.insert(
+            true,
+            vec![
+                PathBuf::from("tmp/rule.py"),
+                PathBuf::from("tmp/bin/ruff.rs"),
+            ],
+        );
+        inputs.insert(
+            true,
+            vec![
+                PathBuf::from("tmp/rule.pyi"),
+                PathBuf::from("tmp/bin/ruff.rs"),
+            ],
+        );
+        inputs.insert(
+            true,
+            vec![
+                PathBuf::from("tmp/rule.pyi"),
+                PathBuf::from("tmp/bin/ruff.rs"),
+            ],
+        );
+        inputs.insert(
+            false,
+            vec![
+                PathBuf::from("tmp/rule.js"),
+                PathBuf::from("tmp/Cargo.toml"),
+                PathBuf::from("tmp/bin/ruff.rs"),
+            ],
+        );
+        for (expected, paths) in inputs {
+            assert_eq!(expected, has_file_changed(&paths));
+        }
+    }
 }
