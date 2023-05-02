@@ -1,7 +1,8 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 
 use crate::checkers::ast::Checker;
@@ -24,13 +25,17 @@ pub struct EmptyMethodWithoutAbstractDecorator {
     pub name: String,
 }
 
-impl Violation for EmptyMethodWithoutAbstractDecorator {
+impl AlwaysAutofixableViolation for EmptyMethodWithoutAbstractDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
         let EmptyMethodWithoutAbstractDecorator { name } = self;
         format!(
             "`{name}` is an empty method in an abstract base class, but has no abstract decorator"
         )
+    }
+
+    fn autofix_title(&self) -> String {
+        "Add the @abstractmethod decorator to this method".to_string()
     }
 }
 
@@ -123,12 +128,23 @@ pub fn abstract_base_class(
             && is_empty_body(body)
             && !is_overload(&checker.ctx, decorator_list)
         {
-            checker.diagnostics.push(Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 EmptyMethodWithoutAbstractDecorator {
                     name: format!("{name}.{method_name}"),
                 },
                 stmt.range(),
-            ));
+            );
+            if checker.patch(Rule::EmptyMethodWithoutAbstractDecorator) {
+                diagnostic.set_fix(Edit::insertion(
+                    format!(
+                        "@abstractmethod{new_line}{indent}",
+                        new_line = checker.stylist.line_ending().as_str(),
+                        indent = indentation(checker.locator, stmt).unwrap(),
+                    ),
+                    stmt.range().start(),
+                ));
+            }
+            checker.diagnostics.push(diagnostic);
         }
     }
     if checker
