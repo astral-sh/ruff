@@ -23,8 +23,6 @@ mod panic;
 mod printer;
 mod resolve;
 
-const WATCHED_FILES: [&str; 5] = ["py", "pyi", "pyproject.toml", "ruff.toml", ".ruff.toml"];
-
 #[derive(Copy, Clone)]
 pub enum ExitStatus {
     /// Linting was successful and there were no linting errors.
@@ -45,17 +43,40 @@ impl From<ExitStatus> for ExitCode {
     }
 }
 
-pub fn has_file_changed(paths: &[PathBuf]) -> bool {
-    for path in paths {
-        if let (Some(file_name), Some(suffix)) = (path.file_name(), path.extension()) {
-            if let (Some(file_name), Some(suffix)) = (file_name.to_str(), suffix.to_str()) {
-                if WATCHED_FILES.contains(&file_name) || WATCHED_FILES.contains(&suffix) {
-                    return true;
+#[derive(Default)]
+pub struct FileChangeDetector<'a> {
+    extensions: Vec<&'a str>,
+    config_files: Vec<&'a str>,
+    has_configuration_changed: bool,
+}
+
+impl FileChangeDetector<'_> {
+    pub fn new() -> Self {
+        Self {
+            extensions: vec!["py", "pyi"],
+            config_files: vec!["pyproject.toml", "ruff.toml", ".ruff.toml"],
+            has_configuration_changed: false,
+        }
+    }
+
+    pub fn change_detected(&mut self, paths: &[PathBuf]) -> bool {
+        for path in paths {
+            if let (Some(file_name), Some(suffix)) = (path.file_name(), path.extension()) {
+                if let (Some(file_name), Some(suffix)) = (file_name.to_str(), suffix.to_str()) {
+                    if self.config_files.contains(&file_name) {
+                        self.has_configuration_changed = true;
+                        return true;
+                    }
+                    if self.extensions.contains(&suffix) {
+                        self.has_configuration_changed = false;
+                        return true;
+                    }
                 }
             }
         }
+        self.has_configuration_changed = false;
+        false
     }
-    false
 }
 
 pub fn run(
@@ -112,7 +133,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_strategy = resolve::resolve(
+    let mut pyproject_strategy = resolve::resolve(
         cli.isolated,
         cli.config.as_deref(),
         &overrides,
@@ -225,10 +246,19 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
 
+        let mut file_change_detector = FileChangeDetector::new();
         loop {
             match rx.recv() {
                 Ok(event) => {
-                    if has_file_changed(&event?.paths) {
+                    if file_change_detector.change_detected(&event?.paths) {
+                        if file_change_detector.has_configuration_changed {
+                            pyproject_strategy = resolve::resolve(
+                                cli.isolated,
+                                cli.config.as_deref(),
+                                &overrides,
+                                cli.stdin_filename.as_deref(),
+                            )?;
+                        }
                         Printer::clear_screen()?;
                         printer.write_to_user("File change detected...\n");
 
@@ -308,13 +338,13 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 }
 
 #[cfg(test)]
-mod test {
-    use crate::has_file_changed;
+mod test_file_change_detector {
+    use crate::FileChangeDetector;
     use std::collections::HashMap;
     use std::path::PathBuf;
 
     #[test]
-    fn test_has_file_changed_should_detect_correct_file() {
+    fn should_detect_correct_file_change() {
         let mut inputs: HashMap<bool, Vec<PathBuf>> = HashMap::new();
         inputs.insert(
             true,
@@ -380,8 +410,30 @@ mod test {
                 PathBuf::from("tmp/bin/ruff.rs"),
             ],
         );
+        inputs.insert(
+            false,
+            vec![PathBuf::from("tmp/py"), PathBuf::from("tmp/pyi")],
+        );
+        let mut file_change_detector = FileChangeDetector::new();
         for (expected, paths) in inputs {
-            assert_eq!(expected, has_file_changed(&paths));
+            assert_eq!(expected, file_change_detector.change_detected(&paths));
         }
+    }
+    #[test]
+    fn should_modify_has_configuration_change_correctly() {
+        let mut file_change_detector = FileChangeDetector::new();
+        let paths = vec![
+            PathBuf::from("tmp/pyproject.toml"),
+            PathBuf::from("tmp/bin/ruff.rs"),
+        ];
+        file_change_detector.change_detected(&paths);
+        assert!(file_change_detector.has_configuration_changed);
+
+        let paths = vec![
+            PathBuf::from("tmp/rule.py"),
+            PathBuf::from("tmp/bin/ruff.rs"),
+        ];
+        file_change_detector.change_detected(&paths);
+        assert!(!file_change_detector.has_configuration_changed);
     }
 }
