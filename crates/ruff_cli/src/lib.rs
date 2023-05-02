@@ -168,7 +168,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         flags::FixMode::Diff
     } else if fix || fix_only {
         flags::FixMode::Apply
-    } else if matches!(format, SerializationFormat::Json) {
+    } else if matches!(format, SerializationFormat::Json) || show_fixes {
         flags::FixMode::Generate
     } else {
         flags::FixMode::None
