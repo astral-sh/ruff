@@ -4,8 +4,8 @@
 
 Yes. Ruff is compatible with [Black](https://github.com/psf/black) out-of-the-box, as long as
 the `line-length` setting is consistent between the two.  Ruff and Black treat `line-length`
-differently because Black does not wrap all long lines (for example, comments) while Ruff will
-still flag those as long lines.
+differently because Black does not wrap all long lines (for example, comments) while Ruff rule
+`E501` flags those same lines for exceeding `line-length`.
 
 As a project, Ruff is designed to be used alongside Black and, as such, will defer implementing
 stylistic lint rules that are obviated by autoformatting.
