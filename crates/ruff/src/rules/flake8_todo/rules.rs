@@ -223,8 +223,9 @@ impl Violation for MissingSpaceAfterColonInTodo {
 // `Nones` for the colon and space checks.
 //
 // Note: Regexes taken from https://github.com/orsinium-labs/flake8-todos/blob/master/flake8_todos/_rules.py#L12.
+// TODO: tags should be case-insensitive
 static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^# {0,1}(?P<tag>(?i)TODO|BUG|FIXME|XXX)( {0,1}\(.*\))?(:)?( )?(.+)?$").unwrap()
+    Regex::new(r"^# {0,1}(?P<tag>TODO|BUG|FIXME|XXX)( {0,1}\(.*\))?(:)?( )?(.+)?$").unwrap()
 });
 
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
@@ -245,53 +246,23 @@ pub fn check_todos(
     settings: &Settings,
 ) -> Vec<Diagnostic> {
     let mut diagnostics: Vec<Diagnostic> = vec![];
-    let mut prev_token_is_todo = false;
-    let mut prev_token_todo_start = 2; // Default to 2, the position of "T" in a properly formed TODO
 
-    for (start, token, end) in tokens.iter().flatten() {
-        let diagnostics_ref = &mut diagnostics;
+    let mut iter = tokens.iter().flatten().peekable();
+    while let Some((start, token, end)) = iter.next() {
+        let Tok::Comment(comment) = token else {
+            continue;
+        };
+
+        let Some(captures) = get_captured_matches(comment).next() else {
+            continue;
+        };
         let range = Range::new(*start, *end);
-
-        let token_opt = match token {
-            Tok::Comment(s) => Some(s),
-            _ => None,
-        };
-
-        // Check for errors due to a missing link: TDO003.
-        if prev_token_is_todo {
-            if token_opt.is_some() && ISSUE_LINK_REGEX_SET.is_match(token_opt.unwrap()) {
-                prev_token_is_todo = false;
-                continue;
-            }
-
-            diagnostics_ref.push(Diagnostic::new(
-                MissingLinkInTodo,
-                Range::new(
-                    Location::new(start.row() - 1, prev_token_todo_start),
-                    Location::new(end.row() - 1, prev_token_todo_start + TODO_LENGTH),
-                ),
-            ));
-        }
-
-        let Some(comment) = token_opt else {
-            prev_token_is_todo = false;
-            continue;
-        };
-
-        let mut captures_opt = get_captured_matches(comment);
-        if captures_opt.peek().is_none() {
-            // If we didn't match the regex at all, we know that this token isn't a TODO. The regex
-            // defined above requires that the `tag` capture group is matched.
-            prev_token_is_todo = false;
-            continue;
-        };
 
         // Check for errors on the tag: TDO001/TDO006.
         // Unwrap is safe because the "tag" capture group is required to get here.
-        let captures = captures_opt.peek().unwrap();
         let tag = captures.name("tag").unwrap().as_str();
         if tag != "TODO" {
-            diagnostics_ref.push(Diagnostic::new(
+            diagnostics.push(Diagnostic::new(
                 InvalidTodoTag {
                     tag: String::from(tag),
                 },
@@ -299,44 +270,62 @@ pub fn check_todos(
             ));
 
             if tag.to_uppercase() == "TODO" {
-                let invalid_capitalization = Diagnostic::new(
+                let mut invalid_capitalization = Diagnostic::new(
                     InvalidCapitalizationInTodo {
                         tag: String::from(tag),
                     },
                     range,
-                )
-                .with_fix(
-                    if should_autofix(autofix, settings, Rule::InvalidCapitalizationInTodo) {
-                        let first_t_position = find_first_t_position(comment);
-
-                        Fix::new(vec![Edit::replacement(
-                            "TODO".to_string(),
-                            Location::new(range.location.row(), first_t_position),
-                            Location::new(range.location.row(), first_t_position + TODO_LENGTH),
-                        )])
-                    } else {
-                        Fix::empty()
-                    },
                 );
 
-                diagnostics_ref.push(invalid_capitalization);
+                if autofix.into() && settings.rules.should_fix(Rule::InvalidCapitalizationInTodo) {
+                    let first_t_position = find_first_t_position(comment);
+
+                    invalid_capitalization.set_fix(Fix::new(vec![Edit::replacement(
+                        "TODO".to_string(),
+                        Location::new(range.location.row(), first_t_position),
+                        Location::new(range.location.row(), first_t_position + TODO_LENGTH),
+                    )]));
+                }
+
+                diagnostics.push(invalid_capitalization);
             }
         }
 
         // Check the rest of the capture groups for errors
+        //
+        // TODO: improve diagnostic placement - this may involve getting rid of the capture groups.
+        // Maybe we iterate through the token and perform each check - this would allow us to find
+        // offsets because we could iterate on index, then when you see an error you store the
+        // index
         for capture_group_index in 2..=NUM_CAPTURE_GROUPS {
             if captures.get(capture_group_index).is_some() {
                 continue;
             }
 
-            if let Some(diagnostic) = get_regex_error(capture_group_index, &range, diagnostics_ref)
+            if let Some(diagnostic) = get_regex_error(capture_group_index, &range, &mut diagnostics)
             {
-                diagnostics_ref.push(diagnostic);
+                diagnostics.push(diagnostic);
             };
         }
 
-        prev_token_is_todo = true;
-        prev_token_todo_start = find_first_t_position(comment);
+        // If we've gotten all the way here, we know that the current token is a TODO. TDO003
+        // requires that the next one is an issue link.
+        if let Some((next_start, next_token, next_end)) = iter.peek() {
+            if let Tok::Comment(next_comment) = next_token {
+                if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
+                    continue;
+                }
+            }
+
+            diagnostics.push(Diagnostic::new(
+                MissingLinkInTodo,
+                Range::new(*next_start, *next_end),
+            ));
+        } else {
+            // There's a TODO on the last line of the file which can't have a link after it.
+            // TODO: restrict the location of the diagnostic to reduce noise
+            diagnostics.push(Diagnostic::new(MissingLinkInTodo, range));
+        }
     }
 
     diagnostics
@@ -363,21 +352,10 @@ fn get_regex_error(i: usize, range: &Range, diagnostics: &mut [Diagnostic]) -> O
     }
 }
 
-fn should_autofix(autofix: flags::Autofix, settings: &Settings, rule: Rule) -> bool {
-    autofix.into() && settings.rules.should_fix(rule)
-}
-
-fn get_captured_matches(text: &str) -> Peekable<CaptureMatches> {
-    TODO_REGEX.captures_iter(text).peekable()
+fn get_captured_matches(text: &str) -> CaptureMatches {
+    TODO_REGEX.captures_iter(text)
 }
 
 fn find_first_t_position(comment: &str) -> usize {
-    // The TODO regex allows for 0 or 1 spaces, so let's find where the first "t"
-    // or "T" is. We know the unwrap is safe because of the mandatory regex
-    // match. We'll use position() since "#" is 2 bytes which could throw
-    // off an implementation that uses byte-indexing.
-    comment
-        .chars()
-        .position(|c| c.to_string() == "t" || c.to_string() == "T")
-        .unwrap()
+    comment.find(['t', 'T']).unwrap()
 }
