@@ -41,7 +41,10 @@ impl std::fmt::Display for Constant {
         match self {
             Constant::None => f.pad("None"),
             Constant::Bool(b) => f.pad(if *b { "True" } else { "False" }),
-            Constant::Str(s) => rustpython_common::str::repr(s).fmt(f),
+            Constant::Str(s) => {
+                use rustpython_common::escape::Escape;
+                rustpython_common::escape::UnicodeEscape::new_repr(s.as_str()).write_quoted(f)
+            }
             Constant::Bytes(b) => {
                 f.pad(&rustpython_common::bytes::repr(b).map_err(|_err| std::fmt::Error)?)
             }
