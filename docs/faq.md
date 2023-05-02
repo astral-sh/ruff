@@ -3,12 +3,16 @@
 ## Is Ruff compatible with Black?
 
 Yes. Ruff is compatible with [Black](https://github.com/psf/black) out-of-the-box, as long as
-the `line-length` setting is consistent between the two.  Ruff and Black treat `line-length`
-differently because Black does not wrap all long lines (for example, comments) while Ruff rule
-`E501` flags those same lines for exceeding `line-length`.
+the `line-length` setting is consistent between the two.
 
 As a project, Ruff is designed to be used alongside Black and, as such, will defer implementing
 stylistic lint rules that are obviated by autoformatting.
+
+Note that Ruff and Black treat line-length enforcement a little differently. Black makes a
+best-effort attempt to adhere to the `line-length`, but avoids automatic line-wrapping in some cases
+(e.g., within comments). Ruff, on the other hand, will flag rule `E501` for any line that exceeds
+the `line-length` setting. As such, if `E501` is enabled, Ruff can still trigger line-length
+violations even when Black is enabled.
 
 ## How does Ruff compare to Flake8?
 
