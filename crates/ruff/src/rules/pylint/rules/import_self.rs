@@ -12,7 +12,7 @@ pub struct ImportSelf;
 impl Violation for ImportSelf {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Module import itself")
+        format!("Module imports itself")
     }
 }
 
