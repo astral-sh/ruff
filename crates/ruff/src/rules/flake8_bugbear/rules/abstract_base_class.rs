@@ -1,10 +1,12 @@
-use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
+use anyhow::{anyhow, Result};
+use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Located, Stmt, StmtKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
 
+use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
 
@@ -73,6 +75,26 @@ fn is_empty_body(body: &[Stmt]) -> bool {
     })
 }
 
+fn fix_abstractmethod_missing(checker: &Checker, stmt: &Located<StmtKind>) -> Result<Fix> {
+    let indent =
+        indentation(checker.locator, stmt).ok_or(anyhow!("Unable to detect indentation"))?;
+    let (import_edit, binding) = get_or_import_symbol(
+        "abc",
+        "abstractmethod",
+        &checker.ctx,
+        &checker.importer,
+        checker.locator,
+    )?;
+    let reference_edit = Edit::insertion(
+        format!(
+            "@{binding}{new_line}{indent}",
+            new_line = checker.stylist.line_ending().as_str(),
+        ),
+        stmt.range().start(),
+    );
+    Ok(Fix::from_iter([import_edit, reference_edit]))
+}
+
 pub fn abstract_base_class(
     checker: &mut Checker,
     stmt: &Stmt,
@@ -135,14 +157,7 @@ pub fn abstract_base_class(
                 stmt.range(),
             );
             if checker.patch(Rule::EmptyMethodWithoutAbstractDecorator) {
-                diagnostic.set_fix(Edit::insertion(
-                    format!(
-                        "@abstractmethod{new_line}{indent}",
-                        new_line = checker.stylist.line_ending().as_str(),
-                        indent = indentation(checker.locator, stmt).unwrap(),
-                    ),
-                    stmt.range().start(),
-                ));
+                diagnostic.try_set_fix(|| fix_abstractmethod_missing(checker, stmt));
             }
             checker.diagnostics.push(diagnostic);
         }

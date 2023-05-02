@@ -17,7 +17,7 @@ B027.py:13:5: B027 [*] `AbstractClass.empty_1` is an empty method in an abstract
 10 10 | 
 11 11 | 
 12 12 | class AbstractClass(ABC):
-   13 |+    @abstractmethod
+   13 |+    @notabstract
 13 14 |     def empty_1(self):  # error
 14 15 |         ...
 15 16 | 
@@ -39,7 +39,7 @@ B027.py:16:5: B027 [*] `AbstractClass.empty_2` is an empty method in an abstract
 13 13 |     def empty_1(self):  # error
 14 14 |         ...
 15 15 | 
-   16 |+    @abstractmethod
+   16 |+    @notabstract
 16 17 |     def empty_2(self):  # error
 17 18 |         pass
 18 19 | 
@@ -62,7 +62,7 @@ B027.py:19:5: B027 [*] `AbstractClass.empty_3` is an empty method in an abstract
 16 16 |     def empty_2(self):  # error
 17 17 |         pass
 18 18 | 
-   19 |+    @abstractmethod
+   19 |+    @notabstract
 19 20 |     def empty_3(self):  # error
 20 21 |         """docstring"""
 21 22 |         ...
@@ -88,7 +88,7 @@ B027.py:23:5: B027 [*] `AbstractClass.empty_4` is an empty method in an abstract
 20 20 |         """docstring"""
 21 21 |         ...
 22 22 | 
-   23 |+    @abstractmethod
+   23 |+    @notabstract
 23 24 |     def empty_4(self):  # error
 24 25 |         """multiple ellipsis/pass"""
 25 26 |         ...
