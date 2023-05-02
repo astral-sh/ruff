@@ -213,6 +213,8 @@ fn remove_unused_variable(
                         ),
                     ))
                 } else {
+                    let parent = checker.ctx.stmts.get_node_id(stmt);
+
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
                     let parent = checker
                         .ctx

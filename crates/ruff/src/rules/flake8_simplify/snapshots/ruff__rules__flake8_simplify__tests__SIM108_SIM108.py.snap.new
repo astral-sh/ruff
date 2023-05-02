@@ -1,0 +1,173 @@
+---
+source: crates/ruff/src/rules/flake8_simplify/mod.rs
+assertion_line: 50
+---
+SIM108.py:2:1: SIM108 [*] Use ternary operator `b = c if a else d` instead of `if`-`else`-block
+  |
+2 |   # SIM108
+3 | / if a:
+4 | |     b = c
+5 | | else:
+6 | |     b = d
+  | |_________^ SIM108
+7 |   
+8 |   # OK
+  |
+  = help: Replace `if`-`else`-block with `b = c if a else d`
+
+ℹ Suggested fix
+1 1 | # SIM108
+2   |-if a:
+3   |-    b = c
+4   |-else:
+5   |-    b = d
+  2 |+b = c if a else d
+6 3 | 
+7 4 | # OK
+8 5 | b = c if a else d
+
+SIM108.py:13:1: SIM108 [*] Use ternary operator `b = a if c else d` instead of `if`-`else`-block
+   |
+13 |   if a:
+14 |       b = c
+15 | / elif c:
+16 | |     b = a
+17 | | else:
+18 | |     b = d
+   | |_________^ SIM108
+19 |   
+20 |   # OK
+   |
+   = help: Replace `if`-`else`-block with `b = a if c else d`
+
+ℹ Suggested fix
+10 10 | # OK
+11 11 | if a:
+12 12 |     b = c
+13    |-elif c:
+14    |-    b = a
+15    |-else:
+16    |-    b = d
+   13 |+b = a if c else d
+17 14 | 
+18 15 | # OK
+19 16 | if True:
+
+SIM108.py:21:1: SIM108 [*] Use ternary operator `b = 1 if a else 2` instead of `if`-`else`-block
+   |
+21 |   if True:
+22 |       pass
+23 | / elif a:
+24 | |     b = 1
+25 | | else:
+26 | |     b = 2
+   | |_________^ SIM108
+27 |   
+28 |   # OK (false negative)
+   |
+   = help: Replace `if`-`else`-block with `b = 1 if a else 2`
+
+ℹ Suggested fix
+18 18 | # OK
+19 19 | if True:
+20 20 |     pass
+21    |-elif a:
+22    |-    b = 1
+23    |-else:
+24    |-    b = 2
+   21 |+b = 1 if a else 2
+25 22 | 
+26 23 | # OK (false negative)
+27 24 | if True:
+
+SIM108.py:30:5: SIM108 [*] Use ternary operator `b = 1 if a else 2` instead of `if`-`else`-block
+   |
+30 |       pass
+31 |   else:
+32 |       if a:
+   |  _____^
+33 | |         b = 1
+34 | |     else:
+35 | |         b = 2
+   | |_____________^ SIM108
+   |
+   = help: Replace `if`-`else`-block with `b = 1 if a else 2`
+
+ℹ Suggested fix
+27 27 | if True:
+28 28 |     pass
+29 29 | else:
+30    |-    if a:
+31    |-        b = 1
+32    |-    else:
+33    |-        b = 2
+   30 |+    b = 1 if a else 2
+34 31 | 
+35 32 | 
+36 33 | import sys
+
+SIM108.py:58:1: SIM108 Use ternary operator `abc = x if x > 0 else -x` instead of `if`-`else`-block
+   |
+58 |   # SIM108 (without fix due to comments)
+59 | / if x > 0:
+60 | |     # test test
+61 | |     abc = x
+62 | | else:
+63 | |     # test test test
+64 | |     abc = -x
+   | |____________^ SIM108
+   |
+
+SIM108.py:82:1: SIM108 [*] Use ternary operator `b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd` instead of `if`-`else`-block
+   |
+82 |   # SIM108
+83 | / if a:
+84 | |     b = cccccccccccccccccccccccccccccccccccc
+85 | | else:
+86 | |     b = ddddddddddddddddddddddddddddddddddddd
+   | |_____________________________________________^ SIM108
+   |
+   = help: Replace `if`-`else`-block with `b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd`
+
+ℹ Suggested fix
+79 79 | 
+80 80 | 
+81 81 | # SIM108
+82    |-if a:
+83    |-    b = cccccccccccccccccccccccccccccccccccc
+84    |-else:
+85    |-    b = ddddddddddddddddddddddddddddddddddddd
+   82 |+b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd
+86 83 | 
+87 84 | 
+88 85 | # OK (too long)
+
+SIM108.py:97:1: SIM108 Use ternary operator `exitcode = 0 if True else 1` instead of `if`-`else`-block
+    |
+ 97 |   # SIM108 (without fix due to trailing comment)
+ 98 | / if True:
+ 99 | |     exitcode = 0
+100 | | else:
+101 | |     exitcode = 1  # Trailing comment
+    | |________________^ SIM108
+    |
+
+SIM108.py:104:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
+    |
+104 |   # SIM108
+105 | / if True: x = 3  # Foo
+106 | | else: x = 5
+    | |___________^ SIM108
+    |
+
+SIM108.py:109:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
+    |
+109 |   # SIM108
+110 | / if True:  # Foo
+111 | |     x = 3
+112 | | else:
+113 | |     x = 5
+    | |_________^ SIM108
+    |
+
+

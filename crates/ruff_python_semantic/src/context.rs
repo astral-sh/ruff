@@ -5,6 +5,7 @@ use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
 
+use indextree::{Arena, NodeId};
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
 use ruff_python_ast::types::RefEquality;
@@ -25,6 +26,10 @@ pub struct Context<'a> {
     pub module_path: Option<Vec<String>>,
     // Retain all scopes and parent nodes, along with a stack of indices to track which are active
     // at various points in time.
+    pub stmts: Vec<RefEquality<'a, Stmt>>,
+    pub parent_to_child
+    pub stmt_id: Option<NodeId>,
+
     pub parents: Vec<RefEquality<'a, Stmt>>,
     pub depths: FxHashMap<RefEquality<'a, Stmt>, usize>,
     pub child_to_parent: FxHashMap<RefEquality<'a, Stmt>, RefEquality<'a, Stmt>>,
@@ -68,6 +73,8 @@ impl<'a> Context<'a> {
         Self {
             typing_modules,
             module_path,
+            stmts: Arena::new(),
+            stmt_id: None,
             parents: Vec::default(),
             depths: FxHashMap::default(),
             child_to_parent: FxHashMap::default(),
@@ -307,6 +314,12 @@ impl<'a> Context<'a> {
     }
 
     pub fn push_parent(&mut self, parent: &'a Stmt) {
+        if let Some(stmt_id) = &mut self.stmt_id {
+            self.stmt_id = Some(stmt_id.append_value(parent, &mut self.stmts));
+        } else {
+            self.stmt_id = Some(self.stmts.new_node(parent));
+        }
+
         let num_existing = self.parents.len();
         self.parents.push(RefEquality(parent));
         self.depths.insert(self.parents[num_existing], num_existing);
@@ -317,7 +330,9 @@ impl<'a> Context<'a> {
     }
 
     pub fn pop_parent(&mut self) {
-        self.parents.pop().expect("Attempted to pop without parent");
+        if let Some(stmt_id) = self.stmt_id {
+            self.stmt_id = self.stmts[stmt_id].parent()
+        }
     }
 
     pub fn push_expr(&mut self, expr: &'a Expr) {

@@ -1,0 +1,18 @@
+---
+source: crates/ruff/src/rules/pyflakes/mod.rs
+assertion_line: 131
+---
+F702.py:20:5: F702 `continue` not properly in loop
+   |
+20 | class Foo:
+21 |     continue
+   |     ^^^^^^^^ F702
+   |
+
+F702.py:23:1: F702 `continue` not properly in loop
+   |
+23 | continue
+   | ^^^^^^^^ F702
+   |
+
+

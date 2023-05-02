@@ -1,0 +1,14 @@
+---
+source: crates/ruff/src/rules/pyflakes/mod.rs
+assertion_line: 131
+---
+F811_7.py:7:12: F811 Redefinition of unused `os` from line 5
+   |
+ 7 |     import os
+ 8 | else:
+ 9 |     import os
+   |            ^^ F811
+10 | os.path
+   |
+
+

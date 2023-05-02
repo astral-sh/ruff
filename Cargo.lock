@@ -1047,6 +1047,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "indextree"
+version = "4.6.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c40411d0e5c63ef1323c3d09ce5ec6d84d71531e18daed0743fccea279d7deb6"
+
+[[package]]
 name = "inotify"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2018,6 +2024,7 @@ dependencies = [
  "globset",
  "ignore",
  "imperative",
+ "indextree",
  "insta",
  "is-macro",
  "itertools",
@@ -2245,6 +2252,7 @@ name = "ruff_python_semantic"
 version = "0.0.0"
 dependencies = [
  "bitflags 2.1.0",
+ "indextree",
  "is-macro",
  "nohash-hasher",
  "ruff_python_ast",

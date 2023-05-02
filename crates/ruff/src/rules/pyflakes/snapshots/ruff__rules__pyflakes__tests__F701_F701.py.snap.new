@@ -1,0 +1,18 @@
+---
+source: crates/ruff/src/rules/pyflakes/mod.rs
+assertion_line: 131
+---
+F701.py:20:5: F701 `break` outside loop
+   |
+20 | class Foo:
+21 |     break
+   |     ^^^^^ F701
+   |
+
+F701.py:23:1: F701 `break` outside loop
+   |
+23 | break
+   | ^^^^^ F701
+   |
+
+

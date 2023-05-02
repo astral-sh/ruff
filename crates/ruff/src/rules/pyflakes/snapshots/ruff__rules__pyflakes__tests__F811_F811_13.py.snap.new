@@ -1,0 +1,24 @@
+---
+source: crates/ruff/src/rules/pyflakes/mod.rs
+assertion_line: 131
+---
+F811_13.py:4:20: F811 Redefinition of unused `funca` from line 2
+  |
+4 |     import funca
+5 | except ImportError:
+6 |     from bb import funca
+  |                    ^^^^^ F811
+7 |     from bb import funcb
+8 | else:
+  |
+
+F811_13.py:7:21: F811 Redefinition of unused `funcb` from line 5
+   |
+ 7 |     from bb import funcb
+ 8 | else:
+ 9 |     from bbb import funcb
+   |                     ^^^^^ F811
+10 | print(funca, funcb)
+   |
+
+

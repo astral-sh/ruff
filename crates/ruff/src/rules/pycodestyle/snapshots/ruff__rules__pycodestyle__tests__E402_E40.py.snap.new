@@ -1,0 +1,5 @@
+---
+source: crates/ruff/src/rules/pycodestyle/mod.rs
+assertion_line: 55
+---
+

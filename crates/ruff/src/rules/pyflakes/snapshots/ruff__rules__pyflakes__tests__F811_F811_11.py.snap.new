@@ -1,0 +1,34 @@
+---
+source: crates/ruff/src/rules/pyflakes/mod.rs
+assertion_line: 131
+---
+F811_11.py:4:20: F811 Redefinition of unused `mixer` from line 2
+  |
+4 |     from aa import mixer
+5 | except AttributeError:
+6 |     from bb import mixer
+  |                    ^^^^^ F811
+7 | except RuntimeError:
+8 |     from cc import mixer
+  |
+
+F811_11.py:6:20: F811 Redefinition of unused `mixer` from line 4
+   |
+ 6 |     from bb import mixer
+ 7 | except RuntimeError:
+ 8 |     from cc import mixer
+   |                    ^^^^^ F811
+ 9 | except:
+10 |     from dd import mixer
+   |
+
+F811_11.py:8:20: F811 Redefinition of unused `mixer` from line 6
+   |
+ 8 |     from cc import mixer
+ 9 | except:
+10 |     from dd import mixer
+   |                    ^^^^^ F811
+11 | mixer(123)
+   |
+
+

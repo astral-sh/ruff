@@ -1,0 +1,34 @@
+---
+source: crates/ruff/src/rules/pyflakes/mod.rs
+assertion_line: 131
+---
+F811_14.py:4:5: F811 Redefinition of unused `b` from line 2
+  |
+4 |     import b
+5 | except ImportError:
+6 |     b = Ellipsis
+  |     ^ F811
+7 |     from bb import a
+8 | else:
+  |
+
+F811_14.py:7:20: F811 Redefinition of unused `a` from line 5
+   |
+ 7 |     from bb import a
+ 8 | else:
+ 9 |     from aa import a
+   |                    ^ F811
+10 | finally:
+11 |     a = 42
+   |
+
+F811_14.py:9:5: F811 Redefinition of unused `a` from line 7
+   |
+ 9 |     from aa import a
+10 | finally:
+11 |     a = 42
+   |     ^ F811
+12 | print(a, b)
+   |
+
+
