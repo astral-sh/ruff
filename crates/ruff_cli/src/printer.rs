@@ -178,9 +178,10 @@ impl Printer {
             SerializationFormat::Junit => {
                 JunitEmitter::default().emit(writer, &diagnostics.messages, &context)?;
             }
-            SerializationFormat::Text => {
+            SerializationFormat::Text | SerializationFormat::EcosystemCi => {
                 TextEmitter::default()
                     .with_show_fix_status(show_fix_status(self.autofix_level))
+                    // Currently only has an effect for ecosystem-ci
                     .with_show_fix(self.flags.contains(Flags::SHOW_FIXES))
                     .with_show_source(self.flags.contains(Flags::SHOW_SOURCE))
                     .emit(writer, &diagnostics.messages, &context)?;
