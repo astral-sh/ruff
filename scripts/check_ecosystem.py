@@ -19,6 +19,7 @@ import time
 from asyncio.subprocess import PIPE, create_subprocess_exec
 from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
+from signal import SIGINT, SIGTERM
 from typing import TYPE_CHECKING, NamedTuple, Self
 
 if TYPE_CHECKING:
@@ -36,6 +37,8 @@ class Repository(NamedTuple):
     select: str = ""
     ignore: str = ""
     exclude: str = ""
+    # Generating fixes is slow and verbose
+    show_fixes: bool = False
 
     @asynccontextmanager
     async def clone(self: Self, checkout_dir: Path) -> AsyncIterator[Path]:
@@ -75,16 +78,28 @@ class Repository(NamedTuple):
         yield Path(checkout_dir)
 
 
+# We only check the fixes for the not-select-ALL cases
 REPOSITORIES = {
-    "airflow": Repository("apache", "airflow", "main", select="ALL"),
-    "bokeh": Repository("bokeh", "bokeh", "branch-3.2", select="ALL"),
-    "build": Repository("pypa", "build", "main"),
-    "cibuildwheel": Repository("pypa", "cibuildwheel", "main"),
-    "disnake": Repository("DisnakeDev", "disnake", "master"),
-    "scikit-build": Repository("scikit-build", "scikit-build", "main"),
-    "scikit-build-core": Repository("scikit-build", "scikit-build-core", "main"),
-    "typeshed": Repository("python", "typeshed", "main", select="PYI"),
-    "zulip": Repository("zulip", "zulip", "main", select="ALL"),
+    "airflow": Repository("apache", "airflow", "main", select="ALL", show_fixes=False),
+    "bokeh": Repository("bokeh", "bokeh", "branch-3.2", select="ALL", show_fixes=False),
+    "build": Repository("pypa", "build", "main", show_fixes=True),
+    "cibuildwheel": Repository("pypa", "cibuildwheel", "main", show_fixes=True),
+    "disnake": Repository("DisnakeDev", "disnake", "master", show_fixes=True),
+    "scikit-build": Repository("scikit-build", "scikit-build", "main", show_fixes=True),
+    "scikit-build-core": Repository(
+        "scikit-build",
+        "scikit-build-core",
+        "main",
+        show_fixes=True,
+    ),
+    "typeshed": Repository(
+        "python",
+        "typeshed",
+        "main",
+        select="PYI",
+        show_fixes=True,
+    ),
+    "zulip": Repository("zulip", "zulip", "main", select="ALL", show_fixes=False),
 }
 
 SUMMARY_LINE_RE = re.compile(r"^(Found \d+ error.*)|(.*potentially fixable with.*)$")
@@ -102,6 +117,7 @@ async def check(
     select: str = "",
     ignore: str = "",
     exclude: str = "",
+    show_fixes: bool = False,
 ) -> Sequence[str]:
     """Run the given ruff binary against the specified path."""
     logger.debug(f"Checking {name} with {ruff}")
@@ -112,6 +128,10 @@ async def check(
         ruff_args.extend(["--ignore", ignore])
     if exclude:
         ruff_args.extend(["--exclude", exclude])
+    if show_fixes:
+        ruff_args.extend(["--show-fixes", "--ecosystem-ci"])
+
+    print(path, ruff_args)
 
     start = time.time()
     proc = await create_subprocess_exec(
@@ -190,6 +210,7 @@ async def compare(
                             select=repo.select,
                             ignore=repo.ignore,
                             exclude=repo.exclude,
+                            show_fixes=repo.show_fixes,
                         ),
                     )
                     check2 = tg.create_task(
@@ -200,6 +221,7 @@ async def compare(
                             select=repo.select,
                             ignore=repo.ignore,
                             exclude=repo.exclude,
+                            show_fixes=repo.show_fixes,
                         ),
                     )
             except ExceptionGroup as e:
@@ -237,6 +259,9 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[str, Repository]:
                     repository["owner"]["login"],
                     repository["name"],
                     None,
+                    select=repository.get("select"),
+                    ignore=repository.get("ignore"),
+                    exclude=repository.get("exclude"),
                 )
         else:
             assert "owner" in data, "Unknown ruff-usage-aggregate format"
@@ -247,6 +272,9 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[str, Repository]:
                 data["owner"],
                 data["repo"],
                 data.get("ref"),
+                select=data.get("select"),
+                ignore=data.get("ignore"),
+                exclude=data.get("exclude"),
             )
     return repositories
 
@@ -414,7 +442,8 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.INFO)
 
-    asyncio.run(
+    loop = asyncio.get_event_loop()
+    main_task = asyncio.ensure_future(
         main(
             ruff1=args.ruff1,
             ruff2=args.ruff2,
@@ -422,3 +451,10 @@ if __name__ == "__main__":
             checkouts=args.checkouts,
         ),
     )
+    # https://stackoverflow.com/a/58840987/3549270
+    for signal in [SIGINT, SIGTERM]:
+        loop.add_signal_handler(signal, main_task.cancel)
+    try:
+        loop.run_until_complete(main_task)
+    finally:
+        loop.close()
