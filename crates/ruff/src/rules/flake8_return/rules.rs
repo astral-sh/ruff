@@ -24,9 +24,10 @@ use super::visitor::{ReturnVisitor, Stack};
 /// possible return value.
 ///
 /// ## Why is this bad?
-/// Python implicitly assumes return `None` if no other return value is present.
-/// Therefore, explicitly returning `None` is redundant and should be avoided
-/// when it is the only possible return value.
+/// Python implicitly assumes `return None` if an explicit `return` value is
+/// omitted. Therefore, explicitly returning `None` is redundant and should be
+/// avoided when it is the only possible `return` value across all code paths
+/// in a given function.
 ///
 /// ## Example
 /// ```python
@@ -60,12 +61,15 @@ impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
 }
 
 /// ## What it does
-/// Checks for the presence of a statement with no value when a non-`None` value
-/// is returned elsewhere in the function.
+/// Checks for the presence of a `return` statement with no explicit value,
+/// for functions that return non-`None` values elsewhere.
 ///
 /// ## Why is this bad?
-/// Defining a return statement with no value when other return statements exist
-/// within the function can cause confusion so a `None` value should be added.
+/// Including a `return` statement with no explicit value can cause confusion
+/// when other `return` statements in the function return non-`None` values.
+/// Python implicitly assumes return `None` if no other return value is present.
+/// Adding an explicit `return None` can make the code more readable by clarifying
+/// intent.
 ///
 /// ## Example
 /// ```python
@@ -97,13 +101,14 @@ impl AlwaysAutofixableViolation for ImplicitReturnValue {
 }
 
 /// ## What it does
-/// Checks for a missing explicit return at the end of a function that can
-/// return a non-`None` value.
+/// Checks for missing explicit `return` statements at the end of functions
+/// that can return non-`None` values.
 ///
 /// ## Why is this bad?
-/// The lack of an explicit return statement at the end of a function that can
-/// cause confusion so an explicit `return None` value should be added when
-/// other non-`None` return values are present.
+/// The lack of an explicit `return` statement at the end of a function that
+/// can return non-`None` values can cause confusion. Python implicitly returns
+/// `None` if no other return value is present. Adding an explicit
+/// `return None` can make the code more readable by clarifying intent.
 ///
 /// ## Example
 /// ```python
@@ -134,12 +139,12 @@ impl AlwaysAutofixableViolation for ImplicitReturn {
 }
 
 /// ## What it does
-/// Checks for a variable assignment that is not used between being defined and
-// being returned.
+/// Checks for variable assignments that are unused between the assignment and
+/// a `return` of the variable.
 ///
 /// ## Why is this bad?
-/// The variable assignment is not used so it should be removed and the value
-/// should be returned directly.
+/// The variable assignment is not necessary as the value can be returned
+/// directly.
 ///
 /// ## Example
 /// ```python
@@ -168,12 +173,13 @@ impl Violation for UnnecessaryAssign {
 }
 
 /// ## What it does
-/// Checks for else statements after a return statement.
+/// Checks for `else` statements with a `return` statement in the preceding
+/// `if` block.
 ///
 /// ## Why is this bad?
-/// The else statement is not needed because the return statement will always
-/// break out of the function. This check will reduce nesting and make the code
-/// more readable.
+/// The `else` statement is not needed as the `return` statement will always
+/// break out of the enclosing function. Removing the `else` will reduce
+/// nesting and make the code more readable.
 ///
 /// ## Example
 /// ```python
@@ -205,12 +211,13 @@ impl Violation for SuperfluousElseReturn {
 }
 
 /// ## What it does
-/// Checks for else statements after a raise statement.
+/// Checks for `else` statements with a `raise` statement in the preceding `if`
+/// block.
 ///
 /// ## Why is this bad?
-/// The else statement is not needed because the raise statement will always
-/// break out of the function. This check will reduce nesting and make the code
-/// more readable.
+/// The `else` statement is not needed as the `raise` statement will always
+/// break out of the current scope. Removing the `else` will reduce nesting
+/// and make the code more readable.
 ///
 /// ## Example
 /// ```python
@@ -242,12 +249,13 @@ impl Violation for SuperfluousElseRaise {
 }
 
 /// ## What it does
-/// Checks for else statements after a continue statement.
+/// Checks for `else` statements with a `continue` statement in the preceding
+/// `if` block.
 ///
 /// ## Why is this bad?
-/// The else statement is not needed because the return statement will always
-/// continue onto the next iteration of a loop. This check will reduce nesting
-/// and make the code more readable.
+/// The `else` statement is not needed, as the `continue` statement will always
+/// continue onto the next iteration of a loop. Removing the `else` will reduce
+/// nesting and make the code more readable.
 ///
 /// ## Example
 /// ```python
@@ -281,12 +289,13 @@ impl Violation for SuperfluousElseContinue {
 }
 
 /// ## What it does
-/// Checks for else statements after a break statement.
+/// Checks for `else` statements with a `break` statement in the preceding `if`
+/// block.
 ///
 /// ## Why is this bad?
-/// The else statement is not needed because the break statement will always
-/// break out of the loop. This check will reduce nesting and make the code more
-///  readable.
+/// The `else` statement is not needed, as the `break` statement will always
+/// break out of the loop. Removing the `else` will reduce nesting and make the
+/// code more readable.
 ///
 /// ## Example
 /// ```python
