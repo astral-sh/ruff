@@ -14,8 +14,9 @@ import json
 import logging
 import re
 import tempfile
+import time
 from asyncio.subprocess import PIPE, create_subprocess_exec
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, nullcontext
 from pathlib import Path
 from typing import TYPE_CHECKING, NamedTuple, Optional, Self
 
@@ -36,37 +37,41 @@ class Repository(NamedTuple):
     exclude: str = ""
 
     @asynccontextmanager
-    async def clone(self: Self) -> "AsyncIterator[Path]":
+    async def clone(self: Self, checkout_dir: Path) -> "AsyncIterator[Path]":
         """Shallow clone this repository to a temporary directory."""
-        with tempfile.TemporaryDirectory() as tmpdir:
-            logger.debug(f"Cloning {self.org}/{self.repo}")
-            git_command = [
-                "git",
-                "clone",
-                "--config",
-                "advice.detachedHead=false",
-                "--quiet",
-                "--depth",
-                "1",
-                "--no-tags",
-            ]
-            if self.ref:
-                git_command.extend(["--branch", self.ref])
+        if checkout_dir.exists():
+            logger.debug(f"Reusing {self.org}/{self.repo}")
+            yield Path(checkout_dir)
+            return
 
-            git_command.extend(
-                [
-                    f"https://github.com/{self.org}/{self.repo}",
-                    tmpdir,
-                ],
-            )
+        logger.debug(f"Cloning {self.org}/{self.repo}")
+        git_command = [
+            "git",
+            "clone",
+            "--config",
+            "advice.detachedHead=false",
+            "--quiet",
+            "--depth",
+            "1",
+            "--no-tags",
+        ]
+        if self.ref:
+            git_command.extend(["--branch", self.ref])
 
-            process = await create_subprocess_exec(*git_command)
+        git_command.extend(
+            [
+                f"https://github.com/{self.org}/{self.repo}",
+                checkout_dir,
+            ],
+        )
 
-            await process.wait()
+        process = await create_subprocess_exec(*git_command)
 
-            logger.debug(f"Finished cloning {self.org}/{self.repo}")
+        await process.wait()
 
-            yield Path(tmpdir)
+        logger.debug(f"Finished cloning {self.org}/{self.repo}")
+
+        yield Path(checkout_dir)
 
 
 REPOSITORIES = {
@@ -106,6 +111,8 @@ async def check(
         ruff_args.extend(["--ignore", ignore])
     if exclude:
         ruff_args.extend(["--exclude", exclude])
+
+    start = time.time()
     proc = await create_subprocess_exec(
         ruff.absolute(),
         *ruff_args,
@@ -114,10 +121,10 @@ async def check(
         stderr=PIPE,
         cwd=path,
     )
-
     result, err = await proc.communicate()
+    end = time.time()
 
-    logger.debug(f"Finished checking {name} with {ruff}")
+    logger.debug(f"Finished checking {name} with {ruff} in {end - start:.2f}")
 
     if proc.returncode != 0:
         raise RuffError(err.decode("utf8"))
@@ -150,41 +157,57 @@ class Diff(NamedTuple):
                 yield f"+ {line}"
 
 
-async def compare(ruff1: Path, ruff2: Path, repo: Repository) -> Diff | None:
+async def compare(
+    ruff1: Path,
+    ruff2: Path,
+    repo: Repository,
+    checkouts: Optional[Path] = None,
+) -> Diff | None:
     """Check a specific repository against two versions of ruff."""
     removed, added = set(), set()
 
-    async with repo.clone() as path:
-        try:
-            async with asyncio.TaskGroup() as tg:
-                check1 = tg.create_task(
-                    check(
-                        ruff=ruff1,
-                        path=path,
-                        name=f"{repo.org}/{repo.repo}",
-                        select=repo.select,
-                        ignore=repo.ignore,
-                        exclude=repo.exclude,
-                    ),
-                )
-                check2 = tg.create_task(
-                    check(
-                        ruff=ruff2,
-                        path=path,
-                        name=f"{repo.org}/{repo.repo}",
-                        select=repo.select,
-                        ignore=repo.ignore,
-                        exclude=repo.exclude,
-                    ),
-                )
-        except ExceptionGroup as e:
-            raise e.exceptions[0] from e
+    # Allows to keep the checkouts locations
+    if checkouts:
+        checkout_dir = checkouts.joinpath(repo.org).joinpath(repo.repo)
+        # Don't create the repodir itself, we need that for checking for existing
+        # clones
+        checkout_dir.parent.mkdir(exist_ok=True, parents=True)
+        location_context = nullcontext(checkout_dir)
+    else:
+        location_context = tempfile.TemporaryDirectory()
 
-        for line in difflib.ndiff(check1.result(), check2.result()):
-            if line.startswith("- "):
-                removed.add(line[2:])
-            elif line.startswith("+ "):
-                added.add(line[2:])
+    with location_context as checkout_dir:
+        async with repo.clone(checkout_dir) as path:
+            try:
+                async with asyncio.TaskGroup() as tg:
+                    check1 = tg.create_task(
+                        check(
+                            ruff=ruff1,
+                            path=path,
+                            name=f"{repo.org}/{repo.repo}",
+                            select=repo.select,
+                            ignore=repo.ignore,
+                            exclude=repo.exclude,
+                        ),
+                    )
+                    check2 = tg.create_task(
+                        check(
+                            ruff=ruff2,
+                            path=path,
+                            name=f"{repo.org}/{repo.repo}",
+                            select=repo.select,
+                            ignore=repo.ignore,
+                            exclude=repo.exclude,
+                        ),
+                    )
+            except ExceptionGroup as e:
+                raise e.exceptions[0] from e
+
+            for line in difflib.ndiff(check1.result(), check2.result()):
+                if line.startswith("- "):
+                    removed.add(line[2:])
+                elif line.startswith("+ "):
+                    added.add(line[2:])
 
     return Diff(removed, added)
 
@@ -226,7 +249,13 @@ def read_projects_jsonl(projects_jsonl: Path) -> dict[str, Repository]:
     return repositories
 
 
-async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> None:
+async def main(
+    *,
+    ruff1: Path,
+    ruff2: Path,
+    projects_jsonl: Optional[Path],
+    checkouts: Optional[Path] = None,
+) -> None:
     """Check two versions of ruff against a corpus of open-source code."""
     if projects_jsonl:
         repositories = read_projects_jsonl(projects_jsonl)
@@ -236,7 +265,7 @@ async def main(*, ruff1: Path, ruff2: Path, projects_jsonl: Optional[Path]) -> N
     logger.debug(f"Checking {len(repositories)} projects")
 
     results = await asyncio.gather(
-        *[compare(ruff1, ruff2, repo) for repo in repositories.values()],
+        *[compare(ruff1, ruff2, repo, checkouts) for repo in repositories.values()],
         return_exceptions=True,
     )
 
@@ -315,6 +344,14 @@ if __name__ == "__main__":
         ),
     )
     parser.add_argument(
+        "--checkouts",
+        type=Path,
+        help=(
+            "Location for the git checkouts, in case you want to save them"
+            " (defaults to temporary directory)"
+        ),
+    )
+    parser.add_argument(
         "-v",
         "--verbose",
         action="store_true",
@@ -336,4 +373,11 @@ if __name__ == "__main__":
     else:
         logging.basicConfig(level=logging.INFO)
 
-    asyncio.run(main(ruff1=args.ruff1, ruff2=args.ruff2, projects_jsonl=args.projects))
+    asyncio.run(
+        main(
+            ruff1=args.ruff1,
+            ruff2=args.ruff2,
+            projects_jsonl=args.projects,
+            checkouts=args.checkouts,
+        ),
+    )
