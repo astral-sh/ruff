@@ -2281,8 +2281,7 @@ where
         match &expr.node {
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) Optional[...], Union[...]
-                if self.ctx.in_type_definition
-                    && !self.settings.pyupgrade.keep_runtime_typing
+                if !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(Rule::NonPEP604Annotation)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
