@@ -1,0 +1,198 @@
+---
+source: crates/ruff/src/rules/pylint/mod.rs
+---
+nested_min_max.py:2:1: PLW3301 [*] Nested min() call
+  |
+2 | min(1, 2, 3)
+3 | min(1, min(2, 3))
+  | ^^^^^^^^^^^^^^^^^ PLW3301
+4 | min(1, min(2, min(3, 4)))
+5 | min(1, foo("a", "b"), min(3, 4))
+  |
+  = help: Flatten nested min() calls
+
+ℹ Suggested fix
+1 1 | min(1, 2, 3)
+2   |-min(1, min(2, 3))
+  2 |+min(1, 2, 3)
+3 3 | min(1, min(2, min(3, 4)))
+4 4 | min(1, foo("a", "b"), min(3, 4))
+5 5 | min(1, max(2, 3))
+
+nested_min_max.py:3:1: PLW3301 [*] Nested min() call
+  |
+3 | min(1, 2, 3)
+4 | min(1, min(2, 3))
+5 | min(1, min(2, min(3, 4)))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
+6 | min(1, foo("a", "b"), min(3, 4))
+7 | min(1, max(2, 3))
+  |
+  = help: Flatten nested min() calls
+
+ℹ Suggested fix
+1 1 | min(1, 2, 3)
+2 2 | min(1, min(2, 3))
+3   |-min(1, min(2, min(3, 4)))
+  3 |+min(1, 2, 3, 4)
+4 4 | min(1, foo("a", "b"), min(3, 4))
+5 5 | min(1, max(2, 3))
+6 6 | max(1, 2, 3)
+
+nested_min_max.py:3:8: PLW3301 [*] Nested min() call
+  |
+3 | min(1, 2, 3)
+4 | min(1, min(2, 3))
+5 | min(1, min(2, min(3, 4)))
+  |        ^^^^^^^^^^^^^^^^^ PLW3301
+6 | min(1, foo("a", "b"), min(3, 4))
+7 | min(1, max(2, 3))
+  |
+  = help: Flatten nested min() calls
+
+ℹ Suggested fix
+1 1 | min(1, 2, 3)
+2 2 | min(1, min(2, 3))
+3   |-min(1, min(2, min(3, 4)))
+  3 |+min(1, min(2, 3, 4))
+4 4 | min(1, foo("a", "b"), min(3, 4))
+5 5 | min(1, max(2, 3))
+6 6 | max(1, 2, 3)
+
+nested_min_max.py:4:1: PLW3301 [*] Nested min() call
+  |
+4 | min(1, min(2, 3))
+5 | min(1, min(2, min(3, 4)))
+6 | min(1, foo("a", "b"), min(3, 4))
+  | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
+7 | min(1, max(2, 3))
+8 | max(1, 2, 3)
+  |
+  = help: Flatten nested min() calls
+
+ℹ Suggested fix
+1 1 | min(1, 2, 3)
+2 2 | min(1, min(2, 3))
+3 3 | min(1, min(2, min(3, 4)))
+4   |-min(1, foo("a", "b"), min(3, 4))
+  4 |+min(1, foo("a", "b"), 3, 4)
+5 5 | min(1, max(2, 3))
+6 6 | max(1, 2, 3)
+7 7 | max(1, max(2, 3))
+
+nested_min_max.py:7:1: PLW3301 [*] Nested max() call
+   |
+ 7 | min(1, max(2, 3))
+ 8 | max(1, 2, 3)
+ 9 | max(1, max(2, 3))
+   | ^^^^^^^^^^^^^^^^^ PLW3301
+10 | max(1, max(2, max(3, 4)))
+11 | max(1, foo("a", "b"), max(3, 4))
+   |
+   = help: Flatten nested max() calls
+
+ℹ Suggested fix
+4 4 | min(1, foo("a", "b"), min(3, 4))
+5 5 | min(1, max(2, 3))
+6 6 | max(1, 2, 3)
+7   |-max(1, max(2, 3))
+  7 |+max(1, 2, 3)
+8 8 | max(1, max(2, max(3, 4)))
+9 9 | max(1, foo("a", "b"), max(3, 4))
+10 10 | 
+
+nested_min_max.py:8:1: PLW3301 [*] Nested max() call
+   |
+ 8 | max(1, 2, 3)
+ 9 | max(1, max(2, 3))
+10 | max(1, max(2, max(3, 4)))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
+11 | max(1, foo("a", "b"), max(3, 4))
+   |
+   = help: Flatten nested max() calls
+
+ℹ Suggested fix
+5 5 | min(1, max(2, 3))
+6 6 | max(1, 2, 3)
+7 7 | max(1, max(2, 3))
+8   |-max(1, max(2, max(3, 4)))
+  8 |+max(1, 2, 3, 4)
+9 9 | max(1, foo("a", "b"), max(3, 4))
+10 10 | 
+11 11 | # keyword args need to be passed through
+
+nested_min_max.py:8:8: PLW3301 [*] Nested max() call
+   |
+ 8 | max(1, 2, 3)
+ 9 | max(1, max(2, 3))
+10 | max(1, max(2, max(3, 4)))
+   |        ^^^^^^^^^^^^^^^^^ PLW3301
+11 | max(1, foo("a", "b"), max(3, 4))
+   |
+   = help: Flatten nested max() calls
+
+ℹ Suggested fix
+5 5 | min(1, max(2, 3))
+6 6 | max(1, 2, 3)
+7 7 | max(1, max(2, 3))
+8   |-max(1, max(2, max(3, 4)))
+  8 |+max(1, max(2, 3, 4))
+9 9 | max(1, foo("a", "b"), max(3, 4))
+10 10 | 
+11 11 | # keyword args need to be passed through
+
+nested_min_max.py:9:1: PLW3301 [*] Nested max() call
+   |
+ 9 | max(1, max(2, 3))
+10 | max(1, max(2, max(3, 4)))
+11 | max(1, foo("a", "b"), max(3, 4))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
+12 | 
+13 | # keyword args need to be passed through
+   |
+   = help: Flatten nested max() calls
+
+ℹ Suggested fix
+6  6  | max(1, 2, 3)
+7  7  | max(1, max(2, 3))
+8  8  | max(1, max(2, max(3, 4)))
+9     |-max(1, foo("a", "b"), max(3, 4))
+   9  |+max(1, foo("a", "b"), 3, 4)
+10 10 | 
+11 11 | # keyword args need to be passed through
+12 12 | min(1, min(2, 3), key=test)
+
+nested_min_max.py:12:1: PLW3301 [*] Nested min() call
+   |
+12 | # keyword args need to be passed through
+13 | min(1, min(2, 3), key=test)
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
+14 | min(1, min(2, 3, key=test))
+   |
+   = help: Flatten nested min() calls
+
+ℹ Suggested fix
+9  9  | max(1, foo("a", "b"), max(3, 4))
+10 10 | 
+11 11 | # keyword args need to be passed through
+12    |-min(1, min(2, 3), key=test)
+   12 |+min(1, 2, 3, key=test)
+13 13 | min(1, min(2, 3, key=test))
+
+nested_min_max.py:13:1: PLW3301 [*] Nested min() call
+   |
+13 | # keyword args need to be passed through
+14 | min(1, min(2, 3), key=test)
+15 | min(1, min(2, 3, key=test))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
+   |
+   = help: Flatten nested min() calls
+
+ℹ Suggested fix
+10 10 | 
+11 11 | # keyword args need to be passed through
+12 12 | min(1, min(2, 3), key=test)
+13    |-min(1, min(2, 3, key=test))
+   13 |+min(1, 2, 3)
+
+
