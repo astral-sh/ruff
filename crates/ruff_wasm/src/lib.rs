@@ -215,12 +215,12 @@ pub fn check(contents: &str, options: JsValue) -> Result<JsValue, JsValue> {
                 message: message.kind.body,
                 location: start_location,
                 end_location,
-                fix: if message.fix.is_empty() {
+                fix: if message.fix.is_none() {
                     None
                 } else {
                     Some(ExpandedFix {
                         message: message.kind.suggestion,
-                        edits: message.fix.into_edits(),
+                        edits: message.fix.unwrap().into_edits(),
                     })
                 },
             }

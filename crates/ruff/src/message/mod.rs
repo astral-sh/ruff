@@ -33,7 +33,7 @@ use ruff_python_ast::source_code::{SourceFile, SourceLocation};
 pub struct Message {
     pub kind: DiagnosticKind,
     pub range: TextRange,
-    pub fix: Fix,
+    pub fix: Option<Fix>,
     pub file: SourceFile,
     pub noqa_offset: TextSize,
 }

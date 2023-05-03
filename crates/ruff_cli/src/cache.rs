@@ -233,7 +233,7 @@ pub fn get(
                 messages.push(Message {
                     kind: header.kind,
                     range: header.range,
-                    fix: header.fix,
+                    fix: Some(header.fix),
                     file: source_file.clone(),
                     noqa_offset: header.noqa_row,
                 });

@@ -16,7 +16,7 @@ pub mod actions;
 pub fn fix_file(diagnostics: &[Diagnostic], locator: &Locator) -> Option<(String, FixTable)> {
     let mut with_fixes = diagnostics
         .iter()
-        .filter(|diag| !diag.fix.is_empty())
+        .filter(|diag| diag.fix.is_some())
         .peekable();
 
     if with_fixes.peek().is_none() {
@@ -38,10 +38,10 @@ fn apply_fixes<'a>(
 
     for (rule, fix) in diagnostics
         .filter_map(|diagnostic| {
-            if diagnostic.fix.is_empty() {
+            if diagnostic.fix.is_none() {
                 None
             } else {
-                Some((diagnostic.kind.rule(), &diagnostic.fix))
+                Some((diagnostic.kind.rule(), diagnostic.fix.as_ref().unwrap()))
             }
         })
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
@@ -114,7 +114,7 @@ mod tests {
                 // The choice of rule here is arbitrary.
                 kind: MissingNewlineAtEndOfFile.into(),
                 range: edit.range(),
-                fix: edit.into(),
+                fix: Some(edit.into()),
                 parent: None,
             })
             .collect()
