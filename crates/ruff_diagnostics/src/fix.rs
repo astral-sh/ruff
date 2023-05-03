@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::edit::Edit;
 
 /// A collection of [`Edit`] elements to be applied to a source file.
-#[derive(Default, Debug, PartialEq, Eq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Fix {
     edits: Vec<Edit>,
