@@ -55,7 +55,7 @@ impl AlwaysAutofixableViolation for NestedMinMax {
     }
 }
 
-/// Collect a new set of arguments to target_func by either accepting existing args as-is or
+/// Collect a new set of arguments to `target_func` by either accepting existing args as-is or
 /// collecting child arguments if it is a call to the same function.
 fn collect_nested_args(target_func: NestedMinMaxFunc, args: &[Expr], new_args: &mut Vec<Expr>) {
     for arg in args {
@@ -97,7 +97,7 @@ pub fn nested_min_max(
                 },
             );
             diagnostic.set_fix(Edit::range_replacement(
-                unparse_expr(&flattened_expr, &checker.stylist),
+                unparse_expr(&flattened_expr, checker.stylist),
                 expr.range(),
             ));
         }
