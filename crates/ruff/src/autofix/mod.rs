@@ -62,7 +62,7 @@ fn apply_fixes<'a>(
             continue;
         }
 
-        for edit in fix.edits() {
+        for edit in fix.edits().iter().sorted_unstable_by_key(|e| e.start()) {
             // Add all contents from `last_pos` to `fix.location`.
             let slice = locator.slice(TextRange::new(last_pos.unwrap_or_default(), edit.start()));
             output.push_str(slice);
