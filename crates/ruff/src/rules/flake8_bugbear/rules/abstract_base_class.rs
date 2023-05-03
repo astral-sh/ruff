@@ -1,4 +1,4 @@
-use anyhow::{anyhow, Result};
+use anyhow::Result;
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Located, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
@@ -76,8 +76,7 @@ fn is_empty_body(body: &[Stmt]) -> bool {
 }
 
 fn fix_abstractmethod_missing(checker: &Checker, stmt: &Located<StmtKind>) -> Result<Fix> {
-    let indent =
-        indentation(checker.locator, stmt).ok_or(anyhow!("Unable to detect indentation"))?;
+    let indent = indentation(checker.locator, stmt).unwrap_or_default();
     let (import_edit, binding) = get_or_import_symbol(
         "abc",
         "abstractmethod",
