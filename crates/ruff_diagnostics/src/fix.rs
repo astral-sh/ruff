@@ -17,6 +17,11 @@ impl Fix {
         Self { edits }
     }
 
+    /// Create a new [`Fix`] with unspecified applicability from multiple [`Edit`] elements.
+    pub fn unspecified_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+        Self::unspecified(std::iter::once(edit).chain(rest.into_iter()).collect())
+    }
+
     /// Create an empty [`Fix`].
     pub const fn empty() -> Self {
         Self { edits: Vec::new() }
