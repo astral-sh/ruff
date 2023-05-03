@@ -1,10 +1,11 @@
 use crate::checkers::logical_lines::LogicalLinesContext;
-use ruff_diagnostics::Violation;
+use itertools::PeekingNext;
+use ruff_diagnostics::{DiagnosticKind, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
 use ruff_text_size::{TextRange, TextSize};
 
-use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
+use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineToken};
 
 // E225
 #[violation]
@@ -56,24 +57,24 @@ pub(crate) fn missing_whitespace_around_operator(
     line: &LogicalLine,
     context: &mut LogicalLinesContext,
 ) {
-    #[derive(Copy, Clone, Eq, PartialEq)]
+    #[derive(Copy, Clone, Eq, PartialEq, Debug)]
     enum NeedsSpace {
+        /// Needs a leading and trailing space
         Yes,
+        /// Doesn't need a leading or trailing space
         No,
-        Unset,
+        /// Needs a trailing space if it has a leading space.
+        Optional,
     }
 
-    let mut needs_space_main = NeedsSpace::No;
-    let mut needs_space_aux = NeedsSpace::Unset;
-    let mut prev_end_aux = TextSize::default();
     let mut parens = 0u32;
-    let mut prev_type: TokenKind = TokenKind::EndOfFile;
-    let mut prev_end = TextSize::default();
+    let mut prev_token: Option<&LogicalLineToken> = None;
+    let mut tokens = line.tokens().iter().peekable();
 
-    for token in line.tokens() {
+    while let Some(token) = tokens.next() {
         let kind = token.kind();
 
-        if kind.is_skip_comment() {
+        if kind.is_trivia() {
             continue;
         }
 
@@ -83,104 +84,123 @@ pub(crate) fn missing_whitespace_around_operator(
             _ => {}
         };
 
-        let needs_space = needs_space_main == NeedsSpace::Yes
-            || needs_space_aux != NeedsSpace::Unset
-            || prev_end_aux != TextSize::new(0);
-        if needs_space {
-            if token.start() > prev_end {
-                if needs_space_main != NeedsSpace::Yes && needs_space_aux != NeedsSpace::Yes {
-                    context.push(
-                        MissingWhitespaceAroundOperator,
-                        TextRange::empty(prev_end_aux),
-                    );
-                }
-                needs_space_main = NeedsSpace::No;
-                needs_space_aux = NeedsSpace::Unset;
-                prev_end_aux = TextSize::new(0);
-            } else if kind == TokenKind::Greater
-                && matches!(prev_type, TokenKind::Less | TokenKind::Minus)
-            {
-                // Tolerate the "<>" operator, even if running Python 3
-                // Deal with Python 3's annotated return value "->"
-            } else if prev_type == TokenKind::Slash
-                && matches!(kind, TokenKind::Comma | TokenKind::Rpar | TokenKind::Colon)
-                || (prev_type == TokenKind::Rpar && kind == TokenKind::Colon)
-            {
-                // Tolerate the "/" operator in function definition
-                // For more info see PEP570
-            } else {
-                if needs_space_main == NeedsSpace::Yes || needs_space_aux == NeedsSpace::Yes {
-                    context.push(MissingWhitespaceAroundOperator, TextRange::empty(prev_end));
-                } else if prev_type != TokenKind::DoubleStar {
-                    if prev_type == TokenKind::Percent {
-                        context.push(
-                            MissingWhitespaceAroundModuloOperator,
-                            TextRange::empty(prev_end_aux),
-                        );
-                    } else if !prev_type.is_arithmetic() {
-                        context.push(
-                            MissingWhitespaceAroundBitwiseOrShiftOperator,
-                            TextRange::empty(prev_end_aux),
-                        );
-                    } else {
-                        context.push(
-                            MissingWhitespaceAroundArithmeticOperator,
-                            TextRange::empty(prev_end_aux),
-                        );
-                    }
-                }
-                needs_space_main = NeedsSpace::No;
-                needs_space_aux = NeedsSpace::Unset;
-                prev_end_aux = TextSize::new(0);
-            }
-        } else if (kind.is_operator() || matches!(kind, TokenKind::Name))
-            && prev_end != TextSize::default()
-        {
-            if kind == TokenKind::Equal && parens > 0 {
-                // Allow keyword args or defaults: foo(bar=None).
-            } else if kind.is_whitespace_needed() {
-                needs_space_main = NeedsSpace::Yes;
-                needs_space_aux = NeedsSpace::Unset;
-                prev_end_aux = TextSize::new(0);
-            } else if kind.is_unary() {
+        let needs_space = if kind == TokenKind::Equal && parens > 0 {
+            // Allow keyword args or defaults: foo(bar=None).
+            NeedsSpace::No
+        } else if kind.is_whitespace_needed() {
+            NeedsSpace::Yes
+        } else if kind.is_unary() {
+            prev_token.map_or(NeedsSpace::No, |prev_token| {
+                let prev_kind = dbg!(prev_token.kind());
+
                 // Check if the operator is used as a binary operator
                 // Allow unary operators: -123, -x, +1.
                 // Allow argument unpacking: foo(*args, **kwargs)
-                if (matches!(
-                    prev_type,
+                if matches!(
+                    prev_kind,
                     TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
-                )) || (!prev_type.is_operator()
-                    && !prev_type.is_keyword()
-                    && !prev_type.is_soft_keyword())
+                ) || !(prev_kind.is_operator()
+                    || prev_kind.is_keyword()
+                    || prev_kind.is_soft_keyword())
                 {
-                    needs_space_main = NeedsSpace::Unset;
-                    needs_space_aux = NeedsSpace::Unset;
-                    prev_end_aux = TextSize::new(0);
+                    NeedsSpace::Optional
+                } else {
+                    NeedsSpace::No
                 }
-            } else if kind.is_whitespace_optional() {
-                needs_space_main = NeedsSpace::Unset;
-                needs_space_aux = NeedsSpace::Unset;
-                prev_end_aux = TextSize::new(0);
+            })
+        } else if kind.is_whitespace_optional() {
+            NeedsSpace::Optional
+        } else {
+            NeedsSpace::No
+        };
+
+        dbg!(needs_space, kind);
+
+        match needs_space {
+            NeedsSpace::Yes => {
+                // Assert leading whitespace
+                if prev_token.map_or(false, |prev| prev.end() == token.start()) {
+                    // A needed opening space was not found
+                    context.push(
+                        diagnostic_kind_for_operator(kind),
+                        TextRange::empty(token.start()),
+                    );
+                }
+                // Assert trailing whitespace
+                else if let Some(next_token) = tokens.peek() {
+                    let next_kind = next_token.kind();
+
+                    // Tolerate the "<>" operator, even if running Python 3
+                    // Deal with Python 3's annotated return value "->"
+                    let not_equal_or_arrow = next_kind == TokenKind::Greater
+                        && matches!(kind, TokenKind::Less | TokenKind::Minus);
+
+                    // Tolerate the "/" operator in function definition
+                    // For more info see PEP570
+                    let is_slash_in_function_definition = matches!(
+                        (kind, next_kind),
+                        (
+                            TokenKind::Slash,
+                            TokenKind::Comma | TokenKind::Rpar | TokenKind::Colon
+                        ) | (TokenKind::Rpar, TokenKind::Colon)
+                    );
+
+                    let has_trailing_trivia =
+                        next_token.start() > token.end() || next_kind.is_trivia();
+
+                    if !has_trailing_trivia
+                        && !not_equal_or_arrow
+                        && !is_slash_in_function_definition
+                    {
+                        context.push(
+                            diagnostic_kind_for_operator(kind),
+                            TextRange::empty(token.end()),
+                        );
+                    }
+                }
             }
 
-            if needs_space_main == NeedsSpace::Unset {
+            NeedsSpace::Optional => {
                 // Surrounding space is optional, but ensure that
-                // trailing space matches opening space
-                prev_end_aux = prev_end;
-                needs_space_aux = if token.start() == prev_end {
-                    NeedsSpace::No
-                } else {
-                    NeedsSpace::Yes
-                };
-            } else if needs_space_main == NeedsSpace::Yes && token.start() == prev_end_aux {
-                // A needed opening space was not found
-                context.push(MissingWhitespaceAroundOperator, TextRange::empty(prev_end));
-                needs_space_main = NeedsSpace::No;
-                needs_space_aux = NeedsSpace::Unset;
-                prev_end_aux = TextSize::new(0);
+                // leading & trailing space matches opening space
+                let has_leading = prev_token.map_or(false, |prev| prev.end() < token.start());
+                let has_trailing = tokens.peek().map_or(false, |next| {
+                    token.end() < next.start() || next.kind().is_trivia()
+                });
+
+                // TODO why does this use MissingWhitespaceAroundOperator...always
+                match (has_leading, has_trailing) {
+                    (true, false) => {
+                        context.push(
+                            MissingWhitespaceAroundOperator,
+                            TextRange::empty(token.end()),
+                        );
+                    }
+                    (false, true) => {
+                        context.push(
+                            MissingWhitespaceAroundOperator,
+                            TextRange::empty(token.start()),
+                        );
+                    }
+                    (false, false) | (true, true) => {}
+                }
             }
-        }
-        prev_type = kind;
-        prev_end = token.end();
+
+            NeedsSpace::No => {}
+        };
+
+        prev_token = Some(token);
+    }
+}
+
+fn diagnostic_kind_for_operator(operator: TokenKind) -> DiagnosticKind {
+    if operator == TokenKind::Percent {
+        DiagnosticKind::from(MissingWhitespaceAroundModuloOperator)
+    } else if operator.is_bitwise_or_shift() {
+        DiagnosticKind::from(MissingWhitespaceAroundBitwiseOrShiftOperator)
+    } else if operator.is_arithmetic() {
+        DiagnosticKind::from(MissingWhitespaceAroundArithmeticOperator)
+    } else {
+        DiagnosticKind::from(MissingWhitespaceAroundOperator)
     }
 }

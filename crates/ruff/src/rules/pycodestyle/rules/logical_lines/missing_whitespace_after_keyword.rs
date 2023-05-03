@@ -22,7 +22,10 @@ pub(crate) fn missing_whitespace_after_keyword(
     line: &LogicalLine,
     context: &mut LogicalLinesContext,
 ) {
-    for (tok0, tok1) in line.tokens().iter().tuple_windows() {
+    for window in line.tokens().windows(2) {
+        let tok0 = &window[0];
+        let tok1 = &window[1];
+
         let tok0_kind = tok0.kind();
         let tok1_kind = tok1.kind();
 

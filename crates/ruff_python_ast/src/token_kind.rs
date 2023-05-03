@@ -195,6 +195,7 @@ impl TokenKind {
                 | TokenKind::In
                 | TokenKind::Is
                 | TokenKind::Rarrow
+                | TokenKind::Percent
         )
     }
 
@@ -207,7 +208,6 @@ impl TokenKind {
                     | TokenKind::Amper
                     | TokenKind::Vbar
                     | TokenKind::LeftShift
-                    | TokenKind::RightShift
                     | TokenKind::Percent
             )
     }
@@ -216,11 +216,7 @@ impl TokenKind {
     pub const fn is_unary(&self) -> bool {
         matches!(
             self,
-            TokenKind::Plus
-                | TokenKind::Minus
-                | TokenKind::Star
-                | TokenKind::DoubleStar
-                | TokenKind::RightShift
+            TokenKind::Plus | TokenKind::Minus | TokenKind::Star | TokenKind::DoubleStar
         )
     }
 
@@ -324,7 +320,7 @@ impl TokenKind {
     }
 
     #[inline]
-    pub const fn is_skip_comment(&self) -> bool {
+    pub const fn is_trivia(&self) -> bool {
         matches!(
             self,
             TokenKind::Newline
@@ -345,6 +341,24 @@ impl TokenKind {
                 | TokenKind::Minus
                 | TokenKind::Slash
                 | TokenKind::At
+        )
+    }
+
+    #[inline]
+    pub const fn is_bitwise_or_shift(&self) -> bool {
+        matches!(
+            self,
+            TokenKind::LeftShift
+                | TokenKind::LeftShiftEqual
+                | TokenKind::RightShift
+                | TokenKind::RightShiftEqual
+                | TokenKind::Amper
+                | TokenKind::AmperEqual
+                | TokenKind::Vbar
+                | TokenKind::VbarEqual
+                | TokenKind::CircumFlex
+                | TokenKind::CircumflexEqual
+                | TokenKind::Tilde
         )
     }
 
