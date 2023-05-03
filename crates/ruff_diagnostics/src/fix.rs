@@ -24,16 +24,6 @@ impl Fix {
         }
     }
 
-    /// Create an empty [`Fix`].
-    pub const fn empty() -> Self {
-        Self { edits: Vec::new() }
-    }
-
-    /// Return `true` if the [`Fix`] contains no [`Edit`] elements.
-    pub fn is_empty(&self) -> bool {
-        self.edits.is_empty()
-    }
-
     /// Return the [`TextSize`] of the first [`Edit`] in the [`Fix`].
     pub fn min_start(&self) -> Option<TextSize> {
         self.edits.iter().map(Edit::start).min()
