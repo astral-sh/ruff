@@ -27,7 +27,7 @@ impl<'a> Diff<'a> {
         } else {
             Some(Diff {
                 source_code: &message.file,
-                fix: &message.fix.as_ref().unwrap(),
+                fix: message.fix.as_ref().unwrap(),
             })
         }
     }
