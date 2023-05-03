@@ -453,24 +453,7 @@ pub fn lint_fix<'a>(
             // longer parseable on a subsequent pass, then we've introduced a
             // syntax error. Return the original code.
             if parseable && result.error.is_some() {
-                #[allow(clippy::print_stderr)]
-                {
-                    eprintln!(
-                        r#"
-{}: Autofix introduced a syntax error. Reverting all changes.
-
-This indicates a bug in `{}`. If you could open an issue at:
-
-    {}/issues/new?title=%5BAutofix%20error%5D
-
-...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
-"#,
-                        "error".red().bold(),
-                        CARGO_PKG_NAME,
-                        CARGO_PKG_REPOSITORY,
-                        fs::relativize_path(path),
-                    );
-                }
+                report_autofix_syntax_error(path, &transformed, &result.error.unwrap());
                 return Err(anyhow!("Autofix introduced a syntax error"));
             }
         }
@@ -493,25 +476,7 @@ This indicates a bug in `{}`. If you could open an issue at:
                 continue;
             }
 
-            #[allow(clippy::print_stderr)]
-            {
-                eprintln!(
-                    r#"
-{}: Failed to converge after {} iterations.
-
-This indicates a bug in `{}`. If you could open an issue at:
-
-    {}/issues/new?title=%5BInfinite%20loop%5D
-
-...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
-"#,
-                    "error".red().bold(),
-                    MAX_ITERATIONS,
-                    CARGO_PKG_NAME,
-                    CARGO_PKG_REPOSITORY,
-                    fs::relativize_path(path),
-                );
-            }
+            report_failed_to_converge_error(path, &transformed);
         }
 
         return Ok(FixerResult {
@@ -524,5 +489,64 @@ This indicates a bug in `{}`. If you could open an issue at:
             transformed,
             fixed,
         });
+    }
+}
+
+#[allow(clippy::print_stderr)]
+fn report_failed_to_converge_error(path: &Path, transformed: &str) {
+    if cfg!(debug_assertions) {
+        eprintln!(
+            "{}: Failed to converge after {} iterations in `{}`:---\n{}\n---",
+            "debug error".red().bold(),
+            MAX_ITERATIONS,
+            fs::relativize_path(path),
+            transformed,
+        );
+    } else {
+        eprintln!(
+            r#"
+{}: Failed to converge after {} iterations.
+
+This indicates a bug in `{}`. If you could open an issue at:
+
+    {}/issues/new?title=%5BInfinite%20loop%5D
+
+...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+"#,
+            "error".red().bold(),
+            MAX_ITERATIONS,
+            CARGO_PKG_NAME,
+            CARGO_PKG_REPOSITORY,
+            fs::relativize_path(path),
+        );
+    }
+}
+
+#[allow(clippy::print_stderr)]
+fn report_autofix_syntax_error(path: &Path, transformed: &str, error: &ParseError) {
+    if cfg!(debug_assertions) {
+        eprintln!(
+            "{}: Autofix introduced a syntax error in `{}`: {}\n---\n{}\n---",
+            "debug error".red().bold(),
+            fs::relativize_path(path),
+            error,
+            transformed,
+        );
+    } else {
+        eprintln!(
+            r#"
+{}: Autofix introduced a syntax error. Reverting all changes.
+
+This indicates a bug in `{}`. If you could open an issue at:
+
+    {}/issues/new?title=%5BAutofix%20error%5D
+
+...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+"#,
+            "error".red().bold(),
+            CARGO_PKG_NAME,
+            CARGO_PKG_REPOSITORY,
+            fs::relativize_path(path),
+        );
     }
 }
