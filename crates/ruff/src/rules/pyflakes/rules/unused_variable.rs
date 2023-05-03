@@ -322,7 +322,9 @@ pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
         .map(|(name, index)| (name, &checker.ctx.bindings[*index]))
     {
         if !binding.used()
-            && (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())
+            && (binding.kind.is_assignment()
+                || binding.kind.is_named_expr_assignment()
+                || binding.kind.is_match_case_assignment() && !matches!(name, &"other"))
             && !checker.settings.dummy_variable_rgx.is_match(name)
             && name != &"__tracebackhide__"
             && name != &"__traceback_info__"

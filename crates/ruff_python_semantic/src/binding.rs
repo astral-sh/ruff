@@ -254,6 +254,7 @@ pub enum BindingKind<'a> {
     Argument,
     Assignment,
     NamedExprAssignment,
+    MatchCaseAssignment,
     Binding,
     LoopVar,
     Global,

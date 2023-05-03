@@ -4134,7 +4134,7 @@ where
             self.add_binding(
                 name,
                 Binding {
-                    kind: BindingKind::Assignment,
+                    kind: BindingKind::MatchCaseAssignment,
                     runtime_usage: None,
                     synthetic_usage: None,
                     typing_usage: None,
