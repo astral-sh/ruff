@@ -94,7 +94,7 @@ fn fix_abstractmethod_missing(
         ),
         stmt.range().start(),
     );
-    Ok(Fix::from_iter([import_edit, reference_edit]))
+    Ok(Fix::unspecified_edits(import_edit, [reference_edit]))
 }
 
 /// B024

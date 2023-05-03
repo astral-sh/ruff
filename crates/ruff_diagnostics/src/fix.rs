@@ -39,14 +39,6 @@ impl Fix {
     }
 }
 
-impl FromIterator<Edit> for Fix {
-    fn from_iter<T: IntoIterator<Item = Edit>>(iter: T) -> Self {
-        Self {
-            edits: Vec::from_iter(iter),
-        }
-    }
-}
-
 impl From<Edit> for Fix {
     fn from(edit: Edit) -> Self {
         Self { edits: vec![edit] }
