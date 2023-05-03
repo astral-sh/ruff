@@ -4790,6 +4790,11 @@ impl<'a> Checker<'a> {
                             pyupgrade::rules::quoted_annotation(self, value, range);
                         }
                     }
+                    if self.is_stub {
+                        if self.settings.rules.enabled(Rule::QuotedAnnotationInStub) {
+                            flake8_pyi::rules::quoted_annotation_in_stub(self, value, range);
+                        }
+                    }
 
                     let expr = allocator.alloc(expr);
 
