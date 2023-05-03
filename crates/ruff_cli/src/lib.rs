@@ -43,40 +43,28 @@ impl From<ExitStatus> for ExitCode {
     }
 }
 
-#[derive(Default)]
-pub struct FileChangeDetector<'a> {
-    extensions: Vec<&'a str>,
-    config_files: Vec<&'a str>,
-    has_configuration_changed: bool,
+#[derive(Copy, Clone, Debug, Eq, PartialEq)]
+pub enum ChangeKind {
+    Configuration,
+    SourceFile,
+    Ignore,
 }
 
-impl FileChangeDetector<'_> {
-    pub fn new() -> Self {
-        Self {
-            extensions: vec!["py", "pyi"],
-            config_files: vec!["pyproject.toml", "ruff.toml", ".ruff.toml"],
-            has_configuration_changed: false,
-        }
-    }
-
-    pub fn change_detected(&mut self, paths: &[PathBuf]) -> bool {
-        for path in paths {
-            if let (Some(file_name), Some(suffix)) = (path.file_name(), path.extension()) {
-                if let (Some(file_name), Some(suffix)) = (file_name.to_str(), suffix.to_str()) {
-                    if self.config_files.contains(&file_name) {
-                        self.has_configuration_changed = true;
-                        return true;
-                    }
-                    if self.extensions.contains(&suffix) {
-                        self.has_configuration_changed = false;
-                        return true;
-                    }
-                }
+pub fn change_detected(paths: &[PathBuf]) -> ChangeKind {
+    for path in paths {
+        if let (Some(file_name), Some(suffix)) = (path.file_name(), path.extension()) {
+            if matches!(
+                file_name.to_str(),
+                Some("pyproject.toml" | "ruff.toml" | ".ruff.toml")
+            ) {
+                return ChangeKind::Configuration;
+            }
+            if matches!(suffix.to_str(), Some("py" | "pyi")) {
+                return ChangeKind::SourceFile;
             }
         }
-        self.has_configuration_changed = false;
-        false
     }
+    ChangeKind::Ignore
 }
 
 pub fn run(
@@ -246,31 +234,34 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             watcher.watch(file, RecursiveMode::Recursive)?;
         }
 
-        let mut file_change_detector = FileChangeDetector::new();
         loop {
             match rx.recv() {
                 Ok(event) => {
-                    if file_change_detector.change_detected(&event?.paths) {
-                        if file_change_detector.has_configuration_changed {
-                            pyproject_strategy = resolve::resolve(
-                                cli.isolated,
-                                cli.config.as_deref(),
-                                &overrides,
-                                cli.stdin_filename.as_deref(),
-                            )?;
-                        }
-                        Printer::clear_screen()?;
-                        printer.write_to_user("File change detected...\n");
+                    let change_kind = change_detected(&event?.paths);
+                    match change_kind {
+                        ChangeKind::Configuration | ChangeKind::SourceFile => {
+                            if matches!(change_kind, ChangeKind::Configuration) {
+                                pyproject_strategy = resolve::resolve(
+                                    cli.isolated,
+                                    cli.config.as_deref(),
+                                    &overrides,
+                                    cli.stdin_filename.as_deref(),
+                                )?;
+                            }
+                            Printer::clear_screen()?;
+                            printer.write_to_user("File change detected...\n");
 
-                        let messages = commands::run::run(
-                            &cli.files,
-                            &pyproject_strategy,
-                            &overrides,
-                            cache.into(),
-                            noqa.into(),
-                            autofix,
-                        )?;
-                        printer.write_continuously(&messages)?;
+                            let messages = commands::run::run(
+                                &cli.files,
+                                &pyproject_strategy,
+                                &overrides,
+                                cache.into(),
+                                noqa.into(),
+                                autofix,
+                            )?;
+                            printer.write_continuously(&messages)?;
+                        }
+                        ChangeKind::Ignore => {}
                     }
                 }
                 Err(err) => return Err(err.into()),
@@ -339,101 +330,75 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
 #[cfg(test)]
 mod test_file_change_detector {
-    use crate::FileChangeDetector;
-    use std::collections::HashMap;
+    use crate::{change_detected, ChangeKind};
     use std::path::PathBuf;
 
     #[test]
     fn should_detect_correct_file_change() {
-        let mut inputs: HashMap<bool, Vec<PathBuf>> = HashMap::new();
-        inputs.insert(
-            true,
+        let mut inputs: Vec<(ChangeKind, Vec<PathBuf>)> = Vec::new();
+        inputs.push((
+            ChangeKind::Configuration,
             vec![
                 PathBuf::from("tmp/pyproject.toml"),
                 PathBuf::from("tmp/bin/ruff.rs"),
             ],
-        );
-        inputs.insert(
-            true,
+        ));
+        inputs.push((
+            ChangeKind::Configuration,
             vec![
                 PathBuf::from("pyproject.toml"),
                 PathBuf::from("tmp/bin/ruff.rs"),
             ],
-        );
-        inputs.insert(
-            true,
+        ));
+        inputs.push((
+            ChangeKind::Configuration,
             vec![
                 PathBuf::from("tmp1/tmp2/tmp3/pyproject.toml"),
                 PathBuf::from("tmp/bin/ruff.rs"),
             ],
-        );
-        inputs.insert(
-            true,
+        ));
+        inputs.push((
+            ChangeKind::Configuration,
             vec![
                 PathBuf::from("tmp/ruff.toml"),
                 PathBuf::from("tmp/bin/ruff.rs"),
             ],
-        );
-        inputs.insert(
-            true,
+        ));
+        inputs.push((
+            ChangeKind::Configuration,
             vec![
                 PathBuf::from("tmp/.ruff.toml"),
                 PathBuf::from("tmp/bin/ruff.rs"),
             ],
-        );
-        inputs.insert(
-            true,
+        ));
+        inputs.push((
+            ChangeKind::SourceFile,
             vec![
                 PathBuf::from("tmp/rule.py"),
                 PathBuf::from("tmp/bin/ruff.rs"),
             ],
-        );
-        inputs.insert(
-            true,
+        ));
+        inputs.push((
+            ChangeKind::SourceFile,
             vec![
                 PathBuf::from("tmp/rule.pyi"),
                 PathBuf::from("tmp/bin/ruff.rs"),
             ],
-        );
-        inputs.insert(
-            true,
-            vec![
-                PathBuf::from("tmp/rule.pyi"),
-                PathBuf::from("tmp/bin/ruff.rs"),
-            ],
-        );
-        inputs.insert(
-            false,
+        ));
+        inputs.push((
+            ChangeKind::Ignore,
             vec![
                 PathBuf::from("tmp/rule.js"),
                 PathBuf::from("tmp/Cargo.toml"),
                 PathBuf::from("tmp/bin/ruff.rs"),
             ],
-        );
-        inputs.insert(
-            false,
+        ));
+        inputs.push((
+            ChangeKind::Ignore,
             vec![PathBuf::from("tmp/py"), PathBuf::from("tmp/pyi")],
-        );
-        let mut file_change_detector = FileChangeDetector::new();
+        ));
         for (expected, paths) in inputs {
-            assert_eq!(expected, file_change_detector.change_detected(&paths));
+            assert_eq!(expected, change_detected(&paths));
         }
-    }
-    #[test]
-    fn should_modify_has_configuration_change_correctly() {
-        let mut file_change_detector = FileChangeDetector::new();
-        let paths = vec![
-            PathBuf::from("tmp/pyproject.toml"),
-            PathBuf::from("tmp/bin/ruff.rs"),
-        ];
-        file_change_detector.change_detected(&paths);
-        assert!(file_change_detector.has_configuration_changed);
-
-        let paths = vec![
-            PathBuf::from("tmp/rule.py"),
-            PathBuf::from("tmp/bin/ruff.rs"),
-        ];
-        file_change_detector.change_detected(&paths);
-        assert!(!file_change_detector.has_configuration_changed);
     }
 }
