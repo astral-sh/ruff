@@ -4,6 +4,23 @@ use serde::{Deserialize, Serialize};
 
 use crate::edit::Edit;
 
+/// Indicates confidence in the correctness of a suggested fix.
+#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[non_exhaustive]
+pub enum Applicability {
+    /// The suggestion is definitely what the user intended, or maintains the exact meaning of the code.
+    /// This suggestion should be automatically applied.
+    Safe,
+
+    /// The suggestion may be what the user intended, but it is uncertain.
+    /// The suggestion should result in valid code if it is applied.
+    MaybeIncorrect,
+
+    /// The applicability of the suggestion is unknown.
+    Unspecified,
+}
+
 /// A collection of [`Edit`] elements to be applied to a source file.
 #[derive(Debug, PartialEq, Eq, Clone)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
