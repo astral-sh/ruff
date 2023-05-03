@@ -12,14 +12,16 @@ pub struct Fix {
 }
 
 impl Fix {
-    /// Create a new [`Fix`] from a vector of [`Edit`] elements with an unspecified applicability.
-    pub fn unspecified(edits: Vec<Edit>) -> Self {
-        Self { edits }
+    /// Create a new [`Fix`] with an unspecified applicability from an [`Edit`] element.
+    pub fn unspecified(edit: Edit) -> Self {
+        Self { edits: vec![edit] }
     }
 
     /// Create a new [`Fix`] with unspecified applicability from multiple [`Edit`] elements.
     pub fn unspecified_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
-        Self::unspecified(std::iter::once(edit).chain(rest.into_iter()).collect())
+        Self {
+            edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
+        }
     }
 
     /// Create an empty [`Fix`].
