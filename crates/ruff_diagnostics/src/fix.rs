@@ -12,8 +12,8 @@ pub struct Fix {
 }
 
 impl Fix {
-    /// Create a new [`Fix`] from a vector of [`Edit`] elements.
-    pub fn new(edits: Vec<Edit>) -> Self {
+    /// Create a new [`Fix`] from a vector of [`Edit`] elements with an unspecified applicability.
+    pub fn unspecified(edits: Vec<Edit>) -> Self {
         Self { edits }
     }
 

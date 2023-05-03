@@ -191,7 +191,7 @@ def fibonacci(n):
             },
             TextRange::new(TextSize::from(94), TextSize::from(95)),
         )
-        .with_fix(Fix::new(vec![Edit::deletion(
+        .with_fix(Fix::unspecified(vec![Edit::deletion(
             TextSize::from(94),
             TextSize::from(99),
         )]));
