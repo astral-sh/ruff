@@ -13,7 +13,6 @@ use strum::IntoEnumIterator;
 use ruff_cache::cache_dir;
 use ruff_macros::CacheKey;
 
-use crate::fs;
 use crate::registry::{Rule, RuleNamespace, RuleSet, INCOMPATIBLE_CODES};
 use crate::rule_selector::{RuleSelector, Specificity};
 use crate::rules::{
@@ -44,15 +43,10 @@ const CARGO_PKG_VERSION: &str = env!("CARGO_PKG_VERSION");
 pub struct AllSettings {
     pub cli: CliSettings,
     pub lib: Settings,
-    settings_path: Option<PathBuf>,
 }
 
 impl AllSettings {
-    pub fn from_configuration(
-        config: Configuration,
-        project_root: &Path,
-        settings_path: Option<PathBuf>,
-    ) -> Result<Self> {
+    pub fn from_configuration(config: Configuration, project_root: &Path) -> Result<Self> {
         Ok(Self {
             cli: CliSettings {
                 cache_dir: config
@@ -66,12 +60,7 @@ impl AllSettings {
                 update_check: config.update_check.unwrap_or_default(),
             },
             lib: Settings::from_configuration(config, project_root)?,
-            settings_path: settings_path.map(fs::normalize_path),
         })
-    }
-
-    pub fn settings_path(&self) -> Option<&Path> {
-        self.settings_path.as_deref()
     }
 }
 
