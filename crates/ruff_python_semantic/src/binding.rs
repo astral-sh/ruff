@@ -5,8 +5,6 @@ use bitflags::bitflags;
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::Stmt;
 
-use ruff_python_ast::types::RefEquality;
-
 use crate::scope::ScopeId;
 
 #[derive(Debug, Clone)]
@@ -16,7 +14,7 @@ pub struct Binding<'a> {
     /// The context in which the binding was created.
     pub context: ExecutionContext,
     /// The statement in which the [`Binding`] was defined.
-    pub source: Option<RefEquality<'a, Stmt>>,
+    pub source: Option<&'a Stmt>,
     /// Tuple of (scope index, range) indicating the scope and range at which
     /// the binding was last used in a runtime context.
     pub runtime_usage: Option<(ScopeId, TextRange)>,

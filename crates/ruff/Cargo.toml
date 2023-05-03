@@ -70,7 +70,6 @@ thiserror = { version = "1.0.38" }
 toml = { workspace = true }
 typed-arena = { version = "2.0.2" }
 unicode-width = { version = "0.1.10" }
-indextree = "4.6.0"
 
 [dev-dependencies]
 insta = { workspace = true }

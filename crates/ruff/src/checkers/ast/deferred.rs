@@ -1,14 +1,14 @@
 use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, Stmt};
 
-use ruff_python_ast::types::RefEquality;
 use ruff_python_semantic::analyze::visibility::{Visibility, VisibleScope};
+use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::ScopeId;
 
 use crate::checkers::ast::AnnotationContext;
 use crate::docstrings::definition::Definition;
 
-type Context<'a> = (ScopeId, Vec<RefEquality<'a, Stmt>>);
+type Context<'a> = (ScopeId, Option<NodeId>);
 
 /// A collection of AST nodes that are deferred for later analysis.
 /// Used to, e.g., store functions, whose bodies shouldn't be analyzed until all

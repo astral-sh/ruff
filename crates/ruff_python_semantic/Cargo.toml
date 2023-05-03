@@ -18,4 +18,3 @@ nohash-hasher = { workspace = true }
 rustc-hash = { workspace = true }
 rustpython-parser = { workspace = true }
 smallvec = { workspace = true }
-indextree = "4.6.0"
