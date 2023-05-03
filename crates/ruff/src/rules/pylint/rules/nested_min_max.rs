@@ -63,6 +63,7 @@ fn collect_nested_args(target_func: NestedMinMaxFunc, args: &[Expr], new_args: &
     }
 }
 
+/// W3301
 pub fn nested_min_max(
     checker: &mut Checker,
     expr: &Expr,
