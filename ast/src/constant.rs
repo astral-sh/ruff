@@ -41,12 +41,13 @@ impl std::fmt::Display for Constant {
         match self {
             Constant::None => f.pad("None"),
             Constant::Bool(b) => f.pad(if *b { "True" } else { "False" }),
-            Constant::Str(s) => {
-                use rustpython_common::escape::Escape;
-                rustpython_common::escape::UnicodeEscape::new_repr(s.as_str()).write_quoted(f)
-            }
+            Constant::Str(s) => rustpython_common::escape::UnicodeEscape::new_repr(s.as_str())
+                .str_repr()
+                .write(f),
             Constant::Bytes(b) => {
-                f.pad(&rustpython_common::bytes::repr(b).map_err(|_err| std::fmt::Error)?)
+                let escape = rustpython_common::escape::AsciiEscape::new_repr(b);
+                let repr = escape.bytes_repr().to_string().unwrap();
+                f.pad(&repr)
             }
             Constant::Int(i) => i.fmt(f),
             Constant::Tuple(tup) => {

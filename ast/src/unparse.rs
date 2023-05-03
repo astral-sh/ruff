@@ -509,10 +509,11 @@ impl<'a> Unparser<'a> {
         if is_spec {
             self.unparse_fstring_body(values, is_spec)
         } else {
-            use rustpython_common::escape::Escape;
             self.p("f")?;
             let body = to_string_fmt(|f| Unparser::new(f).unparse_fstring_body(values, is_spec));
-            rustpython_common::escape::UnicodeEscape::new_repr(&body).write_quoted(&mut self.f)
+            rustpython_common::escape::UnicodeEscape::new_repr(&body)
+                .str_repr()
+                .write(&mut self.f)
         }
     }
 }
