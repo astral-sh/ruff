@@ -14,7 +14,7 @@ use ruff_macros::{derive_message_formats, violation};
 /// than type comments, even if they're intended to support Python 2, since
 /// stub files are not executed at runtime. The one exception is `# type: ignore`.
 ///
-/// It should not be used in `.py` files either in recent versions of Python.
+/// It should not be used in `.py` files either in Python 3.6+ versions.
 ///
 /// ## Example
 /// ```python
