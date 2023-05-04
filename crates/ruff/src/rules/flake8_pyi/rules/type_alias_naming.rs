@@ -27,41 +27,38 @@ impl Violation for TSuffixedTypeAlias {
     #[derive_message_formats]
     fn message(&self) -> String {
         let Self { name } = self;
-        format!("Private type alias `{name}` should not be suffixed with `T` (the `T` suffix implies that an object is a TypeVar)")
+        format!("Private type alias `{name}` should not be suffixed with `T` (the `T` suffix implies that an object is a `TypeVar`)")
     }
 }
 
+/// Return `true` if the given name is a `snake_case` type alias. In this context, we match against
+/// any name that begins with an optional underscore, followed by at least one lowercase letter.
+fn is_snake_case_type_alias(name: &str) -> bool {
+    let mut chars = name.chars();
+    matches!(
+        (chars.next(), chars.next()),
+        (Some('_'), Some('0'..='9' | 'a'..='z')) | (Some('0'..='9' | 'a'..='z'), ..)
+    )
+}
+
+/// Return `true` if the given name is a T-suffixed type alias. In this context, we match against
+/// any name that begins with an underscore, and ends in a lowercase letter, followed by `T`,
+/// followed by an optional digit.
 fn is_t_suffixed_type_alias(name: &str) -> bool {
-    // A T suffixed, private type alias must begin with an underscore.
+    // A T-suffixed, private type alias must begin with an underscore.
     if !name.starts_with('_') {
         return false;
     }
 
     // It must end in a lowercase letter, followed by `T`, and (optionally) a digit.
-    let mut revchars = name.chars().rev();
+    let mut chars = name.chars().rev();
     matches!(
-        (revchars.next(), revchars.next(), revchars.next()), // note this is end -> beginning
+        (chars.next(), chars.next(), chars.next()),
         (Some('0'..='9'), Some('T'), Some('a'..='z')) | (Some('T'), Some('a'..='z'), _)
     )
 }
 
-fn is_snake_case_type_alias(name: &str) -> bool {
-    // The first letter must be alphabetic, optionally preceded by an '_'.
-    let mut chars = name.chars();
-    let Some(mut first) = chars.next() else { return false; };
-
-    if first == '_' {
-        if let Some(c) = chars.next() {
-            first = c;
-        } else {
-            return false;
-        }
-    }
-
-    // There should be at least one other underscore in the name.
-    first.is_ascii_alphabetic() && chars.any(|c| c == '_')
-}
-
+/// PYI042
 pub fn snake_case_type_alias(checker: &mut Checker, target: &Expr) {
     if let ExprKind::Name { id, .. } = target.node() {
         if !is_snake_case_type_alias(id) {
@@ -77,6 +74,7 @@ pub fn snake_case_type_alias(checker: &mut Checker, target: &Expr) {
     }
 }
 
+/// PYI043
 pub fn t_suffixed_type_alias(checker: &mut Checker, target: &Expr) {
     if let ExprKind::Name { id, .. } = target.node() {
         if !is_t_suffixed_type_alias(id) {

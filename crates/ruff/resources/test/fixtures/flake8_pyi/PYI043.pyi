@@ -9,8 +9,10 @@ from typing import (
 
 _PrivateAliasT: TypeAlias = str | int  # PYI043, since this ends in a T
 _PrivateAliasT2: TypeAlias = typing.Any  # PYI043, since this ends in a T
-_PrivateAliasT3: TypeAlias = Literal["not", "a", "chance"]  # PYI043, since this ends in a T
-just_literals_pipe_union: TypeAlias = Literal[True] | Literal['idk']
+_PrivateAliasT3: TypeAlias = Literal[
+    "not", "a", "chance"
+]  # PYI043, since this ends in a T
+just_literals_pipe_union: TypeAlias = Literal[True] | Literal["idk"]
 PublicAliasT: TypeAlias = str | int
 PublicAliasT2: TypeAlias = Union[str, bytes]
 _ABCDEFGHIJKLMNOPQRST: TypeAlias = typing.Any
