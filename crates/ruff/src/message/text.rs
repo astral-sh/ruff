@@ -252,13 +252,12 @@ fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
     let mut last_end = 0;
     let mut range = annotation_range;
     let mut column = 0;
-    let mut column_offset = 0;
 
     for (index, c) in source.chars().enumerate() {
         match c {
             '\t' => {
-                let tab_width = TAB_SIZE - (column + column_offset) % TAB_SIZE;
-                column_offset += tab_width;
+                let tab_width = TAB_SIZE - column % TAB_SIZE;
+                column += tab_width;
 
                 if index < usize::from(annotation_range.start()) {
                     range += TextSize::new(tab_width - 1);
@@ -276,7 +275,6 @@ fn replace_whitespace(source: &str, annotation_range: TextRange) -> SourceCode {
             }
             '\n' | '\r' => {
                 column = 0;
-                column_offset = 0;
             }
             #[allow(clippy::cast_possible_truncation)]
             _ => {
