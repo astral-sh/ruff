@@ -3,7 +3,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{LogicalLine, LogicalLineTo
 use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
-use ruff_text_size::{TextLen, TextRange, TextSize};
+use ruff_text_size::{TextRange, TextSize};
 
 #[violation]
 pub struct UnexpectedSpacesAroundKeywordParameterEquals;

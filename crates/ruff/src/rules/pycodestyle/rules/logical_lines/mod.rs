@@ -230,10 +230,6 @@ impl<'a> LogicalLine<'a> {
             .slice(TextRange::new(token.end(), last_token.end()))
     }
 
-    pub fn token_text(&self, token: &'a LogicalLineToken) -> &str {
-        self.lines.locator.slice(token.range)
-    }
-
     /// Returns the text before `token`
     #[inline]
     pub fn text_before(&self, token: &'a LogicalLineToken) -> &str {
