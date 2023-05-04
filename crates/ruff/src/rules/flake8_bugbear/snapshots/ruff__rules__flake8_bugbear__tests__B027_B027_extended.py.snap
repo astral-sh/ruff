@@ -1,0 +1,122 @@
+---
+source: crates/ruff/src/rules/flake8_bugbear/mod.rs
+---
+B027_extended.py:9:5: B027 [*] `AbstractClass.empty_1` is an empty method in an abstract base class, but has no abstract decorator
+   |
+ 9 |   class AbstractClass(ABC):
+10 |       def empty_1(self):  # error
+   |  _____^
+11 | |         ...
+   | |___________^ B027
+12 |   
+13 |       def empty_2(self):  # error
+   |
+   = help: Add the `@abstractmethod` decorator
+
+ℹ Suggested fix
+2  2  | Should emit:
+3  3  | B027 - on lines 13, 16, 19, 23
+4  4  | """
+5     |-from abc import ABC
+   5  |+from abc import ABC, abstractmethod
+6  6  | 
+7  7  | 
+8  8  | class AbstractClass(ABC):
+   9  |+    @abstractmethod
+9  10 |     def empty_1(self):  # error
+10 11 |         ...
+11 12 | 
+
+B027_extended.py:12:5: B027 [*] `AbstractClass.empty_2` is an empty method in an abstract base class, but has no abstract decorator
+   |
+12 |           ...
+13 |   
+14 |       def empty_2(self):  # error
+   |  _____^
+15 | |         pass
+   | |____________^ B027
+16 |   
+17 |       def body_1(self):
+   |
+   = help: Add the `@abstractmethod` decorator
+
+ℹ Suggested fix
+2  2  | Should emit:
+3  3  | B027 - on lines 13, 16, 19, 23
+4  4  | """
+5     |-from abc import ABC
+   5  |+from abc import ABC, abstractmethod
+6  6  | 
+7  7  | 
+8  8  | class AbstractClass(ABC):
+9  9  |     def empty_1(self):  # error
+10 10 |         ...
+11 11 | 
+   12 |+    @abstractmethod
+12 13 |     def empty_2(self):  # error
+13 14 |         pass
+14 15 | 
+
+B027_extended.py:25:9: B027 [*] `InnerAbstractClass.empty_1` is an empty method in an abstract base class, but has no abstract decorator
+   |
+25 |   def foo():
+26 |       class InnerAbstractClass(ABC):
+27 |           def empty_1(self):  # error
+   |  _________^
+28 | |             ...
+   | |_______________^ B027
+29 |   
+30 |           def empty_2(self):  # error
+   |
+   = help: Add the `@abstractmethod` decorator
+
+ℹ Suggested fix
+2  2  | Should emit:
+3  3  | B027 - on lines 13, 16, 19, 23
+4  4  | """
+5     |-from abc import ABC
+   5  |+from abc import ABC, abstractmethod
+6  6  | 
+7  7  | 
+8  8  | class AbstractClass(ABC):
+--------------------------------------------------------------------------------
+22 22 | 
+23 23 | def foo():
+24 24 |     class InnerAbstractClass(ABC):
+   25 |+        @abstractmethod
+25 26 |         def empty_1(self):  # error
+26 27 |             ...
+27 28 | 
+
+B027_extended.py:28:9: B027 [*] `InnerAbstractClass.empty_2` is an empty method in an abstract base class, but has no abstract decorator
+   |
+28 |               ...
+29 |   
+30 |           def empty_2(self):  # error
+   |  _________^
+31 | |             pass
+   | |________________^ B027
+32 |   
+33 |           def body_1(self):
+   |
+   = help: Add the `@abstractmethod` decorator
+
+ℹ Suggested fix
+2  2  | Should emit:
+3  3  | B027 - on lines 13, 16, 19, 23
+4  4  | """
+5     |-from abc import ABC
+   5  |+from abc import ABC, abstractmethod
+6  6  | 
+7  7  | 
+8  8  | class AbstractClass(ABC):
+--------------------------------------------------------------------------------
+25 25 |         def empty_1(self):  # error
+26 26 |             ...
+27 27 | 
+   28 |+        @abstractmethod
+28 29 |         def empty_2(self):  # error
+29 30 |             pass
+30 31 | 
+
+
