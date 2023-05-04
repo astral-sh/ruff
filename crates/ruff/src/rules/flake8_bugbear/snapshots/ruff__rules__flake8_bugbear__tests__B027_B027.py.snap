@@ -11,7 +11,7 @@ B027.py:13:5: B027 [*] `AbstractClass.empty_1` is an empty method in an abstract
 16 |   
 17 |       def empty_2(self):  # error
    |
-   = help: Add the @abstractmethod decorator to this method
+   = help: Add the `@abstractmethod` decorator
 
 ℹ Suggested fix
 10 10 | 
@@ -33,7 +33,7 @@ B027.py:16:5: B027 [*] `AbstractClass.empty_2` is an empty method in an abstract
 20 |   
 21 |       def empty_3(self):  # error
    |
-   = help: Add the @abstractmethod decorator to this method
+   = help: Add the `@abstractmethod` decorator
 
 ℹ Suggested fix
 13 13 |     def empty_1(self):  # error
@@ -56,7 +56,7 @@ B027.py:19:5: B027 [*] `AbstractClass.empty_3` is an empty method in an abstract
 24 |   
 25 |       def empty_4(self):  # error
    |
-   = help: Add the @abstractmethod decorator to this method
+   = help: Add the `@abstractmethod` decorator
 
 ℹ Suggested fix
 16 16 |     def empty_2(self):  # error
@@ -82,7 +82,7 @@ B027.py:23:5: B027 [*] `AbstractClass.empty_4` is an empty method in an abstract
 31 |   
 32 |       @notabstract
    |
-   = help: Add the @abstractmethod decorator to this method
+   = help: Add the `@abstractmethod` decorator
 
 ℹ Suggested fix
 20 20 |         """docstring"""

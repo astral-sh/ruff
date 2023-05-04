@@ -11,7 +11,7 @@ B027_extended.py:9:5: B027 [*] `AbstractClass.empty_1` is an empty method in an 
 12 |   
 13 |       def empty_2(self):  # error
    |
-   = help: Add the @abstractmethod decorator to this method
+   = help: Add the `@abstractmethod` decorator
 
 ℹ Suggested fix
 2  2  | Should emit:
@@ -38,7 +38,7 @@ B027_extended.py:12:5: B027 [*] `AbstractClass.empty_2` is an empty method in an
 16 |   
 17 |       def body_1(self):
    |
-   = help: Add the @abstractmethod decorator to this method
+   = help: Add the `@abstractmethod` decorator
 
 ℹ Suggested fix
 2  2  | Should emit:
@@ -68,7 +68,7 @@ B027_extended.py:25:9: B027 [*] `InnerAbstractClass.empty_1` is an empty method 
 29 |   
 30 |           def empty_2(self):  # error
    |
-   = help: Add the @abstractmethod decorator to this method
+   = help: Add the `@abstractmethod` decorator
 
 ℹ Suggested fix
 2  2  | Should emit:
@@ -99,7 +99,7 @@ B027_extended.py:28:9: B027 [*] `InnerAbstractClass.empty_2` is an empty method 
 32 |   
 33 |           def body_1(self):
    |
-   = help: Add the @abstractmethod decorator to this method
+   = help: Add the `@abstractmethod` decorator
 
 ℹ Suggested fix
 2  2  | Should emit:

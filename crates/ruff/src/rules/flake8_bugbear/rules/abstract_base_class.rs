@@ -1,4 +1,4 @@
-use anyhow::Result;
+use anyhow::{anyhow, Result};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
@@ -25,6 +25,7 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
         format!("`{name}` is an abstract base class, but it has no abstract methods")
     }
 }
+
 #[violation]
 pub struct EmptyMethodWithoutAbstractDecorator {
     pub name: String,
@@ -83,7 +84,7 @@ fn fix_abstractmethod_missing(
     stylist: &Stylist,
     stmt: &Stmt,
 ) -> Result<Fix> {
-    let indent = indentation(locator, stmt).unwrap_or_default();
+    let indent = indentation(locator, stmt).ok_or(anyhow!("Unable to detect indentation"))?;
     let (import_edit, binding) =
         get_or_import_symbol("abc", "abstractmethod", context, importer, locator)?;
     let reference_edit = Edit::insertion(
@@ -96,6 +97,7 @@ fn fix_abstractmethod_missing(
     Ok(Fix::from_iter([import_edit, reference_edit]))
 }
 
+/// B024
 /// B027
 pub fn abstract_base_class(
     checker: &mut Checker,
