@@ -51,6 +51,30 @@ impl std::fmt::Display for EmptyStringCmpop {
     }
 }
 
+/// ## What it does
+/// Checks for comparisons to empty strings.
+///
+/// ## Why is this bad?
+/// An empty string is falsy, so it is unnecessary to compare it to `""`. If
+/// the value can be something else Python considers falsy, such as `None` or
+/// `0` or another empty container, then the code is not equivalent.
+///
+/// ## Example
+/// ```python
+/// def foo(x):
+///     if x == "":
+///         print("x is empty")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(x):
+///     if not x:
+///         print("x is empty")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[violation]
 pub struct CompareToEmptyString {
     pub existing: String,
