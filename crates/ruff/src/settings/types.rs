@@ -219,9 +219,10 @@ pub enum SerializationFormat {
     Gitlab,
     Pylint,
     Azure,
-    // We can't make this hidden in clap because clap is an optional dependency
-    // TODO(konstin): Remove ecosystem ci once [ruff::message::diff::Diff] is stable.
     /// For use with check_ecosystem.py only
+    ///
+    /// TODO(konstin): Remove ecosystem ci once [ruff::message::diff::Diff] is stable.
+    #[cfg(feature = "ecosystem_ci")]
     EcosystemCi,
 }
 

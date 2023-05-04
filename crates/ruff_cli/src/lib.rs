@@ -169,12 +169,16 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         flags::FixMode::Diff
     } else if fix || fix_only {
         flags::FixMode::Apply
-    } else if matches!(
-        format,
-        SerializationFormat::Json | SerializationFormat::EcosystemCi
-    ) {
+    } else if matches!(format, SerializationFormat::Json) {
         flags::FixMode::Generate
     } else {
+        #[cfg(feature = "ecosystem_ci")]
+        if matches!(format, SerializationFormat::EcosystemCi) {
+            flags::FixMode::Generate
+        } else {
+            flags::FixMode::None
+        }
+        #[cfg(not(feature = "ecosystem_ci"))]
         flags::FixMode::None
     };
     let cache = !cli.no_cache;
