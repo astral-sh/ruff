@@ -278,17 +278,33 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         }
 
         if !cli.exit_zero {
-            if cli.diff || fix_only {
+            if cli.diff {
+                // If we're printing a diff, we always want to exit non-zero if there are
+                // any fixable violations (since we've printed the diff, but not applied the
+                // fixes).
                 if !diagnostics.fixed.is_empty() {
                     return Ok(ExitStatus::Failure);
                 }
-            } else if cli.exit_non_zero_on_fix {
-                if !diagnostics.fixed.is_empty() || !diagnostics.messages.is_empty() {
-                    return Ok(ExitStatus::Failure);
+            } else if fix_only {
+                // If we're only fixing, we want to exit zero (since we've fixed all fixable
+                // violations), unless we're explicitly asked to exit non-zero on fix.
+                if cli.exit_non_zero_on_fix {
+                    if !diagnostics.fixed.is_empty() {
+                        return Ok(ExitStatus::Failure);
+                    }
                 }
             } else {
-                if !diagnostics.messages.is_empty() {
-                    return Ok(ExitStatus::Failure);
+                // If we're running the linter (not just fixing), we want to exit non-zero if
+                // there are any violations, unless we're explicitly asked to exit zero on
+                // fix.
+                if cli.exit_non_zero_on_fix {
+                    if !diagnostics.fixed.is_empty() || !diagnostics.messages.is_empty() {
+                        return Ok(ExitStatus::Failure);
+                    }
+                } else {
+                    if !diagnostics.messages.is_empty() {
+                        return Ok(ExitStatus::Failure);
+                    }
                 }
             }
         }
