@@ -3,6 +3,7 @@ use rustpython_parser::ast::{Alias, Expr, Stmt};
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_stdlib::typing::PEP_585_SUBSCRIPT_ELIGIBLE;
 
 use crate::checkers::ast::Checker;
 
@@ -59,21 +60,6 @@ impl Violation for MissingFutureAnnotationsWithImports {
     }
 }
 
-// PEP_593_SUBSCRIPTS
-pub const FUTURE_ANNOTATIONS_REWRITE_ELIGIBLE: &[&[&str]] = &[
-    &["typing", "DefaultDict"],
-    &["typing", "Deque"],
-    &["typing", "Dict"],
-    &["typing", "FrozenSet"],
-    &["typing", "List"],
-    &["typing", "Optional"],
-    &["typing", "Set"],
-    &["typing", "Tuple"],
-    &["typing", "Type"],
-    &["typing", "Union"],
-    &["typing_extensions", "Type"],
-];
-
 /// FA100
 pub fn missing_future_annotations_from_typing_import(
     checker: &mut Checker,
@@ -85,17 +71,17 @@ pub fn missing_future_annotations_from_typing_import(
         return;
     }
 
-    let result: Vec<String> = names
+    let names: Vec<String> = names
         .iter()
         .map(|name| name.node.name.as_str())
-        .filter(|alias| FUTURE_ANNOTATIONS_REWRITE_ELIGIBLE.contains(&[module, alias].as_slice()))
+        .filter(|alias| PEP_585_SUBSCRIPT_ELIGIBLE.contains(&[module, alias].as_slice()))
         .map(std::string::ToString::to_string)
         .sorted()
         .collect();
 
-    if !result.is_empty() {
+    if !names.is_empty() {
         checker.diagnostics.push(Diagnostic::new(
-            MissingFutureAnnotationsWithImports { names: result },
+            MissingFutureAnnotationsWithImports { names },
             stmt.range(),
         ));
     }
@@ -108,7 +94,7 @@ pub fn missing_future_annotations_from_typing_usage(checker: &mut Checker, expr:
     }
 
     if let Some(binding) = checker.ctx.resolve_call_path(expr) {
-        if FUTURE_ANNOTATIONS_REWRITE_ELIGIBLE.contains(&binding.as_slice()) {
+        if PEP_585_SUBSCRIPT_ELIGIBLE.contains(&binding.as_slice()) {
             checker.diagnostics.push(Diagnostic::new(
                 MissingFutureAnnotationsWithImports {
                     names: vec![binding.iter().join(".")],
