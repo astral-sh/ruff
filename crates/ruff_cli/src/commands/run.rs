@@ -12,8 +12,8 @@ use ruff_text_size::{TextRange, TextSize};
 
 use ruff::message::Message;
 use ruff::registry::Rule;
-use ruff::rules::pylint::pylint_cyclic_import;
 use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
+use ruff::rules::pylint::pylint_cyclic_import;
 use ruff::settings::{flags, AllSettings};
 use ruff::{fs, packaging, resolver, warn_user_once, IOError};
 use ruff_diagnostics::Diagnostic;
@@ -157,7 +157,7 @@ pub fn run(
                     .parent()
                     .and_then(|parent| package_roots.get(parent))
                     .and_then(|package| *package);
-                let settings = resolver.resolve_all(path, pyproject_strategy);
+                let settings = resolver.resolve_all(path, pyproject_config);
                 (path, package, settings)
             });
 
