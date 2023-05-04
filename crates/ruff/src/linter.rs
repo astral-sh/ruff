@@ -4,6 +4,7 @@ use std::path::Path;
 
 use anyhow::{anyhow, Result};
 use colored::Colorize;
+use itertools::Itertools;
 use log::error;
 use rustc_hash::FxHashMap;
 use rustpython_parser::lexer::LexResult;
@@ -457,7 +458,7 @@ pub fn lint_fix<'a>(
                     path,
                     &transformed,
                     &result.error.unwrap(),
-                    fixed.keys(),
+                    fixed.keys().copied(),
                 );
                 return Err(anyhow!("Autofix introduced a syntax error"));
             }
@@ -497,23 +498,21 @@ pub fn lint_fix<'a>(
     }
 }
 
-fn collect_rule_codes(diagnostics: &[Diagnostic]) -> String {
-    let mut codes: Vec<String> = diagnostics
-        .iter()
-        .map(|diagnostic| diagnostic.kind.rule().noqa_code().to_string())
-        .collect();
-    codes.sort();
-    codes.dedup();
-    codes.join(",")
+fn collect_rule_codes(rules: impl IntoIterator<Item = Rule>) -> String {
+    rules
+        .into_iter()
+        .map(|rule| rule.noqa_code().to_string())
+        .sorted_unstable()
+        .dedup()
+        .join(", ")
 }
 
 #[allow(clippy::print_stderr)]
 fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[Diagnostic]) {
-    let codes = collect_rule_codes(diagnostics);
-
     if cfg!(debug_assertions) {
+        let codes = collect_rule_codes(diagnostics.iter().map(|diagnostic| diagnostic.kind.rule()));
         eprintln!(
-            "{}: Failed to converge after {} iterations in `{}`, rule codes {}:---\n{}\n---",
+            "{}: Failed to converge after {} iterations in `{}` with rule codes {}:---\n{}\n---",
             "debug error".red().bold(),
             MAX_ITERATIONS,
             fs::relativize_path(path),
@@ -529,37 +528,31 @@ This indicates a bug in `{}`. If you could open an issue at:
 
     {}/issues/new?title=%5BInfinite%20loop%5D
 
-...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
             "error".red().bold(),
             MAX_ITERATIONS,
             CARGO_PKG_NAME,
             CARGO_PKG_REPOSITORY,
             fs::relativize_path(path),
-            codes
         );
     }
 }
 
 #[allow(clippy::print_stderr)]
-fn report_autofix_syntax_error<'a>(
+fn report_autofix_syntax_error(
     path: &Path,
     transformed: &str,
     error: &ParseError,
-    rules: impl IntoIterator<Item = &'a Rule>,
+    rules: impl IntoIterator<Item = Rule>,
 ) {
-    let mut codes: Vec<String> = rules
-        .into_iter()
-        .map(|rule| rule.noqa_code().to_string())
-        .collect();
-    codes.sort();
-
     if cfg!(debug_assertions) {
+        let codes = collect_rule_codes(rules);
         eprintln!(
             "{}: Autofix introduced a syntax error in `{}` with rule codes {}: {}\n---\n{}\n---",
-            "debug error".red().bold(),
+            "error".red().bold(),
             fs::relativize_path(path),
-            codes.join(","),
+            codes,
             error,
             transformed,
         );
@@ -572,13 +565,12 @@ This indicates a bug in `{}`. If you could open an issue at:
 
     {}/issues/new?title=%5BAutofix%20error%5D
 
-...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
             "error".red().bold(),
             CARGO_PKG_NAME,
             CARGO_PKG_REPOSITORY,
             fs::relativize_path(path),
-            codes.join(","),
         );
     }
 }
