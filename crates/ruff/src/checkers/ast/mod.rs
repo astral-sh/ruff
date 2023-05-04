@@ -2281,8 +2281,7 @@ where
         match &expr.node {
             ExprKind::Subscript { value, slice, .. } => {
                 // Ex) Optional[...], Union[...]
-                if self.ctx.in_type_definition
-                    && !self.settings.pyupgrade.keep_runtime_typing
+                if !self.settings.pyupgrade.keep_runtime_typing
                     && self.settings.rules.enabled(Rule::NonPEP604Annotation)
                     && (self.settings.target_version >= PythonVersion::Py310
                         || (self.settings.target_version >= PythonVersion::Py37
@@ -4789,6 +4788,11 @@ impl<'a> Checker<'a> {
                     if in_annotation && self.ctx.annotations_future_enabled {
                         if self.settings.rules.enabled(Rule::QuotedAnnotation) {
                             pyupgrade::rules::quoted_annotation(self, value, range);
+                        }
+                    }
+                    if self.is_stub {
+                        if self.settings.rules.enabled(Rule::QuotedAnnotationInStub) {
+                            flake8_pyi::rules::quoted_annotation_in_stub(self, value, range);
                         }
                     }
 

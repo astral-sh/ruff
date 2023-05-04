@@ -1,9 +1,11 @@
 //! Generate a Markdown-compatible table of supported lint rules.
 
 use itertools::Itertools;
-use ruff::registry::{Linter, Rule, RuleNamespace, UpstreamCategory};
-use ruff_diagnostics::AutofixKind;
 use strum::IntoEnumIterator;
+
+use ruff::registry::{Linter, Rule, RuleNamespace, UpstreamCategory};
+use ruff::settings::options::Options;
+use ruff_diagnostics::AutofixKind;
 
 const FIX_SYMBOL: &str = "🛠";
 
@@ -73,6 +75,19 @@ pub fn generate() -> String {
                         linter.name()
                     ),
                 }
+            ));
+            table_out.push('\n');
+            table_out.push('\n');
+        }
+
+        if Options::metadata()
+            .iter()
+            .any(|(name, _)| name == &linter.name())
+        {
+            table_out.push_str(&format!(
+                "For related settings, see [{}](settings.md#{}).",
+                linter.name(),
+                linter.name(),
             ));
             table_out.push('\n');
             table_out.push('\n');

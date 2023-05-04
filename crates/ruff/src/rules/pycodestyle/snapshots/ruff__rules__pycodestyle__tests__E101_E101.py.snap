@@ -5,8 +5,8 @@ E101.py:11:1: E101 Indentation contains mixed spaces and tabs
    |
 11 | def func_mixed_start_with_tab():
 12 |     # E101
-13 | 	  print("mixed starts with tab")
-   | ^^ E101
+13 |       print("mixed starts with tab")
+   | ^^^^^^ E101
 14 | 
 15 | def func_mixed_start_with_space():
    |
@@ -15,8 +15,8 @@ E101.py:15:1: E101 Indentation contains mixed spaces and tabs
    |
 15 | def func_mixed_start_with_space():
 16 |     # E101
-17 |  	  	  	   print("mixed starts with space")
-   | ^^^^^^^^ E101
+17 |                     print("mixed starts with space")
+   | ^^^^^^^^^^^^^^^^^^^^ E101
 18 | 
 19 | def xyz():
    |
@@ -25,8 +25,8 @@ E101.py:19:1: E101 Indentation contains mixed spaces and tabs
    |
 19 | def xyz():
 20 |     # E101
-21 |    	print("xyz");
-   | ^^^ E101
+21 |        print("xyz");
+   | ^^^^^^^ E101
    |
 
 

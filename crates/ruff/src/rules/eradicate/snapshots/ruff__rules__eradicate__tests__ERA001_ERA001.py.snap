@@ -91,4 +91,19 @@ ERA001.py:13:5: ERA001 [*] Found commented-out code
 15 14 | 
 16 15 | #import os  # noqa: ERA001
 
+ERA001.py:21:5: ERA001 [*] Found commented-out code
+   |
+21 | class A():
+22 |     pass
+23 |     # b = c
+   |     ^^^^^^^ ERA001
+   |
+   = help: Remove commented-out code
+
+ℹ Suggested fix
+18 18 | 
+19 19 | class A():
+20 20 |     pass
+21    |-    # b = c
+
 
