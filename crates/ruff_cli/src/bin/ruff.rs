@@ -1,6 +1,6 @@
-use clap::{Parser, Subcommand};
 use std::process::ExitCode;
 
+use clap::{Parser, Subcommand};
 use colored::Colorize;
 
 use ruff_cli::args::{Args, Command};
@@ -23,14 +23,17 @@ static GLOBAL: mimalloc::MiMalloc = mimalloc::MiMalloc;
 static GLOBAL: tikv_jemallocator::Jemalloc = tikv_jemallocator::Jemalloc;
 
 pub fn main() -> ExitCode {
-    let mut args: Vec<_> = wild::args().collect();
+    let args = wild::args_os();
+    let mut args =
+        argfile::expand_args_from(args, argfile::parse_fromfile, argfile::PREFIX).unwrap();
 
     // Clap doesn't support default subcommands but we want to run `check` by
     // default for convenience and backwards-compatibility, so we just
     // preprocess the arguments accordingly before passing them to Clap.
     if let Some(arg) = args.get(1) {
-        if !Command::has_subcommand(rewrite_legacy_subcommand(arg))
-            && arg != "-h"
+        if arg.to_str().map_or(false, |arg| {
+            !Command::has_subcommand(rewrite_legacy_subcommand(arg))
+        }) && arg != "-h"
             && arg != "--help"
             && arg != "-V"
             && arg != "--version"

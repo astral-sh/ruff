@@ -8,8 +8,9 @@ use crate::binding::{BindingId, StarImportation};
 
 #[derive(Debug)]
 pub struct Scope<'a> {
-    pub id: ScopeId,
     pub kind: ScopeKind<'a>,
+    pub parent: Option<ScopeId>,
+    /// Whether this scope uses the `locals()` builtin.
     pub uses_locals: bool,
     /// A list of star imports in this scope. These represent _module_ imports (e.g., `sys` in
     /// `from sys import *`), rather than individual bindings (e.g., individual members in `sys`).
@@ -22,13 +23,20 @@ pub struct Scope<'a> {
 
 impl<'a> Scope<'a> {
     pub fn global() -> Self {
-        Scope::local(ScopeId::global(), ScopeKind::Module)
+        Scope {
+            kind: ScopeKind::Module,
+            parent: None,
+            uses_locals: false,
+            star_imports: Vec::default(),
+            bindings: FxHashMap::default(),
+            shadowed_bindings: FxHashMap::default(),
+        }
     }
 
-    pub fn local(id: ScopeId, kind: ScopeKind<'a>) -> Self {
+    pub fn local(kind: ScopeKind<'a>, parent: ScopeId) -> Self {
         Scope {
-            id,
             kind,
+            parent: Some(parent),
             uses_locals: false,
             star_imports: Vec::default(),
             bindings: FxHashMap::default(),
@@ -131,7 +139,7 @@ impl From<ScopeId> for usize {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, is_macro::Is)]
 pub enum ScopeKind<'a> {
     Class(ClassDef<'a>),
     Function(FunctionDef<'a>),
@@ -189,10 +197,22 @@ impl<'a> Scopes<'a> {
     }
 
     /// Pushes a new scope and returns its unique id
-    pub fn push_scope(&mut self, kind: ScopeKind<'a>) -> ScopeId {
+    pub fn push_scope(&mut self, kind: ScopeKind<'a>, parent: ScopeId) -> ScopeId {
         let next_id = ScopeId::try_from(self.0.len()).unwrap();
-        self.0.push(Scope::local(next_id, kind));
+        self.0.push(Scope::local(kind, parent));
         next_id
+    }
+
+    /// Returns an iterator over all [`ScopeId`] ancestors, starting from the given [`ScopeId`].
+    pub fn ancestor_ids(&self, scope_id: ScopeId) -> impl Iterator<Item = ScopeId> + '_ {
+        std::iter::successors(Some(scope_id), |&scope_id| self[scope_id].parent)
+    }
+
+    /// Returns an iterator over all [`Scope`] ancestors, starting from the given [`ScopeId`].
+    pub fn ancestors(&self, scope_id: ScopeId) -> impl Iterator<Item = &Scope> + '_ {
+        std::iter::successors(Some(&self[scope_id]), |&scope| {
+            scope.parent.map(|scope_id| &self[scope_id])
+        })
     }
 }
 
@@ -220,47 +240,5 @@ impl<'a> Deref for Scopes<'a> {
     type Target = [Scope<'a>];
     fn deref(&self) -> &Self::Target {
         &self.0
-    }
-}
-
-#[derive(Debug, Clone)]
-pub struct ScopeStack(Vec<ScopeId>);
-
-impl ScopeStack {
-    /// Pushes a new scope on the stack
-    pub fn push(&mut self, id: ScopeId) {
-        self.0.push(id);
-    }
-
-    /// Pops the top most scope
-    pub fn pop(&mut self) -> Option<ScopeId> {
-        self.0.pop()
-    }
-
-    /// Returns the id of the top-most
-    pub fn top(&self) -> Option<ScopeId> {
-        self.0.last().copied()
-    }
-
-    /// Returns an iterator from the current scope to the top scope (reverse iterator)
-    pub fn iter(&self) -> std::iter::Rev<std::slice::Iter<ScopeId>> {
-        self.0.iter().rev()
-    }
-
-    pub fn snapshot(&self) -> ScopeStackSnapshot {
-        ScopeStackSnapshot(self.0.len())
-    }
-
-    #[allow(clippy::needless_pass_by_value)]
-    pub fn restore(&mut self, snapshot: ScopeStackSnapshot) {
-        self.0.truncate(snapshot.0);
-    }
-}
-
-pub struct ScopeStackSnapshot(usize);
-
-impl Default for ScopeStack {
-    fn default() -> Self {
-        Self(vec![ScopeId::global()])
     }
 }

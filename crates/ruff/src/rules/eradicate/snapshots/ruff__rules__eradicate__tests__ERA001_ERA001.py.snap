@@ -72,22 +72,38 @@ ERA001.py:5:1: ERA001 [*] Found commented-out code
 7 6 | def foo(x, y, z):
 8 7 |     content = 1 # print('hello')
 
-ERA001.py:12:5: ERA001 [*] Found commented-out code
+ERA001.py:13:5: ERA001 [*] Found commented-out code
    |
-12 |     # This is a real comment.
-13 |     #return True
+13 |     # This is a real comment.
+14 |     # # This is a (nested) comment.
+15 |     #return True
    |     ^^^^^^^^^^^^ ERA001
-14 |     return False
+16 |     return False
    |
    = help: Remove commented-out code
 
 ℹ Suggested fix
-9  9  |     print(x, y, z)
 10 10 | 
 11 11 |     # This is a real comment.
-12    |-    #return True
-13 12 |     return False
-14 13 | 
-15 14 | #import os  # noqa: ERA001
+12 12 |     # # This is a (nested) comment.
+13    |-    #return True
+14 13 |     return False
+15 14 | 
+16 15 | #import os  # noqa: ERA001
+
+ERA001.py:21:5: ERA001 [*] Found commented-out code
+   |
+21 | class A():
+22 |     pass
+23 |     # b = c
+   |     ^^^^^^^ ERA001
+   |
+   = help: Remove commented-out code
+
+ℹ Suggested fix
+18 18 | 
+19 19 | class A():
+20 20 |     pass
+21    |-    # b = c
 
 

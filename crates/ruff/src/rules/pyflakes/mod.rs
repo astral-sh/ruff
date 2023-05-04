@@ -11,6 +11,7 @@ mod tests {
     use anyhow::Result;
 
     use regex::Regex;
+    use ruff_diagnostics::Diagnostic;
     use rustpython_parser::lexer::LexResult;
     use test_case::test_case;
     use textwrap::dedent;
@@ -95,6 +96,7 @@ mod tests {
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_19.py"); "F811_19")]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_20.py"); "F811_20")]
     #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_21.py"); "F811_21")]
+    #[test_case(Rule::RedefinedWhileUnused, Path::new("F811_22.py"); "F811_22")]
     #[test_case(Rule::UndefinedName, Path::new("F821_0.py"); "F821_0")]
     #[test_case(Rule::UndefinedName, Path::new("F821_1.py"); "F821_1")]
     #[test_case(Rule::UndefinedName, Path::new("F821_2.py"); "F821_2")]
@@ -254,16 +256,19 @@ mod tests {
         let tokens: Vec<LexResult> = ruff_rustpython::tokenize(&contents);
         let locator = Locator::new(&contents);
         let stylist = Stylist::from_tokens(&tokens, &locator);
-        let indexer: Indexer = tokens.as_slice().into();
-        let directives =
-            directives::extract_directives(&tokens, directives::Flags::from_settings(&settings));
+        let indexer = Indexer::from_tokens(&tokens, &locator);
+        let directives = directives::extract_directives(
+            &tokens,
+            directives::Flags::from_settings(&settings),
+            &locator,
+            &indexer,
+        );
         let LinterResult {
             data: (mut diagnostics, _imports),
             ..
         } = check_path(
             Path::new("<filename>"),
             None,
-            &contents,
             tokens,
             &locator,
             &stylist,
@@ -273,7 +278,7 @@ mod tests {
             flags::Noqa::Enabled,
             flags::Autofix::Enabled,
         );
-        diagnostics.sort_by_key(|diagnostic| diagnostic.location);
+        diagnostics.sort_by_key(Diagnostic::start);
         let actual = diagnostics
             .iter()
             .map(|diagnostic| diagnostic.kind.rule())

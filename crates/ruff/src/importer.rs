@@ -2,8 +2,9 @@
 
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, ImportAlias, Name, NameOrAttribute};
+use ruff_text_size::TextSize;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{Location, Stmt, StmtKind, Suite};
+use rustpython_parser::ast::{Stmt, StmtKind, Suite};
 use rustpython_parser::{lexer, Mode, Tok};
 
 use ruff_diagnostics::Edit;
@@ -95,7 +96,7 @@ impl<'a> Importer<'a> {
 
     /// Add the given member to an existing `StmtKind::ImportFrom` statement.
     pub fn add_member(&self, stmt: &Stmt, member: &str) -> Result<Edit> {
-        let mut tree = match_module(self.locator.slice(stmt))?;
+        let mut tree = match_module(self.locator.slice(stmt.range()))?;
         let import_from = match_import_from(&mut tree)?;
         let aliases = match_aliases(import_from)?;
         aliases.push(ImportAlias {
@@ -113,11 +114,7 @@ impl<'a> Importer<'a> {
             ..CodegenState::default()
         };
         tree.codegen(&mut state);
-        Ok(Edit::replacement(
-            state.to_string(),
-            stmt.location,
-            stmt.end_location.unwrap(),
-        ))
+        Ok(Edit::range_replacement(state.to_string(), stmt.range()))
     }
 }
 
@@ -126,13 +123,13 @@ struct Insertion {
     /// The content to add before the insertion.
     prefix: &'static str,
     /// The location at which to insert.
-    location: Location,
+    location: TextSize,
     /// The content to add after the insertion.
     suffix: &'static str,
 }
 
 impl Insertion {
-    fn new(prefix: &'static str, location: Location, suffix: &'static str) -> Self {
+    fn new(prefix: &'static str, location: TextSize, suffix: &'static str) -> Self {
         Self {
             prefix,
             location,
@@ -142,7 +139,7 @@ impl Insertion {
 }
 
 /// Find the end of the last docstring.
-fn match_docstring_end(body: &[Stmt]) -> Option<Location> {
+fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
     let mut iter = body.iter();
     let Some(mut stmt) = iter.next() else {
         return None;
@@ -156,10 +153,10 @@ fn match_docstring_end(body: &[Stmt]) -> Option<Location> {
         }
         stmt = next;
     }
-    Some(stmt.end_location.unwrap())
+    Some(stmt.end())
 }
 
-/// Find the location at which a "top-of-file" import should be inserted,
+/// Find the location at which an "end-of-statement" import should be inserted,
 /// along with a prefix and suffix to use for the insertion.
 ///
 /// For example, given the following code:
@@ -168,22 +165,28 @@ fn match_docstring_end(body: &[Stmt]) -> Option<Location> {
 /// """Hello, world!"""
 ///
 /// import os
+/// import math
+///
+///
+/// def foo():
+///     pass
 /// ```
 ///
-/// The location returned will be the start of the `import os` statement,
+/// The location returned will be the start of new line after the last
+/// import statement, which in this case is the line after `import math`,
 /// along with a trailing newline suffix.
 fn end_of_statement_insertion(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Insertion {
-    let location = stmt.end_location.unwrap();
+    let location = stmt.end();
     let mut tokens = lexer::lex_located(locator.after(location), Mode::Module, location).flatten();
-    if let Some((.., Tok::Semi, end)) = tokens.next() {
+    if let Some((Tok::Semi, range)) = tokens.next() {
         // If the first token after the docstring is a semicolon, insert after the semicolon as an
         // inline statement;
-        Insertion::new(" ", end, ";")
+        Insertion::new(" ", range.end(), ";")
     } else {
         // Otherwise, insert on the next line.
         Insertion::new(
             "",
-            Location::new(location.row() + 1, 0),
+            locator.full_line_end(location),
             stylist.line_ending().as_str(),
         )
     }
@@ -210,22 +213,22 @@ fn top_of_file_insertion(body: &[Stmt], locator: &Locator, stylist: &Stylist) ->
         let first_token = lexer::lex_located(locator.after(location), Mode::Module, location)
             .flatten()
             .next();
-        if let Some((.., Tok::Semi, end)) = first_token {
-            return Insertion::new(" ", end, ";");
+        if let Some((Tok::Semi, range)) = first_token {
+            return Insertion::new(" ", range.end(), ";");
         }
 
         // Otherwise, advance to the next row.
-        Location::new(location.row() + 1, 0)
+        locator.full_line_end(location)
     } else {
-        Location::default()
+        TextSize::default()
     };
 
     // Skip over any comments and empty lines.
-    for (.., tok, end) in
+    for (tok, range) in
         lexer::lex_located(locator.after(location), Mode::Module, location).flatten()
     {
         if matches!(tok, Tok::Comment(..) | Tok::Newline) {
-            location = Location::new(end.row() + 1, 0);
+            location = locator.full_line_end(range.end());
         } else {
             break;
         }
@@ -237,11 +240,12 @@ fn top_of_file_insertion(body: &[Stmt], locator: &Locator, stylist: &Stylist) ->
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
+    use ruff_python_ast::newlines::LineEnding;
+    use ruff_text_size::TextSize;
     use rustpython_parser as parser;
-    use rustpython_parser::ast::Location;
     use rustpython_parser::lexer::LexResult;
 
-    use ruff_python_ast::source_code::{LineEnding, Locator, Stylist};
+    use ruff_python_ast::source_code::{Locator, Stylist};
 
     use crate::importer::{top_of_file_insertion, Insertion};
 
@@ -258,7 +262,7 @@ mod tests {
         let contents = "";
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(1, 0), LineEnding::default().as_str())
+            Insertion::new("", TextSize::from(0), LineEnding::default().as_str())
         );
 
         let contents = r#"
@@ -266,7 +270,7 @@ mod tests {
             .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(2, 0), LineEnding::default().as_str())
+            Insertion::new("", TextSize::from(19), LineEnding::default().as_str())
         );
 
         let contents = r#"
@@ -275,7 +279,7 @@ mod tests {
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(2, 0), "\n")
+            Insertion::new("", TextSize::from(20), "\n")
         );
 
         let contents = r#"
@@ -285,7 +289,7 @@ mod tests {
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(3, 0), "\n")
+            Insertion::new("", TextSize::from(40), "\n")
         );
 
         let contents = r#"
@@ -294,7 +298,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(1, 0), "\n")
+            Insertion::new("", TextSize::from(0), "\n")
         );
 
         let contents = r#"
@@ -303,7 +307,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(2, 0), "\n")
+            Insertion::new("", TextSize::from(23), "\n")
         );
 
         let contents = r#"
@@ -313,7 +317,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(3, 0), "\n")
+            Insertion::new("", TextSize::from(43), "\n")
         );
 
         let contents = r#"
@@ -323,7 +327,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(3, 0), "\n")
+            Insertion::new("", TextSize::from(43), "\n")
         );
 
         let contents = r#"
@@ -332,7 +336,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new("", Location::new(1, 0), "\n")
+            Insertion::new("", TextSize::from(0), "\n")
         );
 
         let contents = r#"
@@ -341,7 +345,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new(" ", Location::new(1, 20), ";")
+            Insertion::new(" ", TextSize::from(20), ";")
         );
 
         let contents = r#"
@@ -351,7 +355,7 @@ x = 1
         .trim_start();
         assert_eq!(
             insert(contents)?,
-            Insertion::new(" ", Location::new(1, 20), ";")
+            Insertion::new(" ", TextSize::from(20), ";")
         );
 
         Ok(())

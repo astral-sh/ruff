@@ -1,6 +1,6 @@
 //! Settings for import conventions.
 
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 use schemars::JsonSchema;
 use serde::{Deserialize, Serialize};
 
@@ -70,12 +70,23 @@ pub struct Options {
     )]
     /// A mapping from module to its banned import aliases.
     pub banned_aliases: Option<FxHashMap<String, Vec<String>>>,
+    #[option(
+        default = r#"[]"#,
+        value_type = "list[str]",
+        example = r#"
+            # Declare the banned `from` imports.
+            banned-from = ["typing"]
+    "#
+    )]
+    /// A list of modules that are allowed to be imported from
+    pub banned_from: Option<FxHashSet<String>>,
 }
 
 #[derive(Debug, CacheKey)]
 pub struct Settings {
     pub aliases: FxHashMap<String, String>,
     pub banned_aliases: FxHashMap<String, Vec<String>>,
+    pub banned_from: FxHashSet<String>,
 }
 
 fn default_aliases() -> FxHashMap<String, String> {
@@ -85,38 +96,30 @@ fn default_aliases() -> FxHashMap<String, String> {
         .collect::<FxHashMap<_, _>>()
 }
 
-fn resolve_aliases(
-    options: Options,
-) -> (FxHashMap<String, String>, FxHashMap<String, Vec<String>>) {
-    let mut aliases = match options.aliases {
-        Some(options_aliases) => options_aliases,
-        None => default_aliases(),
-    };
-    if let Some(extend_aliases) = options.extend_aliases {
-        aliases.extend(extend_aliases);
-    }
-    let banned_aliases = match options.banned_aliases {
-        Some(options_banned_aliases) => options_banned_aliases,
-        None => FxHashMap::default(),
-    };
-    (aliases, banned_aliases)
-}
-
 impl Default for Settings {
     fn default() -> Self {
         Self {
             aliases: default_aliases(),
             banned_aliases: FxHashMap::default(),
+            banned_from: FxHashSet::default(),
         }
     }
 }
 
 impl From<Options> for Settings {
     fn from(options: Options) -> Self {
-        let (aliases, banned_aliases) = resolve_aliases(options);
+        let mut aliases = match options.aliases {
+            Some(options_aliases) => options_aliases,
+            None => default_aliases(),
+        };
+        if let Some(extend_aliases) = options.extend_aliases {
+            aliases.extend(extend_aliases);
+        }
+
         Self {
             aliases,
-            banned_aliases,
+            banned_aliases: options.banned_aliases.unwrap_or_default(),
+            banned_from: options.banned_from.unwrap_or_default(),
         }
     }
 }
@@ -127,6 +130,7 @@ impl From<Settings> for Options {
             aliases: Some(settings.aliases),
             extend_aliases: None,
             banned_aliases: None,
+            banned_from: None,
         }
     }
 }

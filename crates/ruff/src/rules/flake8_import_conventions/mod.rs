@@ -9,7 +9,7 @@ mod tests {
     use crate::assert_messages;
     use anyhow::Result;
 
-    use rustc_hash::FxHashMap;
+    use rustc_hash::{FxHashMap, FxHashSet};
 
     use crate::registry::Rule;
     use crate::settings::Settings;
@@ -37,6 +37,7 @@ mod tests {
                         ("dask.dataframe".to_string(), "dd".to_string()),
                     ])),
                     banned_aliases: None,
+                    banned_from: None,
                 }
                 .into(),
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
@@ -69,12 +70,36 @@ mod tests {
                         ),
                         ("torch.nn.functional".to_string(), vec!["F".to_string()]),
                     ])),
+                    banned_from: None,
                 }
                 .into(),
                 ..Settings::for_rule(Rule::BannedImportAlias)
             },
         )?;
         assert_messages!("custom_banned", diagnostics);
+        Ok(())
+    }
+
+    #[test]
+    fn custom_banned_from() -> Result<()> {
+        let diagnostics = test_path(
+            Path::new("flake8_import_conventions/custom_banned_from.py"),
+            &Settings {
+                flake8_import_conventions: super::settings::Options {
+                    aliases: None,
+                    extend_aliases: None,
+                    banned_aliases: None,
+                    banned_from: Some(FxHashSet::from_iter([
+                        "logging.config".to_string(),
+                        "typing".to_string(),
+                        "pandas".to_string(),
+                    ])),
+                }
+                .into(),
+                ..Settings::for_rule(Rule::BannedImportFrom)
+            },
+        )?;
+        assert_messages!("custom_banned_from", diagnostics);
         Ok(())
     }
 
@@ -92,6 +117,7 @@ mod tests {
                     ])),
                     extend_aliases: None,
                     banned_aliases: None,
+                    banned_from: None,
                 }
                 .into(),
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
@@ -113,6 +139,7 @@ mod tests {
                         "nmp".to_string(),
                     )])),
                     banned_aliases: None,
+                    banned_from: None,
                 }
                 .into(),
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)
@@ -137,6 +164,7 @@ mod tests {
                         ),
                     ])),
                     banned_aliases: None,
+                    banned_from: None,
                 }
                 .into(),
                 ..Settings::for_rule(Rule::UnconventionalImportAlias)

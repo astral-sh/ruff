@@ -1,6 +1,7 @@
 use crate::fs::relativize_path;
 use crate::message::{Emitter, EmitterContext, Message};
 use crate::registry::AsRule;
+use ruff_python_ast::source_code::OneIndexed;
 use std::io::Write;
 
 /// Generate violations in Pylint format.
@@ -19,9 +20,9 @@ impl Emitter for PylintEmitter {
             let row = if context.is_jupyter_notebook(message.filename()) {
                 // We can't give a reasonable location for the structured formats,
                 // so we show one that's clearly a fallback
-                1
+                OneIndexed::from_zero_indexed(0)
             } else {
-                message.location.row()
+                message.compute_start_location().row
             };
 
             writeln!(

@@ -1,12 +1,11 @@
 use once_cell::sync::Lazy;
+use ruff_text_size::{TextLen, TextRange, TextSize};
 use rustc_hash::FxHashMap;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, DiagnosticKind, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
-use ruff_python_ast::types::Range;
 
-use crate::message::Location;
 use crate::registry::AsRule;
 use crate::rules::ruff::rules::Context;
 use crate::settings::{flags, Settings};
@@ -1685,30 +1684,25 @@ static CONFUSABLES: Lazy<FxHashMap<u32, u8>> = Lazy::new(|| {
 
 pub fn ambiguous_unicode_character(
     locator: &Locator,
-    start: Location,
-    end: Location,
+    range: TextRange,
     context: Context,
     settings: &Settings,
     autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
-    let text = locator.slice(Range::new(start, end));
+    let text = locator.slice(range);
 
-    let mut col_offset = 0;
-    let mut row_offset = 0;
-    for current_char in text.chars() {
+    for (relative_offset, current_char) in text.char_indices() {
         if !current_char.is_ascii() {
             // Search for confusing characters.
             if let Some(representant) = CONFUSABLES.get(&(current_char as u32)).copied() {
                 if !settings.allowed_confusables.contains(&current_char) {
-                    let col = if row_offset == 0 {
-                        start.column() + col_offset
-                    } else {
-                        col_offset
-                    };
-                    let location = Location::new(start.row() + row_offset, col);
-                    let end_location = Location::new(location.row(), location.column() + 1);
+                    let char_range = TextRange::at(
+                        TextSize::try_from(relative_offset).unwrap() + range.start(),
+                        current_char.text_len(),
+                    );
+
                     let mut diagnostic = Diagnostic::new::<DiagnosticKind>(
                         match context {
                             Context::String => AmbiguousUnicodeCharacterString {
@@ -1727,28 +1721,19 @@ pub fn ambiguous_unicode_character(
                             }
                             .into(),
                         },
-                        Range::new(location, end_location),
+                        char_range,
                     );
                     if settings.rules.enabled(diagnostic.kind.rule()) {
                         if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
-                            diagnostic.set_fix(Edit::replacement(
+                            diagnostic.set_fix(Edit::range_replacement(
                                 (representant as char).to_string(),
-                                location,
-                                end_location,
+                                char_range,
                             ));
                         }
                         diagnostics.push(diagnostic);
                     }
                 }
             }
-        }
-
-        // Track the offset from the start position as we iterate over the body.
-        if current_char == '\n' {
-            col_offset = 0;
-            row_offset += 1;
-        } else {
-            col_offset += 1;
         }
     }
 

@@ -5,7 +5,6 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::compose_call_path;
 use ruff_python_ast::helpers::{collect_arg_names, SimpleCallArgs};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
@@ -83,7 +82,7 @@ fn check_patch_call(
             visitor.visit_expr(body);
 
             if !visitor.uses_args {
-                return Some(Diagnostic::new(PytestPatchWithLambda, Range::from(call)));
+                return Some(Diagnostic::new(PytestPatchWithLambda, call.range()));
             }
         }
     }

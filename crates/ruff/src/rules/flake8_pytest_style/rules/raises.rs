@@ -4,7 +4,6 @@ use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::format_call_path;
 use ruff_python_ast::call_path::from_qualified_name;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::Rule;
@@ -74,10 +73,9 @@ pub fn raises_call(checker: &mut Checker, func: &Expr, args: &[Expr], keywords: 
             .enabled(Rule::PytestRaisesWithoutException)
         {
             if args.is_empty() && keywords.is_empty() {
-                checker.diagnostics.push(Diagnostic::new(
-                    PytestRaisesWithoutException,
-                    Range::from(func),
-                ));
+                checker
+                    .diagnostics
+                    .push(Diagnostic::new(PytestRaisesWithoutException, func.range()));
             }
         }
 
@@ -134,7 +132,7 @@ pub fn complex_raises(checker: &mut Checker, stmt: &Stmt, items: &[Withitem], bo
         if is_too_complex {
             checker.diagnostics.push(Diagnostic::new(
                 PytestRaisesWithMultipleStatements,
-                Range::from(stmt),
+                stmt.range(),
             ));
         }
     }
@@ -169,7 +167,7 @@ fn exception_needs_match(checker: &mut Checker, exception: &Expr) {
             PytestRaisesTooBroad {
                 exception: call_path,
             },
-            Range::from(exception),
+            exception.range(),
         ));
     }
 }

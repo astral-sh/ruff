@@ -1,23 +1,23 @@
 use std::path::Path;
 
 use nohash_hasher::{BuildNoHashHasher, IntMap};
-use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
-use ruff_python_ast::helpers::from_relative_import;
-use ruff_python_ast::types::RefEquality;
-use ruff_python_ast::typing::AnnotationKind;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Expr, Stmt};
 use smallvec::smallvec;
 
-use crate::analyze::visibility::{module_visibility, Modifier, VisibleScope};
+use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
+use ruff_python_ast::helpers::from_relative_import;
+use ruff_python_ast::types::RefEquality;
+use ruff_python_ast::typing::AnnotationKind;
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
 
+use crate::analyze::visibility::{module_visibility, Modifier, VisibleScope};
 use crate::binding::{
     Binding, BindingId, BindingKind, Bindings, Exceptions, ExecutionContext, FromImportation,
     Importation, SubmoduleImportation,
 };
-use crate::scope::{Scope, ScopeId, ScopeKind, ScopeStack, Scopes};
+use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 
 #[allow(clippy::struct_excessive_bools)]
 pub struct Context<'a> {
@@ -35,8 +35,8 @@ pub struct Context<'a> {
         std::collections::HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
     pub exprs: Vec<RefEquality<'a, Expr>>,
     pub scopes: Scopes<'a>,
-    pub scope_stack: ScopeStack,
-    pub dead_scopes: Vec<(ScopeId, ScopeStack)>,
+    pub scope_id: ScopeId,
+    pub dead_scopes: Vec<ScopeId>,
     // Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
     pub body_index: usize,
@@ -48,6 +48,7 @@ pub struct Context<'a> {
     pub in_deferred_type_definition: bool,
     pub in_exception_handler: bool,
     pub in_f_string: bool,
+    pub in_boolean_test: bool,
     pub in_literal: bool,
     pub in_subscript: bool,
     pub in_type_checking_block: bool,
@@ -74,7 +75,7 @@ impl<'a> Context<'a> {
             shadowed_bindings: IntMap::default(),
             exprs: Vec::default(),
             scopes: Scopes::default(),
-            scope_stack: ScopeStack::default(),
+            scope_id: ScopeId::global(),
             dead_scopes: Vec::default(),
             body: &[],
             body_index: 0,
@@ -88,6 +89,7 @@ impl<'a> Context<'a> {
             in_deferred_type_definition: false,
             in_exception_handler: false,
             in_f_string: false,
+            in_boolean_test: false,
             in_literal: false,
             in_subscript: false,
             in_type_checking_block: false,
@@ -174,8 +176,12 @@ impl<'a> Context<'a> {
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
-                        source_path.extend(call_path.into_iter().skip(1));
-                        Some(source_path)
+                        if source_path.is_empty() {
+                            None
+                        } else {
+                            source_path.extend(call_path.into_iter().skip(1));
+                            Some(source_path)
+                        }
                     } else {
                         None
                     }
@@ -191,8 +197,12 @@ impl<'a> Context<'a> {
                 if name.starts_with('.') {
                     if let Some(module) = &self.module_path {
                         let mut source_path = from_relative_import(module, name);
-                        source_path.extend(call_path.into_iter().skip(1));
-                        Some(source_path)
+                        if source_path.is_empty() {
+                            None
+                        } else {
+                            source_path.extend(call_path.into_iter().skip(1));
+                            Some(source_path)
+                        }
                     } else {
                         None
                     }
@@ -320,19 +330,18 @@ impl<'a> Context<'a> {
             .expect("Attempted to pop without expression");
     }
 
-    pub fn push_scope(&mut self, kind: ScopeKind<'a>) -> ScopeId {
-        let id = self.scopes.push_scope(kind);
-        self.scope_stack.push(id);
-        id
+    /// Push a [`Scope`] with the given [`ScopeKind`] onto the stack.
+    pub fn push_scope(&mut self, kind: ScopeKind<'a>) {
+        let id = self.scopes.push_scope(kind, self.scope_id);
+        self.scope_id = id;
     }
 
+    /// Pop the current [`Scope`] off the stack.
     pub fn pop_scope(&mut self) {
-        self.dead_scopes.push((
-            self.scope_stack
-                .pop()
-                .expect("Attempted to pop without scope"),
-            self.scope_stack.clone(),
-        ));
+        self.dead_scopes.push(self.scope_id);
+        self.scope_id = self.scopes[self.scope_id]
+            .parent
+            .expect("Attempted to pop without scope");
     }
 
     /// Return the current `Stmt`.
@@ -377,31 +386,20 @@ impl<'a> Context<'a> {
 
     /// Returns the current top most scope.
     pub fn scope(&self) -> &Scope<'a> {
-        &self.scopes[self.scope_stack.top().expect("No current scope found")]
-    }
-
-    /// Returns the id of the top-most scope
-    pub fn scope_id(&self) -> ScopeId {
-        self.scope_stack.top().expect("No current scope found")
+        &self.scopes[self.scope_id]
     }
 
     /// Returns a mutable reference to the current top most scope.
     pub fn scope_mut(&mut self) -> &mut Scope<'a> {
-        let top_id = self.scope_stack.top().expect("No current scope found");
-        &mut self.scopes[top_id]
+        &mut self.scopes[self.scope_id]
     }
 
-    pub fn parent_scope(&self) -> Option<&Scope> {
-        self.scope_stack
-            .iter()
-            .nth(1)
-            .map(|index| &self.scopes[*index])
-    }
-
+    /// Returns an iterator over all scopes, starting from the current scope.
     pub fn scopes(&self) -> impl Iterator<Item = &Scope> {
-        self.scope_stack.iter().map(|index| &self.scopes[*index])
+        self.scopes.ancestors(self.scope_id)
     }
 
+    /// Returns `true` if the context is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.in_exception_handler
     }

@@ -4,7 +4,6 @@ use ruff_diagnostics::Violation;
 use ruff_diagnostics::{Diagnostic, DiagnosticKind};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::call_path::collect_call_path;
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -43,22 +42,23 @@ const FUNC_CALL_NAME_ALLOWLIST: &[&str] = &[
     "assertEquals",
     "assertNotEqual",
     "assertNotEquals",
+    "bytes",
     "failIfEqual",
     "failUnlessEqual",
+    "float",
     "fromkeys",
     "get",
     "getattr",
+    "getboolean",
+    "getfloat",
+    "getint",
     "index",
+    "int",
+    "param",
     "pop",
     "setattr",
     "setdefault",
     "str",
-    "bytes",
-    "int",
-    "float",
-    "getint",
-    "getfloat",
-    "getboolean",
 ];
 
 const FUNC_DEF_NAME_ALLOWLIST: &[&str] = &["__setitem__"];
@@ -90,9 +90,7 @@ const fn is_boolean_arg(arg: &Expr) -> bool {
 
 fn add_if_boolean(checker: &mut Checker, arg: &Expr, kind: DiagnosticKind) {
     if is_boolean_arg(arg) {
-        checker
-            .diagnostics
-            .push(Diagnostic::new(kind, Range::from(arg)));
+        checker.diagnostics.push(Diagnostic::new(kind, arg.range()));
     }
 }
 
@@ -134,7 +132,7 @@ pub fn check_positional_boolean_in_def(
         }
         checker.diagnostics.push(Diagnostic::new(
             BooleanPositionalArgInFunctionDefinition,
-            Range::from(arg),
+            arg.range(),
         ));
     }
 }

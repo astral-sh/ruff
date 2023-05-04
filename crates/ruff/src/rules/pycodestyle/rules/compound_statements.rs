@@ -1,10 +1,10 @@
+use ruff_text_size::TextRange;
 use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
 use ruff_diagnostics::{Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 
 use crate::registry::Rule;
 use crate::settings::{flags, Settings};
@@ -131,7 +131,7 @@ pub fn compound_statements(
     let mut sqb_count = 0;
     let mut brace_count = 0;
 
-    for &(start, ref tok, end) in lxr.iter().flatten() {
+    for &(ref tok, range) in lxr.iter().flatten() {
         match tok {
             Tok::Lpar => {
                 par_count += 1;
@@ -161,7 +161,8 @@ pub fn compound_statements(
         match tok {
             Tok::Newline => {
                 if let Some((start, end)) = semi {
-                    let mut diagnostic = Diagnostic::new(UselessSemicolon, Range::new(start, end));
+                    let mut diagnostic =
+                        Diagnostic::new(UselessSemicolon, TextRange::new(start, end));
                     if autofix.into() && settings.rules.should_fix(Rule::UselessSemicolon) {
                         diagnostic.set_fix(Edit::deletion(start, end));
                     };
@@ -198,12 +199,12 @@ pub fn compound_statements(
                     || while_.is_some()
                     || with.is_some()
                 {
-                    colon = Some((start, end));
+                    colon = Some((range.start(), range.end()));
                     allow_ellipsis = true;
                 }
             }
             Tok::Semi => {
-                semi = Some((start, end));
+                semi = Some((range.start(), range.end()));
             }
             Tok::Comment(..) | Tok::Indent | Tok::Dedent | Tok::NonLogicalNewline => {}
             Tok::Ellipsis if allow_ellipsis => {
@@ -214,7 +215,7 @@ pub fn compound_statements(
                 if let Some((start, end)) = semi {
                     diagnostics.push(Diagnostic::new(
                         MultipleStatementsOnOneLineSemicolon,
-                        Range::new(start, end),
+                        TextRange::new(start, end),
                     ));
 
                     // Reset.
@@ -224,7 +225,7 @@ pub fn compound_statements(
                 if let Some((start, end)) = colon {
                     diagnostics.push(Diagnostic::new(
                         MultipleStatementsOnOneLineColon,
-                        Range::new(start, end),
+                        TextRange::new(start, end),
                     ));
 
                     // Reset.
@@ -263,40 +264,40 @@ pub fn compound_statements(
                 with = None;
             }
             Tok::Case => {
-                case = Some((start, end));
+                case = Some((range.start(), range.end()));
             }
             Tok::If => {
-                if_ = Some((start, end));
+                if_ = Some((range.start(), range.end()));
             }
             Tok::While => {
-                while_ = Some((start, end));
+                while_ = Some((range.start(), range.end()));
             }
             Tok::For => {
-                for_ = Some((start, end));
+                for_ = Some((range.start(), range.end()));
             }
             Tok::Try => {
-                try_ = Some((start, end));
+                try_ = Some((range.start(), range.end()));
             }
             Tok::Except => {
-                except = Some((start, end));
+                except = Some((range.start(), range.end()));
             }
             Tok::Finally => {
-                finally = Some((start, end));
+                finally = Some((range.start(), range.end()));
             }
             Tok::Elif => {
-                elif = Some((start, end));
+                elif = Some((range.start(), range.end()));
             }
             Tok::Else => {
-                else_ = Some((start, end));
+                else_ = Some((range.start(), range.end()));
             }
             Tok::Class => {
-                class = Some((start, end));
+                class = Some((range.start(), range.end()));
             }
             Tok::With => {
-                with = Some((start, end));
+                with = Some((range.start(), range.end()));
             }
             Tok::Match => {
-                match_ = Some((start, end));
+                match_ = Some((range.start(), range.end()));
             }
             _ => {}
         };

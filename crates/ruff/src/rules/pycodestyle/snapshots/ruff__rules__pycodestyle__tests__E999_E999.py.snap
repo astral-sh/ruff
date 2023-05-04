@@ -5,7 +5,8 @@ E999.py:3:1: E999 SyntaxError: unindent does not match any outer indentation lev
   |
 3 | def x():
 4 | 
-  |  E999
+  | ^ E999
+5 | 
   |
 
 

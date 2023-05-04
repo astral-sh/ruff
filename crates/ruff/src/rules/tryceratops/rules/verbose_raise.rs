@@ -2,12 +2,35 @@ use rustpython_parser::ast::{Excepthandler, ExcepthandlerKind, Expr, ExprKind, S
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_ast::visitor;
 use ruff_python_ast::visitor::Visitor;
 
 use crate::checkers::ast::Checker;
 
+/// ## What it does
+/// Checks for needless exception names in `raise` statements.
+///
+/// ## Why is this bad?
+/// It's redundant to specify the exception name in a `raise` statement if the
+/// exception is being re-raised.
+///
+/// ## Example
+/// ```python
+/// def foo():
+///     try:
+///         ...
+///     except ValueError as exc:
+///         raise exc
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo():
+///     try:
+///         ...
+///     except ValueError:
+///         raise
+/// ```
 #[violation]
 pub struct VerboseRaise;
 
@@ -72,7 +95,7 @@ pub fn verbose_raise(checker: &mut Checker, handlers: &[Excepthandler]) {
                         if id == exception_name {
                             checker
                                 .diagnostics
-                                .push(Diagnostic::new(VerboseRaise, Range::from(exc)));
+                                .push(Diagnostic::new(VerboseRaise, exc.range()));
                         }
                     }
                 }

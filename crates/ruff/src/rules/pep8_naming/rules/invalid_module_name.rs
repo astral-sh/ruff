@@ -1,9 +1,9 @@
+use ruff_text_size::TextRange;
 use std::ffi::OsStr;
 use std::path::Path;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
 use ruff_python_stdlib::identifiers::{is_migration_name, is_module_name};
 
 /// ## What it does
@@ -73,7 +73,7 @@ pub fn invalid_module_name(path: &Path, package: Option<&Path>) -> Option<Diagno
                 InvalidModuleName {
                     name: module_name.to_string(),
                 },
-                Range::default(),
+                TextRange::default(),
             ));
         }
     }

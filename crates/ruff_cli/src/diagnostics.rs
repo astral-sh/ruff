@@ -9,16 +9,18 @@ use std::path::Path;
 use anyhow::{anyhow, Result};
 use colored::Colorize;
 use log::{debug, error};
+use ruff_text_size::TextSize;
 use rustc_hash::FxHashMap;
 use similar::TextDiff;
 
 use ruff::fs;
 use ruff::jupyter::{is_jupyter_notebook, JupyterIndex, JupyterNotebook};
 use ruff::linter::{lint_fix, lint_only, FixTable, FixerResult, LinterResult};
+use ruff::logging::DisplayParseError;
 use ruff::message::Message;
 use ruff::settings::{flags, AllSettings, Settings};
 use ruff_python_ast::imports::ImportMap;
-use ruff_python_ast::source_code::SourceFileBuilder;
+use ruff_python_ast::source_code::{LineIndex, SourceCode, SourceFileBuilder};
 
 use crate::cache;
 
@@ -86,8 +88,8 @@ fn load_jupyter_notebook(path: &Path) -> Result<(String, JupyterIndex), Box<Diag
             return Err(Box::new(Diagnostics {
                 messages: vec![Message::from_diagnostic(
                     *diagnostic,
-                    SourceFileBuilder::new(&path.to_string_lossy()).finish(),
-                    1,
+                    SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish(),
+                    TextSize::default(),
                 )],
                 ..Diagnostics::default()
             }));
@@ -197,12 +199,12 @@ pub fn lint_path(
     let imports = imports.unwrap_or_default();
 
     if let Some(err) = parse_error {
-        // Notify the user of any parse errors.
         error!(
-            "{}{}{} {err}",
-            "Failed to parse ".bold(),
-            fs::relativize_path(path).bold(),
-            ":".bold()
+            "{}",
+            DisplayParseError::new(
+                err,
+                SourceCode::new(&contents, &LineIndex::from_source_text(&contents))
+            )
         );
 
         // Purge the cache.

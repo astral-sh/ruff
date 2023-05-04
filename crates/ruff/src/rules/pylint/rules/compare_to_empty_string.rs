@@ -5,7 +5,6 @@ use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprKind};
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{unparse_constant, unparse_expr};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 
@@ -52,6 +51,30 @@ impl std::fmt::Display for EmptyStringCmpop {
     }
 }
 
+/// ## What it does
+/// Checks for comparisons to empty strings.
+///
+/// ## Why is this bad?
+/// An empty string is falsy, so it is unnecessary to compare it to `""`. If
+/// the value can be something else Python considers falsy, such as `None` or
+/// `0` or another empty container, then the code is not equivalent.
+///
+/// ## Example
+/// ```python
+/// def foo(x):
+///     if x == "":
+///         print("x is empty")
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(x):
+///     if not x:
+///         print("x is empty")
+/// ```
+///
+/// ## References
+/// - [Python documentation](https://docs.python.org/3/library/stdtypes.html#truth-value-testing)
 #[violation]
 pub struct CompareToEmptyString {
     pub existing: String,
@@ -103,7 +126,7 @@ pub fn compare_to_empty_string(
                                     existing,
                                     replacement,
                                 },
-                                Range::from(lhs),
+                                lhs.range(),
                             ));
                         }
                     }
@@ -123,7 +146,7 @@ pub fn compare_to_empty_string(
                                 existing,
                                 replacement,
                             },
-                            Range::from(rhs),
+                            rhs.range(),
                         ));
                     }
                 }

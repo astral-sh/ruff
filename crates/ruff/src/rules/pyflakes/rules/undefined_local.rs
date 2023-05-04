@@ -2,8 +2,8 @@ use std::string::ToString;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_semantic::binding::Bindings;
-use ruff_python_semantic::scope::{Scope, ScopeKind};
+
+use crate::checkers::ast::Checker;
 
 #[violation]
 pub struct UndefinedLocal {
@@ -18,26 +18,39 @@ impl Violation for UndefinedLocal {
     }
 }
 
-/// F821
-pub fn undefined_local(name: &str, scopes: &[&Scope], bindings: &Bindings) -> Option<Diagnostic> {
-    let current = &scopes.last().expect("No current scope found");
-    if matches!(current.kind, ScopeKind::Function(_)) && !current.defines(name) {
-        for scope in scopes.iter().rev().skip(1) {
-            if matches!(scope.kind, ScopeKind::Function(_) | ScopeKind::Module) {
-                if let Some(binding) = scope.get(name).map(|index| &bindings[*index]) {
-                    if let Some((scope_id, location)) = binding.runtime_usage {
-                        if scope_id == current.id {
-                            return Some(Diagnostic::new(
-                                UndefinedLocal {
-                                    name: name.to_string(),
-                                },
-                                location,
-                            ));
-                        }
-                    }
+/// F823
+pub fn undefined_local(checker: &mut Checker, name: &str) {
+    // If the name hasn't already been defined in the current scope...
+    let current = checker.ctx.scope();
+    if !current.kind.is_function() || current.defines(name) {
+        return;
+    }
+
+    let Some(parent) = current.parent else {
+        return;
+    };
+
+    // For every function and module scope above us...
+    for scope in checker.ctx.scopes.ancestors(parent) {
+        if !(scope.kind.is_function() || scope.kind.is_module()) {
+            continue;
+        }
+
+        // If the name was defined in that scope...
+        if let Some(binding) = scope.get(name).map(|index| &checker.ctx.bindings[*index]) {
+            // And has already been accessed in the current scope...
+            if let Some((scope_id, location)) = binding.runtime_usage {
+                if scope_id == checker.ctx.scope_id {
+                    // Then it's probably an error.
+                    checker.diagnostics.push(Diagnostic::new(
+                        UndefinedLocal {
+                            name: name.to_string(),
+                        },
+                        location,
+                    ));
+                    return;
                 }
             }
         }
     }
-    None
 }

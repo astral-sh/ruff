@@ -3,7 +3,6 @@ use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Unaryop};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
-use ruff_python_ast::types::Range;
 
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
@@ -97,17 +96,16 @@ pub fn explicit_true_false_in_ifexpr(
         IfExprWithTrueFalse {
             expr: unparse_expr(test, checker.stylist),
         },
-        Range::from(expr),
+        expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 unparse_expr(&test.clone(), checker.stylist),
-                expr.location,
-                expr.end_location.unwrap(),
+                expr.range(),
             ));
         } else if checker.ctx.is_builtin("bool") {
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 unparse_expr(
                     &create_expr(ExprKind::Call {
                         func: Box::new(create_expr(ExprKind::Name {
@@ -119,8 +117,7 @@ pub fn explicit_true_false_in_ifexpr(
                     }),
                     checker.stylist,
                 ),
-                expr.location,
-                expr.end_location.unwrap(),
+                expr.range(),
             ));
         };
     }
@@ -152,10 +149,10 @@ pub fn explicit_false_true_in_ifexpr(
         IfExprWithFalseTrue {
             expr: unparse_expr(test, checker.stylist),
         },
-        Range::from(expr),
+        expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             unparse_expr(
                 &create_expr(ExprKind::UnaryOp {
                     op: Unaryop::Not,
@@ -163,8 +160,7 @@ pub fn explicit_false_true_in_ifexpr(
                 }),
                 checker.stylist,
             ),
-            expr.location,
-            expr.end_location.unwrap(),
+            expr.range(),
         ));
     }
     checker.diagnostics.push(diagnostic);
@@ -201,10 +197,10 @@ pub fn twisted_arms_in_ifexpr(
             expr_body: unparse_expr(body, checker.stylist),
             expr_else: unparse_expr(orelse, checker.stylist),
         },
-        Range::from(expr),
+        expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
+        diagnostic.set_fix(Edit::range_replacement(
             unparse_expr(
                 &create_expr(ExprKind::IfExp {
                     test: Box::new(create_expr(orelse.node.clone())),
@@ -213,8 +209,7 @@ pub fn twisted_arms_in_ifexpr(
                 }),
                 checker.stylist,
             ),
-            expr.location,
-            expr.end_location.unwrap(),
+            expr.range(),
         ));
     }
     checker.diagnostics.push(diagnostic);

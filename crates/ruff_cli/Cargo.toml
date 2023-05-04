@@ -1,6 +1,6 @@
 [package]
 name = "ruff_cli"
-version = "0.0.261"
+version = "0.0.264"
 authors = ["Charlie Marsh <charlie.r.marsh@gmail.com>"]
 edition = { workspace = true }
 rust-version = { workspace = true }
@@ -26,9 +26,11 @@ ruff = { path = "../ruff", features = ["clap"] }
 ruff_cache = { path = "../ruff_cache" }
 ruff_diagnostics = { path = "../ruff_diagnostics" }
 ruff_python_ast = { path = "../ruff_python_ast" }
+ruff_text_size = { workspace = true }
 
 annotate-snippets = { version = "0.9.1", features = ["color"] }
 anyhow = { workspace = true }
+argfile = { version = "0.1.5" }
 atty = { version = "0.2.14" }
 bincode = { version = "1.3.3" }
 bitflags = { workspace = true }

@@ -9,6 +9,9 @@ def f():
 
     # Here's a standalone comment that's over the limit.
 
+    x = 2
+    # Another standalone that is preceded by a newline and indent toke and is over the limit.
+
     print("Here's a string that's over the limit, but it's not a docstring.")
 
 

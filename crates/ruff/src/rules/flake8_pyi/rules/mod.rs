@@ -5,9 +5,11 @@ pub use non_empty_stub_body::{non_empty_stub_body, NonEmptyStubBody};
 pub use pass_in_class_body::{pass_in_class_body, PassInClassBody};
 pub use pass_statement_stub_body::{pass_statement_stub_body, PassStatementStubBody};
 pub use prefix_type_params::{prefix_type_params, UnprefixedTypeParam};
+pub use quoted_annotation_in_stub::{quoted_annotation_in_stub, QuotedAnnotationInStub};
 pub use simple_defaults::{
-    argument_simple_defaults, assignment_default_in_stub, typed_argument_simple_defaults,
-    ArgumentDefaultInStub, AssignmentDefaultInStub, TypedArgumentDefaultInStub,
+    annotated_assignment_default_in_stub, argument_simple_defaults, assignment_default_in_stub,
+    typed_argument_simple_defaults, ArgumentDefaultInStub, AssignmentDefaultInStub,
+    TypedArgumentDefaultInStub,
 };
 pub use type_comment_in_stub::{type_comment_in_stub, TypeCommentInStub};
 pub use unrecognized_platform::{
@@ -21,6 +23,7 @@ mod non_empty_stub_body;
 mod pass_in_class_body;
 mod pass_statement_stub_body;
 mod prefix_type_params;
+mod quoted_annotation_in_stub;
 mod simple_defaults;
 mod type_comment_in_stub;
 mod unrecognized_platform;

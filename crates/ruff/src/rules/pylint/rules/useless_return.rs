@@ -4,7 +4,7 @@ use rustpython_parser::ast::{Constant, Expr, ExprKind, Stmt, StmtKind};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{is_const_none, ReturnStatementVisitor};
-use ruff_python_ast::types::{Range, RefEquality};
+use ruff_python_ast::types::RefEquality;
 use ruff_python_ast::visitor::Visitor;
 
 use crate::autofix::actions::delete_stmt;
@@ -105,7 +105,7 @@ pub fn useless_return<'a>(
         return;
     }
 
-    let mut diagnostic = Diagnostic::new(UselessReturn, Range::from(last_stmt));
+    let mut diagnostic = Diagnostic::new(UselessReturn, last_stmt.range());
     if checker.patch(diagnostic.kind.rule()) {
         let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
         match delete_stmt(

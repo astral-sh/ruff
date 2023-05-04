@@ -3,16 +3,17 @@ use std::iter;
 
 use itertools::Either::{Left, Right};
 use itertools::Itertools;
+use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
-use rustpython_parser::ast::{
-    Boolop, Cmpop, Constant, Expr, ExprContext, ExprKind, Location, Unaryop,
-};
+use rustpython_parser::ast::{Boolop, Cmpop, Expr, ExprContext, ExprKind, Unaryop};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
-use ruff_python_ast::helpers::{contains_effect, create_expr, has_comments, unparse_expr};
-use ruff_python_ast::types::Range;
+use ruff_python_ast::helpers::{
+    contains_effect, create_expr, has_comments, unparse_expr, Truthiness,
+};
+use ruff_python_ast::source_code::Stylist;
 use ruff_python_semantic::context::Context;
 
 use crate::checkers::ast::Checker;
@@ -127,31 +128,114 @@ impl AlwaysAutofixableViolation for ExprOrNotExpr {
     }
 }
 
+#[derive(Debug, PartialEq, Eq)]
+pub enum ContentAround {
+    Before,
+    After,
+    Both,
+}
+
+/// ## What it does
+/// Checks for `or` expressions that contain truthy values.
+///
+/// ## Why is this bad?
+/// If the expression is used as a condition, it can be replaced in-full with
+/// `True`.
+///
+/// In other cases, the expression can be short-circuited to the first truthy
+/// value.
+///
+/// By using `True` (or the first truthy value), the code is more concise
+/// and easier to understand, since it no longer contains redundant conditions.
+///
+/// ## Example
+/// ```python
+/// if x or [1] or y:
+///     pass
+///
+/// a = x or [1] or y
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if True:
+///     pass
+///
+/// a = x or [1]
+/// ```
 #[violation]
-pub struct ExprOrTrue;
+pub struct ExprOrTrue {
+    pub expr: String,
+    pub remove: ContentAround,
+}
 
 impl AlwaysAutofixableViolation for ExprOrTrue {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `True` instead of `... or True`")
+        let ExprOrTrue { expr, remove } = self;
+        let replaced = match remove {
+            ContentAround::After => format!("{expr} or ..."),
+            ContentAround::Before => format!("... or {expr}"),
+            ContentAround::Both => format!("... or {expr} or ..."),
+        };
+        format!("Use `{expr}` instead of `{replaced}`")
     }
 
     fn autofix_title(&self) -> String {
-        "Replace with `True`".to_string()
+        let ExprOrTrue { expr, .. } = self;
+        format!("Replace with `{expr}`")
     }
 }
 
+/// ## What it does
+/// Checks for `and` expressions that contain falsey values.
+///
+/// ## Why is this bad?
+/// If the expression is used as a condition, it can be replaced in-full with
+/// `False`.
+///
+/// In other cases, the expression can be short-circuited to the first falsey
+/// value.
+///
+/// By using `False` (or the first falsey value), the code is more concise
+/// and easier to understand, since it no longer contains redundant conditions.
+///
+/// ## Example
+/// ```python
+/// if x and [] and y:
+///     pass
+///
+/// a = x and [] and y
+/// ```
+///
+/// Use instead:
+/// ```python
+/// if False:
+///     pass
+///
+/// a = x and []
+/// ```
 #[violation]
-pub struct ExprAndFalse;
+pub struct ExprAndFalse {
+    pub expr: String,
+    pub remove: ContentAround,
+}
 
 impl AlwaysAutofixableViolation for ExprAndFalse {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Use `False` instead of `... and False`")
+        let ExprAndFalse { expr, remove } = self;
+        let replaced = match remove {
+            ContentAround::After => format!(r#"{expr} and ..."#),
+            ContentAround::Before => format!("... and {expr}"),
+            ContentAround::Both => format!("... and {expr} and ..."),
+        };
+        format!("Use `{expr}` instead of `{replaced}`")
     }
 
     fn autofix_title(&self) -> String {
-        "Replace with `False`".to_string()
+        let ExprAndFalse { expr, .. } = self;
+        format!("Replace with `{expr}`")
     }
 }
 
@@ -223,7 +307,7 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
                     },
                     fixable,
                 },
-                Range::from(expr),
+                expr.range(),
             );
             if fixable && checker.patch(diagnostic.kind.rule()) {
                 // Grab the types used in each duplicate `isinstance` call (e.g., `int` and `str`
@@ -282,10 +366,9 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 
                 // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
                 // multiple duplicates, the fixes will conflict.
-                diagnostic.set_fix(Edit::replacement(
+                diagnostic.set_fix(Edit::range_replacement(
                     unparse_expr(&bool_op, checker.stylist),
-                    expr.location,
-                    expr.end_location.unwrap(),
+                    expr.range(),
                 ));
             }
             checker.diagnostics.push(diagnostic);
@@ -367,7 +450,7 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
             CompareWithTuple {
                 replacement: unparse_expr(&in_expr, checker.stylist),
             },
-            Range::from(expr),
+            expr.range(),
         );
         if checker.patch(diagnostic.kind.rule()) {
             let unmatched: Vec<Expr> = values
@@ -385,10 +468,9 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
                     values: iter::once(in_expr).chain(unmatched).collect(),
                 })
             };
-            diagnostic.set_fix(Edit::replacement(
+            diagnostic.set_fix(Edit::range_replacement(
                 unparse_expr(&in_expr, checker.stylist),
-                expr.location,
-                expr.end_location.unwrap(),
+                expr.range(),
             ));
         }
         checker.diagnostics.push(diagnostic);
@@ -434,14 +516,10 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
                     ExprAndNotExpr {
                         name: id.to_string(),
                     },
-                    Range::from(expr),
+                    expr.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
-                        "False".to_string(),
-                        expr.location,
-                        expr.end_location.unwrap(),
-                    ));
+                    diagnostic.set_fix(Edit::range_replacement("False".to_string(), expr.range()));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -488,14 +566,10 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
                     ExprOrNotExpr {
                         name: id.to_string(),
                     },
-                    Range::from(expr),
+                    expr.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::replacement(
-                        "True".to_string(),
-                        expr.location,
-                        expr.end_location.unwrap(),
-                    ));
+                    diagnostic.set_fix(Edit::range_replacement("True".to_string(), expr.range()));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -503,27 +577,58 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
     }
 }
 
-pub fn is_short_circuit(
-    ctx: &Context,
+pub fn get_short_circuit_edit(
+    expr: &Expr,
+    range: TextRange,
+    truthiness: Truthiness,
+    in_boolean_test: bool,
+    stylist: &Stylist,
+) -> Edit {
+    let content = if in_boolean_test {
+        match truthiness {
+            Truthiness::Truthy => "True".to_string(),
+            Truthiness::Falsey => "False".to_string(),
+            Truthiness::Unknown => {
+                unreachable!("short_circuit_truthiness should be Truthy or Falsey")
+            }
+        }
+    } else {
+        unparse_expr(expr, stylist)
+    };
+    Edit::range_replacement(content, range)
+}
+
+fn is_short_circuit(
     expr: &Expr,
     expected_op: &Boolop,
-) -> Option<(Location, Location)> {
+    context: &Context,
+    stylist: &Stylist,
+) -> Option<(Edit, ContentAround)> {
     let ExprKind::BoolOp { op, values, } = &expr.node else {
         return None;
     };
     if op != expected_op {
         return None;
     }
-    let short_circuit_value = match op {
-        Boolop::And => false,
-        Boolop::Or => true,
+    let short_circuit_truthiness = match op {
+        Boolop::And => Truthiness::Falsey,
+        Boolop::Or => Truthiness::Truthy,
     };
 
-    let mut location = expr.location;
-    for (value, next_value) in values.iter().tuple_windows() {
+    let mut location = expr.start();
+    let mut edit = None;
+    let mut remove = None;
+
+    for (index, (value, next_value)) in values.iter().tuple_windows().enumerate() {
+        // Keep track of the location of the furthest-right, truthy or falsey expression.
+        let value_truthiness = Truthiness::from_expr(value, |id| context.is_builtin(id));
+        let next_value_truthiness = Truthiness::from_expr(next_value, |id| context.is_builtin(id));
+
         // Keep track of the location of the furthest-right, non-effectful expression.
-        if contains_effect(value, |id| ctx.is_builtin(id)) {
-            location = next_value.location;
+        if value_truthiness.is_unknown()
+            && (!context.in_boolean_test || contains_effect(value, |id| context.is_builtin(id)))
+        {
+            location = next_value.start();
             continue;
         }
 
@@ -531,71 +636,80 @@ pub fn is_short_circuit(
         // we can return the location of the expression. This should only trigger if the
         // short-circuit expression is the first expression in the list; otherwise, we'll see it
         // as `next_value` before we see it as `value`.
-        if let ExprKind::Constant {
-            value: Constant::Bool(bool),
-            ..
-        } = &value.node
-        {
-            if bool == &short_circuit_value {
-                return Some((location, expr.end_location.unwrap()));
-            }
+        if value_truthiness == short_circuit_truthiness {
+            remove = Some(if location == value.start() {
+                ContentAround::After
+            } else {
+                ContentAround::Both
+            });
+            edit = Some(get_short_circuit_edit(
+                value,
+                TextRange::new(location, expr.end()),
+                short_circuit_truthiness,
+                context.in_boolean_test,
+                stylist,
+            ));
+            break;
         }
 
         // If the next expression is a constant, and it matches the short-circuit value, then
         // we can return the location of the expression.
-        if let ExprKind::Constant {
-            value: Constant::Bool(bool),
-            ..
-        } = &next_value.node
-        {
-            if bool == &short_circuit_value {
-                return Some((location, expr.end_location.unwrap()));
-            }
+        if next_value_truthiness == short_circuit_truthiness {
+            remove = Some(if index == values.len() - 2 {
+                ContentAround::Before
+            } else {
+                ContentAround::Both
+            });
+            edit = Some(get_short_circuit_edit(
+                next_value,
+                TextRange::new(location, expr.end()),
+                short_circuit_truthiness,
+                context.in_boolean_test,
+                stylist,
+            ));
+            break;
         }
     }
-    None
+
+    match (edit, remove) {
+        (Some(edit), Some(remove)) => Some((edit, remove)),
+        _ => None,
+    }
 }
 
 /// SIM222
 pub fn expr_or_true(checker: &mut Checker, expr: &Expr) {
-    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr, &Boolop::Or) else {
-        return;
-    };
-    let mut diagnostic = Diagnostic::new(
-        ExprOrTrue,
-        Range {
-            location,
-            end_location,
-        },
-    );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
-            "True".to_string(),
-            location,
-            end_location,
-        ));
+    if let Some((edit, remove)) = is_short_circuit(expr, &Boolop::Or, &checker.ctx, checker.stylist)
+    {
+        let mut diagnostic = Diagnostic::new(
+            ExprOrTrue {
+                expr: edit.content().unwrap_or_default().to_string(),
+                remove,
+            },
+            edit.range(),
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.set_fix(edit);
+        }
+        checker.diagnostics.push(diagnostic);
     }
-    checker.diagnostics.push(diagnostic);
 }
 
 /// SIM223
 pub fn expr_and_false(checker: &mut Checker, expr: &Expr) {
-    let Some((location, end_location)) = is_short_circuit(&checker.ctx, expr, &Boolop::And) else {
-        return;
-    };
-    let mut diagnostic = Diagnostic::new(
-        ExprAndFalse,
-        Range {
-            location,
-            end_location,
-        },
-    );
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::replacement(
-            "False".to_string(),
-            location,
-            end_location,
-        ));
+    if let Some((edit, remove)) =
+        is_short_circuit(expr, &Boolop::And, &checker.ctx, checker.stylist)
+    {
+        let mut diagnostic = Diagnostic::new(
+            ExprAndFalse {
+                expr: edit.content().unwrap_or_default().to_string(),
+                remove,
+            },
+            edit.range(),
+        );
+        if checker.patch(diagnostic.kind.rule()) {
+            diagnostic.set_fix(edit);
+        }
+        checker.diagnostics.push(diagnostic);
     }
-    checker.diagnostics.push(diagnostic);
 }

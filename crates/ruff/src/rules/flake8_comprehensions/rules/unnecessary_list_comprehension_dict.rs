@@ -1,12 +1,10 @@
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
-use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
-
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 use crate::rules::flake8_comprehensions::fixes;
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
+use ruff_macros::{derive_message_formats, violation};
 
 use super::helpers;
 
@@ -63,7 +61,7 @@ pub fn unnecessary_list_comprehension_dict(
     if elts.len() != 2 {
         return;
     }
-    let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionDict, Range::from(expr));
+    let mut diagnostic = Diagnostic::new(UnnecessaryListComprehensionDict, expr.range());
     if checker.patch(diagnostic.kind.rule()) {
         diagnostic.try_set_fix(|| {
             fixes::fix_unnecessary_list_comprehension_dict(checker.locator, checker.stylist, expr)

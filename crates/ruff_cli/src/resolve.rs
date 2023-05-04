@@ -4,7 +4,8 @@ use anyhow::Result;
 use path_absolutize::path_dedot;
 
 use ruff::resolver::{
-    resolve_settings_with_processor, ConfigProcessor, PyprojectDiscovery, Relativity,
+    resolve_settings_with_processor, ConfigProcessor, PyprojectConfig, PyprojectDiscoveryStrategy,
+    Relativity,
 };
 use ruff::settings::configuration::Configuration;
 use ruff::settings::{pyproject, AllSettings};
@@ -18,13 +19,17 @@ pub fn resolve(
     config: Option<&Path>,
     overrides: &Overrides,
     stdin_filename: Option<&Path>,
-) -> Result<PyprojectDiscovery> {
+) -> Result<PyprojectConfig> {
     // First priority: if we're running in isolated mode, use the default settings.
     if isolated {
         let mut config = Configuration::default();
         overrides.process_config(&mut config);
         let settings = AllSettings::from_configuration(config, &path_dedot::CWD)?;
-        return Ok(PyprojectDiscovery::Fixed(settings));
+        return Ok(PyprojectConfig::new(
+            PyprojectDiscoveryStrategy::Fixed,
+            settings,
+            None,
+        ));
     }
 
     // Second priority: the user specified a `pyproject.toml` file. Use that
@@ -36,7 +41,11 @@ pub fn resolve(
         .transpose()?
     {
         let settings = resolve_settings_with_processor(&pyproject, &Relativity::Cwd, overrides)?;
-        return Ok(PyprojectDiscovery::Fixed(settings));
+        return Ok(PyprojectConfig::new(
+            PyprojectDiscoveryStrategy::Fixed,
+            settings,
+            Some(pyproject),
+        ));
     }
 
     // Third priority: find a `pyproject.toml` file in either an ancestor of
@@ -50,7 +59,11 @@ pub fn resolve(
             .unwrap_or(&path_dedot::CWD.as_path()),
     )? {
         let settings = resolve_settings_with_processor(&pyproject, &Relativity::Parent, overrides)?;
-        return Ok(PyprojectDiscovery::Hierarchical(settings));
+        return Ok(PyprojectConfig::new(
+            PyprojectDiscoveryStrategy::Hierarchical,
+            settings,
+            Some(pyproject),
+        ));
     }
 
     // Fourth priority: find a user-specific `pyproject.toml`, but resolve all paths
@@ -59,7 +72,11 @@ pub fn resolve(
     // these act as the "default" settings.)
     if let Some(pyproject) = pyproject::find_user_settings_toml() {
         let settings = resolve_settings_with_processor(&pyproject, &Relativity::Cwd, overrides)?;
-        return Ok(PyprojectDiscovery::Hierarchical(settings));
+        return Ok(PyprojectConfig::new(
+            PyprojectDiscoveryStrategy::Hierarchical,
+            settings,
+            Some(pyproject),
+        ));
     }
 
     // Fallback: load Ruff's default settings, and resolve all paths relative to the
@@ -69,5 +86,9 @@ pub fn resolve(
     let mut config = Configuration::default();
     overrides.process_config(&mut config);
     let settings = AllSettings::from_configuration(config, &path_dedot::CWD)?;
-    Ok(PyprojectDiscovery::Hierarchical(settings))
+    Ok(PyprojectConfig::new(
+        PyprojectDiscoveryStrategy::Hierarchical,
+        settings,
+        None,
+    ))
 }
