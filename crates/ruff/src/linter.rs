@@ -453,7 +453,12 @@ pub fn lint_fix<'a>(
             // longer parseable on a subsequent pass, then we've introduced a
             // syntax error. Return the original code.
             if parseable && result.error.is_some() {
-                report_autofix_syntax_error(path, &transformed, &result.error.unwrap());
+                report_autofix_syntax_error(
+                    path,
+                    &transformed,
+                    &result.error.unwrap(),
+                    fixed.keys(),
+                );
                 return Err(anyhow!("Autofix introduced a syntax error"));
             }
         }
@@ -476,7 +481,7 @@ pub fn lint_fix<'a>(
                 continue;
             }
 
-            report_failed_to_converge_error(path, &transformed);
+            report_failed_to_converge_error(path, &transformed, &result.data.0);
         }
 
         return Ok(FixerResult {
@@ -492,14 +497,27 @@ pub fn lint_fix<'a>(
     }
 }
 
+fn collect_rule_codes(diagnostics: &[Diagnostic]) -> String {
+    let mut codes: Vec<String> = diagnostics
+        .iter()
+        .map(|diagnostic| diagnostic.kind.rule().noqa_code().to_string())
+        .collect();
+    codes.sort();
+    codes.dedup();
+    codes.join(",")
+}
+
 #[allow(clippy::print_stderr)]
-fn report_failed_to_converge_error(path: &Path, transformed: &str) {
+fn report_failed_to_converge_error(path: &Path, transformed: &str, diagnostics: &[Diagnostic]) {
+    let codes = collect_rule_codes(diagnostics);
+
     if cfg!(debug_assertions) {
         eprintln!(
-            "{}: Failed to converge after {} iterations in `{}`:---\n{}\n---",
+            "{}: Failed to converge after {} iterations in `{}`, rule codes {}:---\n{}\n---",
             "debug error".red().bold(),
             MAX_ITERATIONS,
             fs::relativize_path(path),
+            codes,
             transformed,
         );
     } else {
@@ -511,24 +529,37 @@ This indicates a bug in `{}`. If you could open an issue at:
 
     {}/issues/new?title=%5BInfinite%20loop%5D
 
-...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
             "error".red().bold(),
             MAX_ITERATIONS,
             CARGO_PKG_NAME,
             CARGO_PKG_REPOSITORY,
             fs::relativize_path(path),
+            codes
         );
     }
 }
 
 #[allow(clippy::print_stderr)]
-fn report_autofix_syntax_error(path: &Path, transformed: &str, error: &ParseError) {
+fn report_autofix_syntax_error<'a>(
+    path: &Path,
+    transformed: &str,
+    error: &ParseError,
+    rules: impl IntoIterator<Item = &'a Rule>,
+) {
+    let mut codes: Vec<String> = rules
+        .into_iter()
+        .map(|rule| rule.noqa_code().to_string())
+        .collect();
+    codes.sort();
+
     if cfg!(debug_assertions) {
         eprintln!(
-            "{}: Autofix introduced a syntax error in `{}`: {}\n---\n{}\n---",
+            "{}: Autofix introduced a syntax error in `{}` with rule codes {}: {}\n---\n{}\n---",
             "debug error".red().bold(),
             fs::relativize_path(path),
+            codes.join(","),
             error,
             transformed,
         );
@@ -541,12 +572,13 @@ This indicates a bug in `{}`. If you could open an issue at:
 
     {}/issues/new?title=%5BAutofix%20error%5D
 
-...quoting the contents of `{}`, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
+...quoting the contents of `{}`, the rule codes {}, along with the `pyproject.toml` settings and executed command, we'd be very appreciative!
 "#,
             "error".red().bold(),
             CARGO_PKG_NAME,
             CARGO_PKG_REPOSITORY,
             fs::relativize_path(path),
+            codes.join(","),
         );
     }
 }
