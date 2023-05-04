@@ -4,7 +4,6 @@ use ruff_diagnostics::Violation;
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
 
-
 #[violation]
 pub struct MissingWhitespaceAfterKeyword;
 
