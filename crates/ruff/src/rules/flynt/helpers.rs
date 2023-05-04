@@ -1,11 +1,20 @@
 use ruff_python_ast::helpers::create_expr;
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-fn to_formatted_value_expr(inner: Expr) -> Expr {
+/// Wrap an expression in a `FormattedValue` with no special formatting.
+fn to_formatted_value_expr(inner: &Expr) -> Expr {
     create_expr(ExprKind::FormattedValue {
-        value: Box::new(inner),
+        value: Box::new(inner.clone()),
         conversion: 0,
         format_spec: None,
+    })
+}
+
+/// Convert a string to a constant string expression.
+pub(crate) fn to_constant_string(s: &str) -> Expr {
+    create_expr(ExprKind::Constant {
+        value: Constant::Str(s.to_owned()),
+        kind: None,
     })
 }
 
@@ -33,7 +42,7 @@ fn is_simple_callee(func: &Expr) -> bool {
 }
 
 /// Convert an expression to a f-string element (if it looks like a good idea).
-pub fn to_fstring_elem(expr: Expr) -> Option<Expr> {
+pub(crate) fn to_fstring_elem(expr: &Expr) -> Option<Expr> {
     match &expr.node {
         // These are directly handled by `unparse_fstring_elem`:
         ExprKind::Constant {
@@ -41,7 +50,7 @@ pub fn to_fstring_elem(expr: Expr) -> Option<Expr> {
             ..
         }
         | ExprKind::JoinedStr { .. }
-        | ExprKind::FormattedValue { .. } => Some(expr),
+        | ExprKind::FormattedValue { .. } => Some(expr.clone()),
         // These should be pretty safe to wrap in a formatted value.
         ExprKind::Constant {
             value:
@@ -50,15 +59,7 @@ pub fn to_fstring_elem(expr: Expr) -> Option<Expr> {
         }
         | ExprKind::Name { .. }
         | ExprKind::Attribute { .. } => Some(to_formatted_value_expr(expr)),
-        ExprKind::Call { .. } if is_simple_call(&expr) => Some(to_formatted_value_expr(expr)),
+        ExprKind::Call { .. } if is_simple_call(expr) => Some(to_formatted_value_expr(expr)),
         _ => None,
     }
-}
-
-/// Convert a string to a constant string expression.
-pub fn to_constant_string(s: &str) -> Expr {
-    create_expr(ExprKind::Constant {
-        value: Constant::Str(s.to_owned()),
-        kind: None,
-    })
 }

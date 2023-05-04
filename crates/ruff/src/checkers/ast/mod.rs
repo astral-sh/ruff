@@ -2476,8 +2476,7 @@ where
                                 if self.settings.rules.enabled(Rule::StaticJoinToFString) {
                                     flynt::rules::static_join_to_fstring(self, expr, value);
                                 }
-                            }
-                            if attr == "format" {
+                            } else if attr == "format" {
                                 // "...".format(...) call
                                 let location = expr.range();
                                 match pyflakes::format::FormatSummary::try_from(value.as_ref()) {

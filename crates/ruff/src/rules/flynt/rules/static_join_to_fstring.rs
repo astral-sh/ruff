@@ -34,19 +34,21 @@ fn is_static_length(elts: &[Expr]) -> bool {
         .all(|e| !matches!(e.node, ExprKind::Starred { .. }))
 }
 
-fn build_fstring(joiner: &str, joinees: &Vec<Expr>) -> Option<Expr> {
+fn build_fstring(joiner: &str, joinees: &[Expr]) -> Option<Expr> {
     let mut fstring_elems = Vec::with_capacity(joinees.len() * 2);
-    for (i, expr) in joinees.iter().enumerate() {
+    let mut first = true;
+
+    for expr in joinees {
         if matches!(expr.node, ExprKind::JoinedStr { .. }) {
             // Oops, already an f-string. We don't know how to handle those
             // gracefully right now.
             return None;
         }
-        let elem = helpers::to_fstring_elem(expr.clone())?;
-        if i != 0 {
+        if !first {
             fstring_elems.push(helpers::to_constant_string(joiner));
         }
-        fstring_elems.push(elem);
+        fstring_elems.push(helpers::to_fstring_elem(expr)?);
+        first = false;
     }
     Some(create_expr(ExprKind::JoinedStr {
         values: fstring_elems,
@@ -80,19 +82,16 @@ pub fn static_join_to_fstring(checker: &mut Checker, expr: &Expr, joiner: &str) 
     let Some(new_expr) = build_fstring(joiner, joinees) else { return };
 
     let contents = unparse_expr(&new_expr, checker.stylist);
-    let fixable = true; // I'm not sure there is a case where this is not fixable..?
 
     let mut diagnostic = Diagnostic::new(
         StaticJoinToFString {
             expr: contents.clone(),
-            fixable,
+            fixable: true,
         },
         expr.range(),
     );
     if checker.patch(diagnostic.kind.rule()) {
-        if fixable {
-            diagnostic.set_fix(Edit::range_replacement(contents, expr.range()));
-        }
+        diagnostic.set_fix(Edit::range_replacement(contents, expr.range()));
     }
     checker.diagnostics.push(diagnostic);
 }
