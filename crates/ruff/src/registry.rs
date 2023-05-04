@@ -669,6 +669,8 @@ ruff_macros::register_rules!(
     rules::flake8_django::rules::DjangoModelWithoutDunderStr,
     rules::flake8_django::rules::DjangoUnorderedBodyContentInModel,
     rules::flake8_django::rules::DjangoNonLeadingReceiverDecorator,
+    // flynt
+    rules::flynt::rules::StaticJoinToFString,
 );
 
 pub trait AsRule {
@@ -824,6 +826,9 @@ pub enum Linter {
     /// [tryceratops](https://pypi.org/project/tryceratops/1.1.0/)
     #[prefix = "TRY"]
     Tryceratops,
+    /// [flynt](https://pypi.org/project/flynt/)
+    #[prefix = "FLY"]
+    Flynt,
     /// NumPy-specific rules
     #[prefix = "NPY"]
     Numpy,
