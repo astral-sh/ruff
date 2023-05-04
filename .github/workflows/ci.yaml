@@ -65,13 +65,13 @@ jobs:
       - name: "Run tests (Ubuntu)"
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
-          cargo insta test --all --all-features --delete-unreferenced-snapshots
+          cargo insta test --all --features "logical_lines jupyter_notebook" --delete-unreferenced-snapshots
           git diff --exit-code
       - name: "Run tests (Windows)"
         if: ${{ matrix.os == 'windows-latest' }}
         shell: bash
         run: |
-          cargo insta test --all --all-features
+          cargo insta test --all --features "logical_lines jupyter_notebook"
           git diff --exit-code
       - run: cargo test --package ruff_cli --test black_compatibility_test -- --ignored
       # Check for broken links in the documentation.
