@@ -1936,6 +1936,14 @@ where
                             }
                         }
                     }
+                    if self.ctx.match_typing_expr(annotation, "TypeAlias") {
+                        if self.settings.rules.enabled(Rule::SnakeCaseTypeAlias) {
+                            flake8_pyi::rules::snake_case_type_alias(self, target);
+                        }
+                        if self.settings.rules.enabled(Rule::TSuffixedTypeAlias) {
+                            flake8_pyi::rules::t_suffixed_type_alias(self, target);
+                        }
+                    }
                 }
             }
             StmtKind::Delete { targets } => {
