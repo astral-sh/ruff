@@ -94,6 +94,7 @@ fn fix_abstractmethod_missing(checker: &Checker, stmt: &Located<StmtKind>) -> Re
     Ok(Fix::from_iter([import_edit, reference_edit]))
 }
 
+/// B027
 pub fn abstract_base_class(
     checker: &mut Checker,
     stmt: &Stmt,
