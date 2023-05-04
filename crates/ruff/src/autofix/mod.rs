@@ -103,6 +103,7 @@ mod tests {
 
     use ruff_diagnostics::Diagnostic;
     use ruff_diagnostics::Edit;
+    use ruff_diagnostics::Fix;
     use ruff_python_ast::source_code::Locator;
 
     use crate::autofix::apply_fixes;
@@ -114,7 +115,7 @@ mod tests {
                 // The choice of rule here is arbitrary.
                 kind: MissingNewlineAtEndOfFile.into(),
                 range: edit.range(),
-                fix: Some(edit.into()),
+                fix: Some(Fix::unspecified(edit)),
                 parent: None,
             })
             .collect()

@@ -1,6 +1,6 @@
 use ruff_text_size::{TextLen, TextRange, TextSize};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::Line;
 
@@ -95,7 +95,7 @@ pub(crate) fn trailing_whitespace(
                 if matches!(autofix, flags::Autofix::Enabled)
                     && settings.rules.should_fix(Rule::BlankLineWithWhitespace)
                 {
-                    diagnostic.set_fix(Edit::range_deletion(range));
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
                 }
                 return Some(diagnostic);
             }
@@ -104,7 +104,7 @@ pub(crate) fn trailing_whitespace(
             if matches!(autofix, flags::Autofix::Enabled)
                 && settings.rules.should_fix(Rule::TrailingWhitespace)
             {
-                diagnostic.set_fix(Edit::range_deletion(range));
+                diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(range)));
             }
             return Some(diagnostic);
         }

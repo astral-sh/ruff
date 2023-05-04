@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{has_leading_content, has_trailing_content, unparse_stmt};
 use ruff_python_ast::newlines::StrExt;
@@ -103,7 +103,10 @@ pub fn lambda_assignment(
                         indented.push_str(&line);
                     }
                 }
-                diagnostic.set_fix(Edit::range_replacement(indented, stmt.range()));
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    indented,
+                    stmt.range(),
+                )));
             }
 
             checker.diagnostics.push(diagnostic);

@@ -1,6 +1,6 @@
 use rustpython_parser::ast::Expr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::typing::AnnotationKind;
 
@@ -55,7 +55,10 @@ pub fn use_pep585_annotation(checker: &mut Checker, expr: &Expr) {
         if fixable && checker.patch(diagnostic.kind.rule()) {
             let binding = binding.to_lowercase();
             if checker.ctx.is_builtin(&binding) {
-                diagnostic.set_fix(Edit::range_replacement(binding, expr.range()));
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                    binding,
+                    expr.range(),
+                )));
             }
         }
         checker.diagnostics.push(diagnostic);

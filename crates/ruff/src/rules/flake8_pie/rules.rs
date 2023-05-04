@@ -9,7 +9,7 @@ use rustpython_parser::ast::{
 };
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Violation};
-use ruff_diagnostics::{Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{create_expr, trailing_comment_start_offset, unparse_expr};
@@ -136,7 +136,9 @@ pub fn no_unnecessary_pass(checker: &mut Checker, body: &[Stmt]) {
                 let mut diagnostic = Diagnostic::new(UnnecessaryPass, pass_stmt.range());
                 if checker.patch(diagnostic.kind.rule()) {
                     if let Some(index) = trailing_comment_start_offset(pass_stmt, checker.locator) {
-                        diagnostic.set_fix(Edit::range_deletion(pass_stmt.range().add_end(index)));
+                        diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
+                            pass_stmt.range().add_end(index),
+                        )));
                     } else {
                         diagnostic.try_set_fix(|| {
                             delete_stmt(
@@ -414,10 +416,10 @@ pub fn multiple_starts_ends_with(checker: &mut Checker, expr: &Expr) {
                         .collect(),
                 });
 
-                diagnostic.set_fix(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     unparse_expr(&bool_op, checker.stylist),
                     expr.range(),
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -439,7 +441,10 @@ pub fn reimplemented_list_builtin(checker: &mut Checker, expr: &Expr) {
             if elts.is_empty() {
                 let mut diagnostic = Diagnostic::new(ReimplementedListBuiltin, expr.range());
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement("list".to_string(), expr.range()));
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        "list".to_string(),
+                        expr.range(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }

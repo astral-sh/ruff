@@ -4,7 +4,7 @@ use rustc_hash::FxHashSet;
 use rustpython_parser::ast::{Cmpop, Constant, Expr, ExprContext, ExprKind, Stmt, StmtKind};
 use unicode_width::UnicodeWidthStr;
 
-use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::{ComparableConstant, ComparableExpr, ComparableStmt};
 use ruff_python_ast::helpers::{
@@ -370,7 +370,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
     if fixable && checker.patch(diagnostic.kind.rule()) {
         if matches!(test.node, ExprKind::Compare { .. }) {
             // If the condition is a comparison, we can replace it with the condition.
-            diagnostic.set_fix(Edit::range_replacement(
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
                         value: Some(test.clone()),
@@ -378,11 +378,11 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     checker.stylist,
                 ),
                 stmt.range(),
-            ));
+            )));
         } else {
             // Otherwise, we need to wrap the condition in a call to `bool`. (We've already
             // verified, above, that `bool` is a builtin.)
-            diagnostic.set_fix(Edit::range_replacement(
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_stmt(
                     &create_stmt(StmtKind::Return {
                         value: Some(Box::new(create_expr(ExprKind::Call {
@@ -397,7 +397,7 @@ pub fn needless_bool(checker: &mut Checker, stmt: &Stmt) {
                     checker.stylist,
                 ),
                 stmt.range(),
-            ));
+            )));
         };
     }
     checker.diagnostics.push(diagnostic);
@@ -528,7 +528,10 @@ pub fn use_ternary_operator(checker: &mut Checker, stmt: &Stmt, parent: Option<&
         stmt.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(contents, stmt.range()));
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            contents,
+            stmt.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }
@@ -875,7 +878,10 @@ pub fn use_dict_get_with_default(
         stmt.range(),
     );
     if fixable && checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement(contents, stmt.range()));
+        diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+            contents,
+            stmt.range(),
+        )));
     }
     checker.diagnostics.push(diagnostic);
 }

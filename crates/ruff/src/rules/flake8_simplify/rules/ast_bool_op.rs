@@ -7,7 +7,7 @@ use ruff_text_size::TextRange;
 use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Boolop, Cmpop, Expr, ExprContext, ExprKind, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::comparable::ComparableExpr;
 use ruff_python_ast::helpers::{
@@ -366,10 +366,10 @@ pub fn duplicate_isinstance_call(checker: &mut Checker, expr: &Expr) {
 
                 // Populate the `Fix`. Replace the _entire_ `BoolOp`. Note that if we have
                 // multiple duplicates, the fixes will conflict.
-                diagnostic.set_fix(Edit::range_replacement(
+                diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                     unparse_expr(&bool_op, checker.stylist),
                     expr.range(),
-                ));
+                )));
             }
             checker.diagnostics.push(diagnostic);
         }
@@ -468,10 +468,10 @@ pub fn compare_with_tuple(checker: &mut Checker, expr: &Expr) {
                     values: iter::once(in_expr).chain(unmatched).collect(),
                 })
             };
-            diagnostic.set_fix(Edit::range_replacement(
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 unparse_expr(&in_expr, checker.stylist),
                 expr.range(),
-            ));
+            )));
         }
         checker.diagnostics.push(diagnostic);
     }
@@ -519,7 +519,10 @@ pub fn expr_and_not_expr(checker: &mut Checker, expr: &Expr) {
                     expr.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement("False".to_string(), expr.range()));
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        "False".to_string(),
+                        expr.range(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }
@@ -569,7 +572,10 @@ pub fn expr_or_not_expr(checker: &mut Checker, expr: &Expr) {
                     expr.range(),
                 );
                 if checker.patch(diagnostic.kind.rule()) {
-                    diagnostic.set_fix(Edit::range_replacement("True".to_string(), expr.range()));
+                    diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                        "True".to_string(),
+                        expr.range(),
+                    )));
                 }
                 checker.diagnostics.push(diagnostic);
             }

@@ -2,7 +2,7 @@ use ruff_text_size::{TextLen, TextRange, TextSize};
 
 use ruff_diagnostics::AlwaysAutofixableViolation;
 use ruff_diagnostics::Edit;
-use ruff_diagnostics::{Diagnostic, DiagnosticKind};
+use ruff_diagnostics::{Diagnostic, DiagnosticKind, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
@@ -197,7 +197,10 @@ pub fn invalid_string_characters(
 
         let mut diagnostic = Diagnostic::new(rule, range);
         if autofix {
-            diagnostic.set_fix(Edit::range_replacement(replacement.to_string(), range));
+            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
+                replacement.to_string(),
+                range,
+            )));
         }
         diagnostics.push(diagnostic);
     }

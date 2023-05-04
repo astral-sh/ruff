@@ -1,6 +1,6 @@
 use ruff_text_size::TextRange;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::source_code::Locator;
 
@@ -58,7 +58,9 @@ pub fn commented_out_code(
     if is_standalone_comment(line) && comment_contains_code(line, &settings.task_tags[..]) {
         let mut diagnostic = Diagnostic::new(CommentedOutCode, range);
         if autofix.into() && settings.rules.should_fix(Rule::CommentedOutCode) {
-            diagnostic.set_fix(Edit::range_deletion(locator.full_lines_range(range)));
+            diagnostic.set_fix(Fix::unspecified(Edit::range_deletion(
+                locator.full_lines_range(range),
+            )));
         }
         Some(diagnostic)
     } else {

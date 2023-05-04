@@ -1,6 +1,6 @@
 use crate::checkers::logical_lines::LogicalLinesContext;
 use crate::rules::pycodestyle::rules::logical_lines::LogicalLine;
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::token_kind::TokenKind;
 use ruff_text_size::{TextRange, TextSize};
@@ -63,7 +63,7 @@ pub(crate) fn whitespace_before_parameters(
             let mut diagnostic = Diagnostic::new(kind, TextRange::new(start, end));
 
             if autofix {
-                diagnostic.set_fix(Edit::deletion(start, end));
+                diagnostic.set_fix(Fix::unspecified(Edit::deletion(start, end)));
             }
             context.push_diagnostic(diagnostic);
         }
