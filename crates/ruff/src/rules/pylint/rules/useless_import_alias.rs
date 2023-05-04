@@ -6,6 +6,21 @@ use ruff_macros::{derive_message_formats, violation};
 use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
+/// ## What it does
+/// Checks for import aliases that do not rename the original package.
+///
+/// ## Why is this bad?
+/// The import alias is redundant and should be removed to avoid confusion.
+///
+/// ## Example
+/// ```python
+/// import numpy as numpy
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import numpy as np
+/// ```
 #[violation]
 pub struct UselessImportAlias;
 
