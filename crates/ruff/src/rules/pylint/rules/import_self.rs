@@ -19,16 +19,19 @@ impl Violation for ImportSelf {
 
 /// PLW0406
 pub fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Option<Diagnostic> {
-    if let Some(module_path) = module_path {
-        if alias.node.name.split('.').eq(module_path) {
-            return Some(Diagnostic::new(
-                ImportSelf {
-                    name: alias.node.name.clone(),
-                },
-                alias.range(),
-            ));
-        }
+    let Some(module_path) = module_path else {
+        return None;
+    };
+
+    if alias.node.name.split('.').eq(module_path) {
+        return Some(Diagnostic::new(
+            ImportSelf {
+                name: alias.node.name.clone(),
+            },
+            alias.range(),
+        ));
     }
+
     None
 }
 
@@ -39,27 +42,29 @@ pub fn import_from_self(
     names: &[Alias],
     module_path: Option<&[String]>,
 ) -> Option<Diagnostic> {
-    if let Some(module_path) = module_path {
-        if let Some(imported_module_path) =
-            resolve_imported_module_path(level, module, Some(module_path))
+    let Some(module_path) = module_path else {
+        return None;
+    };
+    let Some(imported_module_path) = resolve_imported_module_path(level, module, Some(module_path)) else {
+        return None;
+    };
+
+    if imported_module_path
+        .split('.')
+        .eq(&module_path[..module_path.len() - 1])
+    {
+        if let Some(alias) = names
+            .iter()
+            .find(|alias| alias.node.name == module_path[module_path.len() - 1])
         {
-            if imported_module_path
-                .split('.')
-                .eq(&module_path[..module_path.len() - 1])
-            {
-                if let Some(alias) = names
-                    .iter()
-                    .find(|alias| alias.node.name == module_path[module_path.len() - 1])
-                {
-                    return Some(Diagnostic::new(
-                        ImportSelf {
-                            name: format!("{}.{}", imported_module_path, alias.node.name),
-                        },
-                        alias.range(),
-                    ));
-                }
-            }
+            return Some(Diagnostic::new(
+                ImportSelf {
+                    name: format!("{}.{}", imported_module_path, alias.node.name),
+                },
+                alias.range(),
+            ));
         }
     }
+
     None
 }
