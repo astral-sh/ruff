@@ -41,6 +41,10 @@ mod tests {
     #[test_case(Rule::DocstringInStub, Path::new("PYI021.pyi"))]
     #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.py"))]
     #[test_case(Rule::TypeCommentInStub, Path::new("PYI033.pyi"))]
+    #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.py"))]
+    #[test_case(Rule::SnakeCaseTypeAlias, Path::new("PYI042.pyi"))]
+    #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.py"))]
+    #[test_case(Rule::TSuffixedTypeAlias, Path::new("PYI043.pyi"))]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(

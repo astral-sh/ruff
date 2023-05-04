@@ -11,6 +11,9 @@ pub use simple_defaults::{
     typed_argument_simple_defaults, ArgumentDefaultInStub, AssignmentDefaultInStub,
     TypedArgumentDefaultInStub,
 };
+pub use type_alias_naming::{
+    snake_case_type_alias, t_suffixed_type_alias, SnakeCaseTypeAlias, TSuffixedTypeAlias,
+};
 pub use type_comment_in_stub::{type_comment_in_stub, TypeCommentInStub};
 pub use unrecognized_platform::{
     unrecognized_platform, UnrecognizedPlatformCheck, UnrecognizedPlatformName,
@@ -25,5 +28,6 @@ mod pass_statement_stub_body;
 mod prefix_type_params;
 mod quoted_annotation_in_stub;
 mod simple_defaults;
+mod type_alias_naming;
 mod type_comment_in_stub;
 mod unrecognized_platform;
