@@ -327,6 +327,7 @@ pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
             && name != &"__tracebackhide__"
             && name != &"__traceback_info__"
             && name != &"__traceback_supplement__"
+            && name != &"__debuggerskip__"
         {
             let mut diagnostic = Diagnostic::new(
                 UnusedVariable {
