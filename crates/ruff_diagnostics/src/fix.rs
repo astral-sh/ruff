@@ -39,11 +39,43 @@ impl Fix {
         }
     }
 
-    /// Create a new [`Fix`] with unspecified applicability from multiple [`Edit`] elements.
+    /// Create a new [`Fix`] with an unspecified applicability from multiple [`Edit`] elements.
     pub fn unspecified_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         Self {
             edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
             applicability: Applicability::Unspecified,
+        }
+    }
+
+    /// Create a new [`Fix`] with safe applicability from an [`Edit`] element.
+    pub fn safe(edit: Edit) -> Self {
+        Self {
+            edits: vec![edit],
+            applicability: Applicability::safe,
+        }
+    }
+
+    /// Create a new [`Fix`] with safe applicability from multiple [`Edit`] elements.
+    pub fn safe_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+        Self {
+            edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
+            applicability: Applicability::safe,
+        }
+    }
+
+    /// Create a new [`Fix`] with maybe incorrect applicability from an [`Edit`] element.
+    pub fn maybe_incorrect(edit: Edit) -> Self {
+        Self {
+            edits: vec![edit],
+            applicability: Applicability::MaybeIncorrect,
+        }
+    }
+
+    /// Create a new [`Fix`] with maybe incorrect applicability from multiple [`Edit`] elements.
+    pub fn maybe_incorrect_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
+        Self {
+            edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
+            applicability: Applicability::MaybeIncorrect,
         }
     }
 
