@@ -85,7 +85,7 @@ def foo2(list_a, list_b):
 
 def foo3(list_a, list_b):
     return (
-        # Standlone comment but weirdly placed.
+        # Standalone comment but weirdly placed.
         User.query.filter(User.foo == "bar")
         .filter(
             db.or_(User.field_a.astext.in_(list_a), User.field_b.astext.in_(list_b))

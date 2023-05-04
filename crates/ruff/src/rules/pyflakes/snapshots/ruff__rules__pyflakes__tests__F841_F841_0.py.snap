@@ -210,4 +210,13 @@ F841_0.py:122:14: F841 [*] Local variable `y` is assigned to but never used
     |
     = help: Remove assignment to unused variable `y`
 
+F841_0.py:127:21: F841 [*] Local variable `value` is assigned to but never used
+    |
+127 | def f():
+128 |     if any((key := (value := x)) for x in ["ok"]):
+    |                     ^^^^^ F841
+129 |         print(key)
+    |
+    = help: Remove assignment to unused variable `value`
+
 

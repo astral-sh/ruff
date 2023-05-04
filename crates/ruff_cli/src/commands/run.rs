@@ -12,8 +12,8 @@ use ruff_text_size::{TextRange, TextSize};
 
 use ruff::message::Message;
 use ruff::registry::Rule;
-use ruff::resolver::PyprojectDiscovery;
 use ruff::rules::pylint::pylint_cyclic_import;
+use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
 use ruff::settings::{flags, AllSettings};
 use ruff::{fs, packaging, resolver, warn_user_once, IOError};
 use ruff_diagnostics::Diagnostic;
@@ -28,7 +28,7 @@ use crate::panic::catch_unwind;
 /// Run the linter over a collection of files.
 pub fn run(
     files: &[PathBuf],
-    pyproject_strategy: &PyprojectDiscovery,
+    pyproject_config: &PyprojectConfig,
     overrides: &Overrides,
     cache: flags::Cache,
     noqa: flags::Noqa,
@@ -36,7 +36,7 @@ pub fn run(
 ) -> Result<Diagnostics> {
     // Collect all the Python files to check.
     let start = Instant::now();
-    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_strategy, overrides)?;
+    let (paths, resolver) = resolver::python_files_in_path(files, pyproject_config, overrides)?;
     let duration = start.elapsed();
     debug!("Identified files to lint in: {:?}", duration);
 
@@ -53,12 +53,12 @@ pub fn run(
             }
         }
 
-        match &pyproject_strategy {
-            PyprojectDiscovery::Fixed(settings) => {
-                init_cache(&settings.cli.cache_dir);
+        match pyproject_config.strategy {
+            PyprojectDiscoveryStrategy::Fixed => {
+                init_cache(&pyproject_config.settings.cli.cache_dir);
             }
-            PyprojectDiscovery::Hierarchical(default) => {
-                for settings in std::iter::once(default).chain(resolver.iter()) {
+            PyprojectDiscoveryStrategy::Hierarchical => {
+                for settings in std::iter::once(&pyproject_config.settings).chain(resolver.iter()) {
                     init_cache(&settings.cli.cache_dir);
                 }
             }
@@ -73,7 +73,7 @@ pub fn run(
             .map(ignore::DirEntry::path)
             .collect::<Vec<_>>(),
         &resolver,
-        pyproject_strategy,
+        pyproject_config,
     );
 
     let start = Instant::now();
@@ -87,7 +87,7 @@ pub fn run(
                         .parent()
                         .and_then(|parent| package_roots.get(parent))
                         .and_then(|package| *package);
-                    let settings = resolver.resolve_all(path, pyproject_strategy);
+                    let settings = resolver.resolve_all(path, pyproject_config);
 
                     lint_path(path, package, settings, cache, noqa, autofix).map_err(|e| {
                         (Some(path.to_owned()), {
@@ -117,7 +117,7 @@ pub fn run(
                         fs::relativize_path(path).bold(),
                         ":".bold()
                     );
-                    let settings = resolver.resolve(path, pyproject_strategy);
+                    let settings = resolver.resolve(path, pyproject_config);
                     if settings.rules.enabled(Rule::IOError) {
                         let file =
                             SourceFileBuilder::new(path.to_string_lossy().as_ref(), "").finish();
@@ -252,7 +252,7 @@ mod test {
     use path_absolutize::Absolutize;
 
     use ruff::logging::LogLevel;
-    use ruff::resolver::PyprojectDiscovery;
+    use ruff::resolver::{PyprojectConfig, PyprojectDiscoveryStrategy};
     use ruff::settings::configuration::{Configuration, RuleSelection};
     use ruff::settings::flags::FixMode;
     use ruff::settings::flags::{Cache, Noqa};
@@ -294,7 +294,11 @@ mod test {
 
         let diagnostics = run(
             &[root_path.join("valid.ipynb")],
-            &PyprojectDiscovery::Fixed(AllSettings::from_configuration(configuration, &root_path)?),
+            &PyprojectConfig::new(
+                PyprojectDiscoveryStrategy::Fixed,
+                AllSettings::from_configuration(configuration, &root_path)?,
+                None,
+            ),
             &overrides,
             Cache::Disabled,
             Noqa::Enabled,

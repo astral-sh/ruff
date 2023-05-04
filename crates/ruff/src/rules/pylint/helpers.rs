@@ -16,7 +16,7 @@ pub fn in_dunder_init(checker: &Checker) -> bool {
     if name != "__init__" {
         return false;
     }
-    let Some(parent) = checker.ctx.parent_scope() else {
+    let Some(parent) = scope.parent.map(|scope_id| &checker.ctx.scopes[scope_id]) else {
         return false;
     };
 

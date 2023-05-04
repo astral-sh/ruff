@@ -619,10 +619,14 @@ fn common_section(
             );
             if checker.patch(diagnostic.kind.rule()) {
                 // Replace the existing indentation with whitespace of the appropriate length.
-                diagnostic.set_fix(Edit::range_replacement(
-                    whitespace::clean(docstring.indentation),
-                    TextRange::at(context.range().start(), leading_space.text_len()),
-                ));
+                let content = whitespace::clean(docstring.indentation);
+                let fix_range = TextRange::at(context.range().start(), leading_space.text_len());
+
+                diagnostic.set_fix(if content.is_empty() {
+                    Edit::range_deletion(fix_range)
+                } else {
+                    Edit::range_replacement(content, fix_range)
+                });
             };
             checker.diagnostics.push(diagnostic);
         }

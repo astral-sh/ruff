@@ -322,11 +322,12 @@ pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
         .map(|(name, index)| (name, &checker.ctx.bindings[*index]))
     {
         if !binding.used()
-            && binding.kind.is_assignment()
+            && (binding.kind.is_assignment() || binding.kind.is_named_expr_assignment())
             && !checker.settings.dummy_variable_rgx.is_match(name)
             && name != &"__tracebackhide__"
             && name != &"__traceback_info__"
             && name != &"__traceback_supplement__"
+            && name != &"__debuggerskip__"
         {
             let mut diagnostic = Diagnostic::new(
                 UnusedVariable {

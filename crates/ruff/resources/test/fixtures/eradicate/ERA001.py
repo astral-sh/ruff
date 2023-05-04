@@ -14,3 +14,8 @@ def foo(x, y, z):
     return False
 
 #import os  # noqa: ERA001
+
+
+class A():
+    pass
+    # b = c

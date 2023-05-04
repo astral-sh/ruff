@@ -17,14 +17,12 @@ impl Violation for ReturnOutsideFunction {
 }
 
 pub fn return_outside_function(checker: &mut Checker, stmt: &Stmt) {
-    if let Some(index) = checker.ctx.scope_stack.top() {
-        if matches!(
-            checker.ctx.scopes[index].kind,
-            ScopeKind::Class(_) | ScopeKind::Module
-        ) {
-            checker
-                .diagnostics
-                .push(Diagnostic::new(ReturnOutsideFunction, stmt.range()));
-        }
+    if matches!(
+        checker.ctx.scope().kind,
+        ScopeKind::Class(_) | ScopeKind::Module
+    ) {
+        checker
+            .diagnostics
+            .push(Diagnostic::new(ReturnOutsideFunction, stmt.range()));
     }
 }

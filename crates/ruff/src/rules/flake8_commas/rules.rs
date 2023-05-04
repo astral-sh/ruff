@@ -110,6 +110,29 @@ impl Context {
     }
 }
 
+/// ## What it does
+/// Checks for the absence of trailing commas.
+///
+/// ## Why is this bad?
+/// The presence of a trailing comma can reduce diff size when parameters or
+/// elements are added or removed from function calls, function definitions,
+/// literals, etc.
+///
+/// ## Example
+/// ```python
+/// foo = {
+///     "bar": 1,
+///     "baz": 2
+/// }
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = {
+///     "bar": 1,
+///     "baz": 2,
+/// }
+/// ```
 #[violation]
 pub struct MissingTrailingComma;
 
@@ -124,6 +147,45 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of trailing commas on bare (i.e., unparenthesized)
+/// tuples.
+///
+/// ## Why is this bad?
+/// The presence of a misplaced comma will cause Python to interpret the value
+/// as a tuple, which can lead to unexpected behaviour.
+///
+/// ## Example
+/// ```python
+/// import json
+///
+///
+/// foo = json.dumps({
+///     "bar": 1,
+/// }),
+/// ```
+///
+/// Use instead:
+/// ```python
+/// import json
+///
+///
+/// foo = json.dumps({
+///     "bar": 1,
+/// })
+/// ```
+///
+/// In the event that a tuple is intended, then use instead:
+/// ```python
+/// import json
+///
+///
+/// foo = (
+///     json.dumps({
+///         "bar": 1,
+///     }),
+/// )
+/// ```
 #[violation]
 pub struct TrailingCommaOnBareTuple;
 
@@ -134,6 +196,22 @@ impl Violation for TrailingCommaOnBareTuple {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of prohibited trailing commas.
+///
+/// ## Why is this bad?
+/// Trailing commas are not essential in some cases and can therefore be viewed
+/// as unnecessary.
+///
+/// ## Example
+/// ```python
+/// foo = (1, 2, 3,)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// foo = (1, 2, 3)
+/// ```
 #[violation]
 pub struct ProhibitedTrailingComma;
 
