@@ -1000,14 +1000,10 @@ where
                     if self.settings.rules.enabled(Rule::ManualFromImport) {
                         pylint::rules::manual_from_import(self, stmt, alias, names);
                     }
-
                     if self.settings.rules.enabled(Rule::ImportSelf) {
-                        if let Some(diagnostic) = pylint::rules::import_self(
-                            stmt,
-                            self.path,
-                            self.module_path.as_deref(),
-                            self.locator,
-                        ) {
+                        if let Some(diagnostic) =
+                            pylint::rules::import_self(alias, self.module_path.as_deref())
+                        {
                             self.diagnostics.push(diagnostic);
                         }
                     }
@@ -1489,11 +1485,11 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::ImportSelf) {
-                    if let Some(diagnostic) = pylint::rules::import_self(
-                        stmt,
-                        self.path,
+                    if let Some(diagnostic) = pylint::rules::import_from_self(
+                        *level,
+                        module.as_deref(),
+                        names,
                         self.module_path.as_deref(),
-                        self.locator,
                     ) {
                         self.diagnostics.push(diagnostic);
                     }

@@ -10,7 +10,7 @@ pub use comparison_of_constant::{comparison_of_constant, ComparisonOfConstant};
 pub use continue_in_finally::{continue_in_finally, ContinueInFinally};
 pub use global_statement::{global_statement, GlobalStatement};
 pub use global_variable_not_assigned::GlobalVariableNotAssigned;
-pub use import_self::{import_self, ImportSelf};
+pub use import_self::{import_from_self, import_self, ImportSelf};
 pub use invalid_all_format::{invalid_all_format, InvalidAllFormat};
 pub use invalid_all_object::{invalid_all_object, InvalidAllObject};
 pub use invalid_envvar_default::{invalid_envvar_default, InvalidEnvvarDefault};

@@ -1,80 +1,65 @@
-use std::path::Path;
+use rustpython_parser::ast::Alias;
 
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::helpers::identifier_range;
-use ruff_python_ast::source_code::Locator;
-use rustpython_parser::ast::{Stmt, StmtKind};
+use ruff_python_ast::helpers::resolve_imported_module_path;
 
 #[violation]
-pub struct ImportSelf;
+pub struct ImportSelf {
+    pub name: String,
+}
 
 impl Violation for ImportSelf {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Module imports itself")
-    }
-}
-
-fn get_module_from_path(path: &Path) -> Option<String> {
-    Some(
-        path.iter()
-            .last()?
-            .to_str()?
-            .strip_suffix(".py")?
-            .to_string(),
-    )
-}
-
-fn check_import_self(stmt: &Stmt, path: &Path, module_path: Option<&[String]>) -> bool {
-    match &stmt.node {
-        StmtKind::Import { names, .. } => {
-            if let Some(module_path) = module_path {
-                names
-                    .iter()
-                    .any(|name| name.node.name.split('.').eq(module_path))
-            } else if let Some(module) = get_module_from_path(path) {
-                names.iter().any(|name| name.node.name == module)
-            } else {
-                false
-            }
-        }
-        StmtKind::ImportFrom {
-            module,
-            level,
-            names,
-            ..
-        } => {
-            if let Some(module_path) = module_path {
-                if let Some(module) = module {
-                    module.split('.').eq(module_path.iter())
-                } else {
-                    if *level == Some(1) && module_path.last().is_some() {
-                        names
-                            .iter()
-                            .any(|name| Some(&name.node.name) == module_path.last())
-                    } else {
-                        false
-                    }
-                }
-            } else {
-                get_module_from_path(path) == *module
-            }
-        }
-        _ => panic!("import_self supplied with something other than Import|ImportFrom"),
+        let Self { name } = self;
+        format!("Module `{name}` imports itself")
     }
 }
 
 /// PLW0406
-pub fn import_self(
-    stmt: &Stmt,
-    path: &Path,
-    module_path: Option<&[String]>,
-    locator: &Locator,
-) -> Option<Diagnostic> {
-    if check_import_self(stmt, path, module_path) {
-        Some(Diagnostic::new(ImportSelf, identifier_range(stmt, locator)))
-    } else {
-        None
+pub fn import_self(alias: &Alias, module_path: Option<&[String]>) -> Option<Diagnostic> {
+    if let Some(module_path) = module_path {
+        if alias.node.name.split('.').eq(module_path) {
+            return Some(Diagnostic::new(
+                ImportSelf {
+                    name: alias.node.name.clone(),
+                },
+                alias.range(),
+            ));
+        }
     }
+    None
+}
+
+/// PLW0406
+pub fn import_from_self(
+    level: Option<usize>,
+    module: Option<&str>,
+    names: &[Alias],
+    module_path: Option<&[String]>,
+) -> Option<Diagnostic> {
+    if let Some(module_path) = module_path {
+        if let Some(imported_module_path) =
+            resolve_imported_module_path(level, module, Some(module_path))
+        {
+            if imported_module_path
+                .split('.')
+                .eq(&module_path[..module_path.len() - 1])
+            {
+                if let Some(alias) = names
+                    .iter()
+                    .find(|alias| alias.node.name == module_path[module_path.len() - 1])
+                {
+                    return Some(Diagnostic::new(
+                        ImportSelf {
+                            name: format!("{}.{}", imported_module_path, alias.node.name),
+                        },
+                        alias.range(),
+                    ));
+                }
+            }
+        }
+    }
+    None
 }
