@@ -1370,12 +1370,14 @@
         },
         "tab-size": {
           "description": "The tabulation length to use when enforcing long-lines violations (like `E501`).",
-          "type": [
-            "integer",
-            "null"
-          ],
-          "format": "uint",
-          "minimum": 0.0
+          "anyOf": [
+            {
+              "$ref": "#/definitions/TabSize"
+            },
+            {
+              "type": "null"
+            }
+          ]
         }
       },
       "additionalProperties": false
@@ -2497,6 +2499,11 @@
           ]
         }
       ]
+    },
+    "TabSize": {
+      "type": "integer",
+      "format": "uint8",
+      "minimum": 0.0
     },
     "Version": {
       "type": "string"

@@ -4,6 +4,22 @@ use serde::{Deserialize, Serialize};
 
 use ruff_macros::{CacheKey, CombineOptions, ConfigurationOptions};
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize, CacheKey)]
+#[cfg_attr(feature = "schemars", derive(schemars::JsonSchema))]
+pub struct TabSize(pub u8);
+
+impl From<TabSize> for usize {
+    fn from(tab_size: TabSize) -> Self {
+        tab_size.0 as usize
+    }
+}
+
+impl From<u8> for TabSize {
+    fn from(tab_size: u8) -> Self {
+        Self(tab_size)
+    }
+}
+
 #[derive(
     Debug, PartialEq, Eq, Serialize, Deserialize, Default, ConfigurationOptions, CombineOptions,
 )]
@@ -40,14 +56,14 @@ pub struct Options {
     )]
     /// The tabulation length to use when enforcing long-lines violations (like
     /// `E501`).
-    pub tab_size: Option<usize>,
+    pub tab_size: Option<TabSize>,
 }
 
 #[derive(Debug, CacheKey)]
 pub struct Settings {
     pub max_doc_length: Option<usize>,
     pub ignore_overlong_task_comments: bool,
-    pub tab_size: usize,
+    pub tab_size: TabSize,
 }
 
 impl From<Options> for Settings {
@@ -78,7 +94,7 @@ impl Default for Settings {
         Self {
             max_doc_length: None,
             ignore_overlong_task_comments: false,
-            tab_size: 4,
+            tab_size: TabSize(4),
         }
     }
 }

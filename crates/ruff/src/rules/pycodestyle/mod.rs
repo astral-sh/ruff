@@ -180,13 +180,13 @@ mod tests {
     #[test_case(2)]
     #[test_case(4)]
     #[test_case(8)]
-    fn tab_size(tab_size: usize) -> Result<()> {
+    fn tab_size(tab_size: u8) -> Result<()> {
         let snapshot = format!("tab_size_{tab_size}");
         let diagnostics = test_path(
             Path::new("pycodestyle/E501_2.py"),
             &settings::Settings {
                 pycodestyle: Settings {
-                    tab_size,
+                    tab_size: tab_size.into(),
                     ..Settings::default()
                 },
                 ..settings::Settings::for_rule(Rule::LineTooLong)
