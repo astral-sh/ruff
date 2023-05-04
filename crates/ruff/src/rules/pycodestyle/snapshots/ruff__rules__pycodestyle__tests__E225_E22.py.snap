@@ -259,14 +259,14 @@ E22.py:100:7: E225 Missing whitespace around operator
 103 | #:
     |
 
-E22.py:155:9: E225 Missing whitespace around operator
+E22.py:154:13: E225 Missing whitespace around operator
     |
+154 | func2(lambda a, b=h[:], c=0: (a, b, c))
 155 | if not -5 < x < +5:
-156 |     print >> sys.stderr, "x is out of range."
-157 | print >>sys.stdout, "x is an integer."
-    |          E225
+156 |     print >>sys.stderr, "x is out of range."
+    |              E225
+157 | print >> sys.stdout, "x is an integer."
 158 | x = x / 2 - 1
-159 | x = 1 @ 2
     |
 
 

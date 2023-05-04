@@ -88,30 +88,30 @@ pub(crate) fn missing_whitespace_around_operator(
 
             NeedsSpace::from(!slash_in_func)
         } else if kind.is_unary() || kind == TokenKind::DoubleStar {
-            prev_token.map_or(NeedsSpace::No, |prev_token| {
+            let is_binary = prev_token.map_or(false, |prev_token| {
                 let prev_kind = prev_token.kind();
 
                 // Check if the operator is used as a binary operator.
                 // Allow unary operators: -123, -x, +1.
                 // Allow argument unpacking: foo(*args, **kwargs)
-                let is_binary = matches!(
+                matches!(
                     prev_kind,
                     TokenKind::Rpar | TokenKind::Rsqb | TokenKind::Rbrace
                 ) || !(prev_kind.is_operator()
                     || prev_kind.is_keyword()
-                    || prev_kind.is_soft_keyword());
+                    || prev_kind.is_soft_keyword())
+            });
 
-                if is_binary {
-                    if kind == TokenKind::DoubleStar {
-                        // Enforce consistent spacing, but don't enforce whitespaces.
-                        NeedsSpace::Optional
-                    } else {
-                        NeedsSpace::Yes
-                    }
+            if is_binary {
+                if kind == TokenKind::DoubleStar {
+                    // Enforce consistent spacing, but don't enforce whitespaces.
+                    NeedsSpace::Optional
                 } else {
-                    NeedsSpace::No
+                    NeedsSpace::Yes
                 }
-            })
+            } else {
+                NeedsSpace::No
+            }
         } else if is_whitespace_needed(kind) {
             NeedsSpace::Yes
         } else {
@@ -178,9 +178,10 @@ enum NeedsSpace {
 
 impl From<bool> for NeedsSpace {
     fn from(value: bool) -> Self {
-        match value {
-            true => NeedsSpace::Yes,
-            false => NeedsSpace::No,
+        if value {
+            NeedsSpace::Yes
+        } else {
+            NeedsSpace::No
         }
     }
 }
