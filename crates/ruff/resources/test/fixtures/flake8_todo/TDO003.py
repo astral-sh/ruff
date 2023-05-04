@@ -12,3 +12,5 @@
 # TODO: here's a TODO with no link after it
 def foo(x):
     return x
+
+# TODO: here's a TODO on the last line with no link

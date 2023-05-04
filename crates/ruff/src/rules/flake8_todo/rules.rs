@@ -1,13 +1,11 @@
-use std::iter::Peekable;
-
 use once_cell::sync::Lazy;
 
 use regex::{CaptureMatches, Regex, RegexSet};
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
+use ruff_text_size::{TextRange, TextSize};
+use rustpython_parser::lexer::LexResult;
 use rustpython_parser::Tok;
-use rustpython_parser::{ast::Location, lexer::LexResult};
 
 use crate::{
     registry::Rule,
@@ -66,7 +64,7 @@ pub struct MissingAuthorInTodo;
 impl Violation for MissingAuthorInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing author in TODO")
+        format!("Missing author in TODO. Try: # TODO (<author_name>): ...")
     }
 }
 
@@ -82,17 +80,23 @@ impl Violation for MissingAuthorInTodo {
 /// # TODO: this link has no issue
 /// ```
 ///
-/// Use instead:
+/// Use one of these instead:
 /// ```python
-/// # TODO(ruff): solve this issue!
+/// # TODO (ruff): this comment has an issue link
 /// # https://github.com/charliermarsh/ruff/issues/3870
+///
+/// # TODO (ruff): this comment has a 3-digit issue code
+/// # 003
+///
+/// # TODO (ruff): this comment has an issue code of (up to) 6 characters, then digits
+/// # SIXCHR-003
 /// ```
 #[violation]
 pub struct MissingLinkInTodo;
 impl Violation for MissingLinkInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing issue link following TODO")
+        format!("Missing issue link on the line following this TODO")
     }
 }
 
@@ -116,7 +120,7 @@ pub struct MissingColonInTodo;
 impl Violation for MissingColonInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing colon in TODO")
+        format!("Missing colon in TODO. Try: # TODO: ...")
     }
 }
 
@@ -141,7 +145,7 @@ pub struct MissingTextInTodo;
 impl Violation for MissingTextInTodo {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Missing text in TODO")
+        format!("Missing text after 'TODO'")
     }
 }
 
@@ -172,7 +176,8 @@ impl AlwaysAutofixableViolation for InvalidCapitalizationInTodo {
     }
 
     fn autofix_title(&self) -> String {
-        "Fix capitalization in `TODO`".to_string()
+        let InvalidCapitalizationInTodo { tag } = self;
+        format!("Replace `{tag}` with `TODO`")
     }
 }
 
@@ -223,9 +228,9 @@ impl Violation for MissingSpaceAfterColonInTodo {
 // `Nones` for the colon and space checks.
 //
 // Note: Regexes taken from https://github.com/orsinium-labs/flake8-todos/blob/master/flake8_todos/_rules.py#L12.
-// TODO: tags should be case-insensitive
 static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
-    Regex::new(r"^# {0,1}(?P<tag>TODO|BUG|FIXME|XXX)( {0,1}\(.*\))?(:)?( )?(.+)?$").unwrap()
+    Regex::new(r"^# {0,1}(?i)(?P<tag>TODO|BUG|FIXME|XXX)(?-i)( {0,1}\(.*\))?(:)?( )?(.+)?$")
+        .unwrap()
 });
 
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
@@ -238,7 +243,7 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
 });
 
 static NUM_CAPTURE_GROUPS: usize = 5usize;
-static TODO_LENGTH: usize = 4usize;
+static TODO_LENGTH: u32 = 4u32;
 
 pub fn check_todos(
     tokens: &[LexResult],
@@ -248,7 +253,7 @@ pub fn check_todos(
     let mut diagnostics: Vec<Diagnostic> = vec![];
 
     let mut iter = tokens.iter().flatten().peekable();
-    while let Some((start, token, end)) = iter.next() {
+    while let Some((token, token_range)) = iter.next() {
         let Tok::Comment(comment) = token else {
             continue;
         };
@@ -256,7 +261,6 @@ pub fn check_todos(
         let Some(captures) = get_captured_matches(comment).next() else {
             continue;
         };
-        let range = Range::new(*start, *end);
 
         // Check for errors on the tag: TDO001/TDO006.
         // Unwrap is safe because the "tag" capture group is required to get here.
@@ -266,7 +270,7 @@ pub fn check_todos(
                 InvalidTodoTag {
                     tag: String::from(tag),
                 },
-                range,
+                *token_range,
             ));
 
             if tag.to_uppercase() == "TODO" {
@@ -274,7 +278,7 @@ pub fn check_todos(
                     InvalidCapitalizationInTodo {
                         tag: String::from(tag),
                     },
-                    range,
+                    *token_range,
                 );
 
                 if autofix.into() && settings.rules.should_fix(Rule::InvalidCapitalizationInTodo) {
@@ -282,8 +286,10 @@ pub fn check_todos(
 
                     invalid_capitalization.set_fix(Fix::new(vec![Edit::replacement(
                         "TODO".to_string(),
-                        Location::new(range.location.row(), first_t_position),
-                        Location::new(range.location.row(), first_t_position + TODO_LENGTH),
+                        token_range.start() + TextSize::new(first_t_position),
+                        token_range.start()
+                            + TextSize::new(first_t_position)
+                            + TextSize::new(TODO_LENGTH),
                     )]));
                 }
 
@@ -291,26 +297,23 @@ pub fn check_todos(
             }
         }
 
-        // Check the rest of the capture groups for errors
-        //
-        // TODO: improve diagnostic placement - this may involve getting rid of the capture groups.
-        // Maybe we iterate through the token and perform each check - this would allow us to find
-        // offsets because we could iterate on index, then when you see an error you store the
-        // index
+        // Check the rest of the capture groups for errors.
         for capture_group_index in 2..=NUM_CAPTURE_GROUPS {
             if captures.get(capture_group_index).is_some() {
                 continue;
             }
 
-            if let Some(diagnostic) = get_regex_error(capture_group_index, &range, &mut diagnostics)
+            if let Some(diagnostic) =
+                get_regex_error(capture_group_index, *token_range, &mut diagnostics)
             {
                 diagnostics.push(diagnostic);
             };
         }
 
         // If we've gotten all the way here, we know that the current token is a TODO. TDO003
-        // requires that the next one is an issue link.
-        if let Some((next_start, next_token, next_end)) = iter.peek() {
+        // requires that the next token is an issue link.
+        let todo_start = find_first_t_position(comment);
+        if let Some((next_token, _next_range)) = iter.peek() {
             if let Tok::Comment(next_comment) = next_token {
                 if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
                     continue;
@@ -319,12 +322,20 @@ pub fn check_todos(
 
             diagnostics.push(Diagnostic::new(
                 MissingLinkInTodo,
-                Range::new(*next_start, *next_end),
+                TextRange::new(
+                    token_range.start() + TextSize::new(todo_start),
+                    token_range.start() + TextSize::new(todo_start) + TextSize::new(TODO_LENGTH),
+                ),
             ));
         } else {
             // There's a TODO on the last line of the file which can't have a link after it.
-            // TODO: restrict the location of the diagnostic to reduce noise
-            diagnostics.push(Diagnostic::new(MissingLinkInTodo, range));
+            diagnostics.push(Diagnostic::new(
+                MissingLinkInTodo,
+                TextRange::new(
+                    token_range.start() + TextSize::new(todo_start),
+                    token_range.start() + TextSize::new(todo_start) + TextSize::new(TODO_LENGTH),
+                ),
+            ));
         }
     }
 
@@ -333,21 +344,25 @@ pub fn check_todos(
 
 /// Mapper for static regex errors caused by a capture group at index i (i > 1 since the tag
 /// capture group could lead to multiple diagnostics being pushed)
-fn get_regex_error(i: usize, range: &Range, diagnostics: &mut [Diagnostic]) -> Option<Diagnostic> {
+fn get_regex_error(
+    i: usize,
+    range: TextRange,
+    diagnostics: &mut [Diagnostic],
+) -> Option<Diagnostic> {
     match i {
-        2usize => Some(Diagnostic::new(MissingAuthorInTodo, *range)),
-        3usize => Some(Diagnostic::new(MissingColonInTodo, *range)),
+        2usize => Some(Diagnostic::new(MissingAuthorInTodo, range)),
+        3usize => Some(Diagnostic::new(MissingColonInTodo, range)),
         4usize => {
             if diagnostics
                 .last()
                 .map_or(true, |last| last.kind != MissingColonInTodo.into())
             {
-                Some(Diagnostic::new(MissingSpaceAfterColonInTodo, *range))
+                Some(Diagnostic::new(MissingSpaceAfterColonInTodo, range))
             } else {
                 None
             }
         }
-        5usize => Some(Diagnostic::new(MissingTextInTodo, *range)),
+        5usize => Some(Diagnostic::new(MissingTextInTodo, range)),
         _ => None,
     }
 }
@@ -356,6 +371,7 @@ fn get_captured_matches(text: &str) -> CaptureMatches {
     TODO_REGEX.captures_iter(text)
 }
 
-fn find_first_t_position(comment: &str) -> usize {
-    comment.find(['t', 'T']).unwrap()
+fn find_first_t_position(comment: &str) -> u32 {
+    // We know that the comment has to have a "t" or "T" in it, so the unwrap is safe.
+    comment.find(['t', 'T']).unwrap().try_into().unwrap()
 }
