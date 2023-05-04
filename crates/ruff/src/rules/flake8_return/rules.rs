@@ -19,6 +19,31 @@ use super::branch::Branch;
 use super::helpers::result_exists;
 use super::visitor::{ReturnVisitor, Stack};
 
+/// ## What it does
+/// Checks for the presence of a `return None` statement when `None` is the only
+/// possible return value.
+///
+/// ## Why is this bad?
+/// Python implicitly assumes `return None` if an explicit `return` value is
+/// omitted. Therefore, explicitly returning `None` is redundant and should be
+/// avoided when it is the only possible `return` value across all code paths
+/// in a given function.
+///
+/// ## Example
+/// ```python
+/// def foo(bar):
+///     if not bar:
+///         return
+///     return None
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar):
+///     if not bar:
+///         return
+///     return
+/// ```
 #[violation]
 pub struct UnnecessaryReturnNone;
 
@@ -35,6 +60,32 @@ impl AlwaysAutofixableViolation for UnnecessaryReturnNone {
     }
 }
 
+/// ## What it does
+/// Checks for the presence of a `return` statement with no explicit value,
+/// for functions that return non-`None` values elsewhere.
+///
+/// ## Why is this bad?
+/// Including a `return` statement with no explicit value can cause confusion
+/// when other `return` statements in the function return non-`None` values.
+/// Python implicitly assumes return `None` if no other return value is present.
+/// Adding an explicit `return None` can make the code more readable by clarifying
+/// intent.
+///
+/// ## Example
+/// ```python
+/// def foo(bar):
+///     if not bar:
+///         return
+///     return 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar):
+///     if not bar:
+///         return None
+///     return 1
+/// ```
 #[violation]
 pub struct ImplicitReturnValue;
 
@@ -49,6 +100,30 @@ impl AlwaysAutofixableViolation for ImplicitReturnValue {
     }
 }
 
+/// ## What it does
+/// Checks for missing explicit `return` statements at the end of functions
+/// that can return non-`None` values.
+///
+/// ## Why is this bad?
+/// The lack of an explicit `return` statement at the end of a function that
+/// can return non-`None` values can cause confusion. Python implicitly returns
+/// `None` if no other return value is present. Adding an explicit
+/// `return None` can make the code more readable by clarifying intent.
+///
+/// ## Example
+/// ```python
+/// def foo(bar):
+///     if not bar:
+///         return 1
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar):
+///     if not bar:
+///         return 1
+///     return None
+/// ```
 #[violation]
 pub struct ImplicitReturn;
 
@@ -63,6 +138,30 @@ impl AlwaysAutofixableViolation for ImplicitReturn {
     }
 }
 
+/// ## What it does
+/// Checks for variable assignments that are unused between the assignment and
+/// a `return` of the variable.
+///
+/// ## Why is this bad?
+/// The variable assignment is not necessary as the value can be returned
+/// directly.
+///
+/// ## Example
+/// ```python
+/// def foo():
+///     bar = 1
+///     # some code that not using `bar`
+///     print('test')
+///     return bar
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo():
+///     # some code that not using `bar`
+///     print('test')
+///     return 1
+/// ```
 #[violation]
 pub struct UnnecessaryAssign;
 
@@ -73,6 +172,31 @@ impl Violation for UnnecessaryAssign {
     }
 }
 
+/// ## What it does
+/// Checks for `else` statements with a `return` statement in the preceding
+/// `if` block.
+///
+/// ## Why is this bad?
+/// The `else` statement is not needed as the `return` statement will always
+/// break out of the enclosing function. Removing the `else` will reduce
+/// nesting and make the code more readable.
+///
+/// ## Example
+/// ```python
+/// def foo(bar, baz):
+///     if bar:
+///         return 1
+///     else:
+///         return baz
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar, baz):
+///     if bar:
+///         return 1
+///     return baz
+/// ```
 #[violation]
 pub struct SuperfluousElseReturn {
     pub branch: Branch,
@@ -86,6 +210,31 @@ impl Violation for SuperfluousElseReturn {
     }
 }
 
+/// ## What it does
+/// Checks for `else` statements with a `raise` statement in the preceding `if`
+/// block.
+///
+/// ## Why is this bad?
+/// The `else` statement is not needed as the `raise` statement will always
+/// break out of the current scope. Removing the `else` will reduce nesting
+/// and make the code more readable.
+///
+/// ## Example
+/// ```python
+/// def foo(bar, baz):
+///     if bar == "Specific Error":
+///         raise Exception(bar)
+///     else:
+///         raise Exception(baz)
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar, baz):
+///     if bar == "Specific Error":
+///         raise Exception(bar)
+///     raise Exception(baz)
+/// ```
 #[violation]
 pub struct SuperfluousElseRaise {
     pub branch: Branch,
@@ -99,6 +248,33 @@ impl Violation for SuperfluousElseRaise {
     }
 }
 
+/// ## What it does
+/// Checks for `else` statements with a `continue` statement in the preceding
+/// `if` block.
+///
+/// ## Why is this bad?
+/// The `else` statement is not needed, as the `continue` statement will always
+/// continue onto the next iteration of a loop. Removing the `else` will reduce
+/// nesting and make the code more readable.
+///
+/// ## Example
+/// ```python
+///def foo(bar, baz):
+///    for i in bar:
+///        if i < baz:
+///            continue
+///        else:
+///            x = 0
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar, baz):
+///     for i in bar:
+///         if i < baz:
+///             continue
+///         x = 0
+/// ```
 #[violation]
 pub struct SuperfluousElseContinue {
     pub branch: Branch,
@@ -112,6 +288,33 @@ impl Violation for SuperfluousElseContinue {
     }
 }
 
+/// ## What it does
+/// Checks for `else` statements with a `break` statement in the preceding `if`
+/// block.
+///
+/// ## Why is this bad?
+/// The `else` statement is not needed, as the `break` statement will always
+/// break out of the loop. Removing the `else` will reduce nesting and make the
+/// code more readable.
+///
+/// ## Example
+/// ```python
+/// def foo(bar, baz):
+///     for i in bar:
+///         if i > baz:
+///             break
+///         else:
+///             x = 0
+/// ```
+///
+/// Use instead:
+/// ```python
+/// def foo(bar, baz):
+///     for i in bar:
+///         if i > baz:
+///             break
+///         x = 0
+/// ```
 #[violation]
 pub struct SuperfluousElseBreak {
     pub branch: Branch,

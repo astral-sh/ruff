@@ -540,6 +540,7 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::UnrecognizedPlatformName,
     rules::flake8_pyi::rules::PassInClassBody,
     rules::flake8_pyi::rules::DuplicateUnionMember,
+    rules::flake8_pyi::rules::QuotedAnnotationInStub,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle,
     rules::flake8_pytest_style::rules::PytestFixturePositionalArgs,

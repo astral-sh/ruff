@@ -97,7 +97,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
     // files are present, or files are injected from outside of the hierarchy.
-    let pyproject_strategy = resolve::resolve(
+    let pyproject_config = resolve::resolve(
         cli.isolated,
         cli.config.as_deref(),
         &overrides,
@@ -105,15 +105,13 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     )?;
 
     if cli.show_settings {
-        commands::show_settings::show_settings(&cli.files, &pyproject_strategy, &overrides)?;
+        commands::show_settings::show_settings(&cli.files, &pyproject_config, &overrides)?;
         return Ok(ExitStatus::Success);
     }
     if cli.show_files {
-        commands::show_files::show_files(&cli.files, &pyproject_strategy, &overrides)?;
+        commands::show_files::show_files(&cli.files, &pyproject_config, &overrides)?;
         return Ok(ExitStatus::Success);
     }
-
-    let top_level_settings = pyproject_strategy.top_level_settings();
 
     // Extract options that are included in `Settings`, but only apply at the top
     // level.
@@ -124,7 +122,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         show_fixes,
         update_check,
         ..
-    } = top_level_settings.cli.clone();
+    } = pyproject_config.settings.cli;
 
     // Autofix rules are as follows:
     // - If `--fix` or `--fix-only` is set, always apply fixes to the filesystem (or
@@ -155,7 +153,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         printer_flags |= PrinterFlags::SHOW_FIXES;
     }
 
-    if top_level_settings.lib.show_source {
+    if pyproject_config.settings.lib.show_source {
         printer_flags |= PrinterFlags::SHOW_SOURCE;
     }
 
@@ -171,7 +169,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
             warn_user_once!("--fix is incompatible with --add-noqa.");
         }
         let modifications =
-            commands::add_noqa::add_noqa(&cli.files, &pyproject_strategy, &overrides)?;
+            commands::add_noqa::add_noqa(&cli.files, &pyproject_config, &overrides)?;
         if modifications > 0 && log_level >= LogLevel::Default {
             let s = if modifications == 1 { "" } else { "s" };
             #[allow(clippy::print_stderr)]
@@ -195,7 +193,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
         let messages = commands::run::run(
             &cli.files,
-            &pyproject_strategy,
+            &pyproject_config,
             &overrides,
             cache.into(),
             noqa.into(),
@@ -225,7 +223,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
 
                         let messages = commands::run::run(
                             &cli.files,
-                            &pyproject_strategy,
+                            &pyproject_config,
                             &overrides,
                             cache.into(),
                             noqa.into(),
@@ -244,7 +242,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         let diagnostics = if is_stdin {
             commands::run_stdin::run_stdin(
                 cli.stdin_filename.map(fs::normalize_path).as_deref(),
-                &pyproject_strategy,
+                &pyproject_config,
                 &overrides,
                 noqa.into(),
                 autofix,
@@ -252,7 +250,7 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         } else {
             commands::run::run(
                 &cli.files,
-                &pyproject_strategy,
+                &pyproject_config,
                 &overrides,
                 cache.into(),
                 noqa.into(),

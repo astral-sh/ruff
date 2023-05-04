@@ -28,12 +28,12 @@ E27.py:8:3: E271 Multiple spaces after keyword
 10 | if   1:
    |    E271
 11 | #: E273
-12 | True and		False
+12 | True and        False
    |
 
 E27.py:14:6: E271 Multiple spaces after keyword
    |
-14 | True		and	False
+14 | True        and    False
 15 | #: E271
 16 | a and  b
    |       E271

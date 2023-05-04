@@ -17,6 +17,8 @@ mod tests {
     #[test_case(Rule::CollapsibleIf, Path::new("SIM102.py"); "SIM102")]
     #[test_case(Rule::NeedlessBool, Path::new("SIM103.py"); "SIM103")]
     #[test_case(Rule::SuppressibleException, Path::new("SIM105.py"); "SIM105")]
+    #[test_case(Rule::SuppressibleException, Path::new("SIM105_1.py"); "SIM105_1")]
+    #[test_case(Rule::SuppressibleException, Path::new("SIM105_2.py"); "SIM105_2")]
     #[test_case(Rule::ReturnInTryExceptFinally, Path::new("SIM107.py"); "SIM107")]
     #[test_case(Rule::IfElseBlockInsteadOfIfExp, Path::new("SIM108.py"); "SIM108")]
     #[test_case(Rule::CompareWithTuple, Path::new("SIM109.py"); "SIM109")]
