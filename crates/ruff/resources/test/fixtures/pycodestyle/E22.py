@@ -151,8 +151,8 @@ spam(-1)
 func1(lambda *args, **kw: (args, kw))
 func2(lambda a, b=h[:], c=0: (a, b, c))
 if not -5 < x < +5:
-    print >> sys.stderr, "x is out of range."
-print >>sys.stdout, "x is an integer."
+    print >>sys.stderr, "x is out of range."
+print >> sys.stdout, "x is an integer."
 x = x / 2 - 1
 x = 1 @ 2
 
