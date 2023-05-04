@@ -168,56 +168,8 @@ pub enum TokenKind {
 
 impl TokenKind {
     #[inline]
-    pub const fn is_whitespace_needed(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::DoubleStarEqual
-                | TokenKind::StarEqual
-                | TokenKind::SlashEqual
-                | TokenKind::DoubleSlashEqual
-                | TokenKind::PlusEqual
-                | TokenKind::MinusEqual
-                | TokenKind::NotEqual
-                | TokenKind::Less
-                | TokenKind::Greater
-                | TokenKind::PercentEqual
-                | TokenKind::CircumflexEqual
-                | TokenKind::AmperEqual
-                | TokenKind::VbarEqual
-                | TokenKind::EqEqual
-                | TokenKind::LessEqual
-                | TokenKind::GreaterEqual
-                | TokenKind::LeftShiftEqual
-                | TokenKind::RightShiftEqual
-                | TokenKind::Equal
-                | TokenKind::And
-                | TokenKind::Or
-                | TokenKind::In
-                | TokenKind::Is
-                | TokenKind::Rarrow
-                | TokenKind::Percent
-        )
-    }
-
-    #[inline]
-    pub const fn is_whitespace_optional(&self) -> bool {
-        self.is_arithmetic()
-            || matches!(
-                self,
-                TokenKind::CircumFlex
-                    | TokenKind::Amper
-                    | TokenKind::Vbar
-                    | TokenKind::LeftShift
-                    | TokenKind::Percent
-            )
-    }
-
-    #[inline]
     pub const fn is_unary(&self) -> bool {
-        matches!(
-            self,
-            TokenKind::Plus | TokenKind::Minus | TokenKind::Star | TokenKind::DoubleStar
-        )
+        matches!(self, TokenKind::Plus | TokenKind::Minus | TokenKind::Star)
     }
 
     #[inline]
@@ -311,6 +263,11 @@ impl TokenKind {
                 | TokenKind::Ellipsis
                 | TokenKind::ColonEqual
                 | TokenKind::Colon
+                | TokenKind::And
+                | TokenKind::Or
+                | TokenKind::Not
+                | TokenKind::In
+                | TokenKind::Is
         )
     }
 
@@ -340,6 +297,7 @@ impl TokenKind {
                 | TokenKind::Plus
                 | TokenKind::Minus
                 | TokenKind::Slash
+                | TokenKind::DoubleSlash
                 | TokenKind::At
         )
     }
