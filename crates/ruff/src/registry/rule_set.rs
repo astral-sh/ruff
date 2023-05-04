@@ -7,10 +7,10 @@ use std::iter::FusedIterator;
 ///
 /// Uses a bitset where a bit of one signals that the Rule with that [u16] is in this set.
 #[derive(Clone, Default, CacheKey, PartialEq, Eq)]
-pub struct RuleSet([u64; 9]);
+pub struct RuleSet([u64; 10]);
 
 impl RuleSet {
-    const EMPTY: [u64; 9] = [0; 9];
+    const EMPTY: [u64; 10] = [0; 10];
 
     // 64 fits into a u16 without truncation
     #[allow(clippy::cast_possible_truncation)]
