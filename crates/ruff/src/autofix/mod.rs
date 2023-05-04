@@ -38,11 +38,10 @@ fn apply_fixes<'a>(
 
     for (rule, fix) in diagnostics
         .filter_map(|diagnostic| {
-            if diagnostic.fix.is_none() {
-                None
-            } else {
-                Some((diagnostic.kind.rule(), diagnostic.fix.as_ref().unwrap()))
-            }
+            diagnostic
+                .fix
+                .as_ref()
+                .map(|fix| (diagnostic.kind.rule(), fix))
         })
         .sorted_by(|(rule1, fix1), (rule2, fix2)| cmp_fix(*rule1, *rule2, fix1, fix2))
     {

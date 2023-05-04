@@ -37,14 +37,12 @@ impl Serialize for ExpandedMessages<'_> {
         for message in self.messages {
             let source_code = message.file.to_source_code();
 
-            let fix = if message.fix.is_none() {
-                None
-            } else {
-                Some(json!({
-                    "message": message.kind.suggestion.as_deref(),
-                    "edits": &ExpandedEdits { edits: message.fix.as_ref().unwrap().edits(), source_code: &source_code },
-                }))
-            };
+            let fix = message.fix.as_ref().map(|fix| {
+                json!({
+                        "message": message.kind.suggestion.as_deref(),
+                        "edits": &ExpandedEdits { edits: fix.edits(), source_code: &source_code },
+                })
+            });
 
             let start_location = source_code.source_location(message.start());
             let end_location = source_code.source_location(message.end());
