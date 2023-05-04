@@ -1000,6 +1000,13 @@ where
                     if self.settings.rules.enabled(Rule::ManualFromImport) {
                         pylint::rules::manual_from_import(self, stmt, alias, names);
                     }
+                    if self.settings.rules.enabled(Rule::ImportSelf) {
+                        if let Some(diagnostic) =
+                            pylint::rules::import_self(alias, self.module_path.as_deref())
+                        {
+                            self.diagnostics.push(diagnostic);
+                        }
+                    }
 
                     if let Some(asname) = &alias.node.asname {
                         let name = alias.node.name.split('.').last().unwrap();
@@ -1474,6 +1481,17 @@ where
                                 pylint::rules::useless_import_alias(self, alias);
                             }
                         }
+                    }
+                }
+
+                if self.settings.rules.enabled(Rule::ImportSelf) {
+                    if let Some(diagnostic) = pylint::rules::import_from_self(
+                        *level,
+                        module.as_deref(),
+                        names,
+                        self.module_path.as_deref(),
+                    ) {
+                        self.diagnostics.push(diagnostic);
                     }
                 }
 
