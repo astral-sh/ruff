@@ -180,7 +180,7 @@ fn end_of_statement_insertion(stmt: &Stmt, locator: &Locator, stylist: &Stylist)
         // Otherwise, insert on the next line.
         Insertion::new(
             "",
-            locator.line_end(location),
+            locator.full_line_end(location),
             stylist.line_ending().as_str(),
         )
     }
