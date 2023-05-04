@@ -156,7 +156,7 @@ fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
     Some(stmt.end())
 }
 
-/// Find the location at which a "top-of-file" import should be inserted,
+/// Find the location at which an "end-of-statement" import should be inserted,
 /// along with a prefix and suffix to use for the insertion.
 ///
 /// For example, given the following code:
@@ -165,9 +165,15 @@ fn match_docstring_end(body: &[Stmt]) -> Option<TextSize> {
 /// """Hello, world!"""
 ///
 /// import os
+/// import math
+///
+///
+/// def foo():
+///     pass
 /// ```
 ///
-/// The location returned will be the start of the `import os` statement,
+/// The location returned will be the start of new line after the last
+/// import statement, which in this case is the line after `import math`,
 /// along with a trailing newline suffix.
 fn end_of_statement_insertion(stmt: &Stmt, locator: &Locator, stylist: &Stylist) -> Insertion {
     let location = stmt.end();
@@ -180,7 +186,7 @@ fn end_of_statement_insertion(stmt: &Stmt, locator: &Locator, stylist: &Stylist)
         // Otherwise, insert on the next line.
         Insertion::new(
             "",
-            locator.line_end(location),
+            locator.full_line_end(location),
             stylist.line_ending().as_str(),
         )
     }
