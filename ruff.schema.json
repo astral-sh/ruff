@@ -2393,27 +2393,16 @@
       ]
     },
     "SerializationFormat": {
-      "oneOf": [
-        {
-          "type": "string",
-          "enum": [
-            "text",
-            "json",
-            "junit",
-            "grouped",
-            "github",
-            "gitlab",
-            "pylint",
-            "azure"
-          ]
-        },
-        {
-          "description": "For use with check_ecosystem.py only",
-          "type": "string",
-          "enum": [
-            "ecosystem-ci"
-          ]
-        }
+      "type": "string",
+      "enum": [
+        "text",
+        "json",
+        "junit",
+        "grouped",
+        "github",
+        "gitlab",
+        "pylint",
+        "azure"
       ]
     },
     "Strictness": {

@@ -210,7 +210,7 @@ Options:
       --ignore-noqa
           Ignore any `# noqa` comments
       --format <FORMAT>
-          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint, azure, ecosystem-ci]
+          Output serialization format for violations [env: RUFF_FORMAT=] [possible values: text, json, junit, grouped, github, gitlab, pylint, azure]
       --target-version <TARGET_VERSION>
           The minimum Python version that should be supported [possible values: py37, py38, py39, py310, py311]
       --config <CONFIG>
@@ -224,7 +224,7 @@ Options:
       --show-settings
           See the settings Ruff will use to lint a given Python file
   -h, --help
-          Print help (see more with '--help')
+          Print help
 
 Rule selection:
       --select <RULE_CODE>
