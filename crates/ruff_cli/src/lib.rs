@@ -123,6 +123,8 @@ quoting the executed command, along with the relevant file contents and `pyproje
 }
 
 fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
+    #[cfg(feature = "ecosystem_ci")]
+    let ecosystem_ci = args.ecosystem_ci;
     let (cli, overrides) = args.partition();
 
     // Construct the "default" settings. These are used when no `pyproject.toml`
@@ -172,14 +174,11 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
     } else if matches!(format, SerializationFormat::Json) {
         flags::FixMode::Generate
     } else {
-        #[cfg(feature = "ecosystem_ci")]
-        if matches!(format, SerializationFormat::EcosystemCi) {
+        if cfg!(feature = "ecosystem_ci") && ecosystem_ci {
             flags::FixMode::Generate
         } else {
             flags::FixMode::None
         }
-        #[cfg(not(feature = "ecosystem_ci"))]
-        flags::FixMode::None
     };
     let cache = !cli.no_cache;
     let noqa = !cli.ignore_noqa;
@@ -217,7 +216,14 @@ fn check(args: CheckArgs, log_level: LogLevel) -> Result<ExitStatus> {
         return Ok(ExitStatus::Success);
     }
 
-    let printer = Printer::new(format, log_level, autofix, printer_flags);
+    let printer = Printer::new(
+        format,
+        log_level,
+        autofix,
+        printer_flags,
+        #[cfg(feature = "ecosystem_ci")]
+        ecosystem_ci,
+    );
 
     if cli.watch {
         if format != SerializationFormat::Text {
