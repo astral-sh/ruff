@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 use crate::edit::Edit;
 
 /// Indicates confidence in the correctness of a suggested fix.
-#[derive(Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Default, Copy, Clone, Debug, Hash, PartialEq, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 #[non_exhaustive]
 pub enum Applicability {
@@ -18,6 +18,7 @@ pub enum Applicability {
     MaybeIncorrect,
 
     /// The applicability of the suggestion is unknown.
+    #[default]
     Unspecified,
 }
 
@@ -26,18 +27,23 @@ pub enum Applicability {
 #[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
 pub struct Fix {
     edits: Vec<Edit>,
+    applicability: Applicability,
 }
 
 impl Fix {
     /// Create a new [`Fix`] with an unspecified applicability from an [`Edit`] element.
     pub fn unspecified(edit: Edit) -> Self {
-        Self { edits: vec![edit] }
+        Self {
+            edits: vec![edit],
+            applicability: Applicability::Unspecified,
+        }
     }
 
     /// Create a new [`Fix`] with unspecified applicability from multiple [`Edit`] elements.
     pub fn unspecified_edits(edit: Edit, rest: impl IntoIterator<Item = Edit>) -> Self {
         Self {
             edits: std::iter::once(edit).chain(rest.into_iter()).collect(),
+            applicability: Applicability::Unspecified,
         }
     }
 
