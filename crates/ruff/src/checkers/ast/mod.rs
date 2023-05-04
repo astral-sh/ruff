@@ -1173,7 +1173,7 @@ where
                     .enabled(Rule::MissingFutureAnnotationsWithImports)
                 {
                     if let Some(module) = module.as_deref() {
-                        flake8_future_annotations::rules::check_missing_future_annotations_from_typing_import(
+                        flake8_future_annotations::rules::missing_future_annotations_from_typing_import(
                             self,
                             stmt,
                             module,
@@ -2435,7 +2435,7 @@ where
                     .enabled(Rule::MissingFutureAnnotationsWithImports)
                     && analyze::typing::is_pep585_builtin(expr, &self.ctx)
                 {
-                    flake8_future_annotations::rules::check_missing_future_annotations_import(
+                    flake8_future_annotations::rules::missing_future_annotations_from_typing_usage(
                         self, expr,
                     );
                 }

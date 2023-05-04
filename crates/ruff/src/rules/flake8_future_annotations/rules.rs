@@ -1,16 +1,16 @@
-use crate::checkers::ast::Checker;
 use itertools::Itertools;
+use rustpython_parser::ast::{Alias, Expr, Stmt};
+
 use ruff_diagnostics::{Diagnostic, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::Range;
-use rustpython_parser::ast::{AliasData, Expr, Located, Stmt};
+
+use crate::checkers::ast::Checker;
 
 /// ## What it does
 /// Checks for missing `from __future__ import annotations` import if a type used in the
 /// module can be rewritten using PEP 563.
 ///
 /// ## Why is this bad?
-///
 /// Pairs well with pyupgrade with the --py37-plus flag or higher, since pyupgrade only
 /// replaces type annotations with the PEP 563 rules if `from __future__ import annotations`
 /// is present.
@@ -55,7 +55,7 @@ impl Violation for MissingFutureAnnotationsWithImports {
     fn message(&self) -> String {
         let MissingFutureAnnotationsWithImports { names } = self;
         let names = names.iter().map(|name| format!("`{name}`")).join(", ");
-        format!("Missing from __future__ import annotations but imports: {names}")
+        format!("Missing `from __future__ import annotations`, but imports: {names}")
     }
 }
 
@@ -75,12 +75,16 @@ pub const FUTURE_ANNOTATIONS_REWRITE_ELIGIBLE: &[&[&str]] = &[
 ];
 
 /// FA100
-pub fn check_missing_future_annotations_from_typing_import(
+pub fn missing_future_annotations_from_typing_import(
     checker: &mut Checker,
     stmt: &Stmt,
     module: &str,
-    names: &[Located<AliasData>],
+    names: &[Alias],
 ) {
+    if checker.ctx.annotations_future_enabled {
+        return;
+    }
+
     let result: Vec<String> = names
         .iter()
         .map(|name| name.node.name.as_str())
@@ -89,24 +93,27 @@ pub fn check_missing_future_annotations_from_typing_import(
         .sorted()
         .collect();
 
-    if !checker.ctx.annotations_future_enabled && !result.is_empty() {
+    if !result.is_empty() {
         checker.diagnostics.push(Diagnostic::new(
             MissingFutureAnnotationsWithImports { names: result },
-            Range::from(stmt),
+            stmt.range(),
         ));
     }
 }
 
-pub fn check_missing_future_annotations_import(checker: &mut Checker, expr: &Expr) {
+/// FA100
+pub fn missing_future_annotations_from_typing_usage(checker: &mut Checker, expr: &Expr) {
+    if checker.ctx.annotations_future_enabled {
+        return;
+    }
+
     if let Some(binding) = checker.ctx.resolve_call_path(expr) {
-        if !checker.ctx.annotations_future_enabled
-            && FUTURE_ANNOTATIONS_REWRITE_ELIGIBLE.contains(&binding.as_slice())
-        {
+        if FUTURE_ANNOTATIONS_REWRITE_ELIGIBLE.contains(&binding.as_slice()) {
             checker.diagnostics.push(Diagnostic::new(
                 MissingFutureAnnotationsWithImports {
                     names: vec![binding.iter().join(".")],
                 },
-                Range::from(expr),
+                expr.range(),
             ));
         }
     }
