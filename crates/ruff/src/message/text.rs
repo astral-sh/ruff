@@ -92,7 +92,7 @@ impl Emitter for TextEmitter {
                 col = diagnostic_location.column,
                 sep = ":".cyan(),
                 code_and_body = RuleCodeAndBody {
-                    message: &message,
+                    message,
                     show_fix_status: self.flags.contains(EmitterFlags::SHOW_FIX_STATUS)
                 }
             )?;
@@ -121,7 +121,7 @@ impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         let kind = &self.message.kind;
 
-        if self.show_fix_status && !self.message.fix.is_empty() {
+        if self.show_fix_status && self.message.fix.is_some() {
             write!(
                 f,
                 "{code} {autofix}{body}",

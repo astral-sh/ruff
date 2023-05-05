@@ -182,10 +182,10 @@ def fibonacci(n):
             },
             TextRange::new(TextSize::from(7), TextSize::from(9)),
         )
-        .with_fix(Fix::new(vec![Edit::range_deletion(TextRange::new(
+        .with_fix(Fix::suggested(Edit::range_deletion(TextRange::new(
             TextSize::from(0),
             TextSize::from(10),
-        ))]));
+        ))));
 
         let fib_source = SourceFileBuilder::new("fib.py", fib).finish();
 

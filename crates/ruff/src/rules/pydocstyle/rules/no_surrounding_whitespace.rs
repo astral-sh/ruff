@@ -1,4 +1,4 @@
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_text_size::{TextLen, TextRange};
@@ -11,14 +11,16 @@ use crate::rules::pydocstyle::helpers::ends_with_backslash;
 #[violation]
 pub struct SurroundingWhitespace;
 
-impl AlwaysAutofixableViolation for SurroundingWhitespace {
+impl Violation for SurroundingWhitespace {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("No whitespaces allowed surrounding docstring text")
     }
 
-    fn autofix_title(&self) -> String {
-        "Trim surrounding whitespace".to_string()
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|_| "Trim surrounding whitespace".to_string())
     }
 }
 

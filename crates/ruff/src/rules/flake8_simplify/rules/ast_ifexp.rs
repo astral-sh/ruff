@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprContext, ExprKind, Unaryop};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 
@@ -12,16 +12,20 @@ pub struct IfExprWithTrueFalse {
     expr: String,
 }
 
-impl AlwaysAutofixableViolation for IfExprWithTrueFalse {
+impl Violation for IfExprWithTrueFalse {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let IfExprWithTrueFalse { expr } = self;
         format!("Use `bool({expr})` instead of `True if {expr} else False`")
     }
 
-    fn autofix_title(&self) -> String {
-        let IfExprWithTrueFalse { expr } = self;
-        format!("Replace with `not {expr}")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|violation| {
+            let IfExprWithTrueFalse { expr } = violation;
+            format!("Replace with `not {expr}")
+        })
     }
 }
 

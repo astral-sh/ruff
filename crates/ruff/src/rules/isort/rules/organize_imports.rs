@@ -5,7 +5,7 @@ use ruff_text_size::TextRange;
 use rustpython_parser::ast::Stmt;
 use textwrap::indent;
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
+use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{
     followed_by_multi_statement_line, preceded_by_multi_statement_line, trailing_lines_end,
@@ -40,14 +40,16 @@ use super::super::{comments, format_imports};
 #[violation]
 pub struct UnsortedImports;
 
-impl AlwaysAutofixableViolation for UnsortedImports {
+impl Violation for UnsortedImports {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Import block is un-sorted or un-formatted")
     }
 
-    fn autofix_title(&self) -> String {
-        "Organize imports".to_string()
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|_| "Organize imports".to_string())
     }
 }
 

@@ -125,7 +125,7 @@ impl Display for DisplayGroupedMessage<'_> {
                 self.column_length.get() - calculate_print_width(start_location.column).get()
             ),
             code_and_body = RuleCodeAndBody {
-                message: &message,
+                message,
                 show_fix_status: self.show_fix_status
             },
         )?;

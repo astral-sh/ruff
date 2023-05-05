@@ -1,7 +1,7 @@
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
-use ruff_diagnostics::AlwaysAutofixableViolation;
-use ruff_diagnostics::Diagnostic;
+use ruff_diagnostics::Violation;
+use ruff_diagnostics::{AutofixKind, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::any_over_expr;
 
@@ -42,14 +42,16 @@ use crate::rules::flake8_comprehensions::fixes;
 #[violation]
 pub struct UnnecessaryComprehensionAnyAll;
 
-impl AlwaysAutofixableViolation for UnnecessaryComprehensionAnyAll {
+impl Violation for UnnecessaryComprehensionAnyAll {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         format!("Unnecessary list comprehension.")
     }
 
-    fn autofix_title(&self) -> String {
-        "Remove unnecessary list comprehension".to_string()
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|_| "Remove unnecessary list comprehension".to_string())
     }
 }
 

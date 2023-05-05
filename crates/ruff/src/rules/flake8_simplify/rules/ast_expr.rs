@@ -1,6 +1,6 @@
 use rustpython_parser::ast::{Constant, Expr, ExprKind};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, AutofixKind, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::helpers::{create_expr, unparse_expr};
 
@@ -13,16 +13,20 @@ pub struct UncapitalizedEnvironmentVariables {
     original: String,
 }
 
-impl AlwaysAutofixableViolation for UncapitalizedEnvironmentVariables {
+impl Violation for UncapitalizedEnvironmentVariables {
+    const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
+
     #[derive_message_formats]
     fn message(&self) -> String {
         let UncapitalizedEnvironmentVariables { expected, original } = self;
         format!("Use capitalized environment variable `{expected}` instead of `{original}`")
     }
 
-    fn autofix_title(&self) -> String {
-        let UncapitalizedEnvironmentVariables { expected, original } = self;
-        format!("Replace `{original}` with `{expected}`")
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        Some(|violation| {
+            let UncapitalizedEnvironmentVariables { expected, original } = violation;
+            format!("Replace `{original}` with `{expected}`")
+        })
     }
 }
 
@@ -53,11 +57,16 @@ pub struct DictGetWithNoneDefault {
     original: String,
 }
 
-impl Violation for DictGetWithNoneDefault {
+impl AlwaysAutofixableViolation for DictGetWithNoneDefault {
     #[derive_message_formats]
     fn message(&self) -> String {
         let DictGetWithNoneDefault { expected, original } = self;
         format!("Use `{expected}` instead of `{original}`")
+    }
+
+    fn autofix_title(&self) -> String {
+        let DictGetWithNoneDefault { expected, original } = self;
+        format!("Replace `{original}` with `{expected}`")
     }
 }
 
