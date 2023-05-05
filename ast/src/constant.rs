@@ -35,17 +35,17 @@ impl From<BigInt> for Constant {
     }
 }
 
-#[cfg(feature = "rustpython-common")]
+#[cfg(feature = "rustpython-literal")]
 impl std::fmt::Display for Constant {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Constant::None => f.pad("None"),
             Constant::Bool(b) => f.pad(if *b { "True" } else { "False" }),
-            Constant::Str(s) => rustpython_common::escape::UnicodeEscape::new_repr(s.as_str())
+            Constant::Str(s) => rustpython_literal::escape::UnicodeEscape::new_repr(s.as_str())
                 .str_repr()
                 .write(f),
             Constant::Bytes(b) => {
-                let escape = rustpython_common::escape::AsciiEscape::new_repr(b);
+                let escape = rustpython_literal::escape::AsciiEscape::new_repr(b);
                 let repr = escape.bytes_repr().to_string().unwrap();
                 f.pad(&repr)
             }
@@ -64,7 +64,7 @@ impl std::fmt::Display for Constant {
                     f.write_str(")")
                 }
             }
-            Constant::Float(fp) => f.pad(&rustpython_common::float_ops::to_string(*fp)),
+            Constant::Float(fp) => f.pad(&rustpython_literal::float::to_string(*fp)),
             Constant::Complex { real, imag } => {
                 if *real == 0.0 {
                     write!(f, "{imag}j")
