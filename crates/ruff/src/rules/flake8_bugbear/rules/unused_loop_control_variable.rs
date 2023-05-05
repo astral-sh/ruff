@@ -24,7 +24,6 @@ use serde::{Deserialize, Serialize};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
-use ruff_python_ast::types::RefEquality;
 use ruff_python_ast::visitor::Visitor;
 use ruff_python_ast::{helpers, visitor};
 
@@ -108,12 +107,7 @@ where
 }
 
 /// B007
-pub fn unused_loop_control_variable(
-    checker: &mut Checker,
-    stmt: &Stmt,
-    target: &Expr,
-    body: &[Stmt],
-) {
+pub fn unused_loop_control_variable(checker: &mut Checker, target: &Expr, body: &[Stmt]) {
     let control_names = {
         let mut finder = NameFinder::new();
         finder.visit_expr(target);
@@ -168,9 +162,9 @@ pub fn unused_loop_control_variable(
                 let scope = checker.ctx.scope();
                 let binding = scope.bindings_for_name(name).find_map(|index| {
                     let binding = &checker.ctx.bindings[*index];
-                    binding.source.and_then(|source| {
-                        (RefEquality(source) == RefEquality(stmt)).then_some(binding)
-                    })
+                    binding
+                        .source
+                        .and_then(|source| (Some(source) == checker.ctx.stmt_id).then_some(binding))
                 });
                 if let Some(binding) = binding {
                     if binding.kind.is_loop_var() {

@@ -26,6 +26,7 @@ use ruff_python_semantic::binding::{
     Importation, StarImportation, SubmoduleImportation,
 };
 use ruff_python_semantic::context::Context;
+use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::{ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
@@ -231,7 +232,7 @@ where
                             synthetic_usage: usage,
                             typing_usage: None,
                             range: *range,
-                            source: Some(stmt),
+                            source: self.ctx.stmt_id,
                             context,
                             exceptions,
                         });
@@ -261,7 +262,7 @@ where
                             synthetic_usage: usage,
                             typing_usage: None,
                             range: *range,
-                            source: Some(stmt),
+                            source: self.ctx.stmt_id,
                             context,
                             exceptions,
                         });
@@ -688,7 +689,7 @@ where
                         synthetic_usage: None,
                         typing_usage: None,
                         range: stmt.range(),
-                        source: Some(self.ctx.current_stmt()),
+                        source: self.ctx.stmt_id,
                         context: self.ctx.execution_context(),
                         exceptions: self.ctx.exceptions(),
                     },
@@ -904,7 +905,7 @@ where
                                 synthetic_usage: Some((self.ctx.scope_id, alias.range())),
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: Some(self.ctx.current_stmt()),
+                                source: self.ctx.stmt_id,
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -934,7 +935,7 @@ where
                                 synthetic_usage: None,
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: Some(self.ctx.current_stmt()),
+                                source: self.ctx.stmt_id,
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -962,7 +963,7 @@ where
                                 },
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: Some(self.ctx.current_stmt()),
+                                source: self.ctx.stmt_id,
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -1222,7 +1223,7 @@ where
                                 synthetic_usage: Some((self.ctx.scope_id, alias.range())),
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: Some(self.ctx.current_stmt()),
+                                source: self.ctx.stmt_id,
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -1318,7 +1319,7 @@ where
                                 },
                                 typing_usage: None,
                                 range: alias.range(),
-                                source: Some(self.ctx.current_stmt()),
+                                source: self.ctx.stmt_id,
                                 context: self.ctx.execution_context(),
                                 exceptions: self.ctx.exceptions(),
                             },
@@ -2022,7 +2023,7 @@ where
                             synthetic_usage: None,
                             typing_usage: None,
                             range: stmt.range(),
-                            source: Some(stmt),
+                            source: self.ctx.stmt_id,
                             context: self.ctx.execution_context(),
                             exceptions: self.ctx.exceptions(),
                         });
@@ -2085,7 +2086,7 @@ where
                             synthetic_usage: None,
                             typing_usage: None,
                             range: stmt.range(),
-                            source: Some(stmt),
+                            source: self.ctx.stmt_id,
                             context: self.ctx.execution_context(),
                             exceptions: self.ctx.exceptions(),
                         });
@@ -2246,7 +2247,7 @@ where
                         synthetic_usage: None,
                         typing_usage: None,
                         range: stmt.range(),
-                        source: Some(self.ctx.current_stmt()),
+                        source: self.ctx.stmt_id,
                         context: self.ctx.execution_context(),
                         exceptions: self.ctx.exceptions(),
                     },
@@ -4121,7 +4122,7 @@ where
                 synthetic_usage: None,
                 typing_usage: None,
                 range: arg.range(),
-                source: Some(self.ctx.current_stmt()),
+                source: self.ctx.stmt_id,
                 context: self.ctx.execution_context(),
                 exceptions: self.ctx.exceptions(),
             },
@@ -4165,7 +4166,7 @@ where
                     synthetic_usage: None,
                     typing_usage: None,
                     range: pattern.range(),
-                    source: Some(self.ctx.current_stmt()),
+                    source: self.ctx.stmt_id,
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4243,7 +4244,7 @@ impl<'a> Checker<'a> {
                         && !(existing.kind.is_function_definition()
                             && analyze::visibility::is_overload(
                                 &self.ctx,
-                                cast::decorator_list(existing.source.as_ref().unwrap()),
+                                cast::decorator_list(self.ctx.stmts[existing.source.unwrap()]),
                             ))
                     {
                         if self.settings.rules.enabled(Rule::RedefinedWhileUnused) {
@@ -4260,13 +4261,17 @@ impl<'a> Checker<'a> {
                                     BindingKind::ClassDefinition | BindingKind::FunctionDefinition
                                 )
                                 .then(|| {
-                                    binding.source.as_ref().map_or(binding.range, |source| {
-                                        helpers::identifier_range(source, self.locator)
+                                    binding.source.map_or(binding.range, |source| {
+                                        helpers::identifier_range(
+                                            self.ctx.stmts[source],
+                                            self.locator,
+                                        )
                                     })
                                 })
                                 .unwrap_or(binding.range),
                             );
-                            if let Some(parent) = binding.source.as_ref() {
+                            if let Some(parent) = binding.source {
+                                let parent = self.ctx.stmts[parent];
                                 if matches!(parent.node, StmtKind::ImportFrom { .. })
                                     && parent.range().contains_range(binding.range)
                                 {
@@ -4571,7 +4576,7 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: expr.range(),
-                    source: Some(self.ctx.current_stmt()),
+                    source: self.ctx.stmt_id,
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4591,7 +4596,7 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: expr.range(),
-                    source: Some(self.ctx.current_stmt()),
+                    source: self.ctx.stmt_id,
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4608,7 +4613,7 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: expr.range(),
-                    source: Some(self.ctx.current_stmt()),
+                    source: self.ctx.stmt_id,
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4691,7 +4696,7 @@ impl<'a> Checker<'a> {
                         synthetic_usage: None,
                         typing_usage: None,
                         range: expr.range(),
-                        source: Some(self.ctx.current_stmt()),
+                        source: self.ctx.stmt_id,
                         context: self.ctx.execution_context(),
                         exceptions: self.ctx.exceptions(),
                     },
@@ -4713,7 +4718,7 @@ impl<'a> Checker<'a> {
                     synthetic_usage: None,
                     typing_usage: None,
                     range: expr.range(),
-                    source: Some(self.ctx.current_stmt()),
+                    source: self.ctx.stmt_id,
                     context: self.ctx.execution_context(),
                     exceptions: self.ctx.exceptions(),
                 },
@@ -4729,7 +4734,7 @@ impl<'a> Checker<'a> {
                 synthetic_usage: None,
                 typing_usage: None,
                 range: expr.range(),
-                source: Some(self.ctx.current_stmt()),
+                source: self.ctx.stmt_id,
                 context: self.ctx.execution_context(),
                 exceptions: self.ctx.exceptions(),
             },
@@ -4937,9 +4942,7 @@ impl<'a> Checker<'a> {
                 | StmtKind::AsyncFor { target, body, .. } = &stmt.node
                 {
                     if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
-                        flake8_bugbear::rules::unused_loop_control_variable(
-                            self, stmt, target, body,
-                        );
+                        flake8_bugbear::rules::unused_loop_control_variable(self, target, body);
                     }
                 } else {
                     unreachable!("Expected ExprKind::For | ExprKind::AsyncFor");
@@ -5089,7 +5092,8 @@ impl<'a> Checker<'a> {
                 for (name, index) in scope.bindings() {
                     let binding = &self.ctx.bindings[*index];
                     if binding.kind.is_global() {
-                        if let Some(stmt) = &binding.source {
+                        if let Some(source) = binding.source {
+                            let stmt = &self.ctx.stmts[source];
                             if matches!(stmt.node, StmtKind::Global { .. }) {
                                 diagnostics.push(Diagnostic::new(
                                     pylint::rules::GlobalVariableNotAssigned {
@@ -5143,13 +5147,17 @@ impl<'a> Checker<'a> {
                                             | BindingKind::FunctionDefinition
                                     )
                                     .then(|| {
-                                        rebound.source.as_ref().map_or(rebound.range, |source| {
-                                            helpers::identifier_range(source, self.locator)
+                                        rebound.source.map_or(rebound.range, |source| {
+                                            helpers::identifier_range(
+                                                self.ctx.stmts[source],
+                                                self.locator,
+                                            )
                                         })
                                     })
                                     .unwrap_or(rebound.range),
                                 );
-                                if let Some(parent) = &rebound.source {
+                                if let Some(source) = rebound.source {
+                                    let parent = &self.ctx.stmts[source];
                                     if matches!(parent.node, StmtKind::ImportFrom { .. })
                                         && parent.range().contains_range(rebound.range)
                                     {
@@ -5203,11 +5211,7 @@ impl<'a> Checker<'a> {
                 // Collect all unused imports by location. (Multiple unused imports at the same
                 // location indicates an `import from`.)
                 type UnusedImport<'a> = (&'a str, &'a TextRange);
-                type BindingContext<'a> = (
-                    RefEquality<'a, Stmt>,
-                    Option<RefEquality<'a, Stmt>>,
-                    Exceptions,
-                );
+                type BindingContext<'a> = (NodeId, Option<NodeId>, Exceptions);
 
                 let mut unused: FxHashMap<BindingContext, Vec<UnusedImport>> = FxHashMap::default();
                 let mut ignored: FxHashMap<BindingContext, Vec<UnusedImport>> =
@@ -5232,11 +5236,12 @@ impl<'a> Checker<'a> {
                         continue;
                     }
 
-                    let child = binding.source.unwrap();
-                    let parent = self.ctx.stmts.parent(child);
-                    let exceptions = binding.exceptions;
+                    let child_id = binding.source.unwrap();
+                    let parent_id = self.ctx.stmts.parent_id(child_id);
 
+                    let exceptions = binding.exceptions;
                     let diagnostic_offset = binding.range.start();
+                    let child = &self.ctx.stmts[child_id];
                     let parent_offset = if matches!(child.node, StmtKind::ImportFrom { .. }) {
                         Some(child.start())
                     } else {
@@ -5249,12 +5254,12 @@ impl<'a> Checker<'a> {
                         })
                     {
                         ignored
-                            .entry((RefEquality(child), parent.map(RefEquality), exceptions))
+                            .entry((child_id, parent_id, exceptions))
                             .or_default()
                             .push((full_name, &binding.range));
                     } else {
                         unused
-                            .entry((RefEquality(child), parent.map(RefEquality), exceptions))
+                            .entry((child_id, parent_id, exceptions))
                             .or_default()
                             .push((full_name, &binding.range));
                     }
@@ -5264,10 +5269,10 @@ impl<'a> Checker<'a> {
                     self.settings.ignore_init_module_imports && self.path.ends_with("__init__.py");
                 for ((defined_by, defined_in, exceptions), unused_imports) in unused
                     .into_iter()
-                    .sorted_by_key(|((defined_by, ..), ..)| defined_by.start())
+                    .sorted_by_key(|((defined_by, ..), ..)| *defined_by)
                 {
-                    let child: &Stmt = defined_by.into();
-                    let parent: Option<&Stmt> = defined_in.map(Into::into);
+                    let child = self.ctx.stmts[defined_by];
+                    let parent = defined_in.map(|defined_in| self.ctx.stmts[defined_in]);
                     let multiple = unused_imports.len() > 1;
                     let in_except_handler = exceptions
                         .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);
@@ -5285,7 +5290,7 @@ impl<'a> Checker<'a> {
                         ) {
                             Ok(fix) => {
                                 if fix.is_deletion() || fix.content() == Some("pass") {
-                                    self.deletions.insert(defined_by);
+                                    self.deletions.insert(RefEquality(child));
                                 }
                                 Some(fix)
                             }
@@ -5324,8 +5329,9 @@ impl<'a> Checker<'a> {
                 }
                 for ((child, .., exceptions), unused_imports) in ignored
                     .into_iter()
-                    .sorted_by_key(|((defined_by, ..), ..)| defined_by.start())
+                    .sorted_by_key(|((defined_by, ..), ..)| *defined_by)
                 {
+                    let child = self.ctx.stmts[child];
                     let multiple = unused_imports.len() > 1;
                     let in_except_handler = exceptions
                         .intersects(Exceptions::MODULE_NOT_FOUND_ERROR | Exceptions::IMPORT_ERROR);

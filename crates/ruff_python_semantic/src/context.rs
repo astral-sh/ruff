@@ -252,7 +252,9 @@ impl<'a> Context<'a> {
                                 .take(scope_index)
                                 .all(|scope| scope.get(name).is_none())
                             {
-                                return Some((binding.source.unwrap(), format!("{name}.{member}")));
+                                if let Some(source) = binding.source {
+                                    return Some((self.stmts[source], format!("{name}.{member}")));
+                                }
                             }
                         }
                     }
@@ -268,7 +270,9 @@ impl<'a> Context<'a> {
                                     .take(scope_index)
                                     .all(|scope| scope.get(name).is_none())
                                 {
-                                    return Some((binding.source.unwrap(), (*name).to_string()));
+                                    if let Some(source) = binding.source {
+                                        return Some((self.stmts[source], (*name).to_string()));
+                                    }
                                 }
                             }
                         }
@@ -283,7 +287,9 @@ impl<'a> Context<'a> {
                                 .take(scope_index)
                                 .all(|scope| scope.get(name).is_none())
                             {
-                                return Some((binding.source.unwrap(), format!("{name}.{member}")));
+                                if let Some(source) = binding.source {
+                                    return Some((self.stmts[source], format!("{name}.{member}")));
+                                }
                             }
                         }
                     }
