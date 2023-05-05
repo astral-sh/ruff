@@ -1,0 +1,16 @@
+Cargo.lock
+
+/target
+/*/target
+**/*.rs.bk
+**/*.bytecode
+__pycache__
+**/*.pytest_cache
+.*sw*
+.vscode
+.idea/
+
+flame-graph.html
+flame.txt
+flamescope.json
+
