@@ -55,7 +55,7 @@ impl Violation for DuplicateIsinstanceCall {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let DuplicateIsinstanceCall { name, .. } = self;
+        let DuplicateIsinstanceCall { name } = self;
         if let Some(name) = name {
             format!("Multiple `isinstance` calls for `{name}`, merge into a single call")
         } else {
@@ -64,7 +64,7 @@ impl Violation for DuplicateIsinstanceCall {
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let DuplicateIsinstanceCall { name, .. } = self;
+        let DuplicateIsinstanceCall { name } = self;
 
         Some(if let Some(name) = name {
             format!("Merge `isinstance` calls for `{name}`")

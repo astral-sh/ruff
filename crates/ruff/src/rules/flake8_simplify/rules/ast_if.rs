@@ -62,12 +62,12 @@ impl Violation for NeedlessBool {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NeedlessBool { condition, .. } = self;
+        let NeedlessBool { condition } = self;
         format!("Return the condition `{condition}` directly")
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let NeedlessBool { condition, .. } = self;
+        let NeedlessBool { condition } = self;
         Some(format!("Replace with `return {condition}`"))
     }
 }
@@ -112,12 +112,12 @@ impl Violation for IfElseBlockInsteadOfIfExp {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfElseBlockInsteadOfIfExp { contents, .. } = self;
+        let IfElseBlockInsteadOfIfExp { contents } = self;
         format!("Use ternary operator `{contents}` instead of `if`-`else`-block")
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let IfElseBlockInsteadOfIfExp { contents, .. } = self;
+        let IfElseBlockInsteadOfIfExp { contents } = self;
         Some(format!("Replace `if`-`else`-block with `{contents}`"))
     }
 }
@@ -162,12 +162,12 @@ impl Violation for IfElseBlockInsteadOfDictGet {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let IfElseBlockInsteadOfDictGet { contents, .. } = self;
+        let IfElseBlockInsteadOfDictGet { contents } = self;
         format!("Use `{contents}` instead of an `if` block")
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let IfElseBlockInsteadOfDictGet { contents, .. } = self;
+        let IfElseBlockInsteadOfDictGet { contents } = self;
         Some(format!("Replace with `{contents}`"))
     }
 }

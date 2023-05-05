@@ -17,12 +17,12 @@ impl Violation for CollectionLiteralConcatenation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let CollectionLiteralConcatenation { expr, .. } = self;
+        let CollectionLiteralConcatenation { expr } = self;
         format!("Consider `{expr}` instead of concatenation")
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let CollectionLiteralConcatenation { expr, .. } = self;
+        let CollectionLiteralConcatenation { expr } = self;
         Some(format!("Replace with `{expr}`"))
     }
 }

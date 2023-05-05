@@ -27,7 +27,7 @@ impl Violation for BlankLineAfterSummary {
     }
 
     fn autofix_title(&self) -> Option<String> {
-        return Some("Insert single blank line".to_string());
+        Some("Insert single blank line".to_string())
     }
 }
 

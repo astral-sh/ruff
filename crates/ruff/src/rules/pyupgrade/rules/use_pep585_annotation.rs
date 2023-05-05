@@ -17,7 +17,7 @@ impl Violation for NonPEP585Annotation {
 
     #[derive_message_formats]
     fn message(&self) -> String {
-        let NonPEP585Annotation { name, .. } = self;
+        let NonPEP585Annotation { name } = self;
         format!(
             "Use `{}` instead of `{}` for type annotations",
             name.to_lowercase(),
@@ -26,7 +26,7 @@ impl Violation for NonPEP585Annotation {
     }
 
     fn autofix_title(&self) -> Option<String> {
-        let NonPEP585Annotation { name, .. } = self;
+        let NonPEP585Annotation { name } = self;
         Some(format!("Replace `{name}` with `{}`", name.to_lowercase()))
     }
 }
