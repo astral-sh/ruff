@@ -115,6 +115,7 @@ E731.py:14:5: E731 Do not assign a `lambda` expression, use a `def`
 16 |     f = lambda x: 2 * x
    |     ^^^^^^^^^^^^^^^^^^^ E731
    |
+   = help: Rewrite `f` as a `def`
 
 E731.py:32:1: E731 [*] Do not assign a `lambda` expression, use a `def`
    |

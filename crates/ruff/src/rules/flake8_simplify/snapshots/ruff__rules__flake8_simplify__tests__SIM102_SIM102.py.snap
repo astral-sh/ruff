@@ -81,6 +81,7 @@ SIM102.py:20:1: SIM102 Use a single `if` statement instead of nested `if` statem
    | |_________^ SIM102
 24 |           c
    |
+   = help: Combine `if` statements using `and`
 
 SIM102.py:26:1: SIM102 [*] Use a single `if` statement instead of nested `if` statements
    |

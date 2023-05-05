@@ -65,18 +65,12 @@ impl Violation for UnusedLoopControlVariable {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UnusedLoopControlVariable {
-            certainty, rename, ..
-        } = self;
-        if certainty.to_bool() && rename.is_some() {
-            Some(|UnusedLoopControlVariable { name, rename, .. }| {
-                let rename = rename.as_ref().unwrap();
-                format!("Rename unused `{name}` to `{rename}`")
-            })
-        } else {
-            None
-        }
+    fn autofix_title(&self) -> Option<String> {
+        let UnusedLoopControlVariable { rename, name, .. } = self;
+
+        rename
+            .as_ref()
+            .map(|rename| format!("Rename unused `{name}` to `{rename}`"))
     }
 }
 

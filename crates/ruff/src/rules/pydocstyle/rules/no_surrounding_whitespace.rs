@@ -19,8 +19,8 @@ impl Violation for SurroundingWhitespace {
         format!("No whitespaces allowed surrounding docstring text")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|_| "Trim surrounding whitespace".to_string())
+    fn autofix_title(&self) -> Option<String> {
+        Some("Trim surrounding whitespace".to_string())
     }
 }
 

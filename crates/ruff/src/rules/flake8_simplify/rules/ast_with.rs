@@ -42,9 +42,7 @@ use super::fix_with;
 /// ## References
 /// - [Python: "The with statement"](https://docs.python.org/3/reference/compound_stmts.html#the-with-statement)
 #[violation]
-pub struct MultipleWithStatements {
-    fixable: bool,
-}
+pub struct MultipleWithStatements;
 
 impl Violation for MultipleWithStatements {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -57,9 +55,8 @@ impl Violation for MultipleWithStatements {
         )
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Combine `with` statements"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Combine `with` statements".to_string())
     }
 }
 
@@ -99,7 +96,7 @@ pub fn multiple_with_statements(
             checker.locator,
         );
         let mut diagnostic = Diagnostic::new(
-            MultipleWithStatements { fixable },
+            MultipleWithStatements,
             colon.map_or_else(
                 || with_stmt.range(),
                 |colon| TextRange::new(with_stmt.start(), colon.end()),

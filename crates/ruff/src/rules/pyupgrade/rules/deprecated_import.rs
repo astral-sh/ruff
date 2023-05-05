@@ -62,14 +62,9 @@ impl Violation for DeprecatedImport {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        if let Deprecation::WithoutRename(WithoutRename { fixable, .. }) = self.deprecation {
-            fixable.then_some(|DeprecatedImport { deprecation }| {
-                let Deprecation::WithoutRename(WithoutRename { target, .. }) = deprecation else {
-                    unreachable!();
-                };
-                format!("Import from `{target}`")
-            })
+    fn autofix_title(&self) -> Option<String> {
+        if let Deprecation::WithoutRename(WithoutRename { target, .. }) = &self.deprecation {
+            Some(format!("Import from `{target}`"))
         } else {
             None
         }

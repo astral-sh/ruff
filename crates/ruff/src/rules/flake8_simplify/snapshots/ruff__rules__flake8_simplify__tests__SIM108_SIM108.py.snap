@@ -36,6 +36,7 @@ SIM108.py:58:1: SIM108 Use ternary operator `abc = x if x > 0 else -x` instead o
 64 | |     abc = -x
    | |____________^ SIM108
    |
+   = help: Replace `if`-`else`-block with `abc = x if x > 0 else -x`
 
 SIM108.py:82:1: SIM108 [*] Use ternary operator `b = cccccccccccccccccccccccccccccccccccc if a else ddddddddddddddddddddddddddddddddddddd` instead of `if`-`else`-block
    |
@@ -70,6 +71,7 @@ SIM108.py:97:1: SIM108 Use ternary operator `exitcode = 0 if True else 1` instea
 101 | |     exitcode = 1  # Trailing comment
     | |________________^ SIM108
     |
+    = help: Replace `if`-`else`-block with `exitcode = 0 if True else 1`
 
 SIM108.py:104:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
     |
@@ -78,6 +80,7 @@ SIM108.py:104:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `
 106 | | else: x = 5
     | |___________^ SIM108
     |
+    = help: Replace `if`-`else`-block with `x = 3 if True else 5`
 
 SIM108.py:109:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `if`-`else`-block
     |
@@ -88,5 +91,6 @@ SIM108.py:109:1: SIM108 Use ternary operator `x = 3 if True else 5` instead of `
 113 | |     x = 5
     | |_________^ SIM108
     |
+    = help: Replace `if`-`else`-block with `x = 3 if True else 5`
 
 

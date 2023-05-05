@@ -26,11 +26,9 @@ impl Violation for PytestParametrizeNamesWrongType {
         format!("Wrong name(s) type in `@pytest.mark.parametrize`, expected `{expected}`")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|violation| {
-            let PytestParametrizeNamesWrongType { expected } = violation;
-            format!("Use a `{expected}` for parameter names")
-        })
+    fn autofix_title(&self) -> Option<String> {
+        let PytestParametrizeNamesWrongType { expected } = self;
+        Some(format!("Use a `{expected}` for parameter names"))
     }
 }
 

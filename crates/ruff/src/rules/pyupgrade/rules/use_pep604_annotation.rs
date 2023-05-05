@@ -10,9 +10,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct NonPEP604Annotation {
-    fixable: bool,
-}
+pub struct NonPEP604Annotation;
 
 impl Violation for NonPEP604Annotation {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -22,8 +20,8 @@ impl Violation for NonPEP604Annotation {
         format!("Use `X | Y` for type annotations")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable.then_some(|_| format!("Convert to `X | Y`"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Convert to `X | Y`".to_string())
     }
 }
 
@@ -110,7 +108,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
 
     match typing_member {
         TypingMember::Optional => {
-            let mut diagnostic = Diagnostic::new(NonPEP604Annotation { fixable }, expr.range());
+            let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
                 #[allow(deprecated)]
                 diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
@@ -121,7 +119,7 @@ pub fn use_pep604_annotation(checker: &mut Checker, expr: &Expr, value: &Expr, s
             checker.diagnostics.push(diagnostic);
         }
         TypingMember::Union => {
-            let mut diagnostic = Diagnostic::new(NonPEP604Annotation { fixable }, expr.range());
+            let mut diagnostic = Diagnostic::new(NonPEP604Annotation, expr.range());
             if fixable && checker.patch(diagnostic.kind.rule()) {
                 match &slice.node {
                     ExprKind::Slice { .. } => {

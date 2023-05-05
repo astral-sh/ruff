@@ -44,17 +44,14 @@ impl Violation for UnusedImport {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let UnusedImport { context, .. } = self;
-        context
-            .is_none()
-            .then_some(|UnusedImport { name, multiple, .. }| {
-                if *multiple {
-                    "Remove unused import".to_string()
-                } else {
-                    format!("Remove unused import: `{name}`")
-                }
-            })
+    fn autofix_title(&self) -> Option<String> {
+        let UnusedImport { name, multiple, .. } = self;
+
+        Some(if *multiple {
+            "Remove unused import".to_string()
+        } else {
+            format!("Remove unused import: `{name}`")
+        })
     }
 }
 #[violation]

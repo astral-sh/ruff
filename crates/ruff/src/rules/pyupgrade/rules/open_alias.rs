@@ -7,9 +7,7 @@ use crate::checkers::ast::Checker;
 use crate::registry::AsRule;
 
 #[violation]
-pub struct OpenAlias {
-    fixable: bool,
-}
+pub struct OpenAlias;
 
 impl Violation for OpenAlias {
     const AUTOFIX: AutofixKind = AutofixKind::Sometimes;
@@ -19,9 +17,8 @@ impl Violation for OpenAlias {
         format!("Use builtin `open`")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|_| format!("Replace with builtin `open`"))
+    fn autofix_title(&self) -> Option<String> {
+        Some("Replace with builtin `open`".to_string())
     }
 }
 
@@ -36,7 +33,7 @@ pub fn open_alias(checker: &mut Checker, expr: &Expr, func: &Expr) {
             .ctx
             .find_binding("open")
             .map_or(true, |binding| binding.kind.is_builtin());
-        let mut diagnostic = Diagnostic::new(OpenAlias { fixable }, expr.range());
+        let mut diagnostic = Diagnostic::new(OpenAlias, expr.range());
         if fixable && checker.patch(diagnostic.kind.rule()) {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(

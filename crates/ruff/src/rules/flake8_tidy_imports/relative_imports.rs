@@ -73,12 +73,13 @@ impl Violation for RelativeImports {
         }
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|RelativeImports { strictness }| match strictness {
+    fn autofix_title(&self) -> Option<String> {
+        let RelativeImports { strictness } = self;
+        Some(match strictness {
             Strictness::Parents => {
-                format!("Replace relative imports from parent modules with absolute imports")
+                "Replace relative imports from parent modules with absolute imports".to_string()
             }
-            Strictness::All => format!("Replace relative imports with absolute imports"),
+            Strictness::All => "Replace relative imports with absolute imports".to_string(),
         })
     }
 }

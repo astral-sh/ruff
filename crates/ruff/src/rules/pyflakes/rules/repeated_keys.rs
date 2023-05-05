@@ -26,12 +26,13 @@ impl Violation for MultiValueRepeatedKeyLiteral {
         format!("Dictionary key literal `{name}` repeated")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let MultiValueRepeatedKeyLiteral { repeated_value, .. } = self;
+    fn autofix_title(&self) -> Option<String> {
+        let MultiValueRepeatedKeyLiteral {
+            repeated_value,
+            name,
+        } = self;
         if *repeated_value {
-            Some(|MultiValueRepeatedKeyLiteral { name, .. }| {
-                format!("Remove repeated key literal `{name}`")
-            })
+            Some(format!("Remove repeated key literal `{name}`"))
         } else {
             None
         }
@@ -52,12 +53,13 @@ impl Violation for MultiValueRepeatedKeyVariable {
         format!("Dictionary key `{name}` repeated")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        let MultiValueRepeatedKeyVariable { repeated_value, .. } = self;
+    fn autofix_title(&self) -> Option<String> {
+        let MultiValueRepeatedKeyVariable {
+            repeated_value,
+            name,
+        } = self;
         if *repeated_value {
-            Some(|MultiValueRepeatedKeyVariable { name, .. }| {
-                format!("Remove repeated key `{name}`")
-            })
+            Some(format!("Remove repeated key `{name}`"))
         } else {
             None
         }

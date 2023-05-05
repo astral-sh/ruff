@@ -1,4 +1,4 @@
-use ruff_text_size::TextSize;
+use ruff_text_size::TextRange;
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{AutofixKind, Diagnostic, Edit, Fix, Violation};
@@ -17,7 +17,6 @@ pub enum MinMax {
 #[violation]
 pub struct NestedMinMax {
     func: MinMax,
-    fixable: bool,
 }
 
 impl Violation for NestedMinMax {
@@ -28,9 +27,9 @@ impl Violation for NestedMinMax {
         format!("Nested `{}` calls can be flattened", self.func)
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        self.fixable
-            .then_some(|NestedMinMax { func, .. }| format!("Flatten nested `{func}` calls"))
+    fn autofix_title(&self) -> Option<String> {
+        let NestedMinMax { func } = self;
+        Some(format!("Flatten nested `{func}` calls"))
     }
 }
 
@@ -106,22 +105,15 @@ pub fn nested_min_max(
         MinMax::try_from_call(func, keywords, &checker.ctx) == Some(min_max)
     }) {
         let fixable = !has_comments(expr, checker.locator);
-        let mut diagnostic = Diagnostic::new(
-            NestedMinMax {
-                func: min_max,
-                fixable,
-            },
-            expr.range(),
-        );
+        let mut diagnostic = Diagnostic::new(NestedMinMax { func: min_max }, expr.range());
         if fixable && checker.patch(diagnostic.kind.rule()) {
-            let flattened_expr = Expr::new(
-                TextSize::default(),
-                TextSize::default(),
+            let flattened_expr = Expr::with_range(
                 ExprKind::Call {
                     func: Box::new(func.clone()),
                     args: collect_nested_args(&checker.ctx, min_max, args),
                     keywords: keywords.to_owned(),
                 },
+                TextRange::default(),
             );
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(

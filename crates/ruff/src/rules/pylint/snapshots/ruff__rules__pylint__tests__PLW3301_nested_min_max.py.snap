@@ -192,5 +192,6 @@ nested_min_max.py:18:1: PLW3301 Nested `min` calls can be flattened
 22 | | )
    | |_^ PLW3301
    |
+   = help: Flatten nested `min` calls
 
 

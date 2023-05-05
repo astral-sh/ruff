@@ -22,11 +22,9 @@ impl Violation for UncapitalizedEnvironmentVariables {
         format!("Use capitalized environment variable `{expected}` instead of `{original}`")
     }
 
-    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
-        Some(|violation| {
-            let UncapitalizedEnvironmentVariables { expected, original } = violation;
-            format!("Replace `{original}` with `{expected}`")
-        })
+    fn autofix_title(&self) -> Option<String> {
+        let UncapitalizedEnvironmentVariables { expected, original } = self;
+        Some(format!("Replace `{original}` with `{expected}`"))
     }
 }
 
