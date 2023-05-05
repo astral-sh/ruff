@@ -178,6 +178,8 @@ nested_min_max.py:12:1: PLW3301 [*] Nested min() call
 12    |-min(1, min(2, 3), key=test)
    12 |+min(1, 2, 3, key=test)
 13 13 | min(1, min(2, 3, key=test))
+14 14 | 
+15 15 | # Don't provide a fix if there are comments within the call.
 
 nested_min_max.py:13:1: PLW3301 [*] Nested min() call
    |
@@ -185,6 +187,8 @@ nested_min_max.py:13:1: PLW3301 [*] Nested min() call
 14 | min(1, min(2, 3), key=test)
 15 | min(1, min(2, 3, key=test))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
+16 | 
+17 | # Don't provide a fix if there are comments within the call.
    |
    = help: Flatten nested min() calls
 
@@ -194,5 +198,19 @@ nested_min_max.py:13:1: PLW3301 [*] Nested min() call
 12 12 | min(1, min(2, 3), key=test)
 13    |-min(1, min(2, 3, key=test))
    13 |+min(1, 2, 3)
+14 14 | 
+15 15 | # Don't provide a fix if there are comments within the call.
+16 16 | min(
+
+nested_min_max.py:16:1: PLW3301 [*] Nested min() call
+   |
+16 |   # Don't provide a fix if there are comments within the call.
+17 | / min(
+18 | |     1,  # this is a very special 1.
+19 | |     min(2, 3),
+20 | | )
+   | |_^ PLW3301
+   |
+   = help: Flatten nested min() calls
 
 

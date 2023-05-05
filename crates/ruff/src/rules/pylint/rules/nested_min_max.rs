@@ -1,6 +1,4 @@
-// XXX nested redundant func?
-
-use ruff_python_ast::helpers::unparse_expr;
+use ruff_python_ast::helpers::{has_comments, unparse_expr};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
@@ -84,7 +82,7 @@ pub fn nested_min_max(
 
     if args.iter().any(|arg| nested_func.is_call(arg)) {
         let mut diagnostic = Diagnostic::new(NestedMinMax(nested_func), expr.range());
-        if checker.patch(diagnostic.kind.rule()) {
+        if checker.patch(diagnostic.kind.rule()) && !has_comments(expr, checker.locator) {
             let mut new_args = Vec::with_capacity(args.len());
             collect_nested_args(nested_func, args, &mut new_args);
             let flattened_expr = Expr::new(
