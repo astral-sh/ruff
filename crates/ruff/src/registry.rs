@@ -156,6 +156,7 @@ ruff_macros::register_rules!(
     rules::pylint::rules::BadStringFormatType,
     rules::pylint::rules::BidirectionalUnicode,
     rules::pylint::rules::BinaryOpException,
+    rules::pylint::rules::ImportSelf,
     rules::pylint::rules::InvalidCharacterBackspace,
     rules::pylint::rules::InvalidCharacterSub,
     rules::pylint::rules::InvalidCharacterEsc,
@@ -542,6 +543,8 @@ ruff_macros::register_rules!(
     rules::flake8_pyi::rules::PassInClassBody,
     rules::flake8_pyi::rules::DuplicateUnionMember,
     rules::flake8_pyi::rules::QuotedAnnotationInStub,
+    rules::flake8_pyi::rules::SnakeCaseTypeAlias,
+    rules::flake8_pyi::rules::TSuffixedTypeAlias,
     // flake8-pytest-style
     rules::flake8_pytest_style::rules::PytestFixtureIncorrectParenthesesStyle,
     rules::flake8_pytest_style::rules::PytestFixturePositionalArgs,

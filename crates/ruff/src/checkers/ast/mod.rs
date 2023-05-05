@@ -1000,6 +1000,13 @@ where
                     if self.settings.rules.enabled(Rule::ManualFromImport) {
                         pylint::rules::manual_from_import(self, stmt, alias, names);
                     }
+                    if self.settings.rules.enabled(Rule::ImportSelf) {
+                        if let Some(diagnostic) =
+                            pylint::rules::import_self(alias, self.module_path.as_deref())
+                        {
+                            self.diagnostics.push(diagnostic);
+                        }
+                    }
 
                     if let Some(asname) = &alias.node.asname {
                         let name = alias.node.name.split('.').last().unwrap();
@@ -1490,6 +1497,17 @@ where
                     }
                 }
 
+                if self.settings.rules.enabled(Rule::ImportSelf) {
+                    if let Some(diagnostic) = pylint::rules::import_from_self(
+                        *level,
+                        module.as_deref(),
+                        names,
+                        self.module_path.as_deref(),
+                    ) {
+                        self.diagnostics.push(diagnostic);
+                    }
+                }
+
                 if self.settings.rules.enabled(Rule::BannedImportFrom) {
                     if let Some(diagnostic) = flake8_import_conventions::rules::banned_import_from(
                         stmt,
@@ -1925,6 +1943,14 @@ where
                                     self, target, value, annotation,
                                 );
                             }
+                        }
+                    }
+                    if self.ctx.match_typing_expr(annotation, "TypeAlias") {
+                        if self.settings.rules.enabled(Rule::SnakeCaseTypeAlias) {
+                            flake8_pyi::rules::snake_case_type_alias(self, target);
+                        }
+                        if self.settings.rules.enabled(Rule::TSuffixedTypeAlias) {
+                            flake8_pyi::rules::t_suffixed_type_alias(self, target);
                         }
                     }
                 }

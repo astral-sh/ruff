@@ -204,6 +204,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "R5501") => Rule::CollapsibleElseIf,
         (Pylint, "W0120") => Rule::UselessElseOnLoop,
         (Pylint, "W0129") => Rule::AssertOnStringLiteral,
+        (Pylint, "W0406") => Rule::ImportSelf,
         (Pylint, "W0602") => Rule::GlobalVariableNotAssigned,
         (Pylint, "W0603") => Rule::GlobalStatement,
         (Pylint, "W0711") => Rule::BinaryOpException,
@@ -598,6 +599,8 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Flake8Pyi, "020") => Rule::QuotedAnnotationInStub,
         (Flake8Pyi, "021") => Rule::DocstringInStub,
         (Flake8Pyi, "033") => Rule::TypeCommentInStub,
+        (Flake8Pyi, "042") => Rule::SnakeCaseTypeAlias,
+        (Flake8Pyi, "043") => Rule::TSuffixedTypeAlias,
 
         // flake8-pytest-style
         (Flake8PytestStyle, "001") => Rule::PytestFixtureIncorrectParenthesesStyle,

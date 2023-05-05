@@ -272,7 +272,7 @@ pub struct Options {
     /// in the order specified.
     pub forced_separate: Option<Vec<String>>,
     #[option(
-        default = r#"[]"#,
+        default = r#"["future", "standard-library", "third-party", "first-party", "local-folder"]"#,
         value_type = r#"list["future" | "standard-library" | "third-party" | "first-party" | "local-folder" | str]"#,
         example = r#"
             section-order = ["future", "standard-library", "first-party", "local-folder", "third-party"]
