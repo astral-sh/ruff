@@ -22,20 +22,21 @@ use ruff_python_ast::{cast, helpers, str, visitor};
 use ruff_python_semantic::analyze;
 use ruff_python_semantic::analyze::branch_detection;
 use ruff_python_semantic::analyze::typing::{Callable, SubscriptKind};
+use ruff_python_semantic::analyze::visibility::ModuleSource;
 use ruff_python_semantic::binding::{
     Binding, BindingId, BindingKind, Exceptions, ExecutionContext, Export, FromImportation,
     Importation, StarImportation, SubmoduleImportation,
 };
 use ruff_python_semantic::context::Context;
+use ruff_python_semantic::definition::{Module, ModuleKind};
 use ruff_python_semantic::node::NodeId;
 use ruff_python_semantic::scope::{ClassDef, FunctionDef, Lambda, Scope, ScopeId, ScopeKind};
 use ruff_python_stdlib::builtins::{BUILTINS, MAGIC_GLOBALS};
 use ruff_python_stdlib::path::is_python_stub_file;
 
 use crate::checkers::ast::deferred::Deferred;
-use crate::docstrings::definition::{
-    transition_scope, Definition, DefinitionKind, Docstring, Documentable,
-};
+use crate::docstrings::extraction::ExtractionTarget;
+use crate::docstrings::Docstring;
 use crate::fs::relativize_path;
 use crate::importer::Importer;
 use crate::noqa::NoqaMapping;
@@ -59,7 +60,7 @@ mod deferred;
 pub struct Checker<'a> {
     // Settings, static metadata, etc.
     path: &'a Path,
-    module_path: Option<Vec<String>>,
+    module_path: Option<&'a [String]>,
     package: Option<&'a Path>,
     is_stub: bool,
     noqa: flags::Noqa,
@@ -86,7 +87,7 @@ impl<'a> Checker<'a> {
         noqa: flags::Noqa,
         path: &'a Path,
         package: Option<&'a Path>,
-        module_path: Option<Vec<String>>,
+        module: Module<'a>,
         locator: &'a Locator,
         stylist: &'a Stylist,
         indexer: &'a Indexer,
@@ -98,13 +99,13 @@ impl<'a> Checker<'a> {
             noqa,
             path,
             package,
-            module_path: module_path.clone(),
+            module_path: module.path(),
             is_stub: is_python_stub_file(path),
             locator,
             stylist,
             indexer,
             importer,
-            ctx: Context::new(&settings.typing_modules, path, module_path),
+            ctx: Context::new(&settings.typing_modules, path, module),
             deferred: Deferred::default(),
             diagnostics: Vec::default(),
             deletions: FxHashSet::default(),
@@ -996,7 +997,7 @@ where
                     }
                     if self.settings.rules.enabled(Rule::ImportSelf) {
                         if let Some(diagnostic) =
-                            pylint::rules::import_self(alias, self.module_path.as_deref())
+                            pylint::rules::import_self(alias, self.module_path)
                         {
                             self.diagnostics.push(diagnostic);
                         }
@@ -1166,11 +1167,9 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::BannedApi) {
-                    if let Some(module) = helpers::resolve_imported_module_path(
-                        level,
-                        module,
-                        self.module_path.as_deref(),
-                    ) {
+                    if let Some(module) =
+                        helpers::resolve_imported_module_path(level, module, self.module_path)
+                    {
                         flake8_tidy_imports::banned_api::name_or_parent_is_banned(
                             self, &module, stmt,
                         );
@@ -1315,7 +1314,7 @@ where
                                 stmt,
                                 level,
                                 module,
-                                self.module_path.as_deref(),
+                                self.module_path,
                                 &self.settings.flake8_tidy_imports.ban_relative_imports,
                             )
                         {
@@ -1460,12 +1459,9 @@ where
                 }
 
                 if self.settings.rules.enabled(Rule::ImportSelf) {
-                    if let Some(diagnostic) = pylint::rules::import_from_self(
-                        level,
-                        module,
-                        names,
-                        self.module_path.as_deref(),
-                    ) {
+                    if let Some(diagnostic) =
+                        pylint::rules::import_from_self(level, module, names, self.module_path)
+                    {
                         self.diagnostics.push(diagnostic);
                     }
                 }
@@ -1944,7 +1940,6 @@ where
 
         // Recurse.
         let prev_in_exception_handler = self.ctx.in_exception_handler;
-        let prev_visible_scope = self.ctx.visible_scope;
         match &stmt.node {
             StmtKind::FunctionDef(ast::StmtFunctionDef {
                 body,
@@ -1963,20 +1958,9 @@ where
                 if self.settings.rules.enabled(Rule::FStringDocstring) {
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
-                let definition = docstrings::extraction::extract(
-                    self.ctx.visible_scope,
-                    stmt,
-                    body,
-                    Documentable::Function,
-                );
                 if self.settings.rules.enabled(Rule::YieldInForLoop) {
                     pyupgrade::rules::yield_in_for_loop(self, stmt);
                 }
-                let scope = transition_scope(self.ctx.visible_scope, stmt, Documentable::Function);
-                self.deferred
-                    .definitions
-                    .push((definition, scope.visibility, self.ctx.snapshot()));
-                self.ctx.visible_scope = scope;
 
                 // If any global bindings don't already exist in the global scope, add it.
                 let globals = helpers::extract_globals(body);
@@ -2001,6 +1985,14 @@ where
                     }
                 }
 
+                let definition = docstrings::extraction::extract_definition(
+                    ExtractionTarget::Function,
+                    stmt,
+                    self.ctx.definition_id,
+                    &self.ctx.definitions,
+                );
+                self.ctx.push_definition(definition);
+
                 self.ctx.push_scope(ScopeKind::Function(FunctionDef {
                     name,
                     body,
@@ -2010,9 +2002,7 @@ where
                     globals,
                 }));
 
-                self.deferred
-                    .functions
-                    .push((self.ctx.snapshot(), self.ctx.visible_scope));
+                self.deferred.functions.push(self.ctx.snapshot());
             }
             StmtKind::ClassDef(ast::StmtClassDef {
                 body,
@@ -2024,17 +2014,6 @@ where
                 if self.settings.rules.enabled(Rule::FStringDocstring) {
                     flake8_bugbear::rules::f_string_docstring(self, body);
                 }
-                let definition = docstrings::extraction::extract(
-                    self.ctx.visible_scope,
-                    stmt,
-                    body,
-                    Documentable::Class,
-                );
-                let scope = transition_scope(self.ctx.visible_scope, stmt, Documentable::Class);
-                self.deferred
-                    .definitions
-                    .push((definition, scope.visibility, self.ctx.snapshot()));
-                self.ctx.visible_scope = scope;
 
                 // If any global bindings don't already exist in the global scope, add it.
                 let globals = helpers::extract_globals(body);
@@ -2058,6 +2037,14 @@ where
                         self.ctx.global_scope_mut().add(name, id);
                     }
                 }
+
+                let definition = docstrings::extraction::extract_definition(
+                    ExtractionTarget::Class,
+                    stmt,
+                    self.ctx.definition_id,
+                    &self.ctx.definitions,
+                );
+                self.ctx.push_definition(definition);
 
                 self.ctx.push_scope(ScopeKind::Class(ClassDef {
                     name,
@@ -2195,15 +2182,16 @@ where
             }
             _ => visitor::walk_stmt(self, stmt),
         };
-        self.ctx.visible_scope = prev_visible_scope;
 
         // Post-visit.
         match &stmt.node {
             StmtKind::FunctionDef(_) | StmtKind::AsyncFunctionDef(_) => {
                 self.ctx.pop_scope();
+                self.ctx.pop_definition();
             }
             StmtKind::ClassDef(ast::StmtClassDef { name, .. }) => {
                 self.ctx.pop_scope();
+                self.ctx.pop_definition();
                 self.add_binding(
                     name,
                     Binding {
@@ -4751,23 +4739,11 @@ impl<'a> Checker<'a> {
         ));
     }
 
-    fn visit_docstring(&mut self, python_ast: &'a Suite) -> bool {
+    fn visit_module(&mut self, python_ast: &'a Suite) -> bool {
         if self.settings.rules.enabled(Rule::FStringDocstring) {
             flake8_bugbear::rules::f_string_docstring(self, python_ast);
         }
         let docstring = docstrings::extraction::docstring_from(python_ast);
-        self.deferred.definitions.push((
-            Definition {
-                kind: if self.path.ends_with("__init__.py") {
-                    DefinitionKind::Package
-                } else {
-                    DefinitionKind::Module
-                },
-                docstring,
-            },
-            self.ctx.visible_scope.visibility,
-            self.ctx.snapshot(),
-        ));
         docstring.is_some()
     }
 
@@ -4794,8 +4770,6 @@ impl<'a> Checker<'a> {
                     let expr = allocator.alloc(expr);
 
                     self.ctx.restore(snapshot);
-                    self.ctx.in_type_definition = true;
-                    self.ctx.in_deferred_string_type_definition = Some(kind);
 
                     if self.ctx.in_annotation && self.ctx.annotations_future_enabled {
                         if self.settings.rules.enabled(Rule::QuotedAnnotation) {
@@ -4807,6 +4781,9 @@ impl<'a> Checker<'a> {
                             flake8_pyi::rules::quoted_annotation_in_stub(self, value, range);
                         }
                     }
+
+                    self.ctx.in_type_definition = true;
+                    self.ctx.in_deferred_string_type_definition = Some(kind);
                     self.visit_expr(expr);
 
                     self.ctx.in_deferred_string_type_definition = None;
@@ -4832,9 +4809,8 @@ impl<'a> Checker<'a> {
     fn check_deferred_functions(&mut self) {
         while !self.deferred.functions.is_empty() {
             let deferred_functions = std::mem::take(&mut self.deferred.functions);
-            for (snapshot, visibility) in deferred_functions {
+            for snapshot in deferred_functions {
                 self.ctx.restore(snapshot);
-                self.ctx.visible_scope = visibility;
 
                 match &self.ctx.stmt().node {
                     StmtKind::FunctionDef(ast::StmtFunctionDef { body, args, .. })
@@ -5343,6 +5319,11 @@ impl<'a> Checker<'a> {
         self.diagnostics.extend(diagnostics);
     }
 
+    /// Visit all the [`Definition`] nodes in the AST.
+    ///
+    /// This phase is expected to run after the AST has been traversed in its entirety; as such,
+    /// it is expected that all [`Definition`] nodes have been visited by the time, and that this
+    /// method will not recurse into any other nodes.
     fn check_definitions(&mut self) {
         let enforce_annotations = self.settings.rules.any_enabled(&[
             Rule::MissingTypeFunctionArgument,
@@ -5357,6 +5338,8 @@ impl<'a> Checker<'a> {
             Rule::MissingReturnTypeClassMethod,
             Rule::AnyType,
         ]);
+        let enforce_stubs =
+            self.is_stub && self.settings.rules.any_enabled(&[Rule::DocstringInStub]);
         let enforce_docstrings = self.settings.rules.any_enabled(&[
             Rule::UndocumentedPublicModule,
             Rule::UndocumentedPublicClass,
@@ -5406,185 +5389,187 @@ impl<'a> Checker<'a> {
             Rule::EmptyDocstring,
         ]);
 
+        if !enforce_annotations && !enforce_docstrings && !enforce_stubs {
+            return;
+        }
+
         let mut overloaded_name: Option<String> = None;
-        while !self.deferred.definitions.is_empty() {
-            let definitions = std::mem::take(&mut self.deferred.definitions);
-            for (definition, visibility, snapshot) in definitions {
-                self.ctx.restore(snapshot);
 
-                // flake8-annotations
-                if enforce_annotations {
-                    // TODO(charlie): This should be even stricter, in that an overload
-                    // implementation should come immediately after the overloaded
-                    // interfaces, without any AST nodes in between. Right now, we
-                    // only error when traversing definition boundaries (functions,
-                    // classes, etc.).
-                    if !overloaded_name.map_or(false, |overloaded_name| {
-                        flake8_annotations::helpers::is_overload_impl(
-                            self,
-                            &definition,
-                            &overloaded_name,
-                        )
-                    }) {
-                        self.diagnostics
-                            .extend(flake8_annotations::rules::definition(
-                                self,
-                                &definition,
-                                visibility,
-                            ));
-                    }
-                    overloaded_name =
-                        flake8_annotations::helpers::overloaded_name(self, &definition);
+        let definitions = std::mem::take(&mut self.ctx.definitions);
+        for (definition, visibility) in definitions.iter() {
+            let docstring = docstrings::extraction::extract_docstring(definition);
+
+            // flake8-annotations
+            if enforce_annotations {
+                // TODO(charlie): This should be even stricter, in that an overload
+                // implementation should come immediately after the overloaded
+                // interfaces, without any AST nodes in between. Right now, we
+                // only error when traversing definition boundaries (functions,
+                // classes, etc.).
+                if !overloaded_name.map_or(false, |overloaded_name| {
+                    flake8_annotations::helpers::is_overload_impl(
+                        self,
+                        definition,
+                        &overloaded_name,
+                    )
+                }) {
+                    self.diagnostics
+                        .extend(flake8_annotations::rules::definition(
+                            self, definition, visibility,
+                        ));
                 }
+                overloaded_name = flake8_annotations::helpers::overloaded_name(self, definition);
+            }
 
+            // flake8-pyi
+            if enforce_stubs {
                 if self.is_stub {
                     if self.settings.rules.enabled(Rule::DocstringInStub) {
-                        flake8_pyi::rules::docstring_in_stubs(self, definition.docstring);
+                        flake8_pyi::rules::docstring_in_stubs(self, docstring);
                     }
                 }
+            }
 
-                // pydocstyle
-                if enforce_docstrings {
-                    if pydocstyle::helpers::should_ignore_definition(
+            // pydocstyle
+            if enforce_docstrings {
+                if pydocstyle::helpers::should_ignore_definition(
+                    self,
+                    definition,
+                    &self.settings.pydocstyle.ignore_decorators,
+                ) {
+                    continue;
+                }
+
+                // Extract a `Docstring` from a `Definition`.
+                let Some(expr) = docstring else {
+                    pydocstyle::rules::not_missing(self, definition, visibility);
+                    continue;
+                };
+
+                let contents = self.locator.slice(expr.range());
+
+                let indentation = self.locator.slice(TextRange::new(
+                    self.locator.line_start(expr.start()),
+                    expr.start(),
+                ));
+
+                if pydocstyle::helpers::should_ignore_docstring(contents) {
+                    #[allow(deprecated)]
+                    let location = self.locator.compute_source_location(expr.start());
+                    warn_user!(
+                        "Docstring at {}:{}:{} contains implicit string concatenation; ignoring...",
+                        relativize_path(self.path),
+                        location.row,
+                        location.column
+                    );
+                    continue;
+                }
+
+                // SAFETY: Safe for docstrings that pass `should_ignore_docstring`.
+                let body_range = str::raw_contents_range(contents).unwrap();
+                let docstring = Docstring {
+                    definition,
+                    expr,
+                    contents,
+                    body_range,
+                    indentation,
+                };
+
+                if !pydocstyle::rules::not_empty(self, &docstring) {
+                    continue;
+                }
+
+                if self.settings.rules.enabled(Rule::FitsOnOneLine) {
+                    pydocstyle::rules::one_liner(self, &docstring);
+                }
+                if self.settings.rules.any_enabled(&[
+                    Rule::NoBlankLineBeforeFunction,
+                    Rule::NoBlankLineAfterFunction,
+                ]) {
+                    pydocstyle::rules::blank_before_after_function(self, &docstring);
+                }
+                if self.settings.rules.any_enabled(&[
+                    Rule::OneBlankLineBeforeClass,
+                    Rule::OneBlankLineAfterClass,
+                    Rule::BlankLineBeforeClass,
+                ]) {
+                    pydocstyle::rules::blank_before_after_class(self, &docstring);
+                }
+                if self.settings.rules.enabled(Rule::BlankLineAfterSummary) {
+                    pydocstyle::rules::blank_after_summary(self, &docstring);
+                }
+                if self.settings.rules.any_enabled(&[
+                    Rule::IndentWithSpaces,
+                    Rule::UnderIndentation,
+                    Rule::OverIndentation,
+                ]) {
+                    pydocstyle::rules::indent(self, &docstring);
+                }
+                if self.settings.rules.enabled(Rule::NewLineAfterLastParagraph) {
+                    pydocstyle::rules::newline_after_last_paragraph(self, &docstring);
+                }
+                if self.settings.rules.enabled(Rule::SurroundingWhitespace) {
+                    pydocstyle::rules::no_surrounding_whitespace(self, &docstring);
+                }
+                if self.settings.rules.any_enabled(&[
+                    Rule::MultiLineSummaryFirstLine,
+                    Rule::MultiLineSummarySecondLine,
+                ]) {
+                    pydocstyle::rules::multi_line_summary_start(self, &docstring);
+                }
+                if self.settings.rules.enabled(Rule::TripleSingleQuotes) {
+                    pydocstyle::rules::triple_quotes(self, &docstring);
+                }
+                if self.settings.rules.enabled(Rule::EscapeSequenceInDocstring) {
+                    pydocstyle::rules::backslashes(self, &docstring);
+                }
+                if self.settings.rules.enabled(Rule::EndsInPeriod) {
+                    pydocstyle::rules::ends_with_period(self, &docstring);
+                }
+                if self.settings.rules.enabled(Rule::NonImperativeMood) {
+                    pydocstyle::rules::non_imperative_mood(
                         self,
-                        &definition,
-                        &self.settings.pydocstyle.ignore_decorators,
-                    ) {
-                        continue;
-                    }
-
-                    if definition.docstring.is_none() {
-                        pydocstyle::rules::not_missing(self, &definition, visibility);
-                        continue;
-                    }
-
-                    // Extract a `Docstring` from a `Definition`.
-                    let expr = definition.docstring.unwrap();
-                    let contents = self.locator.slice(expr.range());
-
-                    let indentation = self.locator.slice(TextRange::new(
-                        self.locator.line_start(expr.start()),
-                        expr.start(),
-                    ));
-
-                    if pydocstyle::helpers::should_ignore_docstring(contents) {
-                        #[allow(deprecated)]
-                        let location = self.locator.compute_source_location(expr.start());
-                        warn_user!(
-                            "Docstring at {}:{}:{} contains implicit string concatenation; ignoring...",
-                            relativize_path(self.path),
-                            location.row,
-                            location.column
-                        );
-                        continue;
-                    }
-
-                    // SAFETY: Safe for docstrings that pass `should_ignore_docstring`.
-                    let body_range = str::raw_contents_range(contents).unwrap();
-                    let docstring = Docstring {
-                        kind: definition.kind,
-                        expr,
-                        contents,
-                        indentation,
-                        body_range,
-                    };
-
-                    if !pydocstyle::rules::not_empty(self, &docstring) {
-                        continue;
-                    }
-
-                    if self.settings.rules.enabled(Rule::FitsOnOneLine) {
-                        pydocstyle::rules::one_liner(self, &docstring);
-                    }
-                    if self.settings.rules.any_enabled(&[
-                        Rule::NoBlankLineBeforeFunction,
-                        Rule::NoBlankLineAfterFunction,
-                    ]) {
-                        pydocstyle::rules::blank_before_after_function(self, &docstring);
-                    }
-                    if self.settings.rules.any_enabled(&[
-                        Rule::OneBlankLineBeforeClass,
-                        Rule::OneBlankLineAfterClass,
-                        Rule::BlankLineBeforeClass,
-                    ]) {
-                        pydocstyle::rules::blank_before_after_class(self, &docstring);
-                    }
-                    if self.settings.rules.enabled(Rule::BlankLineAfterSummary) {
-                        pydocstyle::rules::blank_after_summary(self, &docstring);
-                    }
-                    if self.settings.rules.any_enabled(&[
-                        Rule::IndentWithSpaces,
-                        Rule::UnderIndentation,
-                        Rule::OverIndentation,
-                    ]) {
-                        pydocstyle::rules::indent(self, &docstring);
-                    }
-                    if self.settings.rules.enabled(Rule::NewLineAfterLastParagraph) {
-                        pydocstyle::rules::newline_after_last_paragraph(self, &docstring);
-                    }
-                    if self.settings.rules.enabled(Rule::SurroundingWhitespace) {
-                        pydocstyle::rules::no_surrounding_whitespace(self, &docstring);
-                    }
-                    if self.settings.rules.any_enabled(&[
-                        Rule::MultiLineSummaryFirstLine,
-                        Rule::MultiLineSummarySecondLine,
-                    ]) {
-                        pydocstyle::rules::multi_line_summary_start(self, &docstring);
-                    }
-                    if self.settings.rules.enabled(Rule::TripleSingleQuotes) {
-                        pydocstyle::rules::triple_quotes(self, &docstring);
-                    }
-                    if self.settings.rules.enabled(Rule::EscapeSequenceInDocstring) {
-                        pydocstyle::rules::backslashes(self, &docstring);
-                    }
-                    if self.settings.rules.enabled(Rule::EndsInPeriod) {
-                        pydocstyle::rules::ends_with_period(self, &docstring);
-                    }
-                    if self.settings.rules.enabled(Rule::NonImperativeMood) {
-                        pydocstyle::rules::non_imperative_mood(
-                            self,
-                            &docstring,
-                            &self.settings.pydocstyle.property_decorators,
-                        );
-                    }
-                    if self.settings.rules.enabled(Rule::NoSignature) {
-                        pydocstyle::rules::no_signature(self, &docstring);
-                    }
-                    if self.settings.rules.enabled(Rule::FirstLineCapitalized) {
-                        pydocstyle::rules::capitalized(self, &docstring);
-                    }
-                    if self.settings.rules.enabled(Rule::DocstringStartsWithThis) {
-                        pydocstyle::rules::starts_with_this(self, &docstring);
-                    }
-                    if self.settings.rules.enabled(Rule::EndsInPunctuation) {
-                        pydocstyle::rules::ends_with_punctuation(self, &docstring);
-                    }
-                    if self.settings.rules.enabled(Rule::OverloadWithDocstring) {
-                        pydocstyle::rules::if_needed(self, &docstring);
-                    }
-                    if self.settings.rules.any_enabled(&[
-                        Rule::MultiLineSummaryFirstLine,
-                        Rule::SectionNotOverIndented,
-                        Rule::SectionUnderlineNotOverIndented,
-                        Rule::CapitalizeSectionName,
-                        Rule::NewLineAfterSectionName,
-                        Rule::DashedUnderlineAfterSection,
-                        Rule::SectionUnderlineAfterName,
-                        Rule::SectionUnderlineMatchesSectionLength,
-                        Rule::NoBlankLineAfterSection,
-                        Rule::NoBlankLineBeforeSection,
-                        Rule::BlankLinesBetweenHeaderAndContent,
-                        Rule::BlankLineAfterLastSection,
-                        Rule::EmptyDocstringSection,
-                        Rule::SectionNameEndsInColon,
-                        Rule::UndocumentedParam,
-                    ]) {
-                        pydocstyle::rules::sections(
-                            self,
-                            &docstring,
-                            self.settings.pydocstyle.convention.as_ref(),
-                        );
-                    }
+                        &docstring,
+                        &self.settings.pydocstyle.property_decorators,
+                    );
+                }
+                if self.settings.rules.enabled(Rule::NoSignature) {
+                    pydocstyle::rules::no_signature(self, &docstring);
+                }
+                if self.settings.rules.enabled(Rule::FirstLineCapitalized) {
+                    pydocstyle::rules::capitalized(self, &docstring);
+                }
+                if self.settings.rules.enabled(Rule::DocstringStartsWithThis) {
+                    pydocstyle::rules::starts_with_this(self, &docstring);
+                }
+                if self.settings.rules.enabled(Rule::EndsInPunctuation) {
+                    pydocstyle::rules::ends_with_punctuation(self, &docstring);
+                }
+                if self.settings.rules.enabled(Rule::OverloadWithDocstring) {
+                    pydocstyle::rules::if_needed(self, &docstring);
+                }
+                if self.settings.rules.any_enabled(&[
+                    Rule::MultiLineSummaryFirstLine,
+                    Rule::SectionNotOverIndented,
+                    Rule::SectionUnderlineNotOverIndented,
+                    Rule::CapitalizeSectionName,
+                    Rule::NewLineAfterSectionName,
+                    Rule::DashedUnderlineAfterSection,
+                    Rule::SectionUnderlineAfterName,
+                    Rule::SectionUnderlineMatchesSectionLength,
+                    Rule::NoBlankLineAfterSection,
+                    Rule::NoBlankLineBeforeSection,
+                    Rule::BlankLinesBetweenHeaderAndContent,
+                    Rule::BlankLineAfterLastSection,
+                    Rule::EmptyDocstringSection,
+                    Rule::SectionNameEndsInColon,
+                    Rule::UndocumentedParam,
+                ]) {
+                    pydocstyle::rules::sections(
+                        self,
+                        &docstring,
+                        self.settings.pydocstyle.convention.as_ref(),
+                    );
                 }
             }
         }
@@ -5647,13 +5632,28 @@ pub fn check_ast(
     path: &Path,
     package: Option<&Path>,
 ) -> Vec<Diagnostic> {
+    let module_path = package.and_then(|package| to_module_path(package, path));
+    let module = Module {
+        kind: if path.ends_with("__init__.py") {
+            ModuleKind::Package
+        } else {
+            ModuleKind::Module
+        },
+        source: if let Some(module_path) = module_path.as_ref() {
+            ModuleSource::Path(module_path)
+        } else {
+            ModuleSource::File(path)
+        },
+        python_ast,
+    };
+
     let mut checker = Checker::new(
         settings,
         noqa_line_for,
         noqa,
         path,
         package,
-        package.and_then(|package| to_module_path(package, path)),
+        module,
         locator,
         stylist,
         indexer,
@@ -5662,11 +5662,12 @@ pub fn check_ast(
     checker.bind_builtins();
 
     // Check for module docstring.
-    let python_ast = if checker.visit_docstring(python_ast) {
+    let python_ast = if checker.visit_module(python_ast) {
         &python_ast[1..]
     } else {
         python_ast
     };
+
     // Iterate over the AST.
     checker.visit_body(python_ast);
 

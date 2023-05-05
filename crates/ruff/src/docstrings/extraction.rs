@@ -2,12 +2,10 @@
 
 use rustpython_parser::ast::{self, Constant, Expr, ExprKind, Stmt, StmtKind};
 
-use ruff_python_semantic::analyze::visibility;
-
-use crate::docstrings::definition::{Definition, DefinitionKind, Documentable};
+use ruff_python_semantic::definition::{Definition, DefinitionId, Definitions, Member, MemberKind};
 
 /// Extract a docstring from a function or class body.
-pub fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
+pub(crate) fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
     let stmt = suite.first()?;
     // Require the docstring to be a standalone expression.
     let StmtKind::Expr(ast::StmtExpr { value }) = &stmt.node else {
@@ -26,59 +24,68 @@ pub fn docstring_from(suite: &[Stmt]) -> Option<&Expr> {
     Some(value)
 }
 
+/// Extract a docstring from a `Definition`.
+pub(crate) fn extract_docstring<'a>(definition: &'a Definition<'a>) -> Option<&'a Expr> {
+    match definition {
+        Definition::Module(module) => docstring_from(module.python_ast),
+        Definition::Member(member) => {
+            if let StmtKind::ClassDef(ast::StmtClassDef { body, .. })
+            | StmtKind::FunctionDef(ast::StmtFunctionDef { body, .. })
+            | StmtKind::AsyncFunctionDef(ast::StmtAsyncFunctionDef { body, .. }) =
+                &member.stmt.node
+            {
+                docstring_from(body)
+            } else {
+                None
+            }
+        }
+    }
+}
+
+#[derive(Copy, Clone)]
+pub(crate) enum ExtractionTarget {
+    Class,
+    Function,
+}
+
 /// Extract a `Definition` from the AST node defined by a `Stmt`.
-pub fn extract<'a>(
-    scope: visibility::VisibleScope,
+pub(crate) fn extract_definition<'a>(
+    target: ExtractionTarget,
     stmt: &'a Stmt,
-    body: &'a [Stmt],
-    kind: Documentable,
-) -> Definition<'a> {
-    let expr = docstring_from(body);
-    match kind {
-        Documentable::Function => match scope {
-            visibility::VisibleScope {
-                modifier: visibility::Modifier::Module,
-                ..
-            } => Definition {
-                kind: DefinitionKind::Function(stmt),
-                docstring: expr,
+    parent: DefinitionId,
+    definitions: &Definitions<'a>,
+) -> Member<'a> {
+    match target {
+        ExtractionTarget::Function => match &definitions[parent] {
+            Definition::Module(..) => Member {
+                parent,
+                kind: MemberKind::Function,
+                stmt,
             },
-            visibility::VisibleScope {
-                modifier: visibility::Modifier::Class,
+            Definition::Member(Member {
+                kind: MemberKind::Class | MemberKind::NestedClass,
                 ..
-            } => Definition {
-                kind: DefinitionKind::Method(stmt),
-                docstring: expr,
+            }) => Member {
+                parent,
+                kind: MemberKind::Method,
+                stmt,
             },
-            visibility::VisibleScope {
-                modifier: visibility::Modifier::Function,
-                ..
-            } => Definition {
-                kind: DefinitionKind::NestedFunction(stmt),
-                docstring: expr,
+            Definition::Member(..) => Member {
+                parent,
+                kind: MemberKind::NestedFunction,
+                stmt,
             },
         },
-        Documentable::Class => match scope {
-            visibility::VisibleScope {
-                modifier: visibility::Modifier::Module,
-                ..
-            } => Definition {
-                kind: DefinitionKind::Class(stmt),
-                docstring: expr,
+        ExtractionTarget::Class => match &definitions[parent] {
+            Definition::Module(..) => Member {
+                parent,
+                kind: MemberKind::Class,
+                stmt,
             },
-            visibility::VisibleScope {
-                modifier: visibility::Modifier::Class,
-                ..
-            } => Definition {
-                kind: DefinitionKind::NestedClass(stmt),
-                docstring: expr,
-            },
-            visibility::VisibleScope {
-                modifier: visibility::Modifier::Function,
-                ..
-            } => Definition {
-                kind: DefinitionKind::NestedClass(stmt),
-                docstring: expr,
+            Definition::Member(..) => Member {
+                parent,
+                kind: MemberKind::NestedClass,
+                stmt,
             },
         },
     }

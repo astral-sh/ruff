@@ -4,8 +4,8 @@ use std::fmt::{Debug, Formatter};
 use std::iter::FusedIterator;
 use strum_macros::EnumIter;
 
-use crate::docstrings::definition::{Docstring, DocstringBody};
 use crate::docstrings::styles::SectionStyle;
+use crate::docstrings::{Docstring, DocstringBody};
 use ruff_python_ast::whitespace;
 
 #[derive(EnumIter, PartialEq, Eq, Debug, Clone, Copy)]

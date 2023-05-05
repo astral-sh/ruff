@@ -6,7 +6,7 @@ use ruff_python_ast::whitespace;
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
 #[violation]

@@ -1,11 +1,13 @@
+use ruff_text_size::{TextRange, TextSize};
+
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{NewlineWithTrailingNewline, UniversalNewlineIterator};
 use ruff_python_ast::str::{is_triple_quote, leading_quote};
-use ruff_text_size::{TextRange, TextSize};
+use ruff_python_semantic::definition::{Definition, Member};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::{DefinitionKind, Docstring};
+use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
 #[violation]
@@ -91,22 +93,17 @@ pub fn multi_line_summary_start(checker: &mut Checker, docstring: &Docstring) {
                 if !indentation.chars().all(char::is_whitespace) {
                     fixable = false;
 
-                    // If the docstring isn't on its own line, look at the parent indentation, and
-                    // add the default indentation to get the "right" level.
-                    if let DefinitionKind::Class(parent)
-                    | DefinitionKind::NestedClass(parent)
-                    | DefinitionKind::Function(parent)
-                    | DefinitionKind::NestedFunction(parent)
-                    | DefinitionKind::Method(parent) = &docstring.kind
-                    {
-                        let parent_line_start = checker.locator.line_start(parent.start());
-                        let parent_indentation = checker
+                    // If the docstring isn't on its own line, look at the statement indentation,
+                    // and add the default indentation to get the "right" level.
+                    if let Definition::Member(Member { stmt, .. }) = &docstring.definition {
+                        let stmt_line_start = checker.locator.line_start(stmt.start());
+                        let stmt_indentation = checker
                             .locator
-                            .slice(TextRange::new(parent_line_start, parent.start()));
+                            .slice(TextRange::new(stmt_line_start, stmt.start()));
 
-                        if parent_indentation.chars().all(char::is_whitespace) {
+                        if stmt_indentation.chars().all(char::is_whitespace) {
                             indentation.clear();
-                            indentation.push_str(parent_indentation);
+                            indentation.push_str(stmt_indentation);
                             indentation.push_str(checker.stylist.indentation());
                             fixable = true;
                         }

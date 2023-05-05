@@ -1,10 +1,11 @@
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix};
 use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
+use ruff_python_semantic::definition::{Definition, Member, MemberKind};
 use ruff_text_size::{TextLen, TextRange};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::{DefinitionKind, Docstring};
+use crate::docstrings::Docstring;
 use crate::registry::{AsRule, Rule};
 
 #[violation]
@@ -57,7 +58,11 @@ impl AlwaysAutofixableViolation for BlankLineBeforeClass {
 
 /// D203, D204, D211
 pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
-    let (DefinitionKind::Class(parent) | DefinitionKind::NestedClass(parent)) = &docstring.kind else {
+    let Definition::Member(Member {
+        kind: MemberKind::Class | MemberKind::NestedClass ,
+        stmt,
+        ..
+    }) = docstring.definition else {
         return;
     };
 
@@ -69,10 +74,10 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
     {
         let before = checker
             .locator
-            .slice(TextRange::new(parent.start(), docstring.start()));
+            .slice(TextRange::new(stmt.start(), docstring.start()));
 
         let mut blank_lines_before = 0usize;
-        let mut lines = UniversalNewlineIterator::with_offset(before, parent.start()).rev();
+        let mut lines = UniversalNewlineIterator::with_offset(before, stmt.start()).rev();
         let mut blank_lines_start = lines.next().map(|line| line.start()).unwrap_or_default();
 
         for line in lines {
@@ -132,7 +137,7 @@ pub fn blank_before_after_class(checker: &mut Checker, docstring: &Docstring) {
     if checker.settings.rules.enabled(Rule::OneBlankLineAfterClass) {
         let after = checker
             .locator
-            .slice(TextRange::new(docstring.end(), parent.end()));
+            .slice(TextRange::new(docstring.end(), stmt.end()));
 
         let all_blank_after = after
             .universal_newlines()

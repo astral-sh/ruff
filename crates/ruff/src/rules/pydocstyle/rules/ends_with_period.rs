@@ -6,8 +6,8 @@ use ruff_macros::{derive_message_formats, violation};
 use ruff_python_ast::newlines::{StrExt, UniversalNewlineIterator};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
 use crate::docstrings::sections::SectionKind;
+use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 use crate::rules::pydocstyle::helpers::logical_line;
 

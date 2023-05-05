@@ -4,7 +4,7 @@ use ruff_python_ast::newlines::NewlineWithTrailingNewline;
 use ruff_python_ast::str::{leading_quote, trailing_quote};
 
 use crate::checkers::ast::Checker;
-use crate::docstrings::definition::Docstring;
+use crate::docstrings::Docstring;
 use crate::registry::AsRule;
 
 #[violation]
