@@ -116,14 +116,12 @@ pub use rustpython_ast as ast;
 
 mod function;
 // Skip flattening lexer to distinguish from full parser
+mod context;
 pub mod lexer;
 mod mode;
 mod parser;
-mod string;
-#[rustfmt::skip]
-mod python;
-mod context;
 mod soft_keywords;
+mod string;
 mod token;
 
 pub use mode::Mode;
@@ -133,3 +131,15 @@ pub use parser::{
 };
 pub use string::FStringErrorType;
 pub use token::{StringKind, Tok};
+
+#[rustfmt::skip]
+mod python {
+    #![allow(clippy::all)]
+    #![allow(unused)]
+
+    #[cfg(feature = "lalrpop")]
+    include!(concat!(env!("OUT_DIR"), "/src/python.rs"));
+
+    #[cfg(not(feature = "lalrpop"))]
+    include!("python.rs");
+}

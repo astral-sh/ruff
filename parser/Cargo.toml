@@ -9,7 +9,7 @@ license = "MIT"
 edition = "2021"
 
 [features]
-default = ["lalrpop"]  # removing this causes potential build failure
+default = []
 serde = ["dep:serde", "rustpython-compiler-core/serde"]
 
 [build-dependencies]

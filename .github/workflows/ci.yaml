@@ -37,7 +37,9 @@ jobs:
 
       - uses: Swatinem/rust-cache@v2
 
-      - name: run tests
+      - name: run tests with embedded parser
+        run: cargo test --all --no-default-features
+      - name: run tests with generated parser
         run: cargo test --all --all-features
 
   lint:
