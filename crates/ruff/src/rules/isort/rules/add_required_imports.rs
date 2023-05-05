@@ -12,7 +12,7 @@ use ruff_python_ast::source_code::{Locator, Stylist};
 use crate::importer::Importer;
 use crate::registry::Rule;
 use crate::rules::isort::track::Block;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 /// ## What it does
 /// Adds any required imports, as specified by the user, to the top of the
@@ -92,7 +92,6 @@ fn add_required_import(
     locator: &Locator,
     stylist: &Stylist,
     settings: &Settings,
-    autofix: flags::Autofix,
     is_stub: bool,
 ) -> Option<Diagnostic> {
     // If the import is already present in a top-level block, don't add it.
@@ -119,7 +118,7 @@ fn add_required_import(
         MissingRequiredImport(required_import.to_string()),
         TextRange::default(),
     );
-    if autofix.into() && settings.rules.should_fix(Rule::MissingRequiredImport) {
+    if settings.rules.should_fix(Rule::MissingRequiredImport) {
         #[allow(deprecated)]
         diagnostic.set_fix(Fix::unspecified(
             Importer::new(python_ast, locator, stylist)
@@ -136,7 +135,6 @@ pub fn add_required_imports(
     locator: &Locator,
     stylist: &Stylist,
     settings: &Settings,
-    autofix: flags::Autofix,
     is_stub: bool,
 ) -> Vec<Diagnostic> {
     settings
@@ -178,7 +176,6 @@ pub fn add_required_imports(
                             locator,
                             stylist,
                             settings,
-                            autofix,
                             is_stub,
                         )
                     })
@@ -198,7 +195,6 @@ pub fn add_required_imports(
                             locator,
                             stylist,
                             settings,
-                            autofix,
                             is_stub,
                         )
                     })

@@ -77,7 +77,6 @@ pub fn check_path(
     directives: &Directives,
     settings: &Settings,
     noqa: flags::Noqa,
-    autofix: flags::Autofix,
 ) -> LinterResult<(Vec<Diagnostic>, Option<ImportMap>)> {
     // Aggregate all diagnostics.
     let mut diagnostics = vec![];
@@ -99,7 +98,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_tokens())
     {
         let is_stub = is_python_stub_file(path);
-        diagnostics.extend(check_tokens(locator, &tokens, settings, autofix, is_stub));
+        diagnostics.extend(check_tokens(locator, &tokens, settings, is_stub));
     }
 
     // Run the filesystem-based rules.
@@ -119,11 +118,7 @@ pub fn check_path(
     {
         #[cfg(feature = "logical_lines")]
         diagnostics.extend(crate::checkers::logical_lines::check_logical_lines(
-            &tokens,
-            locator,
-            stylist,
-            settings,
-            flags::Autofix::Enabled,
+            &tokens, locator, stylist, settings,
         ));
     }
 
@@ -148,7 +143,6 @@ pub fn check_path(
                         indexer,
                         &directives.noqa_line_for,
                         settings,
-                        autofix,
                         noqa,
                         path,
                         package,
@@ -162,7 +156,6 @@ pub fn check_path(
                         &directives.isort,
                         settings,
                         stylist,
-                        autofix,
                         path,
                         package,
                     );
@@ -198,7 +191,7 @@ pub fn check_path(
         .any(|rule_code| rule_code.lint_source().is_physical_lines())
     {
         diagnostics.extend(check_physical_lines(
-            path, locator, stylist, indexer, &doc_lines, settings, autofix,
+            path, locator, stylist, indexer, &doc_lines, settings,
         ));
     }
 
@@ -223,7 +216,6 @@ pub fn check_path(
             indexer.comment_ranges(),
             &directives.noqa_line_for,
             settings,
-            error.as_ref().map_or(autofix, |_| flags::Autofix::Disabled),
         );
         if noqa.into() {
             for index in ignored.iter().rev() {
@@ -293,7 +285,6 @@ pub fn add_noqa_to_path(path: &Path, package: Option<&Path>, settings: &Settings
         &directives,
         settings,
         flags::Noqa::Disabled,
-        flags::Autofix::Disabled,
     );
 
     // Log any parse errors.
@@ -320,7 +311,6 @@ pub fn lint_only(
     package: Option<&Path>,
     settings: &Settings,
     noqa: flags::Noqa,
-    autofix: flags::Autofix,
 ) -> LinterResult<(Vec<Message>, Option<ImportMap>)> {
     // Tokenize once.
     let tokens: Vec<LexResult> = ruff_rustpython::tokenize(contents);
@@ -353,7 +343,6 @@ pub fn lint_only(
         &directives,
         settings,
         noqa,
-        autofix,
     );
 
     result.map(|(diagnostics, imports)| {
@@ -444,7 +433,6 @@ pub fn lint_fix<'a>(
             &directives,
             settings,
             noqa,
-            flags::Autofix::Enabled,
         );
 
         if iterations == 0 {

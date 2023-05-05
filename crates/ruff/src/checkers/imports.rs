@@ -15,7 +15,7 @@ use crate::directives::IsortDirectives;
 use crate::registry::Rule;
 use crate::rules::isort;
 use crate::rules::isort::track::{Block, ImportTracker};
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 fn extract_import_map(path: &Path, package: Option<&Path>, blocks: &[&Block]) -> Option<ImportMap> {
     let Some(package) = package else {
@@ -79,7 +79,6 @@ pub fn check_imports(
     directives: &IsortDirectives,
     settings: &Settings,
     stylist: &Stylist,
-    autofix: flags::Autofix,
     path: &Path,
     package: Option<&Path>,
 ) -> (Vec<Diagnostic>, Option<ImportMap>) {
@@ -99,7 +98,7 @@ pub fn check_imports(
         for block in &blocks {
             if !block.imports.is_empty() {
                 if let Some(diagnostic) = isort::rules::organize_imports(
-                    block, locator, stylist, indexer, settings, autofix, package,
+                    block, locator, stylist, indexer, settings, package,
                 ) {
                     diagnostics.push(diagnostic);
                 }
@@ -108,7 +107,7 @@ pub fn check_imports(
     }
     if settings.rules.enabled(Rule::MissingRequiredImport) {
         diagnostics.extend(isort::rules::add_required_imports(
-            &blocks, python_ast, locator, stylist, settings, autofix, is_stub,
+            &blocks, python_ast, locator, stylist, settings, is_stub,
         ));
     }
 

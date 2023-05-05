@@ -119,9 +119,7 @@ pub fn lint_path(
         && matches!(autofix, flags::FixMode::None | flags::FixMode::Generate)
     {
         let metadata = path.metadata()?;
-        if let Some((messages, imports)) =
-            cache::get(path, package, &metadata, settings, autofix.into())
-        {
+        if let Some((messages, imports)) = cache::get(path, package, &metadata, settings) {
             debug!("Cache hit for: {}", path.display());
             return Ok(Diagnostics::new(messages, imports));
         }
@@ -172,26 +170,12 @@ pub fn lint_path(
             (result, fixed)
         } else {
             // If we fail to autofix, lint the original source code.
-            let result = lint_only(
-                &contents,
-                path,
-                package,
-                &settings.lib,
-                noqa,
-                autofix.into(),
-            );
+            let result = lint_only(&contents, path, package, &settings.lib, noqa);
             let fixed = FxHashMap::default();
             (result, fixed)
         }
     } else {
-        let result = lint_only(
-            &contents,
-            path,
-            package,
-            &settings.lib,
-            noqa,
-            autofix.into(),
-        );
+        let result = lint_only(&contents, path, package, &settings.lib, noqa);
         let fixed = FxHashMap::default();
         (result, fixed)
     };
@@ -209,20 +193,12 @@ pub fn lint_path(
 
         // Purge the cache.
         if let Some(metadata) = metadata {
-            cache::del(path, package, &metadata, settings, autofix.into());
+            cache::del(path, package, &metadata, settings);
         }
     } else {
         // Re-populate the cache.
         if let Some(metadata) = metadata {
-            cache::set(
-                path,
-                package,
-                &metadata,
-                settings,
-                autofix.into(),
-                &messages,
-                &imports,
-            );
+            cache::set(path, package, &metadata, settings, &messages, &imports);
         }
     }
 
@@ -305,7 +281,6 @@ pub fn lint_stdin(
                 package,
                 settings,
                 noqa,
-                autofix.into(),
             );
             let fixed = FxHashMap::default();
 
@@ -323,7 +298,6 @@ pub fn lint_stdin(
             package,
             settings,
             noqa,
-            autofix.into(),
         );
         let fixed = FxHashMap::default();
         (result, fixed)

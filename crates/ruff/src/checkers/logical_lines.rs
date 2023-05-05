@@ -12,7 +12,7 @@ use crate::rules::pycodestyle::rules::logical_lines::{
     whitespace_around_named_parameter_equals, whitespace_before_comment,
     whitespace_before_parameters, LogicalLines, TokenFlags,
 };
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 /// Return the amount of indentation, expanding tabs to the next multiple of 8.
 fn expand_indent(line: &str) -> usize {
@@ -35,20 +35,18 @@ pub fn check_logical_lines(
     locator: &Locator,
     stylist: &Stylist,
     settings: &Settings,
-    autofix: flags::Autofix,
 ) -> Vec<Diagnostic> {
     let mut context = LogicalLinesContext::new(settings);
 
     #[cfg(feature = "logical_lines")]
-    let should_fix_missing_whitespace =
-        autofix.into() && settings.rules.should_fix(Rule::MissingWhitespace);
+    let should_fix_missing_whitespace = settings.rules.should_fix(Rule::MissingWhitespace);
 
     #[cfg(not(feature = "logical_lines"))]
     let should_fix_missing_whitespace = false;
 
     #[cfg(feature = "logical_lines")]
     let should_fix_whitespace_before_parameters =
-        autofix.into() && settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
+        settings.rules.should_fix(Rule::WhitespaceBeforeParameters);
 
     #[cfg(not(feature = "logical_lines"))]
     let should_fix_whitespace_before_parameters = false;

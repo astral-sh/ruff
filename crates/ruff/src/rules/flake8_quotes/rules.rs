@@ -8,7 +8,7 @@ use ruff_python_ast::source_code::Locator;
 
 use crate::lex::docstring_detection::StateMachine;
 use crate::registry::Rule;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 use super::settings::Quote;
 
@@ -255,12 +255,7 @@ impl<'a> From<&'a str> for Trivia<'a> {
 }
 
 /// Q003
-fn docstring(
-    locator: &Locator,
-    range: TextRange,
-    settings: &Settings,
-    autofix: flags::Autofix,
-) -> Option<Diagnostic> {
+fn docstring(locator: &Locator, range: TextRange, settings: &Settings) -> Option<Diagnostic> {
     let quotes_settings = &settings.flake8_quotes;
 
     let text = locator.slice(range);
@@ -279,7 +274,7 @@ fn docstring(
         },
         range,
     );
-    if autofix.into() && settings.rules.should_fix(Rule::BadQuotesDocstring) {
+    if settings.rules.should_fix(Rule::BadQuotesDocstring) {
         let quote_count = if trivia.is_multiline { 3 } else { 1 };
         let string_contents = &trivia.raw_text[quote_count..trivia.raw_text.len() - quote_count];
         let quote = good_docstring(quotes_settings.docstring_quotes).repeat(quote_count);
@@ -299,12 +294,7 @@ fn docstring(
 }
 
 /// Q001, Q002
-fn strings(
-    locator: &Locator,
-    sequence: &[TextRange],
-    settings: &Settings,
-    autofix: flags::Autofix,
-) -> Vec<Diagnostic> {
+fn strings(locator: &Locator, sequence: &[TextRange], settings: &Settings) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     let quotes_settings = &settings.flake8_quotes;
@@ -358,7 +348,7 @@ fn strings(
                 *range,
             );
 
-            if autofix.into() && settings.rules.should_fix(Rule::BadQuotesMultilineString) {
+            if settings.rules.should_fix(Rule::BadQuotesMultilineString) {
                 let string_contents = &trivia.raw_text[3..trivia.raw_text.len() - 3];
                 let quote = good_multiline(quotes_settings.multiline_quotes);
                 let mut fixed_contents = String::with_capacity(
@@ -391,7 +381,7 @@ fn strings(
                     && !string_contents.contains(bad_single(quotes_settings.inline_quotes))
                 {
                     let mut diagnostic = Diagnostic::new(AvoidableEscapedQuote, *range);
-                    if autofix.into() && settings.rules.should_fix(Rule::AvoidableEscapedQuote) {
+                    if settings.rules.should_fix(Rule::AvoidableEscapedQuote) {
                         let quote = bad_single(quotes_settings.inline_quotes);
 
                         let mut fixed_contents =
@@ -454,7 +444,7 @@ fn strings(
                     },
                     *range,
                 );
-                if autofix.into() && settings.rules.should_fix(Rule::BadQuotesInlineString) {
+                if settings.rules.should_fix(Rule::BadQuotesInlineString) {
                     let quote = good_single(quotes_settings.inline_quotes);
                     let mut fixed_contents =
                         String::with_capacity(trivia.prefix.len() + string_contents.len() + 2);
@@ -477,12 +467,7 @@ fn strings(
 }
 
 /// Generate `flake8-quote` diagnostics from a token stream.
-pub fn from_tokens(
-    lxr: &[LexResult],
-    locator: &Locator,
-    settings: &Settings,
-    autofix: flags::Autofix,
-) -> Vec<Diagnostic> {
+pub fn from_tokens(lxr: &[LexResult], locator: &Locator, settings: &Settings) -> Vec<Diagnostic> {
     let mut diagnostics = vec![];
 
     // Keep track of sequences of strings, which represent implicit string
@@ -496,10 +481,10 @@ pub fn from_tokens(
         // docstring, then move on.
         if is_docstring {
             if !sequence.is_empty() {
-                diagnostics.extend(strings(locator, &sequence, settings, autofix));
+                diagnostics.extend(strings(locator, &sequence, settings));
                 sequence.clear();
             }
-            if let Some(diagnostic) = docstring(locator, range, settings, autofix) {
+            if let Some(diagnostic) = docstring(locator, range, settings) {
                 diagnostics.push(diagnostic);
             }
         } else {
@@ -509,7 +494,7 @@ pub fn from_tokens(
             } else if !matches!(tok, Tok::Comment(..) | Tok::NonLogicalNewline) {
                 // Otherwise, consume the sequence.
                 if !sequence.is_empty() {
-                    diagnostics.extend(strings(locator, &sequence, settings, autofix));
+                    diagnostics.extend(strings(locator, &sequence, settings));
                     sequence.clear();
                 }
             }
@@ -518,7 +503,7 @@ pub fn from_tokens(
 
     // If we have an unterminated sequence, consume it.
     if !sequence.is_empty() {
-        diagnostics.extend(strings(locator, &sequence, settings, autofix));
+        diagnostics.extend(strings(locator, &sequence, settings));
         sequence.clear();
     }
 

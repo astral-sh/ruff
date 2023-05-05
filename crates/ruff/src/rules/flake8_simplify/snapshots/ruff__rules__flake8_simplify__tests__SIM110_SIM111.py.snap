@@ -192,7 +192,7 @@ SIM111.py:83:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` inst
 89 85 | 
 90 86 | 
 
-SIM111.py:124:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead of `for` loop
+SIM111.py:124:5: SIM110 Use `return any(check(x) for x in iterable)` instead of `for` loop
     |
 124 |           pass
 125 |   
@@ -205,7 +205,7 @@ SIM111.py:124:5: SIM110 [*] Use `return any(check(x) for x in iterable)` instead
     |
     = help: Replace with `return any(check(x) for x in iterable)`
 
-SIM111.py:134:5: SIM110 [*] Use `return all(not check(x) for x in iterable)` instead of `for` loop
+SIM111.py:134:5: SIM110 Use `return all(not check(x) for x in iterable)` instead of `for` loop
     |
 134 |           pass
 135 |   

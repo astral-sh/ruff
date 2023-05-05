@@ -6,7 +6,6 @@ use annotate_snippets::display_list::{DisplayList, FormatOptions};
 use annotate_snippets::snippet::{Annotation, AnnotationType, Slice, Snippet, SourceAnnotation};
 use bitflags::bitflags;
 use colored::Colorize;
-use ruff_diagnostics::DiagnosticKind;
 use ruff_python_ast::source_code::{OneIndexed, SourceLocation};
 use ruff_text_size::{TextRange, TextSize};
 use std::borrow::Cow;
@@ -93,7 +92,7 @@ impl Emitter for TextEmitter {
                 col = diagnostic_location.column,
                 sep = ":".cyan(),
                 code_and_body = RuleCodeAndBody {
-                    message_kind: &message.kind,
+                    message: &message,
                     show_fix_status: self.flags.contains(EmitterFlags::SHOW_FIX_STATUS)
                 }
             )?;
@@ -114,38 +113,28 @@ impl Emitter for TextEmitter {
 }
 
 pub(super) struct RuleCodeAndBody<'a> {
-    pub message_kind: &'a DiagnosticKind,
+    pub message: &'a Message,
     pub show_fix_status: bool,
 }
 
 impl Display for RuleCodeAndBody<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.show_fix_status && self.message_kind.fixable {
+        let kind = &self.message.kind;
+
+        if self.show_fix_status && !self.message.fix.is_empty() {
             write!(
                 f,
                 "{code} {autofix}{body}",
-                code = self
-                    .message_kind
-                    .rule()
-                    .noqa_code()
-                    .to_string()
-                    .red()
-                    .bold(),
+                code = kind.rule().noqa_code().to_string().red().bold(),
                 autofix = format_args!("[{}] ", "*".cyan()),
-                body = self.message_kind.body,
+                body = kind.body,
             )
         } else {
             write!(
                 f,
                 "{code} {body}",
-                code = self
-                    .message_kind
-                    .rule()
-                    .noqa_code()
-                    .to_string()
-                    .red()
-                    .bold(),
-                body = self.message_kind.body,
+                code = kind.rule().noqa_code().to_string().red().bold(),
+                body = kind.body,
             )
         }
     }

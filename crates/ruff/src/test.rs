@@ -54,7 +54,6 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
         &directives,
         settings,
         flags::Noqa::Enabled,
-        flags::Autofix::Enabled,
     );
 
     let source_has_errors = error.is_some();
@@ -105,7 +104,6 @@ pub fn test_path(path: impl AsRef<Path>, settings: &Settings) -> Result<Vec<Mess
                 &directives,
                 settings,
                 flags::Noqa::Enabled,
-                flags::Autofix::Enabled,
             );
 
             if let Some(fixed_error) = fixed_error {

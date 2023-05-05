@@ -14,7 +14,7 @@ use ruff_python_ast::source_code::{Indexer, Locator, Stylist};
 use ruff_python_ast::whitespace::leading_space;
 
 use crate::registry::AsRule;
-use crate::settings::{flags, Settings};
+use crate::settings::Settings;
 
 use super::super::track::Block;
 use super::super::{comments, format_imports};
@@ -82,7 +82,6 @@ pub fn organize_imports(
     stylist: &Stylist,
     indexer: &Indexer,
     settings: &Settings,
-    autofix: flags::Autofix,
     package: Option<&Path>,
 ) -> Option<Diagnostic> {
     let indentation = locator.slice(extract_indentation_range(&block.imports, locator));
@@ -147,7 +146,7 @@ pub fn organize_imports(
         None
     } else {
         let mut diagnostic = Diagnostic::new(UnsortedImports, range);
-        if autofix.into() && settings.rules.should_fix(diagnostic.kind.rule()) {
+        if settings.rules.should_fix(diagnostic.kind.rule()) {
             #[allow(deprecated)]
             diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
                 indent(&expected, indentation),

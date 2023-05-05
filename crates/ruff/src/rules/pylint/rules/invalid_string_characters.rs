@@ -171,11 +171,7 @@ impl AlwaysAutofixableViolation for InvalidCharacterZeroWidthSpace {
 }
 
 /// PLE2510, PLE2512, PLE2513, PLE2514, PLE2515
-pub fn invalid_string_characters(
-    locator: &Locator,
-    range: TextRange,
-    autofix: bool,
-) -> Vec<Diagnostic> {
+pub fn invalid_string_characters(locator: &Locator, range: TextRange) -> Vec<Diagnostic> {
     let mut diagnostics = Vec::new();
     let text = locator.slice(range);
 
@@ -195,15 +191,10 @@ pub fn invalid_string_characters(
         let location = range.start() + TextSize::try_from(column).unwrap();
         let range = TextRange::at(location, c.text_len());
 
-        let mut diagnostic = Diagnostic::new(rule, range);
-        if autofix {
-            #[allow(deprecated)]
-            diagnostic.set_fix(Fix::unspecified(Edit::range_replacement(
-                replacement.to_string(),
-                range,
-            )));
-        }
-        diagnostics.push(diagnostic);
+        #[allow(deprecated)]
+        diagnostics.push(Diagnostic::new(rule, range).with_fix(Fix::unspecified(
+            Edit::range_replacement(replacement.to_string(), range),
+        )));
     }
 
     diagnostics

@@ -6,7 +6,22 @@ expression: content
   {
     "code": "F401",
     "message": "`os` imported but unused",
-    "fix": null,
+    "fix": {
+      "message": "Remove unused import: `os`",
+      "edits": [
+        {
+          "content": "",
+          "location": {
+            "row": 1,
+            "column": 0
+          },
+          "end_location": {
+            "row": 2,
+            "column": 0
+          }
+        }
+      ]
+    },
     "location": {
       "row": 1,
       "column": 8

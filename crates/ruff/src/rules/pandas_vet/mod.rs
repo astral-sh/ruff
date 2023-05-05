@@ -47,7 +47,6 @@ mod tests {
             &directives,
             &settings,
             flags::Noqa::Enabled,
-            flags::Autofix::Enabled,
         );
         let actual: Vec<Rule> = diagnostics
             .into_iter()
