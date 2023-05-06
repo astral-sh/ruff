@@ -2,7 +2,7 @@ use ruff_python_ast::helpers::{has_comments, unparse_expr};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
-use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit};
+use ruff_diagnostics::{Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
 
 use crate::{checkers::ast::Checker, registry::AsRule};
@@ -39,17 +39,21 @@ impl std::fmt::Display for NestedMinMaxFunc {
 }
 
 #[violation]
-pub struct NestedMinMax(NestedMinMaxFunc);
+pub struct NestedMinMax {
+    func: NestedMinMaxFunc,
+    fixable: bool,
+}
 
 // XXX this need to be better.
-impl AlwaysAutofixableViolation for NestedMinMax {
+impl Violation for NestedMinMax {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Nested {} call", self.0)
+        format!("Nested {} call", self.func)
     }
 
-    fn autofix_title(&self) -> String {
-        format!("Flatten nested {} calls", self.0)
+    fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
+        self.fixable
+            .then_some(|NestedMinMax { func, .. }| format!("Flatten nested {} calls", func))
     }
 }
 
@@ -81,8 +85,15 @@ pub fn nested_min_max(
     let Some(nested_func) = NestedMinMaxFunc::from_func(func) else { return };
 
     if args.iter().any(|arg| nested_func.is_call(arg)) {
-        let mut diagnostic = Diagnostic::new(NestedMinMax(nested_func), expr.range());
-        if checker.patch(diagnostic.kind.rule()) && !has_comments(expr, checker.locator) {
+        let fixable = !has_comments(expr, checker.locator);
+        let mut diagnostic = Diagnostic::new(
+            NestedMinMax {
+                func: nested_func,
+                fixable,
+            },
+            expr.range(),
+        );
+        if checker.patch(diagnostic.kind.rule()) && fixable {
             let mut new_args = Vec::with_capacity(args.len());
             collect_nested_args(nested_func, args, &mut new_args);
             let flattened_expr = Expr::new(

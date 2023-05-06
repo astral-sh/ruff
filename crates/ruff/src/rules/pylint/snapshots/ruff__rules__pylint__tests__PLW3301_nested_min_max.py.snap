@@ -202,7 +202,7 @@ nested_min_max.py:13:1: PLW3301 [*] Nested min() call
 15 15 | # Don't provide a fix if there are comments within the call.
 16 16 | min(
 
-nested_min_max.py:16:1: PLW3301 [*] Nested min() call
+nested_min_max.py:16:1: PLW3301 Nested min() call
    |
 16 |   # Don't provide a fix if there are comments within the call.
 17 | / min(
@@ -211,6 +211,5 @@ nested_min_max.py:16:1: PLW3301 [*] Nested min() call
 20 | | )
    | |_^ PLW3301
    |
-   = help: Flatten nested min() calls
 
 
