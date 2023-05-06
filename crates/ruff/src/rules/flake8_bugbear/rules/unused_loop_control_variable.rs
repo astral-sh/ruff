@@ -168,10 +168,9 @@ pub fn unused_loop_control_variable(
                 let scope = checker.ctx.scope();
                 let binding = scope.bindings_for_name(name).find_map(|index| {
                     let binding = &checker.ctx.bindings[*index];
-                    binding
-                        .source
-                        .as_ref()
-                        .and_then(|source| (source == &RefEquality(stmt)).then_some(binding))
+                    binding.source.and_then(|source| {
+                        (RefEquality(source) == RefEquality(stmt)).then_some(binding)
+                    })
                 });
                 if let Some(binding) = binding {
                     if binding.kind.is_loop_var() {

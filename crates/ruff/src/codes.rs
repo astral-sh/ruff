@@ -1,5 +1,6 @@
-use crate::registry::{Linter, Rule};
 use std::fmt::Formatter;
+
+use crate::registry::{Linter, Rule};
 
 #[derive(PartialEq, Eq, PartialOrd, Ord)]
 pub struct NoqaCode(&'static str, &'static str);

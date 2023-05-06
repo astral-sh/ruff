@@ -57,9 +57,7 @@ pub fn global_statement(checker: &mut Checker, name: &str) {
         if binding.kind.is_global() {
             let source: &Stmt = binding
                 .source
-                .as_ref()
-                .expect("`global` bindings should always have a `source`")
-                .into();
+                .expect("`global` bindings should always have a `source`");
             let diagnostic = Diagnostic::new(
                 GlobalStatement {
                     name: name.to_string(),

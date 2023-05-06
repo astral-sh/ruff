@@ -4,6 +4,7 @@ use rustpython_parser::ast::{Expr, ExprKind, Stmt};
 
 use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::types::RefEquality;
 
 use crate::autofix::actions;
 use crate::checkers::ast::Checker;
@@ -53,8 +54,8 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
         let defined_by = checker.ctx.current_stmt();
         let defined_in = checker.ctx.current_stmt_parent();
         match actions::delete_stmt(
-            defined_by.into(),
-            defined_in.map(Into::into),
+            defined_by,
+            defined_in,
             &deleted,
             checker.locator,
             checker.indexer,
@@ -62,7 +63,7 @@ pub fn useless_metaclass_type(checker: &mut Checker, stmt: &Stmt, value: &Expr, 
         ) {
             Ok(fix) => {
                 if fix.is_deletion() || fix.content() == Some("pass") {
-                    checker.deletions.insert(*defined_by);
+                    checker.deletions.insert(RefEquality(defined_by));
                 }
                 diagnostic.set_fix(fix);
             }
