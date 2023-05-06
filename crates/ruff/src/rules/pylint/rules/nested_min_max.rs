@@ -56,7 +56,7 @@ impl Violation for NestedMinMax {
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
         self.fixable
-            .then_some(|NestedMinMax { func, .. }| format!("Flatten nested {} calls", func))
+            .then_some(|NestedMinMax { func, .. }| format!("Flatten nested {func} calls"))
     }
 }
 
