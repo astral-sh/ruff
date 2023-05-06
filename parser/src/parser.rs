@@ -250,7 +250,7 @@ fn parse_error_from_lalrpop(
                 source_path,
             }
         }
-        LalrpopError::UnrecognizedEOF { location, expected } => {
+        LalrpopError::UnrecognizedEof { location, expected } => {
             // This could be an initial indentation error that we should ignore
             let indent_error = expected == ["Indent"];
             if indent_error {

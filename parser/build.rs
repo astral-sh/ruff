@@ -5,15 +5,39 @@ use std::path::{Path, PathBuf};
 use tiny_keccak::{Hasher, Sha3};
 
 fn main() -> anyhow::Result<()> {
-    const SOURCE: &str = "python.lalrpop";
     let out_dir = PathBuf::from(std::env::var_os("OUT_DIR").unwrap());
-
-    println!("cargo:rerun-if-changed={SOURCE}");
-
-    try_lalrpop(SOURCE, &out_dir.join("python.rs"))?;
     gen_phf(&out_dir);
 
-    Ok(())
+    const SOURCE: &str = "src/python.lalrpop";
+    println!("cargo:rerun-if-changed={SOURCE}");
+
+    let target;
+    let error;
+
+    #[cfg(feature = "lalrpop")]
+    {
+        target = out_dir.join("src/python.rs");
+    }
+    #[cfg(not(feature = "lalrpop"))]
+    {
+        target = PathBuf::from("src/python.rs");
+        error = "python.lalrpop and src/python.rs doesn't match. This is a rustpython-parser bug. Please report it unless you are editing rustpython-parser. Run `lalrpop src/python.lalrpop` to build parser again.";
+    }
+
+    let Some(message) = requires_lalrpop(SOURCE, &target) else {
+        return Ok(());
+    };
+
+    #[cfg(feature = "lalrpop")]
+    {
+        let Err(e) = try_lalrpop() else {
+            return Ok(());
+        };
+        error = e;
+    }
+
+    println!("cargo:warning={message}");
+    panic!("running lalrpop failed. {error:?}");
 }
 
 fn requires_lalrpop(source: &str, target: &Path) -> Option<String> {
@@ -68,28 +92,14 @@ fn requires_lalrpop(source: &str, target: &Path) -> Option<String> {
     None
 }
 
-fn try_lalrpop(source: &str, target: &Path) -> anyhow::Result<()> {
-    let Some(_message) = requires_lalrpop(source, target) else {
-        return Ok(());
-    };
-
-    #[cfg(feature = "lalrpop")]
+#[cfg(feature = "lalrpop")]
+fn try_lalrpop() -> Result<(), Box<dyn std::error::Error>> {
     // We are not using lalrpop::process_root() or Configuration::process_current_dir()
     // because of https://github.com/lalrpop/lalrpop/issues/699.
     lalrpop::Configuration::new()
         .use_cargo_dir_conventions()
         .set_in_dir(Path::new("."))
         .process()
-        .unwrap_or_else(|e| {
-            println!("cargo:warning={_message}");
-            panic!("running lalrpop failed. {e:?}");
-        });
-
-    #[cfg(not(feature = "lalrpop"))]
-    {
-        println!("cargo:warning=try: cargo build --manifest-path=compiler/parser/Cargo.toml --features=lalrpop");
-    }
-    Ok(())
 }
 
 fn sha_equal(expected_sha3_str: &str, actual_sha3: &[u8; 32]) -> bool {
