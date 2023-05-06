@@ -210,7 +210,7 @@ where
             &stmt.node,
             StmtKind::Import { .. } | StmtKind::ImportFrom { .. }
         ) {
-            if self.ctx.scope_id.is_global() && self.ctx.current_stmt_parent().is_none() {
+            if self.ctx.at_top_level() {
                 self.importer.visit_import(stmt);
             }
         }

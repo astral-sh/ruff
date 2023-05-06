@@ -398,6 +398,15 @@ impl<'a> Context<'a> {
         self.stmts.ancestor_ids(node_id).map(|id| self.stmts[id])
     }
 
+    /// Return `true` if the context is at the top level of the module (i.e., in the module scope,
+    /// and not nested within any statements).
+    pub fn at_top_level(&self) -> bool {
+        self.scope_id.is_global()
+            && self
+                .stmt_id
+                .map_or(true, |stmt_id| self.stmts.parent_id(stmt_id).is_none())
+    }
+
     /// Returns `true` if the context is in an exception handler.
     pub const fn in_exception_handler(&self) -> bool {
         self.in_exception_handler
