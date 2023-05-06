@@ -150,16 +150,12 @@ impl AlwaysAutofixableViolation for ImplicitReturn {
 /// ```python
 /// def foo():
 ///     bar = 1
-///     # some code that not using `bar`
-///     print('test')
 ///     return bar
 /// ```
 ///
 /// Use instead:
 /// ```python
 /// def foo():
-///     # some code that not using `bar`
-///     print('test')
 ///     return 1
 /// ```
 #[violation]
