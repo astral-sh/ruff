@@ -12,6 +12,7 @@ include = ["LICENSE", "Cargo.toml", "src/**/*.rs"]
 resolver = "2"
 members = [
     "ast", "core", "literal", "parser",
+    "ruff_text_size",
 ]
 
 [workspace.dependencies]

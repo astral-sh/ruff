@@ -113,6 +113,7 @@
 #![doc(html_root_url = "https://docs.rs/rustpython-parser/")]
 
 pub use rustpython_ast as ast;
+pub use rustpython_compiler_core::ConversionFlag;
 
 mod function;
 // Skip flattening lexer to distinguish from full parser
@@ -124,11 +125,14 @@ mod soft_keywords;
 mod string;
 mod token;
 
+type Location = TextSize;
+
 pub use mode::Mode;
 pub use parser::{
     parse, parse_expression, parse_expression_located, parse_located, parse_program, parse_tokens,
     ParseError, ParseErrorType,
 };
+use ruff_text_size::TextSize;
 pub use string::FStringErrorType;
 pub use token::{StringKind, Tok};
 

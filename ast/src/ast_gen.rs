@@ -3,36 +3,63 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 pub use crate::constant::*;
-pub use crate::Location;
+pub use ruff_text_size::{TextRange, TextSize};
 
 type Ident = String;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Located<T, U = ()> {
-    pub location: Location,
-    pub end_location: Option<Location>,
+    pub range: TextRange,
     pub custom: U,
     pub node: T,
 }
 
 impl<T> Located<T> {
-    pub fn new(location: Location, end_location: Location, node: T) -> Self {
+    pub fn new(start: TextSize, end: TextSize, node: T) -> Self {
         Self {
-            location,
-            end_location: Some(end_location),
+            range: TextRange::new(start, end),
             custom: (),
             node,
         }
     }
 
-    pub const fn start(&self) -> Location {
-        self.location
+    /// Creates a new node that spans the position specified by `range`.
+    pub fn with_range(node: T, range: TextRange) -> Self {
+        Self {
+            range,
+            custom: (),
+            node,
+        }
     }
 
-    /// Returns the node's [`end_location`](Located::end_location) or [`location`](Located::start) if
-    /// [`end_location`](Located::end_location) is `None`.
-    pub fn end(&self) -> Location {
-        self.end_location.unwrap_or(self.location)
+    /// Returns the absolute start position of the node from the beginning of the document.
+    #[inline]
+    pub const fn start(&self) -> TextSize {
+        self.range.start()
+    }
+
+    /// Returns the node
+    #[inline]
+    pub fn node(&self) -> &T {
+        &self.node
+    }
+
+    /// Consumes self and returns the node.
+    #[inline]
+    pub fn into_node(self) -> T {
+        self.node
+    }
+
+    /// Returns the `range` of the node. The range offsets are absolute to the start of the document.
+    #[inline]
+    pub const fn range(&self) -> TextRange {
+        self.range
+    }
+
+    /// Returns the absolute position at which the node ends in the source document.
+    #[inline]
+    pub const fn end(&self) -> TextSize {
+        self.range.end()
     }
 }
 
@@ -1142,8 +1169,7 @@ pub mod fold {
     ) -> Result<Located<MT, F::TargetU>, F::Error> {
         Ok(Located {
             custom: folder.map_user(node.custom)?,
-            location: node.location,
-            end_location: node.end_location,
+            range: node.range,
             node: f(folder, node.node)?,
         })
     }

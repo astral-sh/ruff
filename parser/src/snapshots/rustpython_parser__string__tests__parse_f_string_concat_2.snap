@@ -4,45 +4,18 @@ expression: parse_ast
 ---
 [
     Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 17,
-            },
-        ),
+        range: 0..17,
         custom: (),
         node: Expr(
             StmtExpr {
                 value: Located {
-                    location: Location {
-                        row: 1,
-                        column: 0,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 1,
-                            column: 17,
-                        },
-                    ),
+                    range: 0..17,
                     custom: (),
                     node: JoinedStr(
                         ExprJoinedStr {
                             values: [
                                 Located {
-                                    location: Location {
-                                        row: 1,
-                                        column: 0,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 1,
-                                            column: 17,
-                                        },
-                                    ),
+                                    range: 0..17,
                                     custom: (),
                                     node: Constant(
                                         ExprConstant {

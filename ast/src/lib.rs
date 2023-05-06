@@ -7,6 +7,5 @@ mod impls;
 mod unparse;
 
 pub use ast_gen::*;
-pub use rustpython_compiler_core::Location;
 
 pub type Suite<U = ()> = Vec<Stmt<U>>;

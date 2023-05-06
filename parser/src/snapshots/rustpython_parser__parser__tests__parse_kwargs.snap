@@ -4,44 +4,17 @@ expression: parse_ast
 ---
 [
     Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 32,
-            },
-        ),
+        range: 0..32,
         custom: (),
         node: Expr(
             StmtExpr {
                 value: Located {
-                    location: Location {
-                        row: 1,
-                        column: 0,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 1,
-                            column: 32,
-                        },
-                    ),
+                    range: 0..32,
                     custom: (),
                     node: Call(
                         ExprCall {
                             func: Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 0,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 7,
-                                    },
-                                ),
+                                range: 0..7,
                                 custom: (),
                                 node: Name(
                                     ExprName {
@@ -52,16 +25,7 @@ expression: parse_ast
                             },
                             args: [
                                 Located {
-                                    location: Location {
-                                        row: 1,
-                                        column: 8,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 1,
-                                            column: 20,
-                                        },
-                                    ),
+                                    range: 8..20,
                                     custom: (),
                                     node: Constant(
                                         ExprConstant {
@@ -75,32 +39,14 @@ expression: parse_ast
                             ],
                             keywords: [
                                 Located {
-                                    location: Location {
-                                        row: 1,
-                                        column: 22,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 1,
-                                            column: 31,
-                                        },
-                                    ),
+                                    range: 22..31,
                                     custom: (),
                                     node: KeywordData {
                                         arg: Some(
                                             "keyword",
                                         ),
                                         value: Located {
-                                            location: Location {
-                                                row: 1,
-                                                column: 30,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 1,
-                                                    column: 31,
-                                                },
-                                            ),
+                                            range: 30..31,
                                             custom: (),
                                             node: Constant(
                                                 ExprConstant {

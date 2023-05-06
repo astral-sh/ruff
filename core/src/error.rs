@@ -1,11 +1,11 @@
-use crate::Location;
+use ruff_text_size::TextSize;
 use std::error::Error as StdError;
 use std::fmt::Display;
 
 #[derive(Debug, PartialEq, Eq)]
 pub struct BaseError<T> {
     pub error: T,
-    pub location: Location,
+    pub location: TextSize,
     pub source_path: String,
 }
 
@@ -31,7 +31,12 @@ where
     T: std::fmt::Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter) -> std::fmt::Result {
-        self.location.fmt_with(f, &self.error)
+        write!(
+            f,
+            "{} at byte offset {}",
+            &self.error,
+            u32::from(self.location)
+        )
     }
 }
 

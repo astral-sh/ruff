@@ -4,12 +4,14 @@
 // regular strings. Since the parser has no definition of f-string formats (Pending PEP 701)
 // we have to do the parsing here, manually.
 use crate::{
-    ast::{self, Constant, ConversionFlag, Expr, ExprKind, Location},
+    ast::{self, Constant, ConversionFlag, Expr, ExprKind},
     lexer::{LexicalError, LexicalErrorType},
     parser::{parse_expression_located, LalrpopError, ParseError, ParseErrorType},
     token::{StringKind, Tok},
+    Location,
 };
 use itertools::Itertools;
+use ruff_text_size::{TextLen, TextSize};
 
 // unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
 const MAX_UNICODE_NAME: usize = 88;
@@ -30,26 +32,25 @@ impl<'a> StringParser<'a> {
         start: Location,
         end: Location,
     ) -> Self {
-        let offset = kind.prefix_len() + if triple_quoted { 3 } else { 1 };
+        let offset = kind.prefix_len()
+            + if triple_quoted {
+                TextSize::from(3)
+            } else {
+                TextSize::from(1)
+            };
         Self {
             chars: source.chars().peekable(),
             kind,
             start,
             end,
-            location: start.with_col_offset(offset),
+            location: start + offset,
         }
     }
 
     #[inline]
     fn next_char(&mut self) -> Option<char> {
-        let Some(c) = self.chars.next() else {
-            return None
-        };
-        if c == '\n' {
-            self.location.newline();
-        } else {
-            self.location.go_right();
-        }
+        let c = self.chars.next()?;
+        self.location += c.text_len();
         Some(c)
     }
 
@@ -571,7 +572,8 @@ impl<'a> StringParser<'a> {
 
 fn parse_fstring_expr(source: &str, location: Location) -> Result<Expr, ParseError> {
     let fstring_body = format!("({source})");
-    parse_expression_located(&fstring_body, "<fstring>", location.with_col_offset(-1))
+    let start = location - Location::from(1);
+    parse_expression_located(&fstring_body, "<fstring>", start)
 }
 
 fn parse_string(
@@ -611,7 +613,7 @@ pub(crate) fn parse_strings(
         let mut content: Vec<u8> = vec![];
         for (start, (source, kind, triple_quoted), end) in values {
             for value in parse_string(&source, kind, triple_quoted, start, end)? {
-                match value.node {
+                match value.into_node() {
                     ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Bytes(value),
                         ..
@@ -635,7 +637,7 @@ pub(crate) fn parse_strings(
         let mut content: Vec<String> = vec![];
         for (start, (source, kind, triple_quoted), end) in values {
             for value in parse_string(&source, kind, triple_quoted, start, end)? {
-                match value.node {
+                match value.into_node() {
                     ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(value),
                         ..
@@ -801,6 +803,7 @@ impl From<FStringError> for LalrpopError<Location, Tok, LexicalError> {
     }
 }
 
+#[cfg(not(feature = "byte_offsets"))]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -812,7 +815,7 @@ mod tests {
             StringKind::FString,
             false,
             Location::default(),
-            Location::default().with_col_offset(source.len() + 3), // 3 for prefix and quotes
+            Location::default() + source.text_len() + Location::from(3), // 3 for prefix and quotes
         )
         .parse()
     }
@@ -876,8 +879,7 @@ mod tests {
                 LexicalErrorType::FStringError(e) => e,
                 e => unreachable!("Expected FStringError: {:?}", e),
             })
-            .err()
-            .expect("Expected error")
+            .expect_err("Expected error")
     }
 
     #[test]

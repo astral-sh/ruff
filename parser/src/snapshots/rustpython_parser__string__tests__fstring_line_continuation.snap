@@ -4,45 +4,18 @@ expression: parse_ast
 ---
 [
     Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 2,
-                column: 4,
-            },
-        ),
+        range: 0..9,
         custom: (),
         node: Expr(
             StmtExpr {
                 value: Located {
-                    location: Location {
-                        row: 1,
-                        column: 0,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 2,
-                            column: 4,
-                        },
-                    ),
+                    range: 0..9,
                     custom: (),
                     node: JoinedStr(
                         ExprJoinedStr {
                             values: [
                                 Located {
-                                    location: Location {
-                                        row: 1,
-                                        column: 0,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 2,
-                                            column: 4,
-                                        },
-                                    ),
+                                    range: 0..9,
                                     custom: (),
                                     node: Constant(
                                         ExprConstant {
@@ -54,30 +27,12 @@ expression: parse_ast
                                     ),
                                 },
                                 Located {
-                                    location: Location {
-                                        row: 1,
-                                        column: 0,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 2,
-                                            column: 4,
-                                        },
-                                    ),
+                                    range: 0..9,
                                     custom: (),
                                     node: FormattedValue(
                                         ExprFormattedValue {
                                             value: Located {
-                                                location: Location {
-                                                    row: 2,
-                                                    column: 1,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 2,
-                                                        column: 2,
-                                                    },
-                                                ),
+                                                range: 6..7,
                                                 custom: (),
                                                 node: Name(
                                                     ExprName {

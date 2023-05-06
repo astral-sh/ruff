@@ -4,32 +4,14 @@ expression: "parse_program(source, \"<test>\").unwrap()"
 ---
 [
     Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 5,
-                column: 6,
-            },
-        ),
+        range: 0..98,
         custom: (),
         node: ClassDef(
             StmtClassDef {
                 name: "Foo",
                 bases: [
                     Located {
-                        location: Location {
-                            row: 1,
-                            column: 10,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 11,
-                            },
-                        ),
+                        range: 10..11,
                         custom: (),
                         node: Name(
                             ExprName {
@@ -39,16 +21,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         ),
                     },
                     Located {
-                        location: Location {
-                            row: 1,
-                            column: 13,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 14,
-                            },
-                        ),
+                        range: 13..14,
                         custom: (),
                         node: Name(
                             ExprName {
@@ -61,16 +34,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                 keywords: [],
                 body: [
                     Located {
-                        location: Location {
-                            row: 2,
-                            column: 1,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 3,
-                                column: 6,
-                            },
-                        ),
+                        range: 18..44,
                         custom: (),
                         node: FunctionDef(
                             StmtFunctionDef {
@@ -79,16 +43,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                     posonlyargs: [],
                                     args: [
                                         Located {
-                                            location: Location {
-                                                row: 2,
-                                                column: 14,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 2,
-                                                    column: 18,
-                                                },
-                                            ),
+                                            range: 31..35,
                                             custom: (),
                                             node: ArgData {
                                                 arg: "self",
@@ -105,16 +60,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 },
                                 body: [
                                     Located {
-                                        location: Location {
-                                            row: 3,
-                                            column: 2,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 3,
-                                                column: 6,
-                                            },
-                                        ),
+                                        range: 40..44,
                                         custom: (),
                                         node: Pass,
                                     },
@@ -126,16 +72,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                         ),
                     },
                     Located {
-                        location: Location {
-                            row: 4,
-                            column: 1,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 5,
-                                column: 6,
-                            },
-                        ),
+                        range: 46..98,
                         custom: (),
                         node: FunctionDef(
                             StmtFunctionDef {
@@ -144,16 +81,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                     posonlyargs: [],
                                     args: [
                                         Located {
-                                            location: Location {
-                                                row: 4,
-                                                column: 25,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 4,
-                                                    column: 29,
-                                                },
-                                            ),
+                                            range: 70..74,
                                             custom: (),
                                             node: ArgData {
                                                 arg: "self",
@@ -162,16 +90,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                             },
                                         },
                                         Located {
-                                            location: Location {
-                                                row: 4,
-                                                column: 31,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 4,
-                                                    column: 34,
-                                                },
-                                            ),
+                                            range: 76..79,
                                             custom: (),
                                             node: ArgData {
                                                 arg: "arg",
@@ -186,16 +105,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                     kwarg: None,
                                     defaults: [
                                         Located {
-                                            location: Location {
-                                                row: 4,
-                                                column: 35,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 4,
-                                                    column: 44,
-                                                },
-                                            ),
+                                            range: 80..89,
                                             custom: (),
                                             node: Constant(
                                                 ExprConstant {
@@ -210,16 +120,7 @@ expression: "parse_program(source, \"<test>\").unwrap()"
                                 },
                                 body: [
                                     Located {
-                                        location: Location {
-                                            row: 5,
-                                            column: 2,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 5,
-                                                column: 6,
-                                            },
-                                        ),
+                                        range: 94..98,
                                         custom: (),
                                         node: Pass,
                                     },

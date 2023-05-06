@@ -3,44 +3,17 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 Located {
-    location: Location {
-        row: 1,
-        column: 0,
-    },
-    end_location: Some(
-        Location {
-            row: 1,
-            column: 26,
-        },
-    ),
+    range: 0..26,
     custom: (),
     node: GeneratorExp(
         ExprGeneratorExp {
             elt: Located {
-                location: Location {
-                    row: 1,
-                    column: 1,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 14,
-                    },
-                ),
+                range: 1..14,
                 custom: (),
                 node: IfExp(
                     ExprIfExp {
                         test: Located {
-                            location: Location {
-                                row: 1,
-                                column: 6,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 7,
-                                },
-                            ),
+                            range: 6..7,
                             custom: (),
                             node: Name(
                                 ExprName {
@@ -50,16 +23,7 @@ Located {
                             ),
                         },
                         body: Located {
-                            location: Location {
-                                row: 1,
-                                column: 1,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 2,
-                                },
-                            ),
+                            range: 1..2,
                             custom: (),
                             node: Name(
                                 ExprName {
@@ -69,16 +33,7 @@ Located {
                             ),
                         },
                         orelse: Located {
-                            location: Location {
-                                row: 1,
-                                column: 13,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 14,
-                                },
-                            ),
+                            range: 13..14,
                             custom: (),
                             node: Name(
                                 ExprName {
@@ -93,16 +48,7 @@ Located {
             generators: [
                 Comprehension {
                     target: Located {
-                        location: Location {
-                            row: 1,
-                            column: 19,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 20,
-                            },
-                        ),
+                        range: 19..20,
                         custom: (),
                         node: Name(
                             ExprName {
@@ -112,16 +58,7 @@ Located {
                         ),
                     },
                     iter: Located {
-                        location: Location {
-                            row: 1,
-                            column: 24,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 25,
-                            },
-                        ),
+                        range: 24..25,
                         custom: (),
                         node: Name(
                             ExprName {

@@ -4,60 +4,24 @@ expression: parse_ast
 ---
 [
     Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 7,
-                column: 57,
-            },
-        ),
+        range: 0..260,
         custom: (),
         node: TryStar(
             StmtTryStar {
                 body: [
                     Located {
-                        location: Location {
-                            row: 2,
-                            column: 4,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 3,
-                                column: 62,
-                            },
-                        ),
+                        range: 9..98,
                         custom: (),
                         node: Raise(
                             StmtRaise {
                                 exc: Some(
                                     Located {
-                                        location: Location {
-                                            row: 2,
-                                            column: 10,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 3,
-                                                column: 62,
-                                            },
-                                        ),
+                                        range: 15..98,
                                         custom: (),
                                         node: Call(
                                             ExprCall {
                                                 func: Located {
-                                                    location: Location {
-                                                        row: 2,
-                                                        column: 10,
-                                                    },
-                                                    end_location: Some(
-                                                        Location {
-                                                            row: 2,
-                                                            column: 24,
-                                                        },
-                                                    ),
+                                                    range: 15..29,
                                                     custom: (),
                                                     node: Name(
                                                         ExprName {
@@ -68,16 +32,7 @@ expression: parse_ast
                                                 },
                                                 args: [
                                                     Located {
-                                                        location: Location {
-                                                            row: 2,
-                                                            column: 25,
-                                                        },
-                                                        end_location: Some(
-                                                            Location {
-                                                                row: 2,
-                                                                column: 29,
-                                                            },
-                                                        ),
+                                                        range: 30..34,
                                                         custom: (),
                                                         node: Constant(
                                                             ExprConstant {
@@ -89,45 +44,18 @@ expression: parse_ast
                                                         ),
                                                     },
                                                     Located {
-                                                        location: Location {
-                                                            row: 3,
-                                                            column: 8,
-                                                        },
-                                                        end_location: Some(
-                                                            Location {
-                                                                row: 3,
-                                                                column: 61,
-                                                            },
-                                                        ),
+                                                        range: 44..97,
                                                         custom: (),
                                                         node: List(
                                                             ExprList {
                                                                 elts: [
                                                                     Located {
-                                                                        location: Location {
-                                                                            row: 3,
-                                                                            column: 9,
-                                                                        },
-                                                                        end_location: Some(
-                                                                            Location {
-                                                                                row: 3,
-                                                                                column: 22,
-                                                                            },
-                                                                        ),
+                                                                        range: 45..58,
                                                                         custom: (),
                                                                         node: Call(
                                                                             ExprCall {
                                                                                 func: Located {
-                                                                                    location: Location {
-                                                                                        row: 3,
-                                                                                        column: 9,
-                                                                                    },
-                                                                                    end_location: Some(
-                                                                                        Location {
-                                                                                            row: 3,
-                                                                                            column: 19,
-                                                                                        },
-                                                                                    ),
+                                                                                    range: 45..55,
                                                                                     custom: (),
                                                                                     node: Name(
                                                                                         ExprName {
@@ -138,16 +66,7 @@ expression: parse_ast
                                                                                 },
                                                                                 args: [
                                                                                     Located {
-                                                                                        location: Location {
-                                                                                            row: 3,
-                                                                                            column: 20,
-                                                                                        },
-                                                                                        end_location: Some(
-                                                                                            Location {
-                                                                                                row: 3,
-                                                                                                column: 21,
-                                                                                            },
-                                                                                        ),
+                                                                                        range: 56..57,
                                                                                         custom: (),
                                                                                         node: Constant(
                                                                                             ExprConstant {
@@ -164,30 +83,12 @@ expression: parse_ast
                                                                         ),
                                                                     },
                                                                     Located {
-                                                                        location: Location {
-                                                                            row: 3,
-                                                                            column: 24,
-                                                                        },
-                                                                        end_location: Some(
-                                                                            Location {
-                                                                                row: 3,
-                                                                                column: 36,
-                                                                            },
-                                                                        ),
+                                                                        range: 60..72,
                                                                         custom: (),
                                                                         node: Call(
                                                                             ExprCall {
                                                                                 func: Located {
-                                                                                    location: Location {
-                                                                                        row: 3,
-                                                                                        column: 24,
-                                                                                    },
-                                                                                    end_location: Some(
-                                                                                        Location {
-                                                                                            row: 3,
-                                                                                            column: 33,
-                                                                                        },
-                                                                                    ),
+                                                                                    range: 60..69,
                                                                                     custom: (),
                                                                                     node: Name(
                                                                                         ExprName {
@@ -198,16 +99,7 @@ expression: parse_ast
                                                                                 },
                                                                                 args: [
                                                                                     Located {
-                                                                                        location: Location {
-                                                                                            row: 3,
-                                                                                            column: 34,
-                                                                                        },
-                                                                                        end_location: Some(
-                                                                                            Location {
-                                                                                                row: 3,
-                                                                                                column: 35,
-                                                                                            },
-                                                                                        ),
+                                                                                        range: 70..71,
                                                                                         custom: (),
                                                                                         node: Constant(
                                                                                             ExprConstant {
@@ -224,30 +116,12 @@ expression: parse_ast
                                                                         ),
                                                                     },
                                                                     Located {
-                                                                        location: Location {
-                                                                            row: 3,
-                                                                            column: 38,
-                                                                        },
-                                                                        end_location: Some(
-                                                                            Location {
-                                                                                row: 3,
-                                                                                column: 48,
-                                                                            },
-                                                                        ),
+                                                                        range: 74..84,
                                                                         custom: (),
                                                                         node: Call(
                                                                             ExprCall {
                                                                                 func: Located {
-                                                                                    location: Location {
-                                                                                        row: 3,
-                                                                                        column: 38,
-                                                                                    },
-                                                                                    end_location: Some(
-                                                                                        Location {
-                                                                                            row: 3,
-                                                                                            column: 45,
-                                                                                        },
-                                                                                    ),
+                                                                                    range: 74..81,
                                                                                     custom: (),
                                                                                     node: Name(
                                                                                         ExprName {
@@ -258,16 +132,7 @@ expression: parse_ast
                                                                                 },
                                                                                 args: [
                                                                                     Located {
-                                                                                        location: Location {
-                                                                                            row: 3,
-                                                                                            column: 46,
-                                                                                        },
-                                                                                        end_location: Some(
-                                                                                            Location {
-                                                                                                row: 3,
-                                                                                                column: 47,
-                                                                                            },
-                                                                                        ),
+                                                                                        range: 82..83,
                                                                                         custom: (),
                                                                                         node: Constant(
                                                                                             ExprConstant {
@@ -284,30 +149,12 @@ expression: parse_ast
                                                                         ),
                                                                     },
                                                                     Located {
-                                                                        location: Location {
-                                                                            row: 3,
-                                                                            column: 50,
-                                                                        },
-                                                                        end_location: Some(
-                                                                            Location {
-                                                                                row: 3,
-                                                                                column: 60,
-                                                                            },
-                                                                        ),
+                                                                        range: 86..96,
                                                                         custom: (),
                                                                         node: Call(
                                                                             ExprCall {
                                                                                 func: Located {
-                                                                                    location: Location {
-                                                                                        row: 3,
-                                                                                        column: 50,
-                                                                                    },
-                                                                                    end_location: Some(
-                                                                                        Location {
-                                                                                            row: 3,
-                                                                                            column: 57,
-                                                                                        },
-                                                                                    ),
+                                                                                    range: 86..93,
                                                                                     custom: (),
                                                                                     node: Name(
                                                                                         ExprName {
@@ -318,16 +165,7 @@ expression: parse_ast
                                                                                 },
                                                                                 args: [
                                                                                     Located {
-                                                                                        location: Location {
-                                                                                            row: 3,
-                                                                                            column: 58,
-                                                                                        },
-                                                                                        end_location: Some(
-                                                                                            Location {
-                                                                                                row: 3,
-                                                                                                column: 59,
-                                                                                            },
-                                                                                        ),
+                                                                                        range: 94..95,
                                                                                         custom: (),
                                                                                         node: Constant(
                                                                                             ExprConstant {
@@ -361,31 +199,13 @@ expression: parse_ast
                 ],
                 handlers: [
                     Located {
-                        location: Location {
-                            row: 4,
-                            column: 0,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 5,
-                                column: 57,
-                            },
-                        ),
+                        range: 99..180,
                         custom: (),
                         node: ExceptHandler(
                             ExcepthandlerExceptHandler {
                                 type_: Some(
                                     Located {
-                                        location: Location {
-                                            row: 4,
-                                            column: 8,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 4,
-                                                column: 17,
-                                            },
-                                        ),
+                                        range: 107..116,
                                         custom: (),
                                         node: Name(
                                             ExprName {
@@ -400,44 +220,17 @@ expression: parse_ast
                                 ),
                                 body: [
                                     Located {
-                                        location: Location {
-                                            row: 5,
-                                            column: 4,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 5,
-                                                column: 57,
-                                            },
-                                        ),
+                                        range: 127..180,
                                         custom: (),
                                         node: Expr(
                                             StmtExpr {
                                                 value: Located {
-                                                    location: Location {
-                                                        row: 5,
-                                                        column: 4,
-                                                    },
-                                                    end_location: Some(
-                                                        Location {
-                                                            row: 5,
-                                                            column: 57,
-                                                        },
-                                                    ),
+                                                    range: 127..180,
                                                     custom: (),
                                                     node: Call(
                                                         ExprCall {
                                                             func: Located {
-                                                                location: Location {
-                                                                    row: 5,
-                                                                    column: 4,
-                                                                },
-                                                                end_location: Some(
-                                                                    Location {
-                                                                        row: 5,
-                                                                        column: 9,
-                                                                    },
-                                                                ),
+                                                                range: 127..132,
                                                                 custom: (),
                                                                 node: Name(
                                                                     ExprName {
@@ -448,31 +241,13 @@ expression: parse_ast
                                                             },
                                                             args: [
                                                                 Located {
-                                                                    location: Location {
-                                                                        row: 5,
-                                                                        column: 10,
-                                                                    },
-                                                                    end_location: Some(
-                                                                        Location {
-                                                                            row: 5,
-                                                                            column: 56,
-                                                                        },
-                                                                    ),
+                                                                    range: 133..179,
                                                                     custom: (),
                                                                     node: JoinedStr(
                                                                         ExprJoinedStr {
                                                                             values: [
                                                                                 Located {
-                                                                                    location: Location {
-                                                                                        row: 5,
-                                                                                        column: 10,
-                                                                                    },
-                                                                                    end_location: Some(
-                                                                                        Location {
-                                                                                            row: 5,
-                                                                                            column: 56,
-                                                                                        },
-                                                                                    ),
+                                                                                    range: 133..179,
                                                                                     custom: (),
                                                                                     node: Constant(
                                                                                         ExprConstant {
@@ -484,44 +259,17 @@ expression: parse_ast
                                                                                     ),
                                                                                 },
                                                                                 Located {
-                                                                                    location: Location {
-                                                                                        row: 5,
-                                                                                        column: 10,
-                                                                                    },
-                                                                                    end_location: Some(
-                                                                                        Location {
-                                                                                            row: 5,
-                                                                                            column: 56,
-                                                                                        },
-                                                                                    ),
+                                                                                    range: 133..179,
                                                                                     custom: (),
                                                                                     node: FormattedValue(
                                                                                         ExprFormattedValue {
                                                                                             value: Located {
-                                                                                                location: Location {
-                                                                                                    row: 5,
-                                                                                                    column: 20,
-                                                                                                },
-                                                                                                end_location: Some(
-                                                                                                    Location {
-                                                                                                        row: 5,
-                                                                                                        column: 27,
-                                                                                                    },
-                                                                                                ),
+                                                                                                range: 143..150,
                                                                                                 custom: (),
                                                                                                 node: Call(
                                                                                                     ExprCall {
                                                                                                         func: Located {
-                                                                                                            location: Location {
-                                                                                                                row: 5,
-                                                                                                                column: 20,
-                                                                                                            },
-                                                                                                            end_location: Some(
-                                                                                                                Location {
-                                                                                                                    row: 5,
-                                                                                                                    column: 24,
-                                                                                                                },
-                                                                                                            ),
+                                                                                                            range: 143..147,
                                                                                                             custom: (),
                                                                                                             node: Name(
                                                                                                                 ExprName {
@@ -532,16 +280,7 @@ expression: parse_ast
                                                                                                         },
                                                                                                         args: [
                                                                                                             Located {
-                                                                                                                location: Location {
-                                                                                                                    row: 5,
-                                                                                                                    column: 25,
-                                                                                                                },
-                                                                                                                end_location: Some(
-                                                                                                                    Location {
-                                                                                                                        row: 5,
-                                                                                                                        column: 26,
-                                                                                                                    },
-                                                                                                                ),
+                                                                                                                range: 148..149,
                                                                                                                 custom: (),
                                                                                                                 node: Name(
                                                                                                                     ExprName {
@@ -561,16 +300,7 @@ expression: parse_ast
                                                                                     ),
                                                                                 },
                                                                                 Located {
-                                                                                    location: Location {
-                                                                                        row: 5,
-                                                                                        column: 10,
-                                                                                    },
-                                                                                    end_location: Some(
-                                                                                        Location {
-                                                                                            row: 5,
-                                                                                            column: 56,
-                                                                                        },
-                                                                                    ),
+                                                                                    range: 133..179,
                                                                                     custom: (),
                                                                                     node: Constant(
                                                                                         ExprConstant {
@@ -582,44 +312,17 @@ expression: parse_ast
                                                                                     ),
                                                                                 },
                                                                                 Located {
-                                                                                    location: Location {
-                                                                                        row: 5,
-                                                                                        column: 10,
-                                                                                    },
-                                                                                    end_location: Some(
-                                                                                        Location {
-                                                                                            row: 5,
-                                                                                            column: 56,
-                                                                                        },
-                                                                                    ),
+                                                                                    range: 133..179,
                                                                                     custom: (),
                                                                                     node: FormattedValue(
                                                                                         ExprFormattedValue {
                                                                                             value: Located {
-                                                                                                location: Location {
-                                                                                                    row: 5,
-                                                                                                    column: 42,
-                                                                                                },
-                                                                                                end_location: Some(
-                                                                                                    Location {
-                                                                                                        row: 5,
-                                                                                                        column: 54,
-                                                                                                    },
-                                                                                                ),
+                                                                                                range: 165..177,
                                                                                                 custom: (),
                                                                                                 node: Attribute(
                                                                                                     ExprAttribute {
                                                                                                         value: Located {
-                                                                                                            location: Location {
-                                                                                                                row: 5,
-                                                                                                                column: 42,
-                                                                                                            },
-                                                                                                            end_location: Some(
-                                                                                                                Location {
-                                                                                                                    row: 5,
-                                                                                                                    column: 43,
-                                                                                                                },
-                                                                                                            ),
+                                                                                                            range: 165..166,
                                                                                                             custom: (),
                                                                                                             node: Name(
                                                                                                                 ExprName {
@@ -655,31 +358,13 @@ expression: parse_ast
                         ),
                     },
                     Located {
-                        location: Location {
-                            row: 6,
-                            column: 0,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 7,
-                                column: 57,
-                            },
-                        ),
+                        range: 181..260,
                         custom: (),
                         node: ExceptHandler(
                             ExcepthandlerExceptHandler {
                                 type_: Some(
                                     Located {
-                                        location: Location {
-                                            row: 6,
-                                            column: 8,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 6,
-                                                column: 15,
-                                            },
-                                        ),
+                                        range: 189..196,
                                         custom: (),
                                         node: Name(
                                             ExprName {
@@ -694,44 +379,17 @@ expression: parse_ast
                                 ),
                                 body: [
                                     Located {
-                                        location: Location {
-                                            row: 7,
-                                            column: 4,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 7,
-                                                column: 57,
-                                            },
-                                        ),
+                                        range: 207..260,
                                         custom: (),
                                         node: Expr(
                                             StmtExpr {
                                                 value: Located {
-                                                    location: Location {
-                                                        row: 7,
-                                                        column: 4,
-                                                    },
-                                                    end_location: Some(
-                                                        Location {
-                                                            row: 7,
-                                                            column: 57,
-                                                        },
-                                                    ),
+                                                    range: 207..260,
                                                     custom: (),
                                                     node: Call(
                                                         ExprCall {
                                                             func: Located {
-                                                                location: Location {
-                                                                    row: 7,
-                                                                    column: 4,
-                                                                },
-                                                                end_location: Some(
-                                                                    Location {
-                                                                        row: 7,
-                                                                        column: 9,
-                                                                    },
-                                                                ),
+                                                                range: 207..212,
                                                                 custom: (),
                                                                 node: Name(
                                                                     ExprName {
@@ -742,31 +400,13 @@ expression: parse_ast
                                                             },
                                                             args: [
                                                                 Located {
-                                                                    location: Location {
-                                                                        row: 7,
-                                                                        column: 10,
-                                                                    },
-                                                                    end_location: Some(
-                                                                        Location {
-                                                                            row: 7,
-                                                                            column: 56,
-                                                                        },
-                                                                    ),
+                                                                    range: 213..259,
                                                                     custom: (),
                                                                     node: JoinedStr(
                                                                         ExprJoinedStr {
                                                                             values: [
                                                                                 Located {
-                                                                                    location: Location {
-                                                                                        row: 7,
-                                                                                        column: 10,
-                                                                                    },
-                                                                                    end_location: Some(
-                                                                                        Location {
-                                                                                            row: 7,
-                                                                                            column: 56,
-                                                                                        },
-                                                                                    ),
+                                                                                    range: 213..259,
                                                                                     custom: (),
                                                                                     node: Constant(
                                                                                         ExprConstant {
@@ -778,44 +418,17 @@ expression: parse_ast
                                                                                     ),
                                                                                 },
                                                                                 Located {
-                                                                                    location: Location {
-                                                                                        row: 7,
-                                                                                        column: 10,
-                                                                                    },
-                                                                                    end_location: Some(
-                                                                                        Location {
-                                                                                            row: 7,
-                                                                                            column: 56,
-                                                                                        },
-                                                                                    ),
+                                                                                    range: 213..259,
                                                                                     custom: (),
                                                                                     node: FormattedValue(
                                                                                         ExprFormattedValue {
                                                                                             value: Located {
-                                                                                                location: Location {
-                                                                                                    row: 7,
-                                                                                                    column: 20,
-                                                                                                },
-                                                                                                end_location: Some(
-                                                                                                    Location {
-                                                                                                        row: 7,
-                                                                                                        column: 27,
-                                                                                                    },
-                                                                                                ),
+                                                                                                range: 223..230,
                                                                                                 custom: (),
                                                                                                 node: Call(
                                                                                                     ExprCall {
                                                                                                         func: Located {
-                                                                                                            location: Location {
-                                                                                                                row: 7,
-                                                                                                                column: 20,
-                                                                                                            },
-                                                                                                            end_location: Some(
-                                                                                                                Location {
-                                                                                                                    row: 7,
-                                                                                                                    column: 24,
-                                                                                                                },
-                                                                                                            ),
+                                                                                                            range: 223..227,
                                                                                                             custom: (),
                                                                                                             node: Name(
                                                                                                                 ExprName {
@@ -826,16 +439,7 @@ expression: parse_ast
                                                                                                         },
                                                                                                         args: [
                                                                                                             Located {
-                                                                                                                location: Location {
-                                                                                                                    row: 7,
-                                                                                                                    column: 25,
-                                                                                                                },
-                                                                                                                end_location: Some(
-                                                                                                                    Location {
-                                                                                                                        row: 7,
-                                                                                                                        column: 26,
-                                                                                                                    },
-                                                                                                                ),
+                                                                                                                range: 228..229,
                                                                                                                 custom: (),
                                                                                                                 node: Name(
                                                                                                                     ExprName {
@@ -855,16 +459,7 @@ expression: parse_ast
                                                                                     ),
                                                                                 },
                                                                                 Located {
-                                                                                    location: Location {
-                                                                                        row: 7,
-                                                                                        column: 10,
-                                                                                    },
-                                                                                    end_location: Some(
-                                                                                        Location {
-                                                                                            row: 7,
-                                                                                            column: 56,
-                                                                                        },
-                                                                                    ),
+                                                                                    range: 213..259,
                                                                                     custom: (),
                                                                                     node: Constant(
                                                                                         ExprConstant {
@@ -876,44 +471,17 @@ expression: parse_ast
                                                                                     ),
                                                                                 },
                                                                                 Located {
-                                                                                    location: Location {
-                                                                                        row: 7,
-                                                                                        column: 10,
-                                                                                    },
-                                                                                    end_location: Some(
-                                                                                        Location {
-                                                                                            row: 7,
-                                                                                            column: 56,
-                                                                                        },
-                                                                                    ),
+                                                                                    range: 213..259,
                                                                                     custom: (),
                                                                                     node: FormattedValue(
                                                                                         ExprFormattedValue {
                                                                                             value: Located {
-                                                                                                location: Location {
-                                                                                                    row: 7,
-                                                                                                    column: 42,
-                                                                                                },
-                                                                                                end_location: Some(
-                                                                                                    Location {
-                                                                                                        row: 7,
-                                                                                                        column: 54,
-                                                                                                    },
-                                                                                                ),
+                                                                                                range: 245..257,
                                                                                                 custom: (),
                                                                                                 node: Attribute(
                                                                                                     ExprAttribute {
                                                                                                         value: Located {
-                                                                                                            location: Location {
-                                                                                                                row: 7,
-                                                                                                                column: 42,
-                                                                                                            },
-                                                                                                            end_location: Some(
-                                                                                                                Location {
-                                                                                                                    row: 7,
-                                                                                                                    column: 43,
-                                                                                                                },
-                                                                                                            ),
+                                                                                                            range: 245..246,
                                                                                                             custom: (),
                                                                                                             node: Name(
                                                                                                                 ExprName {

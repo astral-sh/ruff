@@ -3,30 +3,12 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 Located {
-    location: Location {
-        row: 1,
-        column: 0,
-    },
-    end_location: Some(
-        Location {
-            row: 1,
-            column: 14,
-        },
-    ),
+    range: 0..14,
     custom: (),
     node: GeneratorExp(
         ExprGeneratorExp {
             elt: Located {
-                location: Location {
-                    row: 1,
-                    column: 1,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 2,
-                    },
-                ),
+                range: 1..2,
                 custom: (),
                 node: Name(
                     ExprName {
@@ -38,16 +20,7 @@ Located {
             generators: [
                 Comprehension {
                     target: Located {
-                        location: Location {
-                            row: 1,
-                            column: 7,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 8,
-                            },
-                        ),
+                        range: 7..8,
                         custom: (),
                         node: Name(
                             ExprName {
@@ -57,16 +30,7 @@ Located {
                         ),
                     },
                     iter: Located {
-                        location: Location {
-                            row: 1,
-                            column: 12,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 13,
-                            },
-                        ),
+                        range: 12..13,
                         custom: (),
                         node: Name(
                             ExprName {

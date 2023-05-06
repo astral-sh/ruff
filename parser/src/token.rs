@@ -5,6 +5,7 @@
 //!
 //! [CPython source]: https://github.com/python/cpython/blob/dfc2e065a2e71011017077e549cd2f9bf4944c54/Include/internal/pycore_token.h
 use num_bigint::BigInt;
+use ruff_text_size::TextSize;
 use std::fmt;
 
 /// The set of tokens the Python source code can be tokenized in.
@@ -401,12 +402,12 @@ impl StringKind {
     }
 
     /// Returns the number of characters in the prefix.
-    pub fn prefix_len(&self) -> usize {
+    pub fn prefix_len(&self) -> TextSize {
         use StringKind::*;
         match self {
-            String => 0,
-            RawString | FString | Unicode | Bytes => 1,
-            RawFString | RawBytes => 2,
+            String => TextSize::from(0),
+            RawString | FString | Unicode | Bytes => TextSize::from(1),
+            RawFString | RawBytes => TextSize::from(2),
         }
     }
 }

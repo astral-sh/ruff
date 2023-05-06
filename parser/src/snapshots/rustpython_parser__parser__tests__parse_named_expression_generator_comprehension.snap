@@ -3,44 +3,17 @@ source: parser/src/parser.rs
 expression: parse_ast
 ---
 Located {
-    location: Location {
-        row: 1,
-        column: 0,
-    },
-    end_location: Some(
-        Location {
-            row: 1,
-            column: 23,
-        },
-    ),
+    range: 0..23,
     custom: (),
     node: GeneratorExp(
         ExprGeneratorExp {
             elt: Located {
-                location: Location {
-                    row: 1,
-                    column: 1,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 11,
-                    },
-                ),
+                range: 1..11,
                 custom: (),
                 node: NamedExpr(
                     ExprNamedExpr {
                         target: Located {
-                            location: Location {
-                                row: 1,
-                                column: 1,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 2,
-                                },
-                            ),
+                            range: 1..2,
                             custom: (),
                             node: Name(
                                 ExprName {
@@ -50,30 +23,12 @@ Located {
                             ),
                         },
                         value: Located {
-                            location: Location {
-                                row: 1,
-                                column: 6,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 11,
-                                },
-                            ),
+                            range: 6..11,
                             custom: (),
                             node: BinOp(
                                 ExprBinOp {
                                     left: Located {
-                                        location: Location {
-                                            row: 1,
-                                            column: 6,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 1,
-                                                column: 7,
-                                            },
-                                        ),
+                                        range: 6..7,
                                         custom: (),
                                         node: Name(
                                             ExprName {
@@ -84,16 +39,7 @@ Located {
                                     },
                                     op: Add,
                                     right: Located {
-                                        location: Location {
-                                            row: 1,
-                                            column: 10,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 1,
-                                                column: 11,
-                                            },
-                                        ),
+                                        range: 10..11,
                                         custom: (),
                                         node: Constant(
                                             ExprConstant {
@@ -113,16 +59,7 @@ Located {
             generators: [
                 Comprehension {
                     target: Located {
-                        location: Location {
-                            row: 1,
-                            column: 16,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 17,
-                            },
-                        ),
+                        range: 16..17,
                         custom: (),
                         node: Name(
                             ExprName {
@@ -132,16 +69,7 @@ Located {
                         ),
                     },
                     iter: Located {
-                        location: Location {
-                            row: 1,
-                            column: 21,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 22,
-                            },
-                        ),
+                        range: 21..22,
                         custom: (),
                         node: Name(
                             ExprName {

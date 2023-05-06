@@ -4,30 +4,12 @@ expression: parse_ast
 ---
 [
     Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 3,
-                column: 8,
-            },
-        ),
+        range: 0..28,
         custom: (),
         node: If(
             StmtIf {
                 test: Located {
-                    location: Location {
-                        row: 1,
-                        column: 3,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 1,
-                            column: 4,
-                        },
-                    ),
+                    range: 3..4,
                     custom: (),
                     node: Constant(
                         ExprConstant {
@@ -40,30 +22,12 @@ expression: parse_ast
                 },
                 body: [
                     Located {
-                        location: Location {
-                            row: 1,
-                            column: 6,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 8,
-                            },
-                        ),
+                        range: 6..8,
                         custom: (),
                         node: Expr(
                             StmtExpr {
                                 value: Located {
-                                    location: Location {
-                                        row: 1,
-                                        column: 6,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 1,
-                                            column: 8,
-                                        },
-                                    ),
+                                    range: 6..8,
                                     custom: (),
                                     node: Constant(
                                         ExprConstant {
@@ -80,30 +44,12 @@ expression: parse_ast
                 ],
                 orelse: [
                     Located {
-                        location: Location {
-                            row: 2,
-                            column: 0,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 3,
-                                column: 8,
-                            },
-                        ),
+                        range: 9..28,
                         custom: (),
                         node: If(
                             StmtIf {
                                 test: Located {
-                                    location: Location {
-                                        row: 2,
-                                        column: 5,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 2,
-                                            column: 6,
-                                        },
-                                    ),
+                                    range: 14..15,
                                     custom: (),
                                     node: Constant(
                                         ExprConstant {
@@ -116,30 +62,12 @@ expression: parse_ast
                                 },
                                 body: [
                                     Located {
-                                        location: Location {
-                                            row: 2,
-                                            column: 8,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 2,
-                                                column: 10,
-                                            },
-                                        ),
+                                        range: 17..19,
                                         custom: (),
                                         node: Expr(
                                             StmtExpr {
                                                 value: Located {
-                                                    location: Location {
-                                                        row: 2,
-                                                        column: 8,
-                                                    },
-                                                    end_location: Some(
-                                                        Location {
-                                                            row: 2,
-                                                            column: 10,
-                                                        },
-                                                    ),
+                                                    range: 17..19,
                                                     custom: (),
                                                     node: Constant(
                                                         ExprConstant {
@@ -156,30 +84,12 @@ expression: parse_ast
                                 ],
                                 orelse: [
                                     Located {
-                                        location: Location {
-                                            row: 3,
-                                            column: 6,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 3,
-                                                column: 8,
-                                            },
-                                        ),
+                                        range: 26..28,
                                         custom: (),
                                         node: Expr(
                                             StmtExpr {
                                                 value: Located {
-                                                    location: Location {
-                                                        row: 3,
-                                                        column: 6,
-                                                    },
-                                                    end_location: Some(
-                                                        Location {
-                                                            row: 3,
-                                                            column: 8,
-                                                        },
-                                                    ),
+                                                    range: 26..28,
                                                     custom: (),
                                                     node: Constant(
                                                         ExprConstant {

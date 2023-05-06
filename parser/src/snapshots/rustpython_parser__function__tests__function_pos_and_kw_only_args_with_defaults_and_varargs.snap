@@ -5,16 +5,7 @@ expression: parse_ast
 Ok(
     [
         Located {
-            location: Location {
-                row: 1,
-                column: 0,
-            },
-            end_location: Some(
-                Location {
-                    row: 1,
-                    column: 42,
-                },
-            ),
+            range: 0..42,
             custom: (),
             node: FunctionDef(
                 StmtFunctionDef {
@@ -23,16 +14,7 @@ Ok(
                         posonlyargs: [],
                         args: [
                             Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 6,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 7,
-                                    },
-                                ),
+                                range: 6..7,
                                 custom: (),
                                 node: ArgData {
                                     arg: "a",
@@ -41,16 +23,7 @@ Ok(
                                 },
                             },
                             Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 9,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 10,
-                                    },
-                                ),
+                                range: 9..10,
                                 custom: (),
                                 node: ArgData {
                                     arg: "b",
@@ -59,16 +32,7 @@ Ok(
                                 },
                             },
                             Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 12,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 13,
-                                    },
-                                ),
+                                range: 12..13,
                                 custom: (),
                                 node: ArgData {
                                     arg: "c",
@@ -79,16 +43,7 @@ Ok(
                         ],
                         vararg: Some(
                             Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 16,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 20,
-                                    },
-                                ),
+                                range: 16..20,
                                 custom: (),
                                 node: ArgData {
                                     arg: "args",
@@ -99,16 +54,7 @@ Ok(
                         ),
                         kwonlyargs: [
                             Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 22,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 23,
-                                    },
-                                ),
+                                range: 22..23,
                                 custom: (),
                                 node: ArgData {
                                     arg: "d",
@@ -117,16 +63,7 @@ Ok(
                                 },
                             },
                             Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 25,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 26,
-                                    },
-                                ),
+                                range: 25..26,
                                 custom: (),
                                 node: ArgData {
                                     arg: "e",
@@ -135,16 +72,7 @@ Ok(
                                 },
                             },
                             Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 31,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 32,
-                                    },
-                                ),
+                                range: 31..32,
                                 custom: (),
                                 node: ArgData {
                                     arg: "f",
@@ -155,16 +83,7 @@ Ok(
                         ],
                         kw_defaults: [
                             Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 27,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 29,
-                                    },
-                                ),
+                                range: 27..29,
                                 custom: (),
                                 node: Constant(
                                     ExprConstant {
@@ -176,16 +95,7 @@ Ok(
                                 ),
                             },
                             Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 33,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 35,
-                                    },
-                                ),
+                                range: 33..35,
                                 custom: (),
                                 node: Constant(
                                     ExprConstant {
@@ -202,16 +112,7 @@ Ok(
                     },
                     body: [
                         Located {
-                            location: Location {
-                                row: 1,
-                                column: 38,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 42,
-                                },
-                            ),
+                            range: 38..42,
                             custom: (),
                             node: Pass,
                         },

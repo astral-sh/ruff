@@ -16,5 +16,6 @@ unparse = ["rustpython-literal"]
 [dependencies]
 rustpython-compiler-core = { path = "../core", version = "0.2.0" }
 rustpython-literal = { path = "../literal", version = "0.2.0", optional = true }
+ruff_text_size =  { path = "../ruff_text_size" }
 
 num-bigint = { workspace = true }

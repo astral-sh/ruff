@@ -4,46 +4,19 @@ expression: parse_ast
 ---
 [
     Located {
-        location: Location {
-            row: 2,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 6,
-                column: 19,
-            },
-        ),
+        range: 1..73,
         custom: (),
         node: Match(
             StmtMatch {
                 subject: Located {
-                    location: Location {
-                        row: 2,
-                        column: 6,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 2,
-                            column: 17,
-                        },
-                    ),
+                    range: 7..18,
                     custom: (),
                     node: Dict(
                         ExprDict {
                             keys: [
                                 Some(
                                     Located {
-                                        location: Location {
-                                            row: 2,
-                                            column: 7,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 2,
-                                                column: 13,
-                                            },
-                                        ),
+                                        range: 8..14,
                                         custom: (),
                                         node: Constant(
                                             ExprConstant {
@@ -58,16 +31,7 @@ expression: parse_ast
                             ],
                             values: [
                                 Located {
-                                    location: Location {
-                                        row: 2,
-                                        column: 15,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 2,
-                                            column: 16,
-                                        },
-                                    ),
+                                    range: 16..17,
                                     custom: (),
                                     node: Constant(
                                         ExprConstant {
@@ -85,16 +49,7 @@ expression: parse_ast
                 cases: [
                     MatchCase {
                         pattern: Located {
-                            location: Location {
-                                row: 3,
-                                column: 9,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 5,
-                                    column: 5,
-                                },
-                            ),
+                            range: 29..52,
                             custom: (),
                             node: MatchMapping(
                                 PatternMatchMapping {
@@ -109,44 +64,17 @@ expression: parse_ast
                         guard: None,
                         body: [
                             Located {
-                                location: Location {
-                                    row: 6,
-                                    column: 8,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 6,
-                                        column: 19,
-                                    },
-                                ),
+                                range: 62..73,
                                 custom: (),
                                 node: Expr(
                                     StmtExpr {
                                         value: Located {
-                                            location: Location {
-                                                row: 6,
-                                                column: 8,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 6,
-                                                    column: 19,
-                                                },
-                                            ),
+                                            range: 62..73,
                                             custom: (),
                                             node: Call(
                                                 ExprCall {
                                                     func: Located {
-                                                        location: Location {
-                                                            row: 6,
-                                                            column: 8,
-                                                        },
-                                                        end_location: Some(
-                                                            Location {
-                                                                row: 6,
-                                                                column: 13,
-                                                            },
-                                                        ),
+                                                        range: 62..67,
                                                         custom: (),
                                                         node: Name(
                                                             ExprName {
@@ -157,16 +85,7 @@ expression: parse_ast
                                                     },
                                                     args: [
                                                         Located {
-                                                            location: Location {
-                                                                row: 6,
-                                                                column: 14,
-                                                            },
-                                                            end_location: Some(
-                                                                Location {
-                                                                    row: 6,
-                                                                    column: 18,
-                                                                },
-                                                            ),
+                                                            range: 68..72,
                                                             custom: (),
                                                             node: Name(
                                                                 ExprName {
@@ -190,46 +109,19 @@ expression: parse_ast
         ),
     },
     Located {
-        location: Location {
-            row: 7,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 11,
-                column: 20,
-            },
-        ),
+        range: 74..177,
         custom: (),
         node: Match(
             StmtMatch {
                 subject: Located {
-                    location: Location {
-                        row: 7,
-                        column: 6,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 7,
-                            column: 23,
-                        },
-                    ),
+                    range: 80..97,
                     custom: (),
                     node: Dict(
                         ExprDict {
                             keys: [
                                 Some(
                                     Located {
-                                        location: Location {
-                                            row: 7,
-                                            column: 7,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 7,
-                                                column: 14,
-                                            },
-                                        ),
+                                        range: 81..88,
                                         custom: (),
                                         node: Constant(
                                             ExprConstant {
@@ -244,16 +136,7 @@ expression: parse_ast
                             ],
                             values: [
                                 Located {
-                                    location: Location {
-                                        row: 7,
-                                        column: 16,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 7,
-                                            column: 22,
-                                        },
-                                    ),
+                                    range: 90..96,
                                     custom: (),
                                     node: Constant(
                                         ExprConstant {
@@ -271,31 +154,13 @@ expression: parse_ast
                 cases: [
                     MatchCase {
                         pattern: Located {
-                            location: Location {
-                                row: 8,
-                                column: 9,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 10,
-                                    column: 5,
-                                },
-                            ),
+                            range: 108..155,
                             custom: (),
                             node: MatchMapping(
                                 PatternMatchMapping {
                                     keys: [
                                         Located {
-                                            location: Location {
-                                                row: 9,
-                                                column: 8,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 9,
-                                                    column: 15,
-                                                },
-                                            ),
+                                            range: 118..125,
                                             custom: (),
                                             node: Constant(
                                                 ExprConstant {
@@ -309,60 +174,24 @@ expression: parse_ast
                                     ],
                                     patterns: [
                                         Located {
-                                            location: Location {
-                                                row: 9,
-                                                column: 17,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 9,
-                                                    column: 38,
-                                                },
-                                            ),
+                                            range: 127..148,
                                             custom: (),
                                             node: MatchAs(
                                                 PatternMatchAs {
                                                     pattern: Some(
                                                         Located {
-                                                            location: Location {
-                                                                row: 9,
-                                                                column: 17,
-                                                            },
-                                                            end_location: Some(
-                                                                Location {
-                                                                    row: 9,
-                                                                    column: 29,
-                                                                },
-                                                            ),
+                                                            range: 127..139,
                                                             custom: (),
                                                             node: MatchOr(
                                                                 PatternMatchOr {
                                                                     patterns: [
                                                                         Located {
-                                                                            location: Location {
-                                                                                row: 9,
-                                                                                column: 17,
-                                                                            },
-                                                                            end_location: Some(
-                                                                                Location {
-                                                                                    row: 9,
-                                                                                    column: 22,
-                                                                                },
-                                                                            ),
+                                                                            range: 127..132,
                                                                             custom: (),
                                                                             node: MatchClass(
                                                                                 PatternMatchClass {
                                                                                     cls: Located {
-                                                                                        location: Location {
-                                                                                            row: 9,
-                                                                                            column: 17,
-                                                                                        },
-                                                                                        end_location: Some(
-                                                                                            Location {
-                                                                                                row: 9,
-                                                                                                column: 20,
-                                                                                            },
-                                                                                        ),
+                                                                                        range: 127..130,
                                                                                         custom: (),
                                                                                         node: Name(
                                                                                             ExprName {
@@ -378,16 +207,7 @@ expression: parse_ast
                                                                             ),
                                                                         },
                                                                         Located {
-                                                                            location: Location {
-                                                                                row: 9,
-                                                                                column: 25,
-                                                                            },
-                                                                            end_location: Some(
-                                                                                Location {
-                                                                                    row: 9,
-                                                                                    column: 29,
-                                                                                },
-                                                                            ),
+                                                                            range: 135..139,
                                                                             custom: (),
                                                                             node: MatchSingleton(
                                                                                 PatternMatchSingleton {
@@ -414,44 +234,17 @@ expression: parse_ast
                         guard: None,
                         body: [
                             Located {
-                                location: Location {
-                                    row: 11,
-                                    column: 8,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 11,
-                                        column: 20,
-                                    },
-                                ),
+                                range: 165..177,
                                 custom: (),
                                 node: Expr(
                                     StmtExpr {
                                         value: Located {
-                                            location: Location {
-                                                row: 11,
-                                                column: 8,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 11,
-                                                    column: 20,
-                                                },
-                                            ),
+                                            range: 165..177,
                                             custom: (),
                                             node: Call(
                                                 ExprCall {
                                                     func: Located {
-                                                        location: Location {
-                                                            row: 11,
-                                                            column: 8,
-                                                        },
-                                                        end_location: Some(
-                                                            Location {
-                                                                row: 11,
-                                                                column: 13,
-                                                            },
-                                                        ),
+                                                        range: 165..170,
                                                         custom: (),
                                                         node: Name(
                                                             ExprName {
@@ -462,16 +255,7 @@ expression: parse_ast
                                                     },
                                                     args: [
                                                         Located {
-                                                            location: Location {
-                                                                row: 11,
-                                                                column: 14,
-                                                            },
-                                                            end_location: Some(
-                                                                Location {
-                                                                    row: 11,
-                                                                    column: 19,
-                                                                },
-                                                            ),
+                                                            range: 171..176,
                                                             custom: (),
                                                             node: Name(
                                                                 ExprName {
@@ -495,30 +279,12 @@ expression: parse_ast
         ),
     },
     Located {
-        location: Location {
-            row: 12,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 14,
-                column: 13,
-            },
-        ),
+        range: 178..218,
         custom: (),
         node: Match(
             StmtMatch {
                 subject: Located {
-                    location: Location {
-                        row: 12,
-                        column: 6,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 12,
-                            column: 7,
-                        },
-                    ),
+                    range: 184..185,
                     custom: (),
                     node: Name(
                         ExprName {
@@ -530,45 +296,18 @@ expression: parse_ast
                 cases: [
                     MatchCase {
                         pattern: Located {
-                            location: Location {
-                                row: 13,
-                                column: 9,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 13,
-                                    column: 16,
-                                },
-                            ),
+                            range: 196..203,
                             custom: (),
                             node: MatchSequence(
                                 PatternMatchSequence {
                                     patterns: [
                                         Located {
-                                            location: Location {
-                                                row: 13,
-                                                column: 10,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 13,
-                                                    column: 11,
-                                                },
-                                            ),
+                                            range: 197..198,
                                             custom: (),
                                             node: MatchValue(
                                                 PatternMatchValue {
                                                     value: Located {
-                                                        location: Location {
-                                                            row: 13,
-                                                            column: 10,
-                                                        },
-                                                        end_location: Some(
-                                                            Location {
-                                                                row: 13,
-                                                                column: 11,
-                                                            },
-                                                        ),
+                                                        range: 197..198,
                                                         custom: (),
                                                         node: Constant(
                                                             ExprConstant {
@@ -583,30 +322,12 @@ expression: parse_ast
                                             ),
                                         },
                                         Located {
-                                            location: Location {
-                                                row: 13,
-                                                column: 13,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 13,
-                                                    column: 14,
-                                                },
-                                            ),
+                                            range: 200..201,
                                             custom: (),
                                             node: MatchValue(
                                                 PatternMatchValue {
                                                     value: Located {
-                                                        location: Location {
-                                                            row: 13,
-                                                            column: 13,
-                                                        },
-                                                        end_location: Some(
-                                                            Location {
-                                                                row: 13,
-                                                                column: 14,
-                                                            },
-                                                        ),
+                                                        range: 200..201,
                                                         custom: (),
                                                         node: Constant(
                                                             ExprConstant {
@@ -627,31 +348,13 @@ expression: parse_ast
                         guard: None,
                         body: [
                             Located {
-                                location: Location {
-                                    row: 14,
-                                    column: 8,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 14,
-                                        column: 13,
-                                    },
-                                ),
+                                range: 213..218,
                                 custom: (),
                                 node: Assign(
                                     StmtAssign {
                                         targets: [
                                             Located {
-                                                location: Location {
-                                                    row: 14,
-                                                    column: 8,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 14,
-                                                        column: 9,
-                                                    },
-                                                ),
+                                                range: 213..214,
                                                 custom: (),
                                                 node: Name(
                                                     ExprName {
@@ -662,16 +365,7 @@ expression: parse_ast
                                             },
                                         ],
                                         value: Located {
-                                            location: Location {
-                                                row: 14,
-                                                column: 12,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 14,
-                                                    column: 13,
-                                                },
-                                            ),
+                                            range: 217..218,
                                             custom: (),
                                             node: Constant(
                                                 ExprConstant {
@@ -693,30 +387,12 @@ expression: parse_ast
         ),
     },
     Located {
-        location: Location {
-            row: 15,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 17,
-                column: 13,
-            },
-        ),
+        range: 219..259,
         custom: (),
         node: Match(
             StmtMatch {
                 subject: Located {
-                    location: Location {
-                        row: 15,
-                        column: 6,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 15,
-                            column: 7,
-                        },
-                    ),
+                    range: 225..226,
                     custom: (),
                     node: Name(
                         ExprName {
@@ -728,45 +404,18 @@ expression: parse_ast
                 cases: [
                     MatchCase {
                         pattern: Located {
-                            location: Location {
-                                row: 16,
-                                column: 9,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 16,
-                                    column: 16,
-                                },
-                            ),
+                            range: 237..244,
                             custom: (),
                             node: MatchSequence(
                                 PatternMatchSequence {
                                     patterns: [
                                         Located {
-                                            location: Location {
-                                                row: 16,
-                                                column: 10,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 16,
-                                                    column: 11,
-                                                },
-                                            ),
+                                            range: 238..239,
                                             custom: (),
                                             node: MatchValue(
                                                 PatternMatchValue {
                                                     value: Located {
-                                                        location: Location {
-                                                            row: 16,
-                                                            column: 10,
-                                                        },
-                                                        end_location: Some(
-                                                            Location {
-                                                                row: 16,
-                                                                column: 11,
-                                                            },
-                                                        ),
+                                                        range: 238..239,
                                                         custom: (),
                                                         node: Constant(
                                                             ExprConstant {
@@ -781,30 +430,12 @@ expression: parse_ast
                                             ),
                                         },
                                         Located {
-                                            location: Location {
-                                                row: 16,
-                                                column: 13,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 16,
-                                                    column: 14,
-                                                },
-                                            ),
+                                            range: 241..242,
                                             custom: (),
                                             node: MatchValue(
                                                 PatternMatchValue {
                                                     value: Located {
-                                                        location: Location {
-                                                            row: 16,
-                                                            column: 13,
-                                                        },
-                                                        end_location: Some(
-                                                            Location {
-                                                                row: 16,
-                                                                column: 14,
-                                                            },
-                                                        ),
+                                                        range: 241..242,
                                                         custom: (),
                                                         node: Constant(
                                                             ExprConstant {
@@ -825,31 +456,13 @@ expression: parse_ast
                         guard: None,
                         body: [
                             Located {
-                                location: Location {
-                                    row: 17,
-                                    column: 8,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 17,
-                                        column: 13,
-                                    },
-                                ),
+                                range: 254..259,
                                 custom: (),
                                 node: Assign(
                                     StmtAssign {
                                         targets: [
                                             Located {
-                                                location: Location {
-                                                    row: 17,
-                                                    column: 8,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 17,
-                                                        column: 9,
-                                                    },
-                                                ),
+                                                range: 254..255,
                                                 custom: (),
                                                 node: Name(
                                                     ExprName {
@@ -860,16 +473,7 @@ expression: parse_ast
                                             },
                                         ],
                                         value: Located {
-                                            location: Location {
-                                                row: 17,
-                                                column: 12,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 17,
-                                                    column: 13,
-                                                },
-                                            ),
+                                            range: 258..259,
                                             custom: (),
                                             node: Constant(
                                                 ExprConstant {
@@ -891,30 +495,12 @@ expression: parse_ast
         ),
     },
     Located {
-        location: Location {
-            row: 18,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 20,
-                column: 13,
-            },
-        ),
+        range: 260..297,
         custom: (),
         node: Match(
             StmtMatch {
                 subject: Located {
-                    location: Location {
-                        row: 18,
-                        column: 6,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 18,
-                            column: 7,
-                        },
-                    ),
+                    range: 266..267,
                     custom: (),
                     node: Name(
                         ExprName {
@@ -926,45 +512,18 @@ expression: parse_ast
                 cases: [
                     MatchCase {
                         pattern: Located {
-                            location: Location {
-                                row: 19,
-                                column: 9,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 19,
-                                    column: 13,
-                                },
-                            ),
+                            range: 278..282,
                             custom: (),
                             node: MatchSequence(
                                 PatternMatchSequence {
                                     patterns: [
                                         Located {
-                                            location: Location {
-                                                row: 19,
-                                                column: 10,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 19,
-                                                    column: 11,
-                                                },
-                                            ),
+                                            range: 279..280,
                                             custom: (),
                                             node: MatchValue(
                                                 PatternMatchValue {
                                                     value: Located {
-                                                        location: Location {
-                                                            row: 19,
-                                                            column: 10,
-                                                        },
-                                                        end_location: Some(
-                                                            Location {
-                                                                row: 19,
-                                                                column: 11,
-                                                            },
-                                                        ),
+                                                        range: 279..280,
                                                         custom: (),
                                                         node: Constant(
                                                             ExprConstant {
@@ -985,31 +544,13 @@ expression: parse_ast
                         guard: None,
                         body: [
                             Located {
-                                location: Location {
-                                    row: 20,
-                                    column: 8,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 20,
-                                        column: 13,
-                                    },
-                                ),
+                                range: 292..297,
                                 custom: (),
                                 node: Assign(
                                     StmtAssign {
                                         targets: [
                                             Located {
-                                                location: Location {
-                                                    row: 20,
-                                                    column: 8,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 20,
-                                                        column: 9,
-                                                    },
-                                                ),
+                                                range: 292..293,
                                                 custom: (),
                                                 node: Name(
                                                     ExprName {
@@ -1020,16 +561,7 @@ expression: parse_ast
                                             },
                                         ],
                                         value: Located {
-                                            location: Location {
-                                                row: 20,
-                                                column: 12,
-                                            },
-                                            end_location: Some(
-                                                Location {
-                                                    row: 20,
-                                                    column: 13,
-                                                },
-                                            ),
+                                            range: 296..297,
                                             custom: (),
                                             node: Constant(
                                                 ExprConstant {

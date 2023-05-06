@@ -4,6 +4,7 @@ use crate::{
     ast,
     lexer::{LexicalError, LexicalErrorType},
 };
+use ruff_text_size::TextSize;
 use rustc_hash::FxHashSet;
 
 pub(crate) struct ArgumentList {
@@ -83,10 +84,7 @@ pub(crate) fn parse_params(
     Ok((pos_only, names, defaults))
 }
 
-type FunctionArgument = (
-    Option<(ast::Location, ast::Location, Option<String>)>,
-    ast::Expr,
-);
+type FunctionArgument = (Option<(TextSize, TextSize, Option<String>)>, ast::Expr);
 
 // Parse arguments as supplied during a function/lambda *call*.
 pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentList, LexicalError> {
