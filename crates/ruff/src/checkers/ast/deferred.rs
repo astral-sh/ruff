@@ -1,5 +1,5 @@
 use ruff_text_size::TextRange;
-use rustpython_parser::ast::{Expr, Stmt};
+use rustpython_parser::ast::Expr;
 
 use ruff_python_semantic::analyze::visibility::{Visibility, VisibleScope};
 use ruff_python_semantic::node::NodeId;
@@ -20,8 +20,8 @@ pub struct Deferred<'a> {
     pub definitions: Vec<(Definition<'a>, Visibility, Context<'a>)>,
     pub string_type_definitions: Vec<(TextRange, &'a str, AnnotationContext, Context<'a>)>,
     pub type_definitions: Vec<(&'a Expr, AnnotationContext, Context<'a>)>,
-    pub functions: Vec<(&'a Stmt, Context<'a>, VisibleScope)>,
+    pub functions: Vec<(Context<'a>, VisibleScope)>,
     pub lambdas: Vec<(&'a Expr, Context<'a>)>,
-    pub for_loops: Vec<(&'a Stmt, Context<'a>)>,
+    pub for_loops: Vec<Context<'a>>,
     pub assignments: Vec<Context<'a>>,
 }
