@@ -29,7 +29,7 @@ impl NestedMinMaxFunc {
 
     /// Returns true if the passed expr is a call to the same function as self.
     fn is_call(self, expr: &Expr, checker: &mut Checker) -> bool {
-        matches!(expr.node(), ExprKind::Call { func, ..} if NestedMinMaxFunc::from_func(func, checker) == Some(self))
+        matches!(expr.node(), ExprKind::Call { func, keywords, ..} if NestedMinMaxFunc::from_func(func, checker) == Some(self) && keywords.is_empty())
     }
 }
 
@@ -48,7 +48,6 @@ pub struct NestedMinMax {
     fixable: bool,
 }
 
-// XXX this need to be better.
 impl Violation for NestedMinMax {
     #[derive_message_formats]
     fn message(&self) -> String {
@@ -71,8 +70,12 @@ fn collect_nested_args(
 ) {
     for arg in args {
         match arg.node() {
-            ExprKind::Call { func, args, .. }
-                if NestedMinMaxFunc::from_func(func, checker) == Some(target_func) =>
+            ExprKind::Call {
+                func,
+                args,
+                keywords,
+            } if NestedMinMaxFunc::from_func(func, checker) == Some(target_func)
+                && keywords.is_empty() =>
             {
                 collect_nested_args(target_func, checker, args, new_args);
             }
@@ -92,6 +95,10 @@ pub fn nested_min_max(
     keywords: &[Keyword],
 ) {
     let Some(nested_func) = NestedMinMaxFunc::from_func(func, checker) else { return };
+    // Do not analyze cases where keyword arguments are provided.
+    if !keywords.is_empty() {
+        return;
+    };
 
     if args.iter().any(|arg| nested_func.is_call(arg, checker)) {
         let fixable = !has_comments(expr, checker.locator);

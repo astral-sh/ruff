@@ -119,7 +119,7 @@ nested_min_max.py:8:1: PLW3301 [*] Nested max() call
   8 |+max(1, 2, 3, 4)
 9 9 | max(1, foo("a", "b"), max(3, 4))
 10 10 | 
-11 11 | # keyword args need to be passed through
+11 11 | # these should not trigger; we do not flag cases with keyword args.
 
 nested_min_max.py:8:8: PLW3301 [*] Nested max() call
    |
@@ -139,7 +139,7 @@ nested_min_max.py:8:8: PLW3301 [*] Nested max() call
   8 |+max(1, max(2, 3, 4))
 9 9 | max(1, foo("a", "b"), max(3, 4))
 10 10 | 
-11 11 | # keyword args need to be passed through
+11 11 | # these should not trigger; we do not flag cases with keyword args.
 
 nested_min_max.py:9:1: PLW3301 [*] Nested max() call
    |
@@ -148,7 +148,7 @@ nested_min_max.py:9:1: PLW3301 [*] Nested max() call
 11 | max(1, foo("a", "b"), max(3, 4))
    | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
 12 | 
-13 | # keyword args need to be passed through
+13 | # these should not trigger; we do not flag cases with keyword args.
    |
    = help: Flatten nested max() calls
 
@@ -159,56 +159,37 @@ nested_min_max.py:9:1: PLW3301 [*] Nested max() call
 9     |-max(1, foo("a", "b"), max(3, 4))
    9  |+max(1, foo("a", "b"), 3, 4)
 10 10 | 
-11 11 | # keyword args need to be passed through
+11 11 | # these should not trigger; we do not flag cases with keyword args.
 12 12 | min(1, min(2, 3), key=test)
 
-nested_min_max.py:12:1: PLW3301 [*] Nested min() call
+nested_min_max.py:15:1: PLW3301 [*] Nested min() call
    |
-12 | # keyword args need to be passed through
-13 | min(1, min(2, 3), key=test)
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
-14 | min(1, min(2, 3, key=test))
-   |
-   = help: Flatten nested min() calls
-
-ℹ Suggested fix
-9  9  | max(1, foo("a", "b"), max(3, 4))
-10 10 | 
-11 11 | # keyword args need to be passed through
-12    |-min(1, min(2, 3), key=test)
-   12 |+min(1, 2, 3, key=test)
-13 13 | min(1, min(2, 3, key=test))
-14 14 | 
-15 15 | # Don't provide a fix if there are comments within the call.
-
-nested_min_max.py:13:1: PLW3301 [*] Nested min() call
-   |
-13 | # keyword args need to be passed through
-14 | min(1, min(2, 3), key=test)
 15 | min(1, min(2, 3, key=test))
-   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
-16 | 
-17 | # Don't provide a fix if there are comments within the call.
+16 | # this will still trigger to merge the calls without keyword args.
+17 | min(1, min(2, 3, key=test), min(4, 5))
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ PLW3301
+18 | 
+19 | # Don't provide a fix if there are comments within the call.
    |
    = help: Flatten nested min() calls
 
 ℹ Suggested fix
-10 10 | 
-11 11 | # keyword args need to be passed through
 12 12 | min(1, min(2, 3), key=test)
-13    |-min(1, min(2, 3, key=test))
-   13 |+min(1, 2, 3)
-14 14 | 
-15 15 | # Don't provide a fix if there are comments within the call.
-16 16 | min(
+13 13 | min(1, min(2, 3, key=test))
+14 14 | # this will still trigger to merge the calls without keyword args.
+15    |-min(1, min(2, 3, key=test), min(4, 5))
+   15 |+min(1, min(2, 3, key=test), 4, 5)
+16 16 | 
+17 17 | # Don't provide a fix if there are comments within the call.
+18 18 | min(
 
-nested_min_max.py:16:1: PLW3301 Nested min() call
+nested_min_max.py:18:1: PLW3301 Nested min() call
    |
-16 |   # Don't provide a fix if there are comments within the call.
-17 | / min(
-18 | |     1,  # this is a very special 1.
-19 | |     min(2, 3),
-20 | | )
+18 |   # Don't provide a fix if there are comments within the call.
+19 | / min(
+20 | |     1,  # this is a very special 1.
+21 | |     min(2, 3),
+22 | | )
    | |_^ PLW3301
    |
 
