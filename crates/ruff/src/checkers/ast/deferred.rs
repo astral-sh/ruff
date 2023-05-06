@@ -8,6 +8,8 @@ use ruff_python_semantic::scope::ScopeId;
 use crate::checkers::ast::AnnotationContext;
 use crate::docstrings::definition::Definition;
 
+/// A snapshot of the current scope and statement, which will be restored when visiting any
+/// deferred definitions.
 type Context<'a> = (ScopeId, Option<NodeId>);
 
 /// A collection of AST nodes that are deferred for later analysis.

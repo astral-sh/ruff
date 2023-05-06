@@ -214,7 +214,7 @@ fn remove_unused_variable(
                     ))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                    let parent = checker.ctx.nodes.parent(stmt);
+                    let parent = checker.ctx.stmts.parent(stmt);
                     let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
                     match delete_stmt(
                         stmt,
@@ -255,7 +255,7 @@ fn remove_unused_variable(
                 ))
             } else {
                 // If assigning to a constant (`x = 1`), delete the entire statement.
-                let parent = checker.ctx.nodes.parent(stmt);
+                let parent = checker.ctx.stmts.parent(stmt);
                 let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
                 match delete_stmt(
                     stmt,

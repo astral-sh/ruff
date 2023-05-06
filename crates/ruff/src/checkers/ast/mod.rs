@@ -1714,7 +1714,7 @@ where
                 if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
                     self.deferred
                         .for_loops
-                        .push((stmt, (self.ctx.scope_id, self.ctx.node_id)));
+                        .push((stmt, (self.ctx.scope_id, self.ctx.stmt_id)));
                 }
                 if self
                     .settings
@@ -2003,7 +2003,7 @@ where
                 self.deferred.definitions.push((
                     definition,
                     scope.visibility,
-                    (self.ctx.scope_id, self.ctx.node_id),
+                    (self.ctx.scope_id, self.ctx.stmt_id),
                 ));
                 self.ctx.visible_scope = scope;
 
@@ -2041,7 +2041,7 @@ where
 
                 self.deferred.functions.push((
                     stmt,
-                    (self.ctx.scope_id, self.ctx.node_id),
+                    (self.ctx.scope_id, self.ctx.stmt_id),
                     self.ctx.visible_scope,
                 ));
             }
@@ -2066,7 +2066,7 @@ where
                 self.deferred.definitions.push((
                     definition,
                     scope.visibility,
-                    (self.ctx.scope_id, self.ctx.node_id),
+                    (self.ctx.scope_id, self.ctx.stmt_id),
                 ));
                 self.ctx.visible_scope = scope;
 
@@ -2281,13 +2281,13 @@ where
                     expr.range(),
                     value,
                     (self.ctx.in_annotation, self.ctx.in_type_checking_block),
-                    (self.ctx.scope_id, self.ctx.node_id),
+                    (self.ctx.scope_id, self.ctx.stmt_id),
                 ));
             } else {
                 self.deferred.type_definitions.push((
                     expr,
                     (self.ctx.in_annotation, self.ctx.in_type_checking_block),
-                    (self.ctx.scope_id, self.ctx.node_id),
+                    (self.ctx.scope_id, self.ctx.stmt_id),
                 ));
             }
             return;
@@ -3514,7 +3514,7 @@ where
                         expr.range(),
                         value,
                         (self.ctx.in_annotation, self.ctx.in_type_checking_block),
-                        (self.ctx.scope_id, self.ctx.node_id),
+                        (self.ctx.scope_id, self.ctx.stmt_id),
                     ));
                 }
                 if self
@@ -3637,7 +3637,7 @@ where
             ExprKind::Lambda { .. } => {
                 self.deferred
                     .lambdas
-                    .push((expr, (self.ctx.scope_id, self.ctx.node_id)));
+                    .push((expr, (self.ctx.scope_id, self.ctx.stmt_id)));
             }
             ExprKind::IfExp { test, body, orelse } => {
                 visit_boolean_test!(self, test);
@@ -4212,7 +4212,7 @@ impl<'a> Checker<'a> {
             if !existing.kind.is_builtin()
                 && existing.source.map_or(true, |left| {
                     binding.source.map_or(true, |right| {
-                        !branch_detection::different_forks(left, right, &self.ctx.nodes)
+                        !branch_detection::different_forks(left, right, &self.ctx.stmts)
                     })
                 })
             {
@@ -4775,7 +4775,7 @@ impl<'a> Checker<'a> {
                 docstring,
             },
             self.ctx.visible_scope.visibility,
-            (self.ctx.scope_id, self.ctx.node_id),
+            (self.ctx.scope_id, self.ctx.stmt_id),
         ));
         docstring.is_some()
     }
@@ -4787,7 +4787,7 @@ impl<'a> Checker<'a> {
                 type_definitions
             {
                 self.ctx.scope_id = scope_id;
-                self.ctx.node_id = node_id;
+                self.ctx.stmt_id = node_id;
                 self.ctx.in_annotation = in_annotation;
                 self.ctx.in_type_checking_block = in_type_checking_block;
                 self.ctx.in_type_definition = true;
@@ -4820,7 +4820,7 @@ impl<'a> Checker<'a> {
                     let expr = allocator.alloc(expr);
 
                     self.ctx.scope_id = scope_id;
-                    self.ctx.node_id = node_id;
+                    self.ctx.stmt_id = node_id;
                     self.ctx.in_annotation = in_annotation;
                     self.ctx.in_type_checking_block = in_type_checking_block;
                     self.ctx.in_type_definition = true;
@@ -4851,7 +4851,7 @@ impl<'a> Checker<'a> {
             let deferred_functions = std::mem::take(&mut self.deferred.functions);
             for (stmt, (scope_id, node_id), visibility) in deferred_functions {
                 self.ctx.scope_id = scope_id;
-                self.ctx.node_id = node_id;
+                self.ctx.stmt_id = node_id;
                 self.ctx.visible_scope = visibility;
 
                 match &stmt.node {
@@ -4875,7 +4875,7 @@ impl<'a> Checker<'a> {
             let lambdas = std::mem::take(&mut self.deferred.lambdas);
             for (expr, (scope_id, node_id)) in lambdas {
                 self.ctx.scope_id = scope_id;
-                self.ctx.node_id = node_id;
+                self.ctx.stmt_id = node_id;
 
                 if let ExprKind::Lambda { args, body } = &expr.node {
                     self.visit_arguments(args);
@@ -4931,7 +4931,7 @@ impl<'a> Checker<'a> {
 
             for (stmt, (scope_id, node_id)) in for_loops {
                 self.ctx.scope_id = scope_id;
-                self.ctx.node_id = node_id;
+                self.ctx.stmt_id = node_id;
 
                 if let StmtKind::For { target, body, .. }
                 | StmtKind::AsyncFor { target, body, .. } = &stmt.node
@@ -5233,7 +5233,7 @@ impl<'a> Checker<'a> {
                     }
 
                     let child = binding.source.unwrap();
-                    let parent = self.ctx.nodes.parent(child);
+                    let parent = self.ctx.stmts.parent(child);
                     let exceptions = binding.exceptions;
 
                     let diagnostic_offset = binding.range.start();
@@ -5423,7 +5423,7 @@ impl<'a> Checker<'a> {
             let definitions = std::mem::take(&mut self.deferred.definitions);
             for (definition, visibility, (scope_id, node_id)) in definitions {
                 self.ctx.scope_id = scope_id;
-                self.ctx.node_id = node_id;
+                self.ctx.stmt_id = node_id;
 
                 // flake8-annotations
                 if enforce_annotations {

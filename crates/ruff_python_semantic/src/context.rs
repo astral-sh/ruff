@@ -23,9 +23,9 @@ use crate::scope::{Scope, ScopeId, ScopeKind, Scopes};
 pub struct Context<'a> {
     pub typing_modules: &'a [String],
     pub module_path: Option<Vec<String>>,
-    // Stack of all visited nodes, along with the identifier of the current node.
-    pub nodes: Nodes<'a>,
-    pub node_id: Option<NodeId>,
+    // Stack of all visited statements, along with the identifier of the current statement.
+    pub stmts: Nodes<'a>,
+    pub stmt_id: Option<NodeId>,
     // Stack of all scopes, along with the identifier of the current scope.
     pub scopes: Scopes<'a>,
     pub scope_id: ScopeId,
@@ -67,8 +67,8 @@ impl<'a> Context<'a> {
         Self {
             typing_modules,
             module_path,
-            nodes: Nodes::default(),
-            node_id: None,
+            stmts: Nodes::default(),
+            stmt_id: None,
             scopes: Scopes::default(),
             scope_id: ScopeId::global(),
             dead_scopes: Vec::default(),
@@ -297,13 +297,13 @@ impl<'a> Context<'a> {
 
     /// Push a [`Stmt`] onto the stack.
     pub fn push_stmt(&mut self, stmt: &'a Stmt) {
-        self.node_id = Some(self.nodes.push_node(stmt, self.node_id));
+        self.stmt_id = Some(self.stmts.insert(stmt, self.stmt_id));
     }
 
     /// Pop the current [`Stmt`] off the stack.
     pub fn pop_stmt(&mut self) {
-        let node_id = self.node_id.expect("Attempted to pop without statement");
-        self.node_id = self.nodes.parent_id(node_id);
+        let node_id = self.stmt_id.expect("Attempted to pop without statement");
+        self.stmt_id = self.stmts.parent_id(node_id);
     }
 
     pub fn push_expr(&mut self, expr: &'a Expr) {
@@ -332,15 +332,15 @@ impl<'a> Context<'a> {
 
     /// Return the current `Stmt`.
     pub fn current_stmt(&self) -> &'a Stmt {
-        let node_id = self.node_id.expect("No current statement");
-        self.nodes[node_id]
+        let node_id = self.stmt_id.expect("No current statement");
+        self.stmts[node_id]
     }
 
     /// Return the parent `Stmt` of the current `Stmt`, if any.
     pub fn current_stmt_parent(&self) -> Option<&'a Stmt> {
-        let node_id = self.node_id.expect("No current statement");
-        let parent_id = self.nodes.parent_id(node_id)?;
-        Some(self.nodes[parent_id])
+        let node_id = self.stmt_id.expect("No current statement");
+        let parent_id = self.stmts.parent_id(node_id)?;
+        Some(self.stmts[parent_id])
     }
 
     /// Return the parent `Expr` of the current `Expr`.
@@ -389,8 +389,8 @@ impl<'a> Context<'a> {
     }
 
     pub fn parents(&self) -> impl Iterator<Item = &Stmt> + '_ {
-        let node_id = self.node_id.expect("No current statement");
-        self.nodes.ancestor_ids(node_id).map(|id| self.nodes[id])
+        let node_id = self.stmt_id.expect("No current statement");
+        self.stmts.ancestor_ids(node_id).map(|id| self.stmts[id])
     }
 
     /// Returns `true` if the context is in an exception handler.
