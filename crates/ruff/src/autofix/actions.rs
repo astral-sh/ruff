@@ -435,6 +435,7 @@ pub fn remove_argument(
 pub fn get_or_import_symbol(
     module: &str,
     member: &str,
+    at: TextSize,
     context: &Context,
     importer: &Importer,
     locator: &Locator,
@@ -462,7 +463,7 @@ pub fn get_or_import_symbol(
             Edit::range_replacement(locator.slice(source.range()).to_string(), source.range());
         Ok((import_edit, binding))
     } else {
-        if let Some(stmt) = importer.get_import_from(module) {
+        if let Some(stmt) = importer.find_import_from(module, at) {
             // Case 1: `from functools import lru_cache` is in scope, and we're trying to reference
             // `functools.cache`; thus, we add `cache` to the import, and return `"cache"` as the
             // bound name.
@@ -485,7 +486,8 @@ pub fn get_or_import_symbol(
                 .find_binding(module)
                 .map_or(true, |binding| binding.kind.is_builtin())
             {
-                let import_edit = importer.add_import(&AnyImport::Import(Import::module(module)));
+                let import_edit =
+                    importer.add_import(&AnyImport::Import(Import::module(module)), at);
                 Ok((import_edit, format!("{module}.{member}")))
             } else {
                 bail!(

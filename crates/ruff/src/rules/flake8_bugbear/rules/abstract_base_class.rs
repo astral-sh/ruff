@@ -85,8 +85,14 @@ fn fix_abstractmethod_missing(
     stmt: &Stmt,
 ) -> Result<Fix> {
     let indent = indentation(locator, stmt).ok_or(anyhow!("Unable to detect indentation"))?;
-    let (import_edit, binding) =
-        get_or_import_symbol("abc", "abstractmethod", context, importer, locator)?;
+    let (import_edit, binding) = get_or_import_symbol(
+        "abc",
+        "abstractmethod",
+        stmt.start(),
+        context,
+        importer,
+        locator,
+    )?;
     let reference_edit = Edit::insertion(
         format!(
             "@{binding}{line_ending}{indent}",

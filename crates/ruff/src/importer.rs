@@ -3,7 +3,6 @@
 use anyhow::Result;
 use libcst_native::{Codegen, CodegenState, ImportAlias, Name, NameOrAttribute};
 use ruff_text_size::TextSize;
-use rustc_hash::FxHashMap;
 use rustpython_parser::ast::{Stmt, StmtKind, Suite};
 use rustpython_parser::{lexer, Mode, Tok};
 
@@ -18,10 +17,7 @@ pub struct Importer<'a> {
     python_ast: &'a Suite,
     locator: &'a Locator<'a>,
     stylist: &'a Stylist<'a>,
-    /// A map from module name to top-level `StmtKind::ImportFrom` statements.
-    import_from_map: FxHashMap<&'a str, &'a Stmt>,
-    /// The last top-level import statement.
-    trailing_import: Option<&'a Stmt>,
+    ordered_imports: Vec<&'a Stmt>,
 }
 
 impl<'a> Importer<'a> {
@@ -30,34 +26,21 @@ impl<'a> Importer<'a> {
             python_ast,
             locator,
             stylist,
-            import_from_map: FxHashMap::default(),
-            trailing_import: None,
+            ordered_imports: Vec::default(),
         }
     }
 
     /// Visit a top-level import statement.
     pub fn visit_import(&mut self, import: &'a Stmt) {
-        // Store a reference to the import statement in the appropriate map.
-        match &import.node {
-            StmtKind::Import { .. } => {
-                // Nothing to do here, we don't extend top-level `import` statements at all, so
-                // no need to track them.
-            }
-            StmtKind::ImportFrom { module, level, .. } => {
-                // Store a reverse-map from module name to `import ... from` statement.
-                if level.map_or(true, |level| level == 0) {
-                    if let Some(module) = module {
-                        self.import_from_map.insert(module.as_str(), import);
-                    }
-                }
-            }
-            _ => {
-                panic!("Expected StmtKind::Import | StmtKind::ImportFrom");
-            }
-        }
+        self.ordered_imports.push(import);
+    }
 
-        // Store a reference to the last top-level import statement.
-        self.trailing_import = Some(import);
+    /// Return the import statement that precedes the given position, if any.
+    fn preceding_import(&self, at: TextSize) -> Option<&Stmt> {
+        self.ordered_imports
+            .partition_point(|stmt| stmt.start() < at)
+            .checked_sub(1)
+            .map(|idx| self.ordered_imports[idx])
     }
 
     /// Add an import statement to import the given module.
@@ -65,9 +48,9 @@ impl<'a> Importer<'a> {
     /// If there are no existing imports, the new import will be added at the top
     /// of the file. Otherwise, it will be added after the most recent top-level
     /// import statement.
-    pub fn add_import(&self, import: &AnyImport) -> Edit {
+    pub fn add_import(&self, import: &AnyImport, at: TextSize) -> Edit {
         let required_import = import.to_string();
-        if let Some(stmt) = self.trailing_import {
+        if let Some(stmt) = self.preceding_import(at) {
             // Insert after the last top-level import.
             let Insertion {
                 prefix,
@@ -88,10 +71,28 @@ impl<'a> Importer<'a> {
         }
     }
 
-    /// Return the top-level [`Stmt`] that imports the given module using `StmtKind::ImportFrom`.
-    /// if it exists.
-    pub fn get_import_from(&self, module: &str) -> Option<&Stmt> {
-        self.import_from_map.get(module).copied()
+    /// Return the top-level [`Stmt`] that imports the given module using `StmtKind::ImportFrom`
+    /// preceding the given position, if any.
+    pub fn find_import_from(&self, module: &str, at: TextSize) -> Option<&Stmt> {
+        let mut import_from = None;
+        for stmt in &self.ordered_imports {
+            if stmt.start() >= at {
+                break;
+            }
+            if let StmtKind::ImportFrom {
+                module: name,
+                level,
+                ..
+            } = &stmt.node
+            {
+                if level.map_or(true, |level| level == 0)
+                    && name.as_ref().map_or(false, |name| name == module)
+                {
+                    import_from = Some(*stmt);
+                }
+            }
+        }
+        import_from
     }
 
     /// Add the given member to an existing `StmtKind::ImportFrom` statement.
@@ -240,11 +241,11 @@ fn top_of_file_insertion(body: &[Stmt], locator: &Locator, stylist: &Stylist) ->
 #[cfg(test)]
 mod tests {
     use anyhow::Result;
-    use ruff_python_ast::newlines::LineEnding;
     use ruff_text_size::TextSize;
     use rustpython_parser as parser;
     use rustpython_parser::lexer::LexResult;
 
+    use ruff_python_ast::newlines::LineEnding;
     use ruff_python_ast::source_code::{Locator, Stylist};
 
     use crate::importer::{top_of_file_insertion, Insertion};
