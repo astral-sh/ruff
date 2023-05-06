@@ -1721,7 +1721,7 @@ ArgumentList: ArgumentList = {
     }
 };
 
-FunctionArgument: (Option<(crate::Location, crate::Location, Option<String>)>, ast::Expr) = {
+FunctionArgument: (Option<(crate::text_size::TextSize, crate::text_size::TextSize, Option<String>)>, ast::Expr) = {
     <location:@L> <e:NamedExpressionTest> <c:CompFor?> <end_location:@R> => {
         let expr = match c {
             Some(c) => ast::Expr::new(
@@ -1776,7 +1776,7 @@ Identifier: String = <s:name> => s;
 
 // Hook external lexer:
 extern {
-    type Location = crate::Location;
+    type Location = crate::text_size::TextSize;
     type Error = LexicalError;
 
     enum token::Tok {

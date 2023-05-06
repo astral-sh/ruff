@@ -3,8 +3,8 @@
 use crate::{
     ast,
     lexer::{LexicalError, LexicalErrorType},
+    text_size::TextSize,
 };
-use ruff_text_size::TextSize;
 use rustc_hash::FxHashSet;
 
 pub(crate) struct ArgumentList {

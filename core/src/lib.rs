@@ -11,3 +11,5 @@ pub use bytecode::*;
 pub use error::BaseError;
 pub use location::Location;
 pub use mode::Mode;
+
+pub use ruff_text_size as text_size; // re-export mandatory and frequently accessed dependency

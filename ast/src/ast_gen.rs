@@ -3,7 +3,7 @@
 #![allow(clippy::derive_partial_eq_without_eq)]
 
 pub use crate::constant::*;
-pub use ruff_text_size::{TextRange, TextSize};
+pub use rustpython_compiler_core::text_size::{TextRange, TextSize};
 
 type Ident = String;
 

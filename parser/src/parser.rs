@@ -13,12 +13,12 @@
 //! [`Mode`]: crate::mode
 
 use crate::{
-    ast::{self},
+    ast,
     lexer::{self, LexResult, LexicalError, LexicalErrorType},
     mode::Mode,
     python,
+    text_size::TextSize,
     token::Tok,
-    Location,
 };
 use itertools::Itertools;
 use std::iter;
@@ -70,7 +70,7 @@ pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, Pars
 ///
 /// ```
 pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseError> {
-    parse_expression_located(source, path, Location::default())
+    parse_expression_located(source, path, TextSize::default())
 }
 
 /// Parses a Python expression from a given location.
@@ -84,8 +84,7 @@ pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseErro
 /// somewhat silly, location:
 ///
 /// ```
-/// use ruff_text_size::TextSize;
-/// use rustpython_parser::{parse_expression_located};
+/// use rustpython_parser::{text_size::TextSize, parse_expression_located};
 ///
 /// let expr = parse_expression_located("1 + 2", "<embedded>", TextSize::from(400));
 /// assert!(expr.is_ok());
@@ -93,7 +92,7 @@ pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseErro
 pub fn parse_expression_located(
     source: &str,
     path: &str,
-    location: Location,
+    location: TextSize,
 ) -> Result<ast::Expr, ParseError> {
     parse_located(source, Mode::Expression, path, location).map(|top| match top {
         ast::Mod::Expression(ast::ModExpression { body }) => *body,
@@ -133,7 +132,7 @@ pub fn parse_expression_located(
 /// assert!(program.is_ok());
 /// ```
 pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, ParseError> {
-    parse_located(source, mode, source_path, Location::default())
+    parse_located(source, mode, source_path, TextSize::default())
 }
 
 /// Parse the given Python source code using the specified [`Mode`] and [`Location`].
@@ -144,8 +143,7 @@ pub fn parse(source: &str, mode: Mode, source_path: &str) -> Result<ast::Mod, Pa
 /// # Example
 ///
 /// ```
-/// use ruff_text_size::TextSize;
-/// use rustpython_parser::{Mode, parse_located};
+/// use rustpython_parser::{text_size::TextSize, Mode, parse_located};
 ///
 /// let source = r#"
 /// def fib(i):
@@ -163,7 +161,7 @@ pub fn parse_located(
     source: &str,
     mode: Mode,
     source_path: &str,
-    location: Location,
+    location: TextSize,
 ) -> Result<ast::Mod, ParseError> {
     let lxr = lexer::lex_located(source, mode, location);
     parse_tokens(lxr, mode, source_path)
@@ -226,7 +224,7 @@ impl std::error::Error for ParseErrorType {}
 
 // Convert `lalrpop_util::ParseError` to our internal type
 fn parse_error_from_lalrpop(
-    err: LalrpopError<Location, Tok, LexicalError>,
+    err: LalrpopError<TextSize, Tok, LexicalError>,
     source_path: &str,
 ) -> ParseError {
     let source_path = source_path.to_owned();

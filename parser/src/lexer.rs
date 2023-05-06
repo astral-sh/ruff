@@ -31,12 +31,12 @@ use crate::{
     mode::Mode,
     soft_keywords::SoftKeywordTransformer,
     string::FStringErrorType,
+    text_size::{TextLen, TextRange, TextSize},
     token::{StringKind, Tok},
 };
 use log::trace;
 use num_bigint::BigInt;
 use num_traits::{Num, Zero};
-use ruff_text_size::{TextLen, TextRange, TextSize};
 use std::{char, cmp::Ordering, ops::Index, slice::SliceIndex, str::FromStr};
 use unic_emoji_char::is_emoji_presentation;
 use unic_ucd_ident::{is_xid_continue, is_xid_start};

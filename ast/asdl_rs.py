@@ -718,7 +718,7 @@ def write_ast_def(mod, typeinfo, f):
         #![allow(clippy::derive_partial_eq_without_eq)]
         
         pub use crate::constant::*;
-        pub use ruff_text_size::{TextSize, TextRange};
+        pub use rustpython_compiler_core::text_size::{TextSize, TextRange};
 
         type Ident = String;
         \n
