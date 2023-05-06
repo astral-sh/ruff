@@ -447,7 +447,7 @@ class ClassDefVisitor(EmitVisitor):
         self.emit(f"struct {structname};", depth)
         self.emit("#[pyclass(flags(HAS_DICT, BASETYPE))]", depth)
         self.emit(f"impl {structname} {{", depth)
-        self.emit(f"#[extend_class]", depth + 1)
+        self.emit("#[extend_class]", depth + 1)
         self.emit(
             "fn extend_class_with_fields(ctx: &Context, class: &'static Py<PyType>) {",
             depth + 1,
