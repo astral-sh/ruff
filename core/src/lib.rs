@@ -8,6 +8,6 @@ pub mod marshal;
 mod mode;
 
 pub use bytecode::*;
-pub use error::{BaseError, CompileError};
+pub use error::BaseError;
 pub use location::Location;
 pub use mode::Mode;
