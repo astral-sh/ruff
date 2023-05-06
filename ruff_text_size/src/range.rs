@@ -463,6 +463,13 @@ impl RangeBounds<TextSize> for TextRange {
     }
 }
 
+impl From<Range<TextSize>> for TextRange {
+    #[inline]
+    fn from(r: Range<TextSize>) -> Self {
+        TextRange::new(r.start, r.end)
+    }
+}
+
 impl<T> From<TextRange> for Range<T>
 where
     T: From<TextSize>,

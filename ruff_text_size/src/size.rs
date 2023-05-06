@@ -63,6 +63,30 @@ impl TextSize {
     pub fn of<T: TextLen>(text: T) -> TextSize {
         text.text_len()
     }
+
+    /// Returns current raw `offset` as u32.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use ruff_text_size::*;
+    /// assert_eq!(TextSize::from(4).to_u32(), 4);
+    /// ```
+    pub fn to_u32(&self) -> u32 {
+        self.raw
+    }
+
+    /// Returns current raw `offset` as usize.
+    ///
+    /// # Examples
+    ///
+    /// ```rust
+    /// # use ruff_text_size::*;
+    /// assert_eq!(TextSize::from(4).to_usize(), 4);
+    /// ```
+    pub fn to_usize(&self) -> usize {
+        self.raw as usize
+    }
 }
 
 /// Methods to act like a primitive integer type, where reasonably applicable.
@@ -91,7 +115,7 @@ impl From<u32> for TextSize {
 impl From<TextSize> for u32 {
     #[inline]
     fn from(value: TextSize) -> Self {
-        value.raw
+        value.to_u32()
     }
 }
 
@@ -106,7 +130,7 @@ impl TryFrom<usize> for TextSize {
 impl From<TextSize> for usize {
     #[inline]
     fn from(value: TextSize) -> Self {
-        value.raw as usize
+        value.to_usize()
     }
 }
 

@@ -1,9 +1,6 @@
-#[cfg(feature = "serde")]
-use serde::{Deserialize, Serialize};
-
 /// Source code location.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(Serialize, Deserialize))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Location {
     pub(super) row: u32,
     pub(super) column: u32,
@@ -95,6 +92,8 @@ impl Location {
         }
     }
 }
+
+pub type LocationRange = std::ops::Range<Location>;
 
 #[cfg(test)]
 mod tests {

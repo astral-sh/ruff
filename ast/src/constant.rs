@@ -137,6 +137,7 @@ impl<U> crate::fold::Fold<U> for ConstantOptimizer {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rustpython_compiler_core::text_size::TextRange;
 
     #[cfg(feature = "constant-optimization")]
     #[test]
@@ -146,13 +147,13 @@ mod tests {
         let range = TextRange::default();
         #[allow(clippy::let_unit_value)]
         let custom = ();
-        let ast = Located {
+        let ast = Attributed {
             range,
             custom,
             node: ExprTuple {
                 ctx: ExprContext::Load,
                 elts: vec![
-                    Located {
+                    Attributed {
                         range,
                         custom,
                         node: ExprConstant {
@@ -161,7 +162,7 @@ mod tests {
                         }
                         .into(),
                     },
-                    Located {
+                    Attributed {
                         range,
                         custom,
                         node: ExprConstant {
@@ -170,13 +171,13 @@ mod tests {
                         }
                         .into(),
                     },
-                    Located {
+                    Attributed {
                         range,
                         custom,
                         node: ExprTuple {
                             ctx: ExprContext::Load,
                             elts: vec![
-                                Located {
+                                Attributed {
                                     range,
                                     custom,
                                     node: ExprConstant {
@@ -185,7 +186,7 @@ mod tests {
                                     }
                                     .into(),
                                 },
-                                Located {
+                                Attributed {
                                     range,
                                     custom,
                                     node: ExprConstant {
@@ -194,7 +195,7 @@ mod tests {
                                     }
                                     .into(),
                                 },
-                                Located {
+                                Attributed {
                                     range,
                                     custom,
                                     node: ExprConstant {
@@ -216,7 +217,7 @@ mod tests {
             .unwrap_or_else(|e| match e {});
         assert_eq!(
             new_ast,
-            Located {
+            Attributed {
                 range,
                 custom,
                 node: ExprConstant {

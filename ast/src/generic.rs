@@ -2,74 +2,10 @@
 
 #![allow(clippy::derive_partial_eq_without_eq)]
 
-pub use crate::constant::*;
-pub use rustpython_compiler_core::text_size::{TextRange, TextSize};
+pub use crate::{constant::*, Attributed};
+use rustpython_compiler_core::text_size::{TextRange, TextSize};
 
 type Ident = String;
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct Located<T, U = ()> {
-    pub range: TextRange,
-    pub custom: U,
-    pub node: T,
-}
-
-impl<T> Located<T> {
-    pub fn new(start: TextSize, end: TextSize, node: T) -> Self {
-        Self {
-            range: TextRange::new(start, end),
-            custom: (),
-            node,
-        }
-    }
-
-    /// Creates a new node that spans the position specified by `range`.
-    pub fn with_range(node: T, range: TextRange) -> Self {
-        Self {
-            range,
-            custom: (),
-            node,
-        }
-    }
-
-    /// Returns the absolute start position of the node from the beginning of the document.
-    #[inline]
-    pub const fn start(&self) -> TextSize {
-        self.range.start()
-    }
-
-    /// Returns the node
-    #[inline]
-    pub fn node(&self) -> &T {
-        &self.node
-    }
-
-    /// Consumes self and returns the node.
-    #[inline]
-    pub fn into_node(self) -> T {
-        self.node
-    }
-
-    /// Returns the `range` of the node. The range offsets are absolute to the start of the document.
-    #[inline]
-    pub const fn range(&self) -> TextRange {
-        self.range
-    }
-
-    /// Returns the absolute position at which the node ends in the source document.
-    #[inline]
-    pub const fn end(&self) -> TextSize {
-        self.range.end()
-    }
-}
-
-impl<T, U> std::ops::Deref for Located<T, U> {
-    type Target = T;
-
-    fn deref(&self) -> &Self::Target {
-        &self.node
-    }
-}
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ModModule<U = ()> {
@@ -467,7 +403,7 @@ pub enum StmtKind<U = ()> {
     Break,
     Continue,
 }
-pub type Stmt<U = ()> = Located<StmtKind<U>, U>;
+pub type Stmt<U = ()> = Attributed<StmtKind<U>, U>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct ExprBoolOp<U = ()> {
@@ -827,7 +763,7 @@ pub enum ExprKind<U = ()> {
     Tuple(ExprTuple<U>),
     Slice(ExprSlice<U>),
 }
-pub type Expr<U = ()> = Located<ExprKind<U>, U>;
+pub type Expr<U = ()> = Attributed<ExprKind<U>, U>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum ExprContext {
@@ -906,7 +842,7 @@ impl<U> From<ExcepthandlerExceptHandler<U>> for ExcepthandlerKind<U> {
 pub enum ExcepthandlerKind<U = ()> {
     ExceptHandler(ExcepthandlerExceptHandler<U>),
 }
-pub type Excepthandler<U = ()> = Located<ExcepthandlerKind<U>, U>;
+pub type Excepthandler<U = ()> = Attributed<ExcepthandlerKind<U>, U>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Arguments<U = ()> {
@@ -925,21 +861,21 @@ pub struct ArgData<U = ()> {
     pub annotation: Option<Box<Expr<U>>>,
     pub type_comment: Option<String>,
 }
-pub type Arg<U = ()> = Located<ArgData<U>, U>;
+pub type Arg<U = ()> = Attributed<ArgData<U>, U>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct KeywordData<U = ()> {
     pub arg: Option<Ident>,
     pub value: Expr<U>,
 }
-pub type Keyword<U = ()> = Located<KeywordData<U>, U>;
+pub type Keyword<U = ()> = Attributed<KeywordData<U>, U>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct AliasData {
     pub name: Ident,
     pub asname: Option<Ident>,
 }
-pub type Alias<U = ()> = Located<AliasData, U>;
+pub type Alias<U = ()> = Attributed<AliasData, U>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct Withitem<U = ()> {
@@ -1059,7 +995,7 @@ pub enum PatternKind<U = ()> {
     MatchAs(PatternMatchAs<U>),
     MatchOr(PatternMatchOr<U>),
 }
-pub type Pattern<U = ()> = Located<PatternKind<U>, U>;
+pub type Pattern<U = ()> = Attributed<PatternKind<U>, U>;
 
 #[derive(Clone, Debug, PartialEq)]
 pub struct TypeIgnoreTypeIgnore {
@@ -1086,6 +1022,17 @@ pub mod fold {
         type TargetU;
         type Error;
         fn map_user(&mut self, user: U) -> Result<Self::TargetU, Self::Error>;
+        fn map_located<T>(
+            &mut self,
+            located: Attributed<T, U>,
+        ) -> Result<Attributed<T, Self::TargetU>, Self::Error> {
+            let custom = self.map_user(located.custom)?;
+            Ok(Attributed {
+                range: located.range,
+                custom,
+                node: located.node,
+            })
+        }
         fn fold_mod(&mut self, node: Mod<U>) -> Result<Mod<Self::TargetU>, Self::Error> {
             fold_mod(self, node)
         }
@@ -1164,11 +1111,12 @@ pub mod fold {
     }
     fn fold_located<U, F: Fold<U> + ?Sized, T, MT>(
         folder: &mut F,
-        node: Located<T, U>,
+        node: Attributed<T, U>,
         f: impl FnOnce(&mut F, T) -> Result<MT, F::Error>,
-    ) -> Result<Located<MT, F::TargetU>, F::Error> {
-        Ok(Located {
-            custom: folder.map_user(node.custom)?,
+    ) -> Result<Attributed<MT, F::TargetU>, F::Error> {
+        let node = folder.map_located(node)?;
+        Ok(Attributed {
+            custom: node.custom,
             range: node.range,
             node: f(folder, node.node)?,
         })

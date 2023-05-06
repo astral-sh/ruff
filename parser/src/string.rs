@@ -10,9 +10,7 @@ use crate::{
     token::{StringKind, Tok},
 };
 use itertools::Itertools;
-use rustpython_compiler_core::{
-    text_size::{TextLen, TextSize},
-};
+use rustpython_compiler_core::text_size::{TextLen, TextSize};
 
 // unicode_name2 does not expose `MAX_NAME_LENGTH`, so we replicate that constant here, fix #3798
 const MAX_UNICODE_NAME: usize = 88;
@@ -67,7 +65,7 @@ impl<'a> StringParser<'a> {
 
     #[inline]
     fn expr(&self, node: ExprKind) -> Expr {
-        Expr::new(self.start, self.end, node)
+        Expr::new(self.start..self.end, node)
     }
 
     fn parse_unicode_literal(&mut self, literal_number: usize) -> Result<char, LexicalError> {
@@ -624,8 +622,7 @@ pub(crate) fn parse_strings(
             }
         }
         return Ok(Expr::new(
-            initial_start,
-            last_end,
+            initial_start..last_end,
             ast::ExprConstant {
                 value: Constant::Bytes(content),
                 kind: None,
@@ -648,8 +645,7 @@ pub(crate) fn parse_strings(
             }
         }
         return Ok(Expr::new(
-            initial_start,
-            last_end,
+            initial_start..last_end,
             ast::ExprConstant {
                 value: Constant::Str(content.join("")),
                 kind: initial_kind,
@@ -664,8 +660,7 @@ pub(crate) fn parse_strings(
 
     let take_current = |current: &mut Vec<String>| -> Expr {
         Expr::new(
-            initial_start,
-            last_end,
+            initial_start..last_end,
             ast::ExprConstant {
                 value: Constant::Str(current.drain(..).join("")),
                 kind: initial_kind.clone(),
@@ -696,8 +691,7 @@ pub(crate) fn parse_strings(
     }
 
     Ok(Expr::new(
-        initial_start,
-        last_end,
+        initial_start..last_end,
         ast::ExprJoinedStr { values: deduped }.into(),
     ))
 }

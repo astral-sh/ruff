@@ -211,9 +211,9 @@ pub fn lex(source: &str, mode: Mode) -> impl Iterator<Item = LexResult> + '_ {
 pub fn lex_located(
     source: &str,
     mode: Mode,
-    start_location: TextSize,
+    start_offset: TextSize,
 ) -> impl Iterator<Item = LexResult> + '_ {
-    SoftKeywordTransformer::new(Lexer::new(source.chars(), start_location), mode)
+    SoftKeywordTransformer::new(Lexer::new(source.chars(), start_offset), mode)
 }
 
 impl<T> Lexer<T>

@@ -92,9 +92,9 @@ pub fn parse_expression(source: &str, path: &str) -> Result<ast::Expr, ParseErro
 pub fn parse_expression_located(
     source: &str,
     path: &str,
-    location: TextSize,
+    offset: TextSize,
 ) -> Result<ast::Expr, ParseError> {
-    parse_located(source, Mode::Expression, path, location).map(|top| match top {
+    parse_located(source, Mode::Expression, path, offset).map(|top| match top {
         ast::Mod::Expression(ast::ModExpression { body }) => *body,
         _ => unreachable!(),
     })
@@ -161,9 +161,9 @@ pub fn parse_located(
     source: &str,
     mode: Mode,
     source_path: &str,
-    location: TextSize,
+    offset: TextSize,
 ) -> Result<ast::Mod, ParseError> {
-    let lxr = lexer::lex_located(source, mode, location);
+    let lxr = lexer::lex_located(source, mode, offset);
     parse_tokens(lxr, mode, source_path)
 }
 
@@ -233,17 +233,17 @@ fn parse_error_from_lalrpop(
         // TODO: Are there cases where this isn't an EOF?
         LalrpopError::InvalidToken { location } => ParseError {
             error: ParseErrorType::Eof,
-            location,
+            offset: location,
             source_path,
         },
         LalrpopError::ExtraToken { token } => ParseError {
             error: ParseErrorType::ExtraToken(token.1),
-            location: token.0,
+            offset: token.0,
             source_path,
         },
         LalrpopError::User { error } => ParseError {
             error: ParseErrorType::Lexical(error.error),
-            location: error.location,
+            offset: error.location,
             source_path,
         },
         LalrpopError::UnrecognizedToken { token, expected } => {
@@ -252,7 +252,7 @@ fn parse_error_from_lalrpop(
             let expected = (expected.len() == 1).then(|| expected[0].clone());
             ParseError {
                 error: ParseErrorType::UnrecognizedToken(token.1, expected),
-                location: token.0,
+                offset: token.0,
                 source_path,
             }
         }
@@ -262,13 +262,13 @@ fn parse_error_from_lalrpop(
             if indent_error {
                 ParseError {
                     error: ParseErrorType::Lexical(LexicalErrorType::IndentationError),
-                    location,
+                    offset: location,
                     source_path,
                 }
             } else {
                 ParseError {
                     error: ParseErrorType::Eof,
-                    location,
+                    offset: location,
                     source_path,
                 }
             }

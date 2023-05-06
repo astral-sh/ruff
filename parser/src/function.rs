@@ -114,8 +114,7 @@ pub(crate) fn parse_args(func_args: Vec<FunctionArgument>) -> Result<ArgumentLis
                 }
 
                 keywords.push(ast::Keyword::new(
-                    start,
-                    end,
+                    start..end,
                     ast::KeywordData { arg: name, value },
                 ));
             }

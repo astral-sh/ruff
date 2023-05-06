@@ -8,8 +8,13 @@ pub mod marshal;
 mod mode;
 
 pub use bytecode::*;
-pub use error::BaseError;
-pub use location::Location;
+pub use error::{BaseError, LocatedError};
+pub use location::{Location, LocationRange};
 pub use mode::Mode;
 
 pub use ruff_text_size as text_size; // re-export mandatory and frequently accessed dependency
+
+// FIXME: temp code
+pub fn to_location(offset: &text_size::TextSize, source: &str) -> Location {
+    todo!()
+}
