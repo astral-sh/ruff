@@ -1,5 +1,5 @@
 # TDO006 - accepted
-# TODO(evanrittenhouse): this is a valid TODO
+# TODO (evanrittenhouse): this is a valid TODO
 # TDO006 - error
-# ToDo(evanrittenhouse): invalid capitalization
-# todo(evanrittenhouse): another invalid capitalization
+# ToDo (evanrittenhouse): invalid capitalization
+# todo (evanrittenhouse): another invalid capitalization

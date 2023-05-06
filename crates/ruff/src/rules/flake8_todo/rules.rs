@@ -1,3 +1,5 @@
+use std::{collections::HashMap, str::Chars};
+
 use once_cell::sync::Lazy;
 
 use regex::{CaptureMatches, Regex, RegexSet};
@@ -233,6 +235,29 @@ static TODO_REGEX: Lazy<Regex> = Lazy::new(|| {
         .unwrap()
 });
 
+// Matches against any of the 4 recognized PATTERNS.
+static TODO_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
+    let PATTERNS: [&str; 4] = [
+        r#"^#\s*(?i)(TODO).*$"#,
+        r#"^#\s*(?i)(BUG).*$"#,
+        r#"^#\s*(?i)(FIXME).*$"#,
+        r#"^#\s*(?i)(XXX).*$"#,
+    ];
+
+    return RegexSet::new(PATTERNS).unwrap();
+});
+
+// Maps the index of a particular Regex (specified by its index in the above PATTERNS slice) to the length of the
+// tag that we're trying to capture.
+static PATTERN_LENGTHS: Lazy<HashMap<usize, usize>> = Lazy::new(|| {
+    HashMap::from([
+        (0usize, 4usize),
+        (1usize, 3usize),
+        (2usize, 5usize),
+        (3usize, 3usize),
+    ])
+});
+
 static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
     RegexSet::new([
         r#"^#\s*(http|https)://.*"#, // issue link
@@ -244,6 +269,15 @@ static ISSUE_LINK_REGEX_SET: Lazy<RegexSet> = Lazy::new(|| {
 
 static NUM_CAPTURE_GROUPS: usize = 5usize;
 static TODO_LENGTH: u32 = 4u32;
+
+// If this struct ever gets pushed outside of this module, it may be worth creating an enum for
+// the different tag types + other convenience methods.
+/// Represents a TODO tag or any of its variants - FIXME, XXX, BUG, TODO.
+#[derive(Debug, PartialEq, Eq)]
+struct Tag<'a> {
+    range: TextRange,
+    content: &'a str,
+}
 
 pub fn check_todos(
     tokens: &[LexResult],
@@ -258,61 +292,16 @@ pub fn check_todos(
             continue;
         };
 
-        let Some(captures) = get_captured_matches(comment).next() else {
+        // Check that the comment is a TODO (properly formed or not).
+        let Some(tag) = detect_tag(comment, token_range) else {
             continue;
         };
 
-        // Check for errors on the tag: TDO001/TDO006.
-        // Unwrap is safe because the "tag" capture group is required to get here.
-        let tag = captures.name("tag").unwrap().as_str();
-        if tag != "TODO" {
-            diagnostics.push(Diagnostic::new(
-                InvalidTodoTag {
-                    tag: String::from(tag),
-                },
-                *token_range,
-            ));
+        check_for_tag_errors(token_range, &tag, &mut diagnostics, autofix, settings);
+        check_for_static_errors(comment, &tag, &mut diagnostics);
 
-            if tag.to_uppercase() == "TODO" {
-                let mut invalid_capitalization = Diagnostic::new(
-                    InvalidCapitalizationInTodo {
-                        tag: String::from(tag),
-                    },
-                    *token_range,
-                );
-
-                if autofix.into() && settings.rules.should_fix(Rule::InvalidCapitalizationInTodo) {
-                    let first_t_position = find_first_t_position(comment);
-
-                    invalid_capitalization.set_fix(Fix::new(vec![Edit::replacement(
-                        "TODO".to_string(),
-                        token_range.start() + TextSize::new(first_t_position),
-                        token_range.start()
-                            + TextSize::new(first_t_position)
-                            + TextSize::new(TODO_LENGTH),
-                    )]));
-                }
-
-                diagnostics.push(invalid_capitalization);
-            }
-        }
-
-        // Check the rest of the capture groups for errors.
-        for capture_group_index in 2..=NUM_CAPTURE_GROUPS {
-            if captures.get(capture_group_index).is_some() {
-                continue;
-            }
-
-            if let Some(diagnostic) =
-                get_regex_error(capture_group_index, *token_range, &mut diagnostics)
-            {
-                diagnostics.push(diagnostic);
-            };
-        }
-
-        // If we've gotten all the way here, we know that the current token is a TODO. TDO003
-        // requires that the next token is an issue link.
-        let todo_start = find_first_t_position(comment);
+        // TDO-003
+        let todo_start = tag.range.start();
         if let Some((next_token, _next_range)) = iter.peek() {
             if let Tok::Comment(next_comment) = next_token {
                 if ISSUE_LINK_REGEX_SET.is_match(next_comment) {
@@ -320,26 +309,87 @@ pub fn check_todos(
                 }
             }
 
-            diagnostics.push(Diagnostic::new(
-                MissingLinkInTodo,
-                TextRange::new(
-                    token_range.start() + TextSize::new(todo_start),
-                    token_range.start() + TextSize::new(todo_start) + TextSize::new(TODO_LENGTH),
-                ),
-            ));
+            diagnostics.push(Diagnostic::new(MissingLinkInTodo, tag.range));
         } else {
-            // There's a TODO on the last line of the file which can't have a link after it.
-            diagnostics.push(Diagnostic::new(
-                MissingLinkInTodo,
-                TextRange::new(
-                    token_range.start() + TextSize::new(todo_start),
-                    token_range.start() + TextSize::new(todo_start) + TextSize::new(TODO_LENGTH),
-                ),
-            ));
+            // There's a TODO on the last line of the file, so there can't be a link after it.
+            diagnostics.push(Diagnostic::new(MissingLinkInTodo, tag.range));
         }
     }
 
     diagnostics
+}
+
+// TODO: update all comments
+
+/// Returns the tag pulled out of a given comment if it exists.
+fn detect_tag<'a>(comment: &'a String, comment_range: &'a TextRange) -> Option<Tag<'a>> {
+    let Some(regex_index) = TODO_REGEX_SET.matches(comment).into_iter().next() else {
+        return None;
+    };
+
+    let pattern_length = *PATTERN_LENGTHS.get(&regex_index).unwrap();
+
+    let mut tag_start_offset = 0usize;
+    for (i, char) in comment.chars().enumerate() {
+        // Regex ensures that the first letter in the comment is the first letter of the tag.
+        if char.is_alphabetic() {
+            tag_start_offset = i;
+            break;
+        }
+    }
+
+    Some(Tag {
+        content: comment
+            .get(tag_start_offset..tag_start_offset + pattern_length)
+            .unwrap(),
+        range: TextRange::new(
+            comment_range.start() + TextSize::new(tag_start_offset.try_into().ok().unwrap()),
+            comment_range.start()
+                + TextSize::new((tag_start_offset + pattern_length).try_into().ok().unwrap()),
+        ),
+    })
+}
+
+/// Check that the tag is valid since we're not using capture groups anymore. This function
+/// modifies `diagnostics` in-place.
+fn check_for_tag_errors(
+    comment_range: &TextRange,
+    tag: &Tag,
+    diagnostics: &mut Vec<Diagnostic>,
+    autofix: flags::Autofix,
+    settings: &Settings,
+) {
+    if tag.content != "TODO" {
+        // TDO-001
+        diagnostics.push(Diagnostic::new(
+            InvalidTodoTag {
+                tag: tag.content.to_string(),
+            },
+            tag.range,
+        ));
+
+        if tag.content.to_uppercase() == "TODO" {
+            // TDO-006
+            let mut invalid_capitalization = Diagnostic::new(
+                InvalidCapitalizationInTodo {
+                    tag: tag.content.to_string(),
+                },
+                tag.range,
+            );
+
+            if autofix.into() && settings.rules.should_fix(Rule::InvalidCapitalizationInTodo) {
+                invalid_capitalization.set_fix(Fix::new(vec![Edit::replacement(
+                    "TODO".to_string(),
+                    tag.range.start(),
+                    tag.range.end(),
+                )]));
+            }
+
+            diagnostics.push(invalid_capitalization);
+        }
+    }
+}
+
 }
 
 /// Mapper for static regex errors caused by a capture group at index i (i > 1 since the tag
@@ -371,7 +421,82 @@ fn get_captured_matches(text: &str) -> CaptureMatches {
     TODO_REGEX.captures_iter(text)
 }
 
-fn find_first_t_position(comment: &str) -> u32 {
-    // We know that the comment has to have a "t" or "T" in it, so the unwrap is safe.
-    comment.find(['t', 'T']).unwrap().try_into().unwrap()
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_detect_tag() {
+        let test_comment = "# TODO: todo tag";
+        let mut chars = test_comment.chars();
+        let expected = Tag {
+            content: "TODO",
+            range: TextRange::new(TextSize::new(2), TextSize::new(6)),
+        };
+        assert_eq!(
+            Some(expected),
+            detect_tag(
+                &test_comment.to_owned(),
+                &TextRange::new(TextSize::new(0), TextSize::new(15)),
+            )
+        );
+
+        let test_comment = "#TODO: todo tag";
+        let mut chars = test_comment.chars();
+        let expected = Tag {
+            content: "TODO",
+            range: TextRange::new(TextSize::new(1), TextSize::new(5)),
+        };
+        assert_eq!(
+            Some(expected),
+            detect_tag(
+                &test_comment.to_owned(),
+                &TextRange::new(TextSize::new(0), TextSize::new(15)),
+            )
+        );
+
+        // sanity checks :)
+        let test_comment = "# todo: todo tag";
+        let mut chars = test_comment.chars();
+        let expected = Tag {
+            content: "todo",
+            range: TextRange::new(TextSize::new(2), TextSize::new(6)),
+        };
+        assert_eq!(
+            Some(expected),
+            detect_tag(
+                &test_comment.to_owned(),
+                &TextRange::new(TextSize::new(0), TextSize::new(15)),
+            )
+        );
+        let test_comment = "# fixme: fixme tag";
+        let mut chars = test_comment.chars();
+        let expected = Tag {
+            content: "fixme",
+            range: TextRange::new(TextSize::new(2), TextSize::new(7)),
+        };
+        assert_eq!(
+            Some(expected),
+            detect_tag(
+                &test_comment.to_owned(),
+                &TextRange::new(TextSize::new(0), TextSize::new(17)),
+                5
+            )
+        );
+    }
+
+    #[test]
+    fn test_check_static_errors() {
+        let mut diagnostics: Vec<Diagnostic> = vec![];
+        let test_comment = "# TODO: this has no author";
+        let test_range = TextRange::new(
+            TextSize::new(0),
+            TextSize::try_from(test_comment.len()).ok().unwrap(),
+        );
+        let tag = "TODO";
+
+        check_for_static_errors(test_comment, &test_range, tag, &mut diagnostics);
+
+        assert_eq!(true, false);
+    }
 }
