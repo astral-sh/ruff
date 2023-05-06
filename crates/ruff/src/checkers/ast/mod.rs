@@ -1715,7 +1715,7 @@ where
                 if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
                     self.deferred
                         .for_loops
-                        .push((stmt, (self.ctx.scope_id, self.ctx.stmt_id)));
+                        .push((self.ctx.scope_id, self.ctx.stmt_id));
                 }
                 if self
                     .settings
@@ -2041,7 +2041,6 @@ where
                 }));
 
                 self.deferred.functions.push((
-                    stmt,
                     (self.ctx.scope_id, self.ctx.stmt_id),
                     self.ctx.visible_scope,
                 ));
@@ -4788,11 +4787,11 @@ impl<'a> Checker<'a> {
     fn check_deferred_type_definitions(&mut self) {
         while !self.deferred.type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.deferred.type_definitions);
-            for (expr, (in_annotation, in_type_checking_block), (scope_id, node_id)) in
+            for (expr, (in_annotation, in_type_checking_block), (scope_id, stmt_id)) in
                 type_definitions
             {
                 self.ctx.scope_id = scope_id;
-                self.ctx.stmt_id = node_id;
+                self.ctx.stmt_id = stmt_id;
                 self.ctx.in_annotation = in_annotation;
                 self.ctx.in_type_checking_block = in_type_checking_block;
                 self.ctx.in_type_definition = true;
@@ -4807,7 +4806,7 @@ impl<'a> Checker<'a> {
     fn check_deferred_string_type_definitions(&mut self, allocator: &'a typed_arena::Arena<Expr>) {
         while !self.deferred.string_type_definitions.is_empty() {
             let type_definitions = std::mem::take(&mut self.deferred.string_type_definitions);
-            for (range, value, (in_annotation, in_type_checking_block), (scope_id, node_id)) in
+            for (range, value, (in_annotation, in_type_checking_block), (scope_id, stmt_id)) in
                 type_definitions
             {
                 if let Ok((expr, kind)) = parse_type_annotation(value, range, self.locator) {
@@ -4825,7 +4824,7 @@ impl<'a> Checker<'a> {
                     let expr = allocator.alloc(expr);
 
                     self.ctx.scope_id = scope_id;
-                    self.ctx.stmt_id = node_id;
+                    self.ctx.stmt_id = stmt_id;
                     self.ctx.in_annotation = in_annotation;
                     self.ctx.in_type_checking_block = in_type_checking_block;
                     self.ctx.in_type_definition = true;
@@ -4854,12 +4853,12 @@ impl<'a> Checker<'a> {
     fn check_deferred_functions(&mut self) {
         while !self.deferred.functions.is_empty() {
             let deferred_functions = std::mem::take(&mut self.deferred.functions);
-            for (stmt, (scope_id, node_id), visibility) in deferred_functions {
+            for ((scope_id, stmt_id), visibility) in deferred_functions {
                 self.ctx.scope_id = scope_id;
-                self.ctx.stmt_id = node_id;
+                self.ctx.stmt_id = stmt_id;
                 self.ctx.visible_scope = visibility;
 
-                match &stmt.node {
+                match &self.ctx.current_stmt().node {
                     StmtKind::FunctionDef { body, args, .. }
                     | StmtKind::AsyncFunctionDef { body, args, .. } => {
                         self.visit_arguments(args);
@@ -4870,7 +4869,7 @@ impl<'a> Checker<'a> {
                     }
                 }
 
-                self.deferred.assignments.push((scope_id, node_id));
+                self.deferred.assignments.push((scope_id, stmt_id));
             }
         }
     }
@@ -4878,9 +4877,9 @@ impl<'a> Checker<'a> {
     fn check_deferred_lambdas(&mut self) {
         while !self.deferred.lambdas.is_empty() {
             let lambdas = std::mem::take(&mut self.deferred.lambdas);
-            for (expr, (scope_id, node_id)) in lambdas {
+            for (expr, (scope_id, stmt_id)) in lambdas {
                 self.ctx.scope_id = scope_id;
-                self.ctx.stmt_id = node_id;
+                self.ctx.stmt_id = stmt_id;
 
                 if let ExprKind::Lambda { args, body } = &expr.node {
                     self.visit_arguments(args);
@@ -4889,7 +4888,7 @@ impl<'a> Checker<'a> {
                     unreachable!("Expected ExprKind::Lambda");
                 }
 
-                self.deferred.assignments.push((scope_id, node_id));
+                self.deferred.assignments.push((scope_id, stmt_id));
             }
         }
     }
@@ -4934,12 +4933,12 @@ impl<'a> Checker<'a> {
         while !self.deferred.for_loops.is_empty() {
             let for_loops = std::mem::take(&mut self.deferred.for_loops);
 
-            for (stmt, (scope_id, node_id)) in for_loops {
+            for (scope_id, stmt_id) in for_loops {
                 self.ctx.scope_id = scope_id;
-                self.ctx.stmt_id = node_id;
+                self.ctx.stmt_id = stmt_id;
 
                 if let StmtKind::For { target, body, .. }
-                | StmtKind::AsyncFor { target, body, .. } = &stmt.node
+                | StmtKind::AsyncFor { target, body, .. } = &self.ctx.current_stmt().node
                 {
                     if self.settings.rules.enabled(Rule::UnusedLoopControlVariable) {
                         flake8_bugbear::rules::unused_loop_control_variable(self, target, body);
@@ -5427,9 +5426,9 @@ impl<'a> Checker<'a> {
         let mut overloaded_name: Option<String> = None;
         while !self.deferred.definitions.is_empty() {
             let definitions = std::mem::take(&mut self.deferred.definitions);
-            for (definition, visibility, (scope_id, node_id)) in definitions {
+            for (definition, visibility, (scope_id, stmt_id)) in definitions {
                 self.ctx.scope_id = scope_id;
-                self.ctx.stmt_id = node_id;
+                self.ctx.stmt_id = stmt_id;
 
                 // flake8-annotations
                 if enforce_annotations {
