@@ -6,7 +6,6 @@ use smallvec::smallvec;
 
 use ruff_python_ast::call_path::{collect_call_path, from_unqualified_name, CallPath};
 use ruff_python_ast::helpers::from_relative_import;
-use ruff_python_ast::types::RefEquality;
 use ruff_python_ast::typing::AnnotationKind;
 use ruff_python_stdlib::path::is_python_stub_file;
 use ruff_python_stdlib::typing::TYPING_EXTENSIONS;
@@ -35,7 +34,7 @@ pub struct Context<'a> {
     // Map from binding index to indexes of bindings that shadow it in other scopes.
     pub shadowed_bindings:
         std::collections::HashMap<BindingId, Vec<BindingId>, BuildNoHashHasher<BindingId>>,
-    pub exprs: Vec<RefEquality<'a, Expr>>,
+    pub exprs: Vec<&'a Expr>,
     // Body iteration; used to peek at siblings.
     pub body: &'a [Stmt],
     pub body_index: usize,
@@ -313,7 +312,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn push_expr(&mut self, expr: &'a Expr) {
-        self.exprs.push(RefEquality(expr));
+        self.exprs.push(expr);
     }
 
     pub fn pop_expr(&mut self) {
@@ -350,17 +349,17 @@ impl<'a> Context<'a> {
     }
 
     /// Return the parent `Expr` of the current `Expr`.
-    pub fn current_expr_parent(&self) -> Option<&RefEquality<'a, Expr>> {
-        self.exprs.iter().rev().nth(1)
+    pub fn current_expr_parent(&self) -> Option<&'a Expr> {
+        self.exprs.iter().rev().nth(1).copied()
     }
 
     /// Return the grandparent `Expr` of the current `Expr`.
-    pub fn current_expr_grandparent(&self) -> Option<&RefEquality<'a, Expr>> {
-        self.exprs.iter().rev().nth(2)
+    pub fn current_expr_grandparent(&self) -> Option<&'a Expr> {
+        self.exprs.iter().rev().nth(2).copied()
     }
 
     /// Return an [`Iterator`] over the current `Expr` parents.
-    pub fn expr_ancestors(&self) -> impl Iterator<Item = &RefEquality<'a, Expr>> {
+    pub fn expr_ancestors(&self) -> impl Iterator<Item = &&Expr> {
         self.exprs.iter().rev().skip(1)
     }
 
