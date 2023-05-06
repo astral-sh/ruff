@@ -18,7 +18,7 @@ impl Default for Location {
 impl Location {
     pub fn fmt_with(
         &self,
-        f: &mut std::fmt::Formatter,
+        f: &mut impl std::fmt::Write,
         e: &impl std::fmt::Display,
     ) -> std::fmt::Result {
         write!(f, "{} at line {} column {}", e, self.row(), self.column())
