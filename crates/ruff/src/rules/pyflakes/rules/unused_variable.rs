@@ -328,7 +328,8 @@ pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
                 binding.range,
             );
             if checker.patch(diagnostic.kind.rule()) {
-                if let Some(stmt) = binding.source {
+                if let Some(source) = binding.source {
+                    let stmt = checker.ctx.stmts[source];
                     if let Some((kind, fix)) = remove_unused_variable(stmt, binding.range, checker)
                     {
                         if matches!(kind, DeletionKind::Whole) {
