@@ -15,17 +15,21 @@ pub enum NestedMinMaxFunc {
 
 impl NestedMinMaxFunc {
     /// Returns a value if this is a min() or max() call.
-    fn from_func(func: &Expr) -> Option<NestedMinMaxFunc> {
+    fn from_func(func: &Expr, checker: &mut Checker) -> Option<NestedMinMaxFunc> {
         match func.node() {
-            ExprKind::Name { id, .. } if id == "min" => Some(NestedMinMaxFunc::Min),
-            ExprKind::Name { id, .. } if id == "max" => Some(NestedMinMaxFunc::Max),
+            ExprKind::Name { id, .. } if id == "min" && checker.ctx.is_builtin("min") => {
+                Some(NestedMinMaxFunc::Min)
+            }
+            ExprKind::Name { id, .. } if id == "max" && checker.ctx.is_builtin("max") => {
+                Some(NestedMinMaxFunc::Max)
+            }
             _ => None,
         }
     }
 
     /// Returns true if the passed expr is a call to the same function as self.
-    fn is_call(self, expr: &Expr) -> bool {
-        matches!(expr.node(), ExprKind::Call { func, ..} if NestedMinMaxFunc::from_func(func) == Some(self))
+    fn is_call(self, expr: &Expr, checker: &mut Checker) -> bool {
+        matches!(expr.node(), ExprKind::Call { func, ..} if NestedMinMaxFunc::from_func(func, checker) == Some(self))
     }
 }
 
@@ -59,13 +63,18 @@ impl Violation for NestedMinMax {
 
 /// Collect a new set of arguments to `target_func` by either accepting existing args as-is or
 /// collecting child arguments if it is a call to the same function.
-fn collect_nested_args(target_func: NestedMinMaxFunc, args: &[Expr], new_args: &mut Vec<Expr>) {
+fn collect_nested_args(
+    target_func: NestedMinMaxFunc,
+    checker: &mut Checker,
+    args: &[Expr],
+    new_args: &mut Vec<Expr>,
+) {
     for arg in args {
         match arg.node() {
             ExprKind::Call { func, args, .. }
-                if NestedMinMaxFunc::from_func(func) == Some(target_func) =>
+                if NestedMinMaxFunc::from_func(func, checker) == Some(target_func) =>
             {
-                collect_nested_args(target_func, args, new_args);
+                collect_nested_args(target_func, checker, args, new_args);
             }
             _ => {
                 new_args.push(arg.clone());
@@ -82,9 +91,9 @@ pub fn nested_min_max(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(nested_func) = NestedMinMaxFunc::from_func(func) else { return };
+    let Some(nested_func) = NestedMinMaxFunc::from_func(func, checker) else { return };
 
-    if args.iter().any(|arg| nested_func.is_call(arg)) {
+    if args.iter().any(|arg| nested_func.is_call(arg, checker)) {
         let fixable = !has_comments(expr, checker.locator);
         let mut diagnostic = Diagnostic::new(
             NestedMinMax {
@@ -95,7 +104,7 @@ pub fn nested_min_max(
         );
         if checker.patch(diagnostic.kind.rule()) && fixable {
             let mut new_args = Vec::with_capacity(args.len());
-            collect_nested_args(nested_func, args, &mut new_args);
+            collect_nested_args(nested_func, checker, args, &mut new_args);
             let flattened_expr = Expr::new(
                 TextSize::default(),
                 TextSize::default(),
