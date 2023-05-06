@@ -176,7 +176,7 @@ class Check(VisitorBase):
 
     def visitField(self, field, name):
         key = str(field.type)
-        l = self.types.setdefault(key, [])
+        l = self.types.setdefault(key, [])  # noqa
         l.append(name)
 
     def visitProduct(self, prod, name):
@@ -193,7 +193,7 @@ def check(mod):
     v.visit(mod)
 
     for t in v.types:
-        if t not in mod.types and not t in builtin_types:
+        if t not in mod.types and t not in builtin_types:
             v.errors += 1
             uses = ", ".join(v.types[t])
             print('Undefined type {}, used in {}'.format(t, uses))
