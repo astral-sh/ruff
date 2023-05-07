@@ -77,7 +77,7 @@ def format_file(
             lineno = contents[: error.offset].count("\n") + 1
             print(f"{file}:{lineno}: code block parse error {error.exc}")
 
-        return 1
+        return 2
 
     if contents != new_contents:
         rule_name = file.name.split(".")[0]
@@ -145,34 +145,46 @@ def main(argv: Sequence[str] | None = None) -> int:
     # reason for the example. These files will be stored in
     # `scripts/known_formatting_erorrs.txt`
 
-    with Path("scripts/known_rule_formatting_errors.txt").open() as f:
-        known_formatting_errors = f.read().splitlines()
+    with Path("scripts/known_rule_formatting_violations.txt").open() as f:
+        known_formatting_violations = f.read().splitlines()
 
-    # Check known formatting errors is sorted alphabetically and has no duplicates
-    # This will reduce the diff when adding new errors
+    # Check known formatting violations is sorted alphabetically and has no duplicates
+    # This will reduce the diff when adding new violations
 
-    known_formatting_errors_sorted = sorted(known_formatting_errors)
-    if known_formatting_errors != known_formatting_errors_sorted:
+    known_formatting_violations_sorted = sorted(known_formatting_violations)
+    if known_formatting_violations != known_formatting_violations_sorted:
         print(
-            "Known formatting errors is not sorted alphabetically. Please sort and"
+            "Known formatting violations is not sorted alphabetically. Please sort and"
             " re-run.",
         )
         return 1
 
-    if len(known_formatting_errors) != len(set(known_formatting_errors)):
-        print("Known formatting errors has duplicates. Please remove them and re-run.")
+    if len(known_formatting_violations) != len(set(known_formatting_violations)):
+        print(
+            "Known formatting violations has duplicates. Please remove them and"
+            " re-run.",
+        )
         return 1
 
+    violations = 0
     errors = 0
     for file in [*static_docs, *generated_docs]:
-        if file.name.split(".")[0] in known_formatting_errors:
+        if file.name.split(".")[0] in known_formatting_violations:
             continue
 
         result = format_file(file, black_mode, args)
-        errors += result
+        if result == 1:
+            violations += 1
+        elif result == 2:
+            errors += 1
+
+    if violations > 0:
+        print(f"Formatting violations identified: {violations}")
 
     if errors > 0:
-        print(f"Errors identified: {errors}")
+        print(f"Code block parse errors identified: {errors}")
+
+    if violations > 0 or errors > 0:
         return 1
 
     return 0
