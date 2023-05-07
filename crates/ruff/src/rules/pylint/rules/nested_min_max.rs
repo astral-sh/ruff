@@ -34,7 +34,10 @@ impl Violation for NestedMinMax {
 
 impl MinMax {
     /// Converts a function call [`Expr`] into a [`MinMax`] if it is a call to `min` or `max`.
-    fn try_from_func(func: &Expr, context: &Context) -> Option<MinMax> {
+    fn try_from_call(func: &Expr, keywords: &[Keyword], context: &Context) -> Option<MinMax> {
+        if !keywords.is_empty() {
+            return None;
+        }
         let ExprKind::Name { id, .. } = func.node() else {
             return None;
         };
@@ -45,14 +48,6 @@ impl MinMax {
         } else {
             None
         }
-    }
-
-    /// Returns `true` if the passed [`Expr`] is a call to the same built-in function.
-    fn is_call(self, expr: &Expr, context: &Context) -> bool {
-        let ExprKind::Call { func, keywords, ..} = expr.node() else {
-            return false;
-        };
-        keywords.is_empty() && MinMax::try_from_func(func, context) == Some(self)
     }
 }
 
@@ -67,8 +62,8 @@ impl std::fmt::Display for MinMax {
 
 /// Collect a new set of arguments to by either accepting existing args as-is or
 /// collecting child arguments, if it's a call to the same function.
-fn collect_nested_args(context: &Context, target_func: MinMax, args: &[Expr]) -> Vec<Expr> {
-    fn inner(context: &Context, target_func: MinMax, args: &[Expr], new_args: &mut Vec<Expr>) {
+fn collect_nested_args(context: &Context, min_max: MinMax, args: &[Expr]) -> Vec<Expr> {
+    fn inner(context: &Context, min_max: MinMax, args: &[Expr], new_args: &mut Vec<Expr>) {
         for arg in args {
             if let ExprKind::Call {
                 func,
@@ -76,9 +71,8 @@ fn collect_nested_args(context: &Context, target_func: MinMax, args: &[Expr]) ->
                 keywords,
             } = arg.node()
             {
-                if MinMax::try_from_func(func, context) == Some(target_func) && keywords.is_empty()
-                {
-                    inner(context, target_func, args, new_args);
+                if MinMax::try_from_call(func, keywords, context) == Some(min_max) {
+                    inner(context, min_max, args, new_args);
                     continue;
                 }
             }
@@ -87,7 +81,7 @@ fn collect_nested_args(context: &Context, target_func: MinMax, args: &[Expr]) ->
     }
 
     let mut new_args = Vec::with_capacity(args.len());
-    inner(context, target_func, args, &mut new_args);
+    inner(context, min_max, args, &mut new_args);
     new_args
 }
 
@@ -99,15 +93,16 @@ pub fn nested_min_max(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    if !keywords.is_empty() {
+    let Some(min_max) = MinMax::try_from_call(func, keywords, &checker.ctx) else {
         return;
     };
 
-    let Some(min_max) = MinMax::try_from_func(func, &checker.ctx) else {
-        return;
-    };
-
-    if args.iter().any(|arg| min_max.is_call(arg, &checker.ctx)) {
+    if args.iter().any(|arg| {
+        let ExprKind::Call { func, keywords, ..} = arg.node() else {
+            return false;
+        };
+        MinMax::try_from_call(func, keywords, &checker.ctx) == Some(min_max)
+    }) {
         let fixable = !has_comments(expr, checker.locator);
         let mut diagnostic = Diagnostic::new(
             NestedMinMax {
