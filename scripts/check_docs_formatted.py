@@ -1,14 +1,12 @@
 #!/usr/bin/env python3
 """Check code snippets in docs are formatted by black."""
 import argparse
-import contextlib
 import os
 import re
 import textwrap
-from collections.abc import Generator, Sequence
+from collections.abc import Sequence
 from pathlib import Path
 from re import Match
-from typing import NamedTuple
 
 import black
 from black.mode import Mode, TargetVersion
@@ -23,11 +21,8 @@ MD_RE = re.compile(
 )
 
 
-class CodeBlockError(NamedTuple):
+class CodeBlockError(Exception):
     """A code block parse error."""
-
-    offset: int
-    exc: Exception
 
 
 def format_str(
@@ -37,17 +32,13 @@ def format_str(
     """Format a single docs file string."""
     errors: list[CodeBlockError] = []
 
-    @contextlib.contextmanager
-    def _collect_error(match: Match[str]) -> Generator[None, None, None]:
-        try:
-            yield
-        except InvalidInput as e:
-            errors.append(CodeBlockError(match.start(), e))
-
     def _md_match(match: Match[str]) -> str:
         code = textwrap.dedent(match["code"])
-        with _collect_error(match):
+        try:
             code = black.format_str(code, mode=black_mode)
+        except InvalidInput as e:
+            errors.append(CodeBlockError(e))
+
         code = textwrap.indent(code, match["indent"])
         return f'{match["before"]}{code}{match["after"]}'
 
@@ -74,8 +65,8 @@ def format_file(
 
     if errors and not args.skip_errors:
         for error in errors:
-            lineno = contents[: error.offset].count("\n") + 1
-            print(f"{file}:{lineno}: code block parse error {error.exc}")
+            rule_name = file.name.split(".")[0]
+            print(f"Docs parse error for {rule_name} docs: {error}")
 
         return 2
 
