@@ -124,7 +124,7 @@ impl Serialize for SerializeMessage<'_> {
 struct MessageHeader {
     kind: DiagnosticKind,
     range: TextRange,
-    fix: Fix,
+    fix: Option<Fix>,
     file_id: usize,
     noqa_row: TextSize,
 }
@@ -233,7 +233,7 @@ pub fn get(
                 messages.push(Message {
                     kind: header.kind,
                     range: header.range,
-                    fix: Some(header.fix),
+                    fix: header.fix,
                     file: source_file.clone(),
                     noqa_offset: header.noqa_row,
                 });
