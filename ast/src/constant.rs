@@ -100,7 +100,7 @@ impl<U> crate::fold::Fold<U> for ConstantOptimizer {
     }
     fn fold_expr(&mut self, node: crate::Expr<U>) -> Result<crate::Expr<U>, Self::Error> {
         match node.node {
-            crate::ExprKind::Tuple { elts, ctx } => {
+            crate::ExprKind::Tuple(crate::ExprTuple { elts, ctx }) => {
                 let elts = elts
                     .into_iter()
                     .map(|x| self.fold_expr(x))
@@ -112,16 +112,16 @@ impl<U> crate::fold::Fold<U> for ConstantOptimizer {
                     let tuple = elts
                         .into_iter()
                         .map(|e| match e.node {
-                            crate::ExprKind::Constant { value, .. } => value,
+                            crate::ExprKind::Constant(crate::ExprConstant { value, .. }) => value,
                             _ => unreachable!(),
                         })
                         .collect();
-                    crate::ExprKind::Constant {
+                    crate::ExprKind::Constant(crate::ExprConstant {
                         value: Constant::Tuple(tuple),
                         kind: None,
-                    }
+                    })
                 } else {
-                    crate::ExprKind::Tuple { elts, ctx }
+                    crate::ExprKind::Tuple(crate::ExprTuple { elts, ctx })
                 };
                 Ok(crate::Expr {
                     node: expr,
@@ -151,66 +151,73 @@ mod tests {
             location: start,
             end_location: end,
             custom,
-            node: ExprKind::Tuple {
+            node: ExprTuple {
                 ctx: ExprContext::Load,
                 elts: vec![
                     Located {
                         location: start,
                         end_location: end,
                         custom,
-                        node: ExprKind::Constant {
+                        node: ExprConstant {
                             value: BigInt::from(1).into(),
                             kind: None,
-                        },
+                        }
+                        .into(),
                     },
                     Located {
                         location: start,
                         end_location: end,
                         custom,
-                        node: ExprKind::Constant {
+                        node: ExprConstant {
                             value: BigInt::from(2).into(),
                             kind: None,
-                        },
+                        }
+                        .into(),
                     },
                     Located {
                         location: start,
                         end_location: end,
                         custom,
-                        node: ExprKind::Tuple {
+                        node: ExprTuple {
                             ctx: ExprContext::Load,
                             elts: vec![
                                 Located {
                                     location: start,
                                     end_location: end,
                                     custom,
-                                    node: ExprKind::Constant {
+                                    node: ExprConstant {
                                         value: BigInt::from(3).into(),
                                         kind: None,
-                                    },
+                                    }
+                                    .into(),
                                 },
                                 Located {
                                     location: start,
                                     end_location: end,
                                     custom,
-                                    node: ExprKind::Constant {
+                                    node: ExprConstant {
                                         value: BigInt::from(4).into(),
                                         kind: None,
-                                    },
+                                    }
+                                    .into(),
                                 },
                                 Located {
                                     location: start,
                                     end_location: end,
                                     custom,
-                                    node: ExprKind::Constant {
+                                    node: ExprConstant {
                                         value: BigInt::from(5).into(),
                                         kind: None,
-                                    },
+                                    }
+                                    .into(),
                                 },
                             ],
-                        },
+                        }
+                        .into(),
                     },
                 ],
-            },
+            }
+            .into(),
         };
         let new_ast = ConstantOptimizer::new()
             .fold_expr(ast)
@@ -221,7 +228,7 @@ mod tests {
                 location: start,
                 end_location: end,
                 custom,
-                node: ExprKind::Constant {
+                node: ExprConstant {
                     value: Constant::Tuple(vec![
                         BigInt::from(1).into(),
                         BigInt::from(2).into(),
@@ -232,7 +239,8 @@ mod tests {
                         ])
                     ]),
                     kind: None
-                },
+                }
+                .into(),
             }
         );
     }

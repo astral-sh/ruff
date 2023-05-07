@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/string.rs
+source: parser/src/string.rs
 expression: parse_ast
 ---
 [
@@ -15,63 +15,71 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: FormattedValue {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 3,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 6,
-                    },
-                ),
-                custom: (),
-                node: Name {
-                    id: "foo",
-                    ctx: Load,
-                },
-            },
-            conversion: 0,
-            format_spec: Some(
-                Located {
+        node: FormattedValue(
+            ExprFormattedValue {
+                value: Located {
                     location: Location {
                         row: 1,
-                        column: 0,
+                        column: 3,
                     },
                     end_location: Some(
                         Location {
                             row: 1,
-                            column: 13,
+                            column: 6,
                         },
                     ),
                     custom: (),
-                    node: JoinedStr {
-                        values: [
-                            Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 0,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 13,
-                                    },
-                                ),
-                                custom: (),
-                                node: Constant {
-                                    value: Str(
-                                        "spec",
-                                    ),
-                                    kind: None,
-                                },
-                            },
-                        ],
-                    },
+                    node: Name(
+                        ExprName {
+                            id: "foo",
+                            ctx: Load,
+                        },
+                    ),
                 },
-            ),
-        },
+                conversion: 0,
+                format_spec: Some(
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 13,
+                            },
+                        ),
+                        custom: (),
+                        node: JoinedStr(
+                            ExprJoinedStr {
+                                values: [
+                                    Located {
+                                        location: Location {
+                                            row: 1,
+                                            column: 0,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 1,
+                                                column: 13,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Constant(
+                                            ExprConstant {
+                                                value: Str(
+                                                    "spec",
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+            },
+        ),
     },
 ]

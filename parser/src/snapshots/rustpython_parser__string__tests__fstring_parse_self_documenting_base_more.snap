@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/string.rs
+source: parser/src/string.rs
 expression: parse_ast
 ---
 [
@@ -15,84 +15,14 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Constant {
-            value: Str(
-                "mix ",
-            ),
-            kind: None,
-        },
-    },
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 38,
-            },
-        ),
-        custom: (),
-        node: Constant {
-            value: Str(
-                "user=",
-            ),
-            kind: None,
-        },
-    },
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 38,
-            },
-        ),
-        custom: (),
-        node: Constant {
-            value: Str(
-                "",
-            ),
-            kind: None,
-        },
-    },
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 38,
-            },
-        ),
-        custom: (),
-        node: FormattedValue {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 7,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 11,
-                    },
+        node: Constant(
+            ExprConstant {
+                value: Str(
+                    "mix ",
                 ),
-                custom: (),
-                node: Name {
-                    id: "user",
-                    ctx: Load,
-                },
+                kind: None,
             },
-            conversion: 114,
-            format_spec: None,
-        },
+        ),
     },
     Located {
         location: Location {
@@ -106,83 +36,173 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Constant {
-            value: Str(
-                " with text and ",
-            ),
-            kind: None,
-        },
-    },
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 38,
-            },
-        ),
-        custom: (),
-        node: Constant {
-            value: Str(
-                "second=",
-            ),
-            kind: None,
-        },
-    },
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 38,
-            },
-        ),
-        custom: (),
-        node: Constant {
-            value: Str(
-                "",
-            ),
-            kind: None,
-        },
-    },
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 38,
-            },
-        ),
-        custom: (),
-        node: FormattedValue {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 29,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 35,
-                    },
+        node: Constant(
+            ExprConstant {
+                value: Str(
+                    "user=",
                 ),
-                custom: (),
-                node: Name {
-                    id: "second",
-                    ctx: Load,
-                },
+                kind: None,
             },
-            conversion: 114,
-            format_spec: None,
+        ),
+    },
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
         },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 38,
+            },
+        ),
+        custom: (),
+        node: Constant(
+            ExprConstant {
+                value: Str(
+                    "",
+                ),
+                kind: None,
+            },
+        ),
+    },
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 38,
+            },
+        ),
+        custom: (),
+        node: FormattedValue(
+            ExprFormattedValue {
+                value: Located {
+                    location: Location {
+                        row: 1,
+                        column: 7,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 11,
+                        },
+                    ),
+                    custom: (),
+                    node: Name(
+                        ExprName {
+                            id: "user",
+                            ctx: Load,
+                        },
+                    ),
+                },
+                conversion: 114,
+                format_spec: None,
+            },
+        ),
+    },
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 38,
+            },
+        ),
+        custom: (),
+        node: Constant(
+            ExprConstant {
+                value: Str(
+                    " with text and ",
+                ),
+                kind: None,
+            },
+        ),
+    },
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 38,
+            },
+        ),
+        custom: (),
+        node: Constant(
+            ExprConstant {
+                value: Str(
+                    "second=",
+                ),
+                kind: None,
+            },
+        ),
+    },
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 38,
+            },
+        ),
+        custom: (),
+        node: Constant(
+            ExprConstant {
+                value: Str(
+                    "",
+                ),
+                kind: None,
+            },
+        ),
+    },
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 38,
+            },
+        ),
+        custom: (),
+        node: FormattedValue(
+            ExprFormattedValue {
+                value: Located {
+                    location: Location {
+                        row: 1,
+                        column: 29,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 35,
+                        },
+                    ),
+                    custom: (),
+                    node: Name(
+                        ExprName {
+                            id: "second",
+                            ctx: Load,
+                        },
+                    ),
+                },
+                conversion: 114,
+                format_spec: None,
+            },
+        ),
     },
 ]

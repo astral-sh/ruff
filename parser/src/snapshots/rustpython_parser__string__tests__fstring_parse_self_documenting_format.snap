@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/string.rs
+source: parser/src/string.rs
 expression: parse_ast
 ---
 [
@@ -15,101 +15,113 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Constant {
-            value: Str(
-                "user=",
-            ),
-            kind: None,
-        },
-    },
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 14,
-            },
-        ),
-        custom: (),
-        node: Constant {
-            value: Str(
-                "",
-            ),
-            kind: None,
-        },
-    },
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 14,
-            },
-        ),
-        custom: (),
-        node: FormattedValue {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 3,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 7,
-                    },
+        node: Constant(
+            ExprConstant {
+                value: Str(
+                    "user=",
                 ),
-                custom: (),
-                node: Name {
-                    id: "user",
-                    ctx: Load,
-                },
+                kind: None,
             },
-            conversion: 0,
-            format_spec: Some(
-                Located {
+        ),
+    },
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 14,
+            },
+        ),
+        custom: (),
+        node: Constant(
+            ExprConstant {
+                value: Str(
+                    "",
+                ),
+                kind: None,
+            },
+        ),
+    },
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 14,
+            },
+        ),
+        custom: (),
+        node: FormattedValue(
+            ExprFormattedValue {
+                value: Located {
                     location: Location {
                         row: 1,
-                        column: 0,
+                        column: 3,
                     },
                     end_location: Some(
                         Location {
                             row: 1,
-                            column: 14,
+                            column: 7,
                         },
                     ),
                     custom: (),
-                    node: JoinedStr {
-                        values: [
-                            Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 0,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 14,
-                                    },
-                                ),
-                                custom: (),
-                                node: Constant {
-                                    value: Str(
-                                        ">10",
-                                    ),
-                                    kind: None,
-                                },
-                            },
-                        ],
-                    },
+                    node: Name(
+                        ExprName {
+                            id: "user",
+                            ctx: Load,
+                        },
+                    ),
                 },
-            ),
-        },
+                conversion: 0,
+                format_spec: Some(
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 14,
+                            },
+                        ),
+                        custom: (),
+                        node: JoinedStr(
+                            ExprJoinedStr {
+                                values: [
+                                    Located {
+                                        location: Location {
+                                            row: 1,
+                                            column: 0,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 1,
+                                                column: 14,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Constant(
+                                            ExprConstant {
+                                                value: Str(
+                                                    ">10",
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
+                                    },
+                                ],
+                            },
+                        ),
+                    },
+                ),
+            },
+        ),
     },
 ]

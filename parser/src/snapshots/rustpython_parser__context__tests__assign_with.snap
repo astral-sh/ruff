@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/context.rs
+source: parser/src/context.rs
 expression: parse_ast
 ---
 [
@@ -15,66 +15,72 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: With {
-            items: [
-                Withitem {
-                    context_expr: Located {
-                        location: Location {
-                            row: 1,
-                            column: 5,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 6,
-                            },
-                        ),
-                        custom: (),
-                        node: Constant {
-                            value: Int(
-                                1,
-                            ),
-                            kind: None,
-                        },
-                    },
-                    optional_vars: Some(
-                        Located {
+        node: With(
+            StmtWith {
+                items: [
+                    Withitem {
+                        context_expr: Located {
                             location: Location {
                                 row: 1,
-                                column: 10,
+                                column: 5,
                             },
                             end_location: Some(
                                 Location {
                                     row: 1,
-                                    column: 11,
+                                    column: 6,
                                 },
                             ),
                             custom: (),
-                            node: Name {
-                                id: "x",
-                                ctx: Store,
+                            node: Constant(
+                                ExprConstant {
+                                    value: Int(
+                                        1,
+                                    ),
+                                    kind: None,
+                                },
+                            ),
+                        },
+                        optional_vars: Some(
+                            Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 10,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 1,
+                                        column: 11,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name(
+                                    ExprName {
+                                        id: "x",
+                                        ctx: Store,
+                                    },
+                                ),
                             },
-                        },
-                    ),
-                },
-            ],
-            body: [
-                Located {
-                    location: Location {
-                        row: 1,
-                        column: 13,
+                        ),
                     },
-                    end_location: Some(
-                        Location {
+                ],
+                body: [
+                    Located {
+                        location: Location {
                             row: 1,
-                            column: 17,
+                            column: 13,
                         },
-                    ),
-                    custom: (),
-                    node: Pass,
-                },
-            ],
-            type_comment: None,
-        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 17,
+                            },
+                        ),
+                        custom: (),
+                        node: Pass,
+                    },
+                ],
+                type_comment: None,
+            },
+        ),
     },
 ]

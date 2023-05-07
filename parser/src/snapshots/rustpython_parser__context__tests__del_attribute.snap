@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/context.rs
+source: parser/src/context.rs
 expression: parse_ast
 ---
 [
@@ -15,43 +15,49 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Delete {
-            targets: [
-                Located {
-                    location: Location {
-                        row: 1,
-                        column: 4,
-                    },
-                    end_location: Some(
-                        Location {
+        node: Delete(
+            StmtDelete {
+                targets: [
+                    Located {
+                        location: Location {
                             row: 1,
-                            column: 7,
+                            column: 4,
                         },
-                    ),
-                    custom: (),
-                    node: Attribute {
-                        value: Located {
-                            location: Location {
+                        end_location: Some(
+                            Location {
                                 row: 1,
-                                column: 4,
+                                column: 7,
                             },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 5,
+                        ),
+                        custom: (),
+                        node: Attribute(
+                            ExprAttribute {
+                                value: Located {
+                                    location: Location {
+                                        row: 1,
+                                        column: 4,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 1,
+                                            column: 5,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Name(
+                                        ExprName {
+                                            id: "x",
+                                            ctx: Load,
+                                        },
+                                    ),
                                 },
-                            ),
-                            custom: (),
-                            node: Name {
-                                id: "x",
-                                ctx: Load,
+                                attr: "y",
+                                ctx: Del,
                             },
-                        },
-                        attr: "y",
-                        ctx: Del,
+                        ),
                     },
-                },
-            ],
-        },
+                ],
+            },
+        ),
     },
 ]

@@ -46,7 +46,7 @@ pub(super) use lalrpop_util::ParseError as LalrpopError;
 /// ```
 pub fn parse_program(source: &str, source_path: &str) -> Result<ast::Suite, ParseError> {
     parse(source, Mode::Module, source_path).map(|top| match top {
-        ast::Mod::Module { body, .. } => body,
+        ast::Mod::Module(ast::ModModule { body, .. }) => body,
         _ => unreachable!(),
     })
 }
@@ -94,7 +94,7 @@ pub fn parse_expression_located(
     location: Location,
 ) -> Result<ast::Expr, ParseError> {
     parse_located(source, Mode::Expression, path, location).map(|top| match top {
-        ast::Mod::Expression { body } => *body,
+        ast::Mod::Expression(ast::ModExpression { body }) => *body,
         _ => unreachable!(),
     })
 }

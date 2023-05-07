@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/function.rs
+source: parser/src/function.rs
 expression: parse_ast
 ---
 Ok(
@@ -16,37 +16,39 @@ Ok(
                 },
             ),
             custom: (),
-            node: FunctionDef {
-                name: "f",
-                args: Arguments {
-                    posonlyargs: [],
-                    args: [],
-                    vararg: None,
-                    kwonlyargs: [],
-                    kw_defaults: [],
-                    kwarg: None,
-                    defaults: [],
-                },
-                body: [
-                    Located {
-                        location: Location {
-                            row: 1,
-                            column: 9,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 13,
-                            },
-                        ),
-                        custom: (),
-                        node: Pass,
+            node: FunctionDef(
+                StmtFunctionDef {
+                    name: "f",
+                    args: Arguments {
+                        posonlyargs: [],
+                        args: [],
+                        vararg: None,
+                        kwonlyargs: [],
+                        kw_defaults: [],
+                        kwarg: None,
+                        defaults: [],
                     },
-                ],
-                decorator_list: [],
-                returns: None,
-                type_comment: None,
-            },
+                    body: [
+                        Located {
+                            location: Location {
+                                row: 1,
+                                column: 9,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 1,
+                                    column: 13,
+                                },
+                            ),
+                            custom: (),
+                            node: Pass,
+                        },
+                    ],
+                    decorator_list: [],
+                    returns: None,
+                    type_comment: None,
+                },
+            ),
         },
     ],
 )

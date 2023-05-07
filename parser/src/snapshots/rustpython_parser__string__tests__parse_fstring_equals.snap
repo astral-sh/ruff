@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/string.rs
+source: parser/src/string.rs
 expression: parse_ast
 ---
 [
@@ -15,67 +15,75 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: FormattedValue {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 3,
-                },
-                end_location: Some(
-                    Location {
+        node: FormattedValue(
+            ExprFormattedValue {
+                value: Located {
+                    location: Location {
                         row: 1,
-                        column: 11,
+                        column: 3,
                     },
-                ),
-                custom: (),
-                node: Compare {
-                    left: Located {
-                        location: Location {
+                    end_location: Some(
+                        Location {
                             row: 1,
-                            column: 3,
+                            column: 11,
                         },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 5,
-                            },
-                        ),
-                        custom: (),
-                        node: Constant {
-                            value: Int(
-                                42,
-                            ),
-                            kind: None,
-                        },
-                    },
-                    ops: [
-                        Eq,
-                    ],
-                    comparators: [
-                        Located {
-                            location: Location {
-                                row: 1,
-                                column: 9,
-                            },
-                            end_location: Some(
-                                Location {
+                    ),
+                    custom: (),
+                    node: Compare(
+                        ExprCompare {
+                            left: Located {
+                                location: Location {
                                     row: 1,
-                                    column: 11,
+                                    column: 3,
                                 },
-                            ),
-                            custom: (),
-                            node: Constant {
-                                value: Int(
-                                    42,
+                                end_location: Some(
+                                    Location {
+                                        row: 1,
+                                        column: 5,
+                                    },
                                 ),
-                                kind: None,
+                                custom: (),
+                                node: Constant(
+                                    ExprConstant {
+                                        value: Int(
+                                            42,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
                             },
+                            ops: [
+                                Eq,
+                            ],
+                            comparators: [
+                                Located {
+                                    location: Location {
+                                        row: 1,
+                                        column: 9,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 1,
+                                            column: 11,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Constant(
+                                        ExprConstant {
+                                            value: Int(
+                                                42,
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
+                                },
+                            ],
                         },
-                    ],
+                    ),
                 },
+                conversion: 0,
+                format_spec: None,
             },
-            conversion: 0,
-            format_spec: None,
-        },
+        ),
     },
 ]

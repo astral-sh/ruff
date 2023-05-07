@@ -13,7 +13,7 @@ impl<U> ExprKind<U> {
             ExprKind::Compare { .. } => "comparison",
             ExprKind::Attribute { .. } => "attribute",
             ExprKind::Call { .. } => "function call",
-            ExprKind::Constant { value, .. } => match value {
+            ExprKind::Constant(crate::ExprConstant { value, .. }) => match value {
                 Constant::Str(_)
                 | Constant::Int(_)
                 | Constant::Float(_)
@@ -40,7 +40,7 @@ impl<U> ExprKind<U> {
             ExprKind::GeneratorExp { .. } => "generator expression",
             ExprKind::Starred { .. } => "starred",
             ExprKind::Slice { .. } => "slice",
-            ExprKind::JoinedStr { values } => {
+            ExprKind::JoinedStr(crate::ExprJoinedStr { values }) => {
                 if values
                     .iter()
                     .any(|e| matches!(e.node, ExprKind::JoinedStr { .. }))

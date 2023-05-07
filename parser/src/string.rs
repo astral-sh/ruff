@@ -4,7 +4,7 @@
 // regular strings. Since the parser has no definition of f-string formats (Pending PEP 701)
 // we have to do the parsing here, manually.
 use crate::{
-    ast::{Constant, ConversionFlag, Expr, ExprKind, Location},
+    ast::{self, Constant, ConversionFlag, Expr, ExprKind, Location},
     lexer::{LexicalError, LexicalErrorType},
     parser::{parse_expression_located, LalrpopError, ParseError, ParseErrorType},
     token::{StringKind, Tok},
@@ -230,9 +230,14 @@ impl<'a> StringParser<'a> {
                 ':' if delimiters.is_empty() => {
                     let parsed_spec = self.parse_spec(nested)?;
 
-                    spec = Some(Box::new(self.expr(ExprKind::JoinedStr {
-                        values: parsed_spec,
-                    })));
+                    spec = Some(Box::new(
+                        self.expr(
+                            ast::ExprJoinedStr {
+                                values: parsed_spec,
+                            }
+                            .into(),
+                        ),
+                    ));
                 }
                 '(' | '{' | '[' => {
                     expression.push(ch);
@@ -296,29 +301,8 @@ impl<'a> StringParser<'a> {
                     }
 
                     let ret = if !self_documenting {
-                        vec![self.expr(ExprKind::FormattedValue {
-                            value: Box::new(parse_fstring_expr(&expression, location).map_err(
-                                |e| {
-                                    FStringError::new(
-                                        InvalidExpression(Box::new(e.error)),
-                                        location,
-                                    )
-                                },
-                            )?),
-                            conversion: conversion as _,
-                            format_spec: spec,
-                        })]
-                    } else {
-                        vec![
-                            self.expr(ExprKind::Constant {
-                                value: Constant::Str(expression.to_owned() + "="),
-                                kind: None,
-                            }),
-                            self.expr(ExprKind::Constant {
-                                value: trailing_seq.into(),
-                                kind: None,
-                            }),
-                            self.expr(ExprKind::FormattedValue {
+                        vec![self.expr(
+                            ast::ExprFormattedValue {
                                 value: Box::new(
                                     parse_fstring_expr(&expression, location).map_err(|e| {
                                         FStringError::new(
@@ -327,14 +311,48 @@ impl<'a> StringParser<'a> {
                                         )
                                     })?,
                                 ),
-                                conversion: (if conversion == ConversionFlag::None && spec.is_none()
-                                {
-                                    ConversionFlag::Repr
-                                } else {
-                                    conversion
-                                }) as _,
+                                conversion: conversion as _,
                                 format_spec: spec,
-                            }),
+                            }
+                            .into(),
+                        )]
+                    } else {
+                        vec![
+                            self.expr(
+                                ast::ExprConstant {
+                                    value: Constant::Str(expression.to_owned() + "="),
+                                    kind: None,
+                                }
+                                .into(),
+                            ),
+                            self.expr(
+                                ast::ExprConstant {
+                                    value: trailing_seq.into(),
+                                    kind: None,
+                                }
+                                .into(),
+                            ),
+                            self.expr(
+                                ast::ExprFormattedValue {
+                                    value: Box::new(
+                                        parse_fstring_expr(&expression, location).map_err(|e| {
+                                            FStringError::new(
+                                                InvalidExpression(Box::new(e.error)),
+                                                location,
+                                            )
+                                        })?,
+                                    ),
+                                    conversion: (if conversion == ConversionFlag::None
+                                        && spec.is_none()
+                                    {
+                                        ConversionFlag::Repr
+                                    } else {
+                                        conversion
+                                    }) as _,
+                                    format_spec: spec,
+                                }
+                                .into(),
+                            ),
                         ]
                     };
                     return Ok(ret);
@@ -374,10 +392,15 @@ impl<'a> StringParser<'a> {
             match next {
                 '{' => {
                     if !constant_piece.is_empty() {
-                        spec_constructor.push(self.expr(ExprKind::Constant {
-                            value: constant_piece.drain(..).collect::<String>().into(),
-                            kind: None,
-                        }));
+                        spec_constructor.push(
+                            self.expr(
+                                ast::ExprConstant {
+                                    value: constant_piece.drain(..).collect::<String>().into(),
+                                    kind: None,
+                                }
+                                .into(),
+                            ),
+                        );
                     }
                     let parsed_expr = self.parse_fstring(nested + 1)?;
                     spec_constructor.extend(parsed_expr);
@@ -393,10 +416,15 @@ impl<'a> StringParser<'a> {
             self.next_char();
         }
         if !constant_piece.is_empty() {
-            spec_constructor.push(self.expr(ExprKind::Constant {
-                value: constant_piece.drain(..).collect::<String>().into(),
-                kind: None,
-            }));
+            spec_constructor.push(
+                self.expr(
+                    ast::ExprConstant {
+                        value: constant_piece.drain(..).collect::<String>().into(),
+                        kind: None,
+                    }
+                    .into(),
+                ),
+            );
         }
         Ok(spec_constructor)
     }
@@ -429,10 +457,15 @@ impl<'a> StringParser<'a> {
                         }
                     }
                     if !content.is_empty() {
-                        values.push(self.expr(ExprKind::Constant {
-                            value: content.drain(..).collect::<String>().into(),
-                            kind: None,
-                        }));
+                        values.push(
+                            self.expr(
+                                ast::ExprConstant {
+                                    value: content.drain(..).collect::<String>().into(),
+                                    kind: None,
+                                }
+                                .into(),
+                            ),
+                        );
                     }
 
                     let parsed_values = self.parse_formatted_value(nested)?;
@@ -462,10 +495,15 @@ impl<'a> StringParser<'a> {
         }
 
         if !content.is_empty() {
-            values.push(self.expr(ExprKind::Constant {
-                value: content.into(),
-                kind: None,
-            }))
+            values.push(
+                self.expr(
+                    ast::ExprConstant {
+                        value: content.into(),
+                        kind: None,
+                    }
+                    .into(),
+                ),
+            )
         }
 
         Ok(values)
@@ -492,10 +530,13 @@ impl<'a> StringParser<'a> {
             }
         }
 
-        Ok(self.expr(ExprKind::Constant {
-            value: Constant::Bytes(content.chars().map(|c| c as u8).collect()),
-            kind: None,
-        }))
+        Ok(self.expr(
+            ast::ExprConstant {
+                value: Constant::Bytes(content.chars().map(|c| c as u8).collect()),
+                kind: None,
+            }
+            .into(),
+        ))
     }
 
     fn parse_string(&mut self) -> Result<Expr, LexicalError> {
@@ -508,10 +549,13 @@ impl<'a> StringParser<'a> {
                 ch => content.push(ch),
             }
         }
-        Ok(self.expr(ExprKind::Constant {
-            value: Constant::Str(content),
-            kind: self.kind.is_unicode().then(|| "u".to_string()),
-        }))
+        Ok(self.expr(
+            ast::ExprConstant {
+                value: Constant::Str(content),
+                kind: self.kind.is_unicode().then(|| "u".to_string()),
+            }
+            .into(),
+        ))
     }
 
     fn parse(&mut self) -> Result<Vec<Expr>, LexicalError> {
@@ -568,10 +612,10 @@ pub(crate) fn parse_strings(
         for (start, (source, kind, triple_quoted), end) in values {
             for value in parse_string(&source, kind, triple_quoted, start, end)? {
                 match value.node {
-                    ExprKind::Constant {
+                    ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Bytes(value),
                         ..
-                    } => content.extend(value),
+                    }) => content.extend(value),
                     _ => unreachable!("Unexpected non-bytes expression."),
                 }
             }
@@ -579,10 +623,11 @@ pub(crate) fn parse_strings(
         return Ok(Expr::new(
             initial_start,
             last_end,
-            ExprKind::Constant {
+            ast::ExprConstant {
                 value: Constant::Bytes(content),
                 kind: None,
-            },
+            }
+            .into(),
         ));
     }
 
@@ -591,10 +636,10 @@ pub(crate) fn parse_strings(
         for (start, (source, kind, triple_quoted), end) in values {
             for value in parse_string(&source, kind, triple_quoted, start, end)? {
                 match value.node {
-                    ExprKind::Constant {
+                    ExprKind::Constant(ast::ExprConstant {
                         value: Constant::Str(value),
                         ..
-                    } => content.push(value),
+                    }) => content.push(value),
                     _ => unreachable!("Unexpected non-string expression."),
                 }
             }
@@ -602,10 +647,11 @@ pub(crate) fn parse_strings(
         return Ok(Expr::new(
             initial_start,
             last_end,
-            ExprKind::Constant {
+            ast::ExprConstant {
                 value: Constant::Str(content.join("")),
                 kind: initial_kind,
-            },
+            }
+            .into(),
         ));
     }
 
@@ -617,10 +663,11 @@ pub(crate) fn parse_strings(
         Expr::new(
             initial_start,
             last_end,
-            ExprKind::Constant {
+            ast::ExprConstant {
                 value: Constant::Str(current.drain(..).join("")),
                 kind: initial_kind.clone(),
-            },
+            }
+            .into(),
         )
     };
 
@@ -633,10 +680,10 @@ pub(crate) fn parse_strings(
                     }
                     deduped.push(value)
                 }
-                ExprKind::Constant {
+                ExprKind::Constant(ast::ExprConstant {
                     value: Constant::Str(value),
                     ..
-                } => current.push(value),
+                }) => current.push(value),
                 _ => unreachable!("Unexpected non-string expression."),
             }
         }
@@ -648,7 +695,7 @@ pub(crate) fn parse_strings(
     Ok(Expr::new(
         initial_start,
         last_end,
-        ExprKind::JoinedStr { values: deduped },
+        ast::ExprJoinedStr { values: deduped }.into(),
     ))
 }
 

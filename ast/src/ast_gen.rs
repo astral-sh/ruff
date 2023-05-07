@@ -45,145 +45,397 @@ impl<T, U> std::ops::Deref for Located<T, U> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ModModule<U = ()> {
+    pub body: Vec<Stmt<U>>,
+    pub type_ignores: Vec<TypeIgnore>,
+}
+
+impl<U> From<ModModule<U>> for Mod<U> {
+    fn from(payload: ModModule<U>) -> Self {
+        Mod::Module(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModInteractive<U = ()> {
+    pub body: Vec<Stmt<U>>,
+}
+
+impl<U> From<ModInteractive<U>> for Mod<U> {
+    fn from(payload: ModInteractive<U>) -> Self {
+        Mod::Interactive(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModExpression<U = ()> {
+    pub body: Box<Expr<U>>,
+}
+
+impl<U> From<ModExpression<U>> for Mod<U> {
+    fn from(payload: ModExpression<U>) -> Self {
+        Mod::Expression(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ModFunctionType<U = ()> {
+    pub argtypes: Vec<Expr<U>>,
+    pub returns: Box<Expr<U>>,
+}
+
+impl<U> From<ModFunctionType<U>> for Mod<U> {
+    fn from(payload: ModFunctionType<U>) -> Self {
+        Mod::FunctionType(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum Mod<U = ()> {
-    Module {
-        body: Vec<Stmt<U>>,
-        type_ignores: Vec<TypeIgnore>,
-    },
-    Interactive {
-        body: Vec<Stmt<U>>,
-    },
-    Expression {
-        body: Box<Expr<U>>,
-    },
-    FunctionType {
-        argtypes: Vec<Expr<U>>,
-        returns: Box<Expr<U>>,
-    },
+    Module(ModModule<U>),
+    Interactive(ModInteractive<U>),
+    Expression(ModExpression<U>),
+    FunctionType(ModFunctionType<U>),
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtFunctionDef<U = ()> {
+    pub name: Ident,
+    pub args: Box<Arguments<U>>,
+    pub body: Vec<Stmt<U>>,
+    pub decorator_list: Vec<Expr<U>>,
+    pub returns: Option<Box<Expr<U>>>,
+    pub type_comment: Option<String>,
+}
+
+impl<U> From<StmtFunctionDef<U>> for StmtKind<U> {
+    fn from(payload: StmtFunctionDef<U>) -> Self {
+        StmtKind::FunctionDef(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAsyncFunctionDef<U = ()> {
+    pub name: Ident,
+    pub args: Box<Arguments<U>>,
+    pub body: Vec<Stmt<U>>,
+    pub decorator_list: Vec<Expr<U>>,
+    pub returns: Option<Box<Expr<U>>>,
+    pub type_comment: Option<String>,
+}
+
+impl<U> From<StmtAsyncFunctionDef<U>> for StmtKind<U> {
+    fn from(payload: StmtAsyncFunctionDef<U>) -> Self {
+        StmtKind::AsyncFunctionDef(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtClassDef<U = ()> {
+    pub name: Ident,
+    pub bases: Vec<Expr<U>>,
+    pub keywords: Vec<Keyword<U>>,
+    pub body: Vec<Stmt<U>>,
+    pub decorator_list: Vec<Expr<U>>,
+}
+
+impl<U> From<StmtClassDef<U>> for StmtKind<U> {
+    fn from(payload: StmtClassDef<U>) -> Self {
+        StmtKind::ClassDef(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtReturn<U = ()> {
+    pub value: Option<Box<Expr<U>>>,
+}
+
+impl<U> From<StmtReturn<U>> for StmtKind<U> {
+    fn from(payload: StmtReturn<U>) -> Self {
+        StmtKind::Return(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtDelete<U = ()> {
+    pub targets: Vec<Expr<U>>,
+}
+
+impl<U> From<StmtDelete<U>> for StmtKind<U> {
+    fn from(payload: StmtDelete<U>) -> Self {
+        StmtKind::Delete(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAssign<U = ()> {
+    pub targets: Vec<Expr<U>>,
+    pub value: Box<Expr<U>>,
+    pub type_comment: Option<String>,
+}
+
+impl<U> From<StmtAssign<U>> for StmtKind<U> {
+    fn from(payload: StmtAssign<U>) -> Self {
+        StmtKind::Assign(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAugAssign<U = ()> {
+    pub target: Box<Expr<U>>,
+    pub op: Operator,
+    pub value: Box<Expr<U>>,
+}
+
+impl<U> From<StmtAugAssign<U>> for StmtKind<U> {
+    fn from(payload: StmtAugAssign<U>) -> Self {
+        StmtKind::AugAssign(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAnnAssign<U = ()> {
+    pub target: Box<Expr<U>>,
+    pub annotation: Box<Expr<U>>,
+    pub value: Option<Box<Expr<U>>>,
+    pub simple: usize,
+}
+
+impl<U> From<StmtAnnAssign<U>> for StmtKind<U> {
+    fn from(payload: StmtAnnAssign<U>) -> Self {
+        StmtKind::AnnAssign(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtFor<U = ()> {
+    pub target: Box<Expr<U>>,
+    pub iter: Box<Expr<U>>,
+    pub body: Vec<Stmt<U>>,
+    pub orelse: Vec<Stmt<U>>,
+    pub type_comment: Option<String>,
+}
+
+impl<U> From<StmtFor<U>> for StmtKind<U> {
+    fn from(payload: StmtFor<U>) -> Self {
+        StmtKind::For(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAsyncFor<U = ()> {
+    pub target: Box<Expr<U>>,
+    pub iter: Box<Expr<U>>,
+    pub body: Vec<Stmt<U>>,
+    pub orelse: Vec<Stmt<U>>,
+    pub type_comment: Option<String>,
+}
+
+impl<U> From<StmtAsyncFor<U>> for StmtKind<U> {
+    fn from(payload: StmtAsyncFor<U>) -> Self {
+        StmtKind::AsyncFor(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtWhile<U = ()> {
+    pub test: Box<Expr<U>>,
+    pub body: Vec<Stmt<U>>,
+    pub orelse: Vec<Stmt<U>>,
+}
+
+impl<U> From<StmtWhile<U>> for StmtKind<U> {
+    fn from(payload: StmtWhile<U>) -> Self {
+        StmtKind::While(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtIf<U = ()> {
+    pub test: Box<Expr<U>>,
+    pub body: Vec<Stmt<U>>,
+    pub orelse: Vec<Stmt<U>>,
+}
+
+impl<U> From<StmtIf<U>> for StmtKind<U> {
+    fn from(payload: StmtIf<U>) -> Self {
+        StmtKind::If(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtWith<U = ()> {
+    pub items: Vec<Withitem<U>>,
+    pub body: Vec<Stmt<U>>,
+    pub type_comment: Option<String>,
+}
+
+impl<U> From<StmtWith<U>> for StmtKind<U> {
+    fn from(payload: StmtWith<U>) -> Self {
+        StmtKind::With(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAsyncWith<U = ()> {
+    pub items: Vec<Withitem<U>>,
+    pub body: Vec<Stmt<U>>,
+    pub type_comment: Option<String>,
+}
+
+impl<U> From<StmtAsyncWith<U>> for StmtKind<U> {
+    fn from(payload: StmtAsyncWith<U>) -> Self {
+        StmtKind::AsyncWith(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtMatch<U = ()> {
+    pub subject: Box<Expr<U>>,
+    pub cases: Vec<MatchCase<U>>,
+}
+
+impl<U> From<StmtMatch<U>> for StmtKind<U> {
+    fn from(payload: StmtMatch<U>) -> Self {
+        StmtKind::Match(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtRaise<U = ()> {
+    pub exc: Option<Box<Expr<U>>>,
+    pub cause: Option<Box<Expr<U>>>,
+}
+
+impl<U> From<StmtRaise<U>> for StmtKind<U> {
+    fn from(payload: StmtRaise<U>) -> Self {
+        StmtKind::Raise(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtTry<U = ()> {
+    pub body: Vec<Stmt<U>>,
+    pub handlers: Vec<Excepthandler<U>>,
+    pub orelse: Vec<Stmt<U>>,
+    pub finalbody: Vec<Stmt<U>>,
+}
+
+impl<U> From<StmtTry<U>> for StmtKind<U> {
+    fn from(payload: StmtTry<U>) -> Self {
+        StmtKind::Try(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtTryStar<U = ()> {
+    pub body: Vec<Stmt<U>>,
+    pub handlers: Vec<Excepthandler<U>>,
+    pub orelse: Vec<Stmt<U>>,
+    pub finalbody: Vec<Stmt<U>>,
+}
+
+impl<U> From<StmtTryStar<U>> for StmtKind<U> {
+    fn from(payload: StmtTryStar<U>) -> Self {
+        StmtKind::TryStar(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtAssert<U = ()> {
+    pub test: Box<Expr<U>>,
+    pub msg: Option<Box<Expr<U>>>,
+}
+
+impl<U> From<StmtAssert<U>> for StmtKind<U> {
+    fn from(payload: StmtAssert<U>) -> Self {
+        StmtKind::Assert(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtImport<U = ()> {
+    pub names: Vec<Alias<U>>,
+}
+
+impl<U> From<StmtImport<U>> for StmtKind<U> {
+    fn from(payload: StmtImport<U>) -> Self {
+        StmtKind::Import(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtImportFrom<U = ()> {
+    pub module: Option<Ident>,
+    pub names: Vec<Alias<U>>,
+    pub level: Option<usize>,
+}
+
+impl<U> From<StmtImportFrom<U>> for StmtKind<U> {
+    fn from(payload: StmtImportFrom<U>) -> Self {
+        StmtKind::ImportFrom(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtGlobal {
+    pub names: Vec<Ident>,
+}
+
+impl From<StmtGlobal> for StmtKind {
+    fn from(payload: StmtGlobal) -> Self {
+        StmtKind::Global(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtNonlocal {
+    pub names: Vec<Ident>,
+}
+
+impl From<StmtNonlocal> for StmtKind {
+    fn from(payload: StmtNonlocal) -> Self {
+        StmtKind::Nonlocal(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct StmtExpr<U = ()> {
+    pub value: Box<Expr<U>>,
+}
+
+impl<U> From<StmtExpr<U>> for StmtKind<U> {
+    fn from(payload: StmtExpr<U>) -> Self {
+        StmtKind::Expr(payload)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum StmtKind<U = ()> {
-    FunctionDef {
-        name: Ident,
-        args: Box<Arguments<U>>,
-        body: Vec<Stmt<U>>,
-        decorator_list: Vec<Expr<U>>,
-        returns: Option<Box<Expr<U>>>,
-        type_comment: Option<String>,
-    },
-    AsyncFunctionDef {
-        name: Ident,
-        args: Box<Arguments<U>>,
-        body: Vec<Stmt<U>>,
-        decorator_list: Vec<Expr<U>>,
-        returns: Option<Box<Expr<U>>>,
-        type_comment: Option<String>,
-    },
-    ClassDef {
-        name: Ident,
-        bases: Vec<Expr<U>>,
-        keywords: Vec<Keyword<U>>,
-        body: Vec<Stmt<U>>,
-        decorator_list: Vec<Expr<U>>,
-    },
-    Return {
-        value: Option<Box<Expr<U>>>,
-    },
-    Delete {
-        targets: Vec<Expr<U>>,
-    },
-    Assign {
-        targets: Vec<Expr<U>>,
-        value: Box<Expr<U>>,
-        type_comment: Option<String>,
-    },
-    AugAssign {
-        target: Box<Expr<U>>,
-        op: Operator,
-        value: Box<Expr<U>>,
-    },
-    AnnAssign {
-        target: Box<Expr<U>>,
-        annotation: Box<Expr<U>>,
-        value: Option<Box<Expr<U>>>,
-        simple: usize,
-    },
-    For {
-        target: Box<Expr<U>>,
-        iter: Box<Expr<U>>,
-        body: Vec<Stmt<U>>,
-        orelse: Vec<Stmt<U>>,
-        type_comment: Option<String>,
-    },
-    AsyncFor {
-        target: Box<Expr<U>>,
-        iter: Box<Expr<U>>,
-        body: Vec<Stmt<U>>,
-        orelse: Vec<Stmt<U>>,
-        type_comment: Option<String>,
-    },
-    While {
-        test: Box<Expr<U>>,
-        body: Vec<Stmt<U>>,
-        orelse: Vec<Stmt<U>>,
-    },
-    If {
-        test: Box<Expr<U>>,
-        body: Vec<Stmt<U>>,
-        orelse: Vec<Stmt<U>>,
-    },
-    With {
-        items: Vec<Withitem<U>>,
-        body: Vec<Stmt<U>>,
-        type_comment: Option<String>,
-    },
-    AsyncWith {
-        items: Vec<Withitem<U>>,
-        body: Vec<Stmt<U>>,
-        type_comment: Option<String>,
-    },
-    Match {
-        subject: Box<Expr<U>>,
-        cases: Vec<MatchCase<U>>,
-    },
-    Raise {
-        exc: Option<Box<Expr<U>>>,
-        cause: Option<Box<Expr<U>>>,
-    },
-    Try {
-        body: Vec<Stmt<U>>,
-        handlers: Vec<Excepthandler<U>>,
-        orelse: Vec<Stmt<U>>,
-        finalbody: Vec<Stmt<U>>,
-    },
-    TryStar {
-        body: Vec<Stmt<U>>,
-        handlers: Vec<Excepthandler<U>>,
-        orelse: Vec<Stmt<U>>,
-        finalbody: Vec<Stmt<U>>,
-    },
-    Assert {
-        test: Box<Expr<U>>,
-        msg: Option<Box<Expr<U>>>,
-    },
-    Import {
-        names: Vec<Alias<U>>,
-    },
-    ImportFrom {
-        module: Option<Ident>,
-        names: Vec<Alias<U>>,
-        level: Option<usize>,
-    },
-    Global {
-        names: Vec<Ident>,
-    },
-    Nonlocal {
-        names: Vec<Ident>,
-    },
-    Expr {
-        value: Box<Expr<U>>,
-    },
+    FunctionDef(StmtFunctionDef<U>),
+    AsyncFunctionDef(StmtAsyncFunctionDef<U>),
+    ClassDef(StmtClassDef<U>),
+    Return(StmtReturn<U>),
+    Delete(StmtDelete<U>),
+    Assign(StmtAssign<U>),
+    AugAssign(StmtAugAssign<U>),
+    AnnAssign(StmtAnnAssign<U>),
+    For(StmtFor<U>),
+    AsyncFor(StmtAsyncFor<U>),
+    While(StmtWhile<U>),
+    If(StmtIf<U>),
+    With(StmtWith<U>),
+    AsyncWith(StmtAsyncWith<U>),
+    Match(StmtMatch<U>),
+    Raise(StmtRaise<U>),
+    Try(StmtTry<U>),
+    TryStar(StmtTryStar<U>),
+    Assert(StmtAssert<U>),
+    Import(StmtImport<U>),
+    ImportFrom(StmtImportFrom<U>),
+    Global(StmtGlobal),
+    Nonlocal(StmtNonlocal),
+    Expr(StmtExpr<U>),
     Pass,
     Break,
     Continue,
@@ -191,119 +443,362 @@ pub enum StmtKind<U = ()> {
 pub type Stmt<U = ()> = Located<StmtKind<U>, U>;
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ExprBoolOp<U = ()> {
+    pub op: Boolop,
+    pub values: Vec<Expr<U>>,
+}
+
+impl<U> From<ExprBoolOp<U>> for ExprKind<U> {
+    fn from(payload: ExprBoolOp<U>) -> Self {
+        ExprKind::BoolOp(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprNamedExpr<U = ()> {
+    pub target: Box<Expr<U>>,
+    pub value: Box<Expr<U>>,
+}
+
+impl<U> From<ExprNamedExpr<U>> for ExprKind<U> {
+    fn from(payload: ExprNamedExpr<U>) -> Self {
+        ExprKind::NamedExpr(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprBinOp<U = ()> {
+    pub left: Box<Expr<U>>,
+    pub op: Operator,
+    pub right: Box<Expr<U>>,
+}
+
+impl<U> From<ExprBinOp<U>> for ExprKind<U> {
+    fn from(payload: ExprBinOp<U>) -> Self {
+        ExprKind::BinOp(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprUnaryOp<U = ()> {
+    pub op: Unaryop,
+    pub operand: Box<Expr<U>>,
+}
+
+impl<U> From<ExprUnaryOp<U>> for ExprKind<U> {
+    fn from(payload: ExprUnaryOp<U>) -> Self {
+        ExprKind::UnaryOp(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprLambda<U = ()> {
+    pub args: Box<Arguments<U>>,
+    pub body: Box<Expr<U>>,
+}
+
+impl<U> From<ExprLambda<U>> for ExprKind<U> {
+    fn from(payload: ExprLambda<U>) -> Self {
+        ExprKind::Lambda(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprIfExp<U = ()> {
+    pub test: Box<Expr<U>>,
+    pub body: Box<Expr<U>>,
+    pub orelse: Box<Expr<U>>,
+}
+
+impl<U> From<ExprIfExp<U>> for ExprKind<U> {
+    fn from(payload: ExprIfExp<U>) -> Self {
+        ExprKind::IfExp(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprDict<U = ()> {
+    pub keys: Vec<Option<Expr<U>>>,
+    pub values: Vec<Expr<U>>,
+}
+
+impl<U> From<ExprDict<U>> for ExprKind<U> {
+    fn from(payload: ExprDict<U>) -> Self {
+        ExprKind::Dict(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprSet<U = ()> {
+    pub elts: Vec<Expr<U>>,
+}
+
+impl<U> From<ExprSet<U>> for ExprKind<U> {
+    fn from(payload: ExprSet<U>) -> Self {
+        ExprKind::Set(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprListComp<U = ()> {
+    pub elt: Box<Expr<U>>,
+    pub generators: Vec<Comprehension<U>>,
+}
+
+impl<U> From<ExprListComp<U>> for ExprKind<U> {
+    fn from(payload: ExprListComp<U>) -> Self {
+        ExprKind::ListComp(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprSetComp<U = ()> {
+    pub elt: Box<Expr<U>>,
+    pub generators: Vec<Comprehension<U>>,
+}
+
+impl<U> From<ExprSetComp<U>> for ExprKind<U> {
+    fn from(payload: ExprSetComp<U>) -> Self {
+        ExprKind::SetComp(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprDictComp<U = ()> {
+    pub key: Box<Expr<U>>,
+    pub value: Box<Expr<U>>,
+    pub generators: Vec<Comprehension<U>>,
+}
+
+impl<U> From<ExprDictComp<U>> for ExprKind<U> {
+    fn from(payload: ExprDictComp<U>) -> Self {
+        ExprKind::DictComp(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprGeneratorExp<U = ()> {
+    pub elt: Box<Expr<U>>,
+    pub generators: Vec<Comprehension<U>>,
+}
+
+impl<U> From<ExprGeneratorExp<U>> for ExprKind<U> {
+    fn from(payload: ExprGeneratorExp<U>) -> Self {
+        ExprKind::GeneratorExp(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprAwait<U = ()> {
+    pub value: Box<Expr<U>>,
+}
+
+impl<U> From<ExprAwait<U>> for ExprKind<U> {
+    fn from(payload: ExprAwait<U>) -> Self {
+        ExprKind::Await(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprYield<U = ()> {
+    pub value: Option<Box<Expr<U>>>,
+}
+
+impl<U> From<ExprYield<U>> for ExprKind<U> {
+    fn from(payload: ExprYield<U>) -> Self {
+        ExprKind::Yield(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprYieldFrom<U = ()> {
+    pub value: Box<Expr<U>>,
+}
+
+impl<U> From<ExprYieldFrom<U>> for ExprKind<U> {
+    fn from(payload: ExprYieldFrom<U>) -> Self {
+        ExprKind::YieldFrom(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprCompare<U = ()> {
+    pub left: Box<Expr<U>>,
+    pub ops: Vec<Cmpop>,
+    pub comparators: Vec<Expr<U>>,
+}
+
+impl<U> From<ExprCompare<U>> for ExprKind<U> {
+    fn from(payload: ExprCompare<U>) -> Self {
+        ExprKind::Compare(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprCall<U = ()> {
+    pub func: Box<Expr<U>>,
+    pub args: Vec<Expr<U>>,
+    pub keywords: Vec<Keyword<U>>,
+}
+
+impl<U> From<ExprCall<U>> for ExprKind<U> {
+    fn from(payload: ExprCall<U>) -> Self {
+        ExprKind::Call(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprFormattedValue<U = ()> {
+    pub value: Box<Expr<U>>,
+    pub conversion: usize,
+    pub format_spec: Option<Box<Expr<U>>>,
+}
+
+impl<U> From<ExprFormattedValue<U>> for ExprKind<U> {
+    fn from(payload: ExprFormattedValue<U>) -> Self {
+        ExprKind::FormattedValue(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprJoinedStr<U = ()> {
+    pub values: Vec<Expr<U>>,
+}
+
+impl<U> From<ExprJoinedStr<U>> for ExprKind<U> {
+    fn from(payload: ExprJoinedStr<U>) -> Self {
+        ExprKind::JoinedStr(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprConstant {
+    pub value: Constant,
+    pub kind: Option<String>,
+}
+
+impl From<ExprConstant> for ExprKind {
+    fn from(payload: ExprConstant) -> Self {
+        ExprKind::Constant(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprAttribute<U = ()> {
+    pub value: Box<Expr<U>>,
+    pub attr: Ident,
+    pub ctx: ExprContext,
+}
+
+impl<U> From<ExprAttribute<U>> for ExprKind<U> {
+    fn from(payload: ExprAttribute<U>) -> Self {
+        ExprKind::Attribute(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprSubscript<U = ()> {
+    pub value: Box<Expr<U>>,
+    pub slice: Box<Expr<U>>,
+    pub ctx: ExprContext,
+}
+
+impl<U> From<ExprSubscript<U>> for ExprKind<U> {
+    fn from(payload: ExprSubscript<U>) -> Self {
+        ExprKind::Subscript(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprStarred<U = ()> {
+    pub value: Box<Expr<U>>,
+    pub ctx: ExprContext,
+}
+
+impl<U> From<ExprStarred<U>> for ExprKind<U> {
+    fn from(payload: ExprStarred<U>) -> Self {
+        ExprKind::Starred(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprName {
+    pub id: Ident,
+    pub ctx: ExprContext,
+}
+
+impl From<ExprName> for ExprKind {
+    fn from(payload: ExprName) -> Self {
+        ExprKind::Name(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprList<U = ()> {
+    pub elts: Vec<Expr<U>>,
+    pub ctx: ExprContext,
+}
+
+impl<U> From<ExprList<U>> for ExprKind<U> {
+    fn from(payload: ExprList<U>) -> Self {
+        ExprKind::List(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprTuple<U = ()> {
+    pub elts: Vec<Expr<U>>,
+    pub ctx: ExprContext,
+}
+
+impl<U> From<ExprTuple<U>> for ExprKind<U> {
+    fn from(payload: ExprTuple<U>) -> Self {
+        ExprKind::Tuple(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct ExprSlice<U = ()> {
+    pub lower: Option<Box<Expr<U>>>,
+    pub upper: Option<Box<Expr<U>>>,
+    pub step: Option<Box<Expr<U>>>,
+}
+
+impl<U> From<ExprSlice<U>> for ExprKind<U> {
+    fn from(payload: ExprSlice<U>) -> Self {
+        ExprKind::Slice(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum ExprKind<U = ()> {
-    BoolOp {
-        op: Boolop,
-        values: Vec<Expr<U>>,
-    },
-    NamedExpr {
-        target: Box<Expr<U>>,
-        value: Box<Expr<U>>,
-    },
-    BinOp {
-        left: Box<Expr<U>>,
-        op: Operator,
-        right: Box<Expr<U>>,
-    },
-    UnaryOp {
-        op: Unaryop,
-        operand: Box<Expr<U>>,
-    },
-    Lambda {
-        args: Box<Arguments<U>>,
-        body: Box<Expr<U>>,
-    },
-    IfExp {
-        test: Box<Expr<U>>,
-        body: Box<Expr<U>>,
-        orelse: Box<Expr<U>>,
-    },
-    Dict {
-        keys: Vec<Option<Expr<U>>>,
-        values: Vec<Expr<U>>,
-    },
-    Set {
-        elts: Vec<Expr<U>>,
-    },
-    ListComp {
-        elt: Box<Expr<U>>,
-        generators: Vec<Comprehension<U>>,
-    },
-    SetComp {
-        elt: Box<Expr<U>>,
-        generators: Vec<Comprehension<U>>,
-    },
-    DictComp {
-        key: Box<Expr<U>>,
-        value: Box<Expr<U>>,
-        generators: Vec<Comprehension<U>>,
-    },
-    GeneratorExp {
-        elt: Box<Expr<U>>,
-        generators: Vec<Comprehension<U>>,
-    },
-    Await {
-        value: Box<Expr<U>>,
-    },
-    Yield {
-        value: Option<Box<Expr<U>>>,
-    },
-    YieldFrom {
-        value: Box<Expr<U>>,
-    },
-    Compare {
-        left: Box<Expr<U>>,
-        ops: Vec<Cmpop>,
-        comparators: Vec<Expr<U>>,
-    },
-    Call {
-        func: Box<Expr<U>>,
-        args: Vec<Expr<U>>,
-        keywords: Vec<Keyword<U>>,
-    },
-    FormattedValue {
-        value: Box<Expr<U>>,
-        conversion: usize,
-        format_spec: Option<Box<Expr<U>>>,
-    },
-    JoinedStr {
-        values: Vec<Expr<U>>,
-    },
-    Constant {
-        value: Constant,
-        kind: Option<String>,
-    },
-    Attribute {
-        value: Box<Expr<U>>,
-        attr: Ident,
-        ctx: ExprContext,
-    },
-    Subscript {
-        value: Box<Expr<U>>,
-        slice: Box<Expr<U>>,
-        ctx: ExprContext,
-    },
-    Starred {
-        value: Box<Expr<U>>,
-        ctx: ExprContext,
-    },
-    Name {
-        id: Ident,
-        ctx: ExprContext,
-    },
-    List {
-        elts: Vec<Expr<U>>,
-        ctx: ExprContext,
-    },
-    Tuple {
-        elts: Vec<Expr<U>>,
-        ctx: ExprContext,
-    },
-    Slice {
-        lower: Option<Box<Expr<U>>>,
-        upper: Option<Box<Expr<U>>>,
-        step: Option<Box<Expr<U>>>,
-    },
+    BoolOp(ExprBoolOp<U>),
+    NamedExpr(ExprNamedExpr<U>),
+    BinOp(ExprBinOp<U>),
+    UnaryOp(ExprUnaryOp<U>),
+    Lambda(ExprLambda<U>),
+    IfExp(ExprIfExp<U>),
+    Dict(ExprDict<U>),
+    Set(ExprSet<U>),
+    ListComp(ExprListComp<U>),
+    SetComp(ExprSetComp<U>),
+    DictComp(ExprDictComp<U>),
+    GeneratorExp(ExprGeneratorExp<U>),
+    Await(ExprAwait<U>),
+    Yield(ExprYield<U>),
+    YieldFrom(ExprYieldFrom<U>),
+    Compare(ExprCompare<U>),
+    Call(ExprCall<U>),
+    FormattedValue(ExprFormattedValue<U>),
+    JoinedStr(ExprJoinedStr<U>),
+    Constant(ExprConstant),
+    Attribute(ExprAttribute<U>),
+    Subscript(ExprSubscript<U>),
+    Starred(ExprStarred<U>),
+    Name(ExprName),
+    List(ExprList<U>),
+    Tuple(ExprTuple<U>),
+    Slice(ExprSlice<U>),
 }
 pub type Expr<U = ()> = Located<ExprKind<U>, U>;
 
@@ -368,12 +863,21 @@ pub struct Comprehension<U = ()> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct ExcepthandlerExceptHandler<U = ()> {
+    pub type_: Option<Box<Expr<U>>>,
+    pub name: Option<Ident>,
+    pub body: Vec<Stmt<U>>,
+}
+
+impl<U> From<ExcepthandlerExceptHandler<U>> for ExcepthandlerKind<U> {
+    fn from(payload: ExcepthandlerExceptHandler<U>) -> Self {
+        ExcepthandlerKind::ExceptHandler(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum ExcepthandlerKind<U = ()> {
-    ExceptHandler {
-        type_: Option<Box<Expr<U>>>,
-        name: Option<Ident>,
-        body: Vec<Stmt<U>>,
-    },
+    ExceptHandler(ExcepthandlerExceptHandler<U>),
 }
 pub type Excepthandler<U = ()> = Located<ExcepthandlerKind<U>, U>;
 
@@ -424,43 +928,127 @@ pub struct MatchCase<U = ()> {
 }
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct PatternMatchValue<U = ()> {
+    pub value: Box<Expr<U>>,
+}
+
+impl<U> From<PatternMatchValue<U>> for PatternKind<U> {
+    fn from(payload: PatternMatchValue<U>) -> Self {
+        PatternKind::MatchValue(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternMatchSingleton {
+    pub value: Constant,
+}
+
+impl From<PatternMatchSingleton> for PatternKind {
+    fn from(payload: PatternMatchSingleton) -> Self {
+        PatternKind::MatchSingleton(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternMatchSequence<U = ()> {
+    pub patterns: Vec<Pattern<U>>,
+}
+
+impl<U> From<PatternMatchSequence<U>> for PatternKind<U> {
+    fn from(payload: PatternMatchSequence<U>) -> Self {
+        PatternKind::MatchSequence(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternMatchMapping<U = ()> {
+    pub keys: Vec<Expr<U>>,
+    pub patterns: Vec<Pattern<U>>,
+    pub rest: Option<Ident>,
+}
+
+impl<U> From<PatternMatchMapping<U>> for PatternKind<U> {
+    fn from(payload: PatternMatchMapping<U>) -> Self {
+        PatternKind::MatchMapping(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternMatchClass<U = ()> {
+    pub cls: Box<Expr<U>>,
+    pub patterns: Vec<Pattern<U>>,
+    pub kwd_attrs: Vec<Ident>,
+    pub kwd_patterns: Vec<Pattern<U>>,
+}
+
+impl<U> From<PatternMatchClass<U>> for PatternKind<U> {
+    fn from(payload: PatternMatchClass<U>) -> Self {
+        PatternKind::MatchClass(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternMatchStar {
+    pub name: Option<Ident>,
+}
+
+impl From<PatternMatchStar> for PatternKind {
+    fn from(payload: PatternMatchStar) -> Self {
+        PatternKind::MatchStar(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternMatchAs<U = ()> {
+    pub pattern: Option<Box<Pattern<U>>>,
+    pub name: Option<Ident>,
+}
+
+impl<U> From<PatternMatchAs<U>> for PatternKind<U> {
+    fn from(payload: PatternMatchAs<U>) -> Self {
+        PatternKind::MatchAs(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
+pub struct PatternMatchOr<U = ()> {
+    pub patterns: Vec<Pattern<U>>,
+}
+
+impl<U> From<PatternMatchOr<U>> for PatternKind<U> {
+    fn from(payload: PatternMatchOr<U>) -> Self {
+        PatternKind::MatchOr(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum PatternKind<U = ()> {
-    MatchValue {
-        value: Box<Expr<U>>,
-    },
-    MatchSingleton {
-        value: Constant,
-    },
-    MatchSequence {
-        patterns: Vec<Pattern<U>>,
-    },
-    MatchMapping {
-        keys: Vec<Expr<U>>,
-        patterns: Vec<Pattern<U>>,
-        rest: Option<Ident>,
-    },
-    MatchClass {
-        cls: Box<Expr<U>>,
-        patterns: Vec<Pattern<U>>,
-        kwd_attrs: Vec<Ident>,
-        kwd_patterns: Vec<Pattern<U>>,
-    },
-    MatchStar {
-        name: Option<Ident>,
-    },
-    MatchAs {
-        pattern: Option<Box<Pattern<U>>>,
-        name: Option<Ident>,
-    },
-    MatchOr {
-        patterns: Vec<Pattern<U>>,
-    },
+    MatchValue(PatternMatchValue<U>),
+    MatchSingleton(PatternMatchSingleton),
+    MatchSequence(PatternMatchSequence<U>),
+    MatchMapping(PatternMatchMapping<U>),
+    MatchClass(PatternMatchClass<U>),
+    MatchStar(PatternMatchStar),
+    MatchAs(PatternMatchAs<U>),
+    MatchOr(PatternMatchOr<U>),
 }
 pub type Pattern<U = ()> = Located<PatternKind<U>, U>;
 
 #[derive(Clone, Debug, PartialEq)]
+pub struct TypeIgnoreTypeIgnore {
+    pub lineno: usize,
+    pub tag: String,
+}
+
+impl From<TypeIgnoreTypeIgnore> for TypeIgnore {
+    fn from(payload: TypeIgnoreTypeIgnore) -> Self {
+        TypeIgnore::TypeIgnore(payload)
+    }
+}
+
+#[derive(Clone, Debug, PartialEq)]
 pub enum TypeIgnore {
-    TypeIgnore { lineno: usize, tag: String },
+    TypeIgnore(TypeIgnoreTypeIgnore),
 }
 
 #[cfg(feature = "fold")]
@@ -573,20 +1161,22 @@ pub mod fold {
         node: Mod<U>,
     ) -> Result<Mod<F::TargetU>, F::Error> {
         match node {
-            Mod::Module { body, type_ignores } => Ok(Mod::Module {
+            Mod::Module(ModModule { body, type_ignores }) => Ok(Mod::Module(ModModule {
                 body: Foldable::fold(body, folder)?,
                 type_ignores: Foldable::fold(type_ignores, folder)?,
-            }),
-            Mod::Interactive { body } => Ok(Mod::Interactive {
+            })),
+            Mod::Interactive(ModInteractive { body }) => Ok(Mod::Interactive(ModInteractive {
                 body: Foldable::fold(body, folder)?,
-            }),
-            Mod::Expression { body } => Ok(Mod::Expression {
+            })),
+            Mod::Expression(ModExpression { body }) => Ok(Mod::Expression(ModExpression {
                 body: Foldable::fold(body, folder)?,
-            }),
-            Mod::FunctionType { argtypes, returns } => Ok(Mod::FunctionType {
-                argtypes: Foldable::fold(argtypes, folder)?,
-                returns: Foldable::fold(returns, folder)?,
-            }),
+            })),
+            Mod::FunctionType(ModFunctionType { argtypes, returns }) => {
+                Ok(Mod::FunctionType(ModFunctionType {
+                    argtypes: Foldable::fold(argtypes, folder)?,
+                    returns: Foldable::fold(returns, folder)?,
+                }))
+            }
         }
     }
     impl<T, U> Foldable<T, U> for Stmt<T> {
@@ -603,189 +1193,191 @@ pub mod fold {
         node: Stmt<U>,
     ) -> Result<Stmt<F::TargetU>, F::Error> {
         fold_located(folder, node, |folder, node| match node {
-            StmtKind::FunctionDef {
+            StmtKind::FunctionDef(StmtFunctionDef {
                 name,
                 args,
                 body,
                 decorator_list,
                 returns,
                 type_comment,
-            } => Ok(StmtKind::FunctionDef {
+            }) => Ok(StmtKind::FunctionDef(StmtFunctionDef {
                 name: Foldable::fold(name, folder)?,
                 args: Foldable::fold(args, folder)?,
                 body: Foldable::fold(body, folder)?,
                 decorator_list: Foldable::fold(decorator_list, folder)?,
                 returns: Foldable::fold(returns, folder)?,
                 type_comment: Foldable::fold(type_comment, folder)?,
-            }),
-            StmtKind::AsyncFunctionDef {
+            })),
+            StmtKind::AsyncFunctionDef(StmtAsyncFunctionDef {
                 name,
                 args,
                 body,
                 decorator_list,
                 returns,
                 type_comment,
-            } => Ok(StmtKind::AsyncFunctionDef {
+            }) => Ok(StmtKind::AsyncFunctionDef(StmtAsyncFunctionDef {
                 name: Foldable::fold(name, folder)?,
                 args: Foldable::fold(args, folder)?,
                 body: Foldable::fold(body, folder)?,
                 decorator_list: Foldable::fold(decorator_list, folder)?,
                 returns: Foldable::fold(returns, folder)?,
                 type_comment: Foldable::fold(type_comment, folder)?,
-            }),
-            StmtKind::ClassDef {
+            })),
+            StmtKind::ClassDef(StmtClassDef {
                 name,
                 bases,
                 keywords,
                 body,
                 decorator_list,
-            } => Ok(StmtKind::ClassDef {
+            }) => Ok(StmtKind::ClassDef(StmtClassDef {
                 name: Foldable::fold(name, folder)?,
                 bases: Foldable::fold(bases, folder)?,
                 keywords: Foldable::fold(keywords, folder)?,
                 body: Foldable::fold(body, folder)?,
                 decorator_list: Foldable::fold(decorator_list, folder)?,
-            }),
-            StmtKind::Return { value } => Ok(StmtKind::Return {
+            })),
+            StmtKind::Return(StmtReturn { value }) => Ok(StmtKind::Return(StmtReturn {
                 value: Foldable::fold(value, folder)?,
-            }),
-            StmtKind::Delete { targets } => Ok(StmtKind::Delete {
+            })),
+            StmtKind::Delete(StmtDelete { targets }) => Ok(StmtKind::Delete(StmtDelete {
                 targets: Foldable::fold(targets, folder)?,
-            }),
-            StmtKind::Assign {
+            })),
+            StmtKind::Assign(StmtAssign {
                 targets,
                 value,
                 type_comment,
-            } => Ok(StmtKind::Assign {
+            }) => Ok(StmtKind::Assign(StmtAssign {
                 targets: Foldable::fold(targets, folder)?,
                 value: Foldable::fold(value, folder)?,
                 type_comment: Foldable::fold(type_comment, folder)?,
-            }),
-            StmtKind::AugAssign { target, op, value } => Ok(StmtKind::AugAssign {
-                target: Foldable::fold(target, folder)?,
-                op: Foldable::fold(op, folder)?,
-                value: Foldable::fold(value, folder)?,
-            }),
-            StmtKind::AnnAssign {
+            })),
+            StmtKind::AugAssign(StmtAugAssign { target, op, value }) => {
+                Ok(StmtKind::AugAssign(StmtAugAssign {
+                    target: Foldable::fold(target, folder)?,
+                    op: Foldable::fold(op, folder)?,
+                    value: Foldable::fold(value, folder)?,
+                }))
+            }
+            StmtKind::AnnAssign(StmtAnnAssign {
                 target,
                 annotation,
                 value,
                 simple,
-            } => Ok(StmtKind::AnnAssign {
+            }) => Ok(StmtKind::AnnAssign(StmtAnnAssign {
                 target: Foldable::fold(target, folder)?,
                 annotation: Foldable::fold(annotation, folder)?,
                 value: Foldable::fold(value, folder)?,
                 simple: Foldable::fold(simple, folder)?,
-            }),
-            StmtKind::For {
+            })),
+            StmtKind::For(StmtFor {
                 target,
                 iter,
                 body,
                 orelse,
                 type_comment,
-            } => Ok(StmtKind::For {
+            }) => Ok(StmtKind::For(StmtFor {
                 target: Foldable::fold(target, folder)?,
                 iter: Foldable::fold(iter, folder)?,
                 body: Foldable::fold(body, folder)?,
                 orelse: Foldable::fold(orelse, folder)?,
                 type_comment: Foldable::fold(type_comment, folder)?,
-            }),
-            StmtKind::AsyncFor {
+            })),
+            StmtKind::AsyncFor(StmtAsyncFor {
                 target,
                 iter,
                 body,
                 orelse,
                 type_comment,
-            } => Ok(StmtKind::AsyncFor {
+            }) => Ok(StmtKind::AsyncFor(StmtAsyncFor {
                 target: Foldable::fold(target, folder)?,
                 iter: Foldable::fold(iter, folder)?,
                 body: Foldable::fold(body, folder)?,
                 orelse: Foldable::fold(orelse, folder)?,
                 type_comment: Foldable::fold(type_comment, folder)?,
-            }),
-            StmtKind::While { test, body, orelse } => Ok(StmtKind::While {
+            })),
+            StmtKind::While(StmtWhile { test, body, orelse }) => Ok(StmtKind::While(StmtWhile {
                 test: Foldable::fold(test, folder)?,
                 body: Foldable::fold(body, folder)?,
                 orelse: Foldable::fold(orelse, folder)?,
-            }),
-            StmtKind::If { test, body, orelse } => Ok(StmtKind::If {
+            })),
+            StmtKind::If(StmtIf { test, body, orelse }) => Ok(StmtKind::If(StmtIf {
                 test: Foldable::fold(test, folder)?,
                 body: Foldable::fold(body, folder)?,
                 orelse: Foldable::fold(orelse, folder)?,
-            }),
-            StmtKind::With {
+            })),
+            StmtKind::With(StmtWith {
                 items,
                 body,
                 type_comment,
-            } => Ok(StmtKind::With {
+            }) => Ok(StmtKind::With(StmtWith {
                 items: Foldable::fold(items, folder)?,
                 body: Foldable::fold(body, folder)?,
                 type_comment: Foldable::fold(type_comment, folder)?,
-            }),
-            StmtKind::AsyncWith {
+            })),
+            StmtKind::AsyncWith(StmtAsyncWith {
                 items,
                 body,
                 type_comment,
-            } => Ok(StmtKind::AsyncWith {
+            }) => Ok(StmtKind::AsyncWith(StmtAsyncWith {
                 items: Foldable::fold(items, folder)?,
                 body: Foldable::fold(body, folder)?,
                 type_comment: Foldable::fold(type_comment, folder)?,
-            }),
-            StmtKind::Match { subject, cases } => Ok(StmtKind::Match {
+            })),
+            StmtKind::Match(StmtMatch { subject, cases }) => Ok(StmtKind::Match(StmtMatch {
                 subject: Foldable::fold(subject, folder)?,
                 cases: Foldable::fold(cases, folder)?,
-            }),
-            StmtKind::Raise { exc, cause } => Ok(StmtKind::Raise {
+            })),
+            StmtKind::Raise(StmtRaise { exc, cause }) => Ok(StmtKind::Raise(StmtRaise {
                 exc: Foldable::fold(exc, folder)?,
                 cause: Foldable::fold(cause, folder)?,
-            }),
-            StmtKind::Try {
+            })),
+            StmtKind::Try(StmtTry {
                 body,
                 handlers,
                 orelse,
                 finalbody,
-            } => Ok(StmtKind::Try {
+            }) => Ok(StmtKind::Try(StmtTry {
                 body: Foldable::fold(body, folder)?,
                 handlers: Foldable::fold(handlers, folder)?,
                 orelse: Foldable::fold(orelse, folder)?,
                 finalbody: Foldable::fold(finalbody, folder)?,
-            }),
-            StmtKind::TryStar {
+            })),
+            StmtKind::TryStar(StmtTryStar {
                 body,
                 handlers,
                 orelse,
                 finalbody,
-            } => Ok(StmtKind::TryStar {
+            }) => Ok(StmtKind::TryStar(StmtTryStar {
                 body: Foldable::fold(body, folder)?,
                 handlers: Foldable::fold(handlers, folder)?,
                 orelse: Foldable::fold(orelse, folder)?,
                 finalbody: Foldable::fold(finalbody, folder)?,
-            }),
-            StmtKind::Assert { test, msg } => Ok(StmtKind::Assert {
+            })),
+            StmtKind::Assert(StmtAssert { test, msg }) => Ok(StmtKind::Assert(StmtAssert {
                 test: Foldable::fold(test, folder)?,
                 msg: Foldable::fold(msg, folder)?,
-            }),
-            StmtKind::Import { names } => Ok(StmtKind::Import {
+            })),
+            StmtKind::Import(StmtImport { names }) => Ok(StmtKind::Import(StmtImport {
                 names: Foldable::fold(names, folder)?,
-            }),
-            StmtKind::ImportFrom {
+            })),
+            StmtKind::ImportFrom(StmtImportFrom {
                 module,
                 names,
                 level,
-            } => Ok(StmtKind::ImportFrom {
+            }) => Ok(StmtKind::ImportFrom(StmtImportFrom {
                 module: Foldable::fold(module, folder)?,
                 names: Foldable::fold(names, folder)?,
                 level: Foldable::fold(level, folder)?,
-            }),
-            StmtKind::Global { names } => Ok(StmtKind::Global {
+            })),
+            StmtKind::Global(StmtGlobal { names }) => Ok(StmtKind::Global(StmtGlobal {
                 names: Foldable::fold(names, folder)?,
-            }),
-            StmtKind::Nonlocal { names } => Ok(StmtKind::Nonlocal {
+            })),
+            StmtKind::Nonlocal(StmtNonlocal { names }) => Ok(StmtKind::Nonlocal(StmtNonlocal {
                 names: Foldable::fold(names, folder)?,
-            }),
-            StmtKind::Expr { value } => Ok(StmtKind::Expr {
+            })),
+            StmtKind::Expr(StmtExpr { value }) => Ok(StmtKind::Expr(StmtExpr {
                 value: Foldable::fold(value, folder)?,
-            }),
+            })),
             StmtKind::Pass {} => Ok(StmtKind::Pass {}),
             StmtKind::Break {} => Ok(StmtKind::Break {}),
             StmtKind::Continue {} => Ok(StmtKind::Continue {}),
@@ -805,134 +1397,152 @@ pub mod fold {
         node: Expr<U>,
     ) -> Result<Expr<F::TargetU>, F::Error> {
         fold_located(folder, node, |folder, node| match node {
-            ExprKind::BoolOp { op, values } => Ok(ExprKind::BoolOp {
+            ExprKind::BoolOp(ExprBoolOp { op, values }) => Ok(ExprKind::BoolOp(ExprBoolOp {
                 op: Foldable::fold(op, folder)?,
                 values: Foldable::fold(values, folder)?,
-            }),
-            ExprKind::NamedExpr { target, value } => Ok(ExprKind::NamedExpr {
-                target: Foldable::fold(target, folder)?,
-                value: Foldable::fold(value, folder)?,
-            }),
-            ExprKind::BinOp { left, op, right } => Ok(ExprKind::BinOp {
+            })),
+            ExprKind::NamedExpr(ExprNamedExpr { target, value }) => {
+                Ok(ExprKind::NamedExpr(ExprNamedExpr {
+                    target: Foldable::fold(target, folder)?,
+                    value: Foldable::fold(value, folder)?,
+                }))
+            }
+            ExprKind::BinOp(ExprBinOp { left, op, right }) => Ok(ExprKind::BinOp(ExprBinOp {
                 left: Foldable::fold(left, folder)?,
                 op: Foldable::fold(op, folder)?,
                 right: Foldable::fold(right, folder)?,
-            }),
-            ExprKind::UnaryOp { op, operand } => Ok(ExprKind::UnaryOp {
+            })),
+            ExprKind::UnaryOp(ExprUnaryOp { op, operand }) => Ok(ExprKind::UnaryOp(ExprUnaryOp {
                 op: Foldable::fold(op, folder)?,
                 operand: Foldable::fold(operand, folder)?,
-            }),
-            ExprKind::Lambda { args, body } => Ok(ExprKind::Lambda {
+            })),
+            ExprKind::Lambda(ExprLambda { args, body }) => Ok(ExprKind::Lambda(ExprLambda {
                 args: Foldable::fold(args, folder)?,
                 body: Foldable::fold(body, folder)?,
-            }),
-            ExprKind::IfExp { test, body, orelse } => Ok(ExprKind::IfExp {
+            })),
+            ExprKind::IfExp(ExprIfExp { test, body, orelse }) => Ok(ExprKind::IfExp(ExprIfExp {
                 test: Foldable::fold(test, folder)?,
                 body: Foldable::fold(body, folder)?,
                 orelse: Foldable::fold(orelse, folder)?,
-            }),
-            ExprKind::Dict { keys, values } => Ok(ExprKind::Dict {
+            })),
+            ExprKind::Dict(ExprDict { keys, values }) => Ok(ExprKind::Dict(ExprDict {
                 keys: Foldable::fold(keys, folder)?,
                 values: Foldable::fold(values, folder)?,
-            }),
-            ExprKind::Set { elts } => Ok(ExprKind::Set {
+            })),
+            ExprKind::Set(ExprSet { elts }) => Ok(ExprKind::Set(ExprSet {
                 elts: Foldable::fold(elts, folder)?,
-            }),
-            ExprKind::ListComp { elt, generators } => Ok(ExprKind::ListComp {
-                elt: Foldable::fold(elt, folder)?,
-                generators: Foldable::fold(generators, folder)?,
-            }),
-            ExprKind::SetComp { elt, generators } => Ok(ExprKind::SetComp {
-                elt: Foldable::fold(elt, folder)?,
-                generators: Foldable::fold(generators, folder)?,
-            }),
-            ExprKind::DictComp {
+            })),
+            ExprKind::ListComp(ExprListComp { elt, generators }) => {
+                Ok(ExprKind::ListComp(ExprListComp {
+                    elt: Foldable::fold(elt, folder)?,
+                    generators: Foldable::fold(generators, folder)?,
+                }))
+            }
+            ExprKind::SetComp(ExprSetComp { elt, generators }) => {
+                Ok(ExprKind::SetComp(ExprSetComp {
+                    elt: Foldable::fold(elt, folder)?,
+                    generators: Foldable::fold(generators, folder)?,
+                }))
+            }
+            ExprKind::DictComp(ExprDictComp {
                 key,
                 value,
                 generators,
-            } => Ok(ExprKind::DictComp {
+            }) => Ok(ExprKind::DictComp(ExprDictComp {
                 key: Foldable::fold(key, folder)?,
                 value: Foldable::fold(value, folder)?,
                 generators: Foldable::fold(generators, folder)?,
-            }),
-            ExprKind::GeneratorExp { elt, generators } => Ok(ExprKind::GeneratorExp {
-                elt: Foldable::fold(elt, folder)?,
-                generators: Foldable::fold(generators, folder)?,
-            }),
-            ExprKind::Await { value } => Ok(ExprKind::Await {
+            })),
+            ExprKind::GeneratorExp(ExprGeneratorExp { elt, generators }) => {
+                Ok(ExprKind::GeneratorExp(ExprGeneratorExp {
+                    elt: Foldable::fold(elt, folder)?,
+                    generators: Foldable::fold(generators, folder)?,
+                }))
+            }
+            ExprKind::Await(ExprAwait { value }) => Ok(ExprKind::Await(ExprAwait {
                 value: Foldable::fold(value, folder)?,
-            }),
-            ExprKind::Yield { value } => Ok(ExprKind::Yield {
+            })),
+            ExprKind::Yield(ExprYield { value }) => Ok(ExprKind::Yield(ExprYield {
                 value: Foldable::fold(value, folder)?,
-            }),
-            ExprKind::YieldFrom { value } => Ok(ExprKind::YieldFrom {
-                value: Foldable::fold(value, folder)?,
-            }),
-            ExprKind::Compare {
+            })),
+            ExprKind::YieldFrom(ExprYieldFrom { value }) => {
+                Ok(ExprKind::YieldFrom(ExprYieldFrom {
+                    value: Foldable::fold(value, folder)?,
+                }))
+            }
+            ExprKind::Compare(ExprCompare {
                 left,
                 ops,
                 comparators,
-            } => Ok(ExprKind::Compare {
+            }) => Ok(ExprKind::Compare(ExprCompare {
                 left: Foldable::fold(left, folder)?,
                 ops: Foldable::fold(ops, folder)?,
                 comparators: Foldable::fold(comparators, folder)?,
-            }),
-            ExprKind::Call {
+            })),
+            ExprKind::Call(ExprCall {
                 func,
                 args,
                 keywords,
-            } => Ok(ExprKind::Call {
+            }) => Ok(ExprKind::Call(ExprCall {
                 func: Foldable::fold(func, folder)?,
                 args: Foldable::fold(args, folder)?,
                 keywords: Foldable::fold(keywords, folder)?,
-            }),
-            ExprKind::FormattedValue {
+            })),
+            ExprKind::FormattedValue(ExprFormattedValue {
                 value,
                 conversion,
                 format_spec,
-            } => Ok(ExprKind::FormattedValue {
+            }) => Ok(ExprKind::FormattedValue(ExprFormattedValue {
                 value: Foldable::fold(value, folder)?,
                 conversion: Foldable::fold(conversion, folder)?,
                 format_spec: Foldable::fold(format_spec, folder)?,
-            }),
-            ExprKind::JoinedStr { values } => Ok(ExprKind::JoinedStr {
-                values: Foldable::fold(values, folder)?,
-            }),
-            ExprKind::Constant { value, kind } => Ok(ExprKind::Constant {
+            })),
+            ExprKind::JoinedStr(ExprJoinedStr { values }) => {
+                Ok(ExprKind::JoinedStr(ExprJoinedStr {
+                    values: Foldable::fold(values, folder)?,
+                }))
+            }
+            ExprKind::Constant(ExprConstant { value, kind }) => {
+                Ok(ExprKind::Constant(ExprConstant {
+                    value: Foldable::fold(value, folder)?,
+                    kind: Foldable::fold(kind, folder)?,
+                }))
+            }
+            ExprKind::Attribute(ExprAttribute { value, attr, ctx }) => {
+                Ok(ExprKind::Attribute(ExprAttribute {
+                    value: Foldable::fold(value, folder)?,
+                    attr: Foldable::fold(attr, folder)?,
+                    ctx: Foldable::fold(ctx, folder)?,
+                }))
+            }
+            ExprKind::Subscript(ExprSubscript { value, slice, ctx }) => {
+                Ok(ExprKind::Subscript(ExprSubscript {
+                    value: Foldable::fold(value, folder)?,
+                    slice: Foldable::fold(slice, folder)?,
+                    ctx: Foldable::fold(ctx, folder)?,
+                }))
+            }
+            ExprKind::Starred(ExprStarred { value, ctx }) => Ok(ExprKind::Starred(ExprStarred {
                 value: Foldable::fold(value, folder)?,
-                kind: Foldable::fold(kind, folder)?,
-            }),
-            ExprKind::Attribute { value, attr, ctx } => Ok(ExprKind::Attribute {
-                value: Foldable::fold(value, folder)?,
-                attr: Foldable::fold(attr, folder)?,
                 ctx: Foldable::fold(ctx, folder)?,
-            }),
-            ExprKind::Subscript { value, slice, ctx } => Ok(ExprKind::Subscript {
-                value: Foldable::fold(value, folder)?,
-                slice: Foldable::fold(slice, folder)?,
-                ctx: Foldable::fold(ctx, folder)?,
-            }),
-            ExprKind::Starred { value, ctx } => Ok(ExprKind::Starred {
-                value: Foldable::fold(value, folder)?,
-                ctx: Foldable::fold(ctx, folder)?,
-            }),
-            ExprKind::Name { id, ctx } => Ok(ExprKind::Name {
+            })),
+            ExprKind::Name(ExprName { id, ctx }) => Ok(ExprKind::Name(ExprName {
                 id: Foldable::fold(id, folder)?,
                 ctx: Foldable::fold(ctx, folder)?,
-            }),
-            ExprKind::List { elts, ctx } => Ok(ExprKind::List {
+            })),
+            ExprKind::List(ExprList { elts, ctx }) => Ok(ExprKind::List(ExprList {
                 elts: Foldable::fold(elts, folder)?,
                 ctx: Foldable::fold(ctx, folder)?,
-            }),
-            ExprKind::Tuple { elts, ctx } => Ok(ExprKind::Tuple {
+            })),
+            ExprKind::Tuple(ExprTuple { elts, ctx }) => Ok(ExprKind::Tuple(ExprTuple {
                 elts: Foldable::fold(elts, folder)?,
                 ctx: Foldable::fold(ctx, folder)?,
-            }),
-            ExprKind::Slice { lower, upper, step } => Ok(ExprKind::Slice {
+            })),
+            ExprKind::Slice(ExprSlice { lower, upper, step }) => Ok(ExprKind::Slice(ExprSlice {
                 lower: Foldable::fold(lower, folder)?,
                 upper: Foldable::fold(upper, folder)?,
                 step: Foldable::fold(step, folder)?,
-            }),
+            })),
         })
     }
     impl<T, U> Foldable<T, U> for ExprContext {
@@ -1087,12 +1697,14 @@ pub mod fold {
         node: Excepthandler<U>,
     ) -> Result<Excepthandler<F::TargetU>, F::Error> {
         fold_located(folder, node, |folder, node| match node {
-            ExcepthandlerKind::ExceptHandler { type_, name, body } => {
-                Ok(ExcepthandlerKind::ExceptHandler {
-                    type_: Foldable::fold(type_, folder)?,
-                    name: Foldable::fold(name, folder)?,
-                    body: Foldable::fold(body, folder)?,
-                })
+            ExcepthandlerKind::ExceptHandler(ExcepthandlerExceptHandler { type_, name, body }) => {
+                Ok(ExcepthandlerKind::ExceptHandler(
+                    ExcepthandlerExceptHandler {
+                        type_: Foldable::fold(type_, folder)?,
+                        name: Foldable::fold(name, folder)?,
+                        body: Foldable::fold(body, folder)?,
+                    },
+                ))
             }
         })
     }
@@ -1256,45 +1868,57 @@ pub mod fold {
         node: Pattern<U>,
     ) -> Result<Pattern<F::TargetU>, F::Error> {
         fold_located(folder, node, |folder, node| match node {
-            PatternKind::MatchValue { value } => Ok(PatternKind::MatchValue {
-                value: Foldable::fold(value, folder)?,
-            }),
-            PatternKind::MatchSingleton { value } => Ok(PatternKind::MatchSingleton {
-                value: Foldable::fold(value, folder)?,
-            }),
-            PatternKind::MatchSequence { patterns } => Ok(PatternKind::MatchSequence {
-                patterns: Foldable::fold(patterns, folder)?,
-            }),
-            PatternKind::MatchMapping {
+            PatternKind::MatchValue(PatternMatchValue { value }) => {
+                Ok(PatternKind::MatchValue(PatternMatchValue {
+                    value: Foldable::fold(value, folder)?,
+                }))
+            }
+            PatternKind::MatchSingleton(PatternMatchSingleton { value }) => {
+                Ok(PatternKind::MatchSingleton(PatternMatchSingleton {
+                    value: Foldable::fold(value, folder)?,
+                }))
+            }
+            PatternKind::MatchSequence(PatternMatchSequence { patterns }) => {
+                Ok(PatternKind::MatchSequence(PatternMatchSequence {
+                    patterns: Foldable::fold(patterns, folder)?,
+                }))
+            }
+            PatternKind::MatchMapping(PatternMatchMapping {
                 keys,
                 patterns,
                 rest,
-            } => Ok(PatternKind::MatchMapping {
+            }) => Ok(PatternKind::MatchMapping(PatternMatchMapping {
                 keys: Foldable::fold(keys, folder)?,
                 patterns: Foldable::fold(patterns, folder)?,
                 rest: Foldable::fold(rest, folder)?,
-            }),
-            PatternKind::MatchClass {
+            })),
+            PatternKind::MatchClass(PatternMatchClass {
                 cls,
                 patterns,
                 kwd_attrs,
                 kwd_patterns,
-            } => Ok(PatternKind::MatchClass {
+            }) => Ok(PatternKind::MatchClass(PatternMatchClass {
                 cls: Foldable::fold(cls, folder)?,
                 patterns: Foldable::fold(patterns, folder)?,
                 kwd_attrs: Foldable::fold(kwd_attrs, folder)?,
                 kwd_patterns: Foldable::fold(kwd_patterns, folder)?,
-            }),
-            PatternKind::MatchStar { name } => Ok(PatternKind::MatchStar {
-                name: Foldable::fold(name, folder)?,
-            }),
-            PatternKind::MatchAs { pattern, name } => Ok(PatternKind::MatchAs {
-                pattern: Foldable::fold(pattern, folder)?,
-                name: Foldable::fold(name, folder)?,
-            }),
-            PatternKind::MatchOr { patterns } => Ok(PatternKind::MatchOr {
-                patterns: Foldable::fold(patterns, folder)?,
-            }),
+            })),
+            PatternKind::MatchStar(PatternMatchStar { name }) => {
+                Ok(PatternKind::MatchStar(PatternMatchStar {
+                    name: Foldable::fold(name, folder)?,
+                }))
+            }
+            PatternKind::MatchAs(PatternMatchAs { pattern, name }) => {
+                Ok(PatternKind::MatchAs(PatternMatchAs {
+                    pattern: Foldable::fold(pattern, folder)?,
+                    name: Foldable::fold(name, folder)?,
+                }))
+            }
+            PatternKind::MatchOr(PatternMatchOr { patterns }) => {
+                Ok(PatternKind::MatchOr(PatternMatchOr {
+                    patterns: Foldable::fold(patterns, folder)?,
+                }))
+            }
         })
     }
     impl<T, U> Foldable<T, U> for TypeIgnore {
@@ -1311,10 +1935,12 @@ pub mod fold {
         node: TypeIgnore,
     ) -> Result<TypeIgnore, F::Error> {
         match node {
-            TypeIgnore::TypeIgnore { lineno, tag } => Ok(TypeIgnore::TypeIgnore {
-                lineno: Foldable::fold(lineno, folder)?,
-                tag: Foldable::fold(tag, folder)?,
-            }),
+            TypeIgnore::TypeIgnore(TypeIgnoreTypeIgnore { lineno, tag }) => {
+                Ok(TypeIgnore::TypeIgnore(TypeIgnoreTypeIgnore {
+                    lineno: Foldable::fold(lineno, folder)?,
+                    tag: Foldable::fold(tag, folder)?,
+                }))
+            }
         }
     }
 }

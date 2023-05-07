@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/string.rs
+source: parser/src/string.rs
 expression: parse_ast
 ---
 [
@@ -15,77 +15,87 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Expr {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 0,
-                },
-                end_location: Some(
-                    Location {
-                        row: 2,
-                        column: 6,
+        node: Expr(
+            StmtExpr {
+                value: Located {
+                    location: Location {
+                        row: 1,
+                        column: 0,
                     },
-                ),
-                custom: (),
-                node: JoinedStr {
-                    values: [
-                        Located {
-                            location: Location {
-                                row: 1,
-                                column: 0,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 2,
-                                    column: 6,
-                                },
-                            ),
-                            custom: (),
-                            node: Constant {
-                                value: Str(
-                                    "\n",
-                                ),
-                                kind: None,
-                            },
+                    end_location: Some(
+                        Location {
+                            row: 2,
+                            column: 6,
                         },
-                        Located {
-                            location: Location {
-                                row: 1,
-                                column: 0,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 2,
-                                    column: 6,
-                                },
-                            ),
-                            custom: (),
-                            node: FormattedValue {
-                                value: Located {
+                    ),
+                    custom: (),
+                    node: JoinedStr(
+                        ExprJoinedStr {
+                            values: [
+                                Located {
                                     location: Location {
-                                        row: 2,
-                                        column: 1,
+                                        row: 1,
+                                        column: 0,
                                     },
                                     end_location: Some(
                                         Location {
                                             row: 2,
-                                            column: 2,
+                                            column: 6,
                                         },
                                     ),
                                     custom: (),
-                                    node: Name {
-                                        id: "x",
-                                        ctx: Load,
-                                    },
+                                    node: Constant(
+                                        ExprConstant {
+                                            value: Str(
+                                                "\n",
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
                                 },
-                                conversion: 0,
-                                format_spec: None,
-                            },
+                                Located {
+                                    location: Location {
+                                        row: 1,
+                                        column: 0,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 2,
+                                            column: 6,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: FormattedValue(
+                                        ExprFormattedValue {
+                                            value: Located {
+                                                location: Location {
+                                                    row: 2,
+                                                    column: 1,
+                                                },
+                                                end_location: Some(
+                                                    Location {
+                                                        row: 2,
+                                                        column: 2,
+                                                    },
+                                                ),
+                                                custom: (),
+                                                node: Name(
+                                                    ExprName {
+                                                        id: "x",
+                                                        ctx: Load,
+                                                    },
+                                                ),
+                                            },
+                                            conversion: 0,
+                                            format_spec: None,
+                                        },
+                                    ),
+                                },
+                            ],
                         },
-                    ],
+                    ),
                 },
             },
-        },
+        ),
     },
 ]

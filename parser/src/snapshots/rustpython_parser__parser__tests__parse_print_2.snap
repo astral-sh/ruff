@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/parser.rs
+source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
@@ -15,80 +15,90 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Expr {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 0,
-                },
-                end_location: Some(
-                    Location {
+        node: Expr(
+            StmtExpr {
+                value: Located {
+                    location: Location {
                         row: 1,
-                        column: 23,
+                        column: 0,
                     },
-                ),
-                custom: (),
-                node: Call {
-                    func: Located {
-                        location: Location {
+                    end_location: Some(
+                        Location {
                             row: 1,
-                            column: 0,
+                            column: 23,
                         },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 5,
-                            },
-                        ),
-                        custom: (),
-                        node: Name {
-                            id: "print",
-                            ctx: Load,
-                        },
-                    },
-                    args: [
-                        Located {
-                            location: Location {
-                                row: 1,
-                                column: 6,
-                            },
-                            end_location: Some(
-                                Location {
+                    ),
+                    custom: (),
+                    node: Call(
+                        ExprCall {
+                            func: Located {
+                                location: Location {
                                     row: 1,
-                                    column: 19,
+                                    column: 0,
                                 },
-                            ),
-                            custom: (),
-                            node: Constant {
-                                value: Str(
-                                    "Hello world",
+                                end_location: Some(
+                                    Location {
+                                        row: 1,
+                                        column: 5,
+                                    },
                                 ),
-                                kind: None,
+                                custom: (),
+                                node: Name(
+                                    ExprName {
+                                        id: "print",
+                                        ctx: Load,
+                                    },
+                                ),
                             },
-                        },
-                        Located {
-                            location: Location {
-                                row: 1,
-                                column: 21,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 22,
+                            args: [
+                                Located {
+                                    location: Location {
+                                        row: 1,
+                                        column: 6,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 1,
+                                            column: 19,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Constant(
+                                        ExprConstant {
+                                            value: Str(
+                                                "Hello world",
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
                                 },
-                            ),
-                            custom: (),
-                            node: Constant {
-                                value: Int(
-                                    2,
-                                ),
-                                kind: None,
-                            },
+                                Located {
+                                    location: Location {
+                                        row: 1,
+                                        column: 21,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 1,
+                                            column: 22,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Constant(
+                                        ExprConstant {
+                                            value: Int(
+                                                2,
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
+                                },
+                            ],
+                            keywords: [],
                         },
-                    ],
-                    keywords: [],
+                    ),
                 },
             },
-        },
+        ),
     },
 ]

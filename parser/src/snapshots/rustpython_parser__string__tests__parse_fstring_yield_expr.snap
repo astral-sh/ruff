@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/string.rs
+source: parser/src/string.rs
 expression: parse_ast
 ---
 [
@@ -15,25 +15,29 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: FormattedValue {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 3,
-                },
-                end_location: Some(
-                    Location {
+        node: FormattedValue(
+            ExprFormattedValue {
+                value: Located {
+                    location: Location {
                         row: 1,
-                        column: 8,
+                        column: 3,
                     },
-                ),
-                custom: (),
-                node: Yield {
-                    value: None,
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 8,
+                        },
+                    ),
+                    custom: (),
+                    node: Yield(
+                        ExprYield {
+                            value: None,
+                        },
+                    ),
                 },
+                conversion: 0,
+                format_spec: None,
             },
-            conversion: 0,
-            format_spec: None,
-        },
+        ),
     },
 ]

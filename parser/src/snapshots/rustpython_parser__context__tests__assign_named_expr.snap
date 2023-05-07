@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/context.rs
+source: parser/src/context.rs
 expression: parse_ast
 ---
 [
@@ -15,75 +15,83 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: If {
-            test: Located {
-                location: Location {
-                    row: 1,
-                    column: 3,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 8,
-                    },
-                ),
-                custom: (),
-                node: NamedExpr {
-                    target: Located {
-                        location: Location {
-                            row: 1,
-                            column: 3,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 4,
-                            },
-                        ),
-                        custom: (),
-                        node: Name {
-                            id: "x",
-                            ctx: Store,
-                        },
-                    },
-                    value: Located {
-                        location: Location {
-                            row: 1,
-                            column: 7,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 8,
-                            },
-                        ),
-                        custom: (),
-                        node: Constant {
-                            value: Int(
-                                1,
-                            ),
-                            kind: None,
-                        },
-                    },
-                },
-            },
-            body: [
-                Located {
+        node: If(
+            StmtIf {
+                test: Located {
                     location: Location {
                         row: 1,
-                        column: 10,
+                        column: 3,
                     },
                     end_location: Some(
                         Location {
                             row: 1,
-                            column: 14,
+                            column: 8,
                         },
                     ),
                     custom: (),
-                    node: Pass,
+                    node: NamedExpr(
+                        ExprNamedExpr {
+                            target: Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 3,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 1,
+                                        column: 4,
+                                    },
+                                ),
+                                custom: (),
+                                node: Name(
+                                    ExprName {
+                                        id: "x",
+                                        ctx: Store,
+                                    },
+                                ),
+                            },
+                            value: Located {
+                                location: Location {
+                                    row: 1,
+                                    column: 7,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 1,
+                                        column: 8,
+                                    },
+                                ),
+                                custom: (),
+                                node: Constant(
+                                    ExprConstant {
+                                        value: Int(
+                                            1,
+                                        ),
+                                        kind: None,
+                                    },
+                                ),
+                            },
+                        },
+                    ),
                 },
-            ],
-            orelse: [],
-        },
+                body: [
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 10,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 14,
+                            },
+                        ),
+                        custom: (),
+                        node: Pass,
+                    },
+                ],
+                orelse: [],
+            },
+        ),
     },
 ]

@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/string.rs
+source: parser/src/string.rs
 expression: parse_ast
 ---
 [
@@ -15,26 +15,30 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Expr {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 0,
-                },
-                end_location: Some(
-                    Location {
+        node: Expr(
+            StmtExpr {
+                value: Located {
+                    location: Location {
                         row: 1,
-                        column: 12,
+                        column: 0,
                     },
-                ),
-                custom: (),
-                node: Constant {
-                    value: Str(
-                        "\u{1b}",
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 12,
+                        },
                     ),
-                    kind: None,
+                    custom: (),
+                    node: Constant(
+                        ExprConstant {
+                            value: Str(
+                                "\u{1b}",
+                            ),
+                            kind: None,
+                        },
+                    ),
                 },
             },
-        },
+        ),
     },
 ]

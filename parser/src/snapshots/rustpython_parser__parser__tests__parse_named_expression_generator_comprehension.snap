@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/parser.rs
+source: parser/src/parser.rs
 expression: parse_ast
 ---
 Located {
@@ -14,72 +14,45 @@ Located {
         },
     ),
     custom: (),
-    node: GeneratorExp {
-        elt: Located {
-            location: Location {
-                row: 1,
-                column: 1,
-            },
-            end_location: Some(
-                Location {
+    node: GeneratorExp(
+        ExprGeneratorExp {
+            elt: Located {
+                location: Location {
                     row: 1,
-                    column: 11,
+                    column: 1,
                 },
-            ),
-            custom: (),
-            node: NamedExpr {
-                target: Located {
-                    location: Location {
+                end_location: Some(
+                    Location {
                         row: 1,
-                        column: 1,
+                        column: 11,
                     },
-                    end_location: Some(
-                        Location {
-                            row: 1,
-                            column: 2,
-                        },
-                    ),
-                    custom: (),
-                    node: Name {
-                        id: "x",
-                        ctx: Store,
-                    },
-                },
-                value: Located {
-                    location: Location {
-                        row: 1,
-                        column: 6,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 1,
-                            column: 11,
-                        },
-                    ),
-                    custom: (),
-                    node: BinOp {
-                        left: Located {
+                ),
+                custom: (),
+                node: NamedExpr(
+                    ExprNamedExpr {
+                        target: Located {
                             location: Location {
                                 row: 1,
-                                column: 6,
+                                column: 1,
                             },
                             end_location: Some(
                                 Location {
                                     row: 1,
-                                    column: 7,
+                                    column: 2,
                                 },
                             ),
                             custom: (),
-                            node: Name {
-                                id: "y",
-                                ctx: Load,
-                            },
+                            node: Name(
+                                ExprName {
+                                    id: "x",
+                                    ctx: Store,
+                                },
+                            ),
                         },
-                        op: Add,
-                        right: Located {
+                        value: Located {
                             location: Location {
                                 row: 1,
-                                column: 10,
+                                column: 6,
                             },
                             end_location: Some(
                                 Location {
@@ -88,56 +61,99 @@ Located {
                                 },
                             ),
                             custom: (),
-                            node: Constant {
-                                value: Int(
-                                    1,
-                                ),
-                                kind: None,
+                            node: BinOp(
+                                ExprBinOp {
+                                    left: Located {
+                                        location: Location {
+                                            row: 1,
+                                            column: 6,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 1,
+                                                column: 7,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Name(
+                                            ExprName {
+                                                id: "y",
+                                                ctx: Load,
+                                            },
+                                        ),
+                                    },
+                                    op: Add,
+                                    right: Located {
+                                        location: Location {
+                                            row: 1,
+                                            column: 10,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 1,
+                                                column: 11,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Constant(
+                                            ExprConstant {
+                                                value: Int(
+                                                    1,
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
+                                    },
+                                },
+                            ),
+                        },
+                    },
+                ),
+            },
+            generators: [
+                Comprehension {
+                    target: Located {
+                        location: Location {
+                            row: 1,
+                            column: 16,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 17,
                             },
-                        },
+                        ),
+                        custom: (),
+                        node: Name(
+                            ExprName {
+                                id: "y",
+                                ctx: Store,
+                            },
+                        ),
                     },
+                    iter: Located {
+                        location: Location {
+                            row: 1,
+                            column: 21,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 22,
+                            },
+                        ),
+                        custom: (),
+                        node: Name(
+                            ExprName {
+                                id: "z",
+                                ctx: Load,
+                            },
+                        ),
+                    },
+                    ifs: [],
+                    is_async: 0,
                 },
-            },
+            ],
         },
-        generators: [
-            Comprehension {
-                target: Located {
-                    location: Location {
-                        row: 1,
-                        column: 16,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 1,
-                            column: 17,
-                        },
-                    ),
-                    custom: (),
-                    node: Name {
-                        id: "y",
-                        ctx: Store,
-                    },
-                },
-                iter: Located {
-                    location: Location {
-                        row: 1,
-                        column: 21,
-                    },
-                    end_location: Some(
-                        Location {
-                            row: 1,
-                            column: 22,
-                        },
-                    ),
-                    custom: (),
-                    node: Name {
-                        id: "z",
-                        ctx: Load,
-                    },
-                },
-                ifs: [],
-                is_async: 0,
-            },
-        ],
-    },
+    ),
 }
