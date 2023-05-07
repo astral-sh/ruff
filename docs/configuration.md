@@ -235,6 +235,8 @@ Rule selection:
           Like --select, but adds additional rule codes on top of the selected ones
       --per-file-ignores <PER_FILE_IGNORES>
           List of mappings from file pattern to code to exclude
+      --extend-per-file-ignores <EXTEND_PER_FILE_IGNORES>
+          List of mappings from file pattern to code to exclude
       --fixable <RULE_CODE>
           List of rule codes to treat as eligible for autofix. Only applicable when autofix itself is enabled (e.g., via `--fix`)
       --unfixable <RULE_CODE>

@@ -165,7 +165,12 @@ impl Settings {
             line_length: config.line_length.unwrap_or(defaults::LINE_LENGTH),
             namespace_packages: config.namespace_packages.unwrap_or_default(),
             per_file_ignores: resolve_per_file_ignores(
-                config.per_file_ignores.unwrap_or_default(),
+                config
+                    .per_file_ignores
+                    .unwrap_or_default()
+                    .into_iter()
+                    .chain(config.extend_per_file_ignores)
+                    .collect(),
             )?,
             respect_gitignore: config.respect_gitignore.unwrap_or(true),
             src: config

@@ -150,6 +150,10 @@ pub struct CheckArgs {
     /// List of mappings from file pattern to code to exclude
     #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
     pub per_file_ignores: Option<Vec<PatternPrefixPair>>,
+    /// List of mappings from file pattern to code to exclude, on top of those
+    /// already specified with per-file-ignores.
+    #[arg(long, value_delimiter = ',', help_heading = "Rule selection")]
+    pub extend_per_file_ignores: Option<Vec<PatternPrefixPair>>,
     /// List of paths, used to omit files and/or directories from analysis.
     #[arg(
         long,

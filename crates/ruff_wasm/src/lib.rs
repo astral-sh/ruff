@@ -110,6 +110,7 @@ pub fn defaultSettings() -> Result<JsValue, JsValue> {
         extend: None,
         extend_exclude: None,
         extend_include: None,
+        extend_per_file_ignores: None,
         fix: None,
         fix_only: None,
         fixable: None,
