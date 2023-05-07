@@ -1,0 +1,42 @@
+---
+source: crates/ruff/src/rules/ruff/mod.rs
+---
+RUF010.py:6:23: RUF010 [*] Blank comments are useless and should be removed
+  |
+6 | # is valid
+7 | 
+8 | print("Hello, world!")  #
+  |                       ^^^ RUF010
+  |
+  = help: Remove blank comment
+
+ℹ Suggested fix
+3 3 | #
+4 4 | # is valid
+5 5 | 
+6   |-print("Hello, world!")  #
+  6 |+print("Hello, world!")
+7 7 | 
+8 8 | 
+9 9 | def func_1():
+
+RUF010.py:11:27: RUF010 [*] Blank comments are useless and should be removed
+   |
+11 | def func_1():
+12 |     # This is a valid comment
+13 |     print("Hello, world!")  #
+   |                           ^^^ RUF010
+   |
+   = help: Remove blank comment
+
+ℹ Suggested fix
+8  8  | 
+9  9  | def func_1():
+10 10 |     # This is a valid comment
+11    |-    print("Hello, world!")  #
+   11 |+    print("Hello, world!")
+12 12 | 
+13 13 | 
+14 14 | def func_2():
+
+

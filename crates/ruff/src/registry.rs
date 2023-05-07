@@ -651,6 +651,7 @@ ruff_macros::register_rules!(
     rules::ruff::rules::AmbiguousUnicodeCharacterString,
     rules::ruff::rules::AmbiguousUnicodeCharacterDocstring,
     rules::ruff::rules::AmbiguousUnicodeCharacterComment,
+    rules::ruff::rules::BlankComment,
     rules::ruff::rules::CollectionLiteralConcatenation,
     rules::ruff::rules::AsyncioDanglingTask,
     rules::ruff::rules::UnusedNOQA,
@@ -902,6 +903,7 @@ impl Rule {
             | Rule::ShebangLeadingWhitespace
             | Rule::TrailingWhitespace
             | Rule::TabIndentation
+            | Rule::BlankComment
             | Rule::BlankLineWithWhitespace => LintSource::PhysicalLines,
             Rule::AmbiguousUnicodeCharacterComment
             | Rule::AmbiguousUnicodeCharacterDocstring

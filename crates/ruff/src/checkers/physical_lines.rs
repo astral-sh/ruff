@@ -19,6 +19,7 @@ use crate::rules::pycodestyle::rules::{
 use crate::rules::pygrep_hooks::rules::{blanket_noqa, blanket_type_ignore};
 use crate::rules::pylint;
 use crate::rules::pyupgrade::rules::unnecessary_coding_comment;
+use crate::rules::ruff::rules::blank_comment;
 use crate::settings::{flags, Settings};
 
 pub fn check_physical_lines(
@@ -34,6 +35,7 @@ pub fn check_physical_lines(
     let mut has_any_shebang = false;
 
     let enforce_blanket_noqa = settings.rules.enabled(Rule::BlanketNOQA);
+    let enforce_blank_comment = settings.rules.enabled(Rule::BlankComment);
     let enforce_shebang_not_executable = settings.rules.enabled(Rule::ShebangNotExecutable);
     let enforce_shebang_missing = settings.rules.enabled(Rule::ShebangMissingExecutableFile);
     let enforce_shebang_whitespace = settings.rules.enabled(Rule::ShebangLeadingWhitespace);
@@ -81,6 +83,10 @@ pub fn check_physical_lines(
 
             if enforce_blanket_noqa {
                 blanket_noqa(&mut diagnostics, &line);
+            }
+
+            if enforce_blank_comment {
+                blank_comment(&mut diagnostics, &line, settings, autofix);
             }
 
             if enforce_shebang_missing

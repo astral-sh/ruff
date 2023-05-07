@@ -19,6 +19,7 @@ mod tests {
 
     #[test_case(Rule::CollectionLiteralConcatenation, Path::new("RUF005.py"); "RUF005")]
     #[test_case(Rule::AsyncioDanglingTask, Path::new("RUF006.py"); "RUF006")]
+    #[test_case(Rule::BlankComment, Path::new("RUF010.py"); "RUF010")]
     fn rules(rule_code: Rule, path: &Path) -> Result<()> {
         let snapshot = format!("{}_{}", rule_code.noqa_code(), path.to_string_lossy());
         let diagnostics = test_path(
