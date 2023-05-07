@@ -47,9 +47,7 @@ impl Violation for MultipleStatementsOnOneLineColon {
 ///
 /// ## Example
 /// ```python
-/// do_one()
-/// do_two()
-/// do_three()
+/// do_one(); do_two(); do_three()
 /// ```
 ///
 /// Use instead:
@@ -79,8 +77,7 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
 ///
 /// ## Example
 /// ```python
-/// do_four()
-/// # useless semicolon
+/// do_four();  # useless semicolon
 /// ```
 ///
 /// Use instead:

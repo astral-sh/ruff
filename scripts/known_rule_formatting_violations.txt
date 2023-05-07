@@ -7,5 +7,7 @@ line-too-long
 missing-trailing-comma
 multi-line-implicit-string-concatenation
 multiple-statements-on-one-line-colon
+multiple-statements-on-one-line-semicolon
 prohibited-trailing-comma
 trailing-comma-on-bare-tuple
+useless-semicolon
