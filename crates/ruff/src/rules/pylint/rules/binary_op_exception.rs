@@ -42,7 +42,7 @@ impl From<&rustpython_parser::ast::Boolop> for Boolop {
 /// ```python
 /// try:
 ///     pass
-/// except (A ,B):
+/// except (A, B):
 ///     pass
 /// ```
 #[violation]

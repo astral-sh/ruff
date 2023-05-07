@@ -21,7 +21,7 @@ use crate::registry::AsRule;
 /// from typing import TYPE_CHECKING
 ///
 /// if TYPE_CHECKING:
-///    pass
+///     pass
 ///
 /// print("Hello, world!")
 /// ```

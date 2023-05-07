@@ -17,12 +17,12 @@ use crate::settings::{flags, Settings};
 ///
 /// ## Example
 /// ```python
-/// if foo == 'blah': do_blah_thing()
+/// if foo == "blah": do_blah_thing()
 /// ```
 ///
 /// Use instead:
 /// ```python
-/// if foo == 'blah':
+/// if foo == "blah":
 ///     do_blah_thing()
 /// ```
 ///
@@ -47,7 +47,9 @@ impl Violation for MultipleStatementsOnOneLineColon {
 ///
 /// ## Example
 /// ```python
-/// do_one(); do_two(); do_three()
+/// do_one()
+/// do_two()
+/// do_three()
 /// ```
 ///
 /// Use instead:
@@ -77,7 +79,8 @@ impl Violation for MultipleStatementsOnOneLineSemicolon {
 ///
 /// ## Example
 /// ```python
-/// do_four();  # useless semicolon
+/// do_four()
+/// # useless semicolon
 /// ```
 ///
 /// Use instead:

@@ -29,7 +29,7 @@ use crate::registry::AsRule;
 /// Use instead:
 /// ```python
 /// def f():
-///    print(5)
+///     print(5)
 /// ```
 #[violation]
 pub struct UselessReturn;

@@ -16,6 +16,7 @@ use crate::checkers::ast::Checker;
 /// ```python
 /// from django.shortcuts import render
 ///
+///
 /// def index(request):
 ///     posts = Post.objects.all()
 ///     return render(request, "app/index.html", locals())
@@ -24,6 +25,7 @@ use crate::checkers::ast::Checker;
 /// Use instead:
 /// ```python
 /// from django.shortcuts import render
+///
 ///
 /// def index(request):
 ///     posts = Post.objects.all()

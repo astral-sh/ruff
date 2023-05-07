@@ -160,9 +160,7 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
 /// import json
 ///
 ///
-/// foo = json.dumps({
-///     "bar": 1,
-/// }),
+/// foo = json.dumps({"bar": 1}),
 /// ```
 ///
 /// Use instead:
@@ -170,9 +168,7 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
 /// import json
 ///
 ///
-/// foo = json.dumps({
-///     "bar": 1,
-/// })
+/// foo = json.dumps({"bar": 1})
 /// ```
 ///
 /// In the event that a tuple is intended, then use instead:
@@ -180,11 +176,7 @@ impl AlwaysAutofixableViolation for MissingTrailingComma {
 /// import json
 ///
 ///
-/// foo = (
-///     json.dumps({
-///         "bar": 1,
-///     }),
-/// )
+/// foo = (json.dumps({"bar": 1}),)
 /// ```
 #[violation]
 pub struct TrailingCommaOnBareTuple;
