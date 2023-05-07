@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/parser.rs
+source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
@@ -15,79 +15,69 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Expr {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 0,
-                },
-                end_location: Some(
-                    Location {
+        node: Expr(
+            StmtExpr {
+                value: Located {
+                    location: Location {
                         row: 1,
-                        column: 32,
+                        column: 0,
                     },
-                ),
-                custom: (),
-                node: Call {
-                    func: Located {
-                        location: Location {
+                    end_location: Some(
+                        Location {
                             row: 1,
-                            column: 0,
+                            column: 32,
                         },
-                        end_location: Some(
-                            Location {
-                                row: 1,
-                                column: 7,
-                            },
-                        ),
-                        custom: (),
-                        node: Name {
-                            id: "my_func",
-                            ctx: Load,
-                        },
-                    },
-                    args: [
-                        Located {
-                            location: Location {
-                                row: 1,
-                                column: 8,
-                            },
-                            end_location: Some(
-                                Location {
+                    ),
+                    custom: (),
+                    node: Call(
+                        ExprCall {
+                            func: Located {
+                                location: Location {
                                     row: 1,
-                                    column: 20,
+                                    column: 0,
                                 },
-                            ),
-                            custom: (),
-                            node: Constant {
-                                value: Str(
-                                    "positional",
+                                end_location: Some(
+                                    Location {
+                                        row: 1,
+                                        column: 7,
+                                    },
                                 ),
-                                kind: None,
-                            },
-                        },
-                    ],
-                    keywords: [
-                        Located {
-                            location: Location {
-                                row: 1,
-                                column: 22,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 31,
-                                },
-                            ),
-                            custom: (),
-                            node: KeywordData {
-                                arg: Some(
-                                    "keyword",
+                                custom: (),
+                                node: Name(
+                                    ExprName {
+                                        id: "my_func",
+                                        ctx: Load,
+                                    },
                                 ),
-                                value: Located {
+                            },
+                            args: [
+                                Located {
                                     location: Location {
                                         row: 1,
-                                        column: 30,
+                                        column: 8,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 1,
+                                            column: 20,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Constant(
+                                        ExprConstant {
+                                            value: Str(
+                                                "positional",
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
+                                },
+                            ],
+                            keywords: [
+                                Located {
+                                    location: Location {
+                                        row: 1,
+                                        column: 22,
                                     },
                                     end_location: Some(
                                         Location {
@@ -96,18 +86,38 @@ expression: parse_ast
                                         },
                                     ),
                                     custom: (),
-                                    node: Constant {
-                                        value: Int(
-                                            2,
+                                    node: KeywordData {
+                                        arg: Some(
+                                            "keyword",
                                         ),
-                                        kind: None,
+                                        value: Located {
+                                            location: Location {
+                                                row: 1,
+                                                column: 30,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 1,
+                                                    column: 31,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Constant(
+                                                ExprConstant {
+                                                    value: Int(
+                                                        2,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        },
                                     },
                                 },
-                            },
+                            ],
                         },
-                    ],
+                    ),
                 },
             },
-        },
+        ),
     },
 ]

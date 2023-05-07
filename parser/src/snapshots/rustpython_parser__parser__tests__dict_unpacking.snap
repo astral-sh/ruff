@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/parser.rs
+source: parser/src/parser.rs
 expression: parse_ast
 ---
 Located {
@@ -14,108 +14,120 @@ Located {
         },
     ),
     custom: (),
-    node: Dict {
-        keys: [
-            Some(
+    node: Dict(
+        ExprDict {
+            keys: [
+                Some(
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 1,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 4,
+                            },
+                        ),
+                        custom: (),
+                        node: Constant(
+                            ExprConstant {
+                                value: Str(
+                                    "a",
+                                ),
+                                kind: None,
+                            },
+                        ),
+                    },
+                ),
+                None,
+                Some(
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 16,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 19,
+                            },
+                        ),
+                        custom: (),
+                        node: Constant(
+                            ExprConstant {
+                                value: Str(
+                                    "d",
+                                ),
+                                kind: None,
+                            },
+                        ),
+                    },
+                ),
+            ],
+            values: [
                 Located {
                     location: Location {
                         row: 1,
-                        column: 1,
+                        column: 6,
                     },
                     end_location: Some(
                         Location {
                             row: 1,
-                            column: 4,
+                            column: 9,
                         },
                     ),
                     custom: (),
-                    node: Constant {
-                        value: Str(
-                            "a",
-                        ),
-                        kind: None,
-                    },
+                    node: Constant(
+                        ExprConstant {
+                            value: Str(
+                                "b",
+                            ),
+                            kind: None,
+                        },
+                    ),
                 },
-            ),
-            None,
-            Some(
                 Located {
                     location: Location {
                         row: 1,
-                        column: 16,
+                        column: 13,
                     },
                     end_location: Some(
                         Location {
                             row: 1,
-                            column: 19,
+                            column: 14,
                         },
                     ),
                     custom: (),
-                    node: Constant {
-                        value: Str(
-                            "d",
-                        ),
-                        kind: None,
-                    },
-                },
-            ),
-        ],
-        values: [
-            Located {
-                location: Location {
-                    row: 1,
-                    column: 6,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 9,
-                    },
-                ),
-                custom: (),
-                node: Constant {
-                    value: Str(
-                        "b",
+                    node: Name(
+                        ExprName {
+                            id: "c",
+                            ctx: Load,
+                        },
                     ),
-                    kind: None,
                 },
-            },
-            Located {
-                location: Location {
-                    row: 1,
-                    column: 13,
-                },
-                end_location: Some(
-                    Location {
+                Located {
+                    location: Location {
                         row: 1,
-                        column: 14,
+                        column: 21,
                     },
-                ),
-                custom: (),
-                node: Name {
-                    id: "c",
-                    ctx: Load,
-                },
-            },
-            Located {
-                location: Location {
-                    row: 1,
-                    column: 21,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 24,
-                    },
-                ),
-                custom: (),
-                node: Constant {
-                    value: Str(
-                        "e",
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 24,
+                        },
                     ),
-                    kind: None,
+                    custom: (),
+                    node: Constant(
+                        ExprConstant {
+                            value: Str(
+                                "e",
+                            ),
+                            kind: None,
+                        },
+                    ),
                 },
-            },
-        ],
-    },
+            ],
+        },
+    ),
 }

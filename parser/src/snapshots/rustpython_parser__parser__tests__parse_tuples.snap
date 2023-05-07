@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/parser.rs
+source: parser/src/parser.rs
 expression: "parse_program(source, \"<test>\").unwrap()"
 ---
 [
@@ -15,118 +15,132 @@ expression: "parse_program(source, \"<test>\").unwrap()"
             },
         ),
         custom: (),
-        node: Assign {
-            targets: [
-                Located {
+        node: Assign(
+            StmtAssign {
+                targets: [
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 4,
+                            },
+                        ),
+                        custom: (),
+                        node: Tuple(
+                            ExprTuple {
+                                elts: [
+                                    Located {
+                                        location: Location {
+                                            row: 1,
+                                            column: 0,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 1,
+                                                column: 1,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Name(
+                                            ExprName {
+                                                id: "a",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                    },
+                                    Located {
+                                        location: Location {
+                                            row: 1,
+                                            column: 3,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 1,
+                                                column: 4,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Name(
+                                            ExprName {
+                                                id: "b",
+                                                ctx: Store,
+                                            },
+                                        ),
+                                    },
+                                ],
+                                ctx: Store,
+                            },
+                        ),
+                    },
+                ],
+                value: Located {
                     location: Location {
                         row: 1,
-                        column: 0,
+                        column: 7,
                     },
                     end_location: Some(
                         Location {
                             row: 1,
-                            column: 4,
+                            column: 11,
                         },
                     ),
                     custom: (),
-                    node: Tuple {
-                        elts: [
-                            Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 0,
-                                },
-                                end_location: Some(
-                                    Location {
+                    node: Tuple(
+                        ExprTuple {
+                            elts: [
+                                Located {
+                                    location: Location {
                                         row: 1,
-                                        column: 1,
+                                        column: 7,
                                     },
-                                ),
-                                custom: (),
-                                node: Name {
-                                    id: "a",
-                                    ctx: Store,
+                                    end_location: Some(
+                                        Location {
+                                            row: 1,
+                                            column: 8,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Constant(
+                                        ExprConstant {
+                                            value: Int(
+                                                4,
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
                                 },
-                            },
-                            Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 3,
-                                },
-                                end_location: Some(
-                                    Location {
+                                Located {
+                                    location: Location {
                                         row: 1,
-                                        column: 4,
+                                        column: 10,
                                     },
-                                ),
-                                custom: (),
-                                node: Name {
-                                    id: "b",
-                                    ctx: Store,
+                                    end_location: Some(
+                                        Location {
+                                            row: 1,
+                                            column: 11,
+                                        },
+                                    ),
+                                    custom: (),
+                                    node: Constant(
+                                        ExprConstant {
+                                            value: Int(
+                                                5,
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
                                 },
-                            },
-                        ],
-                        ctx: Store,
-                    },
-                },
-            ],
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 7,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 11,
-                    },
-                ),
-                custom: (),
-                node: Tuple {
-                    elts: [
-                        Located {
-                            location: Location {
-                                row: 1,
-                                column: 7,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 8,
-                                },
-                            ),
-                            custom: (),
-                            node: Constant {
-                                value: Int(
-                                    4,
-                                ),
-                                kind: None,
-                            },
+                            ],
+                            ctx: Load,
                         },
-                        Located {
-                            location: Location {
-                                row: 1,
-                                column: 10,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 1,
-                                    column: 11,
-                                },
-                            ),
-                            custom: (),
-                            node: Constant {
-                                value: Int(
-                                    5,
-                                ),
-                                kind: None,
-                            },
-                        },
-                    ],
-                    ctx: Load,
+                    ),
                 },
+                type_comment: None,
             },
-            type_comment: None,
-        },
+        ),
     },
 ]

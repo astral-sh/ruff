@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/string.rs
+source: parser/src/string.rs
 expression: parse_ast
 ---
 [
@@ -15,78 +15,88 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: FormattedValue {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 3,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 6,
-                    },
-                ),
-                custom: (),
-                node: Name {
-                    id: "foo",
-                    ctx: Load,
-                },
-            },
-            conversion: 0,
-            format_spec: Some(
-                Located {
+        node: FormattedValue(
+            ExprFormattedValue {
+                value: Located {
                     location: Location {
                         row: 1,
-                        column: 0,
+                        column: 3,
                     },
                     end_location: Some(
                         Location {
                             row: 1,
-                            column: 15,
+                            column: 6,
                         },
                     ),
                     custom: (),
-                    node: JoinedStr {
-                        values: [
-                            Located {
-                                location: Location {
-                                    row: 1,
-                                    column: 0,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 1,
-                                        column: 15,
-                                    },
-                                ),
-                                custom: (),
-                                node: FormattedValue {
-                                    value: Located {
+                    node: Name(
+                        ExprName {
+                            id: "foo",
+                            ctx: Load,
+                        },
+                    ),
+                },
+                conversion: 0,
+                format_spec: Some(
+                    Located {
+                        location: Location {
+                            row: 1,
+                            column: 0,
+                        },
+                        end_location: Some(
+                            Location {
+                                row: 1,
+                                column: 15,
+                            },
+                        ),
+                        custom: (),
+                        node: JoinedStr(
+                            ExprJoinedStr {
+                                values: [
+                                    Located {
                                         location: Location {
                                             row: 1,
-                                            column: 8,
+                                            column: 0,
                                         },
                                         end_location: Some(
                                             Location {
                                                 row: 1,
-                                                column: 12,
+                                                column: 15,
                                             },
                                         ),
                                         custom: (),
-                                        node: Name {
-                                            id: "spec",
-                                            ctx: Load,
-                                        },
+                                        node: FormattedValue(
+                                            ExprFormattedValue {
+                                                value: Located {
+                                                    location: Location {
+                                                        row: 1,
+                                                        column: 8,
+                                                    },
+                                                    end_location: Some(
+                                                        Location {
+                                                            row: 1,
+                                                            column: 12,
+                                                        },
+                                                    ),
+                                                    custom: (),
+                                                    node: Name(
+                                                        ExprName {
+                                                            id: "spec",
+                                                            ctx: Load,
+                                                        },
+                                                    ),
+                                                },
+                                                conversion: 0,
+                                                format_spec: None,
+                                            },
+                                        ),
                                     },
-                                    conversion: 0,
-                                    format_spec: None,
-                                },
+                                ],
                             },
-                        ],
+                        ),
                     },
-                },
-            ),
-        },
+                ),
+            },
+        ),
     },
 ]

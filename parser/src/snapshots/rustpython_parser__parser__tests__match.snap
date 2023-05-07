@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/parser.rs
+source: parser/src/parser.rs
 expression: parse_ast
 ---
 [
@@ -15,117 +15,114 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Match {
-            subject: Located {
-                location: Location {
-                    row: 2,
-                    column: 6,
-                },
-                end_location: Some(
-                    Location {
+        node: Match(
+            StmtMatch {
+                subject: Located {
+                    location: Location {
                         row: 2,
-                        column: 17,
+                        column: 6,
                     },
-                ),
-                custom: (),
-                node: Dict {
-                    keys: [
-                        Some(
-                            Located {
-                                location: Location {
-                                    row: 2,
-                                    column: 7,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 2,
-                                        column: 13,
+                    end_location: Some(
+                        Location {
+                            row: 2,
+                            column: 17,
+                        },
+                    ),
+                    custom: (),
+                    node: Dict(
+                        ExprDict {
+                            keys: [
+                                Some(
+                                    Located {
+                                        location: Location {
+                                            row: 2,
+                                            column: 7,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 2,
+                                                column: 13,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Constant(
+                                            ExprConstant {
+                                                value: Str(
+                                                    "test",
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
                                     },
                                 ),
-                                custom: (),
-                                node: Constant {
-                                    value: Str(
-                                        "test",
-                                    ),
-                                    kind: None,
-                                },
-                            },
-                        ),
-                    ],
-                    values: [
-                        Located {
-                            location: Location {
-                                row: 2,
-                                column: 15,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 2,
-                                    column: 16,
-                                },
-                            ),
-                            custom: (),
-                            node: Constant {
-                                value: Int(
-                                    1,
-                                ),
-                                kind: None,
-                            },
-                        },
-                    ],
-                },
-            },
-            cases: [
-                MatchCase {
-                    pattern: Located {
-                        location: Location {
-                            row: 3,
-                            column: 9,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 5,
-                                column: 5,
-                            },
-                        ),
-                        custom: (),
-                        node: MatchMapping {
-                            keys: [],
-                            patterns: [],
-                            rest: Some(
-                                "rest",
-                            ),
-                        },
-                    },
-                    guard: None,
-                    body: [
-                        Located {
-                            location: Location {
-                                row: 6,
-                                column: 8,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 6,
-                                    column: 19,
-                                },
-                            ),
-                            custom: (),
-                            node: Expr {
-                                value: Located {
+                            ],
+                            values: [
+                                Located {
                                     location: Location {
-                                        row: 6,
-                                        column: 8,
+                                        row: 2,
+                                        column: 15,
                                     },
                                     end_location: Some(
                                         Location {
-                                            row: 6,
-                                            column: 19,
+                                            row: 2,
+                                            column: 16,
                                         },
                                     ),
                                     custom: (),
-                                    node: Call {
-                                        func: Located {
+                                    node: Constant(
+                                        ExprConstant {
+                                            value: Int(
+                                                1,
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
+                                },
+                            ],
+                        },
+                    ),
+                },
+                cases: [
+                    MatchCase {
+                        pattern: Located {
+                            location: Location {
+                                row: 3,
+                                column: 9,
+                            },
+                            end_location: Some(
+                                Location {
+                                    row: 5,
+                                    column: 5,
+                                },
+                            ),
+                            custom: (),
+                            node: MatchMapping(
+                                PatternMatchMapping {
+                                    keys: [],
+                                    patterns: [],
+                                    rest: Some(
+                                        "rest",
+                                    ),
+                                },
+                            ),
+                        },
+                        guard: None,
+                        body: [
+                            Located {
+                                location: Location {
+                                    row: 6,
+                                    column: 8,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 6,
+                                        column: 19,
+                                    },
+                                ),
+                                custom: (),
+                                node: Expr(
+                                    StmtExpr {
+                                        value: Located {
                                             location: Location {
                                                 row: 6,
                                                 column: 8,
@@ -133,43 +130,64 @@ expression: parse_ast
                                             end_location: Some(
                                                 Location {
                                                     row: 6,
-                                                    column: 13,
+                                                    column: 19,
                                                 },
                                             ),
                                             custom: (),
-                                            node: Name {
-                                                id: "print",
-                                                ctx: Load,
-                                            },
-                                        },
-                                        args: [
-                                            Located {
-                                                location: Location {
-                                                    row: 6,
-                                                    column: 14,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 6,
-                                                        column: 18,
+                                            node: Call(
+                                                ExprCall {
+                                                    func: Located {
+                                                        location: Location {
+                                                            row: 6,
+                                                            column: 8,
+                                                        },
+                                                        end_location: Some(
+                                                            Location {
+                                                                row: 6,
+                                                                column: 13,
+                                                            },
+                                                        ),
+                                                        custom: (),
+                                                        node: Name(
+                                                            ExprName {
+                                                                id: "print",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
                                                     },
-                                                ),
-                                                custom: (),
-                                                node: Name {
-                                                    id: "rest",
-                                                    ctx: Load,
+                                                    args: [
+                                                        Located {
+                                                            location: Location {
+                                                                row: 6,
+                                                                column: 14,
+                                                            },
+                                                            end_location: Some(
+                                                                Location {
+                                                                    row: 6,
+                                                                    column: 18,
+                                                                },
+                                                            ),
+                                                            custom: (),
+                                                            node: Name(
+                                                                ExprName {
+                                                                    id: "rest",
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ],
+                                                    keywords: [],
                                                 },
-                                            },
-                                        ],
-                                        keywords: [],
+                                            ),
+                                        },
                                     },
-                                },
+                                ),
                             },
-                        },
-                    ],
-                },
-            ],
-        },
+                        ],
+                    },
+                ],
+            },
+        ),
     },
     Located {
         location: Location {
@@ -183,131 +201,128 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Match {
-            subject: Located {
-                location: Location {
-                    row: 7,
-                    column: 6,
-                },
-                end_location: Some(
-                    Location {
+        node: Match(
+            StmtMatch {
+                subject: Located {
+                    location: Location {
                         row: 7,
-                        column: 23,
+                        column: 6,
                     },
-                ),
-                custom: (),
-                node: Dict {
-                    keys: [
-                        Some(
-                            Located {
-                                location: Location {
-                                    row: 7,
-                                    column: 7,
-                                },
-                                end_location: Some(
-                                    Location {
-                                        row: 7,
-                                        column: 14,
+                    end_location: Some(
+                        Location {
+                            row: 7,
+                            column: 23,
+                        },
+                    ),
+                    custom: (),
+                    node: Dict(
+                        ExprDict {
+                            keys: [
+                                Some(
+                                    Located {
+                                        location: Location {
+                                            row: 7,
+                                            column: 7,
+                                        },
+                                        end_location: Some(
+                                            Location {
+                                                row: 7,
+                                                column: 14,
+                                            },
+                                        ),
+                                        custom: (),
+                                        node: Constant(
+                                            ExprConstant {
+                                                value: Str(
+                                                    "label",
+                                                ),
+                                                kind: None,
+                                            },
+                                        ),
                                     },
                                 ),
-                                custom: (),
-                                node: Constant {
-                                    value: Str(
-                                        "label",
+                            ],
+                            values: [
+                                Located {
+                                    location: Location {
+                                        row: 7,
+                                        column: 16,
+                                    },
+                                    end_location: Some(
+                                        Location {
+                                            row: 7,
+                                            column: 22,
+                                        },
                                     ),
-                                    kind: None,
+                                    custom: (),
+                                    node: Constant(
+                                        ExprConstant {
+                                            value: Str(
+                                                "test",
+                                            ),
+                                            kind: None,
+                                        },
+                                    ),
                                 },
-                            },
-                        ),
-                    ],
-                    values: [
-                        Located {
+                            ],
+                        },
+                    ),
+                },
+                cases: [
+                    MatchCase {
+                        pattern: Located {
                             location: Location {
-                                row: 7,
-                                column: 16,
+                                row: 8,
+                                column: 9,
                             },
                             end_location: Some(
                                 Location {
-                                    row: 7,
-                                    column: 22,
+                                    row: 10,
+                                    column: 5,
                                 },
                             ),
                             custom: (),
-                            node: Constant {
-                                value: Str(
-                                    "test",
-                                ),
-                                kind: None,
-                            },
-                        },
-                    ],
-                },
-            },
-            cases: [
-                MatchCase {
-                    pattern: Located {
-                        location: Location {
-                            row: 8,
-                            column: 9,
-                        },
-                        end_location: Some(
-                            Location {
-                                row: 10,
-                                column: 5,
-                            },
-                        ),
-                        custom: (),
-                        node: MatchMapping {
-                            keys: [
-                                Located {
-                                    location: Location {
-                                        row: 9,
-                                        column: 8,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 9,
-                                            column: 15,
-                                        },
-                                    ),
-                                    custom: (),
-                                    node: Constant {
-                                        value: Str(
-                                            "label",
-                                        ),
-                                        kind: None,
-                                    },
-                                },
-                            ],
-                            patterns: [
-                                Located {
-                                    location: Location {
-                                        row: 9,
-                                        column: 17,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 9,
-                                            column: 38,
-                                        },
-                                    ),
-                                    custom: (),
-                                    node: MatchAs {
-                                        pattern: Some(
-                                            Located {
-                                                location: Location {
+                            node: MatchMapping(
+                                PatternMatchMapping {
+                                    keys: [
+                                        Located {
+                                            location: Location {
+                                                row: 9,
+                                                column: 8,
+                                            },
+                                            end_location: Some(
+                                                Location {
                                                     row: 9,
-                                                    column: 17,
+                                                    column: 15,
                                                 },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 9,
-                                                        column: 29,
-                                                    },
-                                                ),
-                                                custom: (),
-                                                node: MatchOr {
-                                                    patterns: [
+                                            ),
+                                            custom: (),
+                                            node: Constant(
+                                                ExprConstant {
+                                                    value: Str(
+                                                        "label",
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        },
+                                    ],
+                                    patterns: [
+                                        Located {
+                                            location: Location {
+                                                row: 9,
+                                                column: 17,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 9,
+                                                    column: 38,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: MatchAs(
+                                                PatternMatchAs {
+                                                    pattern: Some(
                                                         Located {
                                                             location: Location {
                                                                 row: 9,
@@ -316,91 +331,103 @@ expression: parse_ast
                                                             end_location: Some(
                                                                 Location {
                                                                     row: 9,
-                                                                    column: 22,
-                                                                },
-                                                            ),
-                                                            custom: (),
-                                                            node: MatchClass {
-                                                                cls: Located {
-                                                                    location: Location {
-                                                                        row: 9,
-                                                                        column: 17,
-                                                                    },
-                                                                    end_location: Some(
-                                                                        Location {
-                                                                            row: 9,
-                                                                            column: 20,
-                                                                        },
-                                                                    ),
-                                                                    custom: (),
-                                                                    node: Name {
-                                                                        id: "str",
-                                                                        ctx: Load,
-                                                                    },
-                                                                },
-                                                                patterns: [],
-                                                                kwd_attrs: [],
-                                                                kwd_patterns: [],
-                                                            },
-                                                        },
-                                                        Located {
-                                                            location: Location {
-                                                                row: 9,
-                                                                column: 25,
-                                                            },
-                                                            end_location: Some(
-                                                                Location {
-                                                                    row: 9,
                                                                     column: 29,
                                                                 },
                                                             ),
                                                             custom: (),
-                                                            node: MatchSingleton {
-                                                                value: None,
-                                                            },
+                                                            node: MatchOr(
+                                                                PatternMatchOr {
+                                                                    patterns: [
+                                                                        Located {
+                                                                            location: Location {
+                                                                                row: 9,
+                                                                                column: 17,
+                                                                            },
+                                                                            end_location: Some(
+                                                                                Location {
+                                                                                    row: 9,
+                                                                                    column: 22,
+                                                                                },
+                                                                            ),
+                                                                            custom: (),
+                                                                            node: MatchClass(
+                                                                                PatternMatchClass {
+                                                                                    cls: Located {
+                                                                                        location: Location {
+                                                                                            row: 9,
+                                                                                            column: 17,
+                                                                                        },
+                                                                                        end_location: Some(
+                                                                                            Location {
+                                                                                                row: 9,
+                                                                                                column: 20,
+                                                                                            },
+                                                                                        ),
+                                                                                        custom: (),
+                                                                                        node: Name(
+                                                                                            ExprName {
+                                                                                                id: "str",
+                                                                                                ctx: Load,
+                                                                                            },
+                                                                                        ),
+                                                                                    },
+                                                                                    patterns: [],
+                                                                                    kwd_attrs: [],
+                                                                                    kwd_patterns: [],
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                        Located {
+                                                                            location: Location {
+                                                                                row: 9,
+                                                                                column: 25,
+                                                                            },
+                                                                            end_location: Some(
+                                                                                Location {
+                                                                                    row: 9,
+                                                                                    column: 29,
+                                                                                },
+                                                                            ),
+                                                                            custom: (),
+                                                                            node: MatchSingleton(
+                                                                                PatternMatchSingleton {
+                                                                                    value: None,
+                                                                                },
+                                                                            ),
+                                                                        },
+                                                                    ],
+                                                                },
+                                                            ),
                                                         },
-                                                    ],
+                                                    ),
+                                                    name: Some(
+                                                        "label",
+                                                    ),
                                                 },
-                                            },
-                                        ),
-                                        name: Some(
-                                            "label",
-                                        ),
-                                    },
-                                },
-                            ],
-                            rest: None,
-                        },
-                    },
-                    guard: None,
-                    body: [
-                        Located {
-                            location: Location {
-                                row: 11,
-                                column: 8,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 11,
-                                    column: 20,
+                                            ),
+                                        },
+                                    ],
+                                    rest: None,
                                 },
                             ),
-                            custom: (),
-                            node: Expr {
-                                value: Located {
-                                    location: Location {
+                        },
+                        guard: None,
+                        body: [
+                            Located {
+                                location: Location {
+                                    row: 11,
+                                    column: 8,
+                                },
+                                end_location: Some(
+                                    Location {
                                         row: 11,
-                                        column: 8,
+                                        column: 20,
                                     },
-                                    end_location: Some(
-                                        Location {
-                                            row: 11,
-                                            column: 20,
-                                        },
-                                    ),
-                                    custom: (),
-                                    node: Call {
-                                        func: Located {
+                                ),
+                                custom: (),
+                                node: Expr(
+                                    StmtExpr {
+                                        value: Located {
                                             location: Location {
                                                 row: 11,
                                                 column: 8,
@@ -408,43 +435,64 @@ expression: parse_ast
                                             end_location: Some(
                                                 Location {
                                                     row: 11,
-                                                    column: 13,
+                                                    column: 20,
                                                 },
                                             ),
                                             custom: (),
-                                            node: Name {
-                                                id: "print",
-                                                ctx: Load,
-                                            },
-                                        },
-                                        args: [
-                                            Located {
-                                                location: Location {
-                                                    row: 11,
-                                                    column: 14,
-                                                },
-                                                end_location: Some(
-                                                    Location {
-                                                        row: 11,
-                                                        column: 19,
+                                            node: Call(
+                                                ExprCall {
+                                                    func: Located {
+                                                        location: Location {
+                                                            row: 11,
+                                                            column: 8,
+                                                        },
+                                                        end_location: Some(
+                                                            Location {
+                                                                row: 11,
+                                                                column: 13,
+                                                            },
+                                                        ),
+                                                        custom: (),
+                                                        node: Name(
+                                                            ExprName {
+                                                                id: "print",
+                                                                ctx: Load,
+                                                            },
+                                                        ),
                                                     },
-                                                ),
-                                                custom: (),
-                                                node: Name {
-                                                    id: "label",
-                                                    ctx: Load,
+                                                    args: [
+                                                        Located {
+                                                            location: Location {
+                                                                row: 11,
+                                                                column: 14,
+                                                            },
+                                                            end_location: Some(
+                                                                Location {
+                                                                    row: 11,
+                                                                    column: 19,
+                                                                },
+                                                            ),
+                                                            custom: (),
+                                                            node: Name(
+                                                                ExprName {
+                                                                    id: "label",
+                                                                    ctx: Load,
+                                                                },
+                                                            ),
+                                                        },
+                                                    ],
+                                                    keywords: [],
                                                 },
-                                            },
-                                        ],
-                                        keywords: [],
+                                            ),
+                                        },
                                     },
-                                },
+                                ),
                             },
-                        },
-                    ],
-                },
-            ],
-        },
+                        ],
+                    },
+                ],
+            },
+        ),
     },
     Located {
         location: Location {
@@ -458,54 +506,45 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Match {
-            subject: Located {
-                location: Location {
-                    row: 12,
-                    column: 6,
-                },
-                end_location: Some(
-                    Location {
+        node: Match(
+            StmtMatch {
+                subject: Located {
+                    location: Location {
                         row: 12,
-                        column: 7,
+                        column: 6,
                     },
-                ),
-                custom: (),
-                node: Name {
-                    id: "x",
-                    ctx: Load,
-                },
-            },
-            cases: [
-                MatchCase {
-                    pattern: Located {
-                        location: Location {
-                            row: 13,
-                            column: 9,
+                    end_location: Some(
+                        Location {
+                            row: 12,
+                            column: 7,
                         },
-                        end_location: Some(
-                            Location {
+                    ),
+                    custom: (),
+                    node: Name(
+                        ExprName {
+                            id: "x",
+                            ctx: Load,
+                        },
+                    ),
+                },
+                cases: [
+                    MatchCase {
+                        pattern: Located {
+                            location: Location {
                                 row: 13,
-                                column: 16,
+                                column: 9,
                             },
-                        ),
-                        custom: (),
-                        node: MatchSequence {
-                            patterns: [
-                                Located {
-                                    location: Location {
-                                        row: 13,
-                                        column: 10,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 13,
-                                            column: 11,
-                                        },
-                                    ),
-                                    custom: (),
-                                    node: MatchValue {
-                                        value: Located {
+                            end_location: Some(
+                                Location {
+                                    row: 13,
+                                    column: 16,
+                                },
+                            ),
+                            custom: (),
+                            node: MatchSequence(
+                                PatternMatchSequence {
+                                    patterns: [
+                                        Located {
                                             location: Location {
                                                 row: 13,
                                                 column: 10,
@@ -517,29 +556,33 @@ expression: parse_ast
                                                 },
                                             ),
                                             custom: (),
-                                            node: Constant {
-                                                value: Int(
-                                                    0,
-                                                ),
-                                                kind: None,
-                                            },
+                                            node: MatchValue(
+                                                PatternMatchValue {
+                                                    value: Located {
+                                                        location: Location {
+                                                            row: 13,
+                                                            column: 10,
+                                                        },
+                                                        end_location: Some(
+                                                            Location {
+                                                                row: 13,
+                                                                column: 11,
+                                                            },
+                                                        ),
+                                                        custom: (),
+                                                        node: Constant(
+                                                            ExprConstant {
+                                                                value: Int(
+                                                                    0,
+                                                                ),
+                                                                kind: None,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
                                         },
-                                    },
-                                },
-                                Located {
-                                    location: Location {
-                                        row: 13,
-                                        column: 13,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 13,
-                                            column: 14,
-                                        },
-                                    ),
-                                    custom: (),
-                                    node: MatchValue {
-                                        value: Located {
+                                        Located {
                                             location: Location {
                                                 row: 13,
                                                 column: 13,
@@ -551,78 +594,103 @@ expression: parse_ast
                                                 },
                                             ),
                                             custom: (),
-                                            node: Constant {
-                                                value: Int(
-                                                    1,
-                                                ),
-                                                kind: None,
-                                            },
+                                            node: MatchValue(
+                                                PatternMatchValue {
+                                                    value: Located {
+                                                        location: Location {
+                                                            row: 13,
+                                                            column: 13,
+                                                        },
+                                                        end_location: Some(
+                                                            Location {
+                                                                row: 13,
+                                                                column: 14,
+                                                            },
+                                                        ),
+                                                        custom: (),
+                                                        node: Constant(
+                                                            ExprConstant {
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                                kind: None,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
                                         },
-                                    },
-                                },
-                            ],
-                        },
-                    },
-                    guard: None,
-                    body: [
-                        Located {
-                            location: Location {
-                                row: 14,
-                                column: 8,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 14,
-                                    column: 13,
+                                    ],
                                 },
                             ),
-                            custom: (),
-                            node: Assign {
-                                targets: [
-                                    Located {
-                                        location: Location {
-                                            row: 14,
-                                            column: 8,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 14,
-                                                column: 9,
-                                            },
-                                        ),
-                                        custom: (),
-                                        node: Name {
-                                            id: "y",
-                                            ctx: Store,
-                                        },
-                                    },
-                                ],
-                                value: Located {
-                                    location: Location {
-                                        row: 14,
-                                        column: 12,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 14,
-                                            column: 13,
-                                        },
-                                    ),
-                                    custom: (),
-                                    node: Constant {
-                                        value: Int(
-                                            0,
-                                        ),
-                                        kind: None,
-                                    },
-                                },
-                                type_comment: None,
-                            },
                         },
-                    ],
-                },
-            ],
-        },
+                        guard: None,
+                        body: [
+                            Located {
+                                location: Location {
+                                    row: 14,
+                                    column: 8,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 14,
+                                        column: 13,
+                                    },
+                                ),
+                                custom: (),
+                                node: Assign(
+                                    StmtAssign {
+                                        targets: [
+                                            Located {
+                                                location: Location {
+                                                    row: 14,
+                                                    column: 8,
+                                                },
+                                                end_location: Some(
+                                                    Location {
+                                                        row: 14,
+                                                        column: 9,
+                                                    },
+                                                ),
+                                                custom: (),
+                                                node: Name(
+                                                    ExprName {
+                                                        id: "y",
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                        value: Located {
+                                            location: Location {
+                                                row: 14,
+                                                column: 12,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 14,
+                                                    column: 13,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Constant(
+                                                ExprConstant {
+                                                    value: Int(
+                                                        0,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        },
+                                        type_comment: None,
+                                    },
+                                ),
+                            },
+                        ],
+                    },
+                ],
+            },
+        ),
     },
     Located {
         location: Location {
@@ -636,54 +704,45 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Match {
-            subject: Located {
-                location: Location {
-                    row: 15,
-                    column: 6,
-                },
-                end_location: Some(
-                    Location {
+        node: Match(
+            StmtMatch {
+                subject: Located {
+                    location: Location {
                         row: 15,
-                        column: 7,
+                        column: 6,
                     },
-                ),
-                custom: (),
-                node: Name {
-                    id: "x",
-                    ctx: Load,
-                },
-            },
-            cases: [
-                MatchCase {
-                    pattern: Located {
-                        location: Location {
-                            row: 16,
-                            column: 9,
+                    end_location: Some(
+                        Location {
+                            row: 15,
+                            column: 7,
                         },
-                        end_location: Some(
-                            Location {
+                    ),
+                    custom: (),
+                    node: Name(
+                        ExprName {
+                            id: "x",
+                            ctx: Load,
+                        },
+                    ),
+                },
+                cases: [
+                    MatchCase {
+                        pattern: Located {
+                            location: Location {
                                 row: 16,
-                                column: 16,
+                                column: 9,
                             },
-                        ),
-                        custom: (),
-                        node: MatchSequence {
-                            patterns: [
-                                Located {
-                                    location: Location {
-                                        row: 16,
-                                        column: 10,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 16,
-                                            column: 11,
-                                        },
-                                    ),
-                                    custom: (),
-                                    node: MatchValue {
-                                        value: Located {
+                            end_location: Some(
+                                Location {
+                                    row: 16,
+                                    column: 16,
+                                },
+                            ),
+                            custom: (),
+                            node: MatchSequence(
+                                PatternMatchSequence {
+                                    patterns: [
+                                        Located {
                                             location: Location {
                                                 row: 16,
                                                 column: 10,
@@ -695,29 +754,33 @@ expression: parse_ast
                                                 },
                                             ),
                                             custom: (),
-                                            node: Constant {
-                                                value: Int(
-                                                    0,
-                                                ),
-                                                kind: None,
-                                            },
+                                            node: MatchValue(
+                                                PatternMatchValue {
+                                                    value: Located {
+                                                        location: Location {
+                                                            row: 16,
+                                                            column: 10,
+                                                        },
+                                                        end_location: Some(
+                                                            Location {
+                                                                row: 16,
+                                                                column: 11,
+                                                            },
+                                                        ),
+                                                        custom: (),
+                                                        node: Constant(
+                                                            ExprConstant {
+                                                                value: Int(
+                                                                    0,
+                                                                ),
+                                                                kind: None,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
                                         },
-                                    },
-                                },
-                                Located {
-                                    location: Location {
-                                        row: 16,
-                                        column: 13,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 16,
-                                            column: 14,
-                                        },
-                                    ),
-                                    custom: (),
-                                    node: MatchValue {
-                                        value: Located {
+                                        Located {
                                             location: Location {
                                                 row: 16,
                                                 column: 13,
@@ -729,78 +792,103 @@ expression: parse_ast
                                                 },
                                             ),
                                             custom: (),
-                                            node: Constant {
-                                                value: Int(
-                                                    1,
-                                                ),
-                                                kind: None,
-                                            },
+                                            node: MatchValue(
+                                                PatternMatchValue {
+                                                    value: Located {
+                                                        location: Location {
+                                                            row: 16,
+                                                            column: 13,
+                                                        },
+                                                        end_location: Some(
+                                                            Location {
+                                                                row: 16,
+                                                                column: 14,
+                                                            },
+                                                        ),
+                                                        custom: (),
+                                                        node: Constant(
+                                                            ExprConstant {
+                                                                value: Int(
+                                                                    1,
+                                                                ),
+                                                                kind: None,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
                                         },
-                                    },
-                                },
-                            ],
-                        },
-                    },
-                    guard: None,
-                    body: [
-                        Located {
-                            location: Location {
-                                row: 17,
-                                column: 8,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 17,
-                                    column: 13,
+                                    ],
                                 },
                             ),
-                            custom: (),
-                            node: Assign {
-                                targets: [
-                                    Located {
-                                        location: Location {
-                                            row: 17,
-                                            column: 8,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 17,
-                                                column: 9,
-                                            },
-                                        ),
-                                        custom: (),
-                                        node: Name {
-                                            id: "y",
-                                            ctx: Store,
-                                        },
-                                    },
-                                ],
-                                value: Located {
-                                    location: Location {
-                                        row: 17,
-                                        column: 12,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 17,
-                                            column: 13,
-                                        },
-                                    ),
-                                    custom: (),
-                                    node: Constant {
-                                        value: Int(
-                                            0,
-                                        ),
-                                        kind: None,
-                                    },
-                                },
-                                type_comment: None,
-                            },
                         },
-                    ],
-                },
-            ],
-        },
+                        guard: None,
+                        body: [
+                            Located {
+                                location: Location {
+                                    row: 17,
+                                    column: 8,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 17,
+                                        column: 13,
+                                    },
+                                ),
+                                custom: (),
+                                node: Assign(
+                                    StmtAssign {
+                                        targets: [
+                                            Located {
+                                                location: Location {
+                                                    row: 17,
+                                                    column: 8,
+                                                },
+                                                end_location: Some(
+                                                    Location {
+                                                        row: 17,
+                                                        column: 9,
+                                                    },
+                                                ),
+                                                custom: (),
+                                                node: Name(
+                                                    ExprName {
+                                                        id: "y",
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                        value: Located {
+                                            location: Location {
+                                                row: 17,
+                                                column: 12,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 17,
+                                                    column: 13,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Constant(
+                                                ExprConstant {
+                                                    value: Int(
+                                                        0,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        },
+                                        type_comment: None,
+                                    },
+                                ),
+                            },
+                        ],
+                    },
+                ],
+            },
+        ),
     },
     Located {
         location: Location {
@@ -814,54 +902,45 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Match {
-            subject: Located {
-                location: Location {
-                    row: 18,
-                    column: 6,
-                },
-                end_location: Some(
-                    Location {
+        node: Match(
+            StmtMatch {
+                subject: Located {
+                    location: Location {
                         row: 18,
-                        column: 7,
+                        column: 6,
                     },
-                ),
-                custom: (),
-                node: Name {
-                    id: "x",
-                    ctx: Load,
-                },
-            },
-            cases: [
-                MatchCase {
-                    pattern: Located {
-                        location: Location {
-                            row: 19,
-                            column: 9,
+                    end_location: Some(
+                        Location {
+                            row: 18,
+                            column: 7,
                         },
-                        end_location: Some(
-                            Location {
+                    ),
+                    custom: (),
+                    node: Name(
+                        ExprName {
+                            id: "x",
+                            ctx: Load,
+                        },
+                    ),
+                },
+                cases: [
+                    MatchCase {
+                        pattern: Located {
+                            location: Location {
                                 row: 19,
-                                column: 13,
+                                column: 9,
                             },
-                        ),
-                        custom: (),
-                        node: MatchSequence {
-                            patterns: [
-                                Located {
-                                    location: Location {
-                                        row: 19,
-                                        column: 10,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 19,
-                                            column: 11,
-                                        },
-                                    ),
-                                    custom: (),
-                                    node: MatchValue {
-                                        value: Located {
+                            end_location: Some(
+                                Location {
+                                    row: 19,
+                                    column: 13,
+                                },
+                            ),
+                            custom: (),
+                            node: MatchSequence(
+                                PatternMatchSequence {
+                                    patterns: [
+                                        Located {
                                             location: Location {
                                                 row: 19,
                                                 column: 10,
@@ -873,77 +952,102 @@ expression: parse_ast
                                                 },
                                             ),
                                             custom: (),
-                                            node: Constant {
-                                                value: Int(
-                                                    0,
-                                                ),
-                                                kind: None,
-                                            },
+                                            node: MatchValue(
+                                                PatternMatchValue {
+                                                    value: Located {
+                                                        location: Location {
+                                                            row: 19,
+                                                            column: 10,
+                                                        },
+                                                        end_location: Some(
+                                                            Location {
+                                                                row: 19,
+                                                                column: 11,
+                                                            },
+                                                        ),
+                                                        custom: (),
+                                                        node: Constant(
+                                                            ExprConstant {
+                                                                value: Int(
+                                                                    0,
+                                                                ),
+                                                                kind: None,
+                                                            },
+                                                        ),
+                                                    },
+                                                },
+                                            ),
                                         },
-                                    },
-                                },
-                            ],
-                        },
-                    },
-                    guard: None,
-                    body: [
-                        Located {
-                            location: Location {
-                                row: 20,
-                                column: 8,
-                            },
-                            end_location: Some(
-                                Location {
-                                    row: 20,
-                                    column: 13,
+                                    ],
                                 },
                             ),
-                            custom: (),
-                            node: Assign {
-                                targets: [
-                                    Located {
-                                        location: Location {
-                                            row: 20,
-                                            column: 8,
-                                        },
-                                        end_location: Some(
-                                            Location {
-                                                row: 20,
-                                                column: 9,
-                                            },
-                                        ),
-                                        custom: (),
-                                        node: Name {
-                                            id: "y",
-                                            ctx: Store,
-                                        },
-                                    },
-                                ],
-                                value: Located {
-                                    location: Location {
-                                        row: 20,
-                                        column: 12,
-                                    },
-                                    end_location: Some(
-                                        Location {
-                                            row: 20,
-                                            column: 13,
-                                        },
-                                    ),
-                                    custom: (),
-                                    node: Constant {
-                                        value: Int(
-                                            0,
-                                        ),
-                                        kind: None,
-                                    },
-                                },
-                                type_comment: None,
-                            },
                         },
-                    ],
-                },
-            ],
-        },
+                        guard: None,
+                        body: [
+                            Located {
+                                location: Location {
+                                    row: 20,
+                                    column: 8,
+                                },
+                                end_location: Some(
+                                    Location {
+                                        row: 20,
+                                        column: 13,
+                                    },
+                                ),
+                                custom: (),
+                                node: Assign(
+                                    StmtAssign {
+                                        targets: [
+                                            Located {
+                                                location: Location {
+                                                    row: 20,
+                                                    column: 8,
+                                                },
+                                                end_location: Some(
+                                                    Location {
+                                                        row: 20,
+                                                        column: 9,
+                                                    },
+                                                ),
+                                                custom: (),
+                                                node: Name(
+                                                    ExprName {
+                                                        id: "y",
+                                                        ctx: Store,
+                                                    },
+                                                ),
+                                            },
+                                        ],
+                                        value: Located {
+                                            location: Location {
+                                                row: 20,
+                                                column: 12,
+                                            },
+                                            end_location: Some(
+                                                Location {
+                                                    row: 20,
+                                                    column: 13,
+                                                },
+                                            ),
+                                            custom: (),
+                                            node: Constant(
+                                                ExprConstant {
+                                                    value: Int(
+                                                        0,
+                                                    ),
+                                                    kind: None,
+                                                },
+                                            ),
+                                        },
+                                        type_comment: None,
+                                    },
+                                ),
+                            },
+                        ],
+                    },
+                ],
+            },
+        ),
     },
 ]

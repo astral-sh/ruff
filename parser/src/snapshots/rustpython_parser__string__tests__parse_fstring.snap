@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/string.rs
+source: parser/src/string.rs
 expression: parse_ast
 ---
 [
@@ -15,27 +15,31 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: FormattedValue {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 3,
-                },
-                end_location: Some(
-                    Location {
+        node: FormattedValue(
+            ExprFormattedValue {
+                value: Located {
+                    location: Location {
                         row: 1,
-                        column: 4,
+                        column: 3,
                     },
-                ),
-                custom: (),
-                node: Name {
-                    id: "a",
-                    ctx: Load,
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 4,
+                        },
+                    ),
+                    custom: (),
+                    node: Name(
+                        ExprName {
+                            id: "a",
+                            ctx: Load,
+                        },
+                    ),
                 },
+                conversion: 0,
+                format_spec: None,
             },
-            conversion: 0,
-            format_spec: None,
-        },
+        ),
     },
     Located {
         location: Location {
@@ -49,27 +53,31 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: FormattedValue {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 7,
-                },
-                end_location: Some(
-                    Location {
+        node: FormattedValue(
+            ExprFormattedValue {
+                value: Located {
+                    location: Location {
                         row: 1,
-                        column: 8,
+                        column: 7,
                     },
-                ),
-                custom: (),
-                node: Name {
-                    id: "b",
-                    ctx: Load,
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 8,
+                        },
+                    ),
+                    custom: (),
+                    node: Name(
+                        ExprName {
+                            id: "b",
+                            ctx: Load,
+                        },
+                    ),
                 },
+                conversion: 0,
+                format_spec: None,
             },
-            conversion: 0,
-            format_spec: None,
-        },
+        ),
     },
     Located {
         location: Location {
@@ -83,11 +91,13 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Constant {
-            value: Str(
-                "{foo}",
-            ),
-            kind: None,
-        },
+        node: Constant(
+            ExprConstant {
+                value: Str(
+                    "{foo}",
+                ),
+                kind: None,
+            },
+        ),
     },
 ]

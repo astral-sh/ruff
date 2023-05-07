@@ -1,5 +1,5 @@
 ---
-source: compiler/parser/src/string.rs
+source: parser/src/string.rs
 expression: parse_ast
 ---
 [
@@ -15,64 +15,72 @@ expression: parse_ast
             },
         ),
         custom: (),
-        node: Constant {
-            value: Str(
-                "x   =",
-            ),
-            kind: None,
-        },
-    },
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 10,
-            },
-        ),
-        custom: (),
-        node: Constant {
-            value: Str(
-                "",
-            ),
-            kind: None,
-        },
-    },
-    Located {
-        location: Location {
-            row: 1,
-            column: 0,
-        },
-        end_location: Some(
-            Location {
-                row: 1,
-                column: 10,
-            },
-        ),
-        custom: (),
-        node: FormattedValue {
-            value: Located {
-                location: Location {
-                    row: 1,
-                    column: 3,
-                },
-                end_location: Some(
-                    Location {
-                        row: 1,
-                        column: 4,
-                    },
+        node: Constant(
+            ExprConstant {
+                value: Str(
+                    "x   =",
                 ),
-                custom: (),
-                node: Name {
-                    id: "x",
-                    ctx: Load,
-                },
+                kind: None,
             },
-            conversion: 114,
-            format_spec: None,
+        ),
+    },
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
         },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 10,
+            },
+        ),
+        custom: (),
+        node: Constant(
+            ExprConstant {
+                value: Str(
+                    "",
+                ),
+                kind: None,
+            },
+        ),
+    },
+    Located {
+        location: Location {
+            row: 1,
+            column: 0,
+        },
+        end_location: Some(
+            Location {
+                row: 1,
+                column: 10,
+            },
+        ),
+        custom: (),
+        node: FormattedValue(
+            ExprFormattedValue {
+                value: Located {
+                    location: Location {
+                        row: 1,
+                        column: 3,
+                    },
+                    end_location: Some(
+                        Location {
+                            row: 1,
+                            column: 4,
+                        },
+                    ),
+                    custom: (),
+                    node: Name(
+                        ExprName {
+                            id: "x",
+                            ctx: Load,
+                        },
+                    ),
+                },
+                conversion: 114,
+                format_spec: None,
+            },
+        ),
     },
 ]
