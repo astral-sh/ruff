@@ -3000,6 +3000,9 @@ where
                 if self.settings.rules.enabled(Rule::InvalidEnvvarValue) {
                     pylint::rules::invalid_envvar_value(self, func, args, keywords);
                 }
+                if self.settings.rules.enabled(Rule::NestedMinMax) {
+                    pylint::rules::nested_min_max(self, expr, func, args, keywords);
+                }
 
                 // flake8-pytest-style
                 if self.settings.rules.enabled(Rule::PytestPatchWithLambda) {

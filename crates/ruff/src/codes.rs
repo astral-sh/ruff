@@ -212,6 +212,7 @@ pub fn code_to_rule(linter: Linter, code: &str) -> Option<Rule> {
         (Pylint, "W1508") => Rule::InvalidEnvvarDefault,
         (Pylint, "W2901") => Rule::RedefinedLoopName,
         (Pylint, "E0302") => Rule::UnexpectedSpecialMethodSignature,
+        (Pylint, "W3301") => Rule::NestedMinMax,
 
         // flake8-builtins
         (Flake8Builtins, "001") => Rule::BuiltinVariableShadowing,
