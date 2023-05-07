@@ -238,6 +238,6 @@ jobs:
       - name: "Generate docs"
         run: python scripts/generate_mkdocs.py
       - name: "Check docs formatting"
-        run: python scripts/check_docs_formatting.py
+        run: python scripts/check_docs_formatted.py
       - name: "Build docs"
         run: mkdocs build --strict
