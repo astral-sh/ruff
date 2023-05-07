@@ -1,89 +1,94 @@
-use ruff_python_ast::helpers::{has_comments, unparse_expr};
 use ruff_text_size::TextSize;
 use rustpython_parser::ast::{Expr, ExprKind, Keyword};
 
 use ruff_diagnostics::{Diagnostic, Edit, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::helpers::{has_comments, unparse_expr};
+use ruff_python_semantic::context::Context;
 
 use crate::{checkers::ast::Checker, registry::AsRule};
 
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-pub enum NestedMinMaxFunc {
+pub enum MinMax {
     Min,
     Max,
 }
 
-impl NestedMinMaxFunc {
-    /// Returns a value if this is a min() or max() call.
-    fn from_func(func: &Expr, checker: &mut Checker) -> Option<NestedMinMaxFunc> {
-        match func.node() {
-            ExprKind::Name { id, .. } if id == "min" && checker.ctx.is_builtin("min") => {
-                Some(NestedMinMaxFunc::Min)
-            }
-            ExprKind::Name { id, .. } if id == "max" && checker.ctx.is_builtin("max") => {
-                Some(NestedMinMaxFunc::Max)
-            }
-            _ => None,
-        }
-    }
-
-    /// Returns true if the passed expr is a call to the same function as self.
-    fn is_call(self, expr: &Expr, checker: &mut Checker) -> bool {
-        matches!(expr.node(), ExprKind::Call { func, keywords, ..} if NestedMinMaxFunc::from_func(func, checker) == Some(self) && keywords.is_empty())
-    }
-}
-
-impl std::fmt::Display for NestedMinMaxFunc {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            NestedMinMaxFunc::Min => write!(f, "min()"),
-            NestedMinMaxFunc::Max => write!(f, "max()"),
-        }
-    }
-}
-
 #[violation]
 pub struct NestedMinMax {
-    func: NestedMinMaxFunc,
+    func: MinMax,
     fixable: bool,
 }
 
 impl Violation for NestedMinMax {
     #[derive_message_formats]
     fn message(&self) -> String {
-        format!("Nested {} call", self.func)
+        format!("Nested `{}` calls can be flattened", self.func)
     }
 
     fn autofix_title_formatter(&self) -> Option<fn(&Self) -> String> {
         self.fixable
-            .then_some(|NestedMinMax { func, .. }| format!("Flatten nested {func} calls"))
+            .then_some(|NestedMinMax { func, .. }| format!("Flatten nested `{func}` calls"))
     }
 }
 
-/// Collect a new set of arguments to `target_func` by either accepting existing args as-is or
-/// collecting child arguments if it is a call to the same function.
-fn collect_nested_args(
-    target_func: NestedMinMaxFunc,
-    checker: &mut Checker,
-    args: &[Expr],
-    new_args: &mut Vec<Expr>,
-) {
-    for arg in args {
-        match arg.node() {
-            ExprKind::Call {
+impl MinMax {
+    /// Converts a function call [`Expr`] into a [`MinMax`] if it is a call to `min` or `max`.
+    fn try_from_func(func: &Expr, context: &Context) -> Option<MinMax> {
+        let ExprKind::Name { id, .. } = func.node() else {
+            return None;
+        };
+        if id == "min" && context.is_builtin("min") {
+            Some(MinMax::Min)
+        } else if id == "max" && context.is_builtin("max") {
+            Some(MinMax::Max)
+        } else {
+            None
+        }
+    }
+
+    /// Returns `true` if the passed [`Expr`] is a call to the same built-in function.
+    fn is_call(self, expr: &Expr, context: &Context) -> bool {
+        let ExprKind::Call { func, keywords, ..} = expr.node() else {
+            return false;
+        };
+        keywords.is_empty() && MinMax::try_from_func(func, context) == Some(self)
+    }
+}
+
+impl std::fmt::Display for MinMax {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            MinMax::Min => write!(f, "min"),
+            MinMax::Max => write!(f, "max"),
+        }
+    }
+}
+
+/// Collect a new set of arguments to by either accepting existing args as-is or
+/// collecting child arguments, if it's a call to the same function.
+fn collect_nested_args(context: &Context, target_func: MinMax, args: &[Expr]) -> Vec<Expr> {
+    fn inner(context: &Context, target_func: MinMax, args: &[Expr], new_args: &mut Vec<Expr>) {
+        for arg in args {
+            if let ExprKind::Call {
                 func,
                 args,
                 keywords,
-            } if NestedMinMaxFunc::from_func(func, checker) == Some(target_func)
-                && keywords.is_empty() =>
+            } = arg.node()
             {
-                collect_nested_args(target_func, checker, args, new_args);
+                if MinMax::try_from_func(func, context) == Some(target_func) && keywords.is_empty()
+                {
+                    inner(context, target_func, args, new_args);
+                    continue;
+                }
             }
-            _ => {
-                new_args.push(arg.clone());
-            }
+            new_args.push(arg.clone());
         }
     }
+
+    let mut new_args = Vec::with_capacity(args.len());
+    inner(context, target_func, args, &mut new_args);
+    new_args
 }
 
 /// W3301
@@ -94,30 +99,30 @@ pub fn nested_min_max(
     args: &[Expr],
     keywords: &[Keyword],
 ) {
-    let Some(nested_func) = NestedMinMaxFunc::from_func(func, checker) else { return };
-    // Do not analyze cases where keyword arguments are provided.
     if !keywords.is_empty() {
         return;
     };
 
-    if args.iter().any(|arg| nested_func.is_call(arg, checker)) {
+    let Some(min_max) = MinMax::try_from_func(func, &checker.ctx) else {
+        return;
+    };
+
+    if args.iter().any(|arg| min_max.is_call(arg, &checker.ctx)) {
         let fixable = !has_comments(expr, checker.locator);
         let mut diagnostic = Diagnostic::new(
             NestedMinMax {
-                func: nested_func,
+                func: min_max,
                 fixable,
             },
             expr.range(),
         );
-        if checker.patch(diagnostic.kind.rule()) && fixable {
-            let mut new_args = Vec::with_capacity(args.len());
-            collect_nested_args(nested_func, checker, args, &mut new_args);
+        if fixable && checker.patch(diagnostic.kind.rule()) {
             let flattened_expr = Expr::new(
                 TextSize::default(),
                 TextSize::default(),
                 ExprKind::Call {
                     func: Box::new(func.clone()),
-                    args: new_args,
+                    args: collect_nested_args(&checker.ctx, min_max, args),
                     keywords: keywords.to_owned(),
                 },
             );
