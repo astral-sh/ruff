@@ -13,7 +13,7 @@ from black.mode import Mode, TargetVersion
 from black.parsing import InvalidInput
 
 TARGET_VERSIONS = ["py37", "py38", "py39", "py310", "py311"]
-MD_RE = re.compile(
+SNIPPED_RE = re.compile(
     r"(?P<before>^(?P<indent> *)```\s*python\n)"
     r"(?P<code>.*?)"
     r"(?P<after>^(?P=indent)```\s*$)",
@@ -32,7 +32,7 @@ def format_str(
     """Format a single docs file string."""
     errors: list[CodeBlockError] = []
 
-    def _md_match(match: Match[str]) -> str:
+    def _snipped_match(match: Match[str]) -> str:
         code = textwrap.dedent(match["code"])
         try:
             code = black.format_str(code, mode=black_mode)
@@ -42,7 +42,7 @@ def format_str(
         code = textwrap.indent(code, match["indent"])
         return f'{match["before"]}{code}{match["after"]}'
 
-    src = MD_RE.sub(_md_match, src)
+    src = SNIPPED_RE.sub(_snipped_match, src)
     return src, errors
 
 
