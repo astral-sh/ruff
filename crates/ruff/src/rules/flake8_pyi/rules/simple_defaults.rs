@@ -394,45 +394,28 @@ pub fn argument_simple_defaults(checker: &mut Checker, args: &Arguments) {
 }
 
 /// PYI015
-pub fn assignment_default_in_stub(checker: &mut Checker, targets: &[Expr], value: &Expr) {
+pub fn check_default_value_in_stub(
+    checker: &mut Checker,
+    targets: &[Expr],
+    value: &Expr,
+    annotation: Option<&Expr>,
+) {
     if targets.len() == 1 && is_special_assignment(&checker.ctx, &targets[0]) {
         return;
     }
     if is_type_var_like_call(&checker.ctx, value) {
         return;
     }
-    if is_valid_default_value_without_annotation(value) {
+    if annotation.is_none() && is_valid_default_value_without_annotation(value) {
         return;
     }
-    if is_valid_default_value_with_annotation(value, checker, true) {
-        return;
-    }
-
-    let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
-    if checker.patch(diagnostic.kind.rule()) {
-        diagnostic.set_fix(Edit::range_replacement("...".to_string(), value.range()));
-    }
-    checker.diagnostics.push(diagnostic);
-}
-
-/// PYI015
-pub fn annotated_assignment_default_in_stub(
-    checker: &mut Checker,
-    target: &Expr,
-    value: &Expr,
-    annotation: &Expr,
-) {
-    if checker.ctx.match_typing_expr(annotation, "TypeAlias") {
-        return;
-    }
-    if is_special_assignment(&checker.ctx, target) {
-        return;
-    }
-    if is_type_var_like_call(&checker.ctx, value) {
-        return;
-    }
-    if is_valid_default_value_with_annotation(value, checker, true) {
-        return;
+    if let Some(anno) = annotation {
+        if checker.ctx.match_typing_expr(anno, "TypeAlias") {
+            return;
+        }
+        if is_valid_default_value_with_annotation(value, checker, true) {
+            return;
+        }
     }
 
     let mut diagnostic = Diagnostic::new(AssignmentDefaultInStub, value.range());
