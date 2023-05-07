@@ -255,12 +255,12 @@ impl Violation for SuperfluousElseRaise {
 ///
 /// ## Example
 /// ```python
-///def foo(bar, baz):
-///    for i in bar:
-///        if i < baz:
-///            continue
-///        else:
-///            x = 0
+/// def foo(bar, baz):
+///     for i in bar:
+///         if i < baz:
+///             continue
+///         else:
+///             x = 0
 /// ```
 ///
 /// Use instead:
