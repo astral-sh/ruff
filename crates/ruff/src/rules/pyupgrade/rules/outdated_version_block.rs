@@ -164,9 +164,9 @@ fn fix_py2_block(
         let defined_by = checker.ctx.current_stmt();
         let defined_in = checker.ctx.current_stmt_parent();
         return match delete_stmt(
-            defined_by.into(),
+            defined_by,
             if block.starter == Tok::If {
-                defined_in.map(Into::into)
+                defined_in
             } else {
                 None
             },
@@ -176,7 +176,7 @@ fn fix_py2_block(
             checker.stylist,
         ) {
             Ok(fix) => {
-                checker.deletions.insert(RefEquality(defined_by.into()));
+                checker.deletions.insert(RefEquality(defined_by));
                 Some(fix)
             }
             Err(err) => {

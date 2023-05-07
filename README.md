@@ -137,7 +137,7 @@ Ruff can also be used as a [pre-commit](https://pre-commit.com) hook:
 ```yaml
 - repo: https://github.com/charliermarsh/ruff-pre-commit
   # Ruff version.
-  rev: 'v0.0.263'
+  rev: 'v0.0.265'
   hooks:
     - id: ruff
 ```
@@ -183,6 +183,7 @@ exclude = [
     ".direnv",
     ".eggs",
     ".git",
+    ".git-rewrite",
     ".hg",
     ".mypy_cache",
     ".nox",

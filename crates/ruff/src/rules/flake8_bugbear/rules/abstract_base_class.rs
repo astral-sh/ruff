@@ -1,10 +1,16 @@
+use anyhow::{anyhow, Result};
 use rustpython_parser::ast::{Constant, Expr, ExprKind, Keyword, Stmt, StmtKind};
 
-use ruff_diagnostics::{Diagnostic, Violation};
+use ruff_diagnostics::{AlwaysAutofixableViolation, Diagnostic, Edit, Fix, Violation};
 use ruff_macros::{derive_message_formats, violation};
+use ruff_python_ast::source_code::{Locator, Stylist};
+use ruff_python_ast::whitespace::indentation;
 use ruff_python_semantic::analyze::visibility::{is_abstract, is_overload};
+use ruff_python_semantic::context::Context;
 
+use crate::autofix::actions::get_or_import_symbol;
 use crate::checkers::ast::Checker;
+use crate::importer::Importer;
 use crate::registry::Rule;
 
 #[violation]
@@ -19,12 +25,13 @@ impl Violation for AbstractBaseClassWithoutAbstractMethod {
         format!("`{name}` is an abstract base class, but it has no abstract methods")
     }
 }
+
 #[violation]
 pub struct EmptyMethodWithoutAbstractDecorator {
     pub name: String,
 }
 
-impl Violation for EmptyMethodWithoutAbstractDecorator {
+impl AlwaysAutofixableViolation for EmptyMethodWithoutAbstractDecorator {
     #[derive_message_formats]
     fn message(&self) -> String {
         let EmptyMethodWithoutAbstractDecorator { name } = self;
@@ -32,24 +39,26 @@ impl Violation for EmptyMethodWithoutAbstractDecorator {
             "`{name}` is an empty method in an abstract base class, but has no abstract decorator"
         )
     }
+
+    fn autofix_title(&self) -> String {
+        "Add the `@abstractmethod` decorator".to_string()
+    }
 }
 
-fn is_abc_class(checker: &Checker, bases: &[Expr], keywords: &[Keyword]) -> bool {
+fn is_abc_class(context: &Context, bases: &[Expr], keywords: &[Keyword]) -> bool {
     keywords.iter().any(|keyword| {
         keyword
             .node
             .arg
             .as_ref()
             .map_or(false, |arg| arg == "metaclass")
-            && checker
-                .ctx
+            && context
                 .resolve_call_path(&keyword.node.value)
                 .map_or(false, |call_path| {
                     call_path.as_slice() == ["abc", "ABCMeta"]
                 })
     }) || bases.iter().any(|base| {
-        checker
-            .ctx
+        context
             .resolve_call_path(base)
             .map_or(false, |call_path| call_path.as_slice() == ["abc", "ABC"])
     })
@@ -68,6 +77,34 @@ fn is_empty_body(body: &[Stmt]) -> bool {
     })
 }
 
+fn fix_abstractmethod_missing(
+    context: &Context,
+    importer: &Importer,
+    locator: &Locator,
+    stylist: &Stylist,
+    stmt: &Stmt,
+) -> Result<Fix> {
+    let indent = indentation(locator, stmt).ok_or(anyhow!("Unable to detect indentation"))?;
+    let (import_edit, binding) = get_or_import_symbol(
+        "abc",
+        "abstractmethod",
+        stmt.start(),
+        context,
+        importer,
+        locator,
+    )?;
+    let reference_edit = Edit::insertion(
+        format!(
+            "@{binding}{line_ending}{indent}",
+            line_ending = stylist.line_ending().as_str(),
+        ),
+        stmt.range().start(),
+    );
+    Ok(Fix::from_iter([import_edit, reference_edit]))
+}
+
+/// B024
+/// B027
 pub fn abstract_base_class(
     checker: &mut Checker,
     stmt: &Stmt,
@@ -79,7 +116,7 @@ pub fn abstract_base_class(
     if bases.len() + keywords.len() != 1 {
         return;
     }
-    if !is_abc_class(checker, bases, keywords) {
+    if !is_abc_class(&checker.ctx, bases, keywords) {
         return;
     }
 
@@ -123,12 +160,24 @@ pub fn abstract_base_class(
             && is_empty_body(body)
             && !is_overload(&checker.ctx, decorator_list)
         {
-            checker.diagnostics.push(Diagnostic::new(
+            let mut diagnostic = Diagnostic::new(
                 EmptyMethodWithoutAbstractDecorator {
                     name: format!("{name}.{method_name}"),
                 },
                 stmt.range(),
-            ));
+            );
+            if checker.patch(Rule::EmptyMethodWithoutAbstractDecorator) {
+                diagnostic.try_set_fix(|| {
+                    fix_abstractmethod_missing(
+                        &checker.ctx,
+                        &checker.importer,
+                        checker.locator,
+                        checker.stylist,
+                        stmt,
+                    )
+                });
+            }
+            checker.diagnostics.push(diagnostic);
         }
     }
     if checker

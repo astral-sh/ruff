@@ -214,11 +214,7 @@ fn remove_unused_variable(
                     ))
                 } else {
                     // If (e.g.) assigning to a constant (`x = 1`), delete the entire statement.
-                    let parent = checker
-                        .ctx
-                        .child_to_parent
-                        .get(&RefEquality(stmt))
-                        .map(Into::into);
+                    let parent = checker.ctx.stmts.parent(stmt);
                     let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
                     match delete_stmt(
                         stmt,
@@ -259,11 +255,7 @@ fn remove_unused_variable(
                 ))
             } else {
                 // If assigning to a constant (`x = 1`), delete the entire statement.
-                let parent = checker
-                    .ctx
-                    .child_to_parent
-                    .get(&RefEquality(stmt))
-                    .map(Into::into);
+                let parent = checker.ctx.stmts.parent(stmt);
                 let deleted: Vec<&Stmt> = checker.deletions.iter().map(Into::into).collect();
                 match delete_stmt(
                     stmt,
@@ -327,6 +319,7 @@ pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
             && name != &"__tracebackhide__"
             && name != &"__traceback_info__"
             && name != &"__traceback_supplement__"
+            && name != &"__debuggerskip__"
         {
             let mut diagnostic = Diagnostic::new(
                 UnusedVariable {
@@ -335,7 +328,8 @@ pub fn unused_variable(checker: &mut Checker, scope: ScopeId) {
                 binding.range,
             );
             if checker.patch(diagnostic.kind.rule()) {
-                if let Some(stmt) = binding.source.as_ref().map(Into::into) {
+                if let Some(source) = binding.source {
+                    let stmt = checker.ctx.stmts[source];
                     if let Some((kind, fix)) = remove_unused_variable(stmt, binding.range, checker)
                     {
                         if matches!(kind, DeletionKind::Whole) {
